@@ -77,7 +77,7 @@ export function StatusPill({ status }: { status: JobStatus }) {
 
 const hasRows = (children: ReactNode) => (Array.isArray(children) ? children.length > 0 : children != null && children !== false)
 
-export function JobPage({
+export function JobPage<T extends string = JobTab>({
   backHref,
   title,
   intro,
@@ -100,10 +100,12 @@ export function JobPage({
    *  you, and a line under it (Shul times, Oct 21). */
   say?: { head: string; sub?: string }
   notice?: ReactNode
-  /** How many rows each tab holds, and which is showing. */
-  tabs?: { counts: Readonly<Record<JobTab, number>>; active: JobTab; onChange: (t: JobTab) => void }
+  /** How many rows each tab holds, and which is showing; `list`, a page's
+   *  own tabs in place of these (Kosher certification's New on a list). */
+  tabs?: { counts: Readonly<Record<T, number>>; active: T; onChange: (t: T) => void; list?: readonly { key: T; label: string }[] }
   children?: ReactNode
 }) {
+  const tabList = tabs && (tabs.list ?? (TABS as unknown as { key: T; label: string }[]).filter((t) => t.key !== 'off' || tabs.counts[t.key] > 0))
   return (
     <div className="space-y-4">
       <Link href={backHref} className="text-sm font-semibold text-primary hover:underline">
@@ -128,7 +130,7 @@ export function JobPage({
       {notice}
       {tabs && (
         <div role="tablist" aria-label={title} className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1">
-          {TABS.filter((t) => t.key !== 'off' || tabs.counts.off > 0).map((t) => {
+          {tabList!.map((t) => {
             const on = t.key === tabs.active
             return (
               <button

@@ -241,6 +241,8 @@ export default function ListingEditor({
     // The phone is the listing's own, not a detail (a website's, Oct 22).
     for (const [k, v] of Object.entries(preset)) {
       if (k === 'phone') draft.setPhone(formatPhone(typeof v === 'string' ? v : ''))
+      // A new place a list has, added from Kosher certification (Oct 22).
+      else if (k === 'name' || k === 'address') (k === 'name' ? draft.setName : draft.setAddress)(typeof v === 'string' ? v : '')
       else setDetail(k, v)
     }
   }
@@ -405,9 +407,11 @@ export default function ListingEditor({
       : verifying
         ? 'Verifying…'
         : creating
-          ? adminSubmit
-            ? 'Add listing'
-            : 'Send'
+          ? adminSave
+            ? adminSave.label
+            : adminSubmit
+              ? 'Add listing'
+              : 'Send'
           : adminSave
             ? adminSave.label
             : `Send ${changed.size} change${changed.size === 1 ? '' : 's'}`

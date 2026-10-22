@@ -1,87 +1,74 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
-import { KOSHER_LIST_NAMES, kosherSection, listWho, type FiledState, type KosherList, type KosherPlace, type KosherSection, type NewOnList } from '@/lib/kosherJob'
+import { KOSHER_LIST_NAMES, kosherSection, listWho, type KosherList, type KosherPlace, type NewOnList } from '@/lib/kosherJob'
+import { googleLine, kosherBoxFields, kosherBoxKeys, kosherKeysToUse, kosherPill, kosherRows, renamedTo, type KosherRow } from '@/lib/kosherBox'
+import { KEYSTONE_CERT } from '@/lib/keystoneWatch'
+import { companionKeys, selectValues, type CategoryConfig } from '@/lib/categories'
+import { isCertificateLink } from '@/lib/listingView'
+import { updatesPill } from '@/lib/dishProposal'
 import type { JobCounts } from '@/lib/watchJobs'
 import type { Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
 import type { Decided } from '@/lib/watchFindingStore'
-import CollapsibleSection from './CollapsibleSection'
-import FindingCompare, { type Decision } from './FindingCompare'
-import { checkLine } from './WatchesManager'
+import type { DirectoryResource } from '@/types'
+import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import FindingCompare from './FindingCompare'
+import ListingEditorScreen from './ListingEditorScreen'
+import { JobPage, day, shortUrl } from './JobPage'
+import { BUTTON, Box, BoxActions, BoxRow, BoxRows, GO, LINK, PlaceRow, ReadingSwitch, SourceLine, type Tone } from './JobBoxes'
 
-// ── The Watches tab's Kosher certification page (step 5, Oct 21) ────────────
+// ── The Watches tab's Kosher certification page ─────────────────────────────
 // Every food place in the guide, with what Keystone-K's and Mekor
-// Habracha's lists say about it next to what the listing says
-// (kosherJob.ts), and the places a list has that the guide doesn't. The
-// lists are read now, as each morning's read does. What differs waits here
-// from that read, on its place's row, to Compare and update or skip (step
-// 6, Oct 21): each difference says where it is, to compare, decided
-// before, or here after tomorrow morning's read.
-// The lists themselves are at the top: Check now, Pause, or start reading
-// one this guide doesn't read yet.
+// Habracha's lists say about it (kosherJob.ts), and the places a list has
+// that the guide doesn't.
+//
+// Drawn on artifact 2PPYvecC87w2KLNeHgYfTN (agreed Oct 21), on the pieces
+// every job page shares (JobBoxes.tsx), with one difference: the sources
+// are two lists, not each place's website. So the lists sit at the top,
+// each with its one Reading switch, and a place's Reads has none, only its
+// pages on them. Tabs: To check, New on a list, Checked, On neither list.
+// A place opened is its listing's Kosher box (kosherBox.ts), what a list
+// says marked on its rows, then Use this / Edit / Keep the listing. Its
+// only hechsher gone: "No hechsher left", Archive the listing, and, when
+// the list has a place by a near name, "It's Kosher City Eats now". A new
+// place is drawn as the listing it would add: Add it / Edit / Leave it out.
 
 export type KosherListState = { list: KosherList; url: string; watch: Watch | null; error: string | null; entries: number | null; updated: string | null }
+/** A finding with what it would make the listing (`values`), and a new
+ *  place's address and category. */
+type KosherFinding = Finding & { address?: string; category?: string }
+type Place = KosherPlace & { href: string; box?: Record<string, unknown>; findings?: KosherFinding[]; decided?: Decided | null }
+type NewPlace = NewOnList & { findings?: KosherFinding[] }
 export type KosherLoaded = {
   available: boolean
+  categories?: CategoryConfig[]
   lists: KosherListState[]
   counts: JobCounts & { notListed: number }
   places: Place[]
-  newPlaces: (NewOnList & { findings?: Finding[] })[]
+  newPlaces: NewPlace[]
   /** What a list filed that matches no place now (the list changed since). */
-  others?: Finding[]
-}
-type Place = KosherPlace & { href: string; findings?: Finding[]; decided?: Decided | null }
-type Settled = ReadonlyMap<string, Decision>
-type Decide = { token: string; community: string; settled: Settled; onDecided: (f: Finding, d: Decision) => void }
-
-const BUTTON = 'rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  others?: KosherFinding[]
 }
 
-const FILED: Record<FiledState, string> = {
-  queued: 'to compare',
-  next: 'here after tomorrow morning’s read',
-  decided: 'decided before',
-}
+type Tab = 'to_check' | 'new' | 'checked' | 'neither'
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'to_check', label: 'To check' },
+  { key: 'new', label: 'New on a list' },
+  { key: 'checked', label: 'Checked' },
+  { key: 'neither', label: 'On neither list' },
+]
+/** What became of a finding this visit: "Used Oct 22", "Left out Oct 22". */
+type Settled = ReadonlyMap<string, string>
+type Act = { token: string; community: string; settled: Settled; onDone: (f: Finding, text: string) => void; onReload: () => void }
 
-/** Its findings, each to Compare, or saying what deciding did. */
-function Findings({ findings, decide: { token, community, settled, onDecided } }: { findings: readonly Finding[]; decide: Decide }) {
-  if (!findings.length) return null
-  return (
-    <ul className="mt-2 space-y-2">
-      {findings.map((f) => (
-        <li key={f.id}>
-          <FindingCompare finding={f} token={token} community={community} jobName="Kosher certification" decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-/** What the listing says about its kosher certification, in a line. */
-function listingSays(p: KosherPlace): string {
-  const certs = p.certs.length ? p.certs.join(', ') : 'no hechsher'
-  return `The listing says ${certs}${p.levels.length ? ` · ${p.levels.join(', ')}` : ''}`
-}
-
-/** What a list says now, or why it says nothing. */
-function listLine(l: KosherListState): string {
-  if (!l.watch) return 'Not read for this guide.'
-  if (!l.watch.active) return 'Paused: not read.'
-  if (l.error) return `Didn’t load just now: ${l.error}`
-  return `${plural(l.entries ?? 0, 'place')} on it now${l.updated ? `, updated ${listDay(l.updated)}` : ''}.`
-}
+const today = () => day(new Date().toISOString())
+const API = '/api/admin/watches/kosher'
 
 /** Mekor's "Last Updated: 2026-10-12" as the rest of the page says a day. */
 function listDay(updated: string): string {
@@ -89,119 +76,428 @@ function listDay(updated: string): string {
   return new Date(`${updated}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
-function ListRow({ list: l, busy, onAct }: { list: KosherListState; busy: boolean; onAct: (body: Record<string, unknown>) => void }) {
+/** When a list was last read, for its row and a box's source line. */
+const readOn = (l: KosherListState | undefined) => l?.watch?.lastCheck?.at ?? l?.watch?.lastOkAt ?? null
+
+function placeTab(p: Place): Tab {
+  const s = kosherSection({ ...p, waiting: p.findings?.length })
+  return s === 'to_check' ? 'to_check' : s === 'not_listed' ? 'neither' : 'checked'
+}
+
+/** The page's sentence: does anything need you? */
+export function kosherSay(n: number): string {
+  if (!n) return 'No place has an update from a list.'
+  return n === 1 ? '1 place has an update from a list.' : `${n} places have an update from a list.`
+}
+
+/** A box's rows: a changed one with "was …" under it, one going crossed
+ *  out with its row's name under it. */
+function Rows({ rows }: { rows: readonly KosherRow[] }) {
   return (
-    <li className="flex flex-wrap items-start gap-3 px-4 py-3" data-testid="kosher-list">
-      <span className="min-w-0 flex-1 space-y-0.5">
-        <a href={l.url} target="_blank" rel="noopener noreferrer" className="block font-semibold text-slate-900 hover:underline">
-          {KOSHER_LIST_NAMES[l.list]}
-        </a>
-        <span className={`block text-sm ${l.error ? 'font-medium text-red-700' : 'text-slate-600'}`}>{listLine(l)}</span>
-        {/* What its morning read compared and filed. */}
-        {l.watch?.lastCheck ? (
-          <span className="block text-sm text-slate-600">{checkLine(l.watch.lastCheck, 'to check here')}</span>
-        ) : l.watch?.lastOkAt ? (
-          <span className="block text-sm text-slate-600">Read {day(l.watch.lastOkAt)}</span>
-        ) : null}
-      </span>
-      <span className="flex flex-wrap gap-2">
-        {l.watch ? (
-          <>
-            {l.watch.active && (
-              <button type="button" disabled={busy} onClick={() => onAct({ action: 'check', id: l.watch!.id })} className={BUTTON}>
-                {busy ? 'Reading…' : 'Check now'}
-              </button>
-            )}
-            <button type="button" disabled={busy} onClick={() => onAct({ action: l.watch!.active ? 'pause' : 'resume', id: l.watch!.id })} className={BUTTON}>
-              {l.watch.active ? 'Pause' : 'Resume'}
+    <BoxRows>
+      {rows.length ? (
+        rows.map((r) =>
+          r.mark === 'gone' ? (
+            <BoxRow key={r.name} name={<span className="[overflow-wrap:anywhere]">{r.value}</span>} sub={r.name} mark="gone" />
+          ) : (
+            <BoxRow
+              key={r.name}
+              name={r.name}
+              mark={r.mark}
+              right={
+                <>
+                  <span className={r.name === 'Certificate' ? 'block truncate' : undefined}>{r.value}</span>
+                  {r.was && <span className="block truncate text-xs text-slate-500">was {r.was}</span>}
+                </>
+              }
+            />
+          ),
+        )
+      ) : (
+        <BoxRow name="Nothing about its hechsher" />
+      )}
+    </BoxRows>
+  )
+}
+
+const listOf = (f: Finding): KosherList => (f.from.startsWith('Mekor') ? 'mekor' : 'keystone')
+
+/** What a list's finding would make the Kosher box: an edit's values; a
+ *  removal's, Keystone-K and its page taken off. */
+function nextBox(category: CategoryConfig, now: Record<string, unknown>, f: KosherFinding): Record<string, unknown> {
+  const keys = kosherBoxKeys(category)
+  if (f.operation !== 'delete') return Object.fromEntries(keys.map((k) => [k, f.values?.[k] ?? null]))
+  const out = { ...now }
+  for (const field of kosherBoxFields(category)) {
+    if (field.caveat) out[field.key] = selectValues(now[field.key]).filter((c) => c !== KEYSTONE_CERT)
+    else if (isCertificateLink(field) && /keystone-k\.org/.test(String(now[field.key] ?? ''))) out[field.key] = null
+  }
+  return out
+}
+
+/** A finding the Kosher box shows: an edit to it and nothing else, or a
+ *  removal. Anything wider is shown whole, to Compare. */
+function inTheBox(category: CategoryConfig | undefined, f: KosherFinding): boolean {
+  if (!category || !kosherBoxKeys(category).length) return false
+  if (f.operation === 'delete') return true
+  if (f.operation !== 'update' || !f.values) return false
+  const keys = new Set(kosherBoxKeys(category))
+  return f.lines.every((l) => keys.has(l.key))
+}
+
+function KosherBox({ place: p, category, finding: f, list, act, busy, onBusy }: { place: Place; category: CategoryConfig; finding: KosherFinding; list?: KosherListState; act: Act; busy: boolean; onBusy: (b: boolean) => void }) {
+  const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{ item: DirectoryResource; edit: BoxEdit } | null>(null)
+  const { token, community, settled, onDone } = act
+  const headers = { Authorization: `Bearer ${token}` }
+  const now = p.box ?? {}
+  const next = nextBox(category, now, f)
+  const rows = kosherRows(category, now, next)
+  const certKey = kosherBoxFields(category).find((x) => x.caveat)?.key
+  const noneLeft = !!certKey && selectValues(now[certKey]).length > 0 && selectValues(next[certKey]).length === 0
+  const done = settled.get(f.id)
+  const near = f.operation === 'delete' ? renamedTo(f.notes) : null
+
+  async function send(path: string, init: RequestInit, text: string) {
+    setError(null)
+    onBusy(true)
+    try {
+      await fetchJson(withCommunity(path, community), { ...init, headers: { ...headers, 'Content-Type': 'application/json' } }, 'Could not save that.')
+      onDone(f, text)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that.')
+    } finally {
+      onBusy(false)
+    }
+  }
+  const decide = (body: Record<string, unknown>, text: string) => send(`/api/admin/submissions/${f.id}`, { method: 'PATCH', body: JSON.stringify(body) }, text)
+  // Only ever the box's keys: the finding's other values are as the listing
+  // was when the list was read. A box that's the same already takes its own.
+  const changed = kosherKeysToUse(rows)
+  const use = changed.length ? changed : f.lines.length ? f.lines.map((l) => l.key) : kosherBoxKeys(category)
+
+  /** Edit: the listing's own Kosher box, filled in with the list's
+   *  version, saved straight to the listing. */
+  async function edit() {
+    setError(null)
+    try {
+      const { item } = await fetchJson<{ item: DirectoryResource }>(withCommunity(`${API}?item=${p.id}`, community), { headers }, 'Could not open its box.')
+      const keys = new Set(kosherBoxKeys(category))
+      // Every field the listing has now, the box's as edited: a finding
+      // carries the listing as it was when read (withReviewEdits).
+      const editable = category.detailFields.flatMap((x) => [x.key, ...companionKeys(x)])
+      setEditing({
+        item,
+        edit: {
+          title: 'Kosher',
+          fields: [],
+          rows: ['facts'],
+          preset: Object.fromEntries([...keys].map((k) => [k, next[k] ?? null])),
+          save: {
+            label: 'Save to the listing',
+            via: async ({ payload }) => {
+              const d = (payload.details ?? {}) as Record<string, unknown>
+              const details = Object.fromEntries(editable.map((k) => [k, keys.has(k) ? (d[k] ?? null) : (item[k] ?? null)]))
+              if (f.operation === 'delete') {
+                // A removal can't be edited: the listing is saved as the
+                // admin left it, and the removal closes.
+                return fetch(withCommunity(API, community), { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'edit', id: f.id, details: Object.fromEntries([...keys].map((k) => [k, d[k] ?? null])) }) })
+              }
+              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
+                method: 'PATCH',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'approved', payload: { name: item.name, address: item.address ?? '', phone: item.phone ?? '', details } }),
+              })
+            },
+            onSaved: () => {
+              setEditing(null)
+              onDone(f, `Used ${today()}`)
+            },
+          },
+        },
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open its box.')
+    }
+  }
+
+  const pill: { text: string; tone: Tone } = done ? { text: done, tone: 'grey' } : f.operation === 'delete' ? { text: `Not on ${f.from}`, tone: 'amber' } : { text: kosherPill(rows), tone: 'amber' }
+  return (
+    <Box key={done ? `${f.id}-done` : f.id} name="Kosher" pill={pill} defaultOpen={!done}>
+      <Rows rows={rows} />
+      {!done && noneLeft && (
+        <>
+          <p className="text-sm font-semibold text-amber-800">No hechsher left</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void (f.operation === 'delete' ? decide({ status: 'approved' }, `Archived ${today()}`) : send(API, { method: 'POST', body: JSON.stringify({ action: 'archive', id: f.id }) }, `Archived ${today()}`))}
+              className={GO}
+            >
+              {busy ? 'Saving…' : 'Archive the listing'}
             </button>
-          </>
-        ) : (
-          <button type="button" disabled={busy} onClick={() => onAct({ action: 'add', purpose: 'kosher', url: l.url })} className={BUTTON}>
-            {busy ? 'Reading…' : 'Read it every morning'}
+            <button type="button" disabled={busy} onClick={() => void edit()} className={BUTTON}>
+              Edit
+            </button>
+            <button type="button" disabled={busy} onClick={() => void decide({ status: 'rejected' }, `Kept ${today()}`)} className={BUTTON}>
+              Keep the listing
+            </button>
+          </div>
+          {near && (
+            <div className="text-[13px]">
+              <button type="button" disabled={busy} onClick={() => void send(API, { method: 'POST', body: JSON.stringify({ action: 'renamed', id: f.id }) }, `Renamed ${today()}`)} className={LINK}>
+                It’s {near.name} now
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {!done && !noneLeft && (
+        <BoxActions busy={busy} onUse={() => void decide({ status: 'approved', only: use }, `Used ${today()}`)} onEdit={() => void edit()} onKeep={() => void decide({ status: 'rejected' }, `Kept ${today()}`)} />
+      )}
+      {error && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      <SourceLine url={list?.url} what={KOSHER_LIST_NAMES[listOf(f)]} at={readOn(list) ?? f.at} />
+      {editing && <BoxEditSheet item={editing.item} category={category} edit={editing.edit} onClose={() => setEditing(null)} />}
+    </Box>
+  )
+}
+
+/** Reads, a place's last box: its pages on the lists, no switch (each
+ *  list has its own, at the top), and the ways on. */
+function PlaceReads({ place: p, lists, act, busy, onBusy, onReadNow, defaultOpen }: { place: Place; lists: readonly KosherListState[]; act: Act; busy: boolean; onBusy: (b: boolean) => void; onReadNow: () => void; defaultOpen: boolean }) {
+  const [adding, setAdding] = useState(false)
+  const [url, setUrl] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  async function give() {
+    setError(null)
+    onBusy(true)
+    try {
+      await fetchJson(
+        withCommunity(API, act.community),
+        { method: 'POST', headers: { Authorization: `Bearer ${act.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'page', resourceId: p.id, url }) },
+        'Could not save that page.',
+      )
+      setAdding(false)
+      act.onReload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that page.')
+    } finally {
+      onBusy(false)
+    }
+  }
+  const reading = lists.some((l) => l.watch?.active)
+  return (
+    <Box name="Reads" pill={{ text: `${p.on.length} page${p.on.length === 1 ? '' : 's'}`, tone: 'grey' }} defaultOpen={defaultOpen} testId="job-reads">
+      {p.on.length > 0 && (
+        <ul className="text-sm">
+          {p.on.map((o) => {
+            const read = readOn(lists.find((l) => l.list === o.list))
+            return (
+              <li key={`${o.list}:${o.url}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-t border-slate-100 py-1.5 first:border-t-0" data-testid="job-source">
+                <span className="min-w-0 font-semibold text-slate-900 [overflow-wrap:anywhere]">
+                  <a href={o.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    {shortUrl(o.url)}
+                  </a>
+                  <small className="block text-[12.5px] font-normal text-slate-500">{KOSHER_LIST_NAMES[o.list]} · Kosher</small>
+                </span>
+                <span className="whitespace-nowrap text-right text-[12.5px] text-slate-500">{read ? `read ${day(read)}` : ''}</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {adding && (
+        <form
+          className="flex flex-wrap gap-2 rounded-md border border-slate-200 bg-slate-50 p-3"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (url.trim()) void give()
+          }}
+        >
+          <label className="min-w-0 flex-1 basis-60 text-xs text-slate-600">
+            Its page on Keystone-K’s list
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="keystone-k.org/kosher/…" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          </label>
+          <div className="flex items-end gap-2">
+            <button type="submit" disabled={busy || !url.trim()} className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+              Save
+            </button>
+            <button type="button" onClick={() => setAdding(false)} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {error && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+        {!adding && (
+          <button type="button" disabled={busy} onClick={() => setAdding(true)} className={LINK}>
+            Add a page
           </button>
         )}
-      </span>
-    </li>
+        {reading && (
+          <button type="button" disabled={busy} onClick={onReadNow} className={LINK}>
+            {busy ? 'Reading…' : 'Read them now'}
+          </button>
+        )}
+        <a href={p.href} target="_blank" rel="noopener noreferrer" className={LINK}>
+          Open its listing
+        </a>
+      </div>
+    </Box>
   )
 }
 
-function PlaceRow({ place: p, section, decide }: { place: Place; section: KosherSection; decide: Decide }) {
-  const [open, setOpen] = useState(false)
+function KosherPlaceRow({ place: p, tab, category, lists, act, reading, onReadNow }: { place: Place; tab: Tab; category?: CategoryConfig; lists: readonly KosherListState[]; act: Act; reading: boolean; onReadNow: () => void }) {
+  const [busy, setBusy] = useState(false)
   const findings = p.findings ?? []
-  // One waiting to compare is said by its own box below.
-  const shown = (section === 'to_check' ? p.differences.filter((d) => d.filed !== 'decided') : p.differences).filter((d) => !(findings.length && d.filed === 'queued'))
+  const own = findings.filter((f) => inTheBox(category, f))
+  const others = findings.filter((f) => !inTheBox(category, f))
+  const waiting = findings.filter((f) => !act.settled.has(f.id))
+  const listOfName = (l: KosherList) => lists.find((x) => x.list === l)
+
+  let pill: { text: string; tone: Tone }
+  if (reading) pill = { text: 'Reading…', tone: 'grey' }
+  else if (findings.length && !waiting.length) pill = { text: act.settled.get(findings[findings.length - 1].id)!, tone: 'grey' }
+  else if (waiting.length) pill = { text: updatesPill(waiting.length), tone: 'amber' }
+  else if (tab === 'to_check') pill = { text: 'Not read yet', tone: 'grey' }
+  else if (tab === 'neither') pill = { text: p.certs.length ? p.certs.join(', ') : 'No hechsher', tone: 'grey' }
+  else if (p.decided) pill = { text: `${p.decided.status === 'approved' ? 'Used' : 'Kept'} ${day(p.decided.at)}`, tone: 'grey' }
+  else pill = { text: 'Same', tone: 'green' }
+
+  const now = p.box ?? {}
+  const rows = category ? kosherRows(category, now) : []
+  // Not compared yet: what each list says, until tomorrow morning's read
+  // (or Read them now) files it here.
+  const pending = !findings.length ? p.differences.filter((d) => d.filed !== 'decided') : []
+  const agree = p.on.map((o) => listWho(o.list)).join(' and ')
   return (
-    <li className="px-4 py-3" data-testid="kosher-place">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="block w-full cursor-pointer text-left">
-        <span className="flex items-start gap-3">
-          <span className="min-w-0 flex-1 space-y-0.5">
-            <span className="block font-semibold text-slate-900">{p.name}</span>
-            <span className="block text-sm text-slate-600">{listingSays(p)}</span>
-            {shown.map((d) => (
-              <span key={`${d.list}:${d.line}`} className={`block text-sm ${section === 'to_check' ? 'text-amber-800' : 'text-slate-700'}`}>
-                {d.line} · {FILED[d.filed]}
-              </span>
-            ))}
-            {section === 'checked' && <span className="block text-sm text-slate-700">{p.on.map((o) => listWho(o.list)).join(' and ')} agree{p.on.length === 1 ? 's' : ''}</span>}
-          </span>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={`mt-1 shrink-0 text-slate-400 ${open ? 'rotate-180' : ''}`}>
-            <path d="M4 6l4 4 4-4" />
-          </svg>
-        </span>
-      </button>
-      <Findings findings={findings} decide={decide} />
-      {open && (
-        <div className="mt-2 space-y-2 text-sm">
-          {p.on.length > 0 ? (
-            <ul className="space-y-0.5 text-slate-700">
-              {p.on.map((o) => (
-                <li key={`${o.list}:${o.url}`}>
-                  <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                    {listWho(o.list)}
-                  </a>{' '}
-                  says: &ldquo;{o.says || 'nothing about its certification'}&rdquo;
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-slate-700">On neither list.</p>
-          )}
-          {section === 'decided' && (
-            <p className="text-slate-700">
-              {p.decided ? `${p.decided.status === 'approved' ? 'Updated on the listing' : 'Skipped'} ${day(p.decided.at)}` : 'Decided before'}. Shown again if the list or the listing changes.
+    <PlaceRow name={p.name} pill={pill} back="Kosher certification">
+      {category &&
+        own.map((f) => (
+          <KosherBox key={f.id} place={p} category={category} finding={f} list={listOfName(listOf(f))} act={act} busy={busy} onBusy={setBusy} />
+        ))}
+      {others.map((f) => (
+        <Box key={act.settled.has(f.id) ? `${f.id}-done` : f.id} name={`From ${f.from}`} pill={act.settled.has(f.id) ? { text: act.settled.get(f.id)!, tone: 'grey' } : { text: updatesPill(f.lines.length), tone: 'amber' }} defaultOpen={!act.settled.has(f.id)}>
+          <FindingCompare
+            finding={f}
+            token={act.token}
+            community={act.community}
+            jobName="Kosher certification"
+            decided={act.settled.has(f.id) ? (act.settled.get(f.id)!.startsWith('Used') ? 'approved' : 'rejected') : undefined}
+            onDecided={(d) => act.onDone(f, `${d === 'approved' ? 'Used' : 'Kept'} ${today()}`)}
+          />
+        </Box>
+      ))}
+      {!findings.length && category && kosherBoxKeys(category).length > 0 && (
+        <Box
+          name="Kosher"
+          pill={pending.length ? { text: 'Not read yet', tone: 'grey' } : tab === 'neither' ? { text: 'On neither list', tone: 'grey' } : { text: 'Same', tone: 'green' }}
+          defaultOpen={pending.length > 0}
+        >
+          <Rows rows={rows} />
+          {pending.map((d) => (
+            <p key={`${d.list}:${d.line}`} className="text-[12.5px] text-amber-800">
+              {d.line}
             </p>
+          ))}
+          {!pending.length && tab === 'checked' && agree && <SourceLine lead="Same as" what={agree === 'Keystone-K' || agree === 'Mekor Habracha' ? KOSHER_LIST_NAMES[p.on[0].list] : `${agree}’s lists`} url={p.on.length === 1 ? listOfName(p.on[0].list)?.url : undefined} />}
+        </Box>
+      )}
+      <PlaceReads place={p} lists={lists} act={act} busy={busy || reading} onBusy={setBusy} onReadNow={onReadNow} defaultOpen={!findings.length && !pending.length} />
+    </PlaceRow>
+  )
+}
+
+/** A place a list has and the guide doesn't, drawn as the listing it would
+ *  add: Add it, Edit, Leave it out. */
+function NewPlaceRow({ place: n, categories, lists, act, onEdit }: { place: NewPlace; categories: readonly CategoryConfig[]; lists: readonly KosherListState[]; act: Act; onEdit: (f: KosherFinding, category: CategoryConfig) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const f = n.findings?.[0]
+  const done = f ? act.settled.get(f.id) : undefined
+  const category = categories.find((c) => c.id === (f?.category ?? 'restaurant'))
+  const rows = category ? kosherRows(category, {}, f?.values ?? {}) : []
+  const google = f ? googleLine(f.notes) : null
+  const list = lists.find((l) => l.list === (f ? listOf(f) : n.on[0]?.list))
+
+  async function decide(body: Record<string, unknown>, text: string) {
+    if (!f) return
+    setError(null)
+    setBusy(true)
+    try {
+      await fetchJson(withCommunity(`/api/admin/submissions/${f.id}`, act.community), { method: 'PATCH', headers: { Authorization: `Bearer ${act.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 'Could not save that.')
+      act.onDone(f, text)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const pill: { text: string; tone: Tone } = done ? { text: done, tone: 'grey' } : f ? { text: 'New', tone: 'amber' } : { text: n.filed === 'next' ? 'Not read yet' : 'New', tone: 'grey' }
+  return (
+    <PlaceRow name={n.name} pill={pill} back="Kosher certification">
+      <Box key={done ? 'place-done' : 'place'} name="Place" pill={done ? { text: done, tone: 'grey' } : { text: 'New', tone: 'amber' }} defaultOpen={!done}>
+        <BoxRows>
+          <BoxRow name={f?.name || n.name} sub={f?.address || n.address || undefined} right={category?.label} mark={done ? 'same' : 'new'} />
+        </BoxRows>
+        {google && <p className="text-[12.5px] text-slate-500">{google}</p>}
+        {n.archived && <p className="text-[12.5px] text-slate-500">The guide has it archived, as “{n.archived}”.</p>}
+      </Box>
+      {rows.length > 0 && (
+        <Box key={done ? 'kosher-done' : 'kosher'} name="Kosher" pill={done ? { text: done, tone: 'grey' } : { text: 'New', tone: 'amber' }} defaultOpen={!done}>
+          <Rows rows={rows} />
+          {f && !done && category && (
+            <BoxActions busy={busy} use="Add it" keep="Leave it out" onUse={() => void decide({ status: 'approved' }, `Added ${today()}`)} onEdit={() => onEdit(f, category)} onKeep={() => void decide({ status: 'rejected' }, `Left out ${today()}`)} />
           )}
-          <a href={p.href} target="_blank" rel="noopener noreferrer" className="block font-semibold text-primary hover:underline">
-            Open its listing
-          </a>
+          {error && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+          <SourceLine url={list?.url} what={list ? KOSHER_LIST_NAMES[list.list] : undefined} at={readOn(list) ?? f?.at ?? null} />
+        </Box>
+      )}
+      {!f && n.filed === 'next' && <p className="text-sm text-slate-600">Suggested after tomorrow morning’s read, if Google says it’s open.</p>}
+    </PlaceRow>
+  )
+}
+
+/** The two lists at the top: each with its Reading switch, and Read them now. */
+function Lists({ lists, busy, onAct, onReadNow }: { lists: readonly KosherListState[]; busy: string | null; onAct: (l: KosherListState, body: Record<string, unknown>) => void; onReadNow: () => void }) {
+  return (
+    <Box name="Lists" pill={{ text: `${lists.length} list${lists.length === 1 ? '' : 's'}`, tone: 'grey' }} defaultOpen testId="kosher-lists">
+      <ul className="text-sm">
+        {lists.map((l) => {
+          const read = readOn(l)
+          const on = !!l.watch?.active
+          return (
+            <li key={l.list} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 border-t border-slate-100 py-1.5 first:border-t-0" data-testid="kosher-list">
+              <span className="min-w-0 font-semibold text-slate-900">
+                <a href={l.url} target="_blank" rel="noopener noreferrer" className="block truncate hover:underline">
+                  {shortUrl(l.url)}
+                </a>
+                <small className={`block text-[12.5px] font-normal ${l.error ? 'font-semibold text-red-700' : 'text-slate-500'}`}>
+                  {KOSHER_LIST_NAMES[l.list]}
+                  {l.error ? ` · didn’t load` : l.updated ? ` · updated ${listDay(l.updated)}` : ''}
+                </small>
+              </span>
+              <span className="whitespace-nowrap text-right text-[12.5px] text-slate-500">{busy === l.list ? 'Reading…' : on && read ? `read ${day(read)}` : on ? 'not read yet' : ''}</span>
+              <ReadingSwitch
+                on={on}
+                busy={busy !== null}
+                onChange={(next) => onAct(l, l.watch ? { action: next ? 'resume' : 'pause', id: l.watch.id } : { action: 'add', purpose: 'kosher', url: l.url })}
+              />
+            </li>
+          )
+        })}
+      </ul>
+      {lists.some((l) => l.watch?.active) && (
+        <div className="text-[13px]">
+          <button type="button" disabled={busy !== null} onClick={onReadNow} className={LINK}>
+            {busy ? 'Reading…' : 'Read them now'}
+          </button>
         </div>
       )}
-    </li>
-  )
-}
-
-function NewRow({ place: n, decide }: { place: NewOnList & { findings?: Finding[] }; decide: Decide }) {
-  return (
-    <li className="space-y-0.5 px-4 py-3 text-sm" data-testid="kosher-new">
-      <p className="font-semibold text-slate-900">{n.name}</p>
-      {n.address && <p className="text-slate-600">{n.address}</p>}
-      {n.on.map((o) => (
-        <p key={`${o.list}:${o.url}`} className="text-slate-700">
-          On{' '}
-          <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-            {KOSHER_LIST_NAMES[o.list]}
-          </a>
-          {o.says ? `: “${o.says}”` : ''}
-        </p>
-      ))}
-      {n.archived && <p className="text-slate-700">The guide has it archived, as &ldquo;{n.archived}&rdquo;.</p>}
-      {n.filed === 'queued' ? (
-        n.findings?.length ? <Findings findings={n.findings} decide={decide} /> : <p className="text-slate-600">Waiting to compare.</p>
-      ) : (
-        <p className="text-slate-600">{n.filed === 'next' ? 'Here to compare after tomorrow morning’s read, unless Google says it has closed.' : 'Decided before.'}</p>
-      )}
-    </li>
+    </Box>
   )
 }
 
@@ -210,29 +506,44 @@ export default function KosherJob({ token }: { token: string }) {
   const [data, setData] = useState<KosherLoaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<KosherList | null>(null)
-  // Findings updated or skipped this visit.
+  const [busy, setBusy] = useState<string | null>(null)
+  // What became of each finding decided this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
+  // Each row's tab, as it was when the page loaded, and the one showing.
+  const [tabOf, setTabOf] = useState<ReadonlyMap<string, Tab>>(new Map())
+  const [tab, setTab] = useState<Tab>('to_check')
+  const [adding, setAdding] = useState<{ finding: KosherFinding; category: CategoryConfig } | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(await fetchJson<KosherLoaded>(withCommunity('/api/admin/watches/kosher', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the kosher lists.'))
+      const got = await fetchJson<KosherLoaded>(withCommunity(API, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the kosher lists.')
+      const tabs = new Map<string, Tab>()
+      for (const p of got.places) tabs.set(p.id, placeTab(p))
+      for (const f of got.others ?? []) tabs.set(f.id, 'to_check')
+      for (const n of got.newPlaces) if (n.filed !== 'decided') tabs.set(`new:${n.name}`, 'new')
+      setData(got)
+      setTabOf(tabs)
+      setTab(TABS.find((t) => [...tabs.values()].includes(t.key))?.key ?? 'to_check')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token, community])
   useLoadOnMount(load)
 
-  async function act(list: KosherList, body: Record<string, unknown>) {
+  async function post(body: Record<string, unknown>) {
+    await fetchJson(
+      withCommunity('/api/admin/watches', community),
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      'Could not do that.',
+    )
+  }
+
+  async function listAct(l: KosherListState, body: Record<string, unknown>) {
     setSaveError(null)
-    setBusy(list)
+    setBusy(l.list)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-        'Could not do that.',
-      )
+      await post(body)
       // A read files what differs: where each difference is now is the server's to say.
       await load()
     } catch (err) {
@@ -242,109 +553,103 @@ export default function KosherJob({ token }: { token: string }) {
     }
   }
 
-  const back = (
-    <Link href={`${adminBase(community)}/watches`} className="text-sm font-semibold text-primary hover:underline">
-      ‹ Watches
-    </Link>
-  )
-  if (error) return <div className="space-y-3">{back}<p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p></div>
-  if (!data) return <div className="space-y-3">{back}<p className="text-sm text-muted">Reading the kosher lists…</p></div>
+  /** Read them now: each list that's read, then the page again. */
+  async function readNow() {
+    if (!data) return
+    setSaveError(null)
+    setBusy('all')
+    try {
+      for (const l of data.lists) if (l.watch?.active) await post({ action: 'check', id: l.watch.id })
+      await load()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not read them.')
+    } finally {
+      setBusy(null)
+    }
+  }
 
-  const decide: Decide = {
+  const backHref = `${adminBase(community)}/watches`
+  if (error || !data) {
+    const notice = error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : <p className="text-sm text-muted">Reading the kosher lists…</p>
+    return <JobPage backHref={backHref} title="Kosher certification" intro="" needYou={0} total={0} noun="place" notice={notice} />
+  }
+
+  const categories = data.categories ?? []
+  const act: Act = {
     token,
     community,
     settled,
-    onDecided: (f, d) => {
-      setSettled((m) => new Map(m).set(f.id, d))
-      setData((x) => x && { ...x, places: x.places.map((y) => (y.id === f.targetId ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
-    },
+    onDone: (f, text) => setSettled((m) => new Map(m).set(f.id, text)),
+    onReload: () => void load(),
   }
-  // A place stays in To check while it has a finding here, decided this
-  // visit or not, so it doesn't jump away under the admin's hand.
-  const inSection = (s: KosherSection) => data.places.filter((p) => kosherSection({ ...p, waiting: p.findings?.length }) === s)
+  if (adding) {
+    const { finding: f, category } = adding
+    return (
+      <ListingEditorScreen
+        heading={f.name}
+        category={category}
+        preset={{ ...(f.values ?? {}), name: f.name, address: f.address ?? '' }}
+        adminSave={{
+          label: 'Add it',
+          via: async ({ payload }) =>
+            fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'approved', payload: { name: payload.name, address: payload.address ?? '', phone: payload.phone ?? '', details: payload.details ?? {}, ...(payload.geo ? { geo: payload.geo } : {}) } }),
+            }),
+          onSaved: () => {
+            act.onDone(f, `Added ${today()}`)
+            setAdding(null)
+          },
+        }}
+        onClose={() => setAdding(null)}
+      />
+    )
+  }
+
   const others = data.others ?? []
-  const fresh = data.newPlaces.filter((n) => n.filed !== 'decided')
-  const freshDecided = data.newPlaces.filter((n) => n.filed === 'decided')
-  const rows = (list: (KosherPlace & { href: string })[], s: KosherSection) => (
-    <ul className="divide-y divide-slate-100">
-      {list.map((p) => (
-        <PlaceRow key={p.id} place={p} section={s} decide={decide} />
-      ))}
-    </ul>
-  )
-  const toCheck = inSection('to_check')
-  const { counts } = data
+  const fresh = data.newPlaces.filter((n) => tabOf.has(`new:${n.name}`))
+  const counts: Record<Tab, number> = { to_check: 0, new: 0, checked: 0, neither: 0 }
+  for (const t of tabOf.values()) counts[t]++
+  const updates = data.places.filter((p) => (p.findings ?? []).some((f) => !settled.has(f.id))).length + others.filter((f) => !settled.has(f.id)).length
+  const reading = busy === 'all'
 
   return (
-    <div className="space-y-4">
-      {back}
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">Kosher certification</h2>
-        <p className="text-sm text-muted">
-          {plural(data.places.length, 'food place')}, compared every morning with Keystone-K&rsquo;s and Mekor Habracha&rsquo;s lists. What a list says that a
-          listing doesn&rsquo;t waits on its row, beside what the listing says: Compare it, then update the listing or skip it. Nothing is taken off
-          without you.
-        </p>
-      </div>
-      {!data.available && <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Keeping a list here needs database migration 070.</p>}
-      {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
-      <section className="bg-white border border-slate-200 rounded-lg shadow-sm" aria-label="Lists">
-        <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">Lists</h3>
-        <ul className="divide-y divide-slate-100">
-          {data.lists.map((l) => (
-            <ListRow key={l.list} list={l} busy={busy === l.list} onAct={(body) => void act(l.list, body)} />
-          ))}
-        </ul>
-      </section>
-      <p className="text-sm font-semibold text-slate-800" data-testid="kosher-counts">
-        {counts.checked} checked · {counts.toCheck} to check · {counts.notListed} on neither list
-        {counts.didntLoad > 0 && <> · {plural(counts.didntLoad, 'list')} didn&rsquo;t load</>}
-      </p>
-      <section className="bg-white border border-slate-200 rounded-lg shadow-sm" aria-label="To check">
-        <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">To check ({toCheck.length})</h3>
-        <p className="px-4 pb-2 text-xs text-muted">A list says something about its certification the listing doesn&rsquo;t.</p>
-        {toCheck.length > 0 ? rows(toCheck, 'to_check') : others.length === 0 && <p className="px-4 pb-3 text-sm text-slate-600">None right now.</p>}
-        {others.length > 0 && (
-          <ul className="divide-y divide-slate-100 border-t border-slate-100" aria-label="No longer matching a place">
-            {others.map((f) => (
-              <li key={f.id} className="px-4 py-3" data-testid="kosher-other">
-                <p className="font-semibold text-slate-900">{f.name}</p>
-                <p className="text-sm text-slate-600">From {f.from}, which no longer matches it to a place here.</p>
-                <Findings findings={[f]} decide={decide} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      {fresh.length > 0 && (
-        <section className="bg-white border border-slate-200 rounded-lg shadow-sm" aria-label="On a list, not in the guide">
-          <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">On a list, not in the guide ({fresh.length})</h3>
-          <p className="px-4 pb-2 text-xs text-muted">Each is suggested as a new listing, once Google says it&rsquo;s open.</p>
-          <ul className="divide-y divide-slate-100">
-            {fresh.map((n) => (
-              <NewRow key={n.name} place={n} decide={decide} />
-            ))}
-          </ul>
-        </section>
-      )}
-      <CollapsibleSection title="Checked" description="On a list, and the list agrees with the listing." count={inSection('checked').length} contentClassName="">
-        {rows(inSection('checked'), 'checked')}
-      </CollapsibleSection>
-      {(inSection('decided').length > 0 || freshDecided.length > 0) && (
-        <CollapsibleSection title="Decided before" description="A list differs, and that was updated or skipped before. Shown again if the list or the listing changes." count={inSection('decided').length + freshDecided.length} contentClassName="">
-          {rows(inSection('decided'), 'decided')}
-          {freshDecided.length > 0 && (
-            <ul className="divide-y divide-slate-100 border-t border-slate-100">
-              {freshDecided.map((n) => (
-                <NewRow key={n.name} place={n} decide={decide} />
-              ))}
-            </ul>
-          )}
-        </CollapsibleSection>
-      )}
-      <CollapsibleSection title="On neither list" description="Its hechsher is one neither list covers, or it names none. Nothing to compare." count={inSection('not_listed').length} contentClassName="">
-        {rows(inSection('not_listed'), 'not_listed')}
-      </CollapsibleSection>
-    </div>
+    <JobPage
+      backHref={backHref}
+      title="Kosher certification"
+      intro=""
+      needYou={updates}
+      total={data.places.length}
+      noun="place"
+      say={{ head: kosherSay(updates) }}
+      tabs={{ counts, active: tab, onChange: setTab, list: TABS }}
+      notice={
+        <>
+          {!data.available && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Keeping a list here needs database migration 070.</p>}
+          {saveError && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
+          <Lists lists={data.lists} busy={busy} onAct={(l, body) => void listAct(l, body)} onReadNow={() => void readNow()} />
+        </>
+      }
+    >
+      {tab === 'new'
+        ? fresh.map((n) => <NewPlaceRow key={n.name} place={n} categories={categories} lists={data.lists} act={act} onEdit={(finding, category) => setAdding({ finding, category })} />)
+        : [
+            ...data.places
+              .filter((p) => tabOf.get(p.id) === tab)
+              .map((p) => (
+                <KosherPlaceRow key={p.id} place={p} tab={tab} category={categories.find((c) => c.id === p.category)} lists={data.lists} act={act} reading={reading} onReadNow={() => void readNow()} />
+              )),
+            ...(tab === 'to_check'
+              ? others.map((f) => (
+                  <PlaceRow key={f.id} name={f.name} pill={settled.has(f.id) ? { text: settled.get(f.id)!, tone: 'grey' } : { text: updatesPill(1), tone: 'amber' }} back="Kosher certification">
+                    <Box name={`From ${f.from}`} pill={{ text: 'Not matched to a place', tone: 'grey' }} defaultOpen>
+                      <FindingCompare finding={f} token={token} community={community} jobName="Kosher certification" decided={settled.has(f.id) ? (settled.get(f.id)!.startsWith('Used') ? 'approved' : 'rejected') : undefined} onDecided={(d) => act.onDone(f, `${d === 'approved' ? 'Used' : 'Kept'} ${today()}`)} />
+                    </Box>
+                  </PlaceRow>
+                ))
+              : []),
+          ]}
+    </JobPage>
   )
 }

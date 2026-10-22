@@ -476,7 +476,35 @@ agreed:
      small grey, as Hospitals now does. Not changed yet: `MikvahHours.tsx`
      and `TimesProposal.tsx` were being edited by the Contact/Phone boxes
      session, which has now committed (Oct 22), so they're free.
-6. Kosher.
+6. Kosher. **Built Oct 22** (compared with its drawing on dev, computer
+   and phone; the lists' findings stubbed in the browser):
+   - The page says "N places have an update from a list." The Lists box
+     holds both lists, each with its page, "read <date>" and the page's
+     only Reading switches, and Read them now. Tabs: To check, New on a
+     list, Checked, On neither list.
+   - An opened place is its listing's Kosher box (`kosherBox.ts`: the
+     editor's facts row headed by a hechsher): Hechsher, Meat, dairy or
+     parve, Certificate, What isn't kosher?. A new value only highlighted,
+     a changed one with "was …", What isn't kosher? compared only for
+     being there. Use this takes only the rows it changes; Edit is the
+     listing's own Kosher box, filled with the list's, saved onto the
+     listing as it is now (everything else as it is today, not as it was
+     when the list was read). Reads is last: the place's pages on the
+     lists, with no switch, and Add a page (its page on Keystone-K's list).
+   - No hechsher left: the rows crossed out, "Not on Keystone-K's list",
+     Archive the listing / Edit / Keep the listing, and "It's <name> now"
+     only when the list has a place by a near name. Renamed, archived (an
+     edit that leaves none files a removal), Edit on a removal and Add a
+     page are each filed as the list's own suggestion and approved at once
+     (`POST /api/admin/watches/kosher`), so the listing's history says so.
+   - New on a list: a Place box (name, address, category, Google's line)
+     and a Kosher box, Add it / Edit (the whole new-listing editor, filled
+     in) / Leave it out. One left out isn't shown again.
+   - An older finding wider than the box shows whole, with Compare. A
+     grocery has no hechsher, so no Kosher box: its findings show whole.
+   - Not as drawn: the tabs show their counts on all four (the other job
+     pages hide an empty one), and "It's … now" uses the list's full
+     name for the place.
 7. Eruv.
 
 Each page is compared with its drawing, side by side, before it's called
@@ -813,6 +841,8 @@ compare, and one it can't read, on desktop and phone.
      list. Each list shows its size and its morning read, with Check now
      and Pause. This answers "Kosher certification when the two lists
      disagree": a place shows each list's line beside the listing's.
+     Redrawn Oct 22 as the listing's Kosher box (see "Building next: the
+     job pages", item 6).
    - **The lists' morning reads file what differs,** as before; since
      step 6 it waits on this page, not in the moderation queue.
    - **"Add a watch" no longer offers an eruv or a kosher list**; they are
