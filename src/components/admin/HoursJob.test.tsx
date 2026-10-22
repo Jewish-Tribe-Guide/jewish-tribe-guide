@@ -530,6 +530,17 @@ describe('Shul times', () => {
     expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From soi\.example\/tefillot · read [A-Z][a-z]{2} \d+$/)
   })
 
+  // A newsletter's times are filed a part at a time too (Oct 22): in its
+  // part's box, from its newsletter, which has no page.
+  it('a newsletter’s update: in its part’s box, from its newsletter', async () => {
+    const fromNewsletter = { ...SHAB, id: 's-news', from: 'its newsletter', page: undefined }
+    await times$([{ ...SOI, findings: [fromNewsletter] } as ShulPlace])
+    await open(SOI.name)
+    const b = box(SOI.name, 'Usual Shabbos times')
+    expect(within(b).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this', 'Edit', 'Keep the listing'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From its newsletter · read [A-Z][a-z]{2} \d+$/)
+  })
+
   it('this week’s: days with the same times as one, a tefillah’s times on one line, a changed one beside its usual time', async () => {
     await times$([SOI])
     await open(SOI.name)

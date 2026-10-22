@@ -182,7 +182,8 @@ function PartBox({ f, decided, busy, at, onUse, onEdit, onKeep }: { f: PartFindi
     <Box name={TIMES_PART_LABELS[f.part]} pill={decided ? { text: doneText(decided, f.part), tone: 'grey' } : { text: what ?? 'Update', tone: 'amber' }} defaultOpen={!decided}>
       {week ? <WeekRows t={t} /> : <Groups groups={groupedRows(rows)} row={(r, i) => <UsualRow key={i} r={r} />} />}
       {!decided && <BoxActions busy={busy} onUse={onUse} onEdit={onEdit} onKeep={onKeep} {...(week ? { use: 'Use this week', keep: 'Skip this week' } : {})} />}
-      <SourceLine url={f.page} what={f.page ? shortUrl(f.page) : 'their website'} at={at} />
+      {/* A newsletter's has no page: "From its newsletter". */}
+      <SourceLine url={f.page} what={f.page ? shortUrl(f.page) : f.from === 'its website' ? 'their website' : f.from} at={at} />
     </Box>
   )
 }

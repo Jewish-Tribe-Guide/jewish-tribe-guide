@@ -406,6 +406,10 @@ agreed:
      version; the hours route's `?item=` hands it the listing.
    - A filing from before parts (dev has three, Sons of Israel's) shows
      whole in a "From its website" box with Compare.
+   - A newsletter's times are filed by part too (the user, Oct 22), one
+     update each, boxed "From its newsletter". So a newsletter no longer
+     files one whole update that stops the website reader filing for that
+     shul. Older newsletter updates stay whole until decided.
 4. Mikvah hours. **Built Oct 22** (compared with its drawing on dev,
    computer and phone; Lower Merion's update stubbed in the browser, Moishe
    Zvi's two from a real read on dev):
