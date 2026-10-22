@@ -1169,6 +1169,11 @@ compare, and one it can't read, on desktop and phone.
   own. No category has a tab of its own now.
 - The Eruvim tab is gone from the admin nav. `/<community>/admin/eruvim`
   redirects to Categories (`next.config.ts`).
+- Fixed after merging: that redirect also caught `/api/admin/eruvim` (as
+  community "api"), so the Eruv row loaded the categories instead and said
+  "run migration 074". 074 was already on both databases. The redirects
+  now skip `api`, and `nextConfigRoutes.test.ts` fails if any redirect or
+  rewrite catches an API route.
 - A community without the Eruv card has nowhere to edit eruvim until it
   adds one (+ Add Eruv on Categories). The site shows eruvim only with that
   card anyway.
