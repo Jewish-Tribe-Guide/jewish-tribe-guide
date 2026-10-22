@@ -274,6 +274,15 @@ describe('/api/admin/main-dishes', () => {
     expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'approved', 'me@x.co')
   })
 
+  // The user, Oct 22: a dish added by hand showed no date on the site until
+  // a reading found it. Dated "seen" now, never "on its menu", so a later
+  // read that misses it still can't cross it out.
+  it('Save to the listing dates a dish typed in by hand as seen, and only a new one', async () => {
+    m.getMenuReading.mockResolvedValue({ ...reading, dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }] })
+    await POST(req('POST', { action: 'save', resourceId: ID, always: ['Falafel', 'Shawarma', 'Kugel'], sometimes: ['Soup'] }))
+    expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', { always: ['Falafel', 'Shawarma', 'Kugel'], sometimes: ['Soups'] }, { names: ['Shawarma'], seen: ['Kugel', 'Soups'], at: expect.any(String), menuUrl: 'https://judah.example/menu' })
+  })
+
   it('nothing used before a reading, nor from a reading already decided, nor at a place without a dish list', async () => {
     m.getMenuReading.mockResolvedValueOnce(null)
     expect((await POST(req('POST', { action: 'use', resourceId: ID }))).status).toBe(409)

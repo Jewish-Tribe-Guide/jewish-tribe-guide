@@ -635,6 +635,10 @@ agreed:
      "Find a bakery" or locations page is never a menu page. A menu page
      whose pictures have alt text has a new fingerprint, so the morning
      run reads it once more. On dev, Read now on each.
+   - A dish added by hand on the Dishes page (Edit, Save to the listing)
+     is dated "seen" that day, as one added through the queue is; it
+     showed no date until a reading found it (the user, Oct 22). Never an
+     "on its menu" date, so a read that misses it still can't cross it out.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

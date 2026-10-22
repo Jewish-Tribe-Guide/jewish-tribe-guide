@@ -56,7 +56,8 @@ import type { DirectoryResource } from '@/types'
 // POST body: { action: 'save', resourceId, always: string[], sometimes: string[] }
 //      Edit's "Save to the listing": the list as the admin left it. The
 //      ones the reading found on its menu are dated; ones added by hand
-//      aren't, so a later read that misses them never crosses them out.
+//      aren't, so a later read that misses them never crosses them out:
+//      a new one is dated "seen" instead.
 // POST /api/admin/main-dishes   body: { action: 'skip', resourceId }
 //      "Keep the listing": the reading stays, marked skipped.
 // POST body: { action: 'unlink', resourceId }
@@ -335,6 +336,7 @@ export async function POST(request: Request) {
     const at = new Date().toISOString()
     let lists: { always: string[]; sometimes: string[] }
     let found: string[]
+    let seen: string[] = []
     if (action === 'use') {
       if (stored.status !== 'proposed') return Response.json({ ok: false, errors: ['Read its menu again first.'] }, { status: 409 })
       const proposal = dishProposal(listedDishes(listing, kind.field), stored)
@@ -346,9 +348,12 @@ export async function POST(request: Request) {
       lists = { always, sometimes: cleanNames(body?.sometimes).filter((n) => !taken.has(n.toLowerCase())) }
       const onMenu = new Set(stored.dishes.map((d) => d.name.toLowerCase()))
       found = [...lists.always, ...lists.sometimes].filter((n) => onMenu.has(n.toLowerCase()))
+      // Typed in by hand: "seen" today, never a menu date (withMenuDishes).
+      const listed = new Set(listedDishes(listing, kind.field).dishes.map((n) => n.toLowerCase()))
+      seen = [...lists.always, ...lists.sometimes].filter((n) => !onMenu.has(n.toLowerCase()) && !listed.has(n.toLowerCase()))
     }
     if (lists.always.length + lists.sometimes.length > MAX_DISHES) return Response.json({ ok: false, errors: ['That’s too many dishes.'] }, { status: 400 })
-    if (!(await setMenuDishes(community.slug, resourceId, kind.field.key, lists, { names: found, at, menuUrl: stored.sourceUrl }))) {
+    if (!(await setMenuDishes(community.slug, resourceId, kind.field.key, lists, { names: found, at, menuUrl: stored.sourceUrl, seen }))) {
       return Response.json({ ok: false, errors: ['That listing isn’t live any more.'] }, { status: 404 })
     }
     await decideMenuReading(community.slug, resourceId, 'approved', admin.email)
