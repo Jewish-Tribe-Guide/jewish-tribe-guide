@@ -420,8 +420,13 @@ agreed:
    - A calendar's lines carry an event's end ("8:10 AM–8:40 AM"), so the
      reader can note it (Rodeph Shalom's Thursday minyan, the user, Oct
      22). Every calendar's lines change, so each is read once more.
-   - Not done: a Zoom link. Rodeph Shalom's is only on each event's own
-     page, and a minyan has nowhere to keep a link but its sign-up.
+   - A Zoom link from a calendar: PR #346 (a minyan's join link, read
+     off each event's page). Not from a newsletter: the Apps Script sends
+     the email's plain text, which has no links (Society Hill's "Click
+     here to Zoom", BZBI's weekday minyan).
+   - This week's schedule made only of dated services (BZBI's newsletter
+     "Sat Oct 24") had no line under it; it has the confirmed line and
+     Edit now (the user, Oct 22).
    - Kol Tzedek's Friday night is on its Weekly Services page
      (kol-tzedek.org/shabbat.html, "All Friday services begin at
      6:30pm"), which isn't one of its watched pages; its calendar has no
