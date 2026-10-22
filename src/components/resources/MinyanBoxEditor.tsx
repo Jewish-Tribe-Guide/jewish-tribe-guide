@@ -58,6 +58,7 @@ export default function MinyanBoxEditor({
   place,
   writing,
   dayChoices,
+  heading,
   onChange,
   onStep,
   send,
@@ -79,6 +80,9 @@ export default function MinyanBoxEditor({
   /** The days a minyan can be put on, when not the box's own: a week the
    *  shul sent out, its own days. */
   dayChoices?: Minyan['days']
+  /** Over the list in place of the shul's name: one of several weeks
+   *  edited together ("Oct 25–31"), the name said once above them. */
+  heading?: string
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
@@ -125,7 +129,7 @@ export default function MinyanBoxEditor({
 
   return (
     <div className="space-y-4" data-testid="minyan-box-list">
-      <p className="-mt-1 text-[14px] text-muted">{place}</p>
+      {heading ? <p className="text-[15.5px] font-extrabold text-slate-900">{heading}</p> : <p className="-mt-1 text-[14px] text-muted">{place}</p>}
       {boxGroups(rows, box).map((g) => (
         <div key={g.label}>
           <p className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>

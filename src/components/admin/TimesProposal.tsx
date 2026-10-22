@@ -245,7 +245,7 @@ export function ShulRow({
 
   /** Edit: the listing's own box editor for the part, filled in with the
    *  website's version, saved straight to the listing. */
-  async function edit(f: PartFinding, weekId: string | undefined) {
+  async function edit(f: PartFinding, weeks: readonly string[]) {
     setError(null)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/hours?job=times&item=${p.id}`, community), { headers }, 'Could not open its times.')
@@ -261,7 +261,7 @@ export function ShulRow({
           fields: [field],
           minyanimBox: f.part === 'week' ? 'this_week' : f.part,
           writing: minyanWriting,
-          week: weekId,
+          weeks,
           preset: f.part === 'week' ? { [sk]: f.times.proposedSchedules } : { [key]: f.times.proposed },
           save: {
             label: 'Save to the listing',
@@ -339,7 +339,7 @@ export function ShulRow({
             busy={busy || saving === f.id}
             at={readAt(f.page) ?? f.at}
             onUse={() => void decide(f, { status: 'approved' }, 'approved')}
-            onEdit={f.part !== 'week' || posted.length === 1 ? () => void edit(f, posted[0]?.id) : undefined}
+            onEdit={f.part !== 'week' || posted.length > 0 ? () => void edit(f, posted.map((s) => s.id)) : undefined}
             onKeep={() => void decide(f, { status: 'rejected' }, 'rejected')}
           />
         )
