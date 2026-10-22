@@ -70,10 +70,16 @@ export const isStoppedPage = (w: Pick<Watch, 'createdBy'>) => w.createdBy === PA
  *  search needs no AI. */
 const CLOCK_TIME = /\b\d{1,2}(:\d\d)?\s*(am|pm|a\.m\.|p\.m\.)/i
 
-/** Whether a page may give weekly hours: a clock time in its words. A PDF
- *  can't be told without reading it, so it may. */
+/** Booking ahead: a mikvah whose hours are "by appointment, 48 hours
+ *  ahead" has no clock time, and its note is all its page says (Mei
+ *  Shalva, Oct 22). */
+const BY_APPOINTMENT = /\bappointments?\b/i
+
+/** Whether a page may give weekly hours or a section's note: a clock time
+ *  in its words, or booking by appointment. A PDF can't be told without
+ *  reading it, so it may. */
 export function looksLikeHours(source: { text: string | null; pdf: string | null }): boolean {
-  return source.pdf !== null || CLOCK_TIME.test(source.text ?? '')
+  return source.pdf !== null || CLOCK_TIME.test(source.text ?? '') || BY_APPOINTMENT.test(source.text ?? '')
 }
 
 /** What a davening time is called beside its clock time. */

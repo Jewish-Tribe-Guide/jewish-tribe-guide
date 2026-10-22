@@ -12,6 +12,7 @@ import type { SpecialSchedule } from '@/lib/schedules'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import HoursJob, { READ_ON_LOAD, type HoursPlace } from './HoursJob'
 import type { ShulPlace } from './TimesProposal'
+import type { ListedSection, MikvahPlace } from './MikvahHours'
 import { day } from './JobPage'
 
 vi.mock('next/navigation', () => ({
@@ -57,19 +58,6 @@ const finding = (over: Partial<Finding> = {}): Finding => ({
   ...over,
 })
 
-// Lower Merion, as the Oct 21 dry run read it: its women's hours differ.
-const LMC = place({
-  id: 'lmc',
-  name: 'Lower Merion Community Mikvah',
-  findings: [finding()],
-  pages: [
-    { watch: watch({ id: 'w-home', lastCheck: check('differs', { differences: ['Women’s Hours: 7:30 PM – 9:30 PM on its website, 8:30 PM – 10:30 PM on the listing'], queue: 'filed' }) }), source: 'Found from its website' },
-    { watch: watch({ id: 'w-mens', url: 'https://lmcmikvah.org/mens-mikvah/', lastCheck: check('agrees', { read: ['Men’s Hours: Sun–Thu 4:30 AM – 10:00 AM'] }) }), source: 'Found from its website’s Men’s Mikvah link' },
-  ],
-})
-const MOISHE = place({ id: 'mz', name: 'Mikvah Moishe Zvi', pages: [{ watch: watch({ id: 'w-mz', url: 'https://mikvahwestphilly.com/', lastCheck: check('agrees') }), source: 'Added by hand' }] })
-const MEI = place({ id: 'mei', name: 'Mikvah Mei Shalva', website: 'https://philamikvah.org/', reason: 'Read its website: no weekly hours on it.' })
-
 const posts: { url: string; body: Record<string, unknown> }[] = []
 const gets: string[] = []
 async function renderPage(places: HoursPlace[] | (() => HoursPlace[]), post: (body: Record<string, unknown>) => Record<string, unknown> = () => ({}), job?: 'times') {
@@ -99,89 +87,199 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
-describe('HoursJob', () => {
-  // The user, Oct 21: "Each listing is there, showing the source reading
-  // from, the results, how it compares to what we have... A way to have it
-  // check again." All of it on the closed row.
-  it('every row says how it compares, where it read from, and has Check now, without opening it', async () => {
-    const OFF = place({ id: 'ol', name: 'Aaron Mikvah', off: true })
-    await renderPage([MOISHE, OFF, MEI, LMC])
-    expect(screen.getByTestId('job-counts').textContent).toBe('2 need you · 4 places')
-    expect(pill(LMC.name)).toBe('Differs from the listing')
-    expect(within(rowOf(LMC.name)).getByText(/^From lmcmikvah\.org and 1 other page · read /)).toBeInTheDocument()
-    expect(within(rowOf(LMC.name)).getByRole('button', { name: 'Check now' })).toBeInTheDocument()
-    // What it found waits on its row, not in the moderation queue (step 6).
-    expect(within(rowOf(LMC.name)).getByTestId('finding')).toHaveTextContent('Women’s Hours: its page says 7:30 PM – 9:30 PM. The listing says 8:30 PM – 10:30 PM. And 1 more.')
-    await tab('Can’t be read')
-    expect(pill(MEI.name)).toBe('Couldn’t read')
-    expect(within(rowOf(MEI.name)).getByText('Read its website: no weekly hours on it.')).toBeInTheDocument()
-    expect(within(rowOf(MEI.name)).getByRole('button', { name: 'Check now' })).toBeInTheDocument()
+// ── Mikvah hours, drawn Oct 21 (artifact 7MUNppcA4S4yvXKupEKJPR) ────────────
+// A mikvah opened is its listing's own sections: an update per section
+// (Women’s), its Hours and its Notes, first and open; a section a page gives
+// the same closed under it; Reads last.
+describe('Mikvah hours', () => {
+  const evening = (open: string, close: string) => ({ open, close })
+  const night = evening('20:30', '22:30')
+  const earlier = evening('19:30', '21:30')
+  const dawn = evening('04:30', '10:00')
+  const WOMEN_NOW = { sun: null, mon: night, tue: night, wed: night, thu: night, fri: null, sat: null }
+  const WOMEN_READ = { sun: earlier, mon: earlier, tue: earlier, wed: earlier, thu: earlier, fri: null, sat: null }
+  const MEN_NOW = { sun: dawn, mon: dawn, tue: dawn, wed: dawn, thu: dawn }
+  const NOTE = 'By appointment, 48 hours ahead.'
+  // Lower Merion's sections as its listing has them (dev, Oct 22).
+  const SECTIONS: ListedSection[] = [
+    { section: 'womenTevillah', label: 'Women’s', hours: 'women_s_hours', notes: 'women_s_notes', labels: ['Women’s Hours', 'Women’s Notes'], now: { women_s_hours: WOMEN_NOW, women_s_notes: 'By appointment.' } },
+    { section: 'menTevillah', label: 'Men’s', hours: 'men_s_hours', notes: 'men_s_notes', labels: ['Men’s Hours', 'Men’s Notes'], now: { men_s_hours: MEN_NOW, men_s_notes: null } },
+    { section: 'keilim', label: 'Keilim', hours: 'keilim_hours', notes: null, labels: ['Keilim Hours'], now: { keilim_hours: null } },
+  ]
+  const HOME = 'https://lmcmikvah.org/'
+  const MENS = 'https://lmcmikvah.org/mens-mikvah/'
+  const WOMEN = finding({
+    id: 's-women',
+    page: HOME,
+    section: 'womenTevillah',
+    values: { women_s_hours: WOMEN_READ, women_s_notes: NOTE },
+    lines: [
+      { key: 'women_s_hours', label: 'Women’s Hours', before: '…', after: '…', choosable: true },
+      { key: 'women_s_notes', label: 'Women’s Notes', before: 'By appointment.', after: NOTE, choosable: true },
+    ],
+  })
+  const page = (id: string, url: string, c: WatchCheck) => ({ watch: watch({ id, url, lastCheck: c }), source: 'Found from its website' })
+  const LOWER: MikvahPlace = place({
+    id: 'lmc',
+    name: 'Lower Merion Community Mikvah',
+    website: HOME,
+    findings: [WOMEN],
+    sections: SECTIONS,
+    pages: [
+      page('w-none', 'https://lmcmikvah.org/contact', check('nothing')),
+      page('w-mens', MENS, check('agrees', { read: ['Men’s Hours, Sun–Thu: 4:30 AM – 10:00 AM'] })),
+      page('w-home', HOME, check('differs', { queue: 'filed', read: ['Women’s Hours, Sun–Thu: 7:30 PM – 9:30 PM', `Women’s Notes: ${NOTE}`] })),
+    ],
+  } as Partial<MikvahPlace>)
+  const SAME: MikvahPlace = place({ id: 'mz', name: 'Mikvah Moishe Zvi', sections: [SECTIONS[1]], pages: [page('w-mz', 'https://mikvahwestphilly.com/', check('agrees', { read: ['Men’s Hours, Sun–Thu: 4:30 AM – 10:00 AM'] }))] } as Partial<MikvahPlace>)
+  const NONE = place({ id: 'mei', name: 'Mikvah Mei Shalva', website: 'https://philamikvah.org/', reason: 'Read its website: no weekly hours on it.' })
+  const OFF = place({ id: 'ol', name: 'Mikvah Ohel Leah', off: true, offSince: ago(0) })
+  const today = () => day(new Date().toISOString())
+  const mikvah = (name: string) => screen.getByRole('region', { name })
+  const boxes = (name: string) => within(mikvah(name)).getAllByRole('region').map((b) => `${b.getAttribute('aria-label')} | ${within(b).queryByTestId('box-pill')?.textContent ?? ''} | ${within(b).getAllByRole('button')[0].getAttribute('aria-expanded')}`)
+  const box = (name: string, label: string) => within(mikvah(name)).getByRole('region', { name: label })
+  const marked = (b: HTMLElement) => within(b).getAllByTestId('box-row').map((r) => `${r.dataset.mark}: ${r.textContent}`)
+
+  it('says at the top whether a mikvah has an update; tabs, each with its count', async () => {
+    await renderPage([SAME, NONE, LOWER, OFF])
+    expect(gets[0]).toBe(HOURS)
+    expect(screen.getByTestId('job-counts')).toHaveTextContent('1 mikvah has an update from its website.')
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['To check 1', 'Can’t be read 1', 'Checked 1', 'Off 1'])
+    expect(pill(LOWER.name)).toBe('1 update')
     await tab('Checked')
-    expect(pill(MOISHE.name)).toBe('Same as the listing')
-    expect(within(rowOf(MOISHE.name)).getByText(/^From mikvahwestphilly\.com · read [A-Z][a-z]{2} \d+$/)).toBeInTheDocument()
-    await tab('Off')
-    expect(within(rowOf(OFF.name)).getByText('No hours online: not read.')).toBeInTheDocument()
-    expect(within(rowOf(OFF.name)).getByRole('button', { name: 'Turn back on' })).toBeInTheDocument()
-    // What's read is said once, not on every row.
-    expect(screen.getByText(/^Women’s Hours, Men’s Hours and Keilim Hours, read every morning/)).toBeInTheDocument()
-    expect(screen.queryByText('Women’s Hours · Men’s Hours · Keilim Hours')).toBeNull()
+    expect(pill(SAME.name)).toBe('Same')
+    await tab('Can’t be read')
+    expect(pill(NONE.name)).toBe('No hours found')
     expect(screen.getByRole('link', { name: '‹ Watches' })).toHaveAttribute('href', '/philly/admin/watches')
   })
 
-  // The user, Oct 21: "can the to check, can't be read, not read yet be
-  // tabs so the page isn't so messy"; and then no "Not read yet": a page
-  // is read as soon as it's found.
-  it('in tabs, each with its count, opening on the first with anything in it; Off only when there are any', async () => {
-    await renderPage([MOISHE, MEI])
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['To check 0', 'Can’t be read 1', 'Checked 1'])
-    // Nothing to check: it opens on Can't be read.
+  it('a quiet day says so, and opens on the first tab with anything in it', async () => {
+    await renderPage([SAME, NONE])
+    expect(screen.getByTestId('job-counts')).toHaveTextContent('No mikvah’s website has an update.')
     expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Can’t be read')
-    expect(rows().map((r) => within(r).getAllByRole('button')[0].querySelector('.font-semibold')?.textContent)).toEqual([MEI.name])
     await tab('To check')
-    expect(screen.queryAllByTestId('job-row')).toHaveLength(0)
     expect(screen.getByRole('tabpanel')).toHaveTextContent('None right now.')
   })
 
-  it('opened: each page it reads, where it came from, what it read, and how that compares', async () => {
-    await renderPage([LMC])
-    await open(LMC.name)
-    const [home, mens] = screen.getAllByTestId('job-source')
-    expect(within(home).getByRole('link', { name: 'lmcmikvah.org' })).toHaveAttribute('href', 'https://lmcmikvah.org/')
-    expect(home).toHaveTextContent('Found from its website')
-    expect(home).toHaveTextContent('7:30 PM – 9:30 PM on its website, 8:30 PM – 10:30 PM on the listing')
-    expect(mens).toHaveTextContent('Found from its website’s Men’s Mikvah link')
-    expect(mens).toHaveTextContent(/Read .*: the same as the listing\./)
-    // What it read, whatever it made of it (the user, Oct 21).
-    expect(within(mens).getByTestId('job-read')).toHaveTextContent('What it readMen’s Hours: Sun–Thu 4:30 AM – 10:00 AM')
-    // Any page can be replaced or stopped, found or given.
-    expect(within(mens).getByRole('button', { name: 'Use a different page' })).toBeInTheDocument()
-    expect(within(mens).getByRole('button', { name: 'Stop reading this page' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', LMC.href)
+  it('opened: a box per section it reads, the update first and open; the same one closed; Reads last', async () => {
+    await renderPage([LOWER])
+    await open(LOWER.name)
+    expect(boxes(LOWER.name)).toEqual(['Women’s | 3 changes | true', 'Men’s | Same | false', 'Reads | 3 pages | false'])
   })
 
-  it('Check now reads every page of the place, and what it filed is read back to compare, in the same place', async () => {
-    const found = check('differs', { differences: ['Hours: closed Sunday on its website'], queue: 'filed' })
-    let now = { ...MOISHE, website: 'https://mikvahwestphilly.com/' }
-    const filed = { ...now, pages: [{ ...MOISHE.pages[0], watch: { ...MOISHE.pages[0].watch, lastCheck: found } }], findings: [finding({ id: 's-mz', targetId: 'mz', name: MOISHE.name, lines: [] })] }
-    await renderPage(() => [LMC, now], (body) => {
-      if (body.action !== 'check') return {}
-      now = filed
-      return { pages: filed.pages, stopped: [] }
+  it('an update: its hours by day beside what they were, its note lit with the old one struck; Use this, Edit, Keep; where it’s from', async () => {
+    await renderPage([LOWER])
+    await open(LOWER.name)
+    const b = box(LOWER.name, 'Women’s')
+    expect(within(b).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Hours', 'Notes'])
+    expect(marked(b)).toEqual(['changed: Sunday7:30–9:30 PMClosed', 'changed: Monday to Thursday7:30–9:30 PM8:30–10:30 PM'])
+    const note = within(b).getByTestId('box-note')
+    expect(note.dataset.mark).toBe('changed')
+    expect(note).toHaveTextContent(NOTE)
+    expect(within(note).getByText('By appointment.').tagName).toBe('S')
+    expect(within(b).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this', 'Edit', 'Keep the listing'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From lmcmikvah\.org · read [A-Z][a-z]{2} \d+$/)
+  })
+
+  it('the same section: the listing’s hours, unmarked, “Same as” the page that gave it, no buttons', async () => {
+    await renderPage([LOWER])
+    await open(LOWER.name)
+    await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: /^Men’s/ }))
+    const b = box(LOWER.name, 'Men’s')
+    expect(marked(b)).toEqual(['same: Sunday to Thursday4:30–10:00 AM'])
+    expect(within(b).queryByTestId('box-note')).toBeNull()
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^Same as lmcmikvah\.org\/mens-mikvah · read/)
+    expect(within(b).getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('Reads: each page named for the section it gives; one with no hours greyed last, and can be stopped', async () => {
+    await renderPage([LOWER])
+    await open(LOWER.name)
+    await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: /^Reads/ }))
+    const lines = within(mikvah(LOWER.name)).getAllByTestId('job-source').map((l) => l.textContent?.replace(/read [A-Z][a-z]{2} \d+/, 'read …'))
+    expect(lines).toEqual(['lmcmikvah.orgWomen’sread …', 'lmcmikvah.org/mens-mikvahMen’sread …', 'lmcmikvah.org/contactno hours'])
+    await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: 'Stop reading lmcmikvah.org/contact' }))
+    expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'lmc', action: 'stop', id: 'w-none' } })
+  })
+
+  it('Use this takes the section whole; its box closes and says so', async () => {
+    await renderPage([LOWER])
+    await open(LOWER.name)
+    await userEvent.setup().click(within(box(LOWER.name, 'Women’s')).getByRole('button', { name: 'Use this' }))
+    expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-women?community=philly', body: { status: 'approved' } })
+    expect(boxes(LOWER.name)[0]).toBe(`Women’s | Used ${today()} | false`)
+    expect(pill(LOWER.name)).toBe(`Used ${today()}`)
+    expect(screen.getByTestId('job-counts')).toHaveTextContent('No mikvah’s website has an update.')
+  })
+
+  it('Keep the listing: kept, and said so', async () => {
+    await renderPage([LOWER])
+    await open(LOWER.name)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Keep the listing' }))
+    expect(posts.at(-1)!.body).toEqual({ status: 'rejected' })
+    expect(pill(LOWER.name)).toBe(`Kept ${today()}`)
+  })
+
+  it('Edit: the listing’s own editor for the section, filled with the website’s, saving that section only', async () => {
+    const category = makeCategory({
+      id: 'mikvah',
+      detailFields: [
+        { key: 'womenTevillah', label: 'Women’s Tevillah', type: 'boolean', filterLabel: 'Women’s' },
+        { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+        { key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea', audienceKey: 'womenTevillah' },
+        { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours', audienceKey: 'menTevillah' },
+      ],
     })
-    await tab('Checked')
-    await userEvent.setup().click(within(rowOf(MOISHE.name)).getByRole('button', { name: 'Check now' }))
-    expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'mz', action: 'check' } })
-    expect(await within(rowOf(MOISHE.name)).findByTestId('finding')).toBeInTheDocument()
-    expect(pill(MOISHE.name)).toBe('Differs from the listing')
-    expect(gets.at(-1)).toBe('/api/admin/watches/hours?counts&community=philly')
-    // Still in Checked: it doesn't jump away under the admin's hand.
-    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Checked 1')
-    expect(rows()).toEqual([rowOf(MOISHE.name)])
+    const item = makeListing({ id: 'lmc', category: 'mikvah', name: LOWER.name, womenTevillah: true, women_s_hours: WOMEN_NOW, women_s_notes: 'By appointment.', men_s_hours: MEN_NOW })
+    await renderPage([LOWER])
+    const listed = vi.mocked(fetchJson).getMockImplementation()!
+    vi.mocked(fetchJson).mockImplementation(async (url, init, fallback) => (String(url).includes('item=lmc') ? { ok: true, item, category } : listed(url, init, fallback)))
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    await open(LOWER.name)
+    const user = userEvent.setup()
+    await user.click(within(box(LOWER.name, 'Women’s')).getByRole('button', { name: 'Edit' }))
+    expect(vi.mocked(fetchJson).mock.calls.map(([u]) => u)).toContain('/api/admin/watches/hours?item=lmc&community=philly')
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('Women’s hours')).toBeInTheDocument()
+    expect(within(sheet).getByDisplayValue(NOTE)).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+    const [url, init] = fetchMock.mock.calls.find(([u]) => String(u).includes('/api/admin/submissions/'))!
+    expect(String(url)).toBe('/api/admin/submissions/s-women?community=philly')
+    const sent = JSON.parse(String(init!.body))
+    expect(sent.status).toBe('approved')
+    expect(Object.keys(sent.payload.details).sort()).toEqual(['women_s_hours', 'women_s_notes'])
+    expect(sent.payload.details.women_s_notes).toBe(NOTE)
+    expect(sent.payload.details.women_s_hours).toMatchObject({ sun: earlier, mon: earlier })
+    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    fetchMock.mockRestore()
   })
 
-  // The user, Oct 21: "all the ones in not read yet can't be checked", and
-  // then no "Not read yet" at all: read as soon as the page loads.
-  it('a page not read yet is read as soon as the page loads, in To check; one with no page has Check now', async () => {
+  it('a finding that isn’t one section’s is shown whole, to compare', async () => {
+    await renderPage([{ ...LOWER, findings: [finding({ id: 's-old', targetId: 'lmc' })] } as MikvahPlace])
+    await open(LOWER.name)
+    expect(within(mikvah(LOWER.name)).getByRole('region', { name: 'From its website' })).toBeInTheDocument()
+    expect(within(mikvah(LOWER.name)).getByRole('button', { name: 'Compare' })).toBeInTheDocument()
+  })
+
+  it('Read them now reads every page of the place, and what it filed shows on its row', async () => {
+    let now: MikvahPlace = { ...LOWER, findings: [] }
+    await renderPage(
+      () => [now],
+      (body) => {
+        if (body.action !== 'check') return {}
+        now = LOWER
+        return { pages: LOWER.pages, stopped: [] }
+      },
+    )
+    await tab('Checked')
+    await open(LOWER.name)
+    await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: /^Reads/ }))
+    await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: 'Read them now' }))
+    expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'lmc', action: 'check' } })
+    await waitFor(() => expect(pill(LOWER.name)).toBe('1 update'))
+  })
+
+  it('a page not read yet is read as soon as the page loads', async () => {
     const unread = place({ id: 'u', name: 'Unread Mikvah', pages: [{ watch: watch({ id: 'w-u', lastRunAt: null, lastCheck: null }), source: 'Found from its website' }] })
     const read = { watch: watch({ id: 'w-u', lastCheck: check('agrees') }), source: 'Found from its website' }
     let answer: (v: Record<string, unknown>) => void = () => {}
@@ -190,106 +288,50 @@ describe('HoursJob', () => {
         posts.push({ url: String(url), body: JSON.parse(String(init.body)) })
         return new Promise((done) => (answer = done))
       }
-      return { ok: true, available: true, name: 'Mikvah hours', places: [unread, MEI] }
+      return { ok: true, available: true, name: 'Mikvah hours', places: [unread] }
     })
     renderWithProviders(<HoursJob token="tok" />, { community: { slug: 'philly' } })
     await screen.findByRole('heading', { name: 'Mikvah hours' })
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['To check 1', 'Can’t be read 1', 'Checked 0'])
-    expect(await within(rowOf('Unread Mikvah')).findByRole('button', { name: 'Reading…' })).toBeDisabled()
+    await waitFor(() => expect(pill('Unread Mikvah')).toBe('Reading…'))
     expect(posts.map((p) => p.body)).toEqual([{ resourceId: 'u', action: 'check' }])
-    expect(pill('Unread Mikvah')).toBe('Not read yet')
     answer({ ok: true, pages: [read], stopped: [] })
-    await waitFor(() => expect(pill('Unread Mikvah')).toBe('Same as the listing'))
-    await tab('Can’t be read')
-    void userEvent.setup().click(within(rowOf(MEI.name)).getByRole('button', { name: 'Check now' }))
-    await waitFor(() => expect(posts.at(-1)!.body).toEqual({ resourceId: 'mei', action: 'check' }))
+    await waitFor(() => expect(pill('Unread Mikvah')).toBe('Same'))
   })
 
-  it('reads at most a few on its own, leaving the rate limit for Check now', async () => {
+  it('reads at most a few on its own, leaving the rate limit for Read them now', async () => {
     const unread = Array.from({ length: READ_ON_LOAD + 2 }, (_, i) => place({ id: `u${i}`, name: `Unread ${i}`, pages: [{ watch: watch({ id: `w-u${i}`, lastRunAt: null, lastCheck: null }), source: 'Found from its website' }] }))
     await renderPage(unread, () => ({ pages: [], stopped: [] }))
     await waitFor(() => expect(posts).toHaveLength(READ_ON_LOAD))
   })
 
-  it('a finding whose read listed no differences still says it differs', async () => {
-    await renderPage([{ ...LMC, pages: [{ ...LMC.pages[0], watch: { ...LMC.pages[0].watch, lastCheck: check('differs', { queue: 'filed' }) } }] }])
-    expect(pill(LMC.name)).toBe('Differs from the listing')
-  })
-
-  it('Compare: a tick per line, and Update sends only the ticked ones; it stays where it was, saying so', async () => {
-    await renderPage([LMC, MOISHE])
+  it('one that can’t be read: why on its row; opened, only Reads, open, its website saying why; a page can be given', async () => {
+    await renderPage([NONE])
+    expect(pill(NONE.name)).toBe('No hours found')
+    await open(NONE.name)
+    expect(boxes(NONE.name)).toEqual(['Reads | 1 page | true'])
+    expect(within(mikvah(NONE.name)).getByTestId('job-source')).toHaveTextContent('philamikvah.orgno hours')
     const user = userEvent.setup()
-    await user.click(within(rowOf(LMC.name)).getByRole('button', { name: 'Compare' }))
-    const box = screen.getByRole('region', { name: /what its website says/ })
-    expect(within(box).getAllByTestId('finding-line')).toHaveLength(2)
-    await user.click(within(box).getByRole('checkbox', { name: 'Call before' }))
-    await user.click(within(box).getByRole('button', { name: 'Update 1 on the listing' }))
-    expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-lmc?community=philly', body: { status: 'approved', only: ['women_s_hours'] } })
-    expect(within(rowOf(LMC.name)).getByTestId('finding-decided')).toHaveTextContent('Updated on the listing.')
-    expect(within(rowOf(LMC.name)).getByText(/^Updated on the listing [A-Z][a-z]{2} \d+\.$/)).toBeInTheDocument()
-    expect(rows()[0]).toBe(rowOf(LMC.name))
-    expect(screen.getByTestId('job-counts').textContent).toBe('0 need you · 2 places')
-  })
-
-  it('Skip for now: rejected, and it says when it comes back', async () => {
-    await renderPage([LMC])
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Compare' }))
-    await user.click(screen.getByRole('button', { name: 'Skip for now' }))
-    expect(posts.at(-1)!.body).toEqual({ status: 'rejected' })
-    expect(screen.getByTestId('finding-decided')).toHaveTextContent('Skipped. Not shown again unless its website says something new.')
-    expect(screen.getByText(/^Skipped [A-Z][a-z]{2} \d+: shown again if its page changes\.$/)).toBeInTheDocument()
-  })
-
-  // The user, Oct 21: "a way to replace the source or add a source".
-  it('a page can be replaced with another, stopped for good and read again, or another added', async () => {
-    const mz = MOISHE.pages[0]
-    const other = { watch: watch({ id: 'w-other', url: 'https://mikvahwestphilly.com/hours', lastCheck: check('agrees') }), source: 'Added by hand' }
-    const stopped = { watch: { ...mz.watch, active: false, createdBy: 'listing pages (stopped)' }, source: 'Stopped' }
-    await renderPage([{ ...MOISHE, website: 'https://mikvahwestphilly.com/' }], (body) =>
-      body.action === 'give' && body.replaces ? { pages: [other], stopped: [stopped] } : body.action === 'again' ? { pages: [other, mz], stopped: [] } : body.action === 'stop' ? { pages: [mz], stopped: [{ ...other, source: 'Stopped' }] } : { pages: [mz, other], stopped: [] },
-    )
-    await open(MOISHE.name)
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Use a different page' }))
-    await user.type(screen.getByLabelText('Instead of mikvahwestphilly.com'), 'mikvahwestphilly.com/hours')
+    await user.click(within(mikvah(NONE.name)).getByRole('button', { name: 'Add a page' }))
+    await user.type(screen.getByPlaceholderText('its-website.org/hours'), 'philamikvah.org/hours')
     await user.click(screen.getByRole('button', { name: 'Save and read' }))
-    expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'mz', action: 'give', url: 'mikvahwestphilly.com/hours', replaces: 'w-mz' } })
-    expect(screen.getAllByTestId('job-source')).toHaveLength(1)
-    expect(screen.getByTestId('hours-stopped')).toHaveTextContent('Stopped, not read: mikvahwestphilly.com')
-    await user.click(screen.getByRole('button', { name: 'Read it again' }))
-    expect(posts.at(-1)!.body).toEqual({ resourceId: 'mz', action: 'again', id: 'w-mz' })
-    expect(screen.getAllByTestId('job-source')).toHaveLength(2)
-    await user.click(within(screen.getAllByTestId('job-source')[0]).getByRole('button', { name: 'Stop reading this page' }))
-    expect(posts.at(-1)!.body).toEqual({ resourceId: 'mz', action: 'stop', id: 'w-other' })
-    await user.click(screen.getByRole('button', { name: 'Add a page' }))
-    await user.type(screen.getByPlaceholderText('its-website.org/hours'), 'mikvahwestphilly.com/keilim')
-    await user.click(screen.getByRole('button', { name: 'Save and read' }))
-    expect(posts.at(-1)!.body).toEqual({ resourceId: 'mz', action: 'give', url: 'mikvahwestphilly.com/keilim' })
-    // Its website, to see what the reader missed.
-    expect(screen.getByRole('link', { name: 'Open its website' })).toHaveAttribute('href', 'https://mikvahwestphilly.com/')
-  })
-
-  it('one that can’t be read opens with its page to give; given, it’s read and says so', async () => {
-    const given = { watch: watch({ id: 'w-new', url: 'https://philamikvah.org/hours', lastCheck: check('agrees') }), source: 'Added by hand' }
-    await renderPage([MEI], (body) => (body.action === 'give' ? { pages: [given], off: false } : { pages: [given], off: true }))
-    await open(MEI.name)
-    await userEvent.setup().type(screen.getByPlaceholderText('its-website.org/hours'), 'philamikvah.org/hours')
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Save and read' }))
     expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'mei', action: 'give', url: 'philamikvah.org/hours' } })
-    expect(pill(MEI.name)).toBe('Same as the listing')
-    expect(within(rowOf(MEI.name)).getByRole('link', { name: 'philamikvah.org/hours' })).toBeInTheDocument()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Turn off this place' }))
-    expect(posts.at(-1)!.body).toEqual({ resourceId: 'mei', action: 'off' })
-    expect(within(rowOf(MEI.name)).getByRole('button', { name: 'Turn back on' })).toBeInTheDocument()
-    expect(within(rowOf(MEI.name)).getByText('Turned off: not read.')).toBeInTheDocument()
   })
 
-  it('one that’s off says so, and Turn back on reads it', async () => {
-    await renderPage([place({ id: 'ol', name: 'Mikvah Ohel Leah', off: true }), place({ id: 'x', name: 'Paused Mikvah', pages: [{ watch: watch({ active: false }), source: 'Found from its website' }] })])
-    expect(pill('Paused Mikvah')).toBe('Off')
-    expect(within(rowOf('Paused Mikvah')).getByText('Turned off: not read.')).toBeInTheDocument()
-    await userEvent.setup().click(within(rowOf('Mikvah Ohel Leah')).getByRole('button', { name: 'Turn back on' }))
+  it('Reading off: its row says Not read, Reads says Off; turned back on, it’s read', async () => {
+    await renderPage([SAME, OFF], (body) => (body.action === 'off' ? { pages: SAME.pages.map((x) => ({ ...x, watch: { ...x.watch, active: false } })), off: true } : { pages: [], off: false }))
+    await tab('Checked')
+    await open(SAME.name)
+    const user = userEvent.setup()
+    await user.click(within(mikvah(SAME.name)).getByRole('button', { name: /^Reads/ }))
+    await user.click(within(mikvah(SAME.name)).getByRole('switch', { name: /Reading/ }))
+    expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'mz', action: 'off' } })
+    expect(pill(SAME.name)).toBe('Not read')
+    await tab('Off')
+    await open(OFF.name)
+    const reads = within(mikvah(OFF.name)).getByRole('region', { name: 'Reads' })
+    expect(within(reads).getByTestId('box-pill')).toHaveTextContent('Off')
+    expect(within(reads).queryByRole('button', { name: 'Read them now' })).toBeNull()
+    await user.click(within(reads).getByRole('switch'))
     expect(posts.at(-1)!.body).toEqual({ resourceId: 'ol', action: 'on' })
   })
 })

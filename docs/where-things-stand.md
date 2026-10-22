@@ -342,9 +342,11 @@ agreed:
   - Dev's one such watch, Moishe Zvi's, is removed. Production had none,
     so nothing there changed.
 - A read that agrees with the listing clears that watch's older finding.
+  **Not built yet.**
 - The uncommitted filing-side work is committed as it was, then built on.
-- Mikvah hours given as notes ("by appointment, 48 hours ahead") waits for
-  the user.
+- Mikvah hours given as notes ("by appointment, 48 hours ahead"): the user,
+  Oct 22, "yes" to reading them as a note under the hours they belong to,
+  shown and approved like a changed time. Built with step 4.
 
 **Order:**
 1. The own-pages fix (built).
@@ -389,7 +391,29 @@ agreed:
      version; the hours route's `?item=` hands it the listing.
    - A filing from before parts (dev has three, Sons of Israel's) shows
      whole in a "From its website" box with Compare.
-4. Mikvah hours.
+4. Mikvah hours. **Built Oct 22** (compared with its drawing on dev,
+   computer and phone; Lower Merion's update stubbed in the browser, Moishe
+   Zvi's two from a real read on dev):
+   - A box per section the listing ticks (Women's, Men's, Keilim;
+     `hoursSections.ts`), each with Hours ("Sunday 7:30–9:30 PM", the old
+     hours struck beside a changed day) and Notes (a changed note lit
+     whole, the old one struck under it). "N changes" or "Same", "Same as"
+     its page (`MikvahHours.tsx`).
+   - Notes are read too: each section's notes go to the reader beside its
+     hours, which is told to keep the guide's note when it says the same.
+     A page that only says "by appointment" is found and read.
+   - A reading is filed a section at a time (`splitSections`), its source
+     naming the section and its keys. Use this approves only those keys
+     onto the listing as it is then (`rebaseSection` in
+     `approveSubmission`), so approving Women's never undoes Men's. A
+     section waiting from the same page is replaced; one filed before
+     isn't filed again.
+   - Edit is the section's own editor ("Women's hours", its hours and
+     notes), filled with the website's, saving only that section's keys.
+   - An older finding whose lines all sit in one section shows as that
+     section's box; one across sections shows whole with Compare.
+   - Not built, as the drawing says: the Contact box (phone and email
+     Google doesn't keep), part of "keeping listings current".
 5. Hospitals.
 6. Kosher.
 7. Eruv.

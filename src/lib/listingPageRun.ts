@@ -17,6 +17,7 @@ import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
 import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
 import { TIMES_PART_LABELS, partKey, partLines, partSize, partsGiven, readPartSource, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
+import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
 import { sendWatchDigest } from '@/lib/email'
 import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
@@ -269,7 +270,7 @@ export async function readPageFor(
   }
   // Weekly hours: the any-field reader (messageReader.ts), told only of this
   // listing, and only its hours kept.
-  const intro = hoursNowIntro(listing.name, category, reads.keys, listing)
+  const intro = hoursNowIntro(listing.name, category, reads.keys, listing, reads.notes)
   // Only the hours fields it reads are offered (pageReadsFor).
   const offered = { ...category, detailFields: category.detailFields.filter((f) => f.type !== 'hours' || reads.keys.includes(f.key)) }
   const reading = await readMessage(
@@ -280,12 +281,12 @@ export async function readPageFor(
     buildCatalog([listing], [offered]),
     { apiKey, communityName, about: listing.id, fetchImpl },
   )
-  const changes = hoursReads(reading.proposals, listing.id, reads.keys)
+  const changes = hoursReads(reading.proposals, listing.id, reads.keys, reads.notes)
   const lines = hoursReadLines(changes, category)
   if (changes.length === 0) return { read: lines, proposal: null }
   const { values, unread } = readFieldChanges(category, listing, changes)
   const { submission, lines: edits } = fieldsEdit(category, listing, values)
-  return { read: lines, proposal: edits.length ? { submission, lines: edits, keys: reads.keys } : null, ...(unread.length ? { unread } : {}) }
+  return { read: lines, proposal: edits.length ? { submission, lines: edits, keys: [...reads.keys, ...reads.notes] } : null, ...(unread.length ? { unread } : {}) }
 }
 
 /**
@@ -377,6 +378,8 @@ async function pendingSuggestions(community: string, listingId: string): Promise
  *  it's one of them. */
 const partOf = (s: { payload: unknown }): PartSource | null => readPartSource((s.payload as { source?: { part?: unknown } } | null)?.source?.part)
 const detailsOf = (s: { payload: unknown }) => (s.payload as { details?: Record<string, unknown> } | null)?.details ?? {}
+/** The section of a mikvah's hours a suggestion is about (hoursSections.ts). */
+const sectionOf = (s: { payload: unknown }): SectionSource | null => readSectionSource((s.payload as { source?: { section?: unknown } } | null)?.source?.section)
 
 /** Everything this watch has filed for the listing, whatever became of it. */
 export async function earlierSuggestions(community: string, listingId: string): Promise<{ payload: unknown }[]> {
@@ -437,7 +440,7 @@ export async function runListingPageWatch(
   // (timesParts.ts): its other parts can still be filed beside it.
   const waitingNow = await pendingSuggestions(watch.communityId, listing.id)
   const pending = waitingNow.length > 0
-  const blocked = waitingNow.some((s) => !partOf(s))
+  const blocked = waitingNow.some((s) => !partOf(s) && !sectionOf(s))
   if (blocked && !opts.full) return { ok: true, filed: 0 }
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
   if (!apiKey) {
@@ -468,6 +471,18 @@ export async function runListingPageWatch(
   if (parts.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
+    if (filed.length) {
+      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
+        console.error('[watch-listing-page] digest failed:', err),
+      )
+    }
+    return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
+  }
+  // A mikvah's hours: filed as the sections they change, each on its own.
+  const sections = reads.kind === 'hours' ? splitSections(hoursSections(category, reads.keys), listing, proposal.submission.details) : []
+  if (sections.length) {
+    if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
+    const { queue, filed } = await fileSections(watch, category, listing, sections, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
     if (filed.length) {
       await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
         console.error('[watch-listing-page] digest failed:', err),
@@ -548,6 +563,60 @@ async function fileParts(
     }
     outcomes.push('filed')
     filed.push(what)
+  }
+  const queue = outcomes.includes('filed') ? 'filed' : outcomes.includes('waiting') ? 'waiting' : 'before'
+  return { queue, filed }
+}
+
+/** A mikvah's hours, filed a section at a time (hoursSections.ts): the
+ *  women's, men's and keilim hours and notes each a finding of its own, as
+ *  Mikvah hours shows them, a box each. A section already waiting as read
+ *  here is left waiting, and one filed before isn't filed again. One
+ *  waiting from this page is replaced by what it says now; one from
+ *  another page is left for the admin. */
+async function fileSections(
+  watch: Pick<Watch, 'communityId' | 'url'>,
+  category: CategoryConfig,
+  listing: DirectoryResource,
+  sections: readonly { section: HoursSection; details: Record<string, unknown>; source: SectionSource }[],
+  waiting: readonly Filed[],
+  text: string | null,
+  at: { now?: number; seen: 'changed' | 'read' },
+): Promise<{ queue: 'filed' | 'waiting' | 'before'; filed: string[] }> {
+  const earlier = await earlierSuggestions(watch.communityId, listing.id)
+  const on = changedOn(at.now ?? Date.now(), communityConfig.timezone)
+  const outcomes: ('filed' | 'waiting' | 'before')[] = []
+  const filed: string[] = []
+  for (const p of sections) {
+    const keys = p.source.keys
+    const key = suggestionKey(p.details, keys)
+    const same = waiting.filter((s) => sectionOf(s)?.section === p.source.section)
+    if (same.some((s) => suggestionKey(detailsOf(s), keys) === key)) {
+      outcomes.push('waiting')
+      continue
+    }
+    // Filed before as this section, or inside a whole reading from before
+    // the sections.
+    if (earlier.some((s) => (sectionOf(s)?.section ?? p.source.section) === p.source.section && suggestionKey(detailsOf(s), keys) === key)) {
+      outcomes.push('before')
+      continue
+    }
+    const { submission, lines } = fieldsEdit(category, listing, Object.fromEntries(keys.map((k) => [k, p.details[k] ?? null])))
+    if (!lines.length) continue
+    const payload = { ...submission, source: { ...listingPageSource(listing.name, watch.url, on, text, at.seen), section: p.source } } as ResourceSubmission
+    const note = listingPageNote(watch.url, on, lines, at.seen)
+    const there = same[0]
+    if (there) {
+      const from = (there.payload as { source?: { note?: unknown } } | null)?.source?.note
+      if (typeof from !== 'string' || !from.endsWith(watch.url) || !(await replacePendingSuggestion(watch.communityId, there.id, payload, note))) {
+        outcomes.push('waiting')
+        continue
+      }
+    } else {
+      await submitListingUpdate(watch.communityId, listing.id, payload, note, { name: LISTING_PAGE_WATCH_NAME })
+    }
+    outcomes.push('filed')
+    filed.push(`${p.section.label}: ${lines.join('; ')}`)
   }
   const queue = outcomes.includes('filed') ? 'filed' : outcomes.includes('waiting') ? 'waiting' : 'before'
   return { queue, filed }

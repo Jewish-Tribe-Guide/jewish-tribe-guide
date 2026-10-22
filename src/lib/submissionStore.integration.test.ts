@@ -228,6 +228,34 @@ describe('submissionStore (integration)', () => {
     expect(after!.phone).toBe('555-0199')
   })
 
+  // Oct 22: a mikvah's hours, the same way, a section at a time
+  // (hoursSections.ts): using the women's hours never undoes men's hours
+  // approved since they were read.
+  it('approving one section of a mikvah’s hours keeps another section approved since it was read', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Mikvah ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const listed = { women_s_hours: 'evenings', women_s_notes: 'By appointment.', men_s_hours: 'mornings', kept: 'yes' }
+    await getAdminClient().from('resource').update({ details: listed }).eq('id', created!.id)
+
+    const file = async (details: object, section: string, keys: string[]) => {
+      const sub = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), details: { ...listed, ...details }, source: { readBy: 'ai', from: 'its website', section: { section, keys } } } as ResourceSubmission, null, null)
+      pendingSubmissionIds.push(sub.id)
+      return sub
+    }
+    // Both read off the listing as it was.
+    const men = await file({ men_s_hours: 'dawn' }, 'menTevillah', ['men_s_hours', 'men_s_notes'])
+    const women = await file({ women_s_hours: 'late evenings' }, 'womenTevillah', ['women_s_hours', 'women_s_notes'])
+    await approveSubmission(men.id)
+    await approveSubmission(women.id)
+
+    const { data: after } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(after!.details).toMatchObject({ women_s_hours: 'late evenings', women_s_notes: 'By appointment.', men_s_hours: 'dawn', kept: 'yes' })
+  })
+
   it('a pending suggestion is said again better in place; one decided meanwhile is left as decided', async () => {
     const category = await makeTestCategory()
     const name = `Integration Shul ${randomUUID()}`

@@ -4,6 +4,7 @@ import { MEKOR_NAME, MEKOR_WATCH_NAME } from './mekorWatch'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { GOOGLE, KEYSTONE_NAME } from './sourceNames'
 import { readPartSource, type PartSource } from './timesParts'
+import { readSectionSource, type SectionSource } from './hoursSections'
 
 // Where a suggestion came from, for the moderation queue (agreed Oct 5,
 // canvas QList/QOpen): every card says it, an AI-read one is labelled "Read
@@ -41,6 +42,10 @@ export type SubmissionSource = {
    *  times, the usual Shabbos times or this week's schedule (timesParts.ts).
    *  Approved, only that part goes on the listing, as the listing is then. */
   part?: PartSource
+  /** A mikvah's hours: which section it changes, and its keys
+   *  (hoursSections.ts). Approved, only those go on the listing, as the
+   *  listing is then. */
+  section?: SectionSource
 }
 
 type SourceInput = {
@@ -69,6 +74,7 @@ export function statedSource(payload: Record<string, unknown> | null | undefined
     ...(text('note') ? { note: text('note') } : {}),
     ...(text('named') ? { named: (text('named') as string).trim() } : {}),
     ...(readPartSource(r.part) ? { part: readPartSource(r.part)! } : {}),
+    ...(readSectionSource(r.section) ? { section: readSectionSource(r.section)! } : {}),
   }
 }
 

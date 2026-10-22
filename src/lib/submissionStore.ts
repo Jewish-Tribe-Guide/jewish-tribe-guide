@@ -13,6 +13,7 @@ import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
 import { isCommunityEdit, statedSource, submissionSource } from './submissionSource'
 import { rebasePart } from './timesParts'
+import { rebaseSection } from './hoursSections'
 import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import type { EruvSuggestion } from './eruvSuggestion'
@@ -457,6 +458,23 @@ export async function approveSubmission(
       address: now.address ?? '',
       phone: now.phone ?? '',
       details: rebasePart(part, listing, sent.details ?? {}),
+    } as unknown as Record<string, unknown>
+  }
+
+  // A mikvah's hours read as one section (hoursSections.ts), the same way:
+  // using the women's hours never undoes men's hours approved since.
+  const section = submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id && !part ? statedSource(submission.payload)?.section : undefined
+  if (section) {
+    const { data: row, error: rowErr } = await supabase.from('resource').select('name, address, phone, details').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const sent = submission.payload as unknown as ResourceSubmission
+    const now = row as Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>
+    submission.payload = {
+      ...sent,
+      name: now.name,
+      address: now.address ?? '',
+      phone: now.phone ?? '',
+      details: rebaseSection(section, now.details ?? {}, sent.details ?? {}),
     } as unknown as Record<string, unknown>
   }
 

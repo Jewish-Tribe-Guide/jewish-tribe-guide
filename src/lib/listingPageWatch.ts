@@ -10,6 +10,7 @@ import { CALENDAR_HEADING } from './calendarFeed'
 import { formatDays, parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type MinyanDayKey } from './davening'
 import { DAY_KEYS, fmt12, formatHoursSummary } from './hours'
 import { dateText } from './schedules'
+import { hoursSections } from './hoursSections'
 
 // ── Watching a listing's own web page (the user, Oct 19) ────────────────────
 // A shul's page of its usual minyan times, or a mikvah's page of its hours,
@@ -54,7 +55,7 @@ export function isListingPageWatch(w: Pick<Watch, 'createdBy'>): boolean {
 /** What a listing's page is read for: a shul's usual minyan times, or the
  *  weekly hours fields (a mikvah's hours, women's hours, men's, keilim).
  *  Null when its category has neither, and the page has nothing to give. */
-export type PageReads = { kind: 'times'; key: string } | { kind: 'hours'; keys: string[] }
+export type PageReads = { kind: 'times'; key: string } | { kind: 'hours'; keys: string[]; notes: string[] }
 
 /** Every category's plain "Hours" field, the one Google keeps. */
 const PLAIN_HOURS_KEY = 'hours'
@@ -67,19 +68,24 @@ export function pageReadsFor(category: Pick<CategoryConfig, 'detailFields'>): Pa
   // "Hours" beside them: offered that, the AI put Lower Merion's women's
   // hours there and missed that they had changed (the user, Oct 20).
   const named = hours.filter((k) => k !== PLAIN_HOURS_KEY)
-  return hours.length ? { kind: 'hours', keys: named.length ? named : hours } : null
+  const keys = named.length ? named : hours
+  // And each section's notes (the user, Oct 22): "by appointment, 48 hours
+  // ahead" can be all a mikvah's page says of its hours.
+  const notes = hoursSections(category, keys).flatMap((s) => (s.notes ? [s.notes] : []))
+  return hours.length ? { kind: 'hours', keys, notes } : null
 }
 
 /** For the AI reading a page for hours: what each field holds now, so it
  *  can tell which of a mikvah's hours the page gives. Without it, "open
  *  7:30–9:30 PM every weeknight" went nowhere, or to the wrong field
  *  (Oct 20). It proposes only what the page says. Null with one field. */
-export function hoursNowIntro(name: string, category: Pick<CategoryConfig, 'detailFields'>, keys: readonly string[], listing: Record<string, unknown>): string | null {
-  if (keys.length < 2) return null
-  const lines = keys.map((k) => {
-    const label = category.detailFields.find((f) => f.key === k)?.label ?? k
-    return `${label}: ${listing[k] ? formatHoursSummary(listing[k]) : 'none listed'}`
-  })
+export function hoursNowIntro(name: string, category: Pick<CategoryConfig, 'detailFields'>, keys: readonly string[], listing: Record<string, unknown>, notes: readonly string[] = []): string | null {
+  if (keys.length + notes.length < 2) return null
+  const labelOf = (k: string) => category.detailFields.find((f) => f.key === k)?.label ?? k
+  const lines = [
+    ...keys.map((k) => `${labelOf(k)}: ${listing[k] ? formatHoursSummary(listing[k]) : 'none listed'}`),
+    ...notes.map((k) => `${labelOf(k)}: ${typeof listing[k] === 'string' && listing[k].trim() ? listing[k].trim() : 'none listed'}`),
+  ]
   // "Every one, the same ones too": told what's listed, the AI otherwise
   // gives only what differs, and a page that agrees reads as giving
   // nothing. A time set by candle lighting can't be weekly hours: offered,
@@ -88,6 +94,11 @@ export function hoursNowIntro(name: string, category: Pick<CategoryConfig, 'deta
     `What the guide lists for ${name} now, only so you can tell which hours the page gives:`,
     ...lines,
     'Give every weekly hours the page states, the ones that match the guide too, and only what the page says. Leave out a day whose time is set by candle lighting, sunset or appointment: weekly hours can’t hold it.',
+    ...(notes.length
+      ? [
+          'Give each section’s notes too: what its hours can’t hold (by appointment, how far ahead to book, times set by candle lighting, Motzei Shabbos, where the entrance is), in the page’s own words. When the guide’s note already says what the page says, give the guide’s note unchanged.',
+        ]
+      : []),
   ].join('\n')
 }
 
@@ -98,10 +109,13 @@ export function listingPageLabel(name: string, reads: PageReads): string {
 /** The hours changes the message reader read for this listing, and only
  *  hours: a page's phone or address is for another day. A page that names
  *  no other place is about this one, so a proposal for no place counts. */
-export function hoursReads(proposals: Proposal[], listingId: string, keys: readonly string[]): FieldRead[] {
+export function hoursReads(proposals: Proposal[], listingId: string, keys: readonly string[], notes: readonly string[] = []): FieldRead[] {
   const wanted = new Set(keys)
+  const noted = new Set(notes)
   return proposals.flatMap((p) =>
-    p.kind === 'fields' && (p.listingId === listingId || (p.listingId === null && !p.ask)) ? p.changes.filter((c) => wanted.has(c.key) && c.hours) : [],
+    p.kind === 'fields' && (p.listingId === listingId || (p.listingId === null && !p.ask))
+      ? p.changes.filter((c) => (wanted.has(c.key) && c.hours) || (noted.has(c.key) && typeof c.value === 'string' && c.value.trim() !== ''))
+      : [],
   )
 }
 
@@ -192,8 +206,12 @@ export function timesReadLines(rows: readonly UpdateRow[]): string[] {
 export function hoursReadLines(reads: readonly FieldRead[], category: Pick<CategoryConfig, 'detailFields'>): string[] {
   return reads.flatMap((r) => {
     const h = r.hours
-    if (!h) return []
     const label = category.detailFields.find((f) => f.key === r.key)?.label ?? r.key
+    if (!h) {
+      if (typeof r.value !== 'string' || !r.value.trim()) return []
+      const v = r.value.trim().replace(/\s+/g, ' ')
+      return [`${label}: ${v.length > 120 ? `${v.slice(0, 119)}…` : v}`]
+    }
     const days = h.days === 'all' ? 'every day' : dayRuns(h.days)
     const said = h.closed ? 'closed' : h.open && h.close ? `${fmt12(h.open)}–${fmt12(h.close)}` : h.open ? `opens ${fmt12(h.open)}` : `closes ${fmt12(h.close!)}`
     return [`${label}, ${days}: ${said}${h.when === 'one_day' ? ' (one day only)' : ''}`]

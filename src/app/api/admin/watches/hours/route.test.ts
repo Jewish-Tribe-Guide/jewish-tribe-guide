@@ -182,6 +182,30 @@ describe('a shul’s times, for its boxes and its Edit (?job=times)', () => {
   })
 })
 
+describe('a mikvah’s sections, for its boxes and its Edit', () => {
+  const SECTIONED = {
+    id: 'mikvah',
+    label: 'Mikvah',
+    detailFields: [
+      { key: 'womenTevillah', label: 'Women’s Tevillah', type: 'boolean', filterLabel: 'Women’s' },
+      { key: 'menTevillah', label: 'Men’s Tevillah', type: 'boolean', filterLabel: 'Men’s' },
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+      { key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea', audienceKey: 'womenTevillah' },
+      { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours', audienceKey: 'menTevillah' },
+    ],
+  }
+  const hours = { mon: { open: '20:30', close: '22:30' } }
+
+  it('each mikvah comes with the sections it has, each with its hours and notes as listed', async () => {
+    m.hoursJobPlaces.mockResolvedValue({ categories: [SECTIONED], places: [makeListing({ id: MEI, category: 'mikvah', name: 'Mikvah Mei Shalva', womenTevillah: true, women_s_notes: 'By appointment.', women_s_hours: hours } as never)] })
+    const body = await (await GET(req('GET'))).json()
+    expect(body.places[0].sections).toEqual([
+      { section: 'womenTevillah', label: 'Women’s', hours: 'women_s_hours', notes: 'women_s_notes', labels: ['Women’s Hours', 'Women’s Notes'], now: { women_s_hours: hours, women_s_notes: 'By appointment.' } },
+    ])
+    expect((await GET(req('GET', undefined, `?item=${MEI}`))).status).toBe(200)
+  })
+})
+
 describe('POST /api/admin/watches/hours', () => {
   // The user, Oct 21: an admin "can remove or replace them".
   it('stop: any page, found or given, kept and never read, so the search never adds it again', async () => {

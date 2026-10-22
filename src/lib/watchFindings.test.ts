@@ -119,6 +119,31 @@ describe('findingFrom: a shul’s times', () => {
   })
 })
 
+describe('findingFrom: a mikvah’s section', () => {
+  const SECTIONED: CategoryField[] = [
+    { key: 'womenTevillah', label: 'Women’s Tevillah', type: 'boolean' },
+    { key: 'menTevillah', label: 'Men’s Tevillah', type: 'boolean' },
+    { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+    { key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea', audienceKey: 'womenTevillah' },
+    { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours', audienceKey: 'menTevillah' },
+  ]
+  const was = { mon: { open: '20:30', close: '22:30' } }
+  const now = { mon: { open: '19:30', close: '21:30' } }
+  const lmc = { ...current, details: { womenTevillah: true, menTevillah: true, women_s_hours: was, women_s_notes: 'By appointment.', men_s_hours: was } }
+  const read = (details: Record<string, unknown>, source: Record<string, unknown> = {}) =>
+    sub({ payload: { category: 'mikvah', name: lmc.name, address: lmc.address, phone: lmc.phone, details: { ...lmc.details, ...details }, source: { readBy: 'ai', from: 'x', note: 'From their website, read Oct 20: https://lmcmikvah.org', ...source } } } as Partial<SubmissionRow>)
+
+  it('the section it was filed for, and that section’s hours and notes as it has them', () => {
+    const f = findingFrom(read({ women_s_hours: now }, { section: { section: 'womenTevillah', keys: ['women_s_hours', 'women_s_notes'] } }), lmc, SECTIONED)
+    expect(f).toMatchObject({ section: 'womenTevillah', values: { women_s_hours: now, women_s_notes: 'By appointment.' }, page: 'https://lmcmikvah.org' })
+  })
+
+  it('one filed before the sections is its section’s when all it changes is in one', () => {
+    expect(findingFrom(read({ women_s_notes: 'Call ahead.' }), lmc, SECTIONED)).toMatchObject({ section: 'womenTevillah', values: { women_s_notes: 'Call ahead.' } })
+    expect(findingFrom(read({ women_s_hours: now, men_s_hours: now }), lmc, SECTIONED).section).toBeUndefined()
+  })
+})
+
 describe('keepOnly', () => {
   it('an unticked line goes back to what the listing says; a ticked one is as its source says', () => {
     const edited = keepOnly(sub().payload as never, current, ['women_s_hours'], FIELDS) as { details: Record<string, unknown>; name: string }

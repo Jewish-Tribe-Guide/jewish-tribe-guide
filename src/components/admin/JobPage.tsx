@@ -211,56 +211,6 @@ export function JobRow({
   )
 }
 
-/** One source a listing is read from, opened: where it is and how it was
- *  found, what its last read said beside the listing, and what it read. */
-export function SourceCard({
-  url,
-  how,
-  result,
-  differences = [],
-  read = [],
-  actions,
-}: {
-  url: string
-  how: string
-  result: string
-  differences?: string[]
-  read?: string[]
-  actions?: ReactNode
-}) {
-  return (
-    <div className="space-y-2 rounded-md border border-slate-200 p-3" data-testid="job-source">
-      <p className="text-sm [overflow-wrap:anywhere]">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">
-          {shortUrl(url)}
-        </a>
-        <span className="text-slate-500"> · {how}</span>
-      </p>
-      <p className="text-sm text-slate-800">{result}</p>
-      {differences.length > 0 && (
-        <ul className="list-disc space-y-0.5 pl-5 text-sm text-slate-800">
-          {differences.map((d) => (
-            <li key={d}>{d}</li>
-          ))}
-        </ul>
-      )}
-      {read.length > 0 && (
-        <div className="text-sm" data-testid="job-read">
-          <p className="text-xs font-semibold text-slate-500">What it read</p>
-          <ul className="space-y-0.5 text-slate-700">
-            {read.map((r) => (
-              <li key={r} className="whitespace-pre-line">
-                {r}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-    </div>
-  )
-}
-
 /** Give a page to read from: "Add a page", or one to use instead. */
 export function GivePage({ label, placeholder, busy, onGive, onCancel }: { label: string; placeholder: string; busy: boolean; onGive: (url: string) => void; onCancel?: () => void }) {
   const [url, setUrl] = useState('')

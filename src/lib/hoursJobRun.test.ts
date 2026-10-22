@@ -62,10 +62,13 @@ beforeEach(() => {
 })
 
 describe('searchHoursPages', () => {
-  it('keeps the pages with a clock time on them, from its home page and its links', async () => {
+  // Its appointments page has no clock time, but says how Shabbos works:
+  // a section's note, read since Oct 22.
+  it('keeps the pages with a clock time or appointments on them, from its home page and its links', async () => {
     expect(await searchHoursPages('http://lmcmikvah.org/', reach)).toEqual({
       found: [
         { url: 'https://lmcmikvah.org/', link: null },
+        { url: 'https://lmcmikvah.org/appointments-and-membership/', link: 'Appointments and Membership' },
         { url: 'https://lmcmikvah.org/mens-mikvah/', link: 'Men’s Mikvah' },
       ],
       unloaded: [],
@@ -106,7 +109,7 @@ describe('searchHoursPages', () => {
 
 describe('syncHoursWatches', () => {
   it('watches each place’s hours pages, marked as found', async () => {
-    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 2, removed: 0 }])
+    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 3, removed: 0 }])
     expect(m.addWatch).toHaveBeenCalledWith('philly', {
       kind: 'website',
       url: 'https://lmcmikvah.org/mens-mikvah/',
@@ -137,7 +140,7 @@ describe('syncHoursWatches', () => {
       readPage: vi.fn(async (url: string) => (url === 'https://kesher.org/davening' ? { url, text: 'Shacharis 8:00 AM', pdf: null } : reach.readPage(url))),
     }
     m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/'), row('kesher', 'Kesher Israel', 'https://kesher.org/', 'synagogue')]
-    expect(await syncHoursWatches(shulReach)).toEqual([{ community: 'philly', added: 3, removed: 0 }])
+    expect(await syncHoursWatches(shulReach)).toEqual([{ community: 'philly', added: 4, removed: 0 }])
     expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://kesher.org/davening', resourceId: 'kesher', label: 'Kesher Israel · Davening', createdBy: HOURS_FOUND_CREATOR })
     // A shul's website isn't searched for a mikvah's links.
     expect(m.addWatch).not.toHaveBeenCalledWith('philly', expect.objectContaining({ resourceId: 'kesher', url: expect.stringContaining('mikvah') }))
@@ -145,7 +148,7 @@ describe('syncHoursWatches', () => {
 
   it('takes away its own page it no longer finds', async () => {
     m.listWatches.mockResolvedValue({ watches: [{ id: 'old', url: 'https://lmcmikvah.org/old-hours/', resourceId: 'lmc', createdBy: HOURS_FOUND_CREATOR, active: true }], available: true })
-    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 2, removed: 1 }])
+    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 3, removed: 1 }])
     expect(m.removeWatch).toHaveBeenCalledWith('philly', 'old')
   })
 })

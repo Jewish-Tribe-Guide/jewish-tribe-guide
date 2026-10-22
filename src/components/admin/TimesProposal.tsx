@@ -72,7 +72,8 @@ export function partPages(pages: readonly Watch[], findings: readonly Finding[])
 export function cantRead(reason: string | null): { pill: string; short: string } {
   const r = reason ?? ''
   if (/turned the reader away/.test(r)) return { pill: 'Turned the reader away', short: 'turned away' }
-  if (/no davening times|no weekly hours/.test(r)) return { pill: 'No times found', short: 'no times' }
+  if (/no davening times/.test(r)) return { pill: 'No times found', short: 'no times' }
+  if (/no weekly hours/.test(r)) return { pill: 'No hours found', short: 'no hours' }
   if (/No website/.test(r)) return { pill: 'No website', short: '' }
   if (/took too long|didn’t answer in time/.test(r)) return { pill: 'Too slow to read', short: 'too slow' }
   if (/didn’t load/.test(r)) return { pill: 'Didn’t load', short: 'didn’t load' }

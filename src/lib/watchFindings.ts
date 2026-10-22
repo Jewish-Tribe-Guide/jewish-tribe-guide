@@ -11,6 +11,7 @@ import { submissionSource } from './submissionSource'
 import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
 import type { Minyan } from './davening'
 import type { TimesPart } from './timesParts'
+import { hoursSections, sectionKeys, sectionOfKeys, type SectionSource } from './hoursSections'
 
 // Step 6 of keeping listings current (decided by the user, Oct 21):
 // "Findings go to the job pages, next to what the listing says, not the
@@ -96,6 +97,11 @@ export type Finding = {
   part?: TimesPart
   /** The page it was read from, for "From soicherryhill.org/tefillot". */
   page?: string
+  /** Which of a mikvah's sections it changes (hoursSections.ts): filed
+   *  as one, or, from before they were, all its lines in one. */
+  section?: string
+  /** That section's hours and notes as the finding has them. */
+  values?: Record<string, unknown>
 }
 
 export type FindingTimes = {
@@ -154,6 +160,7 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
   const name = watchNameOf(s) ?? ''
   const times = timesOf(s, current, payload, lines, fields)
   const page = pageOf(source.note ?? s.note)
+  const section = sectionFinding(s, source.section, payload, lines, fields)
   return {
     id: s.id,
     operation: s.operation,
@@ -168,7 +175,21 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
     ...(times ? { times } : {}),
     ...(source.part ? { part: source.part.part } : {}),
     ...(page ? { page } : {}),
+    ...(section ?? {}),
   }
+}
+
+/** A mikvah's section a finding changes, and its values there: the one it
+ *  was filed for, or, filed before the sections, the one all its lines
+ *  are in. */
+function sectionFinding(s: SubmissionRow, stated: SectionSource | undefined, payload: ResourceSubmission | undefined, lines: readonly FindingLine[], fields: readonly CategoryField[]): { section: string; values: Record<string, unknown> } | undefined {
+  if (s.operation !== 'update' || !payload?.details) return undefined
+  const named = fields.filter((f) => f.type === 'hours' && f.key !== 'hours').map((f) => f.key)
+  const derived = !stated && lines.length ? sectionOfKeys(hoursSections({ detailFields: [...fields] }, named), lines.map((l) => l.key)) : null
+  const src = stated ?? (derived ? { section: derived.section, keys: sectionKeys(derived) } : null)
+  if (!src) return undefined
+  const d = payload.details
+  return { section: src.section, values: Object.fromEntries(src.keys.filter((k) => k in d).map((k) => [k, d[k]])) }
 }
 
 /** The suggestion as it will be approved with only the `keep` lines ticked:

@@ -6,6 +6,7 @@ import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStor
 import { runAndRecord } from '@/lib/watchRunner'
 import { normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
+import { hoursSections, offeredSections, sectionKeys } from '@/lib/hoursSections'
 import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, isHoursOff, isStoppedPage, jobWords, samePage, sourceLine, type PageJob } from '@/lib/hoursJob'
 import { SEARCH_DEADLINE_MS, hoursJobPlaces, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
@@ -73,6 +74,16 @@ function placeWatches(watches: readonly Watch[], id: string) {
 function listedTimes(p: DirectoryResource, category: CategoryConfig) {
   const field = category.detailFields.find((f) => f.type === 'minyanim')
   return field ? { key: field.key, minyanim: regularMinyanim(p[field.key]), schedules: readSchedules(p[schedulesKey(field.key)]) } : null
+}
+
+/** A mikvah's sections as its listing has them: the ones it ticks, each
+ *  with its hours and notes (hoursSections.ts). */
+function listedSections(p: DirectoryResource, category: CategoryConfig) {
+  const reads = pageReadsFor(category)
+  if (reads?.kind !== 'hours') return []
+  const labelOf = (k: string) => category.detailFields.find((f) => f.key === k)?.label ?? k
+  // `labels`: its fields' names, which start the lines a page's read gave.
+  return offeredSections(hoursSections(category, reads.keys), p).map((s) => ({ ...s, labels: sectionKeys(s).map(labelOf), now: Object.fromEntries(sectionKeys(s).map((k) => [k, p[k] ?? null])) }))
 }
 
 const jobOf = (request: Request): PageJob => (new URL(request.url).searchParams.get('job') === 'times' ? 'times' : 'hours')
@@ -158,7 +169,7 @@ export async function GET(request: Request) {
           findings: findings.filter((f) => f.targetId === p.id),
           decided: decided.get(p.id) ?? null,
           fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
-          ...(job === 'times' ? { times: listedTimes(p, category) } : {}),
+          ...(job === 'times' ? { times: listedTimes(p, category) } : { sections: listedSections(p, category) }),
         }
       }),
     )

@@ -48,11 +48,27 @@ describe('isListingPageWatch', () => {
 describe('pageReadsFor', () => {
   it('reads a shul’s page for its davening times, and a mikvah’s for its named hours, not the plain “Hours”', () => {
     expect(pageReadsFor(shul)).toEqual({ kind: 'times', key: 'minyanim' })
-    expect(pageReadsFor(mikvah)).toEqual({ kind: 'hours', keys: ['women_s_hours'] })
+    expect(pageReadsFor(mikvah)).toEqual({ kind: 'hours', keys: ['women_s_hours'], notes: [] })
+  })
+
+  // The user, Oct 22: "by appointment, 48 hours ahead" can be all a
+  // mikvah's page says, so each section's notes are read too.
+  it('reads each section’s notes beside its hours', () => {
+    const sections = makeCategory({
+      detailFields: [
+        { key: 'womenTevillah', label: 'Women’s Tevillah', type: 'boolean' },
+        { key: 'keilim', label: 'Keilim', type: 'boolean' },
+        { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+        { key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea', audienceKey: 'womenTevillah' },
+        { key: 'keilim_hours', label: 'Keilim Hours', type: 'hours', audienceKey: 'keilim' },
+        { key: 'about', label: 'About', type: 'textarea' },
+      ],
+    })
+    expect(pageReadsFor(sections)).toEqual({ kind: 'hours', keys: ['women_s_hours', 'keilim_hours'], notes: ['women_s_notes'] })
   })
 
   it('reads the plain “Hours” where it is the only hours there are', () => {
-    expect(pageReadsFor(makeCategory({ detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] }))).toEqual({ kind: 'hours', keys: ['hours'] })
+    expect(pageReadsFor(makeCategory({ detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] }))).toEqual({ kind: 'hours', keys: ['hours'], notes: [] })
   })
 
   it('has nothing to read for a listing with neither', () => {
@@ -86,6 +102,12 @@ describe('hoursReads', () => {
     expect(hoursReads([fields(null, [women])], 'm1', ['women_s_hours'])).toEqual([women])
     const asked = { ...fields(null, [women]), ask: { question: 'Which?', choices: [] } } as Proposal
     expect(hoursReads([asked], 'm1', ['women_s_hours'])).toEqual([])
+  })
+
+  it('keeps a section’s note read as words, not an empty one or another field’s', () => {
+    const note = { key: 'women_s_notes', value: 'Schedule your appointment (48 hours advance notice would be appreciated)' }
+    expect(hoursReads([fields('m1', [note, { key: 'women_s_notes', value: ' ' }, { key: 'about', value: 'x' }])], 'm1', ['women_s_hours'], ['women_s_notes'])).toEqual([note])
+    expect(hoursReads([fields('m1', [note])], 'm1', ['women_s_hours'])).toEqual([])
   })
 })
 
@@ -230,5 +252,18 @@ describe('what a full read found', () => {
     expect(intro).toContain('Women’s Hours: Sun Closed · Mon 8:30 PM–10:30 PM · Tue–Sat Closed')
     expect(intro).toContain('Keilim Hours: none listed')
     expect(hoursNowIntro('LMC', two, ['women_s_hours'], {})).toBeNull()
+  })
+
+  it('tells it each section’s note too, and to give the page’s words only for what the note doesn’t say', () => {
+    const one = makeCategory({ detailFields: [{ key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' }, { key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea' }] })
+    const intro = hoursNowIntro('Mei Shalva', one, ['women_s_hours'], { women_s_notes: ' By appointment. ' }, ['women_s_notes'])
+    expect(intro).toContain('Women’s Hours: none listed\nWomen’s Notes: By appointment.')
+    expect(intro).toContain('When the guide’s note already says what the page says, give the guide’s note unchanged.')
+  })
+
+  it('says a note it read in a line, cut short when it’s long', () => {
+    const category = { detailFields: [{ key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea' as const }] }
+    expect(hoursReadLines([{ key: 'women_s_notes', value: 'Schedule your\nappointment.' }], category)).toEqual(['Women’s Notes: Schedule your appointment.'])
+    expect(hoursReadLines([{ key: 'women_s_notes', value: 'a'.repeat(200) }], category)[0]).toHaveLength('Women’s Notes: '.length + 120)
   })
 })

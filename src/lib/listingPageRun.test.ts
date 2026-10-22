@@ -640,6 +640,107 @@ describe('runListingPageWatch: a mikvah with women’s, men’s and plain hours'
   })
 })
 
+// Mikvah hours as drawn (Oct 21) shows a mikvah as its listing's sections,
+// Use this taking one whole, so a reading is filed a section at a time; and
+// it reads notes too (the user, Oct 22: "by appointment, 48 hours ahead").
+describe('runListingPageWatch: a mikvah’s sections, each filed on its own', () => {
+  const category = makeCategory({
+    id: 'mikvah',
+    detailFields: [
+      { key: 'womenTevillah', label: 'Women’s Tevillah', type: 'boolean', filterLabel: 'Women’s' },
+      { key: 'menTevillah', label: 'Men’s Tevillah', type: 'boolean', filterLabel: 'Men’s' },
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+      { key: 'women_s_notes', label: 'Women’s Notes', type: 'textarea', audienceKey: 'womenTevillah' },
+      { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours', audienceKey: 'menTevillah' },
+      { key: 'men_s_notes', label: 'Men’s Notes', type: 'textarea', audienceKey: 'menTevillah' },
+    ],
+  })
+  const evening = { open: '20:30', close: '22:30' }
+  const NOTE = 'Schedule your appointment (48 hours advance notice would be appreciated)'
+  const place = {
+    id: 'mk',
+    category: 'mikvah',
+    name: 'Mikvah Mei Shalva',
+    status: 'approved',
+    details: { womenTevillah: true, menTevillah: true, women_s_hours: { mon: evening }, women_s_notes: NOTE, men_s_hours: { sun: { open: '04:30', close: '10:00' } }, men_s_notes: '' },
+  }
+  const reading = (changes: unknown[]) => ({
+    proposals: [{ kind: 'fields', listingId: 'mk', asWritten: 'Mikvah Mei Shalva', ask: null, changes, note: null, quote: '', checked: true }],
+    model: 'cheap',
+  })
+  const women = { key: 'women_s_hours', hours: { days: ['mon'], open: '19:30', close: '21:30', closed: false, when: 'every_week' } }
+  const men = { key: 'men_s_hours', hours: { days: ['sun'], open: '05:00', close: '10:00', closed: false, when: 'every_week' } }
+  const SECTION = (section: string) => ({ section, keys: section === 'womenTevillah' ? ['women_s_hours', 'women_s_notes'] : ['men_s_hours', 'men_s_notes'] })
+  const filedFor = (section: string, details: Record<string, unknown>, url = URL_) => ({ id: `f-${section}`, payload: { details, source: { readBy: 'ai', from: 'x', note: `From their website, read Oct 20: ${url}`, section: SECTION(section) } } })
+  const run = () => runListingPageWatch({ ...changed, resourceId: 'mk' }, undefined, { apiKey: 'k', now: NOW, full: true })
+
+  beforeEach(() => {
+    m.getResourceRowById.mockResolvedValue(place)
+    m.listCategoriesUncached.mockResolvedValue([category])
+  })
+
+  it('files each section the page changes as its own finding, saying which, with only that section changed', async () => {
+    m.readMessage.mockResolvedValue(reading([women, men]))
+    expect(await run()).toMatchObject({ ok: true, filed: 2, check: { result: 'differs', queue: 'filed' } })
+    const [[, , w, wNote], [, , mn]] = m.submitListingUpdate.mock.calls
+    expect(w.source.section).toEqual(SECTION('womenTevillah'))
+    expect(w.details).toMatchObject({ women_s_hours: { mon: { open: '19:30', close: '21:30' } }, men_s_hours: place.details.men_s_hours })
+    expect(wNote).toContain('Women’s Hours, Monday: 8:30 PM–10:30 PM → 7:30 PM–9:30 PM')
+    expect(wNote).not.toContain('Men’s')
+    expect(mn.source.section).toEqual(SECTION('menTevillah'))
+    expect(mn.details).toMatchObject({ women_s_hours: place.details.women_s_hours, men_s_hours: { sun: { open: '05:00', close: '10:00' } } })
+    expect(m.sendWatchDigest.mock.calls[0][2].map((x: { what: string }) => x.what.split(':')[0])).toEqual(['Women’s', 'Men’s'])
+  })
+
+  it('reads a section’s note: one that says what the listing does is read, not “can’t be read”', async () => {
+    m.readMessage.mockResolvedValue(reading([{ key: 'women_s_notes', value: NOTE }]))
+    expect(await run()).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees', read: [`Women’s Notes: ${NOTE}`] } })
+    const [source, catalog] = m.readMessage.mock.calls[0]
+    expect(source.text).toContain(`Women’s Notes: ${NOTE}`)
+    expect(catalog.categories[0].fields.map((f: { key: string }) => f.key)).toContain('women_s_notes')
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('files a changed note as its section’s', async () => {
+    m.readMessage.mockResolvedValue(reading([{ key: 'women_s_notes', value: 'Appointments must be made at least 48 hours in advance.' }]))
+    expect(await run()).toMatchObject({ ok: true, filed: 1 })
+    const [, , payload] = m.submitListingUpdate.mock.calls[0]
+    expect(payload.source.section.section).toBe('womenTevillah')
+    expect(payload.details.women_s_notes).toBe('Appointments must be made at least 48 hours in advance.')
+  })
+
+  it('a section waiting holds back only that section; from this page, it’s replaced by what the page says now', async () => {
+    m.readMessage.mockResolvedValue(reading([women, men]))
+    m.replacePendingSuggestion.mockResolvedValue(true)
+    m.pending = [filedFor('menTevillah', { ...place.details, men_s_hours: { sun: { open: '06:00', close: '10:00' } } })]
+    expect(await run()).toMatchObject({ ok: true, filed: 2 })
+    expect(m.submitListingUpdate.mock.calls.map((c) => c[2].source.section.section)).toEqual(['womenTevillah'])
+    expect(m.replacePendingSuggestion.mock.calls[0][1]).toBe('f-menTevillah')
+  })
+
+  it('one waiting from another page is left for the admin', async () => {
+    m.readMessage.mockResolvedValue(reading([men]))
+    m.pending = [filedFor('menTevillah', { ...place.details, men_s_hours: { sun: { open: '06:00', close: '10:00' } } }, 'https://other.example/')]
+    expect(await run()).toMatchObject({ ok: true, filed: 0, check: { queue: 'waiting' } })
+    expect(m.replacePendingSuggestion).not.toHaveBeenCalled()
+  })
+
+  it('a section filed before, as a section or inside a whole reading, isn’t filed again', async () => {
+    m.readMessage.mockResolvedValue(reading([women]))
+    const as = { ...place.details, women_s_hours: { mon: { open: '19:30', close: '21:30' } } }
+    m.earlier = [{ payload: { details: as } }]
+    expect(await run()).toMatchObject({ ok: true, filed: 0, check: { queue: 'before' } })
+    m.earlier = [filedFor('womenTevillah', as)]
+    expect(await run()).toMatchObject({ ok: true, filed: 0, check: { queue: 'before' } })
+  })
+
+  it('anything else waiting, a person’s edit, still holds back the lot', async () => {
+    m.readMessage.mockResolvedValue(reading([women]))
+    m.pending = [{ id: 'p', payload: { details: {} } }]
+    expect(await run()).toMatchObject({ ok: true, filed: 0, check: { queue: 'waiting' } })
+  })
+})
+
 // The user, Oct 20: a shul with its services on a calendar, not a page of
 // times (Leyv Ha-Ir, Rodeph Shalom). calendarFeed.test.ts reads the formats.
 describe('readListingPage: a page with a calendar', () => {

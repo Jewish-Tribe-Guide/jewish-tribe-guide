@@ -31,8 +31,12 @@ describe('looksLikeHours', () => {
     // Read for hours by the AI, rightly, as none.
     expect(looksLikeHours({ text: 'The kelim mikvah closes at sunset', pdf: null })).toBe(false)
     expect(looksLikeHours({ text: 'The cost is $18 and 48 hours notice is required.', pdf: null })).toBe(false)
-    expect(looksLikeHours({ text: 'On Shabbos, by appointment only, one hour after candle-lighting time.', pdf: null })).toBe(false)
     expect(looksLikeHours({ text: null, pdf: 'JVBERi0' })).toBe(true)
+  })
+
+  it('is a page that books by appointment: its note is all it says of its hours (Mei Shalva, Oct 22)', () => {
+    expect(looksLikeHours({ text: 'Schedule your appointment (48 hours advance notice would be appreciated)', pdf: null })).toBe(true)
+    expect(looksLikeHours({ text: 'On Shabbos, by appointment only, one hour after candle-lighting time.', pdf: null })).toBe(true)
   })
 })
 
