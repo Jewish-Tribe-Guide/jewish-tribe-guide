@@ -437,6 +437,33 @@ describe('/api/admin/main-dishes', () => {
       expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ missing: ['Kugel'] }))
     })
 
+    // The user, Oct 22: "If I add the menu it should have that as its date".
+    it('a read that agrees with the listing dates what its menu names, as Use this would, with nothing left to decide', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      const body = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))).json()
+      expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', { always: ['Falafel'], sometimes: ['Kugel'] }, { names: ['Falafel'], at: expect.any(String), menuUrl: 'https://judah.example/menu' })
+      expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'approved', 'me@x.co')
+      expect(body).toMatchObject({ reading: { status: 'approved', decidedBy: 'me@x.co' }, menuDated: ['Falafel'] })
+
+      for (const action of ['read', 'photos']) {
+        vi.clearAllMocks()
+        m.findMenu.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+        const form = new FormData()
+        form.append('action', 'photos')
+        form.append('resourceId', ID)
+        form.append('file', new File(['PDF'], 'menu.pdf', { type: 'application/pdf' }))
+        await POST(action === 'read' ? req('POST', { action, resourceId: ID }) : new Request('http://x/api/admin/main-dishes?community=philly', { method: 'POST', body: form }))
+        expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', expect.anything(), expect.objectContaining({ names: ['Falafel'] }))
+      }
+
+      // One with something new waits for an admin.
+      vi.clearAllMocks()
+      m.readMenu.mockResolvedValue({ ...read, dishes: [...read.dishes, { name: 'Shawarma', quote: 'Shawarma', checked: true }] })
+      const waiting = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))).json()
+      expect(m.setMenuDishes).not.toHaveBeenCalled()
+      expect(waiting).toMatchObject({ reading: { status: 'proposed' } })
+    })
+
     it('lists which of them are "not always", and which a reader found on its menu before', async () => {
       m.listApprovedResources.mockResolvedValue([{ ...listingOf, itemMenu: { dishes: { Falafel: '2026-10-01T12:00:00Z' } } }])
       const place = (await (await GET(req('GET'))).json()).places[0]

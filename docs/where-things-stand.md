@@ -594,6 +594,11 @@ agreed:
      never runs that. Now the box says "Read from its website · not read
      yet", and Read them now gives the website its watch and reads it
      (`POST /api/admin/watches/eruv { action: 'read' }`).
+   - Main dishes: a menu read that agrees with the listing is kept (the
+     user, Oct 22: "If I add the menu it should have that as it's date last
+     seen"). Adding a menu, Read now or a photo whose dishes are all the
+     listing's already dates them "seen" from that menu, as Use this would,
+     and the row goes to Checked. A read with anything new still waits.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
