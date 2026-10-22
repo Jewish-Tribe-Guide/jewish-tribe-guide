@@ -275,6 +275,11 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
+8. Counts on the admin's To do tabs (how many are waiting in the queue,
+   Watches, Read questions, Responses). Not shown: no count is loaded
+   anywhere the nav can read it, and the agreement was no new requests just
+   for these. Showing them would mean the sign-in check (or one new small
+   request) returning the four counts on every admin page load.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
@@ -1140,6 +1145,20 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 22: the admin nav is five groups (on top of the Eruvim move, #343)
+
+- The admin's one row of tabs is now two rows: the groups on top, the open
+  group's tabs underneath. **To do:** Moderation queue, Watches, Read
+  questions, Responses. **Listings:** Categories, Campaigns, Archived.
+  **Look:** Site, Desktop, Mobile. **Insights:** Metrics, Missed searches
+  (and What changed, when it is switched on). **Settings:** Team, and
+  Communities for the site owner only.
+- Every page keeps its URL; the open group comes from the address. A
+  group's own link opens its first tab. History (approved/rejected, opened
+  from the Metrics tiles) sits under Insights → Metrics.
+- On a phone all five groups fit; the tabs row scrolls sideways.
+- No counts on the To do tabs yet (Small open decisions, 8).
 
 ## Done Oct 22: the Eruvim tab is on the Eruv row
 

@@ -2,25 +2,28 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { adminBase, adminTabs } from '@/lib/adminNav'
+import { adminGroups, adminNavPosition } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useIsSuperAdmin } from './AdminAuthGate'
 
-/** Real per-tab underline, driven by the URL instead of the pushState-shim
- *  local state AdminTabs used to keep — every tab is a genuine
- *  &lt;Link&gt;, so Back/Forward/refresh/sharing all just work. */
+/** The console's nav, driven by the URL — every group and tab is a genuine
+ *  &lt;Link&gt;, so Back/Forward/refresh/sharing all just work. The top row
+ *  is the five groups; the second row is the open group's tabs (which
+ *  group is open comes from the path, see adminNavPosition). */
 export default function AdminNav() {
   const pathname = usePathname()
   const community = useCommunitySlug()
   const isSuperAdmin = useIsSuperAdmin()
-  const base = adminBase(community)
-  const tabs = adminTabs(community, isSuperAdmin)
+  const groups = adminGroups(community, isSuperAdmin)
+  const position = adminNavPosition(pathname, community, isSuperAdmin)
+  const open = groups.find((g) => g.group === position?.group)
 
   return (
-    // touch-pan-x: a diagonal-ish swipe on this strip otherwise gets read as
-    // an ambiguous gesture and can scroll the page vertically along with it —
-    // same fix NearbyList's swipeable rows use (touch-pan-y there) for the
-    // opposite direction. Locks touch panning here to horizontal only.
+    // touch-pan-x: a diagonal-ish swipe on these strips otherwise gets read
+    // as an ambiguous gesture and can scroll the page vertically along with
+    // it — same fix NearbyList's swipeable rows use (touch-pan-y there) for
+    // the opposite direction. Locks touch panning here to horizontal only,
+    // and both rows scroll sideways rather than wrap on a phone.
     //
     // No community switcher here (there used to be one, AdminCommunitySwitcher,
     // removed) — each community's admin console is meant to be reachable only
@@ -30,20 +33,16 @@ export default function AdminNav() {
     // community you're not authorized for still 404s/bounces to sign-in the
     // same as any other unauthorized visit — this just stops offering it as a
     // click.
-    <div className="flex items-center gap-3 mb-5 border-b border-slate-200">
-      <div className="flex gap-1 overflow-x-auto touch-pan-x">
-        {tabs.map(({ tab, href, label }) => {
-          // base (queue) only matches exactly — every other href starts with
-          // it, so a plain startsWith would light up every tab at once.
-          // '/philly/admin/categories' also covers the editor
-          // (/philly/admin/categories/cat:<id>), which should still read as
-          // "on the Categories tab" while you're inside it.
-          const active = href === base ? pathname === base : pathname.startsWith(href)
+    <nav aria-label="Admin" className="mb-5">
+      <div className="flex gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200">
+        {groups.map(({ group, href, label }) => {
+          const active = group === position?.group
           return (
             <Link
-              key={tab}
+              key={group}
               href={href}
-              className={`shrink-0 whitespace-nowrap text-sm font-medium px-3 py-2 -mb-px border-b-2 transition-colors ${
+              aria-current={active ? 'true' : undefined}
+              className={`shrink-0 whitespace-nowrap text-sm font-semibold px-2.5 sm:px-3 py-2 -mb-px border-b-2 transition-colors ${
                 active ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-slate-700'
               }`}
             >
@@ -52,6 +51,25 @@ export default function AdminNav() {
           )
         })}
       </div>
-    </div>
+      {open && (
+        <div data-testid="admin-subnav" className="flex gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pt-2">
+          {open.tabs.map(({ tab, href, label }) => {
+            const active = tab === position?.tab
+            return (
+              <Link
+                key={tab}
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={`shrink-0 whitespace-nowrap text-sm font-medium px-3 py-1.5 rounded-full transition-colors ${
+                  active ? 'bg-primary/10 text-primary' : 'text-muted hover:text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {label}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </nav>
   )
 }
