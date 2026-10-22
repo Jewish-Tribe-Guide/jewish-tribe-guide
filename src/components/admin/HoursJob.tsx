@@ -69,22 +69,11 @@ const isRead = (w: Watch) => !!(w.lastRunAt && w.lastCheck)
 export const READ_ON_LOAD = 5
 
 /** The sentence over Shul times: does anything need you? */
-export function shulSay(statuses: readonly JobStatus[]): { head: string; sub: string } {
+export function shulSay(statuses: readonly JobStatus[]): { head: string } {
   const n = (s: JobStatus) => statuses.filter((x) => x === s).length
-  const total = statuses.length
   const differs = n('differs')
-  const cant = n('cant_read') + n('didnt_load')
-  const head = [
-    differs === 1 ? '1 shul’s website says something different.' : differs ? `${differs} shuls’ websites say something different.` : total && n('same') === total ? (total === 1 ? 'Its one shul matches its website.' : `All ${total} shuls match their websites.`) : 'No shul’s website says anything different.',
-    n('unsure') ? `${n('unsure')} couldn’t be compared.` : '',
-    n('not_read') ? `${n('not_read')} not read yet.` : '',
-  ]
-  const sub = [
-    `${plural(total, 'shul')}, read every morning from their own websites.`,
-    cant ? `${cant} ${cant === 1 ? 'needs its' : 'need their'} page found.` : '',
-    n('off') ? `${n('off')} kept by hand.` : '',
-  ]
-  return { head: head.filter(Boolean).join(' '), sub: sub.filter(Boolean).join(' ') }
+  const head = differs === 1 ? '1 shul has updates from its website.' : differs ? `${differs} shuls have updates from their websites.` : 'No shul’s website has an update.'
+  return { head: n('not_read') ? `${head} ${n('not_read')} not read yet.` : head }
 }
 
 /** How its last read compares with the listing, for its row's pill. */
@@ -359,6 +348,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
               jobName={data.name}
               settled={settled}
               words={words}
+              now={now}
               onAct={(body) => void act(p, body)}
               onDecided={(f, d) => decide(p, f, d)}
             />

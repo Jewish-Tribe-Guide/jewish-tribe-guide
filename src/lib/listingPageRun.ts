@@ -16,7 +16,7 @@ import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
 import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
-import { TIMES_PART_LABELS, partKey, partLines, partSize, readPartSource, splitParts, type PartReading, type PartSource } from '@/lib/timesParts'
+import { TIMES_PART_LABELS, partKey, partLines, partSize, partsGiven, readPartSource, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
 import { sendWatchDigest } from '@/lib/email'
 import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
@@ -190,7 +190,7 @@ export function yieldToNewsletter(update: TimesUpdate, schedules: readonly Speci
 /** What the AI read off the page, a short line each (listingPageWatch.ts),
  *  and what it would change on the listing. `note` says when the
  *  newsletter's days were left to the newsletter. */
-export type PageReading = { read: string[]; proposal: PageProposal; note?: string; unread?: string[] }
+export type PageReading = { read: string[]; proposal: PageProposal; note?: string; unread?: string[]; parts?: PartGiven[] }
 
 const NEWSLETTER_HELD = 'Some days differ, but the newsletter has given those days, and it wins.'
 
@@ -239,6 +239,7 @@ export async function readPageFor(
     let minyanim = regularMinyanim(listing[reads.key])
     let schedules = readSchedules(listing[sk])
     const lines = timesReadLines(read.update.rows)
+    const parts = partsGiven(read.updates)
     const changes: string[] = []
     let held = false
     for (const u of read.updates) {
@@ -258,11 +259,12 @@ export async function readPageFor(
       changes.push(...applied.changes)
     }
     const note = held ? NEWSLETTER_HELD : undefined
-    if (changes.length === 0) return { read: lines, proposal: null, note }
+    if (changes.length === 0) return { read: lines, proposal: null, note, parts }
     return {
       read: lines,
       proposal: { submission: editSubmission(category, listing, { [reads.key]: minyanim, [sk]: schedules }), lines: changes, keys: [reads.key, sk] },
       note,
+      parts,
     }
   }
   // Weekly hours: the any-field reader (messageReader.ts), told only of this
@@ -316,11 +318,14 @@ async function readCalendarWeeks(
   const read: string[] = []
   const lines: string[] = []
   const notes: string[] = []
+  // Every time a calendar gives is on its date: this week's schedule.
+  let given = 0
   for (const w of weeks) {
     const source = sourceFor(w)
     if (!source) continue
     const got = await readShulWeek(listing, key, source, apiKey, { week: w })
     read.push(...timesReadLines(got.update.rows))
+    given += partsGiven([{ ...got.update, kind: 'week' }]).reduce((n, p) => n + p.size, 0)
     const week = keepUncovered(got.update)
     const usualThere = week.rows.some((r) => r.status === 'kept' || r.status === 'gone')
     const eventsOnly = usualThere && !week.rows.some((r) => r.status === 'same' || r.status === 'changed')
@@ -338,8 +343,9 @@ async function readCalendarWeeks(
     lines.push(...applied.changes)
   }
   const note = notes.length ? [...new Set(notes)].join(' ') : undefined
-  if (!lines.length) return { read, proposal: null, note }
-  return { read, proposal: { submission: editSubmission(category, listing, { [key]: minyanim, [sk]: schedules }), lines, keys: [key, sk] }, note }
+  const parts: PartGiven[] = given ? [{ part: 'week', size: given }] : []
+  if (!lines.length) return { read, proposal: null, note, parts }
+  return { read, proposal: { submission: editSubmission(category, listing, { [key]: minyanim, [sk]: schedules }), lines, keys: [key, sk] }, note, parts }
 }
 
 /** What the page would change on the listing, or nothing. */
@@ -451,7 +457,7 @@ export async function runListingPageWatch(
   }
   const { proposal } = reading
   const check = (queue: WatchCheck['queue']) =>
-    pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread })
+    pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread, parts: reading.parts })
   if (!proposal) return { ok: true, filed: 0, pageHash, check: check(null) }
   // A shul's times: filed as the parts they change, each on its own.
   const [timesKey, sk] = proposal.keys

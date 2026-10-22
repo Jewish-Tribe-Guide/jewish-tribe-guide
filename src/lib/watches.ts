@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { KEYSTONE_LIST_URL } from './keystoneWatch'
+import type { PartGiven } from './timesParts'
 
 export type WatchKind = 'keystone_list' | 'website'
 
@@ -73,6 +74,9 @@ export type WatchCheck = {
   /** Anything else worth a line: days left to the newsletter, say. */
   note?: string
   list?: { listed: number; matching: number; differences: number; filed: number }
+  /** A shul's page: the parts of its times it gave (timesParts.ts), for
+   *  Shul times' Reads to name it by. */
+  parts?: PartGiven[]
 }
 
 /** A check whose differences were filed, now or before, so they're a

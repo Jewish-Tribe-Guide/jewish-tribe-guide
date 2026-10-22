@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ResourceRow, SubmissionRow } from '@/types'
 import type { CategoryField } from './categories'
-import { findingFrom, findingPage, keepOnly, onAJobPage } from './watchFindings'
+import { findingFrom, findingPage, keepOnly, onAJobPage, pageOf } from './watchFindings'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
@@ -102,6 +102,16 @@ describe('findingFrom: a shul’s times', () => {
     expect(f.times).toEqual({ field: TIMES[0], current: was, proposed: now, currentSchedules: [], proposedSchedules: week })
   })
 
+  it('the part it updates and the page it was read from, so its box can say both', () => {
+    const now = [{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }]
+    const s = read({ minyanim: now })
+    ;(s.payload as Record<string, unknown>).source = { readBy: 'ai', from: 'Sons of Israel’s website', note: 'From their website, read Oct 21: https://soi.example/tefillot', part: { part: 'shabbos', field: 'minyanim' } }
+    expect(findingFrom(s, shul, TIMES)).toMatchObject({ part: 'shabbos', page: 'https://soi.example/tefillot' })
+    // One filed before parts: neither.
+    const old = findingFrom(read({ minyanim: now }), shul, TIMES)
+    expect(old.part).toBeUndefined()
+  })
+
   it('none when it would change something else too, so it’s shown line by line', () => {
     const f = findingFrom(read({ minyanim: was, rabbi: 'Rabbi Cohen' }), shul, [...TIMES, { key: 'rabbi', label: 'Rabbi', type: 'text' }])
     expect(f.lines.map((l) => l.key)).toEqual(['rabbi'])
@@ -143,4 +153,13 @@ describe('onAJobPage', () => {
 it('findingPage: the job’s admin page and its name', () => {
   expect(findingPage('philly', 'kosher')).toEqual({ path: '/philly/admin/watches/kosher', name: 'Kosher certification' })
   expect(findingPage('philly', 'hours', 'Mikvah hours')).toEqual({ path: '/philly/admin/watches/hours', name: 'Mikvah hours' })
+})
+
+describe('pageOf', () => {
+  it('the page in a watch’s note, from its first line only', () => {
+    expect(pageOf('From their website, read Oct 20: https://soi.example/cal.php')).toBe('https://soi.example/cal.php')
+    expect(pageOf('From their website, changed Oct 20: https://soi.example/\n\nChanged: mincha · Sun')).toBe('https://soi.example/')
+    expect(pageOf('Changed: mincha\nFrom: https://soi.example/')).toBeUndefined()
+    expect(pageOf(null)).toBeUndefined()
+  })
 })

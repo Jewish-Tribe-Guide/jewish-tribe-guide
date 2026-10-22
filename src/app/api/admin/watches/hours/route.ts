@@ -12,6 +12,8 @@ import { SEARCH_DEADLINE_MS, hoursJobPlaces, searchHoursPages, websiteOf } from 
 import { listingSlug } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
+import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
 // GET  /api/admin/watches/hours — the Watches tab's hours job page (the
@@ -26,7 +28,11 @@ import type { DirectoryResource } from '@/types'
 //      `?counts` (the Watches tab's row): the same, but no search, so the
 //      tab isn't kept waiting on a slow website; its reasons are null.
 //      `?job=times`: the Shul times page (Oct 21), every place with davening
-//      times, the same way. Every POST takes it too.
+//      times, the same way, and each one's times as the listing has them
+//      (`times`), for the boxes that are the same as its website. Every POST
+//      takes it too.
+//      `?item=<id>`: one place's listing and category, for Edit (the
+//      listing's own box editor, BoxEditSheet).
 // POST body: { action: 'check', resourceId }
 //      "Check now", on every row: its pages read straight away; with none,
 //      its website searched now and what it finds added and read.
@@ -61,6 +67,12 @@ function placeWatches(watches: readonly Watch[], id: string) {
     stopped: watches.filter((w) => w.resourceId === id && isStoppedPage(w)),
     marker: watches.find((w) => w.resourceId === id && isHoursOff(w)) ?? null,
   }
+}
+
+/** A shul's times as its listing has them. */
+function listedTimes(p: DirectoryResource, category: CategoryConfig) {
+  const field = category.detailFields.find((f) => f.type === 'minyanim')
+  return field ? { key: field.key, minyanim: regularMinyanim(p[field.key]), schedules: readSchedules(p[schedulesKey(field.key)]) } : null
 }
 
 const jobOf = (request: Request): PageJob => (new URL(request.url).searchParams.get('job') === 'times' ? 'times' : 'hours')
@@ -111,6 +123,15 @@ export async function GET(request: Request) {
     const now = Date.now()
     const search = !new URL(request.url).searchParams.has('counts')
     const job = jobOf(request)
+    const itemId = new URL(request.url).searchParams.get('item')
+    if (itemId !== null) {
+      if (!UUID.test(itemId)) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
+      const { categories, places } = await hoursJobPlaces(community.slug, job)
+      const item = places.find((p) => p.id === itemId)
+      const category = item && categories.find((c) => c.id === item.category)
+      if (!item || !category) return Response.json({ ok: false, errors: [`That place isn’t one whose ${jobWords(job).what} are read.`] }, { status: 404 })
+      return Response.json({ ok: true, item, category })
+    }
     const [{ watches, available }, { categories, places }] = await Promise.all([listWatches(community.slug), hoursJobPlaces(community.slug, job)])
 
     // What their pages (and a shul's newsletter) found, waiting here to
@@ -137,6 +158,7 @@ export async function GET(request: Request) {
           findings: findings.filter((f) => f.targetId === p.id),
           decided: decided.get(p.id) ?? null,
           fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
+          ...(job === 'times' ? { times: listedTimes(p, category) } : {}),
         }
       }),
     )

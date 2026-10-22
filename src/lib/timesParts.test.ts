@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { partKey, partLines, partSize, readPartSource, rebasePart, splitParts, withPart } from './timesParts'
+import { partKey, partLines, partSize, partsFromRead, partsGiven, readPartSource, rebasePart, splitParts, withPart } from './timesParts'
 
 const K = 'minyanim'
 const SK = 'minyanim_schedules'
@@ -119,5 +119,37 @@ describe('partLines', () => {
     expect(partLines(sh.source, listing, sh.details)).toEqual(['Changed: Shacharis · Sat, 8:30 AM, was 9 AM'])
     const [w] = splitParts(listing, { ...listing, [SK]: [week] }, K)
     expect(partLines(w.source, listing, w.details)).toEqual(['Posted: This week’s schedule, Oct 19 – Oct 25'])
+  })
+})
+
+// What a page gave, said in Reads ("Usual weekday times · Usual Shabbos
+// times"), and how a part picks its page when several give it: the fullest.
+describe('partsGiven and partsFromRead', () => {
+  it('counts a reading’s rows by part: Friday night is Shabbos, Friday Shacharis a weekday, a week its own; what goes or is kept isn’t given', () => {
+    const rows = [
+      { day: 'fri', tefillah: 'mincha_maariv', status: 'new' },
+      { day: 'fri', tefillah: 'shacharis', status: 'same' },
+      { day: 'sat', tefillah: 'shacharis', status: 'changed' },
+      { day: 'mon', tefillah: 'mincha', status: 'gone' },
+      { day: 'tue', tefillah: 'mincha', status: 'kept' },
+      { day: 'yom_tov', tefillah: 'shacharis', status: 'new' },
+    ]
+    expect(partsGiven([{ kind: 'usual', rows }])).toEqual([
+      { part: 'weekday', size: 1 },
+      { part: 'shabbos', size: 2 },
+    ])
+    expect(partsGiven([{ kind: 'week', rows: [{ day: 'sun', tefillah: 'mincha', status: 'new' }] }])).toEqual([{ part: 'week', size: 1 }])
+    expect(partsGiven([{ kind: 'usual', rows: [{ day: '2026-10-25', tefillah: 'mincha', status: 'new' }] }])).toEqual([{ part: 'week', size: 1 }])
+  })
+
+  it('an older check with no parts: read from its lines, a range of days and a date included, each line once per part', () => {
+    expect(
+      partsFromRead(['Shacharis Mon–Fri 6:45 AM', 'Shacharis Sun, Sat 8:00 AM', 'Mincha & Maariv Fri 7:00 PM · Summer', 'Mincha & Maariv Sun–Thu 15 min before sunset', 'Oct 24 Shacharis 9:00 AM']),
+    ).toEqual([
+      { part: 'weekday', size: 3 },
+      { part: 'shabbos', size: 2 },
+      { part: 'week', size: 1 },
+    ])
+    expect(partsFromRead([])).toEqual([])
   })
 })

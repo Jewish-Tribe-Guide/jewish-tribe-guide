@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { changeCount, proposalLine, scheduleProposal, usualProposal } from './timesProposal'
+import { boxPill, changeCount, daysHeading, groupedRows, joinClocks, proposalLine, rangeText, scheduleProposal, usualProposal } from './timesProposal'
 
 const rule: Pick<Minyan, 'time' | 'anchor' | 'offsetMinutes' | 'notAfter'> = { time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting', offsetMinutes: 0, notAfter: '19:00' }
 const shacharis: Minyan = { id: 's1', tefillah: 'shacharis', days: ['mon', 'thu', 'rosh_chodesh'], time: '6:45am' }
@@ -71,11 +71,12 @@ describe('scheduleProposal', () => {
     expect(weeks).toEqual([
       {
         title: 'This week’s schedule, Oct 19 – Oct 25',
+        range: 'Oct 19–25',
         isWeek: true,
         days: [
-          { label: 'Friday, Oct 23', rows: [{ what: 'Mincha & Maariv', when: '6 PM', note: 'With Kabbalas Shabbos', usually: null }] },
+          { label: 'Fri, Oct 23', rows: [{ what: 'Mincha & Maariv', when: '6 PM', note: 'With Kabbalas Shabbos', usually: null }] },
           {
-            label: 'Saturday, Oct 24',
+            label: 'Shabbos, Oct 24',
             rows: [
               { what: 'Shacharis', when: '9 AM', note: null, usually: '9:15 AM' },
               { what: 'Mincha', when: '5:45 PM', note: null, usually: null },
@@ -89,5 +90,81 @@ describe('scheduleProposal', () => {
   it('leaves out a schedule the listing has already, and names one it takes off', () => {
     const old = { ...week, id: 'old', name: 'Sukkos', kind: undefined }
     expect(scheduleProposal([week, old], [week], [])).toEqual({ weeks: [], gone: ['Sukkos'] })
+  })
+})
+
+// The drawing (B3vwpSiqwdK833s9VAVHBc): rows under the days they're on,
+// Shabbos as Friday night and Shabbos day, one line per tefillah with its
+// times joined ("6:45 and 8:15 AM"), and days with the same times as one.
+describe('as the drawing groups it', () => {
+  it('names days the way a shul’s schedule does', () => {
+    expect(daysHeading(['mon', 'tue', 'wed', 'thu', 'fri'])).toBe('Monday to Friday')
+    expect(daysHeading(['sun'])).toBe('Sunday')
+    expect(daysHeading(['sun', 'wed'])).toBe('Sunday and Wednesday')
+    expect(daysHeading(['mon', 'thu', 'rosh_chodesh'])).toBe('Monday, Thursday and Rosh Chodesh')
+  })
+
+  it('joins a tefillah’s times when they share AM or PM, and not otherwise', () => {
+    expect(joinClocks(['6:45 AM', '8:15 AM'])).toBe('6:45 and 8:15 AM')
+    expect(joinClocks(['7 AM', '8 AM', '9 AM'])).toBe('7, 8 and 9 AM')
+    expect(joinClocks(['11:30 AM', '1 PM'])).toBeNull()
+    expect(joinClocks(['8 AM', '15 min before sunset'])).toBeNull()
+  })
+
+  it('a box’s pill counts what changes, by kind when there is one kind', () => {
+    expect(boxPill([{ status: 'new' }, { status: 'new' }, { status: 'same' }])).toBe('2 new')
+    expect(boxPill([{ status: 'changed' }])).toBe('1 changed')
+    expect(boxPill([{ status: 'gone' }])).toBe('1 taken off')
+    expect(boxPill([{ status: 'new' }, { status: 'gone' }])).toBe('2 updates')
+    expect(boxPill([{ status: 'same' }])).toBeNull()
+  })
+
+  it('says a week as its dates', () => {
+    expect(rangeText('2026-10-21', '2026-10-24')).toBe('Oct 21–24')
+    expect(rangeText('2026-10-30', '2026-11-01')).toBe('Oct 30–Nov 1')
+    expect(rangeText('2026-10-25', '2026-10-25')).toBe('Oct 25')
+  })
+
+  it('usual times: grouped by their days, a tefillah’s same times on one line, a new one kept apart', () => {
+    const usual: Minyan[] = [
+      { id: 'a', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '6:45am' },
+      { id: 'b', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '8:15am' },
+      { id: 'c', tefillah: 'shacharis', days: ['sun'], time: '7:00am' },
+      { id: 'd', tefillah: 'mincha_maariv', days: ['fri'], time: '7:00pm' },
+      { id: 'e', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+    ]
+    const proposed = [...usual, { id: 'f', tefillah: 'shacharis', days: ['sat'], time: '8:00am' } as Minyan]
+    const [weekday, shabbos] = usualProposal(usual, proposed)
+    expect(groupedRows(weekday.rows).map((g) => [g.label, g.rows.map((r) => `${r.tefillah} ${r.when}`)])).toEqual([
+      ['Sunday', ['Shacharis 7 AM']],
+      ['Monday to Friday', ['Shacharis 6:45 and 8:15 AM']],
+    ])
+    expect(groupedRows(shabbos.rows).map((g) => [g.label, g.rows.map((r) => `${r.status} ${r.when}`)])).toEqual([
+      ['Friday night', ['same 7 PM']],
+      ['Shabbos day', ['new 8 AM', 'same 9 AM']],
+    ])
+  })
+
+  it('a week: days with the same times are one heading, and a tefillah’s times one line', () => {
+    const week: SpecialSchedule = {
+      id: 'w',
+      name: 'Times for Oct 21 – Oct 24',
+      from: '2026-10-21',
+      to: '2026-10-24',
+      mode: 'replace',
+      kind: 'week',
+      minyanim: [
+        { id: 'a', tefillah: 'shacharis', on: ['2026-10-21', '2026-10-22'], time: '6:45am' },
+        { id: 'b', tefillah: 'shacharis', on: ['2026-10-21', '2026-10-22'], time: '8:15am' },
+        { id: 'c', tefillah: 'mincha_maariv', on: ['2026-10-21', '2026-10-22'], time: '5:55pm' },
+        { id: 'd', tefillah: 'shacharis', on: ['2026-10-24'], time: '9:00am' },
+      ],
+    }
+    const [w] = scheduleProposal([], [week], []).weeks
+    expect(w.range).toBe('Oct 21–24')
+    expect(w.days.map((d) => [d.label, d.rows.map((r) => `${r.what} ${r.when}`)])).toEqual([
+      ['Wed, Oct 21 and Thu, Oct 22', ['Shacharis 6:45 and 8:15 AM', 'Mincha & Maariv 5:55 PM']],
+      ['Shabbos, Oct 24', ['Shacharis 9 AM']],
+    ])
   })
 })

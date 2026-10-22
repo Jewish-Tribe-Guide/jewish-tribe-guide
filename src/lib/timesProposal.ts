@@ -36,6 +36,11 @@ export type ProposalRow = {
   was?: Partial<Parts>
   /** For today's sunset beside it: it's held relative to a zman. */
   anchored: boolean
+  /** "Shacharis": its name in a box, under its group's heading. */
+  tefillah: string
+  /** Its heading in the box, as the listing's box reads: "Friday night",
+   *  "Shabbos day"; "Sunday", "Monday to Friday". */
+  group: string
 }
 
 export type ProposalBox = { box: 'weekday' | 'shabbos'; label: string; rows: ProposalRow[] }
@@ -75,7 +80,31 @@ function order(box: ProposalBox['box']) {
   return (a: Minyan, b: Minyan) => lead(a) - lead(b) || firstDay(a) - firstDay(b) || minutes(a) - minutes(b) || seasonRank(a) - seasonRank(b) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah)
 }
 
-function row(m: Minyan, status: ProposalStatus, was?: Minyan): ProposalRow {
+const DAY_LONG: Record<Minyan['days'][number], string> = {
+  sun: 'Sunday',
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Shabbos',
+  rosh_chodesh: 'Rosh Chodesh',
+  yom_tov: 'Yom Tov',
+  holiday: 'Public holidays',
+}
+
+/** A weekday box's heading for a minyan's days: "Sunday", "Monday to
+ *  Friday", "Monday and Thursday", "Rosh Chodesh". */
+export function daysHeading(days: Minyan['days']): string {
+  const real = DAY_ORDER.slice(0, 7).filter((d) => days.includes(d))
+  const idx = real.map((d) => DAY_ORDER.indexOf(d))
+  const run = real.length >= 3 && idx.every((x, i) => i === 0 || x === idx[i - 1] + 1)
+  const names = run ? [`${DAY_LONG[real[0]]} to ${DAY_LONG[real.at(-1)!]}`] : real.map((d) => DAY_LONG[d])
+  const all = [...names, ...DAY_ORDER.slice(7).filter((d) => days.includes(d)).map((d) => DAY_LONG[d])]
+  return all.length < 2 ? all.join('') : `${all.slice(0, -1).join(', ')} and ${all.at(-1)}`
+}
+
+function row(m: Minyan, status: ProposalStatus, box: ProposalBox['box'], was?: Minyan): ProposalRow {
   const p = partsOf(m)
   const out: ProposalRow = {
     status,
@@ -84,6 +113,8 @@ function row(m: Minyan, status: ProposalStatus, was?: Minyan): ProposalRow {
     note: [p.note, p.signUp].filter(Boolean).join(' · ') || null,
     season: p.season,
     anchored: !!m.anchor,
+    tefillah: TEFILLAH_LABELS[m.tefillah],
+    group: box === 'shabbos' ? (shabbosPartOf(m) === 'friday' ? 'Friday night' : 'Shabbos day') : daysHeading(m.days),
   }
   if (was) {
     const o = partsOf(was)
@@ -125,13 +156,58 @@ function proposeBox(current: readonly Minyan[], proposed: readonly Minyan[], box
   const rows = [...now.map((m) => ({ m, ...(status.get(m) ?? { status: 'new' as const }) })), ...[...left].map((m) => ({ m, status: 'gone' as const, was: undefined }))]
   const sort = order(box)
   rows.sort((a, b) => sort(a.m, b.m))
-  return { box, label: BOX_LABELS[box], rows: rows.map((r) => row(r.m, r.status, r.was)) }
+  return { box, label: BOX_LABELS[box], rows: rows.map((r) => row(r.m, r.status, box, r.was)) }
 }
 
 /** The website's usual times, in the listing's two boxes, each minyan
  *  marked. A box neither has is left out. */
 export function usualProposal(current: readonly Minyan[], proposed: readonly Minyan[]): ProposalBox[] {
   return (['weekday', 'shabbos'] as const).map((b) => proposeBox(current, proposed, b)).filter((b) => b.rows.length > 0)
+}
+
+/** What a box would change, for its pill: "7 new", "2 changed", "1 taken
+ *  off", or "3 updates" for more than one kind. Null when it's the same. */
+export function boxPill(rows: readonly Pick<ProposalRow, 'status'>[]): string | null {
+  const n = (s: ProposalStatus) => rows.filter((r) => r.status === s).length
+  const kinds = [
+    [n('new'), 'new'],
+    [n('changed'), 'changed'],
+    [n('gone'), 'taken off'],
+  ] as const
+  const some = kinds.filter(([k]) => k > 0)
+  if (!some.length) return null
+  if (some.length === 1) return `${some[0][0]} ${some[0][1]}`
+  const all = some.reduce((t, [k]) => t + k, 0)
+  return `${all} updates`
+}
+
+/** Clock times that share AM or PM, run together: "6:45 and 8:15 AM". */
+export function joinClocks(whens: readonly string[]): string | null {
+  const got = whens.map((w) => w.match(/^(\d{1,2}(?::\d{2})?) (AM|PM)$/))
+  if (got.some((g) => !g) || new Set(got.map((g) => g![2])).size !== 1) return null
+  const times = got.map((g) => g![1])
+  return `${times.length > 1 ? `${times.slice(0, -1).join(', ')} and ` : ''}${times.at(-1)} ${got[0]![2]}`
+}
+
+export type RowGroup<R> = { label: string; rows: R[] }
+
+/** A box's rows under their headings, in the order each heading first
+ *  comes; minyanim with nothing to say but the time run together
+ *  ("Shacharis 6:45 and 8:15 AM"), the same and alike. A marked one stays
+ *  on its own row. */
+export function groupedRows(rows: readonly ProposalRow[]): RowGroup<ProposalRow>[] {
+  const groups = new Map<string, ProposalRow[]>()
+  for (const r of rows) {
+    const g = groups.get(r.group) ?? []
+    const like = r.status === 'same' && g.find((o) => o.status === 'same' && o.tefillah === r.tefillah && o.note === r.note && o.season === r.season && !o.anchored && !r.anchored && joinClocks([o.when, r.when]))
+    if (like) {
+      const i = g.indexOf(like)
+      const whens = [...(like.when.match(/^(.*) (AM|PM)$/)![1].split(/, | and /).map((t) => `${t} ${like.when.slice(-2)}`)), r.when]
+      g[i] = { ...like, when: joinClocks(whens) ?? like.when }
+    } else g.push(r)
+    groups.set(r.group, g)
+  }
+  return [...groups].map(([label, rs]) => ({ label, rows: rs }))
 }
 
 export const changeCount = (boxes: readonly ProposalBox[]) => boxes.reduce((n, b) => n + b.rows.filter((r) => r.status !== 'same').length, 0)
@@ -158,12 +234,51 @@ export type WeekRow = { what: string; when: string; note: string | null; usually
 export type WeekProposal = {
   /** "This week’s schedule, Oct 19 – Oct 25", or a Yom Tov's own name. */
   title: string
+  /** "Oct 19–25". */
+  range: string
   isWeek: boolean
   days: { label: string; rows: WeekRow[] }[]
 }
 
 const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d)
-const fullDay = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
+/** "Wed, Oct 21"; "Shabbos, Oct 24". */
+const shortDay = (date: string) => {
+  const d = new Date(`${date}T12:00:00Z`)
+  const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return `${d.getUTCDay() === 6 ? 'Shabbos' : d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}, ${md}`
+}
+
+/** "Oct 21–24", "Oct 30–Nov 2", "Oct 24". */
+export function rangeText(from: string, to: string): string {
+  const [fm, fd] = dateText(from).split(' ')
+  const [tm, td] = dateText(to).split(' ')
+  return from === to ? dateText(from) : `${fm} ${fd}–${tm === fm ? td : `${tm} ${td}`}`
+}
+
+/** A day's times, minyanim with nothing to say but the time run together. */
+function runTogether(rows: WeekRow[]): WeekRow[] {
+  const out: WeekRow[] = []
+  for (const r of rows) {
+    const like = !r.usually && out.find((o) => !o.usually && o.what === r.what && o.note === r.note && joinClocks([o.when, r.when]))
+    if (like) {
+      const whens = [...like.when.match(/^(.*) (AM|PM)$/)![1].split(/, | and /).map((t) => `${t} ${like.when.slice(-2)}`), r.when]
+      out[out.indexOf(like)] = { ...like, when: joinClocks(whens) ?? like.when }
+    } else out.push(r)
+  }
+  return out
+}
+
+/** Days in a row with the same times, said once: "Wed, Oct 21 and Thu,
+ *  Oct 22"; three or more, "Sun, Oct 18 to Tue, Oct 20". */
+function sameDays(days: WeekProposal['days']): WeekProposal['days'] {
+  const out: { labels: string[]; rows: WeekRow[] }[] = []
+  for (const d of days) {
+    const last = out.at(-1)
+    if (last && JSON.stringify(last.rows) === JSON.stringify(d.rows)) last.labels.push(d.label)
+    else out.push({ labels: [d.label], rows: d.rows })
+  }
+  return out.map((g) => ({ label: g.labels.length === 1 ? g.labels[0] : g.labels.length === 2 ? g.labels.join(' and ') : `${g.labels[0]} to ${g.labels.at(-1)}`, rows: g.rows }))
+}
 
 /** What the usual times say for one of the week's minyanim, when it's one
  *  time and not this one: "usually 9:15 AM". */
@@ -190,13 +305,15 @@ export function scheduleProposal(current: readonly SpecialSchedule[], proposed: 
       const days = [...byDay]
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([on, ms]) => ({
-          label: isDate(on) ? fullDay(on) : scheduleDayText(on),
-          rows: [...ms]
-            .sort((a, b) => (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah))
-            .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: noteText(m.notes), usually: usually(m, on, usual) })),
+          label: isDate(on) ? shortDay(on) : scheduleDayText(on),
+          rows: runTogether(
+            [...ms]
+              .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60))
+              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: noteText(m.notes), usually: usually(m, on, usual) })),
+          ),
         }))
       const dates = `${dateText(s.from)}${s.to !== s.from ? ` – ${dateText(s.to)}` : ''}`
-      return { title: s.kind === 'week' ? `This week’s schedule, ${dates}` : `${s.name}, ${dates}`, isWeek: s.kind === 'week', days }
+      return { title: s.kind === 'week' ? `This week’s schedule, ${dates}` : `${s.name}, ${dates}`, range: rangeText(s.from, s.to), isWeek: s.kind === 'week', days: sameDays(days) }
     })
   const kept = new Set(proposed.map((s) => s.id))
   return { weeks, gone: current.filter((s) => !kept.has(s.id)).map((s) => s.name) }

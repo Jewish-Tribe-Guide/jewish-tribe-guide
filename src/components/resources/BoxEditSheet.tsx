@@ -118,9 +118,12 @@ export function BoxEditor({
   onStep?: (step: { title: string; back: () => void } | null) => void
 }) {
   const draft = useListingDraft(category, item)
-  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item })
+  // An admin's own save (Shul times' Edit) goes their way, unchallenged.
+  const save = edit.save
+  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item, via: save?.via, onSent: save ? () => save.onSaved() : undefined })
+  const verifying = !save && sender.verifying
   // None in the admin console's preview, where nothing is sent.
-  const turnstileActive = useTurnstileActive()
+  const turnstileActive = useTurnstileActive() && !save
   const { details, setDetail } = draft
   // A preset answer goes in once, as if typed.
   const [presetDone, setPresetDone] = useState(false)
@@ -131,12 +134,15 @@ export function BoxEditor({
   // A shul's box: its rows, cut to its days, edited on their own and
   // merged back into the whole list as they change.
   const minyanimField = edit.minyanimBox && edit.writing ? edit.fields.find((f) => f.type === 'minyanim') : undefined
-  const allRows: Minyan[] = minyanimField && isMinyanim(item[minyanimField.key]) ? (item[minyanimField.key] as Minyan[]) : []
+  // Opened from a preset (Shul times' Edit: the website's times), the box
+  // starts from it.
+  const base = (k: string): unknown => (edit.preset && k in edit.preset ? edit.preset[k] : item[k])
+  const allRows: Minyan[] = minyanimField && isMinyanim(base(minyanimField.key)) ? (base(minyanimField.key) as Minyan[]) : []
   // A row stored without an id gets one here, as the old editor gave it
   // (MinyanimInput's initMinyanim): the list opens a minyan by its id.
   // A week the shul sent out: its own rows, sent back into its schedule.
   const sk = minyanimField ? schedulesKey(minyanimField.key) : ''
-  const weekPost = edit.week && minyanimField ? readSchedules(item[sk]).find((s) => s.id === edit.week) : undefined
+  const weekPost = edit.week && minyanimField ? readSchedules(base(sk)).find((s) => s.id === edit.week) : undefined
   const [boxRows] = useState(() =>
     weekPost ? weekPostRows(weekPost) : edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : [],
   )
@@ -169,7 +175,7 @@ export function BoxEditor({
   }
 
   async function send() {
-    if (nothing || sender.submitting || sender.verifying) return
+    if (nothing || sender.submitting || verifying) return
     sender.setErrors([])
     await sender.submit(draft.buildSubmission())
   }
@@ -182,8 +188,8 @@ export function BoxEditor({
     </ul>
   )
   const sendButton = (label: string) => (
-    <button type="button" onClick={send} disabled={nothing || sender.submitting || sender.verifying} className={SUBMIT_PILL}>
-      {sender.submitting ? 'Sending…' : nothing ? 'No changes yet' : sender.verifying ? 'Verifying…' : label}
+    <button type="button" onClick={send} disabled={nothing || sender.submitting || verifying} className={SUBMIT_PILL}>
+      {sender.submitting ? (save ? 'Saving…' : 'Sending…') : nothing ? 'No changes yet' : verifying ? 'Verifying…' : (save?.label ?? label)}
     </button>
   )
 
@@ -205,7 +211,7 @@ export function BoxEditor({
             writing={edit.writing!}
             dayChoices={weekPost ? weekPostDays(weekPost) : undefined}
             onStep={onStep}
-            onChange={(rows) => (weekPost ? setDetail(sk, withWeekRows(readSchedules(item[sk]), weekPost.id, rows)) : setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows)))}
+            onChange={(rows) => (weekPost ? setDetail(sk, withWeekRows(readSchedules(base(sk)), weekPost.id, rows)) : setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows)))}
             send={(n) => (
               <>
                 {errors}

@@ -157,6 +157,31 @@ describe('the Shul times page (?job=times)', () => {
   })
 })
 
+describe('a shul’s times, for its boxes and its Edit (?job=times)', () => {
+  const SOI = '4a7a7af4-724c-4667-823b-df037f06cb00'
+  const SHULS = { id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }
+  const minyanim = [{ id: 'a', tefillah: 'shacharis', days: ['sun'], time: '8:00am' }]
+  const week = { id: 'w', name: 'Times for Oct 21 – Oct 24', from: '2026-10-21', to: '2026-10-24', mode: 'replace', kind: 'week', minyanim: [] }
+  beforeEach(() => {
+    m.hoursJobPlaces.mockResolvedValue({ categories: [SHULS], places: [makeListing({ id: SOI, category: 'synagogue', name: 'Sons of Israel', website: 'https://soi.example/', minyanim, minyanim_schedules: [week] } as never)] })
+  })
+
+  it('each shul comes with its listing’s times, so a box can mark them; the hours page has none', async () => {
+    const body = await (await GET(req('GET', undefined, '?job=times'))).json()
+    expect(body.places[0].times).toEqual({ key: 'minyanim', minyanim, schedules: [week] })
+    m.hoursJobPlaces.mockResolvedValue({ categories: [MIKVAH], places: [makeListing({ id: LMC, category: 'mikvah', name: 'Lower Merion Community Mikvah' })] })
+    expect((await (await GET(req('GET'))).json()).places[0]).not.toHaveProperty('times')
+  })
+
+  it('?item=: one shul’s listing and category, for its Edit; not one the page doesn’t read, nor a bad id', async () => {
+    const body = await (await GET(req('GET', undefined, `?job=times&item=${SOI}`))).json()
+    expect(body).toMatchObject({ ok: true, item: { id: SOI, name: 'Sons of Israel' }, category: { id: 'synagogue' } })
+    expect(m.listWatches).not.toHaveBeenCalled()
+    expect((await GET(req('GET', undefined, `?job=times&item=${LMC}`))).status).toBe(404)
+    expect((await GET(req('GET', undefined, '?job=times&item=nope'))).status).toBe(400)
+  })
+})
+
 describe('POST /api/admin/watches/hours', () => {
   // The user, Oct 21: an admin "can remove or replace them".
   it('stop: any page, found or given, kept and never read, so the search never adds it again', async () => {

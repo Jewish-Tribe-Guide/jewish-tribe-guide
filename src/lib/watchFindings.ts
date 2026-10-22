@@ -10,6 +10,7 @@ import { MEKOR_WATCH_NAME } from './mekorWatch'
 import { submissionSource } from './submissionSource'
 import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
 import type { Minyan } from './davening'
+import type { TimesPart } from './timesParts'
 
 // Step 6 of keeping listings current (decided by the user, Oct 21):
 // "Findings go to the job pages, next to what the listing says, not the
@@ -91,6 +92,10 @@ export type Finding = {
    *  what was read, whole, for Shul times to show as a proposal
    *  (timesProposal.ts) rather than line by line. */
   times?: FindingTimes
+  /** Which of a shul's three parts it changes (timesParts.ts). */
+  part?: TimesPart
+  /** The page it was read from, for "From soicherryhill.org/tefillot". */
+  page?: string
 }
 
 export type FindingTimes = {
@@ -127,6 +132,11 @@ function editableKeys(fields: readonly CategoryField[]): Set<string> {
   return new Set([...CORE, ...fields.flatMap((f) => [f.key, ...companionKeys(f)])])
 }
 
+/** The page in a watch's note: "From their website, read Oct 20: https://…". */
+export function pageOf(note: string | null | undefined): string | undefined {
+  return note?.split('\n')[0].match(/:\s(https?:\/\/\S+)\s*$/)?.[1]
+}
+
 /** A pending suggestion a watch filed, as the job page shows it. */
 export function findingFrom(s: SubmissionRow, current: ResourceRow | null, fields: readonly CategoryField[]): Finding {
   const payload = s.payload as unknown as ResourceSubmission
@@ -143,6 +153,7 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
           })
   const name = watchNameOf(s) ?? ''
   const times = timesOf(s, current, payload, lines, fields)
+  const page = pageOf(source.note ?? s.note)
   return {
     id: s.id,
     operation: s.operation,
@@ -155,6 +166,8 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
     notes: [...new Set([source.note, s.note].filter((n): n is string => typeof n === 'string' && n.trim() !== ''))],
     lines,
     ...(times ? { times } : {}),
+    ...(source.part ? { part: source.part.part } : {}),
+    ...(page ? { page } : {}),
   }
 }
 

@@ -137,7 +137,9 @@ export function BoxRow({ name, sub, right, mark = 'same', why, was }: { name: Re
         <span className={mark === 'gone' ? 'text-slate-600 line-through' : 'text-slate-900'}>{name}</span>
         {sub && <span className="block text-[12.5px] text-slate-500">{sub}</span>}
       </span>
-      <span className="text-right tabular-nums">
+      {/* Capped, so a long rule ("Approximately 45 minutes before
+          shkiya") wraps rather than squeezing the name to a word a line. */}
+      <span className="max-w-[10rem] text-right tabular-nums sm:max-w-[16rem]">
         {right}
         {was && <s className="block text-xs text-slate-500">{was}</s>}
       </span>
@@ -145,12 +147,13 @@ export function BoxRow({ name, sub, right, mark = 'same', why, was }: { name: Re
   )
 }
 
-/** Use this, Edit, Keep the listing. */
-export function BoxActions({ busy, onUse, onEdit, onKeep }: { busy: boolean; onUse: () => void; onEdit?: () => void; onKeep: () => void }) {
+/** Use this, Edit, Keep the listing; a week's, Use this week and Skip
+ *  this week. */
+export function BoxActions({ busy, onUse, onEdit, onKeep, use = 'Use this', keep = 'Keep the listing' }: { busy: boolean; onUse: () => void; onEdit?: () => void; onKeep: () => void; use?: string; keep?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" disabled={busy} onClick={onUse} className={GO}>
-        {busy ? 'Saving…' : 'Use this'}
+        {busy ? 'Saving…' : use}
       </button>
       {onEdit && (
         <button type="button" disabled={busy} onClick={onEdit} className={BUTTON}>
@@ -158,17 +161,18 @@ export function BoxActions({ busy, onUse, onEdit, onKeep }: { busy: boolean; onU
         </button>
       )}
       <button type="button" disabled={busy} onClick={onKeep} className={BUTTON}>
-        Keep the listing
+        {keep}
       </button>
     </div>
   )
 }
 
-/** Where a box's rows are from: "From charliewasasinner.com · read Oct 21". */
-export function SourceLine({ url, what, at, extra }: { url?: string | null; what?: string; at?: string | null; extra?: string }) {
+/** Where a box's rows are from: "From charliewasasinner.com · read Oct 21";
+ *  a box that's the same, "Same as soicherryhill.org/tefillot". */
+export function SourceLine({ url, what, at, extra, lead = 'From' }: { url?: string | null; what?: string; at?: string | null; extra?: string; lead?: string }) {
   return (
     <p className="text-[12.5px] text-slate-500 [overflow-wrap:anywhere]" data-testid="box-source">
-      From{' '}
+      {lead}{' '}
       {url ? (
         <a href={url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
           {what ?? shortUrl(url)}
@@ -188,7 +192,7 @@ export type ReadPage = {
   /** What it's called when it has no address: "Photos of the menu". */
   name?: string
   /** Under it: what it is and what it updated ("Menu link · Main dishes"),
-   *  or why nothing came from it. */
+   *  or why nothing came from it; none when its right side says it. */
   label: string
   /** Said in amber: something about the page to look at. */
   warn?: boolean
@@ -199,10 +203,11 @@ export type ReadPage = {
   onRemove?: () => void
 }
 
-/** Reads, a place's last box: the switch, its pages, and the ways on. */
-export function Reads({ on, busy, onSwitch, pages, links, defaultOpen = false, below }: { on: boolean; busy: boolean; onSwitch: (on: boolean) => void; pages: readonly ReadPage[]; links: ReactNode; defaultOpen?: boolean; below?: ReactNode }) {
+/** Reads, a place's last box: the switch, its pages, and the ways on.
+ *  `pill`: said on its heading instead of how many pages ("Off"). */
+export function Reads({ on, busy, onSwitch, pages, links, defaultOpen = false, below, pill }: { on: boolean; busy: boolean; onSwitch: (on: boolean) => void; pages: readonly ReadPage[]; links: ReactNode; defaultOpen?: boolean; below?: ReactNode; pill?: string }) {
   return (
-    <Box name="Reads" pill={{ text: `${pages.length} page${pages.length === 1 ? '' : 's'}`, tone: 'grey' }} defaultOpen={defaultOpen} testId="job-reads">
+    <Box name="Reads" pill={{ text: pill ?? `${pages.length} page${pages.length === 1 ? '' : 's'}`, tone: 'grey' }} defaultOpen={defaultOpen} testId="job-reads">
       <ReadingSwitch on={on} busy={busy} onChange={onSwitch} />
       {pages.length > 0 && (
         <ul className="text-sm">
@@ -216,7 +221,7 @@ export function Reads({ on, busy, onSwitch, pages, links, defaultOpen = false, b
                 ) : (
                   p.name
                 )}
-                <small className={`block text-[12.5px] font-normal ${p.warn ? 'font-semibold text-amber-800' : 'text-slate-500'}`}>{p.label}</small>
+                {p.label && <small className={`block text-[12.5px] font-normal ${p.warn ? 'font-semibold text-amber-800' : 'text-slate-500'}`}>{p.label}</small>}
               </span>
               <span className="whitespace-nowrap text-right text-[12.5px] text-slate-500">{p.right}</span>
               {p.onRemove ? (

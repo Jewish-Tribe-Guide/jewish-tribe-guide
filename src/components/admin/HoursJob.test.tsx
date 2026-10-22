@@ -9,7 +9,10 @@ import type { Watch, WatchCheck } from '@/lib/watches'
 import type { Finding, FindingTimes } from '@/lib/watchFindings'
 import type { Minyan } from '@/lib/davening'
 import type { SpecialSchedule } from '@/lib/schedules'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
 import HoursJob, { READ_ON_LOAD, type HoursPlace } from './HoursJob'
+import type { ShulPlace } from './TimesProposal'
+import { day } from './JobPage'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -291,153 +294,213 @@ describe('HoursJob', () => {
   })
 })
 
-// ── Shul times, redrawn Oct 21 (artifact B3vwpSiqwdK833s9VAVHBc) ────────────
+// ── Shul times, drawn Oct 21 (artifact B3vwpSiqwdK833s9VAVHBc, v13) ─────────
+// A shul opened is its listing's boxes: an update per part (Usual Shabbos
+// times, This week's schedule) first and open, a part that's the same
+// closed under them, Reads last.
 describe('Shul times', () => {
   const FIELD = { key: 'minyanim', label: 'Davening Times', type: 'minyanim' as const }
-  const rule = { time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting' as const, offsetMinutes: 0, notAfter: '19:00' }
-  const shacharis: Minyan = { id: 's1', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' }
-  const friday: Minyan = { id: 'f1', tefillah: 'mincha_maariv', days: ['fri'], ...rule }
-  const week: SpecialSchedule = { id: 'wk', name: 'Times for Oct 19 – Oct 25', from: '2026-10-19', to: '2026-10-25', mode: 'replace', kind: 'week', postedBy: 'website', minyanim: [{ id: 'a', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:00am' }] }
-  const times = (over: Partial<FindingTimes> = {}): FindingTimes => ({
-    field: FIELD,
-    current: [shacharis, friday],
-    proposed: [shacharis, { id: 'n1', tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'summer' }, { ...friday, season: 'winter' }],
-    currentSchedules: [],
-    proposedSchedules: [],
-    ...over,
-  })
-  const usualLine = { key: 'minyanim', label: 'Davening Times', before: '…', after: '…', choosable: true }
-  const weekLine = { key: 'minyanim_schedules', label: 'Special schedules', before: '—', after: '…', choosable: true }
-  const page = (id: string, over: Partial<WatchCheck> = {}, url = 'https://mekorhabracha.org/davening') => ({ watch: watch({ id, url, lastCheck: check('differs', { what: 'times', queue: 'filed', ...over }) }), source: 'Found from its website' })
-  const MEKOR = place({
-    id: 'mekor',
-    name: 'Mekor Habracha',
+  const m = (id: string, tefillah: Minyan['tefillah'], days: Minyan['days'], time: string, over: Partial<Minyan> = {}): Minyan => ({ id, tefillah, days, time, ...over })
+  const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri'] as Minyan['days']
+  const listing: Minyan[] = [m('a', 'shacharis', weekdays, '6:45am'), m('b', 'shacharis', weekdays, '8:15am'), m('c', 'shacharis', ['sun'], '7:00am'), m('d', 'mincha_maariv', ['sun', 'mon', 'tue', 'wed', 'thu'], '6:00pm')]
+  const shabbos = [m('n1', 'mincha_maariv', ['fri'], '7:00pm', { season: 'summer' }), m('n2', 'shacharis', ['sat'], '9:00am', { notes: 'Main Sanctuary' })]
+  const on = (id: string, tefillah: Minyan['tefillah'], dates: string[], time: string) => ({ id, tefillah, on: dates, time })
+  const week: SpecialSchedule = {
+    id: 'wk',
+    name: 'Times for Oct 21 – Oct 24',
+    from: '2026-10-21',
+    to: '2026-10-24',
+    mode: 'replace',
+    kind: 'week',
+    postedBy: 'website',
+    minyanim: [on('w1', 'shacharis', ['2026-10-21', '2026-10-22'], '6:45am'), on('w2', 'shacharis', ['2026-10-21', '2026-10-22'], '8:15am'), on('w3', 'mincha_maariv', ['2026-10-21', '2026-10-22'], '5:55pm'), on('w4', 'shacharis', ['2026-10-24'], '9:00am')],
+  }
+  const times = (over: Partial<FindingTimes>): FindingTimes => ({ field: FIELD, current: listing, proposed: listing, currentSchedules: [], proposedSchedules: [], ...over })
+  const TEFILLOT = 'https://soi.example/tefillot'
+  const CAL = 'https://soi.example/cal.php'
+  const part = (id: string, p: 'weekday' | 'shabbos' | 'week', page: string, t: FindingTimes) =>
+    finding({ id, targetId: 'soi', name: 'Sons of Israel', lines: [{ key: p === 'week' ? 'minyanim_schedules' : 'minyanim', label: 'Davening Times', before: '…', after: '…', choosable: true }], times: t, part: p, page })
+  const SHAB = part('s-shab', 'shabbos', TEFILLOT, times({ proposed: [...listing, ...shabbos] }))
+  const WEEK = part('s-week', 'week', CAL, times({ proposedSchedules: [week] }))
+  const timesPage = (id: string, url: string, over: Partial<WatchCheck> = {}) => ({ watch: watch({ id, url, lastCheck: check('differs', { what: 'times', queue: 'filed', ...over }) }), source: 'Found from its website' })
+  // Sons of Israel on dev, Oct 21: Tefillot gives the usual times, the
+  // calendar this week's, the home page nothing of its own, one page none.
+  const SOI = place({
+    id: 'soi',
+    name: 'Sons of Israel',
     fields: ['Davening Times'],
-    website: 'https://mekorhabracha.org/',
-    pages: [page('w-mekor')],
-    findings: [finding({ id: 's-mekor', targetId: 'mekor', name: 'Mekor Habracha', lines: [usualLine], times: times() })],
-  })
-  const KESHER = place({ id: 'k', name: 'Kesher Israel', fields: ['Davening Times'], website: 'https://historickesherisrael.com/', pages: [page('w-k', { result: 'agrees', queue: null, read: ['Shacharis · Sun–Fri · 8:00 AM'] }, 'https://historickesherisrael.com/')] })
-  const NONE = place({ id: 'n', name: 'Beth Am', fields: ['Davening Times'], website: 'https://betham.org/', reason: 'Read its website: no davening times on it.' })
+    website: 'https://soi.example/',
+    times: { key: 'minyanim', minyanim: listing, schedules: [] },
+    findings: [WEEK, SHAB],
+    pages: [
+      timesPage('w-home', 'https://soi.example/', { result: 'agrees', queue: null, parts: [] }),
+      timesPage('w-none', 'https://soi.example/cholim', { result: 'nothing', queue: null }),
+      timesPage('w-cal', CAL, { parts: [{ part: 'week', size: 4 }] }),
+      timesPage('w-tef', TEFILLOT, { parts: [{ part: 'weekday', size: 4 }, { part: 'shabbos', size: 2 }] }),
+    ],
+  } as Partial<ShulPlace>)
+  const KESHER = place({
+    id: 'k',
+    name: 'Kesher Israel',
+    fields: ['Davening Times'],
+    website: 'https://kesher.example/',
+    times: { key: 'minyanim', minyanim: listing, schedules: [] },
+    pages: [timesPage('w-k', 'https://kesher.example/', { result: 'agrees', queue: null, read: ['Shacharis Mon–Fri 6:45 AM'] })],
+  } as Partial<ShulPlace>)
+  const NONE = place({ id: 'n', name: 'Beth Am', fields: ['Davening Times'], website: 'https://betham.example/', reason: 'Read its website: no davening times on it.' })
   const VILNA = place({ id: 'v', name: 'Vilna Congregation', fields: ['Davening Times'], off: true, offSince: ago(0) })
   const times$ = (places: HoursPlace[], post?: (body: Record<string, unknown>) => Record<string, unknown>) => renderPage(places, post, 'times')
+  const today = () => day(new Date().toISOString())
+  const shul = (name: string) => screen.getByRole('region', { name })
+  const boxes = (name: string) => within(shul(name)).getAllByRole('region').map((b) => `${b.getAttribute('aria-label')} | ${within(b).queryByTestId('box-pill')?.textContent ?? ''} | ${within(b).getAllByRole('button')[0].getAttribute('aria-expanded')}`)
+  const box = (name: string, label: string) => within(shul(name)).getByRole('region', { name: label })
+  const marked = (b: HTMLElement) => within(b).getAllByTestId('box-row').map((r) => `${r.dataset.mark}: ${r.textContent}`)
 
-  it('says at the top whether anything needs you, with no Not read yet', async () => {
-    await times$([MEKOR, KESHER, NONE, VILNA])
+  it('says at the top whether a shul has updates, and how many aren’t read yet', async () => {
+    await times$([SOI, KESHER, NONE, VILNA, place({ id: 'nr', name: 'Not Read Shul', fields: ['Davening Times'], pages: [{ watch: watch({ id: 'w-nr', lastRunAt: null }), source: 'Found from its website' }] })])
     expect(gets[0]).toBe('/api/admin/watches/hours?job=times&community=philly')
-    expect(screen.getByTestId('job-counts')).toHaveTextContent('1 shul’s website says something different.4 shuls, read every morning from their own websites. 1 needs its page found. 1 kept by hand.')
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['To check 1', 'Can’t be read 1', 'Checked 1', 'Off 1'])
+    expect(screen.getByTestId('job-counts')).toHaveTextContent('1 shul has updates from its website. 1 not read yet.')
+    expect(pill(SOI.name)).toBe('2 updates')
+    await tab('Checked')
+    expect(pill(KESHER.name)).toBe('Same')
   })
 
   it('a quiet day says so', async () => {
-    await times$([KESHER, { ...KESHER, id: 'k2', name: 'Kesher Two' }])
-    expect(screen.getByTestId('job-counts')).toHaveTextContent('All 2 shuls match their websites.')
+    await times$([KESHER])
+    expect(screen.getByTestId('job-counts')).toHaveTextContent('No shul’s website has an update.')
   })
 
-  it('a shul with a change says the change on its row, and opening it is the comparison: no Compare', async () => {
-    await times$([MEKOR])
-    expect(pill(MEKOR.name)).toBe('2 changes')
-    expect(within(rowOf(MEKOR.name)).getByTestId('job-line')).toHaveTextContent('Mincha & Maariv · Fri: new, 7 PM in summer, at candle lighting, never after 7 PM in winter')
-    expect(screen.queryByRole('button', { name: 'Compare' })).toBeNull()
-    await open(MEKOR.name)
-    const shul = screen.getByRole('region', { name: MEKOR.name })
-    expect(within(shul).getByText(/^From/)).toHaveTextContent(/^From mekorhabracha\.org\/davening · read [A-Z][a-z]{2} \d+$/)
-    expect(within(shul).getByText('Their website says the usual times should be:')).toBeInTheDocument()
-    const marked = within(shul).getAllByTestId('proposal-row').map((r) => `${r.dataset.status}: ${r.textContent}`)
-    expect(marked).toEqual([
-      'same: Shacharis · Mon, Thu6:45 AM',
-      'new: NewMincha & Maariv · FriSummer7 PM',
-      'changed: ChangedMincha & Maariv · FriWinterAll yearat candle lighting, never after 7 PM',
+  it('opened: an open box per update, first; the part that’s the same closed under them; Reads last', async () => {
+    await times$([SOI])
+    await open(SOI.name)
+    expect(boxes(SOI.name)).toEqual(['Usual Shabbos times | 2 new | true', 'This week’s schedule | Oct 21–24 | true', 'Usual weekday times | Same | false', 'Reads | 4 pages | false'])
+  })
+
+  it('an update’s box: its rows under their days, a new one lit; Use this, Edit, Keep the listing; where it’s from', async () => {
+    await times$([SOI])
+    await open(SOI.name)
+    const b = box(SOI.name, 'Usual Shabbos times')
+    expect(within(b).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Friday night', 'Shabbos day'])
+    expect(marked(b)).toEqual(['new: Mincha & MaarivSummer7 PM', 'new: ShacharisMain Sanctuary9 AM'])
+    expect(within(b).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this', 'Edit', 'Keep the listing'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From soi\.example\/tefillot · read [A-Z][a-z]{2} \d+$/)
+  })
+
+  it('this week’s: days with the same times as one, a tefillah’s times on one line, a changed one beside its usual time', async () => {
+    await times$([SOI])
+    await open(SOI.name)
+    const b = box(SOI.name, 'This week’s schedule')
+    expect(within(b).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Wed, Oct 21 and Thu, Oct 22', 'Shabbos, Oct 24'])
+    expect(marked(b)).toEqual(['same: Shacharis6:45 and 8:15 AM', 'changed: Mincha & Maariv5:55 PM6 PM', 'same: Shacharis9 AM'])
+    expect(within(b).getByText('6 PM').tagName).toBe('S')
+    expect(within(b).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this week', 'Edit', 'Skip this week'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From soi\.example\/cal\.php · read/)
+  })
+
+  it('the same part: the listing’s times, grouped, “Same as” the page that gave it, no buttons', async () => {
+    await times$([SOI])
+    await open(SOI.name)
+    const user = userEvent.setup()
+    await user.click(within(shul(SOI.name)).getByRole('button', { name: /^Usual weekday times/ }))
+    const b = box(SOI.name, 'Usual weekday times')
+    expect(within(b).getAllByRole('heading').map((h) => h.textContent)).toEqual(['Sunday', 'Monday to Friday', 'Sunday to Thursday'])
+    expect(marked(b)).toEqual(['same: Shacharis7 AM', 'same: Shacharis6:45 and 8:15 AM', 'same: Mincha & Maariv6 PM'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^Same as soi\.example\/tefillot · read/)
+    expect(within(b).getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('Reads: the pages that gave a part first, named for it; then the one that gave nothing; a page with no times greyed last', async () => {
+    await times$([SOI])
+    await open(SOI.name)
+    await userEvent.setup().click(within(shul(SOI.name)).getByRole('button', { name: /^Reads/ }))
+    const lines = within(shul(SOI.name)).getAllByTestId('job-source').map((l) => l.textContent?.replace(/read [A-Z][a-z]{2} \d+/, 'read …'))
+    expect(lines).toEqual([
+      'soi.example/tefillotUsual weekday times · Usual Shabbos timesread …',
+      'soi.example/cal.phpThis week’s scheduleread …',
+      'soi.exampleNothing from itread …',
+      'soi.example/cholimno times',
     ])
-    expect(within(shul).getByText('All year').tagName).toBe('S')
-    expect(within(shul).getByText('This week’s schedule: their website doesn’t post one, so the listing shows the usual times.')).toBeInTheDocument()
-    // Its pages, under the proposal.
-    expect(within(shul).getByTestId('shul-pages')).toHaveTextContent('Reads 1 page.')
-    expect(within(shul).getByRole('button', { name: 'Use a different page' })).toBeInTheDocument()
-    expect(within(shul).getByRole('button', { name: 'Add a page' })).toBeInTheDocument()
-    expect(within(shul).getByRole('link', { name: 'Open its website' })).toHaveAttribute('href', 'https://mekorhabracha.org/')
+    expect(within(shul(SOI.name)).getByRole('switch', { name: /Reading/ })).toHaveAttribute('aria-checked', 'true')
+    await userEvent.setup().click(within(shul(SOI.name)).getByRole('button', { name: 'Stop reading soi.example/cholim' }))
+    expect(posts.at(-1)!.body).toEqual({ resourceId: 'soi', action: 'stop', id: 'w-none' })
   })
 
-  it('Use this makes the listing the proposal; it says so where it was, and the top says nothing needs you', async () => {
-    await times$([MEKOR])
-    await open(MEKOR.name)
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Use this' }))
-    expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-mekor?community=philly', body: { status: 'approved' } })
-    expect(screen.getByTestId('finding-decided')).toHaveTextContent('Updated on the listing.')
-    expect(screen.getByTestId('job-counts')).toHaveTextContent(/^Its one shul matches its website\./)
+  it('Use this changes only that part; its box closes, says so, and sits under the update still to decide', async () => {
+    await times$([SOI])
+    await open(SOI.name)
+    await userEvent.setup().click(within(box(SOI.name, 'Usual Shabbos times')).getByRole('button', { name: 'Use this' }))
+    expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-shab?community=philly', body: { status: 'approved' } })
+    expect(boxes(SOI.name).slice(0, 2)).toEqual(['This week’s schedule | Oct 21–24 | true', `Usual Shabbos times | Used ${today()} | false`])
+    expect(pill(SOI.name)).toBe('1 update')
+    await userEvent.setup().click(within(box(SOI.name, 'This week’s schedule')).getByRole('button', { name: 'Skip this week' }))
+    expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-week?community=philly', body: { status: 'rejected' } })
+    expect(boxes(SOI.name).slice(0, 2)).toEqual([`Usual Shabbos times | Used ${today()} | false`, `This week’s schedule | Skipped ${today()} | false`])
+    expect(pill(SOI.name)).toBe(`Used ${today()}`)
+    expect(screen.getByTestId('job-counts')).toHaveTextContent('No shul’s website has an update.')
   })
 
-  it('Keep the listing skips it until the website changes', async () => {
-    await times$([MEKOR])
-    await open(MEKOR.name)
+  it('Keep the listing: kept, and said so', async () => {
+    await times$([place({ ...SOI, findings: [SHAB] })])
+    await open(SOI.name)
     await userEvent.setup().click(screen.getByRole('button', { name: 'Keep the listing' }))
     expect(posts.at(-1)!.body).toEqual({ status: 'rejected' })
-    expect(screen.getByTestId('finding-decided')).toHaveTextContent('Skipped. Not shown again unless its website says something new.')
+    expect(pill(SOI.name)).toBe(`Kept ${today()}`)
   })
 
-  it('Edit opens the proposal in the listing’s editor, filled in, and saves what was edited', async () => {
-    await times$([MEKOR])
-    await open(MEKOR.name)
+  it('Edit: the listing’s own editor for that part, filled with the website’s, saved to the listing as that update', async () => {
+    const category = makeCategory({ id: 'synagogue', detailFields: [FIELD] })
+    const item = makeListing({ id: 'soi', category: 'synagogue', name: 'Sons of Israel', minyanim: listing })
+    await times$([place({ ...SOI, findings: [SHAB] })])
+    const listed = vi.mocked(fetchJson).getMockImplementation()!
+    vi.mocked(fetchJson).mockImplementation(async (url, init, fallback) => (String(url).includes('item=soi') ? { ok: true, item, category } : listed(url, init, fallback)))
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    await open(SOI.name)
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
-    expect(screen.getByTestId('proposal-edit')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Save to the listing' }))
-    expect(posts.at(-1)!.body).toEqual({ status: 'approved', payload: { details: { minyanim: times().proposed, minyanim_schedules: [] } } })
+    await user.click(within(box(SOI.name, 'Usual Shabbos times')).getByRole('button', { name: 'Edit' }))
+    expect(vi.mocked(fetchJson).mock.calls.map(([u]) => u)).toContain('/api/admin/watches/hours?job=times&item=soi&community=philly')
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('9 AM')).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+    const [url, init] = fetchMock.mock.calls.find(([u]) => String(u).includes('/api/admin/submissions/'))!
+    expect(String(url)).toBe('/api/admin/submissions/s-shab?community=philly')
+    const sent = JSON.parse(String(init!.body))
+    expect(sent.status).toBe('approved')
+    expect(sent.payload.details.minyanim).toEqual(expect.arrayContaining([expect.objectContaining({ tefillah: 'shacharis', days: ['sat'], time: '9:00am' })]))
+    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    fetchMock.mockRestore()
   })
 
-  it('a posted week is proposed apart from the usual times, on its own dates', async () => {
-    const posted = place({ ...MEKOR, findings: [finding({ id: 's-wk', targetId: 'mekor', lines: [weekLine], times: times({ proposed: [shacharis, friday], proposedSchedules: [week] }) })] })
-    await times$([posted])
-    expect(pill(MEKOR.name)).toBe('This week')
-    expect(within(rowOf(MEKOR.name)).getByTestId('job-line')).toHaveTextContent('This week’s schedule, Oct 19 – Oct 25: Thursday, Oct 22, Shacharis 7 AM, usually 6:45 AM')
-    await open(MEKOR.name)
-    expect(screen.getByTestId('proposal-week')).toHaveTextContent('Goes on the listing as This week’s schedule. The usual times stay as they are.')
-    expect(screen.getByText(/Same as their website\./)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Skip this week' })).toBeInTheDocument()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Use this week' }))
-    expect(posts.at(-1)!.body).toEqual({ status: 'approved' })
+  it('a filing from before parts is shown whole, to compare', async () => {
+    await times$([place({ ...SOI, findings: [finding({ id: 's-old', targetId: 'soi', lines: [{ key: 'minyanim', label: 'Davening Times', before: 'a', after: 'b', choosable: true }] })] })])
+    await open(SOI.name)
+    expect(within(shul(SOI.name)).getByRole('region', { name: 'From its website' })).toBeInTheDocument()
+    expect(within(shul(SOI.name)).getByRole('button', { name: 'Compare' })).toBeInTheDocument()
   })
 
-  it('with both, each part has a tick, and Use this sends only the ticked one', async () => {
-    const both = place({ ...MEKOR, findings: [finding({ id: 's-both', targetId: 'mekor', lines: [usualLine, weekLine], times: times({ proposedSchedules: [week] }) })] })
-    await times$([both])
-    await open(MEKOR.name)
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('checkbox', { name: /^Use This week’s schedule/ }))
-    await user.click(screen.getByRole('button', { name: 'Use this' }))
-    expect(posts.at(-1)!.body).toEqual({ status: 'approved', only: ['minyanim'] })
-  })
-
-  it('a shul that matches shows what it read', async () => {
-    await times$([KESHER])
-    expect(pill(KESHER.name)).toBe('Same')
-    expect(within(rowOf(KESHER.name)).getByTestId('job-line')).toHaveTextContent(/^Same as their website · read [A-Z][a-z]{2} \d+$/)
-    await open(KESHER.name)
-    expect(screen.getByTestId('job-read')).toHaveTextContent('Same as their website. Usual times it read:Shacharis · Sun–Fri · 8:00 AMNothing to decide. Read again every morning.')
-  })
-
-  it('Reading is a switch per shul: off, it’s kept by hand; on, it’s read straight away', async () => {
+  it('Reading off: its row says Not read, Reads says Off; turned back on, it’s read', async () => {
     await times$([KESHER, VILNA], (body) => (body.action === 'off' ? { pages: KESHER.pages.map((x) => ({ ...x, watch: { ...x.watch, active: false } })), off: true } : { pages: [], off: false, reason: 'Read its website: no davening times on it.' }))
     await open(KESHER.name)
     const user = userEvent.setup()
-    await user.click(screen.getByRole('switch', { name: /Reading/ }))
+    await user.click(within(shul(KESHER.name)).getByRole('button', { name: /^Reads/ }))
+    await user.click(within(shul(KESHER.name)).getByRole('switch', { name: /Reading/ }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/watches/hours?job=times&community=philly', body: { resourceId: 'k', action: 'off' } })
-    expect(pill(KESHER.name)).toBe('Reading off')
-    expect(screen.getByRole('switch', { name: /Reading/ })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.queryByRole('button', { name: 'Turn off this place' })).toBeNull()
+    expect(pill(KESHER.name)).toBe('Not read')
     await tab('Off')
-    expect(within(rowOf(VILNA.name)).getByTestId('job-line')).toHaveTextContent(/^Kept by hand · reading turned off [A-Z][a-z]{2} \d+$/)
     await open(VILNA.name)
-    await user.click(within(screen.getByRole('region', { name: VILNA.name })).getByRole('switch'))
+    const reads = within(shul(VILNA.name)).getByRole('region', { name: 'Reads' })
+    expect(within(reads).getByTestId('box-pill')).toHaveTextContent('Off')
+    expect(within(reads).queryByRole('button', { name: 'Read them now' })).toBeNull()
+    await user.click(within(reads).getByRole('switch'))
     expect(posts.at(-1)!.body).toEqual({ resourceId: 'v', action: 'on' })
   })
 
-  it('one that can’t be read opens with its page to give', async () => {
+  it('one that can’t be read: why on its row; opened, only Reads, open, its website saying why', async () => {
     await times$([NONE])
-    expect(pill(NONE.name)).toBe('Can’t be read')
+    expect(pill(NONE.name)).toBe('No times found')
     await open(NONE.name)
+    expect(boxes(NONE.name)).toEqual(['Reads | 1 page | true'])
+    expect(within(shul(NONE.name)).getByTestId('job-source')).toHaveTextContent('betham.exampleno times')
+    await userEvent.setup().click(within(shul(NONE.name)).getByRole('button', { name: 'Add a page' }))
     expect(screen.getByPlaceholderText('its-website.org/davening')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'No times online' })).toBeNull()
   })
 })
-

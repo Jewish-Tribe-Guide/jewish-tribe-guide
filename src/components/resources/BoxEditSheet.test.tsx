@@ -105,6 +105,23 @@ describe('BoxEditor, this week’s schedule', () => {
     expect(sent).toMatchObject({ id: 'w1', from: '2026-10-09', to: '2026-10-10', kind: 'week' })
     expect(sent.minyanim).toEqual([week.minyanim[0], { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '8:45am', notes: 'Kiddush after davening' }])
   })
+
+  // Shul times' Edit (Oct 21): the week its website posted, not on the
+  // listing yet, opened in the listing's own box and saved the admin's way.
+  it('opened from a preset, a week only the website has; Save to the listing goes the admin’s way, unchallenged', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const via = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const onSaved = vi.fn()
+    const bare = makeListing({ ...shul, minyanim_schedules: [] })
+    renderWithProviders(<BoxEditSheet item={bare} category={shuls} edit={{ ...edit, preset: { minyanim_schedules: [week] }, save: { label: 'Save to the listing', via, onSaved } }} onClose={vi.fn()} />)
+    expect(within(screen.getByTestId('minyan-box-list')).getAllByRole('button', { name: /^(Mincha|Shacharis)/ })).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Save to the listing' }))
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const details = via.mock.calls[0][0].payload.details
+    expect(details.minyanim_schedules).toEqual([week])
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Verifying/)).not.toBeInTheDocument()
+  })
 })
 
 describe('BoxEditor, a shul’s usual Shabbos times', () => {

@@ -146,3 +146,57 @@ export function partLines(source: PartSource, listingDetails: Record<string, unk
     .flatMap((b) => b.rows)
     .flatMap((r) => (r.status === 'same' ? [] : [`${SAY[r.status]}: ${r.what}, ${r.when}${r.season ? ` in ${r.season.toLowerCase()}` : ''}${r.was?.when ? `, was ${r.was.when}` : ''}`]))
 }
+
+// ── Which parts a page gives (Reads, Oct 21) ────────────────────────────────
+// Shul times' Reads names each page by the parts it gives ("Usual weekday
+// times · Usual Shabbos times", "This week’s schedule"), and when two pages
+// give the same part, the one that gives more is the one named, as
+// fileParts files it. A page with times on it that gives no part another
+// page doesn't give more of says "Nothing from it".
+
+/** A part a page gave, and how many of its times. */
+export type PartGiven = { part: TimesPart; size: number }
+
+const DATED = /^\d{4}-\d{2}-\d{2}$/
+/** One time's part: a dated one is this week's; Friday night and Saturday
+ *  Shabbos's (minyanimForBox's split); Yom Tov neither's. */
+function rowPart(day: string, shacharis: boolean, week: boolean): TimesPart | null {
+  if (week || DATED.test(day)) return 'week'
+  if (day === 'sat' || (day === 'fri' && !shacharis)) return 'shabbos'
+  return day === 'yom_tov' ? null : 'weekday'
+}
+
+const tally = (found: Iterable<TimesPart | null>): PartGiven[] => {
+  const size = new Map<TimesPart, number>()
+  for (const p of found) if (p) size.set(p, (size.get(p) ?? 0) + 1)
+  return TIMES_PARTS.flatMap((part) => (size.has(part) ? [{ part, size: size.get(part)! }] : []))
+}
+
+/** The parts a reading's times give: every time the page gave, not one the
+ *  listing has that it didn't mention. */
+export function partsGiven(updates: readonly { kind: string; rows: readonly { day: string; tefillah: string; status: string }[] }[]): PartGiven[] {
+  return tally(updates.flatMap((u) => u.rows.filter((r) => r.status !== 'gone' && r.status !== 'kept').map((r) => rowPart(r.day, r.tefillah === 'shacharis', u.kind === 'week'))))
+}
+
+const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+const MONTH_DAY = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w* \d{1,2}\b/
+
+/** The same from a check's read lines ("Shacharis Mon–Fri 6:45 AM",
+ *  "Shacharis Wed Oct 21 6:45 AM"), for a page last read before checks
+ *  kept their parts. A line counts once for each part its days touch. */
+export function partsFromRead(lines: readonly string[]): PartGiven[] {
+  return tally(
+    lines.flatMap((line) => {
+      if (MONTH_DAY.test(line)) return ['week' as const]
+      const shacharis = /^Shacharis\b/.test(line)
+      const days = new Set<string>()
+      for (const m of line.matchAll(/\b(Sun|Mon|Tue|Wed|Thu|Fri|Sat)(?:–(Sun|Mon|Tue|Wed|Thu|Fri|Sat))?\b/g)) {
+        const from = SHORT_DAYS.indexOf(m[1] as (typeof SHORT_DAYS)[number])
+        const to = m[2] ? SHORT_DAYS.indexOf(m[2] as (typeof SHORT_DAYS)[number]) : from
+        for (let i = from; i <= to; i++) days.add(KEYS[i])
+      }
+      return [...new Set([...days].map((d) => rowPart(d, shacharis, false)))]
+    }),
+  )
+}

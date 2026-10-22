@@ -369,7 +369,26 @@ agreed:
    - Not built, as the drawing says: board 3 (Hours and Phone boxes for a
      place Google doesn't keep, part of "keeping listings current") and
      board 5 (a menu that moved, a "New menu link" update in Reads).
-3. Shul times.
+3. Shul times. **Built Oct 22** (compared with its drawing on dev, computer
+   and phone, with the shul's updates stubbed in the browser; dev's own
+   are older, unsplit filings):
+   - A box per update, named for its part: Usual Shabbos times ("7 new"),
+     This week's schedule ("Oct 21–24"), Usual weekday times. Rows sit
+     under their days ("Friday night", "Monday to Friday", "Wed, Oct 21
+     and Thu, Oct 22"), a tefillah's times on one line ("6:45 and 8:15
+     AM"), a changed time beside its old one (`timesProposal.ts`).
+   - A usual part a page gives that matches is a closed "Same" box, "Same
+     as" its page.
+   - Each check now records the parts its page gave (`WatchCheck.parts`,
+     `partsGiven`); older checks are worked out from their lines
+     (`partsFromRead`). Reads names each page by the parts it gave, pages
+     that gave a part first, greyed ones last.
+   - A finding carries its part and page (`watchFindings.ts`). Use this
+     approves only that part. Edit is the listing's own box editor
+     (`BoxEditSheet`'s `preset` and `save`), filled with the website's
+     version; the hours route's `?item=` hands it the listing.
+   - A filing from before parts (dev has three, Sons of Israel's) shows
+     whole in a "From its website" box with Compare.
 4. Mikvah hours.
 5. Hospitals.
 6. Kosher.

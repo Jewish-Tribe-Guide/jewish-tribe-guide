@@ -149,7 +149,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       ok: true,
       filed: 1,
       pageHash: await hashOfPage(),
-      check: { what: 'times', from: 'page', result: 'differs', read: ['Mincha Sun 6:05 PM'], differences: ['Changed: mincha · Sun · 6:05pm, was 6:15pm'], queue: 'filed' },
+      check: { what: 'times', from: 'page', result: 'differs', read: ['Mincha Sun 6:05 PM'], differences: ['Changed: mincha · Sun · 6:05pm, was 6:15pm'], queue: 'filed', parts: [{ part: 'weekday', size: 1 }] },
     })
     expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }), 'minyanim', { text: expect.stringContaining('Sunday Mincha 6:05pm') }, 'k')
     const [community, target, payload, note, by] = m.submitListingUpdate.mock.calls[0]
@@ -167,7 +167,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       ok: true,
       filed: 0,
       pageHash: await hashOfPage(),
-      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null },
+      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }] },
     })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     expect(m.confirmFromSource).not.toHaveBeenCalled()
@@ -187,7 +187,8 @@ describe('runListingPageWatch: a shul’s page of times', () => {
 
   it('a page of one week’s times goes to the queue as that week’s times, marked as from the website', async () => {
     m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
-    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+    // Said of the page, so Reads names it "This week’s schedule".
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1, check: { parts: [{ part: 'week', size: 1 }] } })
     const payload = m.submitListingUpdate.mock.calls[0][2]
     expect(payload.details.minyanim).toEqual([expect.objectContaining({ days: ['sun'], time: '6:15pm' })])
     expect(payload.details.minyanim_schedules).toEqual([
@@ -460,7 +461,7 @@ describe('runListingPageWatch: "Check now", the full check', () => {
       ok: true,
       filed: 0,
       pageHash: await hashOfPage(),
-      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null },
+      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }] },
     })
     expect(m.readShulWeek).toHaveBeenCalled()
     expect(m.submitListingUpdate).not.toHaveBeenCalled()

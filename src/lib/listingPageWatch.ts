@@ -205,7 +205,7 @@ export function pageCheck(
   what: 'times' | 'hours' | 'dishes',
   from: CheckFound['from'],
   read: readonly string[],
-  rest: Pick<CheckFound, 'differences' | 'queue' | 'note' | 'unread'>,
+  rest: Pick<CheckFound, 'differences' | 'queue' | 'note' | 'unread' | 'parts'>,
 ): CheckFound {
   // Something read that couldn't be set beside the listing isn't agreement:
   // Lower Merion's women's hours, read with no days, showed as "agrees"
@@ -222,6 +222,7 @@ export function pageCheck(
     ...(unread.length ? { unread } : {}),
     queue: rest.differences.length ? rest.queue : null,
     ...(rest.note ? { note: rest.note } : {}),
+    ...(rest.parts?.length ? { parts: rest.parts } : {}),
   }
 }
 
