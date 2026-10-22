@@ -16,7 +16,7 @@ import { rebasePart } from './timesParts'
 import { rebaseSection } from './hoursSections'
 import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
-import type { EruvSuggestion } from './eruvSuggestion'
+import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
 import { jobCategories, keepOnly, onAJobPage, watchNameOf } from './watchFindings'
 import type {
   ResourceRow,
@@ -409,6 +409,18 @@ export async function approveSubmission(
   }
 
   let savedPayload: Record<string, unknown> | null = null
+  // An eruv's, from Eruv status: Use this's rows, or the admin's Edit.
+  if (submission.target_type === 'eruv' && submission.operation === 'update' && (only !== undefined || edited !== undefined)) {
+    const sent = submission.payload as unknown as EruvSuggestion
+    const eruv = (await listEruvimForAdmin(submission.community_id)).eruvim.find((e) => e.id === sent.eruvId)
+    if (!eruv) throw new ReviewEditError('The eruv this changes couldn’t be found.')
+    const next = eruvAsDecided(sent, eruv, { edited, only })
+    if (!next.ok) throw new ReviewEditError(next.errors.join(' '))
+    savedPayload = next.suggestion as unknown as Record<string, unknown>
+    submission.payload = savedPayload
+    only = undefined
+    edited = undefined
+  }
   if (only !== undefined) {
     if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) {
       throw new ReviewEditError('Only an edit can be approved line by line.')

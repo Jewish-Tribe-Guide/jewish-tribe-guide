@@ -11,6 +11,8 @@ import { runListingPageWatch } from './listingPageRun'
 import { updateWatch } from './watchStore'
 import { afterRun, listCheck, MENU_WATCH_CREATOR, type Watch, type WatchOutcome } from './watches'
 import { isNewsletterWatch, quietError } from './newsletter'
+import { isEruvWebsiteWatch } from './eruvWebsite'
+import { runEruvWebsiteWatch } from './eruvWebsiteRun'
 
 // Runs a watch and records how it went (watches.ts has the rules). Shared by
 // the daily cron and the admin tab's "Check now". Server-only.
@@ -49,6 +51,8 @@ export async function runWatch(
     // from the data it's built from, and compared with the hospital's
     // listing (refuahWatch.ts).
     if (refuahHospitalId(watch.url)) return await runRefuahWatch(watch.communityId, watch.url, watch.resourceId ?? null, watch.lastCheck)
+    // An eruv's website, for its hotline and email alerts (eruvWebsite.ts).
+    if (isEruvWebsiteWatch({ createdBy: watch.createdBy ?? null })) return await runEruvWebsiteWatch(watch.communityId, watch.url)
     // A food place's menu, read by the AI only when it changed (menuWatch.ts).
     if (watch.createdBy === MENU_WATCH_CREATOR) {
       return await runMenuWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null }, budget, { full })

@@ -57,3 +57,19 @@ export function eruvChanges(current: Pick<Eruv, EruvSuggestionField> | null, sug
     return text(before) === text(after) ? [] : [{ key: f.key, label: f.label, before, after }]
   })
 }
+
+/** A suggestion as an admin approves it from Eruv status: with `only`, the
+ *  rows Use this takes, the rest as the eruv has them now (so a row edited
+ *  since it was read isn't put back); with `edited`, the admin's own copy
+ *  from Edit, read as a visitor's is. */
+export function eruvAsDecided(
+  sent: EruvSuggestion,
+  current: Eruv,
+  { edited, only }: { edited?: unknown; only?: readonly string[] },
+): { ok: true; suggestion: EruvSuggestion } | { ok: false; errors: string[] } {
+  if (edited !== undefined) return readEruvSuggestion(edited, current)
+  const keep = new Set(only ?? [])
+  const suggestion: EruvSuggestion = { eruvId: current.id, name: current.name, covers: null, website: null, hotline: null, alertsUrl: null }
+  for (const f of ERUV_SUGGESTION_FIELDS) suggestion[f.key] = keep.has(f.key) ? sent[f.key] ?? null : current[f.key] ?? null
+  return { ok: true, suggestion }
+}

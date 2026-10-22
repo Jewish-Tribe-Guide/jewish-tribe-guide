@@ -55,7 +55,7 @@ export type Watch = {
  *            many differ, how many of those were filed this time */
 export type WatchCheck = {
   at: string
-  what: 'times' | 'hours' | 'dishes' | 'list' | 'contacts'
+  what: 'times' | 'hours' | 'dishes' | 'list' | 'contacts' | 'details'
   /** Where it read: the page, the page and its calendar, a PDF, the
    *  pictures of a menu on its page. */
   from: 'page' | 'calendar' | 'pdf' | 'pictures' | null

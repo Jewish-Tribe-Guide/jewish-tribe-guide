@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dishCounts, dishStatus, eruvCounts, eruvSection, hospitalCounts, hospitalSection, sentThroughSite, type DishPlace, type DishReadingStatus } from './watchJobs'
+import { dishCounts, dishStatus, eruvSection, hospitalCounts, hospitalSection, sentThroughSite, type DishPlace, type DishReadingStatus } from './watchJobs'
 import type { Watch, WatchCheck } from './watches'
 
 const NOW = Date.parse('2026-10-21T12:00:00Z')
@@ -113,13 +113,5 @@ describe('eruvSection', () => {
     expect(eruvSection({ ...page, statusErrorAt: ago(0) })).toBe('didnt_load')
     expect(eruvSection({ ...page, statusErrorAt: ago(1) })).toBe('read')
     expect(eruvSection({ ...page, statusErrorAt: ago(1), statusCheckedAt: null })).toBe('didnt_load')
-  })
-})
-
-describe('eruvCounts', () => {
-  it('has nothing to check: an eruv’s status goes live', () => {
-    const page = { statusUrl: 'https://e.org/s', statusErrorAt: null, statusCheckedAt: ago(0.01) }
-    const none = { statusUrl: null, statusEmail: null, statusErrorAt: null, statusCheckedAt: null }
-    expect(eruvCounts([page, page, none, { ...page, statusErrorAt: ago(0) }])).toEqual({ checked: 2, toCheck: null, cantRead: 1, didntLoad: 1 })
   })
 })

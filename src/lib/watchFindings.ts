@@ -7,6 +7,7 @@ import { NEWSLETTER_WATCH_NAME } from './newsletter'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_WATCH_NAME } from './mekorWatch'
+import { ERUV_WEBSITE_WATCH_NAME } from './eruvWebsite'
 import { submissionSource } from './submissionSource'
 import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
 import type { Minyan } from './davening'
@@ -236,9 +237,12 @@ export function dishCategories<C extends Pick<CategoryConfig, 'detailFields'>>(c
 }
 
 /** Whether a job page shows this pending suggestion, so the moderation
- *  queue leaves it out. Refuah's and the kosher lists' are always on theirs;
+ *  queue leaves it out. Refuah's, the kosher lists' and an eruv website's
+ *  are always on theirs;
  *  a website's or a newsletter's only when its place is one a job reads. */
 export function onAJobPage(s: Pick<SubmissionRow, 'submitted_by' | 'target_type'>, category: string | undefined, jobs: JobCategories): boolean {
+  // An eruv's website's: on Eruv status (eruvWebsite.ts).
+  if (s.target_type === 'eruv') return watchNameOf(s) === ERUV_WEBSITE_WATCH_NAME
   if (s.target_type !== 'listing') return false
   const name = watchNameOf(s)
   if (!name) return false

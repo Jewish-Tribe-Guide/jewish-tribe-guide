@@ -505,7 +505,42 @@ agreed:
    - Not as drawn: the tabs show their counts on all four (the other job
      pages hide an empty one), and "It's … now" uses the list's full
      name for the place.
-7. Eruv.
+7. Eruv. **Built Oct 22** (compared with its drawing on dev, computer and
+   phone; the eruvim stubbed in the browser):
+   - Each eruv's website is read every day, by code with no AI
+     (`eruvWebsite.ts`, `eruvWebsiteRun.ts`), for its hotline and its
+     email-alerts link. Hotline: offered only when the eruv's number is
+     gone from the page and exactly one other number is there; the eruv's
+     wording ("option 3") stays while the number does. Email alerts:
+     offered only when the eruv has none or its link is gone, and the page
+     has exactly one sign-up link. Where it goes and the website itself
+     are never compared.
+   - The daily run gives each eruv website its own watch (`createdBy`
+     "eruv website", no migration), takes away one no eruv has, and keeps
+     a paused one. A change is filed as an ordinary eruv suggestion from
+     "Its website (automated, eruv)", waiting on Eruv status, not the
+     moderation queue; the same reading is never filed twice, and a newer
+     one replaces one still waiting.
+   - The page: "N eruvim have an update from their websites", tabs To
+     check / Can't be read / Checked. An opened eruv is Details (Use this
+     takes only the rows it changes; Edit is the eruv's own suggestion
+     form, filled with the website's, "Save to the listing"), Status (green
+     Up, the words, the date, "on the site at once"), Map, and Reads (the
+     website's switch, a line per page, merged into "Status page · Status,
+     Details" when the status page is the website; × asks before it stops
+     reading; Find its status page, Add a page, Add its emails, Read them
+     now, Open its listing). An email it couldn't read and "Its page dates
+     each week's post" stay in Reads.
+   - The Watches tab's Eruv row now counts To check, and an eruv's website
+     isn't listed among the other watches.
+   - Not as drawn: a map that didn't load can't say "last read Oct 15"
+     (a failed read overwrites that date); the Reading switch is the
+     website's only, so an eruv with no website has one that does nothing;
+     "was …" shows the whole old value, as on every other page; an eruv
+     with no hotline is never given one.
+   - **Live once it reaches `main`:** the daily run then adds a website
+     watch per eruv in production and files what differs. Nothing is
+     written before that.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

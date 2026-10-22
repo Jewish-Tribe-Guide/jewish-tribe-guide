@@ -75,9 +75,9 @@ async function renderTab(
       posts.push({ url: String(url), body })
       return { ok: true, ...post }
     }
-    if (String(url).includes('/api/admin/eruvim')) {
+    if (String(url).includes('/api/admin/watches/eruv')) {
       if (!eruvim) throw new Error('down')
-      return { ok: true, available: true, timezone: 'America/New_York', eruvim }
+      return { ok: true, available: true, timezone: 'America/New_York', eruvim, findings: [], watches: [] }
     }
     if (String(url).includes('/api/admin/watches/kosher')) {
       if (!kosher) throw new Error('down')
@@ -236,16 +236,19 @@ describe('WatchesManager', () => {
   })
 
   // Step 5, Oct 21: Eruv status and Kosher certification are jobs too.
-  it('has an Eruv status row, whose status goes live rather than waiting to be checked', async () => {
-    await renderTab([], {
+  // Oct 22: its website's hotline and email alerts wait there to be checked.
+  it('has an Eruv status row, and an eruv’s website isn’t listed below', async () => {
+    const site = watch({ id: 'ws', url: 'https://ne-eruv.org/', label: 'Northeast Eruv’s website', createdBy: 'eruv website' })
+    await renderTab([site], {
       eruvim: [
         { ...NE, statusUrl: 'https://ne-eruv.org/status', statusCheckedAt: ago(0.1) },
         { ...NE, id: 'cc', name: 'Center City Eruv' },
       ],
     })
     const eruv = jobRow('eruv')
-    expect(eruv).toHaveTextContent('Eruv status2 eruvim. Goes live on its own; every 15 minutes on Friday afternoons')
-    expect(eruv).toHaveTextContent('1checked–goes live1can’t be read0didn’t load today')
+    expect(eruv).toHaveTextContent('Eruv status2 eruvim. Status goes live on its own; its website’s hotline and email alerts wait here')
+    expect(eruv).toHaveTextContent('1checked0to check1can’t be read0didn’t load today')
+    expect(screen.queryByTestId('watch-row')).toBeNull()
     expect(screen.queryByTestId('eruv-watch-row')).toBeNull()
     expect(screen.queryByRole('region', { name: 'Eruv status' })).toBeNull()
   })

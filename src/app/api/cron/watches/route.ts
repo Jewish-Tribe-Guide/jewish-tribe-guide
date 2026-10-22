@@ -7,7 +7,8 @@
 // every hospital the Refuah page nearest it, refuahMatch.ts, and every
 // mikvah its pages of hours found from its website, hoursJob.ts),
 // and so is a shul's or mikvah's own page of times or hours, for what
-// differs from its listing (listingPageWatch.ts); any other website is checked for a change. Then the
+// differs from its listing (listingPageWatch.ts); an eruv's website for its
+// hotline and email alerts (eruvWebsite.ts); any other website is checked for a change. Then the
 // eruvim's maps, for a part an admin left out that's gone (eruvLineRun.ts). Meant to
 // run daily (vercel.json). Each run is recorded on the watch, and the admins
 // are emailed once when a watch breaks and once when it recovers.
@@ -26,6 +27,7 @@ import { runEruvLines } from '@/lib/eruvLineRun'
 import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
 import { syncRefuahWatches } from '@/lib/refuahMatchRun'
 import { syncHoursWatches } from '@/lib/hoursJobRun'
+import { syncEruvWebsiteWatches } from '@/lib/eruvWebsiteRun'
 
 export const maxDuration = 60
 
@@ -42,14 +44,19 @@ async function runAll(): Promise<NextResponse> {
     console.error('[cron/watches] menu watches failed:', err)
     return []
   })
-  // At once: one asks Refuah, the other the mikvahs' websites.
-  const [hospitals, hours] = await Promise.all([
+  // At once: one asks Refuah, one the mikvahs' websites; the last only
+  // gives each eruv's website its watch (eruvWebsiteRun.ts).
+  const [hospitals, hours, eruvWebsites] = await Promise.all([
     syncRefuahWatches().catch((err) => {
       console.error('[cron/watches] Refuah matches failed:', err)
       return []
     }),
     syncHoursWatches().catch((err) => {
       console.error('[cron/watches] hours pages failed:', err)
+      return []
+    }),
+    syncEruvWebsiteWatches().catch((err) => {
+      console.error('[cron/watches] eruv websites failed:', err)
       return []
     }),
   ])
@@ -80,7 +87,7 @@ async function runAll(): Promise<NextResponse> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  return NextResponse.json({ ok: true, recorded: true, menus, hospitals, hours, results, eruvLines: await eruvLines() })
+  return NextResponse.json({ ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, eruvLines: await eruvLines() })
 }
 
 export async function GET(req: NextRequest) {

@@ -139,12 +139,3 @@ export function eruvSection(e: EruvState): EruvSection {
   if (e.statusUrl && e.statusErrorAt && (!e.statusCheckedAt || Date.parse(e.statusErrorAt) > Date.parse(e.statusCheckedAt))) return 'didnt_load'
   return 'read'
 }
-
-/** An eruv's counts never have anything to check: its status goes live
- *  with no approval (the drawing's "goes live"). */
-export type EruvCounts = Omit<JobCounts, 'toCheck'> & { toCheck: null }
-
-export function eruvCounts(eruvim: readonly EruvState[]): EruvCounts {
-  const of = (s: EruvSection) => eruvim.filter((e) => eruvSection(e) === s).length
-  return { checked: of('read'), toCheck: null, cantRead: of('no_source') + of('email'), didntLoad: of('didnt_load') }
-}

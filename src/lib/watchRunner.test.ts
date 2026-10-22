@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NEWSLETTER_WATCH_CREATOR } from './newsletter'
+import { ERUV_WEBSITE_CREATOR } from './eruvWebsite'
 
 // A newsletter sender's watch in the daily run: nothing fetched, only
 // whether its newsletter has gone quiet (newsletter.ts).
@@ -13,6 +14,8 @@ vi.mock('./menuWatchRun', () => ({ runMenuWatch: vi.fn() }))
 const page = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./listingPageRun', () => ({ runListingPageWatch: page.run }))
 vi.mock('./websiteWatch', () => ({ readWebsite: m.readWebsite }))
+const eruv = vi.hoisted(() => ({ run: vi.fn() }))
+vi.mock('./eruvWebsiteRun', () => ({ runEruvWebsiteWatch: eruv.run }))
 vi.mock('./watchStore', () => ({ updateWatch: vi.fn() }))
 
 const { runWatch } = await import('./watchRunner')
@@ -93,4 +96,12 @@ describe('runWatch: a hospital’s Refuah page', () => {
     await runWatch({ communityId: 'philly', kind: 'website', url, resourceId: 'h1', lastCheck })
     expect(refuah.run).toHaveBeenCalledWith('philly', url, 'h1', lastCheck)
   })
+})
+
+// Oct 22: an eruv's website, read for its hotline and email alerts.
+it('runWatch: an eruv’s website is read for its Details, not watched for a change', async () => {
+  eruv.run.mockResolvedValue({ ok: true, filed: 1 })
+  expect(await runWatch({ communityId: 'philly', kind: 'website', url: 'https://lowermerioneruv.org/', createdBy: ERUV_WEBSITE_CREATOR })).toEqual({ ok: true, filed: 1 })
+  expect(eruv.run).toHaveBeenCalledWith('philly', 'https://lowermerioneruv.org/')
+  expect(m.readWebsite).not.toHaveBeenCalled()
 })

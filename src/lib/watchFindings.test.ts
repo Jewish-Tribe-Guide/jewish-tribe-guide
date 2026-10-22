@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ResourceRow, SubmissionRow } from '@/types'
 import type { CategoryField } from './categories'
+import { ERUV_WEBSITE_WATCH_NAME } from './eruvWebsite'
 import { findingFrom, findingPage, jobCategories, jobPageFor, keepOnly, onAJobPage, pageOf } from './watchFindings'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
@@ -183,6 +184,12 @@ describe('onAJobPage', () => {
     expect(onAJobPage(sub({ submitted_by: { name: KEYSTONE_WATCH_NAME }, target_id: null }), undefined, {})).toBe(true)
     expect(onAJobPage(sub({ submitted_by: { email: 'someone@example.com' } }), 'mikvah', jobs)).toBe(false)
     expect(onAJobPage(sub({ target_type: 'eruv' }), 'mikvah', jobs)).toBe(false)
+  })
+  // Oct 22: an eruv's website's wait on Eruv status; a visitor's eruv fix
+  // stays in the queue.
+  it('an eruv website’s always is; a visitor’s eruv fix never is', () => {
+    expect(onAJobPage(sub({ target_type: 'eruv', target_id: null, submitted_by: { name: ERUV_WEBSITE_WATCH_NAME } }), undefined, {})).toBe(true)
+    expect(onAJobPage(sub({ target_type: 'eruv', target_id: null, submitted_by: { email: 'someone@example.com' } }), undefined, {})).toBe(false)
   })
 })
 

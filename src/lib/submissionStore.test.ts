@@ -1897,6 +1897,30 @@ describe('an eruv suggestion', () => {
     expect(mockRecordActivity).not.toHaveBeenCalled()
   })
 
+  // Oct 22, Eruv status: Use this takes only the rows its website changed,
+  // so one edited since it was read isn't put back; Edit saves the admin's.
+  const approveWith = async (edited: unknown, only?: string[], now = eruv) => {
+    let calls = 0
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sub), error: null }) : approveBuilder))
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [now] })
+    mockUpdateEruv.mockResolvedValue(undefined)
+    await approveSubmission('sub-1', 'philly', 'admin@example.org', edited, only)
+    return { builder: approveBuilder }
+  }
+
+  it('Use this takes only the rows it’s given', async () => {
+    const { builder } = await approveWith(undefined, ['hotline'], { ...eruv, covers: 'Edited since.' })
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', { covers: 'Edited since.', website: 'https://old.example', hotline: '215', alertsUrl: null }, expect.anything())
+    expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved', payload: expect.objectContaining({ hotline: '215', website: 'https://old.example' }) }))
+  })
+
+  it('Edit saves the admin’s copy, read as a visitor’s is', async () => {
+    await approveWith({ covers: 'Center City.', website: 'https://old.example', hotline: '(215) 555-0100', alertsUrl: '' })
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', { covers: 'Center City.', website: 'https://old.example', hotline: '(215) 555-0100', alertsUrl: null }, expect.anything())
+    await expect(approveWith({ covers: 'Center City.', website: 'not a site at all' })).rejects.toThrow('isn’t a web address')
+  })
+
   it('an eruv that’s gone can’t be approved', async () => {
     mockFrom.mockReturnValue(chainable({ data: sub, error: null }))
     mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [] })

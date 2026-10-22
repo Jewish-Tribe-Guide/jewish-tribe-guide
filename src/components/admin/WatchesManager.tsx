@@ -15,10 +15,11 @@ import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 import { WATCH_PURPOSES, purposeInfo, sourceKind, sourceProblem, type ListingReads, type WatchPurpose } from '@/lib/watchPurposes'
 import { isHospitalWatch } from '@/lib/refuahMatch'
 import { adminBase } from '@/lib/adminNav'
-import { dishCounts, eruvCounts, hospitalCounts, type DishPlace, type EruvCounts, type JobCounts } from '@/lib/watchJobs'
+import { dishCounts, hospitalCounts, type DishPlace, type JobCounts } from '@/lib/watchJobs'
+import { eruvJobCounts, type EruvJobLoaded } from '@/lib/eruvJob'
+import { isEruvWebsiteWatch } from '@/lib/eruvWebsite'
 import type { Hospital } from './HospitalsJob'
 import type { HoursPlace } from './HoursJob'
-import type { EruvimLoaded } from './EruvJob'
 import type { KosherLoaded } from './KosherJob'
 import { hoursCounts, isHoursOff, isStoppedPage } from '@/lib/hoursJob'
 
@@ -53,14 +54,13 @@ type Jobs = {
   hospitals: Hospital[] | null
   hours: PagesJob
   times: PagesJob
-  eruvim: EruvimLoaded | null
+  eruvim: EruvJobLoaded | null
   kosher: KosherLoaded | null
 }
 
 /** One job's row: what it is and its four counts; the whole row opens its
- *  page. Null counts: they couldn't be loaded. Nothing to check (an eruv's
- *  status, which goes live): "goes live" in its place. */
-function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | EruvCounts | null }) {
+ *  page. Null counts: they couldn't be loaded. */
+function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | null }) {
   const stat = (n: number, label: string, flag: boolean) => (
     <span className="flex min-w-[4.5rem] flex-col">
       <span className={`text-base font-semibold ${flag && n > 0 ? 'text-amber-800' : 'text-slate-900'}`}>{n}</span>
@@ -77,14 +77,7 @@ function JobRow({ href, name, about, counts }: { href: string; name: string; abo
         {counts ? (
           <span className="flex flex-wrap gap-x-4 gap-y-1">
             {stat(counts.checked, 'checked', false)}
-            {counts.toCheck === null ? (
-              <span className="flex min-w-[4.5rem] flex-col">
-                <span className="text-base font-semibold text-slate-900">–</span>
-                <span className="text-xs text-muted">goes live</span>
-              </span>
-            ) : (
-              stat(counts.toCheck, 'to check', true)
-            )}
+            {stat(counts.toCheck, 'to check', true)}
             {stat(counts.cantRead, 'can’t be read', true)}
             {stat(counts.didntLoad, 'didn’t load today', true)}
           </span>
@@ -196,6 +189,7 @@ const NOTHING: Record<WatchCheck['what'], string> = {
   dishes: 'Found no dishes on this menu',
   contacts: 'Refuah has no contacts for this hospital yet',
   list: 'Found no places on the list',
+  details: 'Found no hotline or email alerts on this page',
 }
 
 /** What became of the differences, in a few words. `where`: where a
@@ -712,7 +706,7 @@ export default function WatchesManager({ token }: { token: string }) {
         fetchJson<{ hospitals: Hospital[] }>(withCommunity('/api/admin/watches/hospitals', community), { headers }, '').catch(() => null),
         fetchJson<{ name: string; places: HoursPlace[] }>(withCommunity('/api/admin/watches/hours?counts', community), { headers }, '').catch(() => null),
         fetchJson<{ name: string; places: HoursPlace[] }>(withCommunity('/api/admin/watches/hours?counts&job=times', community), { headers }, '').catch(() => null),
-        fetchJson<EruvimLoaded>(withCommunity('/api/admin/eruvim', community), { headers }, '').catch(() => null),
+        fetchJson<EruvJobLoaded>(withCommunity('/api/admin/watches/eruv', community), { headers }, '').catch(() => null),
         fetchJson<KosherLoaded>(withCommunity('/api/admin/watches/kosher', community), { headers }, '').catch(() => null),
       ])
       setData(watches)
@@ -790,7 +784,8 @@ export default function WatchesManager({ token }: { token: string }) {
 
   // A hospital's Refuah page is on the Hospitals page, a mikvah's hours
   // pages on the hours page, a shul's pages on the Shul times page, and
-  // the kosher lists on the Kosher certification page.
+  // the kosher lists on the Kosher certification page, and an eruv's
+  // website on Eruv status.
   const jobIds = new Set([...(jobs.hours?.places ?? []), ...(jobs.times?.places ?? [])].map((p) => p.id))
   const listed = data.watches.filter(
     (w) =>
@@ -798,6 +793,7 @@ export default function WatchesManager({ token }: { token: string }) {
       !isHoursOff(w) &&
       !isStoppedPage(w) &&
       watchGroupOf(w) !== 'kosher' &&
+      !isEruvWebsiteWatch(w) &&
       !(w.resourceId && jobIds.has(w.resourceId) && isListingPageWatch(w)),
   )
   const groups = data.available ? groupWatches(listed, now, kept, readsOf) : []
@@ -892,10 +888,10 @@ export default function WatchesManager({ token }: { token: string }) {
             name="Eruv status"
             about={
               jobs.eruvim
-                ? `${jobs.eruvim.eruvim.length} eruv${jobs.eruvim.eruvim.length === 1 ? '' : 'im'}. Goes live on its own; every 15 minutes on Friday afternoons`
-                : 'Eruvim. Goes live on its own; every 15 minutes on Friday afternoons'
+                ? `${jobs.eruvim.eruvim.length} eruv${jobs.eruvim.eruvim.length === 1 ? '' : 'im'}. Status goes live on its own; its website’s hotline and email alerts wait here`
+                : 'Eruvim. Status goes live on its own; its website’s hotline and email alerts wait here'
             }
-            counts={jobs.eruvim && eruvCounts(jobs.eruvim.eruvim)}
+            counts={jobs.eruvim && eruvJobCounts(jobs.eruvim, new Date(now))}
           />
           <JobRow
             href={`${base}/watches/kosher`}
