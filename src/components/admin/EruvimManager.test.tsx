@@ -9,11 +9,11 @@ import EruvimManager from './EruvimManager'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
-  usePathname: () => '/test-community/admin/eruvim',
+  usePathname: () => '/test-community/admin/categories/cat:eruv',
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// The Eruvim tab (Oct 12): each eruv's own map as the guide shows it, what
+// The eruvim, on the Eruv row (Oct 12): each eruv's own map as the guide shows it, what
 // to leave out of it, its markers hidden or not, and a warning when a part
 // left out is no longer in its map. No line waits for a yes.
 

@@ -11,6 +11,7 @@ import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
 import ListingEditorScreen from './ListingEditorScreen'
 import CategoryPreview from './CategoryPreview'
+import EruvimManager from './EruvimManager'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
@@ -643,6 +644,8 @@ function SingletonRow({
 // A lightweight editor for Map/Zmanim/Eruv/Medical — no fields to change (it's
 // a fixed, code-driven screen), just the card's name, icon, and home-screen
 // photo/text color, reusing the exact same fields as the full category editor.
+// The Eruv's also holds its eruvim (EruvimManager), which live in their own
+// table rather than as listings.
 export function SingletonEditor({
   token,
   category,
@@ -852,6 +855,14 @@ export function SingletonEditor({
           Cancel
         </button>
       </div>
+
+      {/* The eruvim themselves, each saved on its own: what was the Eruvim
+          tab until Oct 22, so everything about the Eruv page is here. */}
+      {category.kind === 'eruv' && (
+        <div className="mt-8 border-t border-slate-200 pt-6">
+          <EruvimManager token={token} />
+        </div>
+      )}
     </div>
   )
 }

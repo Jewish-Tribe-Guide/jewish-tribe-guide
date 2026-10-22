@@ -11,7 +11,8 @@ import { DEFAULT_LINE_COLOR, lineColorOf, partNames, shownMap, withLineColor, ty
 import type { AdminEruv } from '@/lib/eruvStore'
 import { adminBase } from '@/lib/adminNav'
 
-// ── The "Eruvim" tab (Oct 7) ────────────────────────────────────────────────
+// ── The eruvim, on the Categories tab's Eruv row (Oct 7; its own tab until
+// Oct 22) ───────────────────────────────────────────────────────────────────
 // Each eruv the guide shows: what the public sees of it (its status, as
 // read from its own page), what an admin sets (where it goes, its site,
 // hotline, alerts, the status page, its map's address), and its map. The
@@ -21,8 +22,8 @@ import { adminBase } from '@/lib/adminNav'
 // it's drawn in (Oct 15). An eruv with no status page can have its status
 // emailed instead (Oct 19). Where its status is read from (its page or its
 // emails), and an email the guide couldn't make out, moved to the Watches
-// tab on Oct 19, with every other source the guide reads; this tab says
-// where, and links there.
+// tab on Oct 19, with every other source the guide reads; each eruv here
+// says where, and links there.
 
 type Loaded = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 
@@ -67,7 +68,7 @@ function LinePreview({ file: theirs, leaveOut, hideMarks, lineColor }: { file: E
 const input = 'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 // Not its status source: that's set on the Watches tab, and a save here
-// mustn't put back what was there when this tab loaded.
+// mustn't put back what was there when this loaded.
 type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>
 const draftOf = (e: AdminEruv): Draft => ({
   name: e.name,
@@ -119,10 +120,10 @@ function EruvCard({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4" data-testid="admin-eruv">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-bold text-slate-900">
+        <h3 className="text-base font-bold text-slate-900">
           {eruv.name}
           {!eruv.active && <span className="ml-2 text-sm font-semibold text-slate-500">Hidden</span>}
-        </h2>
+        </h3>
         <button type="button" disabled={busy} onClick={() => onAct('check')} className="cursor-pointer rounded-md border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
           Check now
         </button>
@@ -304,7 +305,7 @@ export default function EruvimManager({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Eruvim</h1>
+        <h2 className="text-lg font-bold text-slate-900">Eruvim</h2>
         <p className="text-sm text-muted">The guide reads each eruv’s status from the page or emails set on the Watches tab, and its map about every hour. It never sets a status itself, or draws a line of its own.</p>
       </div>
       {saveError && <p className="text-sm text-red-700">{saveError}</p>}

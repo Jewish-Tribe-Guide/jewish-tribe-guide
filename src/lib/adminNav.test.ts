@@ -22,6 +22,15 @@ describe('adminTabs', () => {
     }
   })
 
+  // The eruvim moved onto the Categories tab's Eruv row (Oct 22): no
+  // category has a tab of its own. /<community>/admin/eruvim redirects
+  // there (next.config.ts; e2e/routing.spec.ts).
+  it('has no Eruvim tab', () => {
+    for (const superAdmin of [false, true]) {
+      expect(adminTabs('philly', superAdmin).find((t) => t.label === 'Eruvim' || t.href.endsWith('/eruvim'))).toBeUndefined()
+    }
+  })
+
   it('omits the Communities tab for an ordinary (non-superadmin) community admin', () => {
     const tabs = adminTabs('philly', false)
     expect(tabs.find((t) => t.tab === 'communities')).toBeUndefined()

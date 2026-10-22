@@ -40,7 +40,6 @@ export type AdminTab =
   | 'searches'
   | 'questions'
   | 'watches'
-  | 'eruvim'
   | 'team'
   | 'communities'
 
@@ -66,9 +65,6 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     // was a tab of its own), Hospitals (from Refuah), and the pages it
     // reads every morning (Keystone-K's list, shul times pages).
     { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
-    // Each eruv: its status as read from its own page, and its line,
-    // waiting here for an admin when it's new or changed (Oct 7).
-    { tab: 'eruvim', href: `${base}/eruvim`, label: 'Eruvim' },
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },
