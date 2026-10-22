@@ -233,6 +233,72 @@ describe('MainDishes', () => {
     expect(screen.getByTestId('dish-moved-sites').textContent).toContain('Charlie was a sinner.: shtetl.example → bags1.example')
   })
 
+  // Main dishes board 3: Chalavita on dev, Oct 21. Google has no hours for
+  // it, so its website's are read and proposed; its phone is the same.
+  describe('its hours and phone, from its website', () => {
+    const HOME = 'https://chalavita.com/'
+    const AT = new Date(Date.now() - 3_600_000).toISOString()
+    const dinner = { open: '17:00', close: '22:00' }
+    const HOURS = { sun: dinner, mon: dinner, tue: dinner, wed: dinner, thu: dinner, fri: null, sat: null }
+    const hoursFinding = { id: 's-hours', operation: 'update', targetId: 'p4', name: 'Chalavita', from: 'its website', says: 'Its page says', named: null, at: AT, notes: [], lines: [{ key: 'hours', label: 'Hours', before: '', after: 'Sun–Thu 5 PM – 10 PM', choosable: true }], page: HOME, section: 'hours', values: { hours: HOURS } }
+    const homePage = { id: 'w-home', communityId: 'philly', kind: 'website', url: HOME, resourceId: 'p4', label: 'Chalavita · its website', active: true, createdAt: AT, createdBy: 'listing pages (found)', lastRunAt: AT, lastOkAt: AT, lastError: null, failingSince: null, lastFiled: 1, pageHash: null, pageChangedAt: null, lastCheck: { at: AT, what: 'hours', from: 'page', result: 'differs', read: [], differences: [], queue: 'filed', contact: { same: ['phone'], changes: [] } } }
+    const chalavita = {
+      id: 'p4',
+      name: 'Chalavita',
+      href: '/philly/food/chalavita',
+      categoryLabel: 'Food',
+      facts: [],
+      website: 'https://chalavita.com',
+      menuUrl: 'https://chalavita.com/menu',
+      dishes: ['Pizza', 'Pasta'],
+      menuDated: ['Pizza', 'Pasta'],
+      reading: { ...read, sourceUrl: 'https://chalavita.com/menu', dishes: [{ name: 'Pizza', quote: 'Pizza', checked: true, named: true }, { name: 'Pasta', quote: 'Pasta', checked: true, named: true }], missing: [] },
+      pages: [homePage],
+      findings: [hoursFinding],
+      hours: null,
+      contact: { name: 'Phone', fields: [{ key: 'phone', label: 'Phone', kind: 'phone', value: '(215) 555-0142' }] },
+    }
+    const boxes = (place: HTMLElement) => within(place).getAllByRole('region').map((b) => `${b.getAttribute('aria-label')} | ${within(b).queryAllByTestId('box-pill')[0]?.textContent ?? ''} | ${within(b).getAllByRole('button')[0].getAttribute('aria-expanded')}`)
+
+    it('as drawn: Hours open and New, then Main dishes and Phone the same, closed; Reads names the home page for both', async () => {
+      await renderPage([chalavita])
+      expect(screen.getByTestId('job-status').textContent).toBe('1 update')
+      const place = await open('Chalavita')
+      expect(boxes(place)).toEqual(['Hours | New | true', 'Main dishes | Same | false', 'Phone | Same | false', 'Reads | 2 pages | false'])
+      const hours = within(place).getByRole('region', { name: 'Hours' })
+      expect(within(hours).getAllByTestId('box-row').map((r) => r.getAttribute('data-mark'))).toEqual(['new'])
+      // Only highlighted, as drawn: nothing struck under a new day.
+      expect(hours.querySelector('s')).toBeNull()
+      expect(within(hours).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this', 'Edit', 'Keep the listing'])
+      expect(within(hours).getByTestId('box-source').textContent).toMatch(/^From chalavita\.com · read/)
+      await userEvent.click(within(place).getByRole('button', { name: /^Phone/ }))
+      expect(within(within(place).getByRole('region', { name: 'Phone' })).getByTestId('box-source').textContent).toMatch(/^Same as chalavita\.com · read/)
+      const reads = within(place).getByTestId('job-reads')
+      await userEvent.click(within(reads).getByRole('button', { name: /Reads/ }))
+      expect(within(reads).getAllByTestId('job-source').map((x) => x.textContent).join(' / ')).toContain('Hours · Phone')
+    })
+
+    it('Use this: the finding approved, the box and row say so', async () => {
+      await renderPage([chalavita])
+      const place = await open('Chalavita')
+      await userEvent.click(within(within(place).getByRole('region', { name: 'Hours' })).getByRole('button', { name: 'Use this' }))
+      const patch = vi.mocked(fetchJson).mock.calls.find(([, init]) => init?.method === 'PATCH')!
+      expect(String(patch[0])).toBe('/api/admin/submissions/s-hours?community=philly')
+      expect(JSON.parse(String(patch[1]!.body))).toEqual({ status: 'approved' })
+      expect(within(within(place).getByRole('region', { name: 'Hours' })).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
+      expect(screen.getByTestId('job-status').textContent).toBe(`Used ${today()}`)
+    })
+
+    it('the × on its home page stops reading it', async () => {
+      await renderPage([chalavita], { post: { pages: [{ ...homePage, active: false }] } })
+      const place = await open('Chalavita')
+      const reads = within(place).getByTestId('job-reads')
+      await userEvent.click(within(reads).getByRole('button', { name: /Reads/ }))
+      await userEvent.click(within(reads).getByRole('button', { name: 'Stop reading chalavita.com' }))
+      expect(posted()).toEqual([{ action: 'stop', resourceId: 'p4', id: 'w-home' }])
+    })
+  })
+
   it('a place whose dishes came from a menu sent through the site is checked, and says so', async () => {
     await renderPage([{ ...failed, dishes: ['Burgers'], menuAt: '2026-10-21T12:00:00Z' }])
     expect(screen.getByRole('tab', { name: 'Checked 1' })).toHaveAttribute('aria-selected', 'true')

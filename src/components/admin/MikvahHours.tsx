@@ -16,6 +16,7 @@ import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, ty
 import { cantRead, shulPill } from './TimesProposal'
 import type { HoursPlace } from './HoursJob'
 import { updatesPill } from '@/lib/dishProposal'
+import ContactBoxes, { givesContact, isContactFinding } from './ContactBoxes'
 
 // ── Mikvah hours: a mikvah opened, as its listing's own sections (Oct 22) ───
 // Drawn on artifact 7MUNppcA4S4yvXKupEKJPR (agreed Oct 21), on the pieces
@@ -128,7 +129,8 @@ export function MikvahRow({
   const findings = p.findings ?? []
   const isSection = (f: Finding): f is SectionFinding => f.operation === 'update' && !!f.values && sections.some((s) => s.section === f.section)
   const own = findings.filter(isSection)
-  const others = findings.filter((f) => !isSection(f))
+  const contacts = findings.filter(isContactFinding)
+  const others = findings.filter((f) => !isSection(f) && !isContactFinding(f))
   const live = p.pages.filter((x) => x.watch.active).map((x) => x.watch)
   const named = sectionPages(live, sections, findings)
   const headers = { Authorization: `Bearer ${token}` }
@@ -193,7 +195,7 @@ export function MikvahRow({
   const ordered = [...own].sort((a, b) => Number(settled.has(a.id)) - Number(settled.has(b.id)) || order(a) - order(b))
   // A section a page gives, with no update: the same as the website.
   const same = sections.filter((s) => !own.some((f) => f.section === s.section) && named.has(s.section))
-  const boxes = ordered.length + same.length + others.length
+  const boxes = ordered.length + same.length + others.length + contacts.length
 
   // Reads: a line per page, named for the sections it gives; the pages
   // that give one first, then the ones read for nothing, greyed ones last.
@@ -203,12 +205,13 @@ export function MikvahRow({
       const given = sections.filter((s) => named.get(s.section)?.id === w.id)
       const failed = !loads(w, now)
       const read = readOf(w)
-      const none = failed || (!!c && !read)
+      const none = failed || (!!c && !read && !givesContact(w))
+      const names = [...given.map((s) => s.label), ...(p.contact && givesContact(w) ? [p.contact.name] : [])]
       const page: ReadPage = {
         key: w.id,
         url: w.url,
-        label: read && !failed ? (given.length ? given.map((s) => s.label).join(' · ') : 'Nothing from it') : '',
-        right: off ? '' : failed ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : read ? `read ${day(c.at)}` : 'no hours',
+        label: !failed && (read || names.length) ? (names.length ? names.join(' · ') : 'Nothing from it') : '',
+        right: off ? '' : failed ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : read || givesContact(w) ? `read ${day(c.at)}` : 'no hours',
         none,
         onRemove: off ? undefined : () => onAct({ action: 'stop', id: w.id }),
       }
@@ -242,6 +245,7 @@ export function MikvahRow({
           </Box>
         )
       })}
+      <ContactBoxes placeId={p.id} contact={p.contact ?? null} findings={contacts} pages={live} settled={settled} busy={busy} token={token} community={community} itemUrl="/api/admin/watches/hours" onDecided={onDecided} show="updates" />
       {same.map((s) => {
         const page = named.get(s.section)!
         return (
@@ -252,6 +256,9 @@ export function MikvahRow({
           </Box>
         )
       })}
+      {/* Its phone and email: Mikvah hours board 1's Contact, after the
+          sections; an update to it above the Same ones. */}
+      <ContactBoxes placeId={p.id} contact={p.contact ?? null} findings={contacts} pages={live} settled={settled} busy={busy} token={token} community={community} itemUrl="/api/admin/watches/hours" onDecided={onDecided} show="same" />
       {others.map((f) => (
         <Box key={settled.has(f.id) ? `${f.id}-done` : f.id} name={`From ${f.from}`} pill={settled.has(f.id) ? { text: doneText(settled.get(f.id)!), tone: 'grey' } : { text: updatesPill(f.lines.length), tone: 'amber' }} defaultOpen={!settled.has(f.id)}>
           <FindingCompare finding={f} token={token} community={community} jobName={jobName} decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />

@@ -35,6 +35,15 @@ vi.mock('@/lib/categoryStore', () => ({
       ],
     },
     { id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] },
+    {
+      id: 'restaurant',
+      label: 'Food',
+      hasPhone: true,
+      detailFields: [
+        { key: 'hours', label: 'Hours', type: 'hours' },
+        { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' },
+      ],
+    },
   ],
 }))
 
@@ -144,6 +153,17 @@ describe('syncHoursWatches', () => {
     expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://kesher.org/davening', resourceId: 'kesher', label: 'Kesher Israel · Davening', createdBy: HOURS_FOUND_CREATOR })
     // A shul's website isn't searched for a mikvah's links.
     expect(m.addWatch).not.toHaveBeenCalledWith('philly', expect.objectContaining({ resourceId: 'kesher', url: expect.stringContaining('mikvah') }))
+  })
+
+  // Main dishes board 3: a food place's website, for what Google doesn't keep.
+  it('watches a food place’s website when Google keeps neither its hours nor its phone, unsearched', async () => {
+    m.rows = [
+      row('cv', 'Chalavita', 'chalavita.com', 'restaurant'),
+      { ...row('goog', 'Googled Grill', 'https://grill.example/', 'restaurant'), details: { website: 'https://grill.example/', placeId: 'g', googleFields: ['hours', 'phone'] } },
+    ]
+    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 1, removed: 0 }])
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://chalavita.com/', resourceId: 'cv', label: 'Chalavita · its website', createdBy: HOURS_FOUND_CREATOR })
+    expect(reach.fetchHome).not.toHaveBeenCalled()
   })
 
   it('takes away its own page it no longer finds', async () => {

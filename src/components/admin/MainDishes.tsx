@@ -13,7 +13,12 @@ import { itemsField } from '@/lib/listingView'
 import { samePage } from '@/lib/hoursJob'
 import { dishProposal, updatesPill, type DishProposal, type ReadDish } from '@/lib/dishProposal'
 import { dishStatus, sentThroughSite, type DishPlace, type DishPlaceStatus } from '@/lib/watchJobs'
+import { watchHealth, type Watch } from '@/lib/watches'
+import type { Finding } from '@/lib/watchFindings'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import ContactBoxes, { givesContact, isContactFinding, type ListedContact } from './ContactBoxes'
+import FoodHours, { isFoodHoursFinding } from './FoodHours'
+import FindingCompare, { type Decision } from './FindingCompare'
 import { GivePage, JobPage, day, jobTabs, shortUrl, type JobTab } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
 
@@ -37,6 +42,11 @@ import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, ty
 // Its Reading switch is "No menu": off, it isn't read.
 //
 // A place not read yet is read as the page opens, a few at a time.
+//
+// A place whose hours or phone Google doesn't keep is read from its own
+// website for them too (board 3, Oct 22): an Hours box (FoodHours.tsx)
+// and a Phone box (ContactBoxes.tsx), updates first and open, Same boxes
+// closed below, and its website's pages in Reads, named for what they gave.
 
 type Reading = {
   status: 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
@@ -49,7 +59,7 @@ type Reading = {
   decidedAt: string | null
   decidedBy: string | null
 }
-type Place = DishPlace & {
+type Place = Omit<DishPlace, 'findings'> & {
   id: string
   name: string
   href: string
@@ -57,9 +67,17 @@ type Place = DishPlace & {
   facts: string[]
   dishes: string[]
   reading: Reading | null
+  /** Its website's pages read for its hours and phone, what they found
+   *  waiting, its hours as listed (when its website is read for them), and
+   *  its phone (contactRead.ts). */
+  pages?: Watch[]
+  findings?: Finding[]
+  hours?: unknown
+  contact?: ListedContact | null
 }
 type Loaded = { places: Place[]; available: boolean; readerOn: boolean }
 type Decided = 'used' | 'kept'
+type Settled = ReadonlyMap<string, Decision>
 
 /** Places not read yet, read on their own when the page loads, at most. */
 export const READ_ON_LOAD = 5
@@ -87,9 +105,12 @@ export function dishSay(statuses: readonly DishPlaceStatus[]): { head: string } 
 }
 
 /** Its row's pill. */
-function rowPill(p: Place, status: DishPlaceStatus, decided: Decided | undefined, reading: boolean): { text: string; tone: Tone } {
-  if (decided) return { text: `${decided === 'used' ? 'Used' : 'Kept'} ${day(new Date().toISOString())}`, tone: 'grey' }
+function rowPill(p: Place, status: DishPlaceStatus, decided: Decided | undefined, reading: boolean, waiting = 0, last?: Decision): { text: string; tone: Tone } {
   if (reading) return { text: 'Reading…', tone: 'grey' }
+  // Its menu's update, and its website's hours and phone, each one.
+  if (waiting) return { text: updatesPill(waiting), tone: 'amber' }
+  if (decided) return { text: `${decided === 'used' ? 'Used' : 'Kept'} ${day(new Date().toISOString())}`, tone: 'grey' }
+  if (last) return { text: `${last === 'approved' ? 'Used' : 'Kept'} ${day(new Date().toISOString())}`, tone: 'grey' }
   if (status === 'differs') return { text: updatesPill(1), tone: 'amber' }
   if (status === 'not_read') return { text: 'Not read yet', tone: 'grey' }
   if (status === 'cant_read') return { text: p.website || p.menuUrl ? 'No menu found' : 'Nothing to read', tone: 'grey' }
@@ -134,6 +155,24 @@ function readPages(p: Place, status: DishPlaceStatus, act: (body: Record<string,
       onRemove: off ? undefined : what === 'Menu link' ? () => act({ action: 'unlink' }) : () => act({ action: 'no_menu' }),
     })
   }
+  // Its website's pages read for its hours and phone, named for what each
+  // gave; the page its menu came from too, when it's the same one.
+  const now = Date.now()
+  for (const w of (p.pages ?? []).filter((x) => x.active)) {
+    const c = w.lastCheck
+    const failed = ['failing', 'stale'].includes(watchHealth(w, now).state)
+    const found = (p.findings ?? []).filter((f) => f.page && samePage(f.page, w.url))
+    const hours = found.some(isFoodHoursFinding) || (c?.what === 'hours' && (c.result === 'agrees' || c.result === 'differs' || c.result === 'unsure'))
+    const phone = found.some(isContactFinding) || givesContact(w)
+    const names = [...(hours ? ['Hours'] : []), ...(phone && p.contact ? [p.contact.name] : [])]
+    const label = failed ? '' : names.length ? names.join(' · ') : c ? 'Nothing from it' : ''
+    const had = pages.find((x) => x.url && samePage(x.url, w.url))
+    if (had) {
+      if (names.length) had.label = had.none ? names.join(' · ') : [had.label, ...names].join(' · ')
+      continue
+    }
+    pages.push({ key: w.id, url: w.url, label, right: off ? '' : failed ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : `read ${day(c.at)}`, none: failed || (!!c && !names.length), onRemove: () => act({ action: 'stop', id: w.id }) })
+  }
   return pages
 }
 
@@ -147,6 +186,10 @@ function DishRowView({
   onAct,
   onPhotos,
   onEdit,
+  settled,
+  token,
+  community,
+  onDecided,
 }: {
   place: Place
   status: DishPlaceStatus
@@ -157,6 +200,11 @@ function DishRowView({
   onAct: (body: Record<string, unknown>) => void
   onPhotos: (files: File[]) => void
   onEdit: (proposal: DishProposal) => void
+  /** Its website's findings decided this visit. */
+  settled: Settled
+  token: string
+  community: string
+  onDecided: (f: Finding, d: Decision) => void
 }) {
   const [adding, setAdding] = useState(false)
   const r = p.reading
@@ -164,7 +212,14 @@ function DishRowView({
   const sent = sentThroughSite(p)
   const off = status === 'off'
   const cant = status === 'cant_read'
-  const open = status === 'differs' && !decided && r?.status === 'proposed'
+  // Its menu's own update: the place may be in To check for its hours.
+  const open = !decided && r?.status === 'proposed' && (proposal?.updates ?? 0) > 0
+  const findings = p.findings ?? []
+  const others = findings.filter((f) => !isFoodHoursFinding(f) && !isContactFinding(f))
+  const live = (p.pages ?? []).filter((w) => w.active)
+  const waiting = findings.filter((f) => !settled.has(f.id)).length + (open ? 1 : 0)
+  const last = [...findings].reverse().map((f) => settled.get(f.id)).find(Boolean)
+  const web = { placeId: p.id, findings, pages: live, settled, busy, token, community, onDecided }
   const canRead = !off && readerOn && !!(p.website || p.menuUrl)
 
   const boxPill: { text: string; tone: Tone } | undefined = open
@@ -255,14 +310,25 @@ function DishRowView({
     </>
   )
   return (
-    <PlaceRow name={p.name} pill={rowPill(p, status, decided, reading)} back={TITLE}>
-      {dishes}
+    <PlaceRow name={p.name} pill={rowPill(p, status, decided, reading, waiting, last)} back={TITLE}>
+      {/* Updates first and open, then the Same boxes (board 3). */}
+      {open && dishes}
+      <FoodHours {...web} hours={p.hours} show="updates" />
+      <ContactBoxes {...web} contact={p.contact ?? null} itemUrl="/api/admin/main-dishes" sameTone="grey" show="updates" />
+      {!open && dishes}
+      {p.hours !== undefined && <FoodHours {...web} hours={p.hours} show="same" />}
+      <ContactBoxes {...web} contact={p.contact ?? null} itemUrl="/api/admin/main-dishes" sameTone="grey" show="same" />
+      {others.map((f) => (
+        <Box key={settled.has(f.id) ? `${f.id}-done` : f.id} name={`From ${f.from}`} pill={settled.has(f.id) ? { text: `${settled.get(f.id) === 'approved' ? 'Used' : 'Kept'} ${day(new Date().toISOString())}`, tone: 'grey' } : { text: updatesPill(f.lines.length), tone: 'amber' }} defaultOpen={!settled.has(f.id)}>
+          <FindingCompare finding={f} token={token} community={community} jobName={TITLE} decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
+        </Box>
+      ))}
       <Reads
         on={!off}
         busy={busy}
         onSwitch={(on) => onAct({ action: on ? 'undo_no_menu' : 'no_menu' })}
         pages={pages}
-        defaultOpen={!dishes || cant || off || status === 'not_read'}
+        defaultOpen={(!dishes && !findings.length) || cant || off || status === 'not_read'}
         below={
           adding && (
             <GivePage
@@ -294,6 +360,8 @@ export default function MainDishes({ token }: { token: string }) {
   const [tab, setTab] = useState<JobTab>('to_check')
   // Used or kept this visit: said where it was.
   const [decided, setDecided] = useState<ReadonlyMap<string, Decided>>(new Map())
+  // Its website's hours and phone, used or kept this visit.
+  const [settled, setSettled] = useState<Settled>(new Map())
   // Edit: the listing's own Edit for its dishes, started from its menu's.
   const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit } | null>(null)
   const headers = { Authorization: `Bearer ${token}` }
@@ -336,12 +404,13 @@ export default function MainDishes({ token }: { token: string }) {
     setSaveError(null)
     mark(p.id, true)
     try {
-      const res = await fetchJson<{ reading?: Reading | null; menuUrl?: string | null; dishes?: string[]; sometimes?: string[]; menuDated?: string[] }>(
+      const res = await fetchJson<{ reading?: Reading | null; menuUrl?: string | null; dishes?: string[]; sometimes?: string[]; menuDated?: string[]; pages?: Watch[] }>(
         api,
         { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ resourceId: p.id, ...body }) },
         'Could not do that.',
       )
       if (body.action === 'use') used(p, res)
+      else if (body.action === 'stop') patch(p.id, { pages: (p.pages ?? []).filter((w) => w.id !== body.id) })
       else if (body.action === 'skip') {
         patch(p.id, { reading: p.reading && { ...p.reading, status: 'skipped', decidedAt: new Date().toISOString(), decidedBy: 'you' } })
         setDecided((m) => new Map(m).set(p.id, 'kept'))
@@ -349,6 +418,8 @@ export default function MainDishes({ token }: { token: string }) {
         patch(p.id, {
           ...(res.menuUrl !== undefined ? { menuUrl: res.menuUrl } : {}),
           ...(res.reading !== undefined ? { reading: res.reading } : {}),
+          // Its website's pages, read again.
+          ...(res.pages ? { pages: (p.pages ?? []).map((w) => res.pages!.find((x) => x.id === w.id) ?? w) } : {}),
         })
         setDecided((m) => {
           const next = new Map(m)
@@ -484,6 +555,10 @@ export default function MainDishes({ token }: { token: string }) {
               onAct={(body) => void act(p, body)}
               onPhotos={(files) => void addPhotos(p, files)}
               onEdit={(proposal) => void edit(p, proposal)}
+              settled={settled}
+              token={token}
+              community={community}
+              onDecided={(f, d) => setSettled((m) => new Map(m).set(f.id, d))}
             />
           ))}
       </JobPage>

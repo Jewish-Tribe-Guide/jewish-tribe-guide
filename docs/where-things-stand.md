@@ -368,9 +368,19 @@ agreed:
    - Reading switch off = No menu; the × on a menu link takes the link
      off; on a website, No menu. Places not read yet are read as the page
      opens, five at most.
-   - Not built, as the drawing says: board 3 (Hours and Phone boxes for a
-     place Google doesn't keep, part of "keeping listings current") and
-     board 5 (a menu that moved, a "New menu link" update in Reads).
+   - Board 3 **built Oct 22** (compared on dev, computer and phone,
+     Chalavita's hours finding stubbed in the browser): a food place whose
+     hours or phone Google doesn't keep gets a watch on its home page from
+     the daily run (`homePageWatchChanges`, no search; taken off again when
+     Google takes them over). Its hours are filed as the section `hours`,
+     shown as an open Hours box, a day the listing lacks highlighted with
+     nothing struck under it ("New"), Use this / Edit / Keep the listing
+     (`FoodHours.tsx`). Its phone is a Phone box (below). Main dishes
+     comes after them, then Same boxes, then Reads, which names the home
+     page "Hours · Phone" with a × that stops it. A finding puts the place
+     in To check even with No menu (`dishStatus`).
+   - Not built, as the drawing says: board 5 (a menu that moved, a "New
+     menu link" update in Reads).
 3. Shul times. **Built Oct 22** (compared with its drawing on dev, computer
    and phone, with the shul's updates stubbed in the browser; dev's own
    are older, unsplit filings):
@@ -412,8 +422,29 @@ agreed:
      notes), filled with the website's, saving only that section's keys.
    - An older finding whose lines all sit in one section shows as that
      section's box; one across sections shows whole with Compare.
-   - Not built, as the drawing says: the Contact box (phone and email
-     Google doesn't keep), part of "keeping listings current".
+   - The Contact box **built Oct 22** (compared on dev, computer and
+     phone; Lower Merion's email change stubbed, Moishe Zvi's Same from its
+     real fields). See "Phone and Contact boxes" below.
+   - **Phone and Contact boxes** (all three job pages, `ContactBoxes.tsx`,
+     `contactRead.ts`): each listing page read also reads the phones and
+     emails on it, by code, no AI. Only what Google doesn't keep is checked
+     (`googleKeeps`: `placeId` set and the field in `googleFields`); the
+     address never. A number is "the same" however it's written; a change
+     is proposed only when the listing's is gone and exactly one new one of
+     that kind is there; an email only when none the listing knows is on
+     the page. Filed as the section `contact`, apart from hours and times.
+     The box is "Phone" when that's all it checks, else "Contact". An
+     update is open, after the hours or times updates and above the Same
+     boxes; Same is closed, after them, "Same as" its page. Edit is the
+     listing's own contact box (address, phone, website, email), and
+     whatever the admin changes there is saved with it (the approval takes
+     `reviewEdit.fields` too). Shul times shows a shul's Phone the same
+     way (Leyv Ha-Ir's, as its notes say); not drawn as a box, so built in
+     the page's pattern.
+   - **Waiting on the user:** a mikvah's section phones and emails
+     (Women's Phone, Men's Phone…) are checked in its Contact box, not in
+     the Women's / Men's boxes. The drawing doesn't say which; tell me if
+     they belong in their sections.
 5. Hospitals. **Built Oct 22** (compared with its drawing on dev,
    computer and phone; updates stubbed in the browser):
    - An opened hospital is its listing's boxes that hold contacts (Who to
@@ -444,7 +475,7 @@ agreed:
      (the shared `BoxRow`), where its drawing has "was 8:30–10:30 PM" in
      small grey, as Hospitals now does. Not changed yet: `MikvahHours.tsx`
      and `TimesProposal.tsx` were being edited by the Contact/Phone boxes
-     session.
+     session, which has now committed (Oct 22), so they're free.
 6. Kosher.
 7. Eruv.
 

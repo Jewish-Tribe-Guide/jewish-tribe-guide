@@ -238,7 +238,11 @@ export default function ListingEditor({
   const [presetDone, setPresetDone] = useState(false)
   if (!presetDone && preset) {
     setPresetDone(true)
-    for (const [k, v] of Object.entries(preset)) setDetail(k, v)
+    // The phone is the listing's own, not a detail (a website's, Oct 22).
+    for (const [k, v] of Object.entries(preset)) {
+      if (k === 'phone') draft.setPhone(formatPhone(typeof v === 'string' ? v : ''))
+      else setDetail(k, v)
+    }
   }
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({
     mode: creating ? 'create' : 'edit',

@@ -69,6 +69,16 @@ describe('dishStatus and dishCounts', () => {
     expect(dishStatus(place('proposed', { dishes: ['Sliders'], menuDated: ['Sliders'], reading: read(['Sliders']) }))).toBe('same')
   })
 
+  // Main dishes board 3: Chalavita's hours from its website, whatever its menu says.
+  it('puts a place in To check when its website’s hours or phone wait, whatever its menu', () => {
+    const waiting = { findings: [{ id: 'f1' }] }
+    expect(dishStatus(place('approved', waiting))).toBe('differs')
+    expect(dishStatus(place('failed', waiting))).toBe('differs')
+    expect(dishStatus({ website: 'https://x.example', menuUrl: null, dishes: [], reading: null, ...waiting })).toBe('differs')
+    expect(dishStatus(place('no_menu', waiting))).toBe('differs')
+    expect(dishStatus(place('approved', { findings: [] }))).toBe('same')
+  })
+
   it('counts what the Dishes page shows: checked, to check (not read yet too), couldn’t be read, and menu pages that didn’t load', () => {
     const places = [
       place('approved'),

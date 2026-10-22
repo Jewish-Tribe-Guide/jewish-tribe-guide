@@ -19,6 +19,7 @@ import FindingCompare, { type Decision } from './FindingCompare'
 import { GivePage, day, shortUrl, type JobStatus } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
 import type { HoursPlace } from './HoursJob'
+import ContactBoxes, { givesContact, isContactFinding } from './ContactBoxes'
 
 // ── Shul times: a shul opened, as its listing's own boxes (Oct 21) ──────────
 // Drawn on artifact B3vwpSiqwdK833s9VAVHBc (v13, approved Oct 21), on the
@@ -220,7 +221,8 @@ export function ShulRow({
   const off = status === 'off'
   const findings = p.findings ?? []
   const parts = findings.filter(isPart)
-  const others = findings.filter((f) => !isPart(f))
+  const contacts = findings.filter(isContactFinding)
+  const others = findings.filter((f) => !isPart(f) && !isContactFinding(f))
   const live = p.pages.filter((x) => x.watch.active).map((x) => x.watch)
   const named = partPages(live, findings)
   const headers = { Authorization: `Bearer ${token}` }
@@ -285,7 +287,7 @@ export function ShulRow({
   const ordered = [...parts].sort((a, b) => Number(settled.has(a.id)) - Number(settled.has(b.id)) || TIMES_PARTS.indexOf(a.part) - TIMES_PARTS.indexOf(b.part))
   // A usual part a page gives, with no update: the same as the website.
   const same = (['weekday', 'shabbos'] as const).filter((part) => !parts.some((f) => f.part === part) && named.has(part) && !!p.times && usualRows(part, p.times.minyanim, p.times.minyanim).length > 0)
-  const boxes = ordered.length + same.length + others.length
+  const boxes = ordered.length + same.length + others.length + contacts.length
 
   // Reads: a line per page, named for the parts it gives. The pages that
   // give a part first, in the parts' order; then the ones read for nothing;
@@ -296,12 +298,13 @@ export function ShulRow({
       const given = TIMES_PARTS.filter((part) => named.get(part)?.id === w.id)
       const failed = !loads(w, now)
       const read = readOf(w)
-      const none = failed || (!!c && !read)
+      const none = failed || (!!c && !read && !givesContact(w))
+      const names = [...given.map((part) => TIMES_PART_LABELS[part]), ...(p.contact && givesContact(w) ? [p.contact.name] : [])]
       const page: ReadPage = {
         key: w.id,
         url: w.url,
-        label: read && !failed ? (given.length ? given.map((part) => TIMES_PART_LABELS[part]).join(' · ') : 'Nothing from it') : '',
-        right: off ? '' : failed ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : read ? `read ${day(c.at)}` : 'no times',
+        label: !failed && (read || names.length) ? (names.length ? names.join(' · ') : 'Nothing from it') : '',
+        right: off ? '' : failed ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : read || givesContact(w) ? `read ${day(c.at)}` : 'no times',
         none,
         onRemove: off ? undefined : () => onAct({ action: 'stop', id: w.id }),
       }
@@ -331,6 +334,7 @@ export function ShulRow({
           />
         )
       })}
+      <ContactBoxes placeId={p.id} contact={p.contact ?? null} findings={contacts} pages={live} settled={settled} busy={busy} token={token} community={community} itemUrl="/api/admin/watches/hours?job=times" onDecided={onDecided} show="updates" />
       {same.map((part) => {
         const page = named.get(part)!
         return (
@@ -340,6 +344,9 @@ export function ShulRow({
           </Box>
         )
       })}
+      {/* Its phone, under its times (Shul times' notes, Oct 21); an
+          update to it above the Same ones. */}
+      <ContactBoxes placeId={p.id} contact={p.contact ?? null} findings={contacts} pages={live} settled={settled} busy={busy} token={token} community={community} itemUrl="/api/admin/watches/hours?job=times" onDecided={onDecided} show="same" />
       {others.map((f) => (
         <Box key={settled.has(f.id) ? `${f.id}-done` : f.id} name={`From ${f.from}`} pill={settled.has(f.id) ? { text: doneText(settled.get(f.id)!), tone: 'grey' } : { text: updatesPill(f.lines.length), tone: 'amber' }} defaultOpen={!settled.has(f.id)}>
           <FindingCompare finding={f} token={token} community={community} jobName={jobName} decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />

@@ -3,6 +3,7 @@ import { normalizeWatchUrl, settles, watchHealth, type Watch } from './watches'
 import type { HoursPage } from './hoursPages'
 import type { JobCounts } from './watchJobs'
 import type { CategoryConfig } from './categories'
+import { googleKeeps } from './contactRead'
 
 // The hours job (the user, Oct 21): every place in a category with named
 // weekly hours (a mikvah's women's, men's and keilim hours) is read from
@@ -191,6 +192,33 @@ export function hoursWatchChanges(
   const add = search.found.filter((p) => !watches.some((w) => same(w.url, p.url))).map((p) => ({ url: p.url, label: foundPageLabel(place.name, p.link) }))
   const keep = [...search.found.map((p) => p.url), ...search.unloaded]
   const remove = watches.filter((w) => w.resourceId === place.id && isFoundHoursPage(w) && !keep.some((u) => same(u, w.url))).map((w) => w.id)
+  return { add, remove }
+}
+
+/** What a food place's website is read for (Main dishes board 3, Oct 22):
+ *  its hours and its phone, each only when Google doesn't keep it on the
+ *  listing. Its dishes are its menu's (menuWatch.ts). */
+export function homePageReads(category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>, place: Record<string, unknown>): ('hours' | 'phone')[] {
+  const out: ('hours' | 'phone')[] = []
+  if (category.detailFields.some((f) => f.key === 'hours' && f.type === 'hours') && !googleKeeps(place, 'hours')) out.push('hours')
+  if (category.hasPhone !== false && !googleKeeps(place, 'phone')) out.push('phone')
+  return out
+}
+
+/** A food place's home page watch: added when its website has something
+ *  Google doesn't keep (homePageReads) and nothing watches that page yet;
+ *  taken away, its own only, once Google keeps both. A page an admin gave,
+ *  stopped or turned off is never touched. */
+export function homePageWatchChanges(
+  place: { id: string; name: string; website: string | null; details: Record<string, unknown> },
+  category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>,
+  watches: readonly Watch[],
+): { add: { url: string; label: string }[]; remove: string[] } {
+  if (watches.some((w) => w.resourceId === place.id && isHoursOff(w))) return { add: [], remove: [] }
+  const url = place.website && normalizeWatchUrl(place.website)
+  const want = !!url && homePageReads(category, place.details).length > 0
+  const add = want && !watches.some((w) => same(w.url, url)) ? [{ url, label: foundPageLabel(place.name, null) }] : []
+  const remove = watches.filter((w) => w.resourceId === place.id && isFoundHoursPage(w) && !(want && same(w.url, url))).map((w) => w.id)
   return { add, remove }
 }
 

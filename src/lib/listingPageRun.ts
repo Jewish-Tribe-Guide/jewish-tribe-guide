@@ -18,6 +18,7 @@ import { editSubmission } from '@/lib/editSubmission'
 import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
 import { TIMES_PART_LABELS, partKey, partLines, partSize, partsGiven, readPartSource, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
 import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
+import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
 import { sendWatchDigest } from '@/lib/email'
 import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
@@ -52,7 +53,7 @@ import {
  *  and when it has a calendar, its weeks (calendarWeeks), each read on its
  *  own for the shul's times. A calendar posted as pictures has its
  *  pictures' addresses (`pictures`), fetched only when the AI reads them. */
-export type PageSource = MenuSource & { weeks?: CalendarWeek[] }
+export type PageSource = MenuSource & { weeks?: CalendarWeek[]; contacts?: PageContacts }
 
 /** A page as the readers take it. Without its menus (<nav>): a shul
  *  site's runs to thousands of words, crowding out the times in what the
@@ -79,14 +80,18 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
     }
   }
   const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
+  // Its phones and emails, read by code (contactRead.ts): in its words and
+  // its tel: and mailto: links, its menus' included.
+  const contacts = pageContacts(htmlToText(page.body), page.body)
   // No calendar and no davening time in its words: the month may be
   // posted as pictures (calendarPictures). A page that gives its times in
   // words is read for them, whatever its pictures are called.
   if (opts.pictures && !calendarLines(entries, first, last).length && !hasDaveningTimes(text)) {
     const pictures = calendarPictures(page.body, page.url, weeks.flatMap((w) => [w.sunday, w.to]))
-    if (pictures.length) return withPictures(page.url, text, pictures, weeks)
+    if (pictures.length) return { ...withPictures(page.url, text, pictures, weeks), contacts }
   }
-  return withCalendar(page.url, text, entries, weeks)
+  const got = withCalendar(page.url, text, entries, weeks)
+  return got && { ...got, contacts }
 }
 
 /** What heads a page whose calendar is pictures. */
@@ -378,6 +383,8 @@ async function pendingSuggestions(community: string, listingId: string): Promise
  *  it's one of them. */
 const partOf = (s: { payload: unknown }): PartSource | null => readPartSource((s.payload as { source?: { part?: unknown } } | null)?.source?.part)
 const detailsOf = (s: { payload: unknown }) => (s.payload as { details?: Record<string, unknown> } | null)?.details ?? {}
+/** What a suggestion would set: its details and the listing's own phone. */
+const valuesOf = (s: { payload: unknown }) => ({ ...detailsOf(s), phone: (s.payload as { phone?: unknown } | null)?.phone ?? null })
 /** The section of a mikvah's hours a suggestion is about (hoursSections.ts). */
 const sectionOf = (s: { payload: unknown }): SectionSource | null => readSectionSource((s.payload as { source?: { section?: unknown } } | null)?.source?.section)
 
@@ -403,7 +410,7 @@ export async function earlierSuggestions(community: string, listingId: string): 
  *  read and whether that agrees with the listing. The daily run reads with
  *  the AI only a page that changed: it costs. */
 export async function runListingPageWatch(
-  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'> & Partial<Pick<Watch, 'createdBy'>>,
+  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'> & Partial<Pick<Watch, 'createdBy' | 'lastCheck'>>,
   budget?: MenuReadBudget,
   opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; now?: number; full?: boolean } = {},
 ): Promise<WatchOutcome> {
@@ -429,9 +436,17 @@ export async function runListingPageWatch(
   // morning, as one an admin gives is read when it's given: else its job
   // page could never say what it reads until the page changed (Oct 21).
   const firstFound = !watch.pageHash && watch.createdBy === LISTING_PAGE_FOUND_CREATOR
+  // Its phone and email (contactRead.ts): only what Google doesn't keep,
+  // read by code, so on a page never read for them yet (one watched before
+  // they were) as well as on every read below.
+  const contacts = contactFields(category, listing)
+  const contactRead = contacts.length && source.contacts ? readContacts(contacts, listing, source.contacts) : null
+  // A page that gives none of them says nothing of them.
+  const contactReading = contactRead && (contactRead.same.length || Object.keys(contactRead.changes).length) ? contactRead : null
+  const contactUnread = !!contactReading && !watch.lastCheck?.contact
   // Else the first read sets the baseline; an unchanged page is left
   // alone, and its listing's date with it.
-  if (!opts.full && !changed && !firstFound) return { ok: true, filed: 0, pageHash }
+  if (!opts.full && !changed && !firstFound && !contactUnread) return { ok: true, filed: 0, pageHash }
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A
@@ -439,18 +454,45 @@ export async function runListingPageWatch(
   // A part of a shul's times waiting holds back only that part
   // (timesParts.ts): its other parts can still be filed beside it.
   const waitingNow = await pendingSuggestions(watch.communityId, listing.id)
-  const pending = waitingNow.length > 0
   const blocked = waitingNow.some((s) => !partOf(s) && !sectionOf(s))
-  if (blocked && !opts.full) return { ok: true, filed: 0 }
+  const seen = changed ? 'changed' : 'read'
+  // Filed as a box of its own, as a mikvah's sections are; held back only
+  // by a whole suggestion waiting.
+  const contact = contactReading ? await fileContact(watch, category, listing, contacts, contactReading, waitingNow, blocked, source.text, { now: opts.now, seen }) : null
+  const merge = (o: WatchOutcome): WatchOutcome => withContact(o, contact, watch.lastCheck ?? null, reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }))
+  // Read for its phone and email alone: the rest waits for the page to change.
+  if (!opts.full && !changed && !firstFound) return merge({ ok: true, filed: 0, pageHash })
+  // Hours Google keeps on this listing are Google's to check, not the website's.
+  const ownReads: PageReads = reads.kind === 'hours' ? { ...reads, keys: reads.keys.filter((k) => !(k === 'hours' && googleKeeps(listing, 'hours'))) } : reads
+  if (ownReads.kind === 'hours' && !ownReads.keys.length && !ownReads.notes.length) return merge({ ok: true, filed: 0, pageHash })
+  if (blocked && !opts.full) return merge({ ok: true, filed: 0 })
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
   if (!apiKey) {
-    if (!opts.full) return { ok: true, filed: 0 }
-    return { ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source, { pictures: !!source.pictures?.length }), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } }
+    if (!opts.full) return merge({ ok: true, filed: 0 })
+    return merge({ ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source, { pictures: !!source.pictures?.length }), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } })
   }
   if (budget && !opts.full) {
-    if (budget.aiReads <= 0) return { ok: true, filed: 0 }
+    if (budget.aiReads <= 0) return merge({ ok: true, filed: 0 })
     budget.aiReads--
   }
+  return merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash }))
+}
+
+/** The AI's read of a page that changed (or a check's), and what it files:
+ *  a shul's times a part at a time, a mikvah's hours a section at a time,
+ *  anything else whole. */
+async function readAndFile(
+  watch: Pick<Watch, 'communityId' | 'url' | 'pageHash'>,
+  listing: DirectoryResource,
+  category: CategoryConfig,
+  reads: PageReads,
+  source: PageSource,
+  waitingNow: readonly Filed[],
+  blocked: boolean,
+  opts: { fetchImpl?: typeof fetch; apiKey: string; now?: number; full?: boolean; changed: boolean; pageHash: string },
+): Promise<WatchOutcome> {
+  const { apiKey, changed, pageHash } = opts
+  const pending = waitingNow.length > 0
 
   let reading: PageReading
   try {
@@ -591,13 +633,13 @@ async function fileSections(
     const keys = p.source.keys
     const key = suggestionKey(p.details, keys)
     const same = waiting.filter((s) => sectionOf(s)?.section === p.source.section)
-    if (same.some((s) => suggestionKey(detailsOf(s), keys) === key)) {
+    if (same.some((s) => suggestionKey(valuesOf(s), keys) === key)) {
       outcomes.push('waiting')
       continue
     }
     // Filed before as this section, or inside a whole reading from before
     // the sections.
-    if (earlier.some((s) => (sectionOf(s)?.section ?? p.source.section) === p.source.section && suggestionKey(detailsOf(s), keys) === key)) {
+    if (earlier.some((s) => (sectionOf(s)?.section ?? p.source.section) === p.source.section && suggestionKey(valuesOf(s), keys) === key)) {
       outcomes.push('before')
       continue
     }
@@ -620,4 +662,55 @@ async function fileSections(
   }
   const queue = outcomes.includes('filed') ? 'filed' : outcomes.includes('waiting') ? 'waiting' : 'before'
   return { queue, filed }
+}
+
+type ContactFiled = { reading: ContactReading; lines: string[]; queue: WatchCheck['queue']; filed: string[] }
+
+/** A page's phone and email, filed as a box of their own (the section
+ *  `contact`, its keys the fields it changes), as a mikvah's sections are,
+ *  so using it never undoes anything else on the listing. Held back only
+ *  by a whole suggestion waiting. */
+async function fileContact(
+  watch: Pick<Watch, 'communityId' | 'url'>,
+  category: CategoryConfig,
+  listing: DirectoryResource,
+  fields: readonly ContactField[],
+  reading: ContactReading,
+  waiting: readonly Filed[],
+  blocked: boolean,
+  text: string | null,
+  at: { now?: number; seen: 'changed' | 'read' },
+): Promise<ContactFiled> {
+  const keys = Object.keys(reading.changes)
+  const { lines } = keys.length ? fieldsEdit(category, listing, reading.changes) : { lines: [] }
+  if (!lines.length) return { reading, lines: [], queue: null, filed: [] }
+  if (blocked) return { reading, lines, queue: 'waiting', filed: [] }
+  const section: HoursSection = { section: CONTACT_SECTION, label: contactBoxName(fields), hours: null, notes: null }
+  const { queue, filed } = await fileSections(watch, category, listing, [{ section, details: reading.changes, source: { section: CONTACT_SECTION, keys } }], waiting, text, at)
+  if (filed.length) {
+    await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
+      console.error('[watch-listing-page] digest failed:', err),
+    )
+  }
+  return { reading, lines, queue, filed }
+}
+
+/** A run's outcome with what the page said of the phone and email: kept
+ *  on its check (the last one, when this run had the AI read nothing), its
+ *  differences among the check's, what it filed counted. */
+export function withContact(o: WatchOutcome, contact: ContactFiled | null, last: WatchCheck | null, what: PageReads['kind'], from: WatchCheck['from']): WatchOutcome {
+  if (!contact || !o.ok) return o
+  const { at: _at, ...was } = last ?? { at: '' }
+  void _at
+  const base: Omit<WatchCheck, 'at'> = o.check ?? (last ? (was as Omit<WatchCheck, 'at'>) : { what, from, result: 'nothing', read: [], differences: [], queue: null })
+  const { same, changes } = contact.reading
+  const differences = [...base.differences.filter((d) => !contact.lines.includes(d)), ...contact.lines]
+  // A phone that agrees doesn't make a page that gave no hours a read one:
+  // the place stays "can't be read" for its hours (Mikvah hours board 3).
+  const result: WatchCheck['result'] = contact.lines.length ? 'differs' : base.result
+  return {
+    ...o,
+    filed: o.filed + contact.filed.length,
+    check: { ...base, result, differences, queue: base.queue ?? contact.queue, contact: { same, changes: Object.keys(changes) } },
+  }
 }

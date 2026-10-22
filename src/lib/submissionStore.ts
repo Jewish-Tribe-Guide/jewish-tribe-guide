@@ -462,19 +462,25 @@ export async function approveSubmission(
   }
 
   // A mikvah's hours read as one section (hoursSections.ts), the same way:
-  // using the women's hours never undoes men's hours approved since.
+  // using the women's hours never undoes men's hours approved since. A
+  // page's phone and email are a section too (contactRead.ts), its phone
+  // the listing's own, not a detail.
   const section = submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id && !part ? statedSource(submission.payload)?.section : undefined
   if (section) {
     const { data: row, error: rowErr } = await supabase.from('resource').select('name, address, phone, details').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
     if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
     const sent = submission.payload as unknown as ResourceSubmission
     const now = row as Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>
+    // And whatever the admin changed in Edit, which may be more of the box
+    // than the page gave (the listing's whole contact box).
+    const keys = [...new Set([...section.keys, ...((sent as { reviewEdit?: { fields?: string[] } }).reviewEdit?.fields ?? [])])]
+    const own = (k: 'name' | 'address' | 'phone') => (keys.includes(k) ? (sent[k] ?? '') : (now[k] ?? ''))
     submission.payload = {
       ...sent,
-      name: now.name,
-      address: now.address ?? '',
-      phone: now.phone ?? '',
-      details: rebaseSection(section, now.details ?? {}, sent.details ?? {}),
+      name: own('name'),
+      address: own('address'),
+      phone: own('phone'),
+      details: rebaseSection({ ...section, keys }, now.details ?? {}, sent.details ?? {}),
     } as unknown as Record<string, unknown>
   }
 

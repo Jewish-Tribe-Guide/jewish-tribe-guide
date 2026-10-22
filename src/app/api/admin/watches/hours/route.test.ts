@@ -204,6 +204,27 @@ describe('a mikvah’s sections, for its boxes and its Edit', () => {
     ])
     expect((await GET(req('GET', undefined, `?item=${MEI}`))).status).toBe(200)
   })
+
+  // Mikvah hours board 1's Contact box: only what Google doesn't keep.
+  it('each mikvah comes with its phone and email as listed, less what Google keeps', async () => {
+    const withEmail = { ...SECTIONED, hasPhone: true, detailFields: [...SECTIONED.detailFields, { key: 'e', label: 'Email', type: 'text' }] }
+    m.hoursJobPlaces.mockResolvedValue({
+      categories: [withEmail],
+      places: [
+        makeListing({ id: MEI, category: 'mikvah', name: 'Mikvah Mei Shalva', phone: '(267) 225-2651', e: 'centercitymikvah@gmail.com' } as never),
+        makeListing({ id: LMC, category: 'mikvah', name: 'Lower Merion Community Mikvah', phone: '(484) 808-5626', placeId: 'ChIJ', googleFields: ['phone'], e: 'office@lmcmikvah.org' } as never),
+      ],
+    })
+    const [mei, lmc] = (await (await GET(req('GET'))).json()).places
+    expect(mei.contact).toEqual({
+      name: 'Contact',
+      fields: [
+        { key: 'phone', label: 'Phone', kind: 'phone', value: '(267) 225-2651' },
+        { key: 'e', label: 'Email', kind: 'email', value: 'centercitymikvah@gmail.com' },
+      ],
+    })
+    expect(lmc.contact).toEqual({ name: 'Email', fields: [{ key: 'e', label: 'Email', kind: 'email', value: 'office@lmcmikvah.org' }] })
+  })
 })
 
 describe('POST /api/admin/watches/hours', () => {

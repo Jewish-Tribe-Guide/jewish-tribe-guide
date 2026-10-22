@@ -56,7 +56,7 @@ export async function runWatch(
     // A shul's or mikvah's own page, read by the AI for its times or hours
     // only when it changed (listingPageWatch.ts). Shares the run's AI reads.
     if (isListingPageWatch({ createdBy: watch.createdBy ?? null })) {
-      return await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null, createdBy: watch.createdBy ?? null }, budget, { full })
+      return await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
     }
     return await readWebsite(watch.url)
   } catch (err) {

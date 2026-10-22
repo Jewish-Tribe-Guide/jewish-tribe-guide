@@ -1013,3 +1013,66 @@ describe('both seasons on one page', () => {
     expect(dropListed(update([row({})]), listing).rows).toHaveLength(0)
   })
 })
+
+// Its phone and email (contactRead.ts, Oct 22): only what Google doesn't
+// keep, read by code, filed as a box of their own.
+describe('runListingPageWatch: a page’s phone and email', () => {
+  const withPhone = (words: string) => `<html><body><h1>Davening times</h1><p>Sunday Mincha 6:15pm. ${words} ${'Our shul welcomes everyone to daven with us. '.repeat(6)}</p></body></html>`
+  const hashOf = async (body: string) => {
+    const { htmlToText } = await import('./menuReader')
+    return menuHash({ url: URL_, text: htmlToText(body), pdf: null })
+  }
+  const leyv = { ...shul, phone: '(215) 629-1995' }
+  const lastCheck = { at: '2026-10-19T11:00:00Z', what: 'times' as const, from: 'page' as const, result: 'agrees' as const, read: ['Mincha Sun 6:15 PM'], differences: [], queue: null }
+
+  it('reads an unchanged page never read for its phone, without the AI, keeping what it last read', async () => {
+    m.getResourceRowById.mockResolvedValue(leyv)
+    const body = withPhone('Call 215.629.1995.')
+    m.fetchPublic.mockResolvedValue({ ...page, body })
+    const out = await runListingPageWatch({ ...watch, pageHash: await hashOf(body), lastCheck }, undefined, { apiKey: 'k' })
+    expect(out).toEqual({ ok: true, filed: 0, pageHash: await hashOf(body), check: { ...lastCheck, at: undefined, contact: { same: ['phone'], changes: [] } } })
+    expect(m.readShulWeek).not.toHaveBeenCalled()
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    // Read for it once: then left alone until the page changes.
+    const again = await runListingPageWatch({ ...watch, pageHash: await hashOf(body), lastCheck: { ...lastCheck, contact: { same: ['phone'], changes: [] } } }, undefined, { apiKey: 'k' })
+    expect(again).toEqual({ ok: true, filed: 0, pageHash: await hashOf(body) })
+  })
+
+  it('files a changed phone as its own box, on its own keys', async () => {
+    m.getResourceRowById.mockResolvedValue(leyv)
+    const body = withPhone('Call us: 215-555-0100.')
+    m.fetchPublic.mockResolvedValue({ ...page, body })
+    const out = await runListingPageWatch({ ...watch, pageHash: await hashOf(body), lastCheck }, undefined, { apiKey: 'k', now: NOW })
+    expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', queue: 'filed', contact: { same: [], changes: ['phone'] } } })
+    const [, id, payload, note, by] = m.submitListingUpdate.mock.calls[0]
+    expect(id).toBe('s1')
+    expect(payload).toMatchObject({ phone: '(215) 555-0100', source: { section: { section: 'contact', keys: ['phone'] } } })
+    expect(note).toContain('Phone')
+    expect(by).toEqual({ name: LISTING_PAGE_WATCH_NAME })
+    // Waiting already, as read: not filed again.
+    m.submitListingUpdate.mockClear()
+    m.pending = [{ id: 'p1', payload: { ...payload } }]
+    const twice = await runListingPageWatch({ ...watch, pageHash: await hashOf(body), lastCheck }, undefined, { apiKey: 'k', now: NOW })
+    expect(twice).toMatchObject({ ok: true, filed: 0, check: { queue: 'waiting', contact: { changes: ['phone'] } } })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('never reads a phone Google keeps', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...leyv, details: { ...leyv.details, placeId: 'ChIJ', googleFields: ['phone'] } })
+    const body = withPhone('Call us: 215-555-0100.')
+    m.fetchPublic.mockResolvedValue({ ...page, body })
+    expect(await runListingPageWatch({ ...watch, pageHash: await hashOf(body), lastCheck }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOf(body) })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('has the AI read no hours Google keeps: a food place’s page is read for its phone alone', async () => {
+    const restaurant = makeCategory({ id: 'restaurant', detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] })
+    m.listCategoriesUncached.mockResolvedValue([restaurant])
+    m.getResourceRowById.mockResolvedValue({ id: 'r1', category: 'restaurant', name: 'Chalavita', status: 'approved', phone: '(929) 666-1482', details: { placeId: 'x', googleFields: ['name', 'hours'] } })
+    const body = `<html><body><p>Open daily 8am. Call 929 666 1482. ${'Fresh dairy food. '.repeat(15)}</p></body></html>`
+    m.fetchPublic.mockResolvedValue({ ...page, body })
+    const out = await runListingPageWatch({ ...watch, resourceId: 'r1', pageHash: 'old' }, undefined, { apiKey: 'k' })
+    expect(m.readMessage).not.toHaveBeenCalled()
+    expect(out).toMatchObject({ ok: true, filed: 0, pageHash: await hashOf(body), check: { what: 'hours', result: 'nothing', contact: { same: ['phone'], changes: [] } } })
+  })
+})

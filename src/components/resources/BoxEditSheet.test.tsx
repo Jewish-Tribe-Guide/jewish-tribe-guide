@@ -124,6 +124,25 @@ describe('BoxEditor, this week’s schedule', () => {
   })
 })
 
+// A page's phone and email (Oct 22, contactRead.ts): Edit opens the
+// listing's own contact box, filled in with the website's.
+describe('the contact box, opened from a website’s phone and email', () => {
+  it('starts from the website’s phone, and saves it the admin’s way', async () => {
+    const email: CategoryField = { key: 'e', label: 'Email', type: 'text', renderAs: 'row' }
+    const food = makeCategory({ id: 'restaurant', hasPhone: true, detailFields: [email] })
+    const place = makeListing({ id: '7d1f3c2a-9b8e-4c6d-a5f4-3e2d1c0b9a87', category: 'restaurant', name: 'Chalavita', phone: '(215) 555-0100', e: 'old@chalavita.com' })
+    const via = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const onSaved = vi.fn()
+    renderWithProviders(<BoxEditSheet item={place} category={food} edit={{ title: 'Phone', fields: [], rows: ['contact'], preset: { phone: '2155550123', e: 'hi@chalavita.com' }, save: { label: 'Save to the listing', via, onSaved } }} onClose={vi.fn()} />)
+    expect(document.getElementById('edit-phone')).toHaveValue('(215) 555-0123')
+    fireEvent.click(screen.getByRole('button', { name: 'Save to the listing' }))
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const { payload } = via.mock.calls[0][0]
+    expect(payload.phone).toBe('(215) 555-0123')
+    expect(payload.details.e).toBe('hi@chalavita.com')
+  })
+})
+
 describe('BoxEditor, a shul’s usual Shabbos times', () => {
   const minyanim: CategoryField = { key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }
   const shuls = makeCategory({ id: 'synagogue', detailFields: [minyanim] })

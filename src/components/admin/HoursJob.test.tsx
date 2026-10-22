@@ -254,6 +254,76 @@ describe('Mikvah hours', () => {
     fetchMock.mockRestore()
   })
 
+  // Mikvah hours board 1's Contact (Oct 22): only what Google doesn't keep.
+  describe('its Contact, from its website', () => {
+    const CONTACT = { name: 'Contact', fields: [{ key: 'phone', label: 'Phone', kind: 'phone' as const, value: '(484) 808-5626' }, { key: 'e', label: 'Email', kind: 'email' as const, value: 'office@lmcmikvah.org' }] }
+    const PHONE = finding({ id: 's-contact', page: HOME, section: 'contact', values: { phone: '(484) 808-5600' }, lines: [{ key: 'phone', label: 'Phone', before: '(484) 808-5626', after: '(484) 808-5600', choosable: true }] })
+    const withContact = (over: Partial<WatchCheck>) => ({
+      ...LOWER,
+      contact: CONTACT,
+      findings: [WOMEN, PHONE],
+      pages: LOWER.pages.map((x) => (x.watch.id === 'w-home' ? { ...x, watch: { ...x.watch, lastCheck: { ...x.watch.lastCheck!, ...over } } } : x)),
+    })
+    const MZ_CONTACT = { name: 'Contact', fields: [{ key: 'women_s_phone', label: 'Women’s Phone', kind: 'phone' as const, value: '267.496.1990' }, { key: 'men_s_phone', label: 'Men’s Phone', kind: 'phone' as const, value: '267.738.8995' }] }
+
+    it('an update: after the sections’ updates, above the Same ones; the changed phone beside what it was, the email as listed', async () => {
+      await renderPage([withContact({ contact: { same: ['e'], changes: ['phone'] } })])
+      await open(LOWER.name)
+      expect(boxes(LOWER.name)).toEqual(['Women’s | 3 changes | true', 'Contact | 1 change | true', 'Men’s | Same | false', 'Reads | 3 pages | false'])
+      const b = box(LOWER.name, 'Contact')
+      expect(marked(b)).toEqual(['changed: Phone(484) 808-5600(484) 808-5626', 'same: Emailoffice@lmcmikvah.org'])
+      expect(within(b).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this', 'Edit', 'Keep the listing'])
+      expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From lmcmikvah\.org · read/)
+      expect(pill(LOWER.name)).toBe('2 updates')
+      await userEvent.setup().click(within(b).getByRole('button', { name: 'Use this' }))
+      expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-contact?community=philly', body: { status: 'approved' } })
+      expect(boxes(LOWER.name)[1]).toBe(`Contact | Used ${today()} | false`)
+    })
+
+    it('Reads names the page for it too', async () => {
+      await renderPage([withContact({ contact: { same: ['e'], changes: ['phone'] } })])
+      await open(LOWER.name)
+      await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: /^Reads/ }))
+      expect(within(mikvah(LOWER.name)).getAllByTestId('job-source')[0].textContent?.replace(/read [A-Z][a-z]{2} \d+/, 'read …')).toBe('lmcmikvah.orgWomen’s · Contactread …')
+    })
+
+    it('the same: closed after the sections, the listing’s own, “Same as” the page that gave them', async () => {
+      const mz = { ...SAME, contact: MZ_CONTACT, pages: SAME.pages.map((x) => ({ ...x, watch: { ...x.watch, lastCheck: { ...x.watch.lastCheck!, contact: { same: ['women_s_phone', 'men_s_phone'], changes: [] } } } })) }
+      await renderPage([mz])
+      await tab('Checked')
+      await open(SAME.name)
+      expect(boxes(SAME.name)).toEqual(['Men’s | Same | false', 'Contact | Same | false', 'Reads | 1 page | false'])
+      await userEvent.setup().click(within(mikvah(SAME.name)).getByRole('button', { name: /^Contact/ }))
+      const b = box(SAME.name, 'Contact')
+      expect(marked(b)).toEqual(['same: Women’s Phone267.496.1990', 'same: Men’s Phone267.738.8995'])
+      expect(within(b).getByTestId('box-source')).toHaveTextContent(/^Same as mikvahwestphilly\.com · read/)
+    })
+
+    it('Edit: the listing’s own contact box, filled with the website’s phone, saved to the listing', async () => {
+      const category = makeCategory({ id: 'mikvah', hasPhone: true, detailFields: [{ key: 'website', label: 'Website', type: 'url', renderAs: 'row' }, { key: 'e', label: 'Email', type: 'text', renderAs: 'row' }] })
+      const item = makeListing({ id: 'lmc', category: 'mikvah', name: LOWER.name, address: '123 Main St', phone: '(484) 808-5626', website: 'https://lmcmikvah.org/', e: 'office@lmcmikvah.org' })
+      await renderPage([withContact({})])
+      const listed = vi.mocked(fetchJson).getMockImplementation()!
+      vi.mocked(fetchJson).mockImplementation(async (url, init, fallback) => (String(url).includes('item=lmc') ? { ok: true, item, category } : listed(url, init, fallback)))
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+      await open(LOWER.name)
+      const user = userEvent.setup()
+      await user.click(within(box(LOWER.name, 'Contact')).getByRole('button', { name: 'Edit' }))
+      expect(vi.mocked(fetchJson).mock.calls.map(([u]) => u)).toContain('/api/admin/watches/hours?item=lmc&community=philly')
+      const sheet = await screen.findByRole('dialog')
+      expect(within(sheet).getByDisplayValue('(484) 808-5600')).toBeInTheDocument()
+      // The rest of the box is the admin's to fix while there.
+      await user.clear(within(sheet).getByDisplayValue('https://lmcmikvah.org/'))
+      await user.type(within(sheet).getByLabelText('Website'), 'https://lmcmikvah.org/contact')
+      await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+      const [url, init] = fetchMock.mock.calls.find(([u]) => String(u).includes('/api/admin/submissions/'))!
+      expect(String(url)).toBe('/api/admin/submissions/s-contact?community=philly')
+      const sent = JSON.parse(String(init!.body))
+      expect(sent).toMatchObject({ status: 'approved', payload: { phone: '(484) 808-5600', address: '123 Main St', details: { website: 'https://lmcmikvah.org/contact', e: 'office@lmcmikvah.org' } } })
+      fetchMock.mockRestore()
+    })
+  })
+
   it('a finding that isn’t one section’s is shown whole, to compare', async () => {
     await renderPage([{ ...LOWER, findings: [finding({ id: 's-old', targetId: 'lmc' })] } as MikvahPlace])
     await open(LOWER.name)
@@ -449,6 +519,35 @@ describe('Shul times', () => {
     expect(marked(b)).toEqual(['same: Shacharis7 AM', 'same: Shacharis6:45 and 8:15 AM', 'same: Mincha & Maariv6 PM'])
     expect(within(b).getByTestId('box-source')).toHaveTextContent(/^Same as soi\.example\/tefillot · read/)
     expect(within(b).getAllByRole('button')).toHaveLength(1)
+  })
+
+  // Shul times' notes: a shul's phone "would be read from its website too (a
+  // Phone box under its times)", when Google doesn't keep it.
+  describe('its Phone, from its website', () => {
+    const PHONE_BOX = { name: 'Phone', fields: [{ key: 'phone', label: 'Phone', kind: 'phone' as const, value: '(215) 629-1995' }] }
+    const NEW_PHONE = finding({ id: 's-phone', targetId: 'soi', name: 'Sons of Israel', page: 'https://soi.example/', section: 'contact', values: { phone: '(215) 555-0100' }, lines: [{ key: 'phone', label: 'Phone', before: '(215) 629-1995', after: '(215) 555-0100', choosable: true }] })
+
+    it('an update: under its times’ updates, above the part that’s the same; Reads names the page for it', async () => {
+      const soi = { ...SOI, contact: PHONE_BOX, findings: [WEEK, SHAB, NEW_PHONE], pages: SOI.pages.map((x) => (x.watch.id === 'w-home' ? { ...x, watch: { ...x.watch, lastCheck: { ...x.watch.lastCheck!, contact: { same: [], changes: ['phone'] } } } } : x)) }
+      await times$([soi])
+      await open(SOI.name)
+      expect(boxes(SOI.name)).toEqual(['Usual Shabbos times | 2 new | true', 'This week’s schedule | Oct 21–24 | true', 'Phone | 1 change | true', 'Usual weekday times | Same | false', 'Reads | 4 pages | false'])
+      expect(marked(box(SOI.name, 'Phone'))).toEqual(['changed: Phone(215) 555-0100(215) 629-1995'])
+      expect(pill(SOI.name)).toBe('3 updates')
+      await userEvent.setup().click(within(shul(SOI.name)).getByRole('button', { name: /^Reads/ }))
+      expect(within(shul(SOI.name)).getAllByTestId('job-source').map((x) => x.textContent?.replace(/read [A-Z][a-z]{2} \d+/, 'read …'))).toContain('soi.examplePhoneread …')
+    })
+
+    it('the same: a closed Phone box after its times, “Same as” its page', async () => {
+      const kesher = { ...KESHER, contact: PHONE_BOX, pages: KESHER.pages.map((x) => ({ ...x, watch: { ...x.watch, lastCheck: { ...x.watch.lastCheck!, contact: { same: ['phone'], changes: [] } } } })) }
+      await times$([kesher])
+      await tab('Checked')
+      await open(KESHER.name)
+      expect(boxes(KESHER.name).map((b) => b.split(' | ').slice(0, 2).join(' | '))).toContain('Phone | Same')
+      expect(boxes(KESHER.name).at(-2)).toBe('Phone | Same | false')
+      await userEvent.setup().click(within(shul(KESHER.name)).getByRole('button', { name: /^Phone/ }))
+      expect(within(box(KESHER.name, 'Phone')).getByTestId('box-source')).toHaveTextContent(/^Same as kesher\.example · read/)
+    })
   })
 
   it('Reads: the pages that gave a part first, named for it; then the one that gave nothing; a page with no times greyed last', async () => {

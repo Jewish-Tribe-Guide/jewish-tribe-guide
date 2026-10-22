@@ -9,6 +9,8 @@ import {
   hoursOffUrl,
   hoursSection,
   hoursWatchChanges,
+  homePageReads,
+  homePageWatchChanges,
   looksLikeHours,
   timesPagesToRead,
   PAGE_STOPPED_CREATOR,
@@ -16,6 +18,7 @@ import {
 } from './hoursJob'
 import { LISTING_PAGE_WATCH_CREATOR } from './listingPageWatch'
 import type { Watch, WatchCheck } from './watches'
+import type { CategoryConfig } from './categories'
 
 const NOW = Date.parse('2026-10-21T12:00:00Z')
 const ago = (h: number) => new Date(NOW - h * 3_600_000).toISOString()
@@ -133,6 +136,41 @@ describe('hoursWatchChanges', () => {
     expect(hoursWatchChanges(place, null, [own])).toEqual({ add: [], remove: [] })
     const off = watch({ id: 'off', url: hoursOffUrl('lmc'), createdBy: HOURS_OFF_CREATOR, active: false })
     expect(hoursWatchChanges(place, { found, unloaded: [] }, [own, off])).toEqual({ add: [], remove: [] })
+  })
+})
+
+describe('a food place’s home page (Main dishes board 3)', () => {
+  const food = { hasPhone: true, detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }, { key: 'dishes', label: 'Main dishes', type: 'tags' }] as CategoryConfig['detailFields'] }
+  // Chalavita on live: no Google match, so its hours and phone are its website's.
+  const chalavita = { id: 'cv', name: 'Chalavita', website: 'chalavita.com', details: {} }
+
+  it('is read for what Google doesn’t keep: its hours, its phone, both or neither', () => {
+    expect(homePageReads(food, {})).toEqual(['hours', 'phone'])
+    expect(homePageReads(food, { placeId: 'g', googleFields: ['hours'] })).toEqual(['phone'])
+    expect(homePageReads(food, { placeId: 'g', googleFields: ['hours', 'phone'] })).toEqual([])
+    expect(homePageReads({ hasPhone: false, detailFields: [] }, {})).toEqual([])
+  })
+
+  it('is watched once, as its website, unless another watch already reads that page', () => {
+    expect(homePageWatchChanges(chalavita, food, [])).toEqual({ add: [{ url: 'https://chalavita.com/', label: 'Chalavita · its website' }], remove: [] })
+    const menu = watch({ id: 'menu', url: 'https://www.chalavita.com', resourceId: 'cv', createdBy: 'menu links' })
+    expect(homePageWatchChanges(chalavita, food, [menu])).toEqual({ add: [], remove: [] })
+    expect(homePageWatchChanges({ ...chalavita, website: null }, food, [])).toEqual({ add: [], remove: [] })
+  })
+
+  it('goes once Google keeps both, or its website moves; an admin’s never does', () => {
+    const own = watch({ id: 'own', url: 'https://chalavita.com/', resourceId: 'cv' })
+    const hand = watch({ id: 'hand', url: 'https://chalavita.com/hours', resourceId: 'cv', createdBy: LISTING_PAGE_WATCH_CREATOR })
+    const google = { ...chalavita, details: { placeId: 'g', googleFields: ['hours', 'phone'] } }
+    expect(homePageWatchChanges(google, food, [own, hand])).toEqual({ add: [], remove: ['own'] })
+    expect(homePageWatchChanges({ ...chalavita, website: 'chalavita.net' }, food, [own]).remove).toEqual(['own'])
+    expect(homePageWatchChanges(chalavita, food, [own, hand])).toEqual({ add: [], remove: [] })
+  })
+
+  it('is left alone when the place is off', () => {
+    const own = watch({ id: 'own', url: 'https://chalavita.com/', resourceId: 'cv' })
+    const off = watch({ id: 'off', url: hoursOffUrl('cv'), resourceId: 'cv', createdBy: HOURS_OFF_CREATOR, active: false })
+    expect(homePageWatchChanges({ ...chalavita, website: null }, food, [own, off])).toEqual({ add: [], remove: [] })
   })
 })
 

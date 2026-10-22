@@ -12,6 +12,9 @@ import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } fr
 import type { Minyan } from './davening'
 import type { TimesPart } from './timesParts'
 import { hoursSections, sectionKeys, sectionOfKeys, type SectionSource } from './hoursSections'
+import { CONTACT_SECTION } from './contactRead'
+import { itemsField } from './listingView'
+import { itemWording } from './itemMarks'
 
 // Step 6 of keeping listings current (decided by the user, Oct 21):
 // "Findings go to the job pages, next to what the listing says, not the
@@ -26,11 +29,14 @@ import { hoursSections, sectionKeys, sectionOfKeys, type SectionSource } from '.
 // the queue, so nothing a watch finds goes unseen.
 
 /** The jobs whose pages show findings, and the watches that file them. */
-export type FindingJob = 'hours' | 'times' | 'hospitals' | 'kosher'
+export type FindingJob = 'hours' | 'times' | 'dishes' | 'hospitals' | 'kosher'
 
 export const FINDING_SOURCES: Record<FindingJob, readonly string[]> = {
   hours: [LISTING_PAGE_WATCH_NAME],
   times: [LISTING_PAGE_WATCH_NAME, NEWSLETTER_WATCH_NAME],
+  // A food place's website: its hours and phone, when Google doesn't keep
+  // them (Main dishes board 3, Oct 22).
+  dishes: [LISTING_PAGE_WATCH_NAME],
   hospitals: [REFUAH_WATCH_NAME],
   kosher: [KEYSTONE_WATCH_NAME, MEKOR_WATCH_NAME],
 }
@@ -100,7 +106,8 @@ export type Finding = {
   /** Which of a mikvah's sections it changes (hoursSections.ts): filed
    *  as one, or, from before they were, all its lines in one. */
   section?: string
-  /** That section's hours and notes as the finding has them. */
+  /** That section's hours and notes as the finding has them; a page's
+   *  phone and email (the section `contact`), its phone among them. */
   values?: Record<string, unknown>
 }
 
@@ -188,7 +195,7 @@ function sectionFinding(s: SubmissionRow, stated: SectionSource | undefined, pay
   const derived = !stated && lines.length ? sectionOfKeys(hoursSections({ detailFields: [...fields] }, named), lines.map((l) => l.key)) : null
   const src = stated ?? (derived ? { section: derived.section, keys: sectionKeys(derived) } : null)
   if (!src) return undefined
-  const d = payload.details
+  const d = src.section === CONTACT_SECTION ? { ...payload.details, phone: payload.phone ?? null } : payload.details
   return { section: src.section, values: Object.fromEntries(src.keys.filter((k) => k in d).map((k) => [k, d[k]])) }
 }
 
@@ -216,7 +223,16 @@ export function jobCategories(categories: readonly Pick<CategoryConfig, 'id' | '
   return {
     hours: new Set(hoursJobCategories(categories, 'hours').map((c) => c.id)),
     times: new Set(hoursJobCategories(categories, 'times').map((c) => c.id)),
+    dishes: new Set(dishCategories(categories).map((c) => c.id)),
   }
+}
+
+/** The categories Main dishes reads: a list of dishes (the food places). */
+export function dishCategories<C extends Pick<CategoryConfig, 'detailFields'>>(categories: readonly C[]): C[] {
+  return categories.filter((c) => {
+    const field = itemsField(c as unknown as CategoryConfig)
+    return !!field && itemWording(field).noun === 'dish'
+  })
 }
 
 /** Whether a job page shows this pending suggestion, so the moderation
@@ -228,11 +244,12 @@ export function onAJobPage(s: Pick<SubmissionRow, 'submitted_by' | 'target_type'
   if (!name) return false
   if (FINDING_SOURCES.hospitals.includes(name) || FINDING_SOURCES.kosher.includes(name)) return true
   if (!category) return false
-  return (['hours', 'times'] as const).some((job) => FINDING_SOURCES[job].includes(name) && !!jobs[job]?.has(category))
+  return (['hours', 'times', 'dishes'] as const).some((job) => FINDING_SOURCES[job].includes(name) && !!jobs[job]?.has(category))
 }
 
 const PAGE_NAME: Record<Exclude<FindingJob, 'hours'>, string> = {
   times: 'Shul times',
+  dishes: 'Main dishes',
   hospitals: 'Hospitals',
   kosher: 'Kosher certification',
 }
@@ -250,5 +267,6 @@ export function findingPage(community: string, job: FindingJob, hoursName?: stri
 export function jobPageFor(community: string, category: Pick<CategoryConfig, 'id' | 'label' | 'detailFields'>): { path: string; name: string } | undefined {
   if (hoursJobCategories([category], 'times').length) return findingPage(community, 'times')
   if (hoursJobCategories([category], 'hours').length) return findingPage(community, 'hours', hoursJobName([category]))
+  if (dishCategories([category]).length) return findingPage(community, 'dishes')
   return undefined
 }

@@ -14,6 +14,7 @@ import type { Decision } from './FindingCompare'
 import { JobPage, jobTabs, needsYou, type JobStatus, type JobTab } from './JobPage'
 import { ShulRow } from './TimesProposal'
 import { MikvahRow } from './MikvahHours'
+import type { ListedContact } from './ContactBoxes'
 
 // ── The Watches tab's Mikvah hours and Shul times pages (the user, Oct 21) ──
 // Every place whose category has named weekly hours (a mikvah's women's,
@@ -54,6 +55,9 @@ export type HoursPlace = {
   /** When its last finding was decided, and how. */
   decided?: Decided | null
   fields: string[]
+  /** Its phone and email as listed, less what Google keeps, for its
+   *  Phone or Contact box (ContactBoxes.tsx). */
+  contact?: ListedContact | null
 }
 type Loaded = { available: boolean; name: string; places: HoursPlace[] }
 type Saved = { pages?: Page[]; stopped?: Page[]; off?: boolean; reason?: string | null }

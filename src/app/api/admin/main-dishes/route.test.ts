@@ -20,7 +20,14 @@ const m = vi.hoisted(() => ({
   readMenuPage: vi.fn(),
   readMenu: vi.fn(),
   revalidatePublicContent: vi.fn(),
+  listWatches: vi.fn(),
+  updateWatch: vi.fn(),
+  jobFindings: vi.fn(),
+  runAndRecord: vi.fn(),
 }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, updateWatch: m.updateWatch }))
+vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
+vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -99,6 +106,9 @@ beforeEach(() => {
   m.saveMenuLink.mockResolvedValue(true)
   m.markNoMenu.mockImplementation(async (_c, id, by) => ({ ...reading, resourceId: id, status: 'skipped', dishes: [], note: 'No menu', sourceUrl: null, model: null, decidedBy: by }))
   m.setMenuDishes.mockResolvedValue(true)
+  m.listWatches.mockResolvedValue({ watches: [], available: true })
+  m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
+  m.runAndRecord.mockImplementation(async (w: { id: string }) => ({ watch: { ...w, lastRunAt: 'now' } }))
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
 })
 afterEach(() => vi.unstubAllEnvs())
@@ -117,6 +127,50 @@ describe('/api/admin/main-dishes', () => {
       expect.objectContaining({ id: ID, name: 'Judah', website: 'https://judah.example', dishes: ['Falafel'], facts: ['Meat'], reading }),
     ])
     expect(body.readerOn).toBe(true)
+  })
+
+  // Main dishes board 3 (Oct 22): a place Google doesn't keep is read
+  // from its website for its hours and phone too.
+  describe('its hours and phone, from its website, when Google doesn’t keep them', () => {
+    const CV = '7d1f3c2a-9b8e-4c6d-a5f4-3e2d1c0b9a87'
+    const withHours = makeCategory({ ...food, hasPhone: true, detailFields: [...food.detailFields, { key: 'hours', label: 'Hours', type: 'hours' }] })
+    const hours = { sun: { open: '09:00', close: '21:00' } }
+    const chalavita = makeListing({ id: CV, category: 'restaurant', name: 'Chalavita', website: 'https://chalavita.com', phone: '(215) 555-0100', hours } as never)
+    const googled = { ...judah, phone: '(215) 555-0199', placeId: 'g', googleFields: ['hours', 'phone'], hours }
+    const home = { id: 'home', resourceId: CV, url: 'https://chalavita.com/', createdBy: 'listing pages (found)', active: true }
+    const finding = { id: 'f1', targetId: CV, section: 'contact', values: { phone: '(215) 555-0123' } }
+
+    beforeEach(() => {
+      m.listCategories.mockResolvedValue([withHours, grocery])
+      m.listApprovedResources.mockResolvedValue([chalavita, googled])
+      m.listWatches.mockResolvedValue({ watches: [home, { id: 'menu', resourceId: CV, url: 'https://chalavita.com/menu', createdBy: 'menu links', active: true }], available: true })
+      m.jobFindings.mockResolvedValue({ findings: [finding], decided: new Map() })
+    })
+
+    it('each place comes with its website’s pages, what they found, and its hours and phone as listed, only what Google doesn’t keep', async () => {
+      const [cv, jd] = (await (await GET(req('GET'))).json()).places
+      expect(m.jobFindings).toHaveBeenCalledWith('philly', 'dishes', [withHours])
+      expect(cv).toMatchObject({ id: CV, pages: [home], findings: [finding], hours, contact: { name: 'Phone', fields: [{ key: 'phone', label: 'Phone', kind: 'phone', value: '(215) 555-0100' }] } })
+      expect(jd).toMatchObject({ id: ID, pages: [], findings: [], contact: null })
+      expect(jd).not.toHaveProperty('hours')
+    })
+
+    it('Read them now reads its website’s pages too, as a check', async () => {
+      m.getResourceById.mockResolvedValue(chalavita)
+      m.findMenu.mockResolvedValue(null)
+      const body = await (await POST(req('POST', { action: 'read', resourceId: CV }))).json()
+      expect(m.runAndRecord).toHaveBeenCalledTimes(1)
+      expect(m.runAndRecord).toHaveBeenCalledWith(home, undefined, undefined, { full: true })
+      expect(body.pages).toEqual([{ ...home, lastRunAt: 'now' }])
+    })
+
+    it('stop: one of its website’s pages, kept and never read; not its menu’s, nor another place’s', async () => {
+      m.getResourceById.mockResolvedValue(chalavita)
+      expect((await POST(req('POST', { action: 'stop', resourceId: CV, id: 'home' }))).status).toBe(200)
+      expect(m.updateWatch).toHaveBeenCalledWith('philly', 'home', { createdBy: 'listing pages (stopped)', active: false })
+      expect((await POST(req('POST', { action: 'stop', resourceId: CV, id: 'menu' }))).status).toBe(400)
+      expect(m.updateWatch).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('reads a place’s own website, and keeps the proposal for an admin', async () => {

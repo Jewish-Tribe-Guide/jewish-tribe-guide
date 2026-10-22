@@ -11,6 +11,7 @@ import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageR
 import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, isHoursOff, isStoppedPage, jobWords, samePage, sourceLine, type PageJob } from '@/lib/hoursJob'
 import { SEARCH_DEADLINE_MS, hoursJobPlaces, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
 import { listingSlug } from '@/lib/listingSlug'
+import { listedContact } from '@/lib/contactRead'
 import { routes } from '@/lib/routes'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
@@ -170,6 +171,8 @@ export async function GET(request: Request) {
           decided: decided.get(p.id) ?? null,
           fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
           ...(job === 'times' ? { times: listedTimes(p, category) } : { sections: listedSections(p, category) }),
+          // Its phone and email as listed, for the Phone or Contact box.
+          contact: listedContact(category, p as unknown as Record<string, unknown>),
         }
       }),
     )

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ResourceRow, SubmissionRow } from '@/types'
 import type { CategoryField } from './categories'
-import { findingFrom, findingPage, keepOnly, onAJobPage, pageOf } from './watchFindings'
+import { findingFrom, findingPage, jobCategories, jobPageFor, keepOnly, onAJobPage, pageOf } from './watchFindings'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
@@ -144,6 +144,17 @@ describe('findingFrom: a mikvah’s section', () => {
   })
 })
 
+describe('findingFrom: a page’s phone and email', () => {
+  it('its values are the box’s fields, the listing’s own phone among them', () => {
+    const f = findingFrom(
+      sub({ payload: { category: 'mikvah', name: current.name, address: current.address, phone: '(610) 555-0123', details: { ...current.details, e: 'new@lmc.org' }, source: { readBy: 'ai', from: 'x', section: { section: 'contact', keys: ['phone', 'e'] } } } } as Partial<SubmissionRow>),
+      current,
+      [...FIELDS, { key: 'e', label: 'Email', type: 'text' }],
+    )
+    expect(f).toMatchObject({ section: 'contact', values: { phone: '(610) 555-0123', e: 'new@lmc.org' } })
+  })
+})
+
 describe('keepOnly', () => {
   it('an unticked line goes back to what the listing says; a ticked one is as its source says', () => {
     const edited = keepOnly(sub().payload as never, current, ['women_s_hours'], FIELDS) as { details: Record<string, unknown>; name: string }
@@ -173,6 +184,18 @@ describe('onAJobPage', () => {
     expect(onAJobPage(sub({ submitted_by: { email: 'someone@example.com' } }), 'mikvah', jobs)).toBe(false)
     expect(onAJobPage(sub({ target_type: 'eruv' }), 'mikvah', jobs)).toBe(false)
   })
+})
+
+// Oct 22: a food place's website gives its hours and phone (Main dishes
+// board 3), so its findings wait on Main dishes, not in the queue.
+it('a food place’s website findings are Main dishes’, and its email says so', () => {
+  const restaurant = { id: 'restaurant', label: 'Food', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] as CategoryField[] }
+  const grocery = { id: 'grocery', label: 'Grocery', detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags', showCountInHeader: true }] as CategoryField[] }
+  const jobs = jobCategories([restaurant, grocery])
+  expect(onAJobPage(sub(), 'restaurant', jobs)).toBe(true)
+  expect(onAJobPage(sub(), 'grocery', jobs)).toBe(false)
+  expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin/watches/dishes', name: 'Main dishes' })
+  expect(jobPageFor('philly', grocery)).toBeUndefined()
 })
 
 it('findingPage: the job’s admin page and its name', () => {

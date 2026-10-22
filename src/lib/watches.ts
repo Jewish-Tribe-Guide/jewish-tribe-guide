@@ -80,6 +80,10 @@ export type WatchCheck = {
   /** A Refuah watch's: the guide's entries it knows came from Refuah, by
    *  field and name (refuahWatch.ts), so only those are ever taken off. */
   refuahHad?: string[]
+  /** A listing's page: its phone and email as the page gives them
+   *  (contactRead.ts), by field key: the ones that match the listing, and
+   *  the ones it would change. For the job page's Phone or Contact box. */
+  contact?: { same: string[]; changes: string[] }
 }
 
 /** A check whose differences were filed, now or before, so they're a

@@ -256,6 +256,42 @@ describe('submissionStore (integration)', () => {
     expect(after!.details).toMatchObject({ women_s_hours: 'late evenings', women_s_notes: 'By appointment.', men_s_hours: 'dawn', kept: 'yes' })
   })
 
+  // Oct 22: a page's phone and email are a section too (contactRead.ts),
+  // the phone the listing's own column: approving it sets the phone and
+  // undoes nothing approved since; an admin's Edit of it sets theirs.
+  it('approving a page’s phone sets the phone and keeps everything approved since it was read', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Food ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', { ...listingPayload(category.id, name), phone: '(215) 555-0100' })
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const listed = { kept: 'yes' }
+    await getAdminClient().from('resource').update({ details: listed }).eq('id', created!.id)
+
+    const contact = async (phone: string) => {
+      const sub = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), phone, details: listed, source: { readBy: 'ai', from: 'its website', section: { section: 'contact', keys: ['phone'] } } } as ResourceSubmission, null, null)
+      pendingSubmissionIds.push(sub.id)
+      return sub
+    }
+    const read = await contact('(215) 555-0123')
+    // Approved meanwhile: a detail, from someone else.
+    const other = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), phone: '(215) 555-0100', details: { kept: 'changed since' } }, null, null)
+    pendingSubmissionIds.push(other.id)
+    await approveSubmission(other.id)
+    await approveSubmission(read.id)
+    const { data: after } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
+    expect(after!.phone).toBe('(215) 555-0123')
+    expect(after!.details).toMatchObject({ kept: 'changed since' })
+
+    // Edit: the admin's number, not the page's.
+    const edited = await contact('(215) 555-0199')
+    await approveSubmission(edited.id, undefined, 'admin@example.org', { phone: '(215) 555-0177', details: {} })
+    const { data: last } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
+    expect(last!.phone).toBe('(215) 555-0177')
+    expect(last!.details).toMatchObject({ kept: 'changed since' })
+  })
+
   it('a pending suggestion is said again better in place; one decided meanwhile is left as decided', async () => {
     const category = await makeTestCategory()
     const name = `Integration Shul ${randomUUID()}`

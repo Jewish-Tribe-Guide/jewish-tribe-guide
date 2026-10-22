@@ -24,6 +24,9 @@ export type DishPlace = ListedDishes & {
   menuUrl: string | null
   menuAt?: string | null
   reading: { status: DishReadingStatus; readAt: string; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
+  /** What its website's pages found, waiting: its hours or phone, for a
+   *  place Google doesn't keep (Main dishes board 3, Oct 22). */
+  findings?: readonly unknown[]
 }
 
 /** Its dishes came from a menu someone sent through the site ("+ Add"),
@@ -45,6 +48,10 @@ export type DishPlaceStatus = 'differs' | 'not_read' | 'cant_read' | 'same' | 'o
 
 export function dishStatus(p: DishPlace): DishPlaceStatus {
   const r = p.reading
+  // Its website's hours or phone, waiting: an update whatever its menu
+  // says, "No menu" too (its website is still read, and what it finds is
+  // shown nowhere else).
+  if (p.findings?.length) return 'differs'
   if (sentThroughSite(p)) return 'same'
   if (!r) return p.website || p.menuUrl ? 'not_read' : 'cant_read'
   if (r.status === 'no_menu') return 'off'

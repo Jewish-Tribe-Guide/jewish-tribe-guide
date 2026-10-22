@@ -24,6 +24,13 @@ import { dishProposal } from '@/lib/dishProposal'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { pageRenderer } from '@/lib/renderPage'
+import { listWatches, updateWatch } from '@/lib/watchStore'
+import { jobFindings } from '@/lib/watchFindingStore'
+import { runAndRecord } from '@/lib/watchRunner'
+import { isListingPageWatch } from '@/lib/listingPageWatch'
+import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
+import { listedContact } from '@/lib/contactRead'
+import type { Watch } from '@/lib/watches'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -64,6 +71,9 @@ import type { DirectoryResource } from '@/types'
 //      "Add photos of the menu": read as the "+ Add" box reads photos (or a
 //      PDF), kept as a reading to check like any other. The photos aren't
 //      kept, and don't become its menu link.
+// POST body: { action: 'stop', resourceId, id }
+//      Stop reading one of its website's pages (a hours/phone page, Oct 22):
+//      kept, never read, so the morning's run never adds it again.
 // POST body: { action: 'no_menu' | 'undo_no_menu', resourceId }
 //      "No menu": the place has none to read (menuReadingStore's isNoMenu).
 //
@@ -71,6 +81,15 @@ import type { DirectoryResource } from '@/types'
 // has `menuAt`, the newest "on its menu" date among the dishes it lists:
 // dishes approved from a menu someone sent through the site, which the tab
 // says, rather than a stale "couldn't read".
+//
+// A food place Google doesn't keep is read from its website for its hours
+// and phone too (Main dishes board 3, Oct 22: hoursJob.ts's
+// homePageReads). Each place then has `pages` (its website's pages the
+// daily run reads, each with what its last read found), `findings` (what
+// they found waiting to decide, watchFindings.ts), `hours` (its listed
+// hours, when its website is read for them) and `contact` (its phone as
+// listed, when its website is read for it: contactRead.ts). "Read them
+// now" (action 'read') reads those pages too.
 
 export const maxDuration = 60
 
@@ -78,8 +97,11 @@ const MAX_PHOTOS = 3
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
 const PHOTO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf'])
 
-type Action = 'read' | 'use' | 'save' | 'skip' | 'link' | 'unlink' | 'photos' | 'no_menu' | 'undo_no_menu'
-const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unlink', 'photos', 'no_menu', 'undo_no_menu']
+type Action = 'read' | 'use' | 'save' | 'skip' | 'link' | 'unlink' | 'photos' | 'no_menu' | 'undo_no_menu' | 'stop'
+const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unlink', 'photos', 'no_menu', 'undo_no_menu', 'stop']
+
+/** A place's website pages the daily run reads for its hours and phone. */
+const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) => w.resourceId === id && isListingPageWatch(w))
 
 /** A reading as the tab gets it: "no menu" said as its own status. */
 function forTab(r: StoredMenuReading) {
@@ -144,12 +166,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [categories, listings, { readings, available }] = await Promise.all([
+    const [categories, listings, { readings, available }, { watches }] = await Promise.all([
       listCategories(community.slug),
       listApprovedResources(community.slug),
       listMenuReadings(community.slug),
+      listWatches(community.slug),
     ])
     const kinds = dishKinds(categories)
+    const { findings } = await jobFindings(
+      community.slug,
+      'dishes',
+      kinds.map((k) => k.category),
+    )
     const byId = new Map(readings.map((r) => [r.resourceId, r]))
     const places = kinds.flatMap(({ category, field }) =>
       listings
@@ -165,6 +193,10 @@ export async function GET(request: Request) {
           ...listedDishes(l, field),
           menuAt: newestMenuDate(l, field),
           reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
+          pages: pagesOf(watches, l.id),
+          findings: findings.filter((f) => f.targetId === l.id),
+          hours: homePageReads(category, l as unknown as Record<string, unknown>).includes('hours') ? (l.hours ?? null) : undefined,
+          contact: listedContact(category, l as unknown as Record<string, unknown>),
         })),
     )
     places.sort((a, b) => a.name.localeCompare(b.name))
@@ -196,9 +228,21 @@ export async function POST(request: Request) {
     const kind = listing ? dishKinds(await listCategories(community.slug)).find((k) => k.category.id === listing.category) : undefined
     if (!listing || !kind) return Response.json({ ok: false, errors: ['Not a food place with a list of dishes.'] }, { status: 404 })
 
+    if (action === 'stop') {
+      const id = typeof body?.id === 'string' ? body.id : ''
+      const page = pagesOf((await listWatches(community.slug)).watches, resourceId).find((w) => w.id === id)
+      if (!page) return Response.json({ ok: false, errors: ['That page isn’t read for it.'] }, { status: 400 })
+      await updateWatch(community.slug, page.id, { createdBy: PAGE_STOPPED_CREATOR, active: false })
+      return Response.json({ ok: true })
+    }
+
     if (action === 'read') {
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
+      // Its website's pages for its hours and phone, read first, one after
+      // another, as the hours job's Check now reads them.
+      const pages: Watch[] = []
+      for (const w of pagesOf((await listWatches(community.slug)).watches, resourceId).filter((x) => x.active)) pages.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
       const website = menuWebsite(listing, kind.category)
       const menuUrl = menuLinkOf(listing)
       // Its menu link when that can be read, else the pages its website
@@ -222,7 +266,7 @@ export async function POST(request: Request) {
           note: unreadMenuNote(menuUrl, website, trouble),
           model: null,
         })
-        return Response.json({ ok: true, reading })
+        return Response.json({ ok: true, reading, pages })
       }
       const read = (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))!
       const reading = await saveMenuReading(community.slug, resourceId, {
@@ -233,7 +277,7 @@ export async function POST(request: Request) {
         note: read.note,
         model: read.model,
       })
-      return Response.json({ ok: true, reading })
+      return Response.json({ ok: true, reading, pages })
     }
 
     if (action === 'link') {

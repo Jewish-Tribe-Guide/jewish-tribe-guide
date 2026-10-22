@@ -6,7 +6,8 @@ import { fetchPublic, troubleClause, type Trouble } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readListingPage, type PageSource } from '@/lib/listingPageRun'
 import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
-import { HOURS_FOUND_CREATOR, PAGE_JOBS, hoursJobCategories, hoursWatchChanges, looksLikeHours, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
+import { HOURS_FOUND_CREATOR, PAGE_JOBS, homePageWatchChanges, hoursJobCategories, hoursWatchChanges, looksLikeHours, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
+import { dishCategories } from '@/lib/watchFindings'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
 
@@ -73,6 +74,24 @@ export async function hoursJobPlaces(community: string, job: PageJob = 'hours'):
   return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow).sort((a, b) => a.name.localeCompare(b.name)) }
 }
 
+/** A community's food places with main dishes, and their categories
+ *  (Main dishes' places). */
+async function dishPlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const categories = dishCategories(await listCategoriesUncached(community))
+  if (!categories.length) return { categories, places: [] }
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('community_id', community)
+    .eq('status', 'approved')
+    .in(
+      'category',
+      categories.map((c) => c.id),
+    )
+  if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
+  return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow) }
+}
+
 export const websiteOf = (p: DirectoryResource): string | null => (typeof p.website === 'string' && p.website.trim() ? p.website.trim() : null)
 
 /** Watches every place's hours pages, and every shul's pages with its
@@ -88,7 +107,8 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
   for (const { slug } of (data ?? []) as { slug: string }[]) {
     const jobs = await Promise.all(PAGE_JOBS.map(async (job) => (await hoursJobPlaces(slug, job)).places.map((place) => ({ place, job }))))
     const places = jobs.flat()
-    if (!places.length) continue
+    const food = await dishPlaces(slug)
+    if (!places.length && !food.places.length) continue
     const { watches, available } = await listWatches(slug)
     if (!available) continue
     const searches = await Promise.all(
@@ -103,6 +123,20 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     let removed = 0
     for (const [i, { place }] of places.entries()) {
       const { add, remove } = hoursWatchChanges(place, searches[i], watches)
+      for (const w of add) {
+        if (await addWatch(slug, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })) added++
+      }
+      for (const id of remove) {
+        await removeWatch(slug, id)
+        removed++
+      }
+    }
+    // A food place's website, for its hours and phone when Google doesn't
+    // keep them (homePageWatchChanges). No search: its home page is it.
+    for (const place of food.places) {
+      const category = food.categories.find((c) => c.id === place.category)
+      if (!category) continue
+      const { add, remove } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
       for (const w of add) {
         if (await addWatch(slug, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })) added++
       }
