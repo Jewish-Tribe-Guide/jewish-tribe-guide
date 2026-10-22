@@ -585,6 +585,15 @@ agreed:
      follow. On Kosher, a new place added or left out, and a finding that
      matches no place, leave the page once decided. Off stays open while
      it's the tab showing, even after its last row leaves.
+   - Eruv status (the user, Oct 22). Center City's map said "timeout",
+     but that was a dev row left from Oct 15: a good read of an unchanged
+     map saved nothing, so it never cleared an old error. Production
+     reads it fine. Now a good read clears it, and Read them now dates the
+     map's read even when the map is the same. Details named no source
+     until the daily run had given the eruv's website its watch, and dev
+     never runs that. Now the box says "Read from its website · not read
+     yet", and Read them now gives the website its watch and reads it
+     (`POST /api/admin/watches/eruv { action: 'read' }`).
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

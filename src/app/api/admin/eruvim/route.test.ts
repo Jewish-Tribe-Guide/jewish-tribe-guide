@@ -6,11 +6,14 @@ const m = vi.hoisted(() => ({
   findEruvStatusPages: vi.fn(),
   updateEruv: vi.fn(),
   saveStatusRead: vi.fn(),
+  saveLineRead: vi.fn(),
+  readEruvMap: vi.fn(),
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', timezone: 'America/New_York' }) }))
 vi.mock('@/lib/eruvFind', () => ({ findEruvStatusPages: m.findEruvStatusPages }))
+vi.mock('@/lib/eruvLines', () => ({ readEruvMap: m.readEruvMap }))
 vi.mock('@/lib/eruvStore', () => ({
   listEruvimForAdmin: m.listEruvimForAdmin,
   updateEruv: m.updateEruv,
@@ -18,7 +21,7 @@ vi.mock('@/lib/eruvStore', () => ({
   addEruv: vi.fn(),
   removeEruv: vi.fn(),
   saveLineMissing: vi.fn(),
-  saveLineRead: vi.fn(),
+  saveLineRead: m.saveLineRead,
   saveEmailRead: vi.fn(),
 }))
 
@@ -60,5 +63,22 @@ describe("POST /api/admin/eruvim { action: 'find' }", () => {
     const res = await POST(req({ action: 'find', id: 'center-city' }))
     expect(res.status).toBe(400)
     expect((await res.json()).errors).toEqual(['It has no website in the guide. Give its status page instead.'])
+  })
+})
+
+describe("POST /api/admin/eruvim { action: 'check' }", () => {
+  it('Read them now dates its map’s read even when the map is the same', async () => {
+    m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ lineUrl: 'https://centercityeruv.com/map-data.geojson' })], available: true })
+    m.readEruvMap.mockResolvedValue({ map: null, save: undefined, missing: [] })
+    expect((await POST(req({ action: 'check', id: 'center-city' }))).status).toBe(200)
+    expect(m.saveLineRead).toHaveBeenCalledWith('philly', 'center-city', { ok: true, file: null, at: expect.any(String) })
+  })
+
+  it('saves a failed read as it is', async () => {
+    m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ lineUrl: 'https://centercityeruv.com/map-data.geojson' })], available: true })
+    const save = { ok: false, error: 'The map answered 404', at: '2026-10-22T12:00:00Z' }
+    m.readEruvMap.mockResolvedValue({ map: null, save, missing: null })
+    await POST(req({ action: 'check', id: 'center-city' }))
+    expect(m.saveLineRead).toHaveBeenCalledWith('philly', 'center-city', save)
   })
 })

@@ -17,7 +17,7 @@ import type { KeptEmail } from './eruvEmail'
 const PUBLIC_COLUMNS =
   'id, name, covers, website, hotline, alerts_url, status_url, status_dated, status, status_words, status_posted_on, status_checked_at, status_error_at, status_error'
 const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, line_url, sort_order, active, line, line_read_at, line_error, line_leave_out`
-const SOURCE_COLUMNS = 'community_id, id, name, line_url, line, line_leave_out'
+const SOURCE_COLUMNS = 'community_id, id, name, line_url, line, line_leave_out, line_error'
 // Columns later migrations add (076, 081, 084). Until one is run, what it
 // adds isn't there (no markers hidden, nothing remembered as missing, the
 // eruv's own colours, no status by email) and everything else works.
@@ -106,6 +106,8 @@ export type EruvMapSource = {
   lineHidePoints: boolean
   lineMissing: string[]
   lineColor: string | null
+  /** Why its last read failed, if it did. */
+  lineError: string | null
 }
 type SourceRow = {
   community_id: string
@@ -117,6 +119,7 @@ type SourceRow = {
   line_hide_points?: boolean | null
   line_missing?: string[] | null
   line_color?: string | null
+  line_error?: string | null
 }
 const fromSourceRow = (r: SourceRow): EruvMapSource => ({
   communityId: r.community_id,
@@ -128,6 +131,7 @@ const fromSourceRow = (r: SourceRow): EruvMapSource => ({
   lineHidePoints: !!r.line_hide_points,
   lineMissing: r.line_missing ?? [],
   lineColor: r.line_color ?? null,
+  lineError: r.line_error ?? null,
 })
 
 function fromRow(r: Row): Eruv {

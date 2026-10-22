@@ -97,7 +97,9 @@ export async function POST(request: Request) {
       if (eruv.statusUrl) await saveStatusRead(community.slug, id, await readEruvPage(eruv.statusUrl, now))
       if (eruv.lineUrl) {
         const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
-        if (read.save) await saveLineRead(community.slug, id, read.save)
+        // Read now: dated even when the map is the same, so its "read" is today.
+        const save = read.save ?? (read.missing ? { ok: true as const, file: null, at: now.toISOString() } : undefined)
+        if (save) await saveLineRead(community.slug, id, save)
         // Seen here, so no email about it later.
         if (read.missing) await saveLineMissing(community.slug, id, read.missing)
       }

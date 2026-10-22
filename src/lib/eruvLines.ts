@@ -38,14 +38,21 @@ export type MapRead = {
 
 /** One eruv's map, read now: shown from the read, or from the last good
  *  one when the read fails. */
-export async function readEruvMap(source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>, now: Date, fetchImpl: typeof fetch = fetch): Promise<MapRead> {
+export async function readEruvMap(
+  source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'> & { lineError?: string | null },
+  now: Date,
+  fetchImpl: typeof fetch = fetch,
+): Promise<MapRead> {
   const at = now.toISOString()
   const read = await readLineFile(source.lineUrl, fetchImpl)
   // The colour an admin chose is only shown: what's kept is their file.
   const show = (file: EruvLineFile | null) => (file ? shownMap(withLineColor(file, source.lineColor), source.lineLeaveOut, source.lineHidePoints) : null)
   if (!read.ok) return { map: show(source.rawLine), save: { ok: false, error: read.error, at }, missing: null }
   const changed = !sameLine(read.file, source.rawLine)
-  return { map: show(read.file), save: changed ? { ok: true, file: read.file, at } : undefined, missing: missingNames(read.file, source.lineLeaveOut) }
+  // Unchanged, it's saved only to clear why the last read failed (Oct 22:
+  // a timeout from a week before was still said after every good read).
+  const save = changed ? { ok: true as const, file: read.file, at } : source.lineError ? { ok: true as const, file: null, at } : undefined
+  return { map: show(read.file), save, missing: missingNames(read.file, source.lineLeaveOut) }
 }
 
 /** Whether the admins should hear of these missing names: some they

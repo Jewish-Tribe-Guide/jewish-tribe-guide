@@ -22,7 +22,7 @@ const KML = `<kml><Document>
 </Document></kml>`
 const LAST: EruvLineFile = { lines: [{ name: 'Boundary', points: [[39.9, -75.2], [39.9, -75.1]] }] }
 const source = (over: Partial<EruvMapSource> = {}): EruvMapSource => ({
-  communityId: 'philly', id: 'northeast', name: 'Northeast Eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc', rawLine: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, ...over,
+  communityId: 'philly', id: 'northeast', name: 'Northeast Eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc', rawLine: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, lineError: null, ...over,
 })
 const call = async () => {
   const res = await GET(new Request('http://localhost/api/eruv/maps?community=philly'))

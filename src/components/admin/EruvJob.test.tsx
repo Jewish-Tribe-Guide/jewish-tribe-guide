@@ -236,8 +236,19 @@ describe('Eruv status', () => {
     await user().click(within(box('Lower Merion Eruv', 'Reads')).getByRole('button', { name: 'Read them now' }))
     expect(posts.map((p) => [p.url, p.body])).toEqual([
       ['/api/admin/eruvim?community=philly', { id: 'lower-merion', action: 'check' }],
-      ['/api/admin/watches?community=philly', { action: 'check', id: 'w-lm' }],
+      ['/api/admin/watches/eruv?community=philly', { action: 'read', id: 'lower-merion' }],
     ])
+  })
+
+  // Oct 22: Details said nowhere where they're read from until the morning
+  // run had read its website.
+  it('Details name its website before it’s read; Read them now reads it', async () => {
+    await renderPage({ findings: [], watches: [] })
+    await open('Northeast Eruv')
+    await user().click(within(box('Northeast Eruv', 'Details')).getAllByRole('button')[0])
+    expect(within(box('Northeast Eruv', 'Details')).getByTestId('box-source').textContent).toBe('Read from its website · not read yet')
+    await user().click(within(box('Northeast Eruv', 'Reads')).getByRole('button', { name: 'Read them now' }))
+    expect(posts.map((p) => [p.url, p.body])).toEqual([['/api/admin/watches/eruv?community=philly', { action: 'read', id: 'northeast' }]])
   })
 
   it('an eruv with no website still stops reading its status', async () => {
