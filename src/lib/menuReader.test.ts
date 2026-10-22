@@ -404,6 +404,30 @@ describe('a menu posted as pictures', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
+  // LUHV's menu page, Oct 22: four products in its words, and its
+  // locations' menus as pictures named "Hatboro Menu" beside them.
+  it('pictures that say they’re the menu are read beside words that name dishes; only what they add is added', async () => {
+    const html = `${words}<p>Energy Soup</p><img src="/s/Hatboro+Menu.png" alt=""><img src="/s/soup-photo.jpg">`
+    const source = await readMenuPage('https://luhv.example/our-food', { fetchImpl: vi.fn().mockResolvedValue(page(html)), resolve: publicDns })
+    expect(source).toMatchObject({ pictures: ['https://luhv.example/s/Hatboro+Menu.png', 'https://luhv.example/s/soup-photo.jpg'], picturesSayMenu: true })
+    const photosOnly = await readMenuPage('https://luhv.example/our-food', { fetchImpl: vi.fn().mockResolvedValue(page(`${words}<img src="/s/soup-photo.jpg">`)), resolve: publicDns })
+    expect(photosOnly?.picturesSayMenu).toBeUndefined()
+
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(answer([{ name: 'Soups', quote: 'Energy Soup' }]))
+      .mockResolvedValueOnce(jpeg('ONE'))
+      .mockResolvedValueOnce(jpeg('TWO'))
+      .mockResolvedValueOnce(answer([{ name: 'Burgers', quote: 'Beyond Burger' }, { name: 'Soups', quote: 'Soup of the day' }]))
+    const r = await readMenu(source!, 'LUHV', { apiKey: 'k', fetchImpl, resolve: publicDns, listed: ['Burgers', 'Wraps'] })
+    expect(r.dishes.map((d) => [d.name, !!d.picture])).toEqual([
+      ['Soups', false],
+      ['Burgers', true],
+    ])
+    expect(r.missing).toEqual(['Wraps'])
+    expect(r.fromPictures).toBeUndefined()
+  })
+
   it('a page with no words to speak of goes straight to its pictures; pictures that won’t open, or name nothing, leave the words’ reason', async () => {
     const onlyPictures: MenuSource = { url: 'http://star.example/menu.html', text: null, pdf: null, pictures: ['http://star.example/m1.jpg'] }
     const straight = vi.fn().mockResolvedValueOnce(jpeg()).mockResolvedValueOnce(answer([{ name: 'Shawarma', quote: 'Shawarma Plate' }]))
@@ -459,6 +483,15 @@ describe('a menu on another page, or by another name', () => {
       'https://www.bakery.example/sweet-shop',
       'https://store.bakery.example/',
     ])
+  })
+
+  // House of Kosher's home page, Oct 22: its Thanksgiving menu came first.
+  it('a holiday’s menu comes after the everyday one', () => {
+    const html = `
+      <a href="https://shop.hok.example/files/5497.pdf">VIEW OUR THANKSGIVING MENU</a>
+      <a href="https://shop.hok.example/catering/pesach-menu">Pesach</a>
+      <a href="https://shop.hok.example/files/BF40.pdf">VIEW CATERING MENU</a>`
+    expect(menuLinks(html, 'https://hok.example/')).toEqual(['https://shop.hok.example/files/BF40.pdf', 'https://shop.hok.example/files/5497.pdf', 'https://shop.hok.example/catering/pesach-menu'])
   })
 
   it(`up to ${MAX_MENU_PAGES} pages, best first, the website itself last`, async () => {

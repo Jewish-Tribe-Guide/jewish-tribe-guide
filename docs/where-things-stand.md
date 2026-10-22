@@ -613,6 +613,16 @@ agreed:
      merge of #340) is read once more. A note that differs from the
      listing's only in its spacing (Lower Merion's blank lines) is the same
      note. On dev, Read them now reads them.
+   - Main dishes: menus read better (the user, Oct 22). A menu page's
+     pictures that say they're the menu are read beside words that name
+     dishes, and add what only they name (LUHV: four products in words, its
+     menus as pictures). A holiday's menu link comes after the everyday
+     one (House of Kosher's Thanksgiving PDF came first). House of Kosher's
+     menu link is still the Thanksgiving PDF: set it to the catering menu.
+     Open: Rita's and Nothing Bundt Cakes' location pages have no menu
+     (the chain's Treats and Flavors pages do); Playa Bowls reads only its
+     Bowls page; Magical Sweet Shop only its Catering page. All want more
+     than one page read per place.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

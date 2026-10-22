@@ -293,6 +293,9 @@ export function htmlToText(html: string): string {
  *  Gelbstein's "Online Ordering" on its own store. */
 const MENU_BY_ANOTHER_NAME = /\b(our food|food|products?|catering|meals|shop|store|bakery|baked goods|sweets|treats|order online|online ordering)\b/
 
+/** A menu for one holiday or season, not the everyday one. */
+const SEASONAL_MENU = /\b(thanksgiving|christmas|easter|holiday|seasonal|pesach|passover|rosh hashan[ao]h?|yom tov|sukkos|sukkot|shavuos|shavuot|purim|chanukah|hanukkah)\b/
+
 /** The registrable part of a host, near enough: its last two labels
  *  ("store.gelbsteinsbakery.com" → "gelbsteinsbakery.com"). */
 export const siteOf = (hostname: string) => hostname.toLowerCase().split('.').slice(-2).join('.')
@@ -322,7 +325,7 @@ export function menuLinks(html: string, base: string): string[] {
     const pdf = path.endsWith('.pdf')
     const ownSite = siteOf(url.hostname) === own && !isOrderingApp(url.toString())
     if (!ownSite && !pdf) continue
-    const score = /\bmenus?\b/.test(text)
+    let score = /\bmenus?\b/.test(text)
       ? 4
       : /menu/.test(path)
         ? 3
@@ -333,6 +336,9 @@ export function menuLinks(html: string, base: string): string[] {
             : 0
     if (score === 0 || /order|cart|checkout|login|account/.test(path)) continue
     const key = url.toString()
+    // A holiday's menu after the everyday one: House of Kosher's
+    // Thanksgiving menu came before its catering menu (Oct 22).
+    if (SEASONAL_MENU.test(`${text} ${path.replace(/[-_/+]+/g, ' ')}`)) score /= 10
     if (key === site.toString()) continue
     found.set(key, Math.max(found.get(key) ?? 0, score))
   }
@@ -411,13 +417,18 @@ export function pagePictures(html: string, base: string): PagePicture[] {
  *  other page (a home page), only those that say so: its food photos aren't
  *  its menu. Never a logo, an icon, an SVG or a GIF. */
 export function menuPictures(html: string, base: string, { menuPage }: { menuPage: boolean }): string[] {
+  return rankedMenuPictures(html, base, { menuPage }).map((f) => f.url)
+}
+
+/** menuPictures, each saying whether it says it's the menu. */
+function rankedMenuPictures(html: string, base: string, { menuPage }: { menuPage: boolean }): { url: string; says: boolean }[] {
   const says = (p: PagePicture) => {
     const url = new URL(p.url)
     return /menu|brochure|flyer/i.test(`${decodeURIComponent(url.pathname + url.search)} ${p.words}`)
   }
   const found = pagePictures(html, base).map((p) => ({ url: p.url, says: says(p) }))
   const ordered = [...found.filter((f) => f.says), ...(menuPage ? found.filter((f) => !f.says) : [])]
-  return ordered.slice(0, MAX_MENU_PICTURES).map((f) => f.url)
+  return ordered.slice(0, MAX_MENU_PICTURES)
 }
 
 /** A menu as read: a page's text, a PDF, or photos of it (a paper menu or
@@ -425,7 +436,17 @@ export function menuPictures(html: string, base: string, { menuPage }: { menuPag
  *  `url` is null: there's no page to link to. `pictures`: the addresses of
  *  the page's pictures that may be its menu (menuPictures), read when its
  *  words name no dishes (readMenu). */
-export type MenuSource = { url: string | null; text: string | null; pdf: string | null; images?: { mime: string; b64: string }[]; pictures?: string[] }
+export type MenuSource = {
+  url: string | null
+  text: string | null
+  pdf: string | null
+  images?: { mime: string; b64: string }[]
+  pictures?: string[]
+  /** One of `pictures` says it's the menu: read beside words that name
+   *  dishes too (LUHV's menu page, Oct 22: four products in its words, its
+   *  menus in pictures). */
+  picturesSayMenu?: true
+}
 
 /** A page's words count as a menu's from this many characters: fewer is a
  *  page drawn by a script, or a picture with a caption. */
@@ -443,9 +464,11 @@ const isPictureAddress = (url: string) => {
  *  that may be the menu. Null when it has neither. */
 function pageAsMenu(page: { url: string; body: string }, menuPage: boolean): MenuSource | null {
   const text = htmlToText(page.body)
-  const pictures = menuPictures(page.body, page.url, { menuPage })
+  const ranked = rankedMenuPictures(page.body, page.url, { menuPage })
+  const pictures = ranked.map((p) => p.url)
   if (text.length < MIN_TEXT && pictures.length === 0) return null
-  return { url: page.url, text: text.length >= MIN_TEXT ? text : null, pdf: null, ...(pictures.length ? { pictures } : {}) }
+  const hasText = text.length >= MIN_TEXT
+  return { url: page.url, text: hasText ? text : null, pdf: null, ...(pictures.length ? { pictures } : {}), ...(hasText && ranked.some((p) => p.says) ? { picturesSayMenu: true as const } : {}) }
 }
 
 /** Delivery and ordering apps, whose menus the server never fetches: they
@@ -710,13 +733,24 @@ export async function readMenu(
 ): Promise<MenuReading & { model: string; fromPictures?: boolean }> {
   const hasWords = !!(source.text || source.pdf || source.images?.length)
   const first = hasWords ? await askModel(source, placeName, apiKey, model, fetchImpl, listed) : null
-  if (first?.dishes.length || !source.pictures?.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'No menu found on that page.' }), model }
+  const beside = !!first?.dishes.length && !!source.picturesSayMenu
+  if ((first?.dishes.length && !beside) || !source.pictures?.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'No menu found on that page.' }), model }
   const images = await fetchPictures(source.pictures, { fetchImpl, resolve })
   if (!images.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'Its menu’s pictures couldn’t be opened.' }), model }
   const read = await askModel({ url: source.url, text: null, pdf: null, images }, placeName, apiKey, model, fetchImpl, listed)
   // Nothing there either: what the words said is the better reason.
   if (!read.dishes.length && first) return { ...first, model }
-  return { ...read, dishes: read.dishes.map((d) => ({ ...d, picture: true as const })), model, fromPictures: true }
+  const fromPicture = read.dishes.map((d) => ({ ...d, picture: true as const }))
+  if (!beside || !first) return { ...read, dishes: fromPicture, model, fromPictures: true }
+  // Beside the words: theirs first, then what only the pictures name.
+  const seen = new Set(first.dishes.map((d) => d.name.toLowerCase()))
+  const found = new Set([...seen, ...read.dishes.map((d) => d.name.toLowerCase())])
+  return {
+    ...first,
+    dishes: [...first.dishes, ...fromPicture.filter((d) => !seen.has(d.name.toLowerCase()))],
+    ...(first.missing ? { missing: first.missing.filter((n) => !found.has(n.toLowerCase())) } : {}),
+    model,
+  }
 }
 
 /** Reads the pages a menu may be on (findMenus), best first, until one
