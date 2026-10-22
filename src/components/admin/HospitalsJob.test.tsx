@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -96,6 +96,8 @@ async function renderPage(hospitals: Hospital[], post: (body: Record<string, unk
 const rows = () => screen.getAllByTestId('job-row')
 const rowOf = (name: string) => rows().find((r) => within(r).queryAllByText(name).length) as HTMLElement
 const pill = (name: string) => within(rowOf(name)).getByTestId('job-status').textContent
+/** On the tab showing. */
+const shown = (name: string) => screen.queryAllByTestId('job-row').some((r) => within(r).queryAllByText(name).length > 0)
 const open = (name: string) => userEvent.setup().click(within(rowOf(name)).getAllByRole('button')[0])
 const tab = (name: string) => userEvent.setup().click(screen.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) }))
 const place = (name: string) => screen.getByRole('region', { name })
@@ -157,12 +159,17 @@ describe('Hospitals', () => {
     await open(HUP.name)
     await user.click(within(box(HUP.name, 'Rides')).getByRole('button', { name: 'Use this' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-rides?community=philly', body: { status: 'approved' } })
-    expect(within(box(HUP.name, 'Rides')).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
-    expect(pill(HUP.name)).toBe(`Used ${today()}`)
+    // Nothing left to decide: straight to Checked (the user, Oct 22).
+    expect(shown(HUP.name)).toBe(false)
     await open('Two')
     await user.click(within(box('Two', 'Rides')).getByRole('button', { name: 'Keep the listing' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-two?community=philly', body: { status: 'rejected' } })
+    expect(shown('Two')).toBe(false)
+    await tab('Checked')
+    expect(pill(HUP.name)).toBe(`Used ${today()}`)
     expect(pill('Two')).toBe(`Kept ${today()}`)
+    await open(HUP.name)
+    expect(within(box(HUP.name, 'Rides')).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
   })
 
   // Board 4: the listing's own Edit for the box, the one visitors use, a
@@ -197,7 +204,9 @@ describe('Hospitals', () => {
     expect(sent.status).toBe('approved')
     expect(Object.keys(sent.payload.details)).toEqual(['transportation'])
     expect(sent.payload.details.transportation.map((e: { name: string }) => e.name)).toEqual(['Gemach Hatzolah – Monroe', 'Darchei Chesed', 'Bikur Cholim of Philadelphia', 'Lakewood rides'])
-    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    await waitFor(() => expect(shown(HUP.name)).toBe(false))
+    await tab('Checked')
+    expect(pill(HUP.name)).toBe(`Used ${today()}`)
   })
 
   it('a Same box shows what the listing has, and that Refuah agrees', async () => {
@@ -231,7 +240,11 @@ describe('Hospitals', () => {
     expect(posts.at(-1)).toEqual({ url: '/api/admin/watches?community=philly', body: { resourceId: 'jeff', action: 'check', id: 'w-jeff' } })
     await user.click(within(reads).getByRole('button', { name: 'Stop reading refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/watches/hospitals?community=philly', body: { resourceId: 'jeff', action: 'stop' } })
-    expect(within(reads).getByRole('button', { name: 'Not on Refuah' })).toBeInTheDocument()
+    // Nothing read now: to Can’t be read.
+    expect(shown(JEFF.name)).toBe(false)
+    await tab('Can’t be read')
+    await open(JEFF.name)
+    expect(within(within(place(JEFF.name)).getByTestId('job-reads')).getByRole('button', { name: 'Not on Refuah' })).toBeInTheDocument()
   })
 
   it('nothing on Refuah: Reads open, saying so, with Add a page · Read them now · Not on Refuah · Open its listing', async () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -67,6 +67,10 @@ const open = async (name: string) => {
   return screen.getByRole('region', { name })
 }
 const today = () => day(new Date().toISOString())
+const tab = (name: string) => userEvent.click(screen.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) }))
+/** On the tab showing. */
+const shown = (name: string) => screen.queryAllByTestId('job-row').some((r) => within(r).queryAllByText(name).length > 0)
+const pill = () => screen.getByTestId('job-status').textContent
 
 afterEach(() => {
   cleanup()
@@ -126,9 +130,13 @@ describe('MainDishes', () => {
     const place = await open('Charlie was a sinner.')
     await userEvent.click(within(place).getByRole('button', { name: 'Use this' }))
     expect(posted()).toEqual([{ action: 'use', resourceId: 'p1' }])
-    expect(within(place).getByRole('region', { name: 'Main dishes' }).querySelector('[data-testid="box-pill"]')!.textContent).toBe(`Used ${today()}`)
-    expect(screen.getByTestId('job-status').textContent).toBe(`Used ${today()}`)
-    expect(within(place).queryByRole('button', { name: 'Use this' })).toBeNull()
+    // Nothing left to decide: straight to Checked (the user, Oct 22).
+    expect(shown('Charlie was a sinner.')).toBe(false)
+    await tab('Checked')
+    expect(pill()).toBe(`Used ${today()}`)
+    const again = await open('Charlie was a sinner.')
+    expect(within(again).getByRole('region', { name: 'Main dishes' }).querySelector('[data-testid="box-pill"]')!.textContent).toBe(`Used ${today()}`)
+    expect(within(again).queryByRole('button', { name: 'Use this' })).toBeNull()
   })
 
   it('Keep the listing: sent as skip, and said where it was', async () => {
@@ -136,7 +144,9 @@ describe('MainDishes', () => {
     const place = await open('Charlie was a sinner.')
     await userEvent.click(within(place).getByRole('button', { name: 'Keep the listing' }))
     expect(posted()).toEqual([{ action: 'skip', resourceId: 'p1' }])
-    expect(screen.getByTestId('job-status').textContent).toBe(`Kept ${today()}`)
+    expect(shown('Charlie was a sinner.')).toBe(false)
+    await tab('Checked')
+    expect(pill()).toBe(`Kept ${today()}`)
   })
 
   it('Edit: the listing’s own dishes editor, started from the menu’s list, saved straight to the listing', async () => {
@@ -158,7 +168,9 @@ describe('MainDishes', () => {
     const [url, init] = fetchMock.mock.calls.find(([u]) => String(u).includes('main-dishes'))!
     expect(String(url)).toContain('/api/admin/main-dishes')
     expect(JSON.parse(String(init!.body))).toEqual({ action: 'save', resourceId: 'p1', always: ['Sliders', 'Tacos', 'Laffa', 'Kofta'], sometimes: [] })
-    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    await waitFor(() => expect(shown('Charlie was a sinner.')).toBe(false))
+    await tab('Checked')
+    expect(pill()).toBe(`Used ${today()}`)
     fetchMock.mockRestore()
   })
 
@@ -207,9 +219,13 @@ describe('MainDishes', () => {
     await userEvent.click(within(reads).getByRole('button', { name: /Reads/ }))
     await userEvent.click(within(reads).getByRole('switch', { name: 'Reading' }))
     expect(posted()).toEqual([{ action: 'no_menu', resourceId: 'p1' }])
-    expect(screen.getByTestId('job-status').textContent).toBe('Reading off')
+    expect(shown('Charlie was a sinner.')).toBe(false)
+    await tab('Off')
+    expect(pill()).toBe('Reading off')
     vi.mocked(fetchJson).mockImplementation(async () => ({ ok: true, reading: null }))
-    const switched = within(screen.getByRole('region', { name: 'Charlie was a sinner.' })).getByRole('switch', { name: 'Reading' })
+    // Off, its Reads is open.
+    const off = await open('Charlie was a sinner.')
+    const switched = within(off).getByRole('switch', { name: 'Reading' })
     expect(switched).toHaveAttribute('aria-checked', 'false')
     await userEvent.click(switched)
     expect(posted().at(-1)).toEqual({ action: 'undo_no_menu', resourceId: 'p1' })
@@ -302,8 +318,11 @@ describe('MainDishes', () => {
       const patch = vi.mocked(fetchJson).mock.calls.find(([, init]) => init?.method === 'PATCH')!
       expect(String(patch[0])).toBe('/api/admin/submissions/s-hours?community=philly')
       expect(JSON.parse(String(patch[1]!.body))).toEqual({ status: 'approved' })
-      expect(within(within(place).getByRole('region', { name: 'Hours' })).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
-      expect(screen.getByTestId('job-status').textContent).toBe(`Used ${today()}`)
+      expect(shown('Chalavita')).toBe(false)
+      await tab('Checked')
+      expect(pill()).toBe(`Used ${today()}`)
+      const again = await open('Chalavita')
+      expect(within(within(again).getByRole('region', { name: 'Hours' })).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
     })
 
     it('the × on its home page stops reading it', async () => {

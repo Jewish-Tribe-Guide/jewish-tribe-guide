@@ -11,7 +11,7 @@ import type { Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
 import type { Decided } from '@/lib/watchFindingStore'
 import type { Decision } from './FindingCompare'
-import { JobPage, jobTabs, needsYou, type JobStatus, type JobTab } from './JobPage'
+import { JobPage, jobTabs, needsYou, tabCounts, tabOf, type JobStatus, type JobTab } from './JobPage'
 import { ShulRow } from './TimesProposal'
 import { MikvahRow } from './MikvahHours'
 import type { ListedContact } from './ContactBoxes'
@@ -101,19 +101,16 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
   const [now] = useState(() => Date.now())
   // Findings updated or skipped this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
-  // Each place's tab, as it was when the page loaded, and the one showing.
-  const [tabOf, setTabOf] = useState<ReadonlyMap<string, JobTab>>(new Map())
+  // The tab showing.
   const [tab, setTab] = useState<JobTab>('to_check')
 
   const load = useCallback(async () => {
     setError(null)
     try {
       const got = await fetchJson<Loaded>(withCommunity(api, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the places.')
-      // In its tab for the whole visit: a row acted on stays where it is.
       const t = Date.now()
-      const { rows, tabs, first } = jobTabs(got.places, (p) => hoursStatus(p, hoursSection(asPlace(p, new Map()), t), t), (p) => p.name)
+      const { rows, first } = jobTabs(got.places, (p) => hoursStatus(p, hoursSection(asPlace(p, new Map()), t), t), (p) => p.name)
       setData({ ...got, places: rows })
-      setTabOf(tabs)
       setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -183,8 +180,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
     setData((x) => x && { ...x, places: x.places.map((y) => (y.id === p.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
   }
   // What's read, said once above when it's the same for every place.
-  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
-  for (const p of data.places) counts[tabOf.get(p.id) ?? 'to_check']++
+  const counts = tabCounts(data.places.map(statusOf))
   const fields = data.places[0]?.fields ?? []
   const sameFields = data.places.every((p) => p.fields.join('|') === fields.join('|'))
   return (
@@ -204,7 +200,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
         </>
       }
     >
-      {data.places.filter((p) => (tabOf.get(p.id) ?? 'to_check') === tab).map((p) => {
+      {data.places.filter((p) => tabOf(statusOf(p)) === tab).map((p) => {
         const status = statusOf(p)
         if (job === 'times') {
           return (

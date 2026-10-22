@@ -15,9 +15,9 @@ import Link from 'next/link'
 // In tabs, so the page isn't one long list (the user, Oct 21: "can the to
 // check, can't be read, not read yet be tabs so the page isn't so messy"):
 // To check, Can't be read, Checked, and Off when there are any, each A–Z.
-// It opens on the first with anything in it. A row stays in the tab it was
-// in for the whole visit, so one acted on doesn't vanish from under the
-// admin's hand; its pill says what it is now.
+// It opens on the first with anything in it. A row moves as soon as what it
+// is changes: one updated or kept goes to Checked straight away (the user,
+// Oct 22: "I would've expected it to move to the other tab").
 //
 // No "Not read yet" (the user, Oct 21): a page is read as soon as it's
 // found, so one not read yet is in To check, being read.
@@ -47,11 +47,17 @@ const TABS: { key: JobTab; label: string; statuses: JobStatus[] }[] = [
 ]
 export const tabOf = (s: JobStatus): JobTab => TABS.find((t) => t.statuses.includes(s))!.key
 
-/** Each row's tab, from its status when the page loaded, A–Z within it. */
-export function jobTabs<T extends { id: string }>(rows: readonly T[], status: (r: T) => JobStatus, name: (r: T) => string): { rows: T[]; tabs: ReadonlyMap<string, JobTab>; first: JobTab } {
-  const tabs = new Map(rows.map((r) => [r.id, tabOf(status(r))]))
-  const first = TABS.find((t) => rows.some((r) => tabs.get(r.id) === t.key))?.key ?? 'to_check'
-  return { rows: [...rows].sort((a, b) => name(a).localeCompare(name(b))), tabs, first }
+/** The rows A–Z, and the tab to open on: the first with anything in it. */
+export function jobTabs<T>(rows: readonly T[], status: (r: T) => JobStatus, name: (r: T) => string): { rows: T[]; first: JobTab } {
+  const first = TABS.find((t) => rows.some((r) => t.statuses.includes(status(r))))?.key ?? 'to_check'
+  return { rows: [...rows].sort((a, b) => name(a).localeCompare(name(b))), first }
+}
+
+/** How many rows are in each tab, by what each is now. */
+export function tabCounts(statuses: readonly JobStatus[]): Record<JobTab, number> {
+  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
+  for (const s of statuses) counts[tabOf(s)]++
+  return counts
 }
 
 export const BUTTON = 'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
@@ -105,7 +111,7 @@ export function JobPage<T extends string = JobTab>({
   tabs?: { counts: Readonly<Record<T, number>>; active: T; onChange: (t: T) => void; list?: readonly { key: T; label: string }[] }
   children?: ReactNode
 }) {
-  const tabList = tabs && (tabs.list ?? (TABS as unknown as { key: T; label: string }[]).filter((t) => t.key !== 'off' || tabs.counts[t.key] > 0))
+  const tabList = tabs && (tabs.list ?? (TABS as unknown as { key: T; label: string }[]).filter((t) => t.key !== 'off' || tabs.counts[t.key] > 0 || tabs.active === 'off'))
   return (
     <div className="space-y-4">
       <Link href={backHref} className="text-sm font-semibold text-primary hover:underline">

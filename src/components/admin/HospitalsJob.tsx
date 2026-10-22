@@ -19,7 +19,7 @@ import type { DirectoryResource } from '@/types'
 import { updatesPill } from '@/lib/dishProposal'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import FindingCompare, { type Decision } from './FindingCompare'
-import { JobPage, day, jobTabs, needsYou, type JobStatus, type JobTab } from './JobPage'
+import { JobPage, day, jobTabs, needsYou, tabCounts, tabOf, type JobStatus, type JobTab } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
 
 // ── The Watches tab's Hospitals page (the user, Oct 21) ─────────────────────
@@ -383,8 +383,7 @@ export default function HospitalsJob({ token }: { token: string }) {
   const [now] = useState(() => Date.now())
   // Findings updated or skipped this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
-  // Each hospital's tab, as it was when the page loaded, and the one showing.
-  const [tabOf, setTabOf] = useState<ReadonlyMap<string, JobTab>>(new Map())
+  // The tab showing.
   const [tab, setTab] = useState<JobTab>('to_check')
 
   const load = useCallback(async () => {
@@ -392,9 +391,8 @@ export default function HospitalsJob({ token }: { token: string }) {
     try {
       const got = await fetchJson<Loaded>(withCommunity(api, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the hospitals.')
       const t = Date.now()
-      const { rows, tabs, first } = jobTabs(got.hospitals, (h) => hospitalStatus(h, t), (h) => h.name)
+      const { rows, first } = jobTabs(got.hospitals, (h) => hospitalStatus(h, t), (h) => h.name)
       setData({ ...got, hospitals: rows })
-      setTabOf(tabs)
       setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -444,8 +442,7 @@ export default function HospitalsJob({ token }: { token: string }) {
     setSettled((m) => new Map(m).set(f.id, d))
     setData((x) => x && { ...x, hospitals: x.hospitals.map((y) => (y.id === h.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
   }
-  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
-  for (const h of data.hospitals) counts[tabOf.get(h.id) ?? 'to_check']++
+  const counts = tabCounts(data.hospitals.map(statusOf))
   const differing = data.hospitals.filter((h) => statusOf(h) === 'differs')
   return (
     <JobPage
@@ -466,7 +463,7 @@ export default function HospitalsJob({ token }: { token: string }) {
       }
     >
       {data.hospitals
-        .filter((h) => (tabOf.get(h.id) ?? 'to_check') === tab)
+        .filter((h) => tabOf(statusOf(h)) === tab)
         .map((h) => {
           const status = statusOf(h)
           return (

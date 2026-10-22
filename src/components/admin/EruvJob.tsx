@@ -314,8 +314,7 @@ export default function EruvJob({ token }: { token: string }) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [now] = useState(() => new Date())
-  // Each eruv stays on the tab it was on when the page loaded.
-  const [tabs, setTabs] = useState<ReadonlyMap<string, EruvJobTab>>(new Map())
+  // The tab showing.
   const [tab, setTab] = useState<EruvJobTab>('to_check')
   const [settled, setSettled] = useState<Settled>(new Map())
   const [editing, setEditing] = useState<{ eruv: AdminEruv; finding: EruvFinding } | null>(null)
@@ -327,9 +326,8 @@ export default function EruvJob({ token }: { token: string }) {
     try {
       const got = await fetchJson<EruvJobLoaded>(withCommunity(api, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the eruvim.')
       const at = new Date()
-      const of = new Map(got.eruvim.map((e) => [e.id, eruvStanding(e, { finding: findingFor(got.findings, e.id), watch: websiteWatchOf(e, got.watches), now: at, timezone: got.timezone }).tab]))
-      setTabs(of)
-      setTab((['to_check', 'cant_read', 'checked'] as const).find((t) => [...of.values()].includes(t)) ?? 'to_check')
+      const of = got.eruvim.map((e) => eruvStanding(e, { finding: findingFor(got.findings, e.id), watch: websiteWatchOf(e, got.watches), now: at, timezone: got.timezone }).tab)
+      setTab((['to_check', 'cant_read', 'checked'] as const).find((t) => of.includes(t)) ?? 'to_check')
       setData(got)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -337,7 +335,7 @@ export default function EruvJob({ token }: { token: string }) {
   }, [token, community])
   useLoadOnMount(load)
 
-  /** The page again, keeping each eruv's tab. */
+  /** The page again, on the same tab. */
   async function refresh() {
     const got = await fetchJson<EruvJobLoaded>(withCommunity(api, community), { headers }, 'Failed to load the eruvim.').catch(() => null)
     if (got) setData(got)
@@ -401,7 +399,8 @@ export default function EruvJob({ token }: { token: string }) {
   }
 
   const eruvim = data.available ? [...data.eruvim].sort((a, b) => a.name.localeCompare(b.name)) : []
-  const tabOf = (e: AdminEruv) => tabs.get(e.id) ?? 'checked'
+  // Its tab as it is now: one decided moves straight away (the user, Oct 22).
+  const tabOf = (e: AdminEruv): EruvJobTab => eruvStanding(e, { finding: settled.has(e.id) ? null : findingFor(data.findings, e.id), watch: websiteWatchOf(e, data.watches), now, timezone: data.timezone }).tab
   const counts = { to_check: 0, cant_read: 0, checked: 0 }
   for (const e of eruvim) counts[tabOf(e)]++
   const waiting = eruvim.filter((e) => !settled.has(e.id) && updatesOf(e, findingFor(data.findings, e.id)) > 0).length

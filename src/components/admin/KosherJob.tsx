@@ -79,9 +79,25 @@ function listDay(updated: string): string {
 /** When a list was last read, for its row and a box's source line. */
 const readOn = (l: KosherListState | undefined) => l?.watch?.lastCheck?.at ?? l?.watch?.lastOkAt ?? null
 
-function placeTab(p: Place): Tab {
-  const s = kosherSection({ ...p, waiting: p.findings?.length })
+/** Its tab now: a finding decided this visit counts as done, and so do the
+ *  list lines it was filed from. */
+function placeTab(p: Place, settled: Settled): Tab {
+  const findings = p.findings ?? []
+  const waiting = findings.filter((f) => !settled.has(f.id)).length
+  const differences = findings.length && !waiting ? p.differences.map((d) => (d.filed === 'queued' ? { ...d, filed: 'decided' as const } : d)) : p.differences
+  const s = kosherSection({ ...p, differences, waiting })
   return s === 'to_check' ? 'to_check' : s === 'not_listed' ? 'neither' : 'checked'
+}
+
+/** New on a list, not left out or added yet. */
+const isNew = (n: NewPlace, settled: Settled) => n.filed !== 'decided' && !(n.findings?.[0] && settled.has(n.findings[0].id))
+
+function tabCounts(d: KosherLoaded, settled: Settled): Record<Tab, number> {
+  const counts: Record<Tab, number> = { to_check: 0, new: 0, checked: 0, neither: 0 }
+  for (const p of d.places) counts[placeTab(p, settled)]++
+  counts.to_check += (d.others ?? []).filter((f) => !settled.has(f.id)).length
+  counts.new += d.newPlaces.filter((n) => isNew(n, settled)).length
+  return counts
 }
 
 /** The page's sentence: does anything need you? */
@@ -509,8 +525,7 @@ export default function KosherJob({ token }: { token: string }) {
   const [busy, setBusy] = useState<string | null>(null)
   // What became of each finding decided this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
-  // Each row's tab, as it was when the page loaded, and the one showing.
-  const [tabOf, setTabOf] = useState<ReadonlyMap<string, Tab>>(new Map())
+  // The tab showing.
   const [tab, setTab] = useState<Tab>('to_check')
   const [adding, setAdding] = useState<{ finding: KosherFinding; category: CategoryConfig } | null>(null)
 
@@ -518,13 +533,9 @@ export default function KosherJob({ token }: { token: string }) {
     setError(null)
     try {
       const got = await fetchJson<KosherLoaded>(withCommunity(API, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the kosher lists.')
-      const tabs = new Map<string, Tab>()
-      for (const p of got.places) tabs.set(p.id, placeTab(p))
-      for (const f of got.others ?? []) tabs.set(f.id, 'to_check')
-      for (const n of got.newPlaces) if (n.filed !== 'decided') tabs.set(`new:${n.name}`, 'new')
       setData(got)
-      setTabOf(tabs)
-      setTab(TABS.find((t) => [...tabs.values()].includes(t.key))?.key ?? 'to_check')
+      const counts = tabCounts(got, new Map())
+      setTab(TABS.find((t) => counts[t.key])?.key ?? 'to_check')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -607,10 +618,11 @@ export default function KosherJob({ token }: { token: string }) {
     )
   }
 
-  const others = data.others ?? []
-  const fresh = data.newPlaces.filter((n) => tabOf.has(`new:${n.name}`))
-  const counts: Record<Tab, number> = { to_check: 0, new: 0, checked: 0, neither: 0 }
-  for (const t of tabOf.values()) counts[t]++
+  // Each row in its tab as it is now: one decided moves straight away (the
+  // user, Oct 22), a new place or a finding no place has leaving the page.
+  const others = (data.others ?? []).filter((f) => !settled.has(f.id))
+  const fresh = data.newPlaces.filter((n) => isNew(n, settled))
+  const counts = tabCounts(data, settled)
   const updates = data.places.filter((p) => (p.findings ?? []).some((f) => !settled.has(f.id))).length + others.filter((f) => !settled.has(f.id)).length
   const reading = busy === 'all'
 
@@ -636,7 +648,7 @@ export default function KosherJob({ token }: { token: string }) {
         ? fresh.map((n) => <NewPlaceRow key={n.name} place={n} categories={categories} lists={data.lists} act={act} onEdit={(finding, category) => setAdding({ finding, category })} />)
         : [
             ...data.places
-              .filter((p) => tabOf.get(p.id) === tab)
+              .filter((p) => placeTab(p, settled) === tab)
               .map((p) => (
                 <KosherPlaceRow key={p.id} place={p} tab={tab} category={categories.find((c) => c.id === p.category)} lists={data.lists} act={act} reading={reading} onReadNow={() => void readNow()} />
               )),

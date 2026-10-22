@@ -76,6 +76,8 @@ async function renderPage(places: HoursPlace[] | (() => HoursPlace[]), post: (bo
 const rows = () => screen.getAllByTestId('job-row')
 const rowOf = (name: string) => rows().find((r) => within(r).queryAllByText(name).length) as HTMLElement
 const pill = (name: string) => within(rowOf(name)).getByTestId('job-status').textContent
+/** On the tab showing. */
+const shown = (name: string) => screen.queryAllByTestId('job-row').some((r) => within(r).queryAllByText(name).length > 0)
 const open = (name: string) => userEvent.setup().click(within(rowOf(name)).getAllByRole('button')[0])
 const tab = (name: string) => userEvent.setup().click(screen.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) }))
 const HOURS = '/api/admin/watches/hours?community=philly'
@@ -214,9 +216,13 @@ describe('Mikvah hours', () => {
     await open(LOWER.name)
     await userEvent.setup().click(within(box(LOWER.name, 'Women’s')).getByRole('button', { name: 'Use this' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-women?community=philly', body: { status: 'approved' } })
-    expect(boxes(LOWER.name)[0]).toBe(`Women’s | Used ${today()} | false`)
-    expect(pill(LOWER.name)).toBe(`Used ${today()}`)
+    // Nothing left to decide: straight to Checked (the user, Oct 22).
+    expect(shown(LOWER.name)).toBe(false)
     expect(screen.getByTestId('job-counts')).toHaveTextContent('No mikvah’s website has an update.')
+    await tab('Checked')
+    expect(pill(LOWER.name)).toBe(`Used ${today()}`)
+    await open(LOWER.name)
+    expect(boxes(LOWER.name)[0]).toBe(`Women’s | Used ${today()} | false`)
   })
 
   it('Keep the listing: kept, and said so', async () => {
@@ -224,6 +230,8 @@ describe('Mikvah hours', () => {
     await open(LOWER.name)
     await userEvent.setup().click(screen.getByRole('button', { name: 'Keep the listing' }))
     expect(posts.at(-1)!.body).toEqual({ status: 'rejected' })
+    expect(shown(LOWER.name)).toBe(false)
+    await tab('Checked')
     expect(pill(LOWER.name)).toBe(`Kept ${today()}`)
   })
 
@@ -257,7 +265,9 @@ describe('Mikvah hours', () => {
     expect(Object.keys(sent.payload.details).sort()).toEqual(['women_s_hours', 'women_s_notes'])
     expect(sent.payload.details.women_s_notes).toBe(NOTE)
     expect(sent.payload.details.women_s_hours).toMatchObject({ sun: earlier, mon: earlier })
-    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    await waitFor(() => expect(shown(LOWER.name)).toBe(false))
+    await tab('Checked')
+    expect(pill(LOWER.name)).toBe(`Used ${today()}`)
     fetchMock.mockRestore()
   })
 
@@ -353,7 +363,10 @@ describe('Mikvah hours', () => {
     await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: /^Reads/ }))
     await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: 'Read them now' }))
     expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'lmc', action: 'check' } })
-    await waitFor(() => expect(pill(LOWER.name)).toBe('1 update'))
+    // An update: to To check.
+    await waitFor(() => expect(shown(LOWER.name)).toBe(false))
+    await tab('To check')
+    expect(pill(LOWER.name)).toBe('1 update')
   })
 
   it('a page not read yet is read as soon as the page loads', async () => {
@@ -372,7 +385,9 @@ describe('Mikvah hours', () => {
     await waitFor(() => expect(pill('Unread Mikvah')).toBe('Reading…'))
     expect(posts.map((p) => p.body)).toEqual([{ resourceId: 'u', action: 'check' }])
     answer({ ok: true, pages: [read], stopped: [] })
-    await waitFor(() => expect(pill('Unread Mikvah')).toBe('Same'))
+    await waitFor(() => expect(shown('Unread Mikvah')).toBe(false))
+    await tab('Checked')
+    expect(pill('Unread Mikvah')).toBe('Same')
   })
 
   it('reads at most a few on its own, leaving the rate limit for Read them now', async () => {
@@ -402,14 +417,24 @@ describe('Mikvah hours', () => {
     await user.click(within(mikvah(SAME.name)).getByRole('button', { name: /^Reads/ }))
     await user.click(within(mikvah(SAME.name)).getByRole('switch', { name: /Reading/ }))
     expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'mz', action: 'off' } })
-    expect(pill(SAME.name)).toBe('Not read')
+    expect(shown(SAME.name)).toBe(false)
     await tab('Off')
+    expect(pill(SAME.name)).toBe('Not read')
     await open(OFF.name)
     const reads = within(mikvah(OFF.name)).getByRole('region', { name: 'Reads' })
     expect(within(reads).getByTestId('box-pill')).toHaveTextContent('Off')
     expect(within(reads).queryByRole('button', { name: 'Read them now' })).toBeNull()
     await user.click(within(reads).getByRole('switch'))
     expect(posts.at(-1)!.body).toEqual({ resourceId: 'ol', action: 'on' })
+  })
+
+  it('the last one turned back on leaves Off, and Off stays open, empty', async () => {
+    await renderPage([SAME, OFF], () => ({ pages: SAME.pages, off: false }))
+    await tab('Off')
+    await open(OFF.name)
+    await userEvent.setup().click(within(within(mikvah(OFF.name)).getByRole('region', { name: 'Reads' })).getByRole('switch'))
+    expect(shown(OFF.name)).toBe(false)
+    expect(screen.getByRole('tab', { name: 'Off 0' })).toHaveAttribute('aria-selected', 'true')
   })
 })
 
@@ -582,9 +607,12 @@ describe('Shul times', () => {
     expect(pill(SOI.name)).toBe('1 update')
     await userEvent.setup().click(within(box(SOI.name, 'This week’s schedule')).getByRole('button', { name: 'Skip this week' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-week?community=philly', body: { status: 'rejected' } })
-    expect(boxes(SOI.name).slice(0, 2)).toEqual([`Usual Shabbos times | Used ${today()} | false`, `This week’s schedule | Skipped ${today()} | false`])
-    expect(pill(SOI.name)).toBe(`Used ${today()}`)
+    expect(shown(SOI.name)).toBe(false)
     expect(screen.getByTestId('job-counts')).toHaveTextContent('No shul’s website has an update.')
+    await tab('Checked')
+    expect(pill(SOI.name)).toBe(`Used ${today()}`)
+    await open(SOI.name)
+    expect(boxes(SOI.name).slice(0, 2)).toEqual([`Usual Shabbos times | Used ${today()} | false`, `This week’s schedule | Skipped ${today()} | false`])
   })
 
   it('Keep the listing: kept, and said so', async () => {
@@ -592,6 +620,8 @@ describe('Shul times', () => {
     await open(SOI.name)
     await userEvent.setup().click(screen.getByRole('button', { name: 'Keep the listing' }))
     expect(posts.at(-1)!.body).toEqual({ status: 'rejected' })
+    expect(shown(SOI.name)).toBe(false)
+    await tab('Checked')
     expect(pill(SOI.name)).toBe(`Kept ${today()}`)
   })
 
@@ -614,7 +644,9 @@ describe('Shul times', () => {
     const sent = JSON.parse(String(init!.body))
     expect(sent.status).toBe('approved')
     expect(sent.payload.details.minyanim).toEqual(expect.arrayContaining([expect.objectContaining({ tefillah: 'shacharis', days: ['sat'], time: '9:00am' })]))
-    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    await waitFor(() => expect(shown(SOI.name)).toBe(false))
+    await tab('Checked')
+    expect(pill(SOI.name)).toBe(`Used ${today()}`)
     fetchMock.mockRestore()
   })
 
@@ -632,8 +664,9 @@ describe('Shul times', () => {
     await user.click(within(shul(KESHER.name)).getByRole('button', { name: /^Reads/ }))
     await user.click(within(shul(KESHER.name)).getByRole('switch', { name: /Reading/ }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/watches/hours?job=times&community=philly', body: { resourceId: 'k', action: 'off' } })
-    expect(pill(KESHER.name)).toBe('Not read')
+    expect(shown(KESHER.name)).toBe(false)
     await tab('Off')
+    expect(pill(KESHER.name)).toBe('Not read')
     await open(VILNA.name)
     const reads = within(shul(VILNA.name)).getByRole('region', { name: 'Reads' })
     expect(within(reads).getByTestId('box-pill')).toHaveTextContent('Off')

@@ -576,6 +576,15 @@ agreed:
      reads up to 5 a morning instead (`menuPlaceRead.ts`), and "Read now"
      still reads one on demand. On dev nothing runs the crons, so dev
      shows "Not searched yet" until Check now.
+   - A row moves as soon as it's decided (the user, Oct 22: "I would've
+     expected it to move to the other tab"). Rows used to stay in the tab
+     they loaded in for the whole visit. Now each row's tab follows what it
+     is now, on all five job pages. Used or kept with nothing left goes to
+     Checked; reading turned off goes to Off; a stopped page goes to Can't
+     be read; Read now that finds an update goes to To check. The tab counts
+     follow. On Kosher, a new place added or left out, and a finding that
+     matches no place, leave the page once decided. Off stays open while
+     it's the tab showing, even after its last row leaves.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -168,6 +168,8 @@ async function renderPage(over: Partial<KosherLoaded> = {}) {
 const rows = () => screen.getAllByTestId('job-row')
 const rowOf = (name: string) => rows().find((r) => within(r).queryAllByText(name).length) as HTMLElement
 const pill = (name: string) => within(rowOf(name)).getByTestId('job-status').textContent
+/** On the tab showing. */
+const shown = (name: string) => screen.queryAllByTestId('job-row').some((r) => within(r).queryAllByText(name).length > 0)
 const open = (name: string) => userEvent.setup().click(within(rowOf(name)).getAllByRole('button')[0])
 const tab = (name: string) => userEvent.setup().click(screen.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) }))
 const placeOf = (name: string) => screen.getByRole('region', { name })
@@ -228,15 +230,18 @@ describe('Kosher certification', () => {
     await open(TWISTERS.name)
     await user.click(within(box(TWISTERS.name, 'Kosher')).getByRole('button', { name: 'Use this' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-twisters?community=philly', body: { status: 'approved', only: ['t'] } })
-    expect(within(box(TWISTERS.name, 'Kosher')).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
-    expect(within(box(TWISTERS.name, 'Kosher')).queryByRole('button', { name: 'Use this' })).toBeNull()
-    expect(pill(TWISTERS.name)).toBe(`Used ${today()}`)
+    // Nothing left to decide: straight to Checked (the user, Oct 22).
+    expect(shown(TWISTERS.name)).toBe(false)
     await open('Two')
     await user.click(within(box('Two', 'Kosher')).getByRole('button', { name: 'Keep the listing' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-two?community=philly', body: { status: 'rejected' } })
+    expect(shown('Two')).toBe(false)
+    await tab('Checked')
     expect(pill('Two')).toBe(`Kept ${today()}`)
-    // It stays where it was.
-    expect(rows()).toHaveLength(2)
+    expect(pill(TWISTERS.name)).toBe(`Used ${today()}`)
+    await open(TWISTERS.name)
+    expect(within(box(TWISTERS.name, 'Kosher')).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
+    expect(within(box(TWISTERS.name, 'Kosher')).queryByRole('button', { name: 'Use this' })).toBeNull()
   })
 
   it('a finding the listing already agrees with is Same, and Use this still takes only its own lines', async () => {
@@ -273,7 +278,9 @@ describe('Kosher certification', () => {
     // as it was when the list was read.
     expect(sent.payload.details).toMatchObject({ t: ['Parve'], kosherCert: ['Keystone-K'], kosherNote: 'Only Plain/Salt Pretzels are kosher', website: 'https://now.example' })
     expect(sent.payload.name).toBe(TWISTERS.name)
-    expect(await screen.findByText(`Used ${today()}`, { selector: '[data-testid="job-status"]' })).toBeTruthy()
+    await waitFor(() => expect(shown(TWISTERS.name)).toBe(false))
+    await tab('Checked')
+    expect(pill(TWISTERS.name)).toBe(`Used ${today()}`)
   })
 
   // Board 3.
@@ -289,6 +296,8 @@ describe('Kosher certification', () => {
     const user = userEvent.setup()
     await user.click(within(b).getByRole('button', { name: 'Archive the listing' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-bbq?community=philly', body: { status: 'approved' } })
+    expect(shown(BBQ.name)).toBe(false)
+    await tab('Checked')
     expect(pill(BBQ.name)).toBe(`Archived ${today()}`)
   })
 
@@ -297,6 +306,8 @@ describe('Kosher certification', () => {
     await open(BBQ.name)
     await userEvent.setup().click(within(box(BBQ.name, 'Kosher')).getByRole('button', { name: 'It’s Kosher City Eats now' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/watches/kosher?community=philly', body: { action: 'renamed', id: 's-bbq' } })
+    expect(shown(BBQ.name)).toBe(false)
+    await tab('Checked')
     expect(pill(BBQ.name)).toBe(`Renamed ${today()}`)
   })
 
@@ -334,7 +345,9 @@ describe('Kosher certification', () => {
     const user = userEvent.setup()
     await user.click(within(k).getByRole('button', { name: 'Leave it out' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-rivka?community=philly', body: { status: 'rejected' } })
-    expect(pill('Rivka Cakes')).toBe(`Left out ${today()}`)
+    // Decided: off the page.
+    expect(shown('Rivka Cakes')).toBe(false)
+    expect(screen.getByRole('tab', { name: 'New on a list 0' })).toBeInTheDocument()
   })
 
   it('a new place left out before isn’t shown again', async () => {

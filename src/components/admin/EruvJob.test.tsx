@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -86,6 +86,8 @@ const user = () => userEvent.setup()
 const rows = () => screen.getAllByTestId('job-row')
 const rowOf = (name: string) => rows().find((r) => within(r).queryAllByText(name).length) as HTMLElement
 const pill = (name: string) => within(rowOf(name)).getByTestId('job-status').textContent
+/** On the tab showing. */
+const shown = (name: string) => screen.queryAllByTestId('job-row').some((r) => within(r).queryAllByText(name).length > 0)
 const open = (name: string) => user().click(within(rowOf(name)).getAllByRole('button')[0])
 const tab = (name: string) => user().click(screen.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) }))
 const placeOf = (name: string) => screen.getByRole('region', { name })
@@ -147,15 +149,19 @@ describe('Eruv status', () => {
     await open('Lower Merion Eruv')
     await user().click(within(box('Lower Merion Eruv', 'Details')).getByRole('button', { name: 'Use this' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-lm?community=philly', method: 'PATCH', body: { status: 'approved', only: ['hotline'] } })
-    expect(within(box('Lower Merion Eruv', 'Details')).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
-    expect(within(box('Lower Merion Eruv', 'Details')).queryByRole('button', { name: 'Use this' })).toBeNull()
-    expect(pill('Lower Merion Eruv')).toBe(`Used ${today()}`)
+    // Nothing left to decide: straight to Checked (the user, Oct 22).
+    expect(shown('Lower Merion Eruv')).toBe(false)
     await open('Narberth Eruv')
     await user().click(within(box('Narberth Eruv', 'Details')).getByRole('button', { name: 'Keep the listing' }))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-n?community=philly', method: 'PATCH', body: { status: 'rejected' } })
-    expect(pill('Narberth Eruv')).toBe(`Kept ${today()}`)
-    expect(rows()).toHaveLength(2)
+    expect(shown('Narberth Eruv')).toBe(false)
     expect(screen.getByTestId('job-counts').textContent).toBe('No eruv has an update from its website.')
+    await tab('Checked')
+    expect(pill('Narberth Eruv')).toBe(`Kept ${today()}`)
+    expect(pill('Lower Merion Eruv')).toBe(`Used ${today()}`)
+    await open('Lower Merion Eruv')
+    expect(within(box('Lower Merion Eruv', 'Details')).getByTestId('box-pill').textContent).toBe(`Used ${today()}`)
+    expect(within(box('Lower Merion Eruv', 'Details')).queryByRole('button', { name: 'Use this' })).toBeNull()
   })
 
   it('Edit: the eruv’s own form, filled with its website’s, saved to the listing', async () => {
@@ -173,6 +179,8 @@ describe('Eruv status', () => {
       body: { status: 'approved', payload: { covers: 'Bala Cynwyd', website: 'https://lowermerioneruv.org/', hotline: '(610) 555-0199, option 2', alertsUrl: '' } },
     })
     expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(shown('Lower Merion Eruv')).toBe(false))
+    await tab('Checked')
     expect(pill('Lower Merion Eruv')).toBe(`Used ${today()}`)
   })
 
@@ -192,9 +200,15 @@ describe('Eruv status', () => {
     expect(reads).toHaveTextContent('Stop reading University City Eruv’s map?')
     await user().click(within(reads).getByRole('button', { name: 'Stop reading' }))
     expect(posts.map((p) => p.body)).toEqual([{ id: 'uc', action: 'save', edit: { lineUrl: '' } }])
-    await user().click(within(reads).getByRole('switch'))
+    // No map that didn't load now: to Checked.
+    expect(shown('University City Eruv')).toBe(false)
+    await tab('Checked')
+    await open('University City Eruv')
+    const now = box('University City Eruv', 'Reads')
+    await user().click(within(now).getAllByRole('button')[0])
+    await user().click(within(now).getByRole('switch'))
     expect(posts.at(-1)).toEqual({ url: '/api/admin/watches?community=philly', method: 'POST', body: { action: 'pause', id: 'w-uc' } })
-    expect(within(reads).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    expect(within(now).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
   })
 
   it('no status: Find its status page, and read from the one the admin picks', async () => {

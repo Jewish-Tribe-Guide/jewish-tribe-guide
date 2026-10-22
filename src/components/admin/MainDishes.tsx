@@ -19,7 +19,7 @@ import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import ContactBoxes, { givesContact, isContactFinding, type ListedContact } from './ContactBoxes'
 import FoodHours, { isFoodHoursFinding } from './FoodHours'
 import FindingCompare, { type Decision } from './FindingCompare'
-import { GivePage, JobPage, day, jobTabs, shortUrl, type JobTab } from './JobPage'
+import { GivePage, JobPage, day, jobTabs, shortUrl, tabCounts, tabOf, type JobTab } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
 
 // ── The Watches tab's Main dishes page (drawn Oct 21: 7EYjgU1WcHrXG2W6Qpigb7) ─
@@ -363,8 +363,7 @@ export default function MainDishes({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
-  // Each place's tab as it was when the page loaded, and the one showing.
-  const [tabOf, setTabOf] = useState<ReadonlyMap<string, JobTab>>(new Map())
+  // The tab showing.
   const [tab, setTab] = useState<JobTab>('to_check')
   // Used or kept this visit: said where it was.
   const [decided, setDecided] = useState<ReadonlyMap<string, Decided>>(new Map())
@@ -379,9 +378,8 @@ export default function MainDishes({ token }: { token: string }) {
     setError(null)
     try {
       const got = await fetchJson<Loaded>(withCommunity('/api/admin/main-dishes', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the food places.')
-      const { rows, tabs, first } = jobTabs(got.places, (p) => STATUS[dishJobStatus(p, now)], (p) => p.name)
+      const { rows, first } = jobTabs(got.places, (p) => STATUS[dishJobStatus(p, now)], (p) => p.name)
       setData({ ...got, places: rows })
-      setTabOf(tabs)
       setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -500,8 +498,9 @@ export default function MainDishes({ token }: { token: string }) {
     return <JobPage backHref={backHref} title={TITLE} intro="" needYou={0} total={0} noun="place" notice={notice} />
   }
 
-  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
-  for (const p of data.places) counts[tabOf.get(p.id) ?? 'to_check']++
+  // What it is now: its website's findings used or kept this visit count as done.
+  const statusOf = (p: Place) => dishJobStatus({ ...p, findings: p.findings?.filter((f) => !settled.has(f.id)) }, now)
+  const counts = tabCounts(data.places.map((p) => STATUS[statusOf(p)]))
   const moved = data.places.filter(elsewhere)
   return (
     <>
@@ -537,12 +536,12 @@ export default function MainDishes({ token }: { token: string }) {
         }
       >
         {data.places
-          .filter((p) => (tabOf.get(p.id) ?? 'to_check') === tab)
+          .filter((p) => tabOf(STATUS[statusOf(p)]) === tab)
           .map((p) => (
             <DishRowView
               key={`${p.id}:${p.reading?.readAt ?? ''}`}
               place={p}
-              status={dishJobStatus(p, now)}
+              status={statusOf(p)}
               decided={decided.get(p.id)}
               busy={busy.has(p.id)}
               reading={busy.has(p.id) && dishStatus(p) === 'not_read'}

@@ -127,7 +127,10 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   await expect(box.getByTestId('box-source')).toContainText('From menu.example.invalid/menu')
 
   await box.getByRole('button', { name: 'Use this' }).click()
-  await expect(box.getByTestId('box-pill')).toHaveText(/^Used /)
+  // Nothing left to decide: it moves to Checked straight away.
+  await expect(row).toHaveCount(0)
+  await page.getByRole('tab', { name: /^Checked/ }).click()
+  await expect(row.getByTestId('job-status')).toHaveText(/^Used /)
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
   await expect.poll(async () => (await stored())[f.key]).toEqual(['Shawarma', 'Laffa', 'Falafel'])
@@ -181,6 +184,8 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   await sheet.getByRole('button', { name: 'Add', exact: true }).click()
   await sheet.getByRole('button', { name: 'Save to the listing' }).click()
   await expect(sheet).not.toBeVisible()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('tab', { name: /^Checked/ }).click()
   await expect(row.getByTestId('job-status')).toHaveText(/^Used /)
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
@@ -222,6 +227,8 @@ test('a menu that can’t be read: No menu, switched back on, then its menu link
 
   const reading = async () => (await supabase.from('menu_reading').select('status, note, decided_by').eq('resource_id', id).maybeSingle()).data
   await reads.getByRole('button', { name: 'No menu' }).click()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('tab', { name: /^Off/ }).click()
   await expect(row.getByTestId('job-status')).toHaveText('Reading off')
   await expect.poll(async () => (await reading())?.note).toBe('No menu')
   expect((await reading())?.decided_by).toBeTruthy()
