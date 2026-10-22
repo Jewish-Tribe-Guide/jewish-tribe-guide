@@ -121,6 +121,12 @@ describe('what the AI read, kept to what holds up', () => {
     expect(user.content.map((c) => c.type)).toEqual(['text', 'image_url'])
   })
 
+  it('sends a calendar posted as pictures as every one of them (Mikveh Israel’s month)', () => {
+    const images = [{ mime: 'image/png', b64: 'OCT' }, { mime: 'image/png', b64: 'NOV' }]
+    const [, user] = regularMessages({ images }, DAYS, 'Mikveh Israel') as { content: { type: string; image_url?: { url: string } }[] }[]
+    expect(user.content.map((c) => c.image_url?.url ?? c.type)).toEqual(['text', 'data:image/png;base64,OCT', 'data:image/png;base64,NOV'])
+  })
+
   it('asks the model and tidies its answer, never echoing its error', async () => {
     const ok = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ times: [{ tefillah: 'mincha', on: ['2026-09-26'], time: '6:35pm', quote: 'Mincha 6:35' }] }) } }] })))
     expect((await readSchedule({ text }, sukkos, 'K', { apiKey: 'k', fetchImpl: ok, newId: id })).times).toHaveLength(1)
@@ -241,6 +247,114 @@ describe('reading a shul’s regular times', () => {
     expect(r.times[0]).toMatchObject({ time: '10:00am', days: ['sat', 'sun'] })
   })
 
+  // The Oct 21 shul pages dry run: what a website says that isn't a weekly
+  // minyan, read as one.
+  it('leaves out what isn’t the shul’s weekly davening: a monthly service, a call, a class', () => {
+    const page = {
+      text: [
+        'Once per month on Fridays at 5:45 pm and once per month on Saturdays at 11:15 am, we hold a Young Families Shabbat service.',
+        'Daily at 1:00 PM; to participate, dial (773) 377-9170.',
+        'Join Rabbi Gotlib Tuesdays at 7:00 PM for a study of Pathways to God.',
+        'Kabbalat Shabbat Fridays 6:00pm',
+      ].join('\n'),
+    }
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'other', days: ['fri'], time: '5:45 pm', notes: 'Young Families Shabbat service', quote: 'Once per month on Fridays at 5:45 pm' },
+          { tefillah: 'other', days: ['sat'], time: '11:15 am', notes: 'Young Families Shabbat service', quote: 'once per month on Saturdays at 11:15 am' },
+          { tefillah: 'other', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], time: '1:00 PM', notes: 'Tehillim', quote: 'Daily at 1:00 PM' },
+          { tefillah: 'other', days: ['tue'], time: '7:00 PM', notes: 'Study with Rabbi Gotlib', quote: 'Tuesdays at 7:00 PM' },
+          { tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm', quote: 'Kabbalat Shabbat Fridays 6:00pm' },
+        ],
+      },
+      page,
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => `${t.tefillah} ${t.time}`)).toEqual(['kabbalas_shabbos 6:00pm'])
+    // And the AI is told so.
+    const [system] = regularMessages(page, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toMatch(/not held every week[^\n]*leave it out/)
+  })
+
+  it('a time given as a range is its start (Kesher’s “8:00 AM – 8:40 AM”)', () => {
+    expect(asRegularTime('shacharis', '8:00 AM – 8:40 AM')).toEqual({ time: '8:00 AM' })
+    expect(asRegularTime('kabbalas_shabbos', '6:00-7:15 pm')).toEqual({ time: '6:00pm' })
+    expect(asRegularTime('shacharis', '9:30 – 10:30am')).toEqual({ time: '9:30am' })
+    expect(asRegularTime('mincha', '11:30 to 1:00 pm')).toEqual({ time: '11:30am' })
+    expect(asRegularTime('mincha', '12:30 until 1:00pm')).toEqual({ time: '12:30pm' })
+  })
+
+  it('asks for a time given for one season to say so (Mekor’s “7:00 PM · Summer”)', () => {
+    const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toContain('"season": "summer" or "winter" for a time held in one season only')
+    expect(system.content).toContain('A minyan with a summer time and a winter time is two entries')
+  })
+
+  // Mekor's website, Oct 21: Friday night "7:00 PM" in summer, "around
+  // candle-lighting" in winter.
+  const FRIDAY = 'Friday: Mincha / Kabbalat Shabbat / Ma’ariv 7:00 PM (Summer); around candle-lighting (Winter)'
+  it('puts a time’s season in its note, where the guide reads it', () => {
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'summer', quote: 'Ma’ariv 7:00 PM (Summer)' },
+          { tefillah: 'mincha_maariv', days: ['fri'], time: 'around candle-lighting', season: 'winter', notes: 'with Kabbalat Shabbat', quote: 'around candle-lighting (Winter)' },
+          { tefillah: 'shacharis', days: ['sat'], time: '9:15am', season: 'spring', quote: 'Kabbalat Shabbat' },
+        ],
+      },
+      { text: FRIDAY },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => [t.time, t.anchor ?? null, t.notes ?? null])).toEqual([
+      ['7:00 PM', null, 'Summer only'],
+      ['At Candle Lighting', 'candle_lighting', 'Winter only- with Kabbalat Shabbat'],
+      ['9:15am', null, null],
+    ])
+  })
+
+  it('reads one Friday night minyan as one, however the AI splits it (Mekor, Oct 21)', () => {
+    const at7 = (tefillah: string, season = 'summer') => ({ tefillah, days: ['fri'], time: '7:00 PM', season, quote: 'Ma’ariv 7:00 PM (Summer)' })
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          at7('mincha'),
+          at7('kabbalas_shabbos'),
+          at7('maariv'),
+          at7('kabbalas_shabbos', 'winter'),
+        ],
+      },
+      { text: FRIDAY },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => `${t.days.join(',')} ${t.tefillah} ${t.notes ?? ''}`)).toEqual([
+      'fri mincha_maariv Summer only- with Kabbalas Shabbos',
+      'fri kabbalas_shabbos Winter only',
+    ])
+  })
+
+  it('keeps the same time in two seasons as two times', () => {
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'summer', quote: 'Ma’ariv 7:00 PM (Summer)' },
+          { tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'winter', quote: 'Ma’ariv 7:00 PM (Summer)' },
+        ],
+      },
+      { text: FRIDAY },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => t.notes)).toEqual(['Summer only', 'Winter only'])
+  })
+
   it('a "week" with no dates it can place is read as a schedule', () => {
     const r = tidyRegularReading({ kind: 'week', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00am', quote: 'Shacharis 9:00' }] }, { text: POST }, DAYS, id)
     expect(r.kind).toBe('schedule')
@@ -258,6 +372,9 @@ describe('reading a shul’s regular times', () => {
     // The hour alone, as the guide writes it (Kol Tzedek's "10 am").
     expect(asRegularTime('shacharis', '10 am')).toEqual({ time: '10:00am' })
     expect(asRegularTime('maariv', '9 P.M.')).toEqual({ time: '9:00pm' })
+    // With its minutes and dots (Mikveh Israel's calendar picture, Oct 21).
+    expect(asRegularTime('shacharis', '9:00 A.M.')).toEqual({ time: '9:00am' })
+    expect(asRegularTime('mincha', '2:00 p.m.')).toEqual({ time: '2:00pm' })
     expect(asRegularTime('mincha_maariv', 'around candle-lighting')).toMatchObject({ anchor: 'candle_lighting', offsetMinutes: 0 })
   })
 

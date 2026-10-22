@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CategorySubmissionPayload, ResourceSubmission, SubmissionRow } from '@/types'
+import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
+import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
+import { REFUAH_WATCH_NAME } from './refuahWatch'
 
 // Same chainable-builder mocking pattern as tagStore.test.ts: getAdminClient
 // is mocked as a minimal thenable query-builder stand-in, since these tests
@@ -297,6 +300,32 @@ describe('listSubmissionsByStatus', () => {
     expect(result.categoryLabel).toBe('Synagogues')
     expect(result.current).toEqual({ id: 'res-1', category: 'synagogue' })
   })
+
+  // Step 6 of keeping listings current: a watch's finding waits on the job
+  // page that reads its place, so the queue keeps only what people send in.
+  it('leaves out of the queue what a job page shows, and keeps the rest', async () => {
+    const watch = (id: string, name: string, category: string) =>
+      baseSubmission({ id, operation: 'update', target_id: `res-${id}`, submitted_by: { name }, payload: listingPayload({ category }) as never })
+    const subs = [
+      watch('shul', LISTING_PAGE_WATCH_NAME, 'synagogue'),
+      watch('mikvah', LISTING_PAGE_WATCH_NAME, 'mikvah'),
+      watch('food', LISTING_PAGE_WATCH_NAME, 'restaurant'),
+      watch('kosher', KEYSTONE_WATCH_NAME, 'restaurant'),
+      watch('hospital', REFUAH_WATCH_NAME, 'hospital'),
+      baseSubmission({ id: 'visitor', operation: 'update', target_id: 'res-visitor', submitted_by: { email: 'a@example.com' }, payload: listingPayload({ category: 'mikvah' }) as never }),
+    ]
+    mockFrom.mockImplementation((table: string) => chainable({ data: table === 'submission' ? subs : [], error: null }))
+    mockListCategories.mockResolvedValue([
+      { id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] },
+      { id: 'mikvah', label: 'Mikvahs', detailFields: [{ key: 'women_s_hours', label: 'Women’s hours', type: 'hours' }] },
+      { id: 'restaurant', label: 'Food', detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] },
+      { id: 'hospital', label: 'Hospitals', detailFields: [] },
+    ])
+
+    expect((await listSubmissionsByStatus('philly', 'pending')).map((s) => s.id)).toEqual(['food', 'visitor'])
+    // Decided, they're history like anything else.
+    expect(await listSubmissionsByStatus('philly', 'approved')).toHaveLength(6)
+  })
 })
 
 // ── approveSubmission: dispatch + error surfacing ───────────────────────────
@@ -342,6 +371,43 @@ describe('approveSubmission', () => {
       expect.objectContaining({ status: 'approved' }),
     )
     expect(result.status).toBe('approved')
+  })
+
+  // A watch's finding, approved on its job page with one line unticked
+  // ("Update 1 on the listing"): the unticked line stays as the listing says.
+  it('approves only the ticked lines of an edit, recording what was left out', async () => {
+    const fields = [
+      { key: 'women_s_hours', label: 'Women’s hours', type: 'text' },
+      { key: 'call_before', label: 'Call before', type: 'text' },
+    ]
+    const row = { id: 'res-1', community_id: 'philly', category: 'mikvah', name: 'Test Mikvah', anchor_id: 'community', distance: null, address: '123 Main St', phone: '215-555-0100', details: { women_s_hours: '8:30 PM', call_before: '10:00 PM' }, status: 'approved' }
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      submitted_by: { name: LISTING_PAGE_WATCH_NAME },
+      payload: listingPayload({ category: 'mikvah', name: 'Test Mikvah', details: { women_s_hours: '7:30 PM', call_before: '9:00 PM' } }) as never,
+    })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    const resourceBuilder = chainable({ data: row, error: null })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') return ++submissionCalls === 1 ? chainable({ data: sub, error: null }) : approveBuilder
+      if (table === 'resource') return resourceBuilder
+      return chainable({ data: null, error: null })
+    })
+    mockGetCategoryById.mockResolvedValue({ id: 'mikvah', label: 'Mikvahs', detailFields: fields })
+
+    await approveSubmission('sub-1', 'philly', 'admin@x.co', undefined, ['women_s_hours'])
+
+    const applied = (resourceBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { details: Record<string, unknown> }
+    expect(applied.details).toMatchObject({ women_s_hours: '7:30 PM', call_before: '10:00 PM' })
+    const saved = (approveBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { payload: { reviewEdit: { fields: string[]; asSent: Record<string, unknown> } } }
+    expect(saved.payload.reviewEdit).toMatchObject({ by: 'admin@x.co', fields: ['call_before'], asSent: { call_before: '9:00 PM' } })
+  })
+
+  it('refuses line-by-line approval of anything but an edit', async () => {
+    mockFrom.mockReturnValue(chainable({ data: baseSubmission({ operation: 'create', payload: listingPayload() as never }), error: null }))
+    await expect(approveSubmission('sub-1', 'philly', 'a', undefined, ['name'])).rejects.toThrow('Only an edit can be approved line by line.')
   })
 
   it('records the acting admin as reviewed_by when given', async () => {
@@ -1829,6 +1895,30 @@ describe('an eruv suggestion', () => {
     )
     expect(approveBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }))
     expect(mockRecordActivity).not.toHaveBeenCalled()
+  })
+
+  // Oct 22, Eruv status: Use this takes only the rows its website changed,
+  // so one edited since it was read isn't put back; Edit saves the admin's.
+  const approveWith = async (edited: unknown, only?: string[], now = eruv) => {
+    let calls = 0
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sub), error: null }) : approveBuilder))
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [now] })
+    mockUpdateEruv.mockResolvedValue(undefined)
+    await approveSubmission('sub-1', 'philly', 'admin@example.org', edited, only)
+    return { builder: approveBuilder }
+  }
+
+  it('Use this takes only the rows it’s given', async () => {
+    const { builder } = await approveWith(undefined, ['hotline'], { ...eruv, covers: 'Edited since.' })
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', { covers: 'Edited since.', website: 'https://old.example', hotline: '215', alertsUrl: null }, expect.anything())
+    expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved', payload: expect.objectContaining({ hotline: '215', website: 'https://old.example' }) }))
+  })
+
+  it('Edit saves the admin’s copy, read as a visitor’s is', async () => {
+    await approveWith({ covers: 'Center City.', website: 'https://old.example', hotline: '(215) 555-0100', alertsUrl: '' })
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', { covers: 'Center City.', website: 'https://old.example', hotline: '(215) 555-0100', alertsUrl: null }, expect.anything())
+    await expect(approveWith({ covers: 'Center City.', website: 'not a site at all' })).rejects.toThrow('isn’t a web address')
   })
 
   it('an eruv that’s gone can’t be approved', async () => {

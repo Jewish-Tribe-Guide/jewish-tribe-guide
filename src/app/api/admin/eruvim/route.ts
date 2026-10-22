@@ -5,6 +5,8 @@ import { keptEmailSays } from '@/lib/eruvEmail'
 import { readEruvPage } from '@/lib/eruvReader'
 import { readEruvMap } from '@/lib/eruvLines'
 import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
+import { findEruvStatusPages } from '@/lib/eruvFind'
+import { enforceRateLimit } from '@/lib/rateLimit'
 
 // GET  /api/admin/eruvim — the "Eruvim" tab: every eruv of this community
 //      (eruv, migrations 074 and 076), hidden ones too, with its status and
@@ -15,8 +17,15 @@ import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
 //      | { action: 'email-says', id, says: 'up' | 'down' | 'neither' }
 //      an admin reading the email from it the guide couldn't (eruvEmail.ts):
 //      its status from that email, live at once, or the email put away.
+//      | { action: 'find', id }
+//      "Find it on its website" (step 5, Oct 21): the pages on its website
+//      that say it's up or down, offered for the admin to pick (eruvFind.ts).
+//      Nothing is saved: a status goes live with no approval.
 
 export const maxDuration = 60
+
+/** Website searches an admin can run in ten minutes, as for a watch's check. */
+const FIND_LIMIT = { limit: 20, windowSec: 600 }
 
 const notAuthorized = () => Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
@@ -75,12 +84,22 @@ export async function POST(request: Request) {
       await saveEmailRead(community.slug, id, keptEmailSays(eruv.statusEmailKept, says, community.timezone), null)
       return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
+    if (action === 'find') {
+      if (!eruv.website) return bad('It has no website in the guide. Give its status page instead.')
+      const limited = await enforceRateLimit(request, 'admin-eruv-find', FIND_LIMIT)
+      if (limited) return limited
+      const found = await findEruvStatusPages(eruv.website)
+      if ('error' in found) return Response.json({ ok: true, found: [], error: `Its website, ${eruv.website}, wouldn’t open: ${found.error}` })
+      return Response.json({ ok: true, found: found.found, error: null })
+    }
     if (action === 'check') {
       const now = new Date()
       if (eruv.statusUrl) await saveStatusRead(community.slug, id, await readEruvPage(eruv.statusUrl, now))
       if (eruv.lineUrl) {
         const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
-        if (read.save) await saveLineRead(community.slug, id, read.save)
+        // Read now: dated even when the map is the same, so its "read" is today.
+        const save = read.save ?? (read.missing ? { ok: true as const, file: null, at: now.toISOString() } : undefined)
+        if (save) await saveLineRead(community.slug, id, save)
         // Seen here, so no email about it later.
         if (read.missing) await saveLineMissing(community.slug, id, read.missing)
       }

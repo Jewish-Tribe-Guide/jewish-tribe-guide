@@ -9,6 +9,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/read-menus",
+      "schedule": "30 7 * * *"
+    },
+    {
       "path": "/api/cron/walk-routes",
       "schedule": "0 8 * * *"
     }

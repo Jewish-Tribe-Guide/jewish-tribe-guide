@@ -167,6 +167,10 @@ export type FieldsReading = {
   held: string[]
   /** For the admin, beside the change: what the guide can't hold. */
   notes: string[]
+  /** What was read but couldn't be set beside the listing (no days said,
+   *  a time that doesn't fit, one day only, not one of the choices), a
+   *  line each: not the same as agreeing (the watch's check, Oct 20). */
+  unread: string[]
   /** Hours whose "from now on or just once" wasn't said: asked before Send. */
   askWhen: { key: string; question: string; oneDay: string } | null
 }
@@ -177,6 +181,7 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
   const values: Record<string, unknown> = {}
   const held: string[] = []
   const notes: string[] = []
+  const unread: string[] = []
   let askWhen: FieldsReading['askWhen'] = null
 
   for (const r of reads) {
@@ -193,6 +198,7 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
         const note = `${f.label}: ${said}, but which days isn’t said`
         held.push(note)
         notes.push(note)
+        unread.push(note)
         continue
       }
       const next: StructuredHours = { ...((values[f.key] as StructuredHours | undefined) ?? now) }
@@ -219,12 +225,14 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
           : `${f.label}, ${which}: ${said}, which doesn’t fit the hours listed (${days.map((d) => dayText(now[d])).filter((t, i, a) => a.indexOf(t) === i).join('; ')})`
         held.push(note)
         notes.push(note)
+        unread.push(note)
         continue
       }
       const oneDay = `${f.label}, ${which}, one day only: ${said}. The guide’s hours can’t hold a one-day change, so this goes to the admin as a note.`
       if (h.when === 'one_day') {
         held.push(`${f.label}, ${which}: ${said}, one day only`)
         notes.push(oneDay)
+        unread.push(`${f.label}, ${which}: ${said}, one day only`)
         continue
       }
       // Asked only when a day is named: "closes at 3 on Wednesday" may be
@@ -242,6 +250,7 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
       const note = `${f.label}: “${String(r.value ?? '')}”${f.type === 'select' ? ' isn’t one of the guide’s choices' : ''}`
       held.push(note)
       notes.push(note)
+      unread.push(note)
       continue
     }
     // A list gains what was read (mergeContacts): the message gives the
@@ -251,7 +260,7 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
     else values[f.key] = next
   }
   if (askWhen && !(askWhen.key in values)) askWhen = null
-  return { values, lines: changeLines(fields, listing, values), held, notes, askWhen }
+  return { values, lines: changeLines(fields, listing, values), held, notes, unread, askWhen }
 }
 
 // ── Send: the edit itself, worked out again on the server ──────────────────

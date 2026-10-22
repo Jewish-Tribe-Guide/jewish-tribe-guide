@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { changedMenuNote, listedDishes, menuHash, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches } from './menuWatch'
+import { changedMenuNote, listedDishes, menuHash, menuMovedNote, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches, type FoundReading } from './menuWatch'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 
 const food = makeCategory({
   id: 'restaurant',
   detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }],
+})
+const site = makeCategory({
+  id: 'restaurant',
+  detailFields: [
+    { key: 'website', label: 'Website', type: 'url' },
+    { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' },
+  ],
 })
 const grocery = makeCategory({
   id: 'grocery',
@@ -35,6 +42,69 @@ describe('wantedMenuWatches', () => {
   })
 })
 
+// Oct 21: a place with no menu link yet is watched on the page the reader
+// found its menu on, when that page is on the place's own website.
+describe('wantedMenuWatches: the page the reader found', () => {
+  const reading = (resourceId: string, sourceUrl: string | null, more: Partial<FoundReading> = {}): FoundReading => ({
+    resourceId,
+    status: 'proposed',
+    sourceUrl,
+    dishes: [{ name: 'Falafel', quote: 'Falafel plate', checked: true }],
+    ...more,
+  })
+  const place = (id: string, more: Record<string, unknown> = {}) => makeListing({ id, category: 'restaurant', name: id, website: `https://${id}.example`, ...more })
+
+  it('watches the found page on its own website, a PDF anywhere, and its menu link over either', () => {
+    const wanted = wantedMenuWatches(
+      [site],
+      [place('a'), place('b'), place('c', { menuUrl: 'https://c.example/menu' })],
+      [reading('a', 'https://www.a.example/our-menu'), reading('b', 'https://cdn.squarespace.example/b-menu.pdf'), reading('c', 'https://c.example/old')],
+    )
+    expect(wanted).toEqual([
+      { url: 'https://www.a.example/our-menu', resourceId: 'a', label: 'Menu · a' },
+      { url: 'https://cdn.squarespace.example/b-menu.pdf', resourceId: 'b', label: 'Menu · b' },
+      { url: 'https://c.example/menu', resourceId: 'c', label: 'Menu · c' },
+    ])
+  })
+
+  it('a menu link that is an ordering app gives way to the found page', () => {
+    const wanted = wantedMenuWatches([site], [place('a', { menuUrl: 'https://www.doordash.com/store/x' })], [reading('a', 'https://a.example/menu')])
+    expect(wanted.map((w) => w.url)).toEqual(['https://a.example/menu'])
+  })
+
+  it('a reading the admin skipped still found the page', () => {
+    expect(wantedMenuWatches([site], [place('a')], [reading('a', 'https://a.example/menu', { status: 'skipped' })]).map((w) => w.resourceId)).toEqual(['a'])
+  })
+
+  it('none for a reading that failed, said no menu, came from photos, or was read elsewhere, or for a place with no website', () => {
+    const wanted = wantedMenuWatches(
+      [site],
+      [place('a'), place('b'), place('c'), place('d'), place('e'), place('f', { website: '' }), place('g')],
+      [
+        reading('a', 'https://a.example/menu', { status: 'failed' }),
+        reading('b', null, { status: 'skipped', dishes: [] }),
+        reading('c', null),
+        reading('d', 'https://d.example/', { dishes: [] }),
+        reading('e', 'https://casino.example/menu'),
+        reading('f', 'https://f.example/menu'),
+        reading('g', 'https://www.doordash.com/store/g'),
+      ],
+    )
+    expect(wanted).toEqual([])
+  })
+})
+
+describe('menuMovedNote', () => {
+  it('says where the menu is now, that approving moves the link, and what changed', () => {
+    expect(menuMovedNote('https://a.example/new-menu', [], [])).toBe(
+      'Its menu page stopped opening, and the menu is now at https://a.example/new-menu. Approving makes that its menu link.',
+    )
+    expect(menuMovedNote('https://a.example/new-menu', [{ name: 'Shawarma', quote: 'Shawarma', checked: true }], ['Kugel'])).toBe(
+      'Its menu page stopped opening, and the menu is now at https://a.example/new-menu. Approving makes that its menu link. One dish isn’t on the listing yet: Shawarma. One listed dish isn’t on it any more: Kugel.',
+    )
+  })
+})
+
 describe('menuWatchChanges', () => {
   const wanted = [{ url: 'https://judah.example/menu', resourceId: 'a', label: 'Menu · Judah' }]
 
@@ -59,6 +129,13 @@ describe('menuHash', () => {
     expect(menuHash({ url: 'u', text: ' Falafel plate $12 ', pdf: null })).toBe(a)
     expect(menuHash({ url: 'u', text: 'Falafel plate $13', pdf: null })).not.toBe(a)
     expect(menuHash({ url: 'u', text: null, pdf: 'JVBERi0x' })).not.toBe(menuHash({ url: 'u', text: null, pdf: 'JVBERi0y' }))
+  })
+
+  // Oct 20: a menu page that is only pictures changes when a picture is replaced.
+  it('a menu of pictures only: its pictures’ addresses', () => {
+    const a = menuHash({ url: 'u', text: null, pdf: null, pictures: ['https://g.example/menu-2025.jpg'] })
+    expect(menuHash({ url: 'u', text: null, pdf: null, pictures: ['https://g.example/menu-2025.jpg'] })).toBe(a)
+    expect(menuHash({ url: 'u', text: null, pdf: null, pictures: ['https://g.example/menu-2026.jpg'] })).not.toBe(a)
   })
 })
 

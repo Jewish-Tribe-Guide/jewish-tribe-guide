@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarFeeds, calendarLines, embeddedEntries, icsEntries, isIcs } from './calendarFeed'
+import { CALENDAR_HEADING, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs } from './calendarFeed'
 
 const TZ = 'America/New_York'
 
@@ -20,6 +20,19 @@ describe('calendarFeeds: the iCal feeds a page links to', () => {
   it('turns an embedded Google Calendar into its public feed', () => {
     const html = `<iframe src="https://calendar.google.com/calendar/embed?src=shul%40gmail.com&amp;ctz=America%2FNew_York"></iframe>`
     expect(calendarFeeds(html, 'https://shul.example/')).toEqual(['https://calendar.google.com/calendar/ical/shul%40gmail.com/public/basic.ics'])
+  })
+
+  // Kol Tzedek's home page, Oct 21: Google's embed code gave its calendar
+  // in base64, and the feed at that address is a 404.
+  it('reads a Google Calendar embed that names its calendar in base64', () => {
+    const html = `<iframe src="https://calendar.google.com/calendar/embed?height=600&amp;mode=AGENDA&amp;src=a29sdHplZGVrY29tbXVuaWNhdGlvbnNAZ21haWwuY29t&amp;color=%23F6BF26"></iframe>`
+    expect(calendarFeeds(html, 'https://www.kol-tzedek.org/')).toEqual(['https://calendar.google.com/calendar/ical/koltzedekcommunications%40gmail.com/public/basic.ics'])
+    // A calendar id that only looks like base64 is left as it is.
+    const plain = `<iframe src="https://calendar.google.com/calendar/embed?src=en.usa%23holiday%40group.v.calendar.google.com"></iframe><iframe src="https://calendar.google.com/calendar/embed?src=abcd"></iframe>`
+    expect(calendarFeeds(plain, 'https://shul.example/')).toEqual([
+      'https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics',
+      'https://calendar.google.com/calendar/ical/abcd/public/basic.ics',
+    ])
   })
 
   it('finds nothing on a page with no calendar', () => {
@@ -100,19 +113,46 @@ describe('icsEntries: an iCal feed’s entries in the coming days', () => {
 })
 
 describe('calendarLines: what the reader is given', () => {
-  it('a line each from today for three weeks, in order, each once, with the weekday', () => {
+  it('a line each for the days asked, in order, each once, with the weekday', () => {
     const entries = [
       { date: '2026-10-31', time: '10:45 AM', title: 'Shabbat Morning Services' },
       { date: '2026-10-30', time: '6:00 PM', title: 'Shabbat   Evening Service' },
       { date: '2026-10-30', time: null, title: 'Office closed' },
       { date: '2026-10-30', time: '6:00 PM', title: 'Shabbat Evening Service' },
       { date: '2026-10-19', time: '7:00 AM', title: 'Yesterday' },
-      { date: '2026-11-10', time: '7:00 AM', title: 'Past three weeks' },
+      { date: '2026-11-01', time: '7:00 AM', title: 'Past the week' },
     ]
-    expect(calendarLines(entries, '2026-10-20')).toEqual([
+    expect(calendarLines(entries, '2026-10-20', '2026-10-31')).toEqual([
       '2026-10-30 (Fri): Office closed',
       '2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service',
       '2026-10-31 (Sat) 10:45 AM: Shabbat Morning Services',
     ])
+  })
+})
+
+// The user, Oct 20: "for websites where we have access to the big schedule
+// I think we should still only read one week at a time".
+describe('calendarWeeks: the weeks a calendar is read for', () => {
+  it('this week, from today to Shabbos', () => {
+    expect(calendarWeeks('2026-10-20')).toEqual([{ sunday: '2026-10-18', from: '2026-10-20', to: '2026-10-24' }]) // Tue
+    expect(calendarWeeks('2026-10-18')).toEqual([{ sunday: '2026-10-18', from: '2026-10-18', to: '2026-10-24' }]) // Sun
+    expect(calendarWeeks('2026-10-21')).toHaveLength(1) // Wed
+  })
+  it('from Thursday, next week too, the whole of it', () => {
+    const next = { sunday: '2026-10-25', from: '2026-10-25', to: '2026-10-31' }
+    expect(calendarWeeks('2026-10-22')).toEqual([{ sunday: '2026-10-18', from: '2026-10-22', to: '2026-10-24' }, next]) // Thu
+    expect(calendarWeeks('2026-10-24')).toEqual([{ sunday: '2026-10-18', from: '2026-10-24', to: '2026-10-24' }, next]) // Shabbos
+  })
+  it('across a month’s end', () => {
+    expect(calendarWeeks('2026-10-29')[1]).toEqual({ sunday: '2026-11-01', from: '2026-11-01', to: '2026-11-07' })
+  })
+})
+
+// Leyv Ha-Ir's Kabbalat Shabbat is on a Friday a month; the AI is told a
+// calendar's entries are each that date's, so it never makes one a usual
+// time (the user, Oct 20: a usual time is one the shul states).
+describe('CALENDAR_HEADING', () => {
+  it('tells the reader each entry is for its date only, never a weekday', () => {
+    expect(CALENDAR_HEADING).toMatch(/for its date only, however often it repeats: give it that date, never a weekday/)
   })
 })

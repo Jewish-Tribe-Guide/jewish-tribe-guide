@@ -105,6 +105,12 @@ type Props = {
   /** Whether anything's been changed and not yet sent, for a host that
    *  asks before something else takes the editor's place (the desktop map). */
   onHasChanges?: (has: boolean) => void
+  /** Values to start from in place of the listing's own: the Dishes page's
+   *  Edit starts from what its menu says (Oct 21). */
+  preset?: Record<string, unknown>
+  /** An admin saving straight to the listing (the Dishes page's Edit): no
+   *  challenge, this button, sent this way, and `onSaved` once it's in. */
+  adminSave?: { label: string; via: SendVia; onSaved: () => void }
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -217,6 +223,8 @@ export default function ListingEditor({
   adminSubmit,
   onlyRows,
   onHasChanges,
+  preset,
+  adminSave,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -226,14 +234,34 @@ export default function ListingEditor({
   const ownDraft = useListingDraft(category, itemProp)
   const draft = draftProp ?? ownDraft
   const { hasAddress, hasPhone, details, setDetail } = draft
-  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: creating ? 'create' : 'edit', existing: itemProp, sharedTurnstile, via, onSent, adminSubmit, onAdminSubmitted: onClose })
+  // A preset goes in once, as if typed (as BoxEditor's).
+  const [presetDone, setPresetDone] = useState(false)
+  if (!presetDone && preset) {
+    setPresetDone(true)
+    // The phone is the listing's own, not a detail (a website's, Oct 22).
+    for (const [k, v] of Object.entries(preset)) {
+      if (k === 'phone') draft.setPhone(formatPhone(typeof v === 'string' ? v : ''))
+      // A new place a list has, added from Kosher certification (Oct 22).
+      else if (k === 'name' || k === 'address') (k === 'name' ? draft.setName : draft.setAddress)(typeof v === 'string' ? v : '')
+      else setDetail(k, v)
+    }
+  }
+  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({
+    mode: creating ? 'create' : 'edit',
+    existing: itemProp,
+    sharedTurnstile,
+    via: adminSave?.via ?? via,
+    onSent: adminSave ? () => adminSave.onSaved() : onSent,
+    adminSubmit,
+    onAdminSubmitted: onClose,
+  })
   // The category editor's Preview (previewSend.tsx): Send puts the listing
   // in the preview's list instead of sending it, and the address box
   // doesn't call Google.
   const preview = usePreviewSend()
   const turnstileActive = useTurnstileActive()
   // Nothing goes out from the admin console's two uses, so no challenge.
-  const challenged = !adminSubmit && !preview
+  const challenged = !adminSubmit && !adminSave && !preview
   const verifying = challenged && sender.verifying
   const [openId, setOpenId] = useState<string | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
@@ -379,10 +407,14 @@ export default function ListingEditor({
       : verifying
         ? 'Verifying…'
         : creating
-          ? adminSubmit
-            ? 'Add listing'
-            : 'Send'
-          : `Send ${changed.size} change${changed.size === 1 ? '' : 's'}`
+          ? adminSave
+            ? adminSave.label
+            : adminSubmit
+              ? 'Add listing'
+              : 'Send'
+          : adminSave
+            ? adminSave.label
+            : `Send ${changed.size} change${changed.size === 1 ? '' : 's'}`
   const foot = (button: ReactNode) => (sendSlot ? !removalOpen && createPortal(button, sendSlot) : button)
   const errors = sender.errors.length > 0 && (
     <ul className="list-inside list-disc space-y-0.5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -565,8 +597,9 @@ export default function ListingEditor({
               setDetail(`${f.key}_sometimes`, next.sometimes)
             }}
           />
-          {/* Where the menu is, for "Full menu" (the user, Oct 17): with the dishes, under them. */}
-          {itemWording(f).noun === 'dish' && (
+          {/* Where the menu is, for "Full menu" (the user, Oct 17): with the
+              dishes, under them. Not on the Dishes page, whose Reads has it. */}
+          {itemWording(f).noun === 'dish' && !adminSave && (
             <div onBlur={() => readMenuLinkNow(details[MENU_LINK_KEY])}>
               {fieldInput(MENU_LINK_FIELD)}
               {menuRead && menuRead.url === readMenuLink(details[MENU_LINK_KEY]) && (

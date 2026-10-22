@@ -88,9 +88,15 @@ describe('runMekorWatch', () => {
     expect(note).toContain('last updated 2026-10-12')
     expect(by).toEqual({ name: 'Mekor Habracha list (automated)' })
     expect(byId.zevis[3]).toMatch(/doesn't have this place/)
+    // Both differ from the list: none of the guide's places matches it.
+    expect(body).toMatchObject({ entries: expect.any(Number), matching: 0 })
+    // What it read is kept on the watch, for the Kosher page (WatchCheck.listRead).
+    expect(body.ok && body.listRead).toMatchObject({ updated: '2026-10-12' })
+    expect(body.ok ? body.listRead.entries : null).toHaveLength(body.ok ? body.entries : -1)
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
     expect(mockDigest).toHaveBeenCalledTimes(1)
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
+    expect(mockDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/kosher', name: 'Kosher certification' })
   })
 
   it('never files a removal', async () => {
@@ -137,6 +143,10 @@ describe('runMekorWatch', () => {
     setDb([magical, zevis, shtetl], [], filed)
     const body = await run()
     expect(body.ok && body.filed).toBe(0)
+    // Still named, so the Watches tab can say which places differ.
+    const lines = body.ok ? body.differences : []
+    expect(lines.length).toBe(filed.length)
+    for (const l of lines) expect(l).toMatch(/\(filed before\)$/)
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
   })
@@ -150,6 +160,9 @@ describe('runMekorWatch', () => {
     expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Z Candy Bar')
     expect(body.ok && body.closedOnGoogle).toContain('Z Candy Bar')
     expect(mockCreate.mock.calls[0][2]).toContain('Google: open.')
+    const lines = body.ok ? body.differences : []
+    expect(lines).toContain('Z Candy Bar: On Mekor’s list, not in the guide (closed on Google, not filed)')
+    expect(lines).toContain(`${mockCreate.mock.calls[0][1].name}: On Mekor’s list, not in the guide`)
   })
 
   it('files nothing on a dry run', async () => {

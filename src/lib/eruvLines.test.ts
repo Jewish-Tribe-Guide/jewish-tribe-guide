@@ -17,6 +17,10 @@ describe('readEruvMap: the eruv’s own map, read now', () => {
     expect(read.save).toBeUndefined()
     expect(read.missing).toEqual([])
   })
+  it('the same map read fine clears why the last read failed (Oct 22: a week-old timeout still said)', async () => {
+    const read = await readEruvMap(source({ lineError: 'The operation was aborted due to timeout' }), NOW, serving(A))
+    expect(read.save).toEqual({ ok: true, file: null, at: NOW.toISOString() })
+  })
   it('a changed map shows at once, with no one to approve it, and is kept', async () => {
     const read = await readEruvMap(source(), NOW, serving(B))
     expect(read.map?.lines[0].points[1]).toEqual([39.97, -75.18])

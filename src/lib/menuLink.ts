@@ -51,3 +51,31 @@ export function readMenuLink(raw: unknown): string | undefined {
     return undefined
   }
 }
+
+/** A place's own website: its category's first web-address field in the
+ *  form's basics (Website), or one keyed "website". */
+export function menuWebsite(listing: Record<string, unknown>, category: CategoryConfig): string | null {
+  const field = category.detailFields.find((f) => f.type === 'url' && f.coreSection) ?? category.detailFields.find((f) => f.key === 'website')
+  const url = field ? listing[field.key] : null
+  return typeof url === 'string' && /^https?:\/\//i.test(url.trim()) ? url.trim() : null
+}
+
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+/** A menu read somewhere other than the place's own site, and not a PDF
+ *  it links to: its website may have moved, lapsed or been taken over
+ *  (one in Philly's guide now sends visitors to a gambling site). Its menu
+ *  link is wherever someone said the menu is, so that's never elsewhere. */
+export function readElsewhere(source: string | null, website: string | null, menuUrl: string | null): boolean {
+  if (!source || !website || /\.pdf($|\?)/i.test(source)) return false
+  if (menuUrl && hostOf(source) === hostOf(menuUrl)) return false
+  const a = hostOf(source)
+  const b = hostOf(website)
+  return !!a && !!b && a !== b && !a.endsWith(`.${b}`) && !b.endsWith(`.${a}`)
+}

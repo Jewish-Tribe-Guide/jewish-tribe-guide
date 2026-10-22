@@ -10,9 +10,11 @@
 
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
+import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
 import { confirmFromSource } from '@/lib/sourceConfirm'
+import { listDifference, type ListRead } from '@/lib/watches'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import {
@@ -23,6 +25,7 @@ import {
   findingNote,
   parseKeystoneList,
   submissionKey,
+  type KeystoneEntry,
   type WatchFinding,
   type WatchedListing,
 } from '@/lib/keystoneWatch'
@@ -70,16 +73,24 @@ export type KeystoneRun =
   | {
       ok: true
       entries: number
+      /** The list as read, kept on its watch (WatchCheck.listRead). */
+      listRead: ListRead
       findings: number
       filed: number
+      /** Listings the list names that agree with it. */
+      matching: number
       closedOnGoogle: string[]
+      /** Every place it differs on, a line each (listDifference). */
+      differences: string[]
       /** Listings the list agreed with, dated today. */
       confirmed?: number
       /** A dry run's suggestions, unfiled. */
       wouldFile?: (WatchDigestItem & { kind: WatchFinding['kind']; note: string })[]
     }
 
-export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+/** Keystone-K's list, read now: every entry on it, or why it couldn't be.
+ *  Shared with the Kosher certification page (/api/admin/watches/kosher). */
+export async function readKeystoneList(url: string): Promise<{ entries: KeystoneEntry[] } | { error: string }> {
   let res: Response
   try {
     res = await fetch(url, {
@@ -88,13 +99,20 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       signal: AbortSignal.timeout(20_000),
     })
   } catch (err) {
-    return { ok: false, error: `Couldn\u2019t reach Keystone-K's list (${err instanceof Error ? err.message : String(err)})` }
+    return { error: `Couldn\u2019t reach Keystone-K's list (${err instanceof Error ? err.message : String(err)})` }
   }
-  if (!res.ok) return { ok: false, error: `Keystone-K's list answered ${res.status}` }
+  if (!res.ok) return { error: `Keystone-K's list answered ${res.status}` }
   const entries = parseKeystoneList(await res.text())
   if (entries.length < MIN_ENTRIES) {
-    return { ok: false, error: `Read only ${entries.length} places from Keystone-K's list; its page may have changed. Nothing filed.` }
+    return { error: `Read only ${entries.length} places from Keystone-K's list; its page may have changed. Nothing filed.` }
   }
+  return { entries }
+}
+
+export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+  const list = await readKeystoneList(url)
+  if ('error' in list) return { ok: false, error: list.error }
+  const { entries } = list
 
   const supabase = getAdminClient()
   const { data: rows, error } = await supabase
@@ -106,6 +124,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   if (error) return { ok: false, error: `Couldn\u2019t read the guide's listings: ${error.message}` }
 
   const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
+  const agree = keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings)
 
   // Everything this watch has filed before, whatever became of it: a
   // suggestion an admin rejected isn't made again until the list changes.
@@ -120,6 +139,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
 
   const notes = new Map<WatchFinding, string>()
   const closed: string[] = []
+  const closedNow = new Set<WatchFinding>()
   const fresh: WatchFinding[] = []
   for (const f of unfiled) {
     let note = findingNote(f)
@@ -127,6 +147,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       const g = await googleSays(f)
       if (g.closed) {
         closed.push(f.entry.name)
+        closedNow.add(f)
         continue
       }
       note += `\n${g.line}`
@@ -135,13 +156,21 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     fresh.push(f)
   }
 
+  const differences = findings.map((f) => {
+    const d = describe(f)
+    return listDifference(d.name, d.what, filed.has(findingKey(f)) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
+  })
+
   if (dry) {
     return {
       ok: true,
       entries: entries.length,
+      listRead: { updated: null, entries },
       findings: findings.length,
       filed: 0,
+      matching: agree.length,
       closedOnGoogle: closed,
+      differences,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
   }
@@ -188,10 +217,10 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, "Keystone-K's list", items).catch((err) =>
+  await sendWatchDigest(community, "Keystone-K's list", items, findingPage(community, 'kosher')).catch((err) =>
     console.error('[watch-keystone] digest failed:', err),
   )
-  const confirmed = await confirmFromSource(community, keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings), KEYSTONE_NAME)
+  const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated: null, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }

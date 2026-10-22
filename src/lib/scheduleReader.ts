@@ -34,9 +34,23 @@ export type ScheduleReading = {
   missing: string | null
 }
 
-export type ScheduleSource = { text: string } | { image: string; mime: string } | { pdf: string }
+/** What's read: words, a photo, a PDF, or a calendar's pictures (a month
+ *  posted as pictures on a shul's page, listingPageRun.ts), read together. */
+export type ScheduleSource = { text: string } | { image: string; mime: string } | { pdf: string } | { images: { mime: string; b64: string }[] }
 
 const MAX_TEXT = 8_000
+
+/** The user's message: the intro, then what was sent. */
+function messageContent(intro: string, source: ScheduleSource): unknown {
+  if ('text' in source) return `${intro}\n\n${source.text.slice(0, MAX_TEXT)}`
+  const picture = (mime: string, b64: string) => ({ type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } })
+  if ('image' in source) return [{ type: 'text', text: intro }, picture(source.mime, source.image)]
+  if ('images' in source) return [{ type: 'text', text: intro }, ...source.images.map((i) => picture(i.mime, i.b64))]
+  return [
+    { type: 'text', text: intro },
+    { type: 'file', file: { filename: 'schedule.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },
+  ]
+}
 
 /** The festival's days, as the AI is told them: each date with its name, so
  *  "Shemini Atzeres" in a message is a date, and "Yom Tov" a known set. */
@@ -64,18 +78,7 @@ Rules:
 
 Answer in JSON only: {"times": [{"tefillah": "...", "on": ["..."], "time": "...", "notes": "...", "quote": "...", "unsure": "..."}], "missing": "..."}`
   const intro = `The shul: ${shulName}. Its schedule:`
-  const content =
-    'text' in source
-      ? `${intro}\n\n${source.text.slice(0, MAX_TEXT)}`
-      : 'image' in source
-        ? [
-            { type: 'text', text: intro },
-            { type: 'image_url', image_url: { url: `data:${source.mime};base64,${source.image}` } },
-          ]
-        : [
-            { type: 'text', text: intro },
-            { type: 'file', file: { filename: 'schedule.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },
-          ]
+  const content = messageContent(intro, source)
   return [
     { role: 'system', content: system },
     { role: 'user', content },
@@ -219,10 +222,26 @@ const EVENING: Tefillah[] = ['kabbalas_shabbos', 'mincha', 'maariv', 'mincha_maa
  *  the morning: no shul davens Mincha at 5:59 AM), or a rule from a zman
  *  for the tefillos that move with one. Anything else as written. */
 export function asRegularTime(tefillah: Tefillah, time: string): { time: string; anchor?: ZmanAnchor; offsetMinutes?: number } {
+  // "8:00 AM – 8:40 AM", "6:00-7:15 pm": a minyan starts at its start;
+  // its end isn't a time anyone comes for (Kesher, Oct 21: six "changes"
+  // that were the same 8:00am with an end on it). The start takes the
+  // end's am/pm unless it's earlier in the clock's cycle: 11:30 to 1:00 pm.
+  const range = time.trim().match(/^(\d{1,2})(:\d{2})?\s*([ap]\.?m\.?)?\s*(?:–|—|-|to|until)\s*(\d{1,2})(?::\d{2})?\s*([ap])\.?m\.?$/i)
+  if (range) {
+    const [, h, min = ':00', own, endH, endAp] = range
+    if (own) return asRegularTime(tefillah, `${h}${min} ${own}`)
+    const flip = Number(h) !== 12 && Number(h) > Number(endH)
+    const ap = flip ? (endAp.toLowerCase() === 'p' ? 'a' : 'p') : endAp.toLowerCase()
+    return { time: `${Number(h)}${min}${ap}m` }
+  }
   // "10am", "10 a.m.": the hour, as the guide writes it ("10:00am"), or
   // it's a different time from the shul's own 10:00am (Kol Tzedek, Oct 19).
   const hour = time.trim().match(/^(\d{1,2})\s*([ap])\.?\s*m\.?$/i)
   if (hour && Number(hour[1]) >= 1 && Number(hour[1]) <= 12) return { time: `${Number(hour[1])}:00${hour[2].toLowerCase()}m` }
+  // "9:00 A.M.", as Mikveh Israel's calendar picture writes it (Oct 21):
+  // else it's text, not a clock, and never the listing's 9:00am.
+  const dotted = time.trim().match(/^(\d{1,2}):(\d{2})\s*([ap])\.\s*m\.?$/i)
+  if (dotted) return { time: `${Number(dotted[1])}:${dotted[2]}${dotted[3].toLowerCase()}m` }
   const bare = time.trim().match(/^(\d{1,2}):(\d{2})$/)
   if (bare) {
     const h = Number(bare[1])
@@ -261,39 +280,33 @@ First, what the message is:
 - "from", "to": for "week", the first and last dates it covers, from the days above. Else null.
 
 Then "times", one entry per prayer time:
-- "tefillah" is one of: ${TEFILLOS}. A combined "Mincha/Maariv" is mincha_maariv. Candle lighting, Shabbos ends, havdalah, a kiddush, a class or a shiur are not prayers: leave them out, or put them in "notes" of the nearest prayer.
+- "tefillah" is one of: ${TEFILLOS}. A combined "Mincha/Maariv" is mincha_maariv, and so is one line naming several evening prayers held together ("Mincha / Kabbalat Shabbat / Ma'ariv 7:00 PM"): one entry, never one per prayer. Candle lighting, Shabbos ends, havdalah, a kiddush, a class or a shiur are not prayers: leave them out, or put them in "notes" of the nearest prayer.
+- Only the shul's own davening, held every week as given. A service not held every week ("once a month", "the last Shabbat of the month", "first Friday"), a phone or online call run by someone else, a class, a program or an event: leave it out.
 - For "schedule": "days" lists the weekdays it's held, as sun, mon, tue, wed, thu, fri, sat ("Shabbos" is sat, "Sunday–Thursday" is sun to thu). A time for one date only ("Thanksgiving, Thu Nov 26") has "date" (YYYY-MM-DD, the next such date from today, even past the days listed) and "occasion" ("Thanksgiving") instead, never a weekday. Only when the message gives the date or names a day with a fixed date; otherwise leave that time out.
 - For "week": every time has "date", from the days above.
 - Dates are calendar days, midnight to midnight, not Jewish days that start at nightfall. Friday night's Mincha, Maariv or Kabbalas Shabbos is on the Friday.
 - "time" exactly as written, with am/pm when you can tell it ("9:00am", "5:59pm", "30 min before shkiah", "at candle lighting"). Never work a time out or move it.
-- "notes": anything the message says about that one minyan ("following Kiddush", "Winter only"), else leave it out.
+- "notes": anything the message says about that one minyan ("following Kiddush"), else leave it out.
+- "season": "summer" or "winter" for a time held in one season only (a "Summer" or "Winter" label beside it, "during daylight saving time"), else leave it out. A minyan with a summer time and a winter time is two entries, one for each season, each with its own time exactly as written.
 - "quote": a few words copied exactly from the message where you read this time.
 - "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. Otherwise leave it out.
 - Only times the message gives. Never add one it doesn't.
 
-Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "quote": "...", "unsure": "..."}]}`
+Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "quote": "...", "unsure": "..."}]}`
   const intro = `The shul: ${shulName}. Its message:`
-  const content =
-    'text' in source
-      ? `${intro}\n\n${source.text.slice(0, MAX_TEXT)}`
-      : 'image' in source
-        ? [
-            { type: 'text', text: intro },
-            { type: 'image_url', image_url: { url: `data:${source.mime};base64,${source.image}` } },
-          ]
-        : [
-            { type: 'text', text: intro },
-            { type: 'file', file: { filename: 'schedule.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },
-          ]
+  const content = messageContent(intro, source)
   return [
     { role: 'system', content: system },
     { role: 'user', content },
   ]
 }
 
+const NOT_EVERY_WEEK = /\b(?:once (?:a|per|each|every) month|twice (?:a|per) month|monthly|every other (?:week|shabbat|shabbos|friday|saturday)|(?:first|second|third|fourth|last) (?:shabbat|shabbos|friday|saturday|sunday)s? of (?:the|each|every)(?: english| hebrew)? month)\b/i
+const NOT_DAVENING = /\b(?:dial|call|tehillim|class|classes|shiur|shiurim|study|lecture|program|event)\b/i
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const isWeekday = (d: unknown): d is (typeof WEEKDAYS)[number] => (WEEKDAYS as readonly unknown[]).includes(d)
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const seasonNote = (notes: string | undefined) => notes?.match(/\b(summer|winter)\s+only\b/i)?.[1].toLowerCase() ?? null
 const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
 
 /**
@@ -322,13 +335,23 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     const weekdays = [...new Set((Array.isArray(x.days) ? x.days : []).filter(isWeekday))]
     if (!tefillah || !time || !quote || (!date && weekdays.length === 0)) continue
     if (text !== null && !text.includes(` ${plain(quote)} `)) continue
-    const notes = str(x.notes, 120)
+    // A time's season goes where the rest of the guide reads it, its note
+    // ("Winter only", seasonFromNotes), unless the note already says.
+    const said = str(x.notes, 120)
+    const season = x.season === 'summer' || x.season === 'winter' ? x.season : null
+    const notes = season && !/\b(?:summer|winter)\s+only\b/i.test(said ?? '') ? `${season === 'summer' ? 'Summer' : 'Winter'} only${said ? `- ${said}` : ''}` : said
+    // What a website says that isn't its weekly davening, read as if it
+    // were, whatever the AI was told (the Oct 21 dry run: a monthly young
+    // families service, the OU's daily Tehillim call, a Tuesday class).
+    if (!date && NOT_EVERY_WEEK.test(`${quote} ${notes ?? ''}`)) continue
+    if (tefillah === 'other' && NOT_DAVENING.test(`${quote} ${notes ?? ''}`)) continue
     const unsure = str(x.unsure, 200)
     const occasion = date ? str(x.occasion, 40) : null
     // The same time given twice (a page's summary and its detail) is one
     // time on all the days either gives, not a second minyan.
     const at = asRegularTime(tefillah, time)
-    const twin = times.find((o) => o.tefillah === tefillah && o.date === date && o.time === at.time && o.anchor === at.anchor && o.offsetMinutes === at.offsetMinutes)
+    // Not across seasons: 7:00 PM in summer and in winter is two times.
+    const twin = times.find((o) => o.tefillah === tefillah && o.date === date && o.time === at.time && o.anchor === at.anchor && o.offsetMinutes === at.offsetMinutes && seasonNote(o.notes) === seasonNote(notes ?? undefined))
     if (twin) {
       twin.days = [...new Set([...twin.days, ...(date ? [] : weekdays)])]
       continue
@@ -346,6 +369,7 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
       ...(unsure ? { unsure } : {}),
     })
   }
+  joinEvening(times)
   const dated = times.filter((t) => t.date).map((t) => t.date!).sort()
   let kind: RegularReading['kind'] = body.kind === 'week' ? 'week' : 'schedule'
   let from = typeof body.from === 'string' && ahead.has(body.from) ? body.from : (dated.find((d) => ahead.has(d)) ?? null)
@@ -363,6 +387,25 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     from: kind === 'week' ? from : null,
     to: kind === 'week' ? to : null,
     times: weekTimes,
+  }
+}
+
+/** "Mincha / Kabbalat Shabbat / Ma'ariv 7:00 PM" is one minyan, however
+ *  the AI splits it: Mekor's website, read three times on Oct 21, came
+ *  back as Kabbalas Shabbos and Mincha & Maariv, then as Mincha, Maariv
+ *  and Kabbalas Shabbos, each at 7:00 PM. Evening prayers at one time on
+ *  the same days, in the same season, are the shul's Mincha & Maariv. */
+function joinEvening(times: ReadRegularTime[]): void {
+  const at = (t: ReadRegularTime) =>
+    JSON.stringify([t.date ?? null, [...t.days].sort(), t.time, t.anchor ?? null, t.offsetMinutes ?? null, seasonNote(t.notes)])
+  const groups = new Map<string, ReadRegularTime[]>()
+  for (const t of times) if (EVENING.includes(t.tefillah)) groups.set(at(t), [...(groups.get(at(t)) ?? []), t])
+  for (const group of groups.values()) {
+    if (group.length < 2 || !group.some((t) => t.tefillah !== 'kabbalas_shabbos')) continue
+    const [keep, ...rest] = group
+    const notes = [keep.notes, group.some((t) => t.tefillah === 'kabbalas_shabbos') && !/kabbal/i.test(keep.notes ?? '') ? 'with Kabbalas Shabbos' : null].filter(Boolean).join('- ')
+    Object.assign(keep, { tefillah: 'mincha_maariv', ...(notes ? { notes } : {}), ...(rest.some((t) => t.unsure) && !keep.unsure ? { unsure: rest.find((t) => t.unsure)!.unsure } : {}) })
+    for (const t of rest) times.splice(times.indexOf(t), 1)
   }
 }
 

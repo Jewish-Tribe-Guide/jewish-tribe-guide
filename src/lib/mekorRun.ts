@@ -10,10 +10,12 @@
 
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
+import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { askGoogleIfOpen } from '@/lib/keystoneRun'
 import { confirmFromSource } from '@/lib/sourceConfirm'
+import { listDifference, type ListRead } from '@/lib/watches'
 import {
   MEKOR_NAME,
   MEKOR_WATCH_NAME,
@@ -24,6 +26,7 @@ import {
   parseMekorList,
   submissionKey,
   type GuideListing,
+  type MekorEntry,
   type MekorFinding,
   type PendingCreate,
 } from '@/lib/mekorWatch'
@@ -33,7 +36,8 @@ import {
  *  place in the guide. The list had 78 on Oct 18, 2026. */
 const MIN_ENTRIES = 40
 
-const CATEGORIES = ['restaurant', 'grocery']
+/** The food places a kosher list is compared with. */
+export const CATEGORIES = ['restaurant', 'grocery']
 
 /** Ten digits as the guide writes a phone. */
 function phone(digits: string): string {
@@ -52,27 +56,42 @@ export type MekorRun =
   | {
       ok: true
       entries: number
+      /** The list as read, kept on its watch (WatchCheck.listRead). */
+      listRead: ListRead
       findings: number
       filed: number
+      /** Listings the list names that agree with it. */
+      matching: number
       closedOnGoogle: string[]
+      /** Every place it differs on, a line each (listDifference). */
+      differences: string[]
       /** Listings the list agreed with, dated today. */
       confirmed?: number
       /** A dry run's suggestions, unfiled. */
       wouldFile?: (WatchDigestItem & { kind: MekorFinding['kind']; note: string })[]
     }
 
-export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+/** Mekor Habracha's list, read now: its entries and its "Last Updated"
+ *  date, or why it couldn't be. Shared with the Kosher certification page. */
+export async function readMekorList(url: string): Promise<{ updated: string | null; entries: MekorEntry[] } | { error: string }> {
   let res: Response
   try {
     res = await fetch(url, { headers: WATCH_FETCH_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(20_000) })
   } catch (err) {
-    return { ok: false, error: `Couldn’t reach Mekor Habracha’s list (${err instanceof Error ? err.message : String(err)})` }
+    return { error: `Couldn’t reach Mekor Habracha’s list (${err instanceof Error ? err.message : String(err)})` }
   }
-  if (!res.ok) return { ok: false, error: `Mekor Habracha’s list answered ${res.status}` }
+  if (!res.ok) return { error: `Mekor Habracha’s list answered ${res.status}` }
   const { updated, entries } = parseMekorList(await res.text())
   if (entries.length < MIN_ENTRIES) {
-    return { ok: false, error: `Read only ${entries.length} places from Mekor Habracha’s list; its page may have changed. Nothing filed.` }
+    return { error: `Read only ${entries.length} places from Mekor Habracha’s list; its page may have changed. Nothing filed.` }
   }
+  return { updated, entries }
+}
+
+export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+  const list = await readMekorList(url)
+  if ('error' in list) return { ok: false, error: list.error }
+  const { updated, entries } = list
 
   const supabase = getAdminClient()
   // Archived listings too: a place Mekor still lists that the guide took
@@ -107,6 +126,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     }))
 
   const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
+  const agree = mekorAgrees(entries, (rows ?? []) as GuideListing[], findings)
 
   // Everything this watch has filed before, whatever became of it: a
   // suggestion an admin rejected isn't made again until the list changes.
@@ -124,6 +144,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   // one isn't suggested.
   const notes = new Map<MekorFinding, string>()
   const closed: string[] = []
+  const closedNow = new Set<MekorFinding>()
   const fresh: MekorFinding[] = []
   for (const f of unfiled) {
     let note = findingNote(f, updated)
@@ -131,6 +152,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
       const g = await askGoogleIfOpen(f.entry.name, f.entry.address)
       if (g.closed) {
         closed.push(f.entry.name)
+        closedNow.add(f)
         continue
       }
       note += `\n${g.line}`
@@ -139,13 +161,21 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     fresh.push(f)
   }
 
+  const differences = findings.map((f) => {
+    const d = describe(f)
+    return listDifference(d.name, d.what, filed.has(findingKey(f)) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
+  })
+
   if (dry) {
     return {
       ok: true,
       entries: entries.length,
+      listRead: { updated, entries },
       findings: findings.length,
       filed: 0,
+      matching: agree.length,
       closedOnGoogle: closed,
+      differences,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
   }
@@ -193,8 +223,8 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, 'Mekor Habracha’s list', items).catch((err) => console.error('[watch-mekor] digest failed:', err))
-  const confirmed = await confirmFromSource(community, mekorAgrees(entries, (rows ?? []) as GuideListing[], findings), MEKOR_NAME)
+  await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community, 'kosher')).catch((err) => console.error('[watch-mekor] digest failed:', err))
+  const confirmed = await confirmFromSource(community, agree, MEKOR_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }

@@ -101,6 +101,20 @@ describe('runKeystoneWatch', () => {
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
     expect(mockDigest).toHaveBeenCalledTimes(1)
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
+    expect(mockDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/kosher', name: 'Kosher certification' })
+  })
+
+  // The user, Oct 20: the Watches tab says what a run compared, not only
+  // how many it filed, so a run that filed nothing still shows its work.
+  it('says how many of the guide’s places match the list', async () => {
+    setDb([bagel], [])
+    const differs = await run()
+    expect(differs).toMatchObject({ ok: true, matching: 0, listRead: { updated: null } })
+    // What it read is kept on the watch, for the Kosher page (WatchCheck.listRead).
+    expect(differs.ok ? differs.listRead.entries : null).toHaveLength(differs.ok ? differs.entries : -1)
+    setDb([{ ...bagel, details: { ...bagel.details, t: ['Dairy', 'Parve'] } }], [])
+    // A dry run: one that agrees would be dated, which this mock can't.
+    expect(await run(true)).toMatchObject({ ok: true, matching: 1 })
   })
 
   it('files a removal for a place whose only hechsher was Keystone-K and is off the list', async () => {
@@ -133,6 +147,8 @@ describe('runKeystoneWatch', () => {
     setDb([bagel, shtetl], filed)
     const body = await run()
     expect(body.ok && body.filed).toBe(0)
+    // Still named, so the Watches tab can say which places differ.
+    expect(body.ok && body.differences).toContain('Shtetl: No longer on the list, and it was its only hechsher: remove? (filed before)')
     expect(mockDelete).not.toHaveBeenCalled()
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
@@ -168,6 +184,9 @@ describe('runKeystoneWatch', () => {
     expect(names).not.toContain('Sababa Falafel')
     expect(body.ok && body.closedOnGoogle).toContain('Sababa Falafel')
     expect(mockCreate.mock.calls[0][2]).toContain('Google: open.')
+    const lines = body.ok ? body.differences : []
+    expect(lines).toContain('Sababa Falafel: On the list, not in the guide (closed on Google, not filed)')
+    expect(lines).toContain(`${names[0]}: On the list, not in the guide`)
   })
 
   it('files nothing on a dry run', async () => {

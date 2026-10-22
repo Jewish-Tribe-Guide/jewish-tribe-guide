@@ -15,10 +15,12 @@ import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 
 // PATCH /api/admin/submissions/:id
-// body: { status: 'approved' | 'rejected', reason?: string, payload?: listing }
+// body: { status: 'approved' | 'rejected', reason?: string, payload?: listing, only?: string[] }
 // Approving APPLIES the change to the live tables. Admin only. `payload`, with
 // an approval only: the listing as the admin fixed it in the opened card,
-// which is what goes live instead of what was sent (reviewEdits.ts).
+// which is what goes live instead of what was sent (reviewEdits.ts). `only`,
+// with an approval only: the lines of a watch's finding ticked on its job
+// page ("Update 2 on the listing"); the rest stay as the listing says.
 // A best-effort decision email is sent to the submitter if they provided one.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/submissions/[id]'>) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
@@ -29,9 +31,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
   const { id } = await ctx.params
 
-  let body: { status?: string; reason?: string; payload?: unknown }
+  let body: { status?: string; reason?: string; payload?: unknown; only?: unknown }
   try {
-    body = (await request.json()) as { status?: string; reason?: string; payload?: unknown }
+    body = (await request.json()) as typeof body
   } catch {
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
@@ -46,15 +48,19 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   const decision = body.status
   const reason = body.reason?.trim() || undefined
 
-  if (body.payload !== undefined && decision !== 'approved') {
+  if ((body.payload !== undefined || body.only !== undefined) && decision !== 'approved') {
     return Response.json({ ok: false, errors: ['Changes can only be saved by approving.'] }, { status: 400 })
+  }
+  const only = body.only
+  if (only !== undefined && (!Array.isArray(only) || !only.every((k) => typeof k === 'string') || only.length === 0 || body.payload !== undefined)) {
+    return Response.json({ ok: false, errors: ['Tick at least one line to update.'] }, { status: 400 })
   }
 
   let submission
   try {
     submission =
       decision === 'approved'
-        ? await approveSubmission(id, community.slug, admin.email, body.payload)
+        ? await approveSubmission(id, community.slug, admin.email, body.payload, only as string[] | undefined)
         : await rejectSubmission(id, community.slug, admin.email)
   } catch (err) {
     if (err instanceof ReviewEditError) {

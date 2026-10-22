@@ -1,0 +1,165 @@
+import { settles, watchHealth, type Watch } from './watches'
+import { dishProposal, type ListedDishes, type ReadDish } from './dishProposal'
+import { samePage } from './hoursJob'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The Watches tab's jobs (the user, Oct 21): a row per thing the guide keeps
+// current on its own, each with four counts (checked, to check, can't be
+// read, didn't load today), opening a page with every place in it: Dishes
+// (what was the Main dishes tab), Hospitals, Eruv status here, and Mikvah
+// hours, Shul times (hoursJob.ts) and Kosher certification (kosherJob.ts).
+//
+// The counts are worked out here, from the same sections each job's page
+// shows, so a row and the page it opens can't disagree.
+//
+// Pure: no network, no database.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type JobCounts = { checked: number; toCheck: number; cantRead: number; didntLoad: number }
+
+// ── Dishes ──────────────────────────────────────────────────────────────────
+
+export type DishReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
+export type DishPlace = ListedDishes & {
+  website: string | null
+  menuUrl: string | null
+  menuAt?: string | null
+  reading: { status: DishReadingStatus; readAt: string; sourceUrl?: string | null; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
+  /** What its website's pages found, waiting: its hours or phone, for a
+   *  place Google doesn't keep (Main dishes board 3, Oct 22). */
+  findings?: readonly unknown[]
+  /** Its menu watch (menuWatch.ts): its menu link, or the page its menu
+   *  was found on, checked every morning. */
+  menuWatch?: MenuWatchState | null
+}
+
+export type MenuWatchState = Pick<Watch, 'url' | 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'>
+
+/** Its dishes came from a menu someone sent through the site ("+ Add"),
+ *  approved after the tab last failed to read one, or said it had none.
+ *  The tab's own approvals aren't this: their reading says approved. */
+export function sentThroughSite(place: DishPlace): boolean {
+  const r = place.reading
+  if (!place.menuAt || place.dishes.length === 0) return false
+  return !r || ((r.status === 'failed' || r.status === 'no_menu') && Date.parse(place.menuAt) > Date.parse(r.readAt))
+}
+
+/** Where a place is on the Dishes page (its tab, JobPage.tsx):
+ *   differs    its menu would change the listing's dishes (dishProposal)
+ *   not_read   never read, with a website or menu link to read
+ *   cant_read  no menu could be read, or nothing to read it from
+ *   same       read, and its menu agrees, or decided (used or kept)
+ *   off        said to have no menu: not read */
+export type DishPlaceStatus = 'differs' | 'not_read' | 'cant_read' | 'same' | 'off'
+
+export function dishStatus(p: DishPlace): DishPlaceStatus {
+  const r = p.reading
+  // Its website's hours or phone, waiting: an update whatever its menu
+  // says, "No menu" too (its website is still read, and what it finds is
+  // shown nowhere else).
+  if (p.findings?.length) return 'differs'
+  if (sentThroughSite(p)) return 'same'
+  if (!r) return p.website || p.menuUrl ? 'not_read' : 'cant_read'
+  if (r.status === 'no_menu') return 'off'
+  if (r.status === 'failed') return 'cant_read'
+  if (r.status === 'proposed') return dishProposal(p, { dishes: r.dishes ?? [], missing: r.missing }).updates > 0 ? 'differs' : 'same'
+  return 'same'
+}
+
+/** A watch whose page didn't open on its last run, or that hasn't run in
+ *  two days. */
+export function didntLoad(w: Pick<Watch, 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'>, now: number): boolean {
+  const state = watchHealth(w, now).state
+  return state === 'failing' || state === 'stale'
+}
+
+/** Its menu page didn't open on the morning's check, and hasn't been read
+ *  from that page since (Read now on the Dishes page). */
+export function menuDidntLoad(p: Pick<DishPlace, 'menuWatch' | 'reading'>, now: number): boolean {
+  const w = p.menuWatch
+  if (!w || !didntLoad(w, now)) return false
+  const r = p.reading
+  const readSince = !!r && r.status !== 'failed' && !!r.sourceUrl && samePage(r.sourceUrl, w.url) && !!w.lastRunAt && Date.parse(r.readAt) > Date.parse(w.lastRunAt)
+  return !readSince
+}
+
+/** Where a place is on the Dishes page, its menu page not loading
+ *  included: an update or "no menu" said first. */
+export type DishJobStatus = DishPlaceStatus | 'didnt_load'
+export function dishJobStatus(p: DishPlace, now: number): DishJobStatus {
+  const s = dishStatus(p)
+  return s !== 'differs' && s !== 'off' && menuDidntLoad(p, now) ? 'didnt_load' : s
+}
+
+export function dishCounts(places: readonly DishPlace[], now: number): JobCounts {
+  const n = (...of: DishJobStatus[]) => places.filter((p) => of.includes(dishJobStatus(p, now))).length
+  return { checked: n('same'), toCheck: n('differs', 'not_read'), cantRead: n('cant_read'), didntLoad: n('didnt_load') }
+}
+
+// ── Hospitals ───────────────────────────────────────────────────────────────
+
+/** Where a hospital is on its page.
+ *   to_check   Refuah has contacts the listing doesn't
+ *   checked    Refuah's contacts agree with the listing
+ *   nothing    matched, but Refuah lists nothing there yet
+ *   waiting    matched, not compared with the listing yet (the next
+ *              morning's run does it)
+ *   cant_read  no Refuah page for it, or its page didn't load
+ *   off        turned off, or said not to be on Refuah */
+export type HospitalSection = 'to_check' | 'checked' | 'nothing' | 'waiting' | 'cant_read' | 'off'
+
+/** `waiting`: how many of Refuah's findings for it wait on the page; given,
+ *  a difference already decided there (Update or Skip) is settled. */
+export type HospitalState = { watch: Watch | null; notOnRefuah: boolean; waiting?: number }
+
+export function hospitalSection(h: HospitalState, now: number): HospitalSection {
+  if (h.notOnRefuah || (h.watch && !h.watch.active)) return 'off'
+  if (h.waiting) return 'to_check'
+  if (!h.watch) return 'cant_read'
+  const state = watchHealth(h.watch, now).state
+  if (state === 'failing' || state === 'stale') return 'cant_read'
+  // Read, but what it found wasn't kept (before this branch's runs, or
+  // migration 085): not known to agree.
+  if (state === 'waiting' || !h.watch.lastCheck) return 'waiting'
+  const result = h.watch.lastCheck.result
+  if (result === 'differs') return settles(h.watch.lastCheck, h.waiting) ? 'checked' : 'to_check'
+  if (result === 'nothing') return 'nothing'
+  return 'checked'
+}
+
+export function hospitalCounts(hospitals: readonly HospitalState[], now: number): JobCounts & { nothing: number } {
+  const of = (s: HospitalSection) => hospitals.filter((h) => hospitalSection(h, now) === s).length
+  return {
+    checked: of('checked'),
+    toCheck: of('to_check'),
+    cantRead: hospitals.filter((h) => !h.notOnRefuah && !h.watch).length,
+    didntLoad: hospitals.filter((h) => h.watch?.active && didntLoad(h.watch, now)).length,
+    nothing: of('nothing'),
+  }
+}
+
+// ── Eruv status ─────────────────────────────────────────────────────────────
+
+/** Where an eruv is on its page.
+ *   read        its page or its email was read, and the site shows what it said
+ *   didnt_load  its page didn't open on the last read, so the site shows no
+ *               current status
+ *   email       an email from it the reader couldn't make out, waiting for
+ *               an admin to say what it says
+ *   no_source   nowhere to read it from */
+export type EruvSection = 'read' | 'didnt_load' | 'email' | 'no_source'
+
+export type EruvState = {
+  statusUrl: string | null
+  statusEmail?: string | null
+  statusEmailKept?: unknown
+  statusErrorAt: string | null
+  statusCheckedAt: string | null
+}
+
+export function eruvSection(e: EruvState): EruvSection {
+  if (!e.statusUrl && !e.statusEmail) return 'no_source'
+  if (e.statusEmailKept) return 'email'
+  if (e.statusUrl && e.statusErrorAt && (!e.statusCheckedAt || Date.parse(e.statusErrorAt) > Date.parse(e.statusCheckedAt))) return 'didnt_load'
+  return 'read'
+}

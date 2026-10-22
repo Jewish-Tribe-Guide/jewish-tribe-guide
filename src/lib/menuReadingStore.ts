@@ -1,5 +1,6 @@
 import { getAdminClient } from './supabase/admin'
 import type { MenuDish } from './menuReader'
+import { MENU_LINK_KEY } from './menuLink'
 
 // What the menu reader proposed for each food place, and what an admin
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
@@ -12,6 +13,8 @@ export type StoredMenuReading = {
   status: MenuReadingStatus
   sourceUrl: string | null
   dishes: MenuDish[]
+  /** Dishes on the listing this menu doesn't name (menuReader's `missing`). */
+  missing: string[]
   note: string | null
   model: string | null
   readAt: string
@@ -37,12 +40,29 @@ type Row = {
   decided_by: string | null
 }
 
+// The listing's dishes a menu doesn't name are kept among the reading's
+// dishes, each marked `missing` and with no words from the menu, so they
+// need no migration. Split apart again on the way out.
+type MissingEntry = { name: string; quote: ''; checked: false; missing: true }
+
+export function storedDishes(dishes: MenuDish[], missing: readonly string[] = []): (MenuDish | MissingEntry)[] {
+  return [...dishes, ...missing.map((name) => ({ name, quote: '' as const, checked: false as const, missing: true as const }))]
+}
+
+export function splitDishes(raw: unknown): { dishes: MenuDish[]; missing: string[] } {
+  const all = Array.isArray(raw) ? (raw as (MenuDish & { missing?: true })[]) : []
+  return {
+    dishes: all.filter((d) => !d.missing),
+    missing: all.filter((d) => d.missing && typeof d.name === 'string').map((d) => d.name),
+  }
+}
+
 function fromRow(r: Row): StoredMenuReading {
   return {
     resourceId: r.resource_id,
     status: r.status,
     sourceUrl: r.source_url,
-    dishes: Array.isArray(r.dishes) ? (r.dishes as MenuDish[]) : [],
+    ...splitDishes(r.dishes),
     note: r.note,
     model: r.model,
     readAt: r.read_at,
@@ -71,7 +91,7 @@ export async function getMenuReading(community: string, resourceId: string): Pro
 export async function saveMenuReading(
   community: string,
   resourceId: string,
-  reading: { status: 'proposed' | 'failed'; sourceUrl: string | null; dishes: MenuDish[]; note: string | null; model: string | null },
+  reading: { status: 'proposed' | 'failed'; sourceUrl: string | null; dishes: MenuDish[]; missing?: readonly string[]; note: string | null; model: string | null },
 ): Promise<StoredMenuReading> {
   const { data, error } = await getAdminClient()
     .from('menu_reading')
@@ -81,7 +101,7 @@ export async function saveMenuReading(
         resource_id: resourceId,
         status: reading.status,
         source_url: reading.sourceUrl,
-        dishes: reading.dishes,
+        dishes: storedDishes(reading.dishes, reading.missing),
         note: reading.note,
         model: reading.model,
         read_at: new Date().toISOString(),
@@ -103,4 +123,130 @@ export async function decideMenuReading(community: string, resourceId: string, s
     .eq('community_id', community)
     .eq('resource_id', resourceId)
   if (error) throw new Error(`Failed to save the decision: ${error.message}`)
+}
+
+// ── "No menu" (the user, Oct 20) ─────────────────────────────────────────────
+// An admin's word that a place has no menu to read (a butcher, a caterer
+// who cooks to order), so it stops counting as "couldn't be read" and isn't
+// read again. Kept as a skipped reading with no dishes and this note, so it
+// needs no migration. A reading made later (its menu link, photos, the menu
+// watch finding dishes) replaces it, as any reading replaces the last.
+
+export const NO_MENU_NOTE = 'No menu'
+
+export function isNoMenu(r: Pick<StoredMenuReading, 'status' | 'note' | 'dishes'>): boolean {
+  return r.status === 'skipped' && r.note === NO_MENU_NOTE && r.dishes.length === 0
+}
+
+export async function markNoMenu(community: string, resourceId: string, by: string): Promise<StoredMenuReading> {
+  const now = new Date().toISOString()
+  const { data, error } = await getAdminClient()
+    .from('menu_reading')
+    .upsert(
+      {
+        community_id: community,
+        resource_id: resourceId,
+        status: 'skipped',
+        source_url: null,
+        dishes: [],
+        note: NO_MENU_NOTE,
+        model: null,
+        read_at: now,
+        decided_at: now,
+        decided_by: by,
+      },
+      { onConflict: 'community_id,resource_id' },
+    )
+    .select(COLUMNS)
+    .single()
+  if (error) throw new Error(`Failed to save "no menu": ${error.message}`)
+  return fromRow(data as Row)
+}
+
+/** Takes a place's reading away: "No menu" undone, it's as if never read. */
+export async function clearMenuReading(community: string, resourceId: string): Promise<void> {
+  const { error } = await getAdminClient().from('menu_reading').delete().eq('community_id', community).eq('resource_id', resourceId)
+  if (error) throw new Error(`Failed to clear the menu reading: ${error.message}`)
+}
+
+/** Puts a menu link on a live listing, or takes it off (null) (details.menuUrl, menuLink.ts): the
+ *  admin's "Give its menu link". From then on the tab reads it first and
+ *  the menu watch watches it (syncMenuWatches). Read, then written whole,
+ *  as other admin writes to details are. False when the listing isn't live. */
+export async function saveMenuLink(community: string, resourceId: string, url: string | null): Promise<boolean> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
+  if (error) throw new Error(`Failed to load the listing: ${error.message}`)
+  if (!data) return false
+  // null: "Stop reading it", the link taken off.
+  const details: Record<string, unknown> = { ...((data as { details: Record<string, unknown> | null }).details ?? {}) }
+  if (url) details[MENU_LINK_KEY] = url
+  else delete details[MENU_LINK_KEY]
+  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
+  if (saveError) throw new Error(`Failed to save the menu link: ${saveError.message}`)
+  return true
+}
+
+// ── Use this, and Edit's "Save to the listing" (Oct 21) ─────────────────────
+// The Dishes page sets a place's list whole: the dishes its menu no longer
+// names off, the new ones on (dishProposal.ts), or the list as an admin
+// edited it. Each dish keeps its dates under whichever part it's in now;
+// a dish taken off loses them. The ones its menu names are dated "on its
+// menu" now (details.itemMenu, as approve_menu_dishes did): an admin saw
+// them there. A dish added by hand gets no menu date, so a later read that
+// misses it never crosses it out.
+
+const DATE_MAPS = ['itemMenu', 'itemSeen', 'itemGone'] as const
+
+/** The listing's details with its dish lists set. Pure, for its tests. */
+export function withMenuDishes(
+  details: Record<string, unknown>,
+  fieldKey: string,
+  lists: { always: readonly string[]; sometimes: readonly string[] },
+  dated: { names: readonly string[]; at: string; menuUrl: string | null },
+): Record<string, unknown> {
+  const sk = `${fieldKey}_sometimes`
+  const out: Record<string, unknown> = { ...details, [fieldKey]: [...lists.always], [sk]: [...lists.sometimes] }
+  if (lists.sometimes.length === 0) delete out[sk]
+  const onMenu = new Set(dated.names.map((n) => n.trim().toLowerCase()))
+  for (const map of DATE_MAPS) {
+    const all = details[map] && typeof details[map] === 'object' ? { ...(details[map] as Record<string, Record<string, string>>) } : {}
+    const was = new Map<string, string>()
+    for (const key of [fieldKey, sk]) for (const [label, at] of Object.entries(all[key] ?? {})) if (typeof at === 'string') was.set(label.trim().toLowerCase(), at)
+    for (const [key, names] of [
+      [fieldKey, lists.always],
+      [sk, lists.sometimes],
+    ] as const) {
+      const next: Record<string, string> = {}
+      for (const name of names) {
+        const at = map === 'itemMenu' && onMenu.has(name.trim().toLowerCase()) ? dated.at : was.get(name.trim().toLowerCase())
+        if (at) next[name] = at
+      }
+      if (Object.keys(next).length) all[key] = next
+      else delete all[key]
+    }
+    if (Object.keys(all).length) out[map] = all
+    else delete out[map]
+  }
+  if (dated.menuUrl) out[MENU_LINK_KEY] = dated.menuUrl
+  return out
+}
+
+/** Sets a live listing's dish lists (withMenuDishes). Read, then written
+ *  whole, as saveMenuLink. False when the listing isn't live. */
+export async function setMenuDishes(
+  community: string,
+  resourceId: string,
+  fieldKey: string,
+  lists: { always: readonly string[]; sometimes: readonly string[] },
+  dated: { names: readonly string[]; at: string; menuUrl: string | null },
+): Promise<boolean> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
+  if (error) throw new Error(`Failed to load the listing: ${error.message}`)
+  if (!data) return false
+  const details = withMenuDishes((data as { details: Record<string, unknown> | null }).details ?? {}, fieldKey, lists, dated)
+  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
+  if (saveError) throw new Error(`Failed to save the dishes: ${saveError.message}`)
+  return true
 }

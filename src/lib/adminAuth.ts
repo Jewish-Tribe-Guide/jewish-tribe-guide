@@ -34,7 +34,11 @@ export function isAllowedAdminEmail(email: string): boolean {
  *  to set one. Once admin_emails is non-empty, only what's on it is
  *  admitted — the superadmin list no longer applies. */
 export async function isAllowedForCommunity(email: string, communitySlug: string): Promise<boolean> {
-  const configured = await getCommunityAdminEmails(communitySlug)
+  return allowedBy(await getCommunityAdminEmails(communitySlug), email)
+}
+
+/** isAllowedForCommunity's rule, given the community's admin_emails. */
+function allowedBy(configured: readonly string[], email: string): boolean {
   if (configured.length > 0) {
     const target = email.trim().toLowerCase()
     return configured.some((e) => e.trim().toLowerCase() === target)
@@ -81,7 +85,9 @@ export async function getAdminUserForCommunity(
   request: Request,
   communitySlug: string,
 ): Promise<{ email: string } | null> {
-  const email = await verifyToken(request)
-  if (!email || !(await isAllowedForCommunity(email, communitySlug))) return null
+  // The token's check and the community's admin list at once, not one
+  // after the other: a round trip less on every admin request (Oct 22).
+  const [email, configured] = await Promise.all([verifyToken(request), getCommunityAdminEmails(communitySlug)])
+  if (!email || !allowedBy(configured, email)) return null
   return { email }
 }

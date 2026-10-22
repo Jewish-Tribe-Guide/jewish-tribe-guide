@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NEWSLETTER_WATCH_CREATOR } from './newsletter'
+import { ERUV_WEBSITE_CREATOR } from './eruvWebsite'
+import type { Watch } from './watches'
 
 // A newsletter sender's watch in the daily run: nothing fetched, only
 // whether its newsletter has gone quiet (newsletter.ts).
 const m = vi.hoisted(() => ({ readWebsite: vi.fn() }))
 vi.mock('./keystoneRun', () => ({ runKeystoneWatch: vi.fn() }))
-vi.mock('./refuahRun', () => ({ runRefuahWatch: vi.fn() }))
+const refuah = vi.hoisted(() => ({ run: vi.fn() }))
+vi.mock('./refuahRun', () => ({ runRefuahWatch: refuah.run }))
 const mekor = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./mekorRun', () => ({ runMekorWatch: mekor.run }))
 vi.mock('./menuWatchRun', () => ({ runMenuWatch: vi.fn() }))
 const page = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./listingPageRun', () => ({ runListingPageWatch: page.run }))
 vi.mock('./websiteWatch', () => ({ readWebsite: m.readWebsite }))
+const eruv = vi.hoisted(() => ({ run: vi.fn() }))
+vi.mock('./eruvWebsiteRun', () => ({ runEruvWebsiteWatch: eruv.run }))
 vi.mock('./watchStore', () => ({ updateWatch: vi.fn() }))
 
-const { runWatch } = await import('./watchRunner')
+const { runWatch, runAndRecord } = await import('./watchRunner')
 const now = Date.parse('2026-11-20T12:00:00Z')
 const sender = { communityId: 'philly', kind: 'website' as const, url: 'mailto:info@mekor.org', createdBy: NEWSLETTER_WATCH_CREATOR, createdAt: '2026-10-01T00:00:00Z' }
 
@@ -38,10 +43,23 @@ describe('runWatch: Mekor Habracha’s list', () => {
   const mekorList = { communityId: 'philly', kind: 'website' as const, url: 'https://www.mekorhabracha.org/center-city' }
 
   it('is read place by place, not watched for a change', async () => {
-    mekor.run.mockResolvedValue({ ok: true, entries: 78, findings: 18, filed: 18, closedOnGoogle: [] })
-    expect(await runWatch(mekorList)).toEqual({ ok: true, filed: 18 })
+    mekor.run.mockResolvedValue({ ok: true, entries: 78, matching: 60, findings: 18, filed: 18, closedOnGoogle: [] })
+    expect(await runWatch(mekorList)).toEqual({
+      ok: true,
+      filed: 18,
+      check: { what: 'list', from: null, result: 'differs', read: [], differences: [], queue: 'filed', list: { listed: 78, matching: 60, differences: 18, filed: 18 } },
+    })
     expect(mekor.run).toHaveBeenCalledWith('philly', mekorList.url)
     expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  it('keeps what it read on the watch, for the Kosher page, but hands back the watch without it', async () => {
+    const listRead = { updated: 'Oct 20, 2026', entries: [{ name: 'Sweet Lizzy' }] }
+    mekor.run.mockResolvedValue({ ok: true, entries: 1, matching: 1, findings: 0, filed: 0, closedOnGoogle: [], listRead })
+    const { outcome, watch } = await runAndRecord({ ...mekorList, id: 'w1', createdAt: 'c', active: true } as Watch, '2026-10-22T00:00:00Z')
+    expect(outcome).toMatchObject({ ok: true, check: { listRead } })
+    expect(watch.lastCheck).toMatchObject({ what: 'list', at: '2026-10-22T00:00:00Z' })
+    expect(watch.lastCheck).not.toHaveProperty('listRead')
   })
 
   it('says why when it couldn’t be read', async () => {
@@ -59,8 +77,15 @@ describe('runWatch: a listing’s own page', () => {
     page.run.mockResolvedValue({ ok: true, filed: 1, pageHash: 'h2' })
     const budget = { aiReads: 3 }
     expect(await runWatch(shulPage, budget)).toEqual({ ok: true, filed: 1, pageHash: 'h2' })
-    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h' }, budget)
+    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h', createdBy: 'listing pages', lastCheck: null }, budget, { full: false })
     expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  // The user, Oct 20: "Check now" has the AI read it, changed or not.
+  it('is read in full when an admin checks it', async () => {
+    page.run.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    await runWatch(shulPage, undefined, undefined, { full: true })
+    expect(page.run).toHaveBeenCalledWith(expect.objectContaining({ resourceId: 's1' }), undefined, { full: true })
   })
 
   it('an admin’s plain watch on the same page is only checked for a change', async () => {
@@ -69,4 +94,24 @@ describe('runWatch: a listing’s own page', () => {
     expect(page.run).not.toHaveBeenCalled()
     expect(m.readWebsite).toHaveBeenCalledWith(shulPage.url)
   })
+})
+
+// A hospital's page on Refuah (refuahRun.ts) remembers what it matched, so
+// only entries that came from Refuah are ever taken off.
+describe('runWatch: a hospital’s Refuah page', () => {
+  it('is read with what it remembered last time', async () => {
+    const url = 'https://refuah.com/hospitals/abcdefghijklmnopqrst1234'
+    const lastCheck = { at: '2026-10-21T00:00:00Z', what: 'contacts' as const, from: 'page' as const, result: 'agrees' as const, read: [], differences: [], queue: null, refuahHad: ['transportation:dovid'] }
+    refuah.run.mockResolvedValue({ ok: true, filed: 0 })
+    await runWatch({ communityId: 'philly', kind: 'website', url, resourceId: 'h1', lastCheck })
+    expect(refuah.run).toHaveBeenCalledWith('philly', url, 'h1', lastCheck)
+  })
+})
+
+// Oct 22: an eruv's website, read for its hotline and email alerts.
+it('runWatch: an eruv’s website is read for its Details, not watched for a change', async () => {
+  eruv.run.mockResolvedValue({ ok: true, filed: 1 })
+  expect(await runWatch({ communityId: 'philly', kind: 'website', url: 'https://lowermerioneruv.org/', createdBy: ERUV_WEBSITE_CREATOR })).toEqual({ ok: true, filed: 1 })
+  expect(eruv.run).toHaveBeenCalledWith('philly', 'https://lowermerioneruv.org/')
+  expect(m.readWebsite).not.toHaveBeenCalled()
 })

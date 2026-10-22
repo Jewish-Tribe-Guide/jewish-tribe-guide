@@ -33,6 +33,7 @@ const {
   listPendingSubmissions,
   ReviewEditError,
   attachSubmitterEmail,
+  replacePendingSuggestion,
 } = await import('./submissionStore')
 
 const pendingCategoryIds: string[] = []
@@ -190,6 +191,126 @@ describe('submissionStore (integration)', () => {
     expect(after!.phone).toBe('555-0100')
     expect(after!.details.kept).toBe('yes')
     expect(Date.parse(after!.details.confirmedAt)).toBeGreaterThanOrEqual(before - 1000)
+  })
+
+  // Oct 21: a shul's times are filed a part at a time (timesParts.ts), each
+  // from the listing as it was read. Approved, a part goes on the listing
+  // as it is then, so approving the Shabbos times can't undo the weekday
+  // times approved a moment before.
+  it('approving one part of a shul’s times keeps another part approved since it was read', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Shul ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const weekday = { id: 'a', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '6:45am' }
+    const shabbos = { id: 'b', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }
+    await getAdminClient().from('resource').update({ details: { minyanim: [weekday, shabbos] } }).eq('id', created!.id)
+
+    const source = (part: string) => ({ readBy: 'ai', from: 'its website', part: { part, field: 'minyanim' } })
+    const file = async (minyanim: object[], part: string) => {
+      const sub = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), details: { minyanim }, source: source(part) } as ResourceSubmission, null, null)
+      pendingSubmissionIds.push(sub.id)
+      return sub
+    }
+    // Both read off the listing as it was: 6:45 weekdays, 9:00 Shabbos.
+    const weekdays = await file([{ ...weekday, time: '7:00am' }, shabbos], 'weekday')
+    const shabbosPart = await file([weekday, { ...shabbos, time: '8:30am' }], 'shabbos')
+    await approveSubmission(weekdays.id)
+    // And a new phone number, approved meanwhile.
+    await getAdminClient().from('resource').update({ phone: '555-0199' }).eq('id', created!.id)
+    await approveSubmission(shabbosPart.id)
+
+    const { data: after } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
+    const times = (after!.details.minyanim as { days: string[]; time: string }[]).map((m) => `${m.days.join(',')} ${m.time}`).sort()
+    expect(times).toEqual(['mon,tue,wed,thu,fri 7:00am', 'sat 8:30am'])
+    expect(after!.phone).toBe('555-0199')
+  })
+
+  // Oct 22: a mikvah's hours, the same way, a section at a time
+  // (hoursSections.ts): using the women's hours never undoes men's hours
+  // approved since they were read.
+  it('approving one section of a mikvah’s hours keeps another section approved since it was read', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Mikvah ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const listed = { women_s_hours: 'evenings', women_s_notes: 'By appointment.', men_s_hours: 'mornings', kept: 'yes' }
+    await getAdminClient().from('resource').update({ details: listed }).eq('id', created!.id)
+
+    const file = async (details: object, section: string, keys: string[]) => {
+      const sub = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), details: { ...listed, ...details }, source: { readBy: 'ai', from: 'its website', section: { section, keys } } } as ResourceSubmission, null, null)
+      pendingSubmissionIds.push(sub.id)
+      return sub
+    }
+    // Both read off the listing as it was.
+    const men = await file({ men_s_hours: 'dawn' }, 'menTevillah', ['men_s_hours', 'men_s_notes'])
+    const women = await file({ women_s_hours: 'late evenings' }, 'womenTevillah', ['women_s_hours', 'women_s_notes'])
+    await approveSubmission(men.id)
+    await approveSubmission(women.id)
+
+    const { data: after } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(after!.details).toMatchObject({ women_s_hours: 'late evenings', women_s_notes: 'By appointment.', men_s_hours: 'dawn', kept: 'yes' })
+  })
+
+  // Oct 22: a page's phone and email are a section too (contactRead.ts),
+  // the phone the listing's own column: approving it sets the phone and
+  // undoes nothing approved since; an admin's Edit of it sets theirs.
+  it('approving a page’s phone sets the phone and keeps everything approved since it was read', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Food ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', { ...listingPayload(category.id, name), phone: '(215) 555-0100' })
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const listed = { kept: 'yes' }
+    await getAdminClient().from('resource').update({ details: listed }).eq('id', created!.id)
+
+    const contact = async (phone: string) => {
+      const sub = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), phone, details: listed, source: { readBy: 'ai', from: 'its website', section: { section: 'contact', keys: ['phone'] } } } as ResourceSubmission, null, null)
+      pendingSubmissionIds.push(sub.id)
+      return sub
+    }
+    const read = await contact('(215) 555-0123')
+    // Approved meanwhile: a detail, from someone else.
+    const other = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), phone: '(215) 555-0100', details: { kept: 'changed since' } }, null, null)
+    pendingSubmissionIds.push(other.id)
+    await approveSubmission(other.id)
+    await approveSubmission(read.id)
+    const { data: after } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
+    expect(after!.phone).toBe('(215) 555-0123')
+    expect(after!.details).toMatchObject({ kept: 'changed since' })
+
+    // Edit: the admin's number, not the page's.
+    const edited = await contact('(215) 555-0199')
+    await approveSubmission(edited.id, undefined, 'admin@example.org', { phone: '(215) 555-0177', details: {} })
+    const { data: last } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
+    expect(last!.phone).toBe('(215) 555-0177')
+    expect(last!.details).toMatchObject({ kept: 'changed since' })
+  })
+
+  it('a pending suggestion is said again better in place; one decided meanwhile is left as decided', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Shul ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const sub = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), details: { kept: 'one' } }, 'first', null)
+    pendingSubmissionIds.push(sub.id)
+
+    expect(await replacePendingSuggestion('philly', sub.id, { ...listingPayload(category.id, name), details: { kept: 'two' } }, 'second')).toBe(true)
+    const { data: replaced } = await getAdminClient().from('submission').select('payload, note, status').eq('id', sub.id).single()
+    expect([replaced!.payload.details.kept, replaced!.note, replaced!.status]).toEqual(['two', 'second', 'pending'])
+
+    await rejectSubmission(sub.id)
+    expect(await replacePendingSuggestion('philly', sub.id, { ...listingPayload(category.id, name), details: { kept: 'three' } }, 'third')).toBe(false)
+    expect(await replacePendingSuggestion('ues', sub.id, { ...listingPayload(category.id, name), details: { kept: 'three' } }, 'third')).toBe(false)
+    const { data: decided } = await getAdminClient().from('submission').select('payload').eq('id', sub.id).single()
+    expect(decided!.payload.details.kept).toBe('two')
   })
 
   // Oct 6: dishes read off a Food place's menu in the "+ Add" box are dated

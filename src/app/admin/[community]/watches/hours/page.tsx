@@ -2,14 +2,14 @@
 
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import AdminNav from '@/components/admin/AdminNav'
-import MainDishes from '@/components/admin/MainDishes'
+import HoursJob from '@/components/admin/HoursJob'
 
-export default function AdminMainDishesPage() {
+export default function AdminHoursPage() {
   const session = useAdminSession()
   return (
     <div>
       <AdminNav />
-      <MainDishes token={session.access_token} />
+      <HoursJob token={session.access_token} />
     </div>
   )
 }

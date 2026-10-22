@@ -8,7 +8,7 @@ import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { buildCatalog, itemsChange, newPlaceSubmission, readMessage, type ReadImage } from '@/lib/messageReader'
 import { readShulWeek } from '@/lib/shulWeekReading'
-import { findMenu, isOrderingApp, readMenu, type MenuSource } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, readMenus, type MenuSource } from '@/lib/menuReader'
 import { readFieldChanges, type FieldRead } from '@/lib/fieldChanges'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { selectValues } from '@/lib/categories'
@@ -134,14 +134,16 @@ export async function POST(request: Request) {
     let menusRead = 0
     // A menu: where it can be read from, or why it can't.
     // `pasted`: a whole menu sent as text, in the menu box.
-    const menuFrom = async (url: string | null, pasted: string | null = null): Promise<MenuSource | MenuWhy> => {
+    // A link: the pages it may be on, best first (findMenus).
+    const menuFrom = async (url: string | null, pasted: string | null = null): Promise<MenuSource[] | MenuWhy> => {
       if (url) {
         if (isOrderingApp(url)) return 'ordering_app'
-        return (await findMenu(url)) ?? 'wont_open'
+        const found = await findMenus(url)
+        return found.length ? found : 'wont_open'
       }
       const pdf = images.find((i) => i.mime === 'application/pdf')
       const photos = images.filter((i) => i.mime !== 'application/pdf')
-      if (pdf || photos.length || pasted) return { url: null, text: pasted, pdf: pdf?.b64 ?? null, images: photos }
+      if (pdf || photos.length || pasted) return [{ url: null, text: pasted, pdf: pdf?.b64 ?? null, images: photos }]
       return 'no_source'
     }
     const failedMenu = (listingId: string | null, asWritten: string, why: MenuWhy, note: string | null = null) => ({ kind: 'menu', listing: listingId ? brief(listingId) : null, asWritten, why, note })
@@ -150,9 +152,9 @@ export async function POST(request: Request) {
       // One menu per message: each is a model call, and a long one.
       if (++menusRead > MAX_MENUS) return failedMenu(l.id, asWritten, 'one_menu')
       try {
-        const source = await menuFrom(url, pasted)
-        if (typeof source === 'string') return failedMenu(l.id, asWritten, source)
-        const read = await readMenu(source, l.name, { apiKey })
+        const sources = await menuFrom(url, pasted)
+        if (typeof sources === 'string') return failedMenu(l.id, asWritten, sources)
+        const read = (await readMenus(sources, l.name, { apiKey }))!
         if (read.dishes.length === 0) return failedMenu(l.id, asWritten, 'no_dishes', read.note)
         const items = read.dishes.map((d) => ({ name: d.name, availability: 'always' as const, doubt: null }))
         return {
@@ -183,9 +185,9 @@ export async function POST(request: Request) {
     }
     const newPlaceMenu = async (name: string, url: string | null) => {
       try {
-        const source = url ? await menuFrom(url) : 'no_source'
-        if (typeof source === 'string') return failedMenu(null, name, source)
-        const read = await readMenu(source, name, { apiKey })
+        const sources = url ? await menuFrom(url) : 'no_source'
+        if (typeof sources === 'string') return failedMenu(null, name, sources)
+        const read = (await readMenus(sources, name, { apiKey }))!
         if (read.dishes.length === 0) return failedMenu(null, name, 'no_dishes', read.note)
         const items = read.dishes.map((d) => ({ name: d.name, availability: 'always' as const, doubt: null }))
         return { kind: 'items', listingId: null, listing: null, asWritten: name, chain: false, ask: null, items, note: null, menu: { url: read.sourceUrl, dishes: read.dishes }, lines: [], held: [] }

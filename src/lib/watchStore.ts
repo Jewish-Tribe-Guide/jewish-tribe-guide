@@ -1,13 +1,29 @@
 import { getAdminClient } from './supabase/admin'
-import type { Watch, WatchKind } from './watches'
+import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
 
 // The watch table (migration 070): the outside pages the guide reads on its
 // own, and how each run went. Uncached: the cron and an admin screen. A
 // missing table (the migration not run yet) isn't an error: the cron falls
-// back to the built-in Keystone-K watch and the tab says so.
+// back to the built-in Keystone-K watch and the tab says so. What the last
+// full read found is migration 085's `last_check`: until it's run, it's
+// neither read nor saved, and everything else works.
 
-const COLUMNS =
+const BASE_COLUMNS =
   'id, community_id, kind, url, resource_id, label, active, created_at, created_by, last_run_at, last_ok_at, last_error, failing_since, last_filed, page_hash, page_changed_at'
+const COLUMNS = `${BASE_COLUMNS}, last_check`
+
+/** Postgres naming migration 085's column, not there yet. */
+export function checkColumnMissing(message: string | undefined): boolean {
+  return !!message && /last_check/.test(message)
+}
+
+type Res = { data: unknown; error: { message: string } | null }
+
+/** A read with `last_check`, or without it when the column isn't there. */
+async function withCheck(run: (columns: string) => PromiseLike<Res>): Promise<Res> {
+  const res = await run(COLUMNS)
+  return res.error && checkColumnMissing(res.error.message) ? run(BASE_COLUMNS) : res
+}
 
 type Row = {
   id: string
@@ -26,6 +42,7 @@ type Row = {
   last_filed: number | null
   page_hash: string | null
   page_changed_at: string | null
+  last_check?: WatchCheck | null
 }
 
 function fromRow(r: Row): Watch {
@@ -46,6 +63,8 @@ function fromRow(r: Row): Watch {
     lastFiled: r.last_filed,
     pageHash: r.page_hash,
     pageChangedAt: r.page_changed_at,
+    // A kosher list's whole read stays here: getListReads.
+    lastCheck: withoutListRead(r.last_check ?? null),
   }
 }
 
@@ -57,6 +76,7 @@ const TO_COLUMN: Record<string, string> = {
   lastFiled: 'last_filed',
   pageHash: 'page_hash',
   pageChangedAt: 'page_changed_at',
+  lastCheck: 'last_check',
   active: 'active',
   label: 'label',
   resourceId: 'resource_id',
@@ -76,7 +96,7 @@ export function tableMissing(message: string | undefined): boolean {
 /** Every community's watches, for the daily run. `available` is false
  *  without migration 070. */
 export async function listAllWatches(): Promise<{ watches: Watch[]; available: boolean }> {
-  const { data, error } = await getAdminClient().from('watch').select(COLUMNS).order('created_at')
+  const { data, error } = await withCheck((cols) => getAdminClient().from('watch').select(cols).order('created_at'))
   if (error) {
     if (tableMissing(error.message)) return { watches: [], available: false }
     throw new Error(`Failed to load watches: ${error.message}`)
@@ -86,7 +106,7 @@ export async function listAllWatches(): Promise<{ watches: Watch[]; available: b
 
 /** One community's watches, for its admin tab. */
 export async function listWatches(community: string): Promise<{ watches: Watch[]; available: boolean }> {
-  const { data, error } = await getAdminClient().from('watch').select(COLUMNS).eq('community_id', community).order('created_at')
+  const { data, error } = await withCheck((cols) => getAdminClient().from('watch').select(cols).eq('community_id', community).order('created_at'))
   if (error) {
     if (tableMissing(error.message)) return { watches: [], available: false }
     throw new Error(`Failed to load watches: ${error.message}`)
@@ -94,8 +114,19 @@ export async function listWatches(community: string): Promise<{ watches: Watch[]
   return { watches: ((data ?? []) as Row[]).map(fromRow), available: true }
 }
 
+/** Each watch's kosher list read, kept on it by its last run
+ *  (WatchCheck.listRead), by watch id. Empty before migration 085. */
+export async function getListReads(community: string): Promise<Map<string, ListRead>> {
+  const { data, error } = await getAdminClient().from('watch').select('id, listRead:last_check->listRead').eq('community_id', community)
+  if (error) {
+    if (checkColumnMissing(error.message) || tableMissing(error.message)) return new Map()
+    throw new Error(`Failed to load the lists' reads: ${error.message}`)
+  }
+  return new Map(((data ?? []) as { id: string; listRead: ListRead | null }[]).flatMap((r) => (r.listRead ? [[r.id, r.listRead] as const] : [])))
+}
+
 export async function getWatch(community: string, id: string): Promise<Watch | null> {
-  const { data, error } = await getAdminClient().from('watch').select(COLUMNS).eq('community_id', community).eq('id', id).maybeSingle()
+  const { data, error } = await withCheck((cols) => getAdminClient().from('watch').select(cols).eq('community_id', community).eq('id', id).maybeSingle())
   if (error) throw new Error(`Failed to load the watch: ${error.message}`)
   return data ? fromRow(data as Row) : null
 }
@@ -103,7 +134,7 @@ export async function getWatch(community: string, id: string): Promise<Watch | n
 /** The watch on one address, if the community has it: a newsletter's
  *  sender (`mailto:`), looked up as each email comes in. */
 export async function getWatchByUrl(community: string, url: string): Promise<Watch | null> {
-  const { data, error } = await getAdminClient().from('watch').select(COLUMNS).eq('community_id', community).eq('url', url).maybeSingle()
+  const { data, error } = await withCheck((cols) => getAdminClient().from('watch').select(cols).eq('community_id', community).eq('url', url).maybeSingle())
   if (error) throw new Error(`Failed to load the watch: ${error.message}`)
   return data ? fromRow(data as Row) : null
 }
@@ -115,19 +146,21 @@ export async function addWatch(
   community: string,
   watch: { kind: WatchKind; url: string; resourceId: string | null; label: string | null; createdBy: string | null; active?: boolean },
 ): Promise<Watch | null> {
-  const { data, error } = await getAdminClient()
-    .from('watch')
-    .insert({
-      community_id: community,
-      kind: watch.kind,
-      url: watch.url,
-      resource_id: watch.resourceId,
-      label: watch.label,
-      created_by: watch.createdBy,
-      ...(watch.active === false ? { active: false } : {}),
-    })
-    .select(COLUMNS)
-    .single()
+  const { data, error } = await withCheck((cols) =>
+    getAdminClient()
+      .from('watch')
+      .insert({
+        community_id: community,
+        kind: watch.kind,
+        url: watch.url,
+        resource_id: watch.resourceId,
+        label: watch.label,
+        created_by: watch.createdBy,
+        ...(watch.active === false ? { active: false } : {}),
+      })
+      .select(cols)
+      .single(),
+  )
   if (error) {
     if (/duplicate key|unique/i.test(error.message)) return null
     throw new Error(`Failed to add the watch: ${error.message}`)
@@ -136,7 +169,14 @@ export async function addWatch(
 }
 
 export async function updateWatch(community: string, id: string, patch: Partial<Watch>): Promise<void> {
-  const { error } = await getAdminClient().from('watch').update(toColumns(patch)).eq('community_id', community).eq('id', id)
+  const save = (p: Partial<Watch>) => getAdminClient().from('watch').update(toColumns(p)).eq('community_id', community).eq('id', id)
+  let { error } = await save(patch)
+  // Without migration 085, the run is still saved, less what it found.
+  if (error && 'lastCheck' in patch && checkColumnMissing(error.message)) {
+    const rest = { ...patch }
+    delete rest.lastCheck
+    ;({ error } = await save(rest))
+  }
   if (error) throw new Error(`Failed to save the watch: ${error.message}`)
 }
 

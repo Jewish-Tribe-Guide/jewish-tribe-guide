@@ -1,20 +1,27 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { MENU_WATCH_CREATOR, kindForUrl, normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
+import { MENU_WATCH_CREATOR, watchHealth, type Watch, type WatchCheck } from '@/lib/watches'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 import { isMekorList } from '@/lib/mekorWatch'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { groupWatches, watchGroupOf, type WatchGroup, type WatchGroupKey, type WatchRank, type WatchRow } from '@/lib/watchGroups'
 import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 import { WATCH_PURPOSES, purposeInfo, sourceKind, sourceProblem, type ListingReads, type WatchPurpose } from '@/lib/watchPurposes'
-import { eruvView } from '@/lib/eruv'
-import type { AdminEruv } from '@/lib/eruvStore'
-import EruvKeptEmail from './EruvKeptEmail'
+import { isHospitalWatch } from '@/lib/refuahMatch'
+import { adminBase } from '@/lib/adminNav'
+import { dishCounts, hospitalCounts, type DishPlace, type JobCounts } from '@/lib/watchJobs'
+import { eruvJobCounts, type EruvJobLoaded } from '@/lib/eruvJob'
+import { isEruvWebsiteWatch } from '@/lib/eruvWebsite'
+import type { Hospital } from './HospitalsJob'
+import type { HoursPlace } from './HoursJob'
+import type { KosherLoaded } from './KosherJob'
+import { hoursCounts, isHoursOff, isHoursSearched, isStoppedPage } from '@/lib/hoursJob'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
 // Everything the guide reads on its own to stay current: pages every
@@ -23,17 +30,71 @@ import EruvKeptEmail from './EruvKeptEmail'
 // watch" asks that first, then the place, then where it's read, and the
 // list below is grouped in the same words. A row leads with the place, then
 // where it's read from and what it last found; tapping it opens what it
-// does and its buttons. What needs the admin (not working, a sender to link,
-// an email to read, an eruv with no source) shows without opening anything.
+// does and its buttons. What needs the admin (not working, a sender to
+// link) shows without opening anything.
 //
-// Eruv status moved here from the Eruvim tab (the user, Oct 19): an eruv's
-// source is its status page or status email, kept on the eruv
-// (/api/admin/eruvim), listed here first.
+// Since Oct 21 the tab starts with a row per job (watchJobs.ts), each
+// opening a page with every place in it: Dishes (what was the Main dishes
+// tab), Hospitals (matched to Refuah on their own, so their watches
+// aren't listed here any more), Mikvah hours (read from the pages on
+// each one's own website, found on their own) and Shul times (the same,
+// for davening times). Since step 5 (Oct 21), Eruv status (moved here
+// from the Eruvim tab on Oct 19) and Kosher certification (Keystone-K's and
+// Mekor Habracha's lists) are jobs too. The rest are still listed below,
+// until each becomes a job of its own.
 
-type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads }
+/** `job`: the job page where what's read for it waits ("Shul times"); none,
+ *  the moderation queue. */
+type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads; job?: string | null }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
-type Eruvim = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
+type PagesJob = { name: string; places: HoursPlace[] } | null
+/** Each job's, as loaded: undefined while it's still loading, null when it
+ *  couldn't be. */
+type Jobs = {
+  dishes?: DishPlace[] | null
+  hospitals?: Hospital[] | null
+  hours?: PagesJob
+  times?: PagesJob
+  eruvim?: EruvJobLoaded | null
+  kosher?: KosherLoaded | null
+}
+
+/** One job's row: what it is and its four counts; the whole row opens its
+ *  page. Null counts: they couldn't be loaded; undefined, still loading. */
+function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | null | undefined }) {
+  const stat = (n: number, label: string, flag: boolean) => (
+    <span className="flex min-w-[4.5rem] flex-col">
+      <span className={`text-base font-semibold ${flag && n > 0 ? 'text-amber-800' : 'text-slate-900'}`}>{n}</span>
+      <span className="text-xs text-muted">{label}</span>
+    </span>
+  )
+  return (
+    <li>
+      <Link href={href} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 hover:bg-slate-50" data-testid="job-row">
+        <span className="min-w-[12rem] flex-1">
+          <span className="block font-semibold text-slate-900">{name}</span>
+          <span className="block text-sm text-slate-600">{about}</span>
+        </span>
+        {counts ? (
+          <span className="flex flex-wrap gap-x-4 gap-y-1">
+            {stat(counts.checked, 'checked', false)}
+            {stat(counts.toCheck, 'to check', true)}
+            {stat(counts.cantRead, 'can’t be read', true)}
+            {stat(counts.didntLoad, 'didn’t load today', true)}
+          </span>
+        ) : counts === null ? (
+          <span className="text-sm text-slate-500">Couldn&rsquo;t load its counts.</span>
+        ) : (
+          <span className="text-sm text-slate-500" data-testid="job-loading">Loading…</span>
+        )}
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="shrink-0 text-slate-400">
+          <path d="M6 4l4 4-4 4" />
+        </svg>
+      </Link>
+    </li>
+  )
+}
 
 /** A group longer than this starts closed, showing only what needs a look. */
 const OPEN_UP_TO = 4
@@ -99,15 +160,144 @@ function Source({ url }: { url: string | null }) {
   )
 }
 
-/** A watch's state, in a word or two. */
+/** A page the AI reads for the listing: a shul's or mikvah's own. */
+function readByAi(w: Watch): boolean {
+  return isListingPageWatch(w)
+}
+
+/** A watch's state, in a word or two. A page the AI has never read has
+ *  only been seen to open, which isn't the same as working (the user,
+ *  Oct 20). */
 function pillOf(w: Watch, now: number): Pill {
   if (isIgnoredSender(w)) return { tone: 'off', text: 'Skipped' }
   if (isNewsletterWatch(w) && !w.resourceId) return { tone: 'todo', text: 'To link' }
   const h = watchHealth(w, now)
   if (h.state === 'paused') return { tone: 'off', text: 'Paused' }
   if (h.state === 'waiting') return { tone: 'off', text: isNewsletterWatch(w) ? 'No email yet' : 'Not checked yet' }
-  if (h.state === 'working') return { tone: 'ok', text: 'Working' }
+  if (h.state === 'working') {
+    if (readByAi(w) && !w.lastCheck) return { tone: 'off', text: 'Opens · not read yet' }
+    if (readByAi(w) && w.lastCheck?.result === 'nothing') return { tone: 'todo', text: 'Reads nothing' }
+    if (readByAi(w) && w.lastCheck?.result === 'unsure') return { tone: 'todo', text: 'Needs a look' }
+    return { tone: 'ok', text: 'Working' }
+  }
   return { tone: 'bad', text: 'Not working' }
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/** What a check found nothing of, by what it reads. */
+const NOTHING: Record<WatchCheck['what'], string> = {
+  times: 'Found no times on this page',
+  hours: 'Found no hours on this page',
+  dishes: 'Found no dishes on this menu',
+  contacts: 'Refuah has no contacts for this hospital yet',
+  list: 'Found no places on the list',
+  details: 'Found no hotline or email alerts on this page',
+}
+
+/** What became of the differences, in a few words. `where`: where a
+ *  filed one waits, for a job page that shows its own ("to check here");
+ *  otherwise the queue. */
+function queueText(c: WatchCheck, where = 'in the queue'): string {
+  if (c.what === 'dishes') return c.queue === 'before' ? 'already on the Main dishes tab, or skipped there' : 'waiting on the Main dishes tab'
+  if (c.queue === 'filed') return where
+  if (c.queue === 'before') return 'filed before, not again'
+  if (c.queue === 'waiting') return 'not filed: the listing already has a suggestion in the queue'
+  return ''
+}
+
+/** A list's counts: "78 on the list, 74 match the guide, 4 suggestions in
+ *  the queue". */
+function listText(c: WatchCheck, where = 'in the queue'): string {
+  const l = c.list!
+  const head = `${l.listed} on the list, ${l.matching} match${l.matching === 1 ? 'es' : ''} the guide`
+  if (!l.differences) return `${head}, nothing differs`
+  if (l.filed === l.differences) return `${head}, ${plural(l.differences, 'suggestion')} ${where}`
+  if (!l.filed) return `${head}, ${l.differences} differ${l.differences === 1 ? 's' : ''}, all filed before`
+  return `${head}, ${l.differences} differ: ${plural(l.filed, 'new suggestion')} ${where}, ${l.differences - l.filed} filed before`
+}
+
+/** What the last full read found, in one line. `where`: as queueText. */
+export function checkLine(c: WatchCheck, where?: string): string {
+  if (c.result === 'unreadable') return `${day(c.at)}: the page wouldn’t open`
+  if (c.list) return `Read ${day(c.at)}: ${listText(c, where)}`
+  if (c.result === 'agrees') return `Read ${day(c.at)}: agrees with the listing`
+  if (c.result === 'unsure') return `Read ${day(c.at)}: couldn’t compare it with the listing`
+  if (c.result === 'nothing') {
+    const n = NOTHING[c.what]
+    return `Read ${day(c.at)}: ${c.what === 'contacts' ? n : n[0].toLowerCase() + n.slice(1)}`
+  }
+  return `Read ${day(c.at)}: ${plural(c.differences.length, 'difference')}, ${queueText(c, where)}`
+}
+
+const FROM: Record<NonNullable<WatchCheck['from']>, string> = {
+  page: 'the page',
+  calendar: 'the page and its calendar',
+  pdf: 'the PDF',
+  pictures: 'the pictures of its menu',
+}
+
+/** What the last full read found, for the opened row: what it read and
+ *  from where, then whether that agrees with the listing. */
+function CheckResult({ check: c }: { check: WatchCheck }) {
+  // A list's counts are on the row; opened, it names the places that
+  // differ (kept since Oct 20; older checks kept only the counts).
+  if (c.list) {
+    if (!c.differences.length) return null
+    return (
+      <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800" data-testid="watch-check">
+        <p className="text-xs font-semibold text-slate-600">Where the list differs from the guide, {day(c.at)}</p>
+        <ul className="space-y-0.5">
+          {c.differences.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800" data-testid="watch-check">
+      {c.result === 'unreadable' ? (
+        <p className="font-medium text-red-700">The page wouldn’t open.</p>
+      ) : c.read.length ? (
+        <>
+          <p className="text-xs font-semibold text-slate-600">
+            What it read{c.from ? ` from ${FROM[c.from]}` : ''}, {day(c.at)}
+          </p>
+          <ul className="space-y-0.5">
+            {c.read.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+            {c.more ? <li className="text-xs text-muted">and {c.more} more</li> : null}
+          </ul>
+        </>
+      ) : (
+        <p className="font-medium text-amber-800">{NOTHING[c.what]}.</p>
+      )}
+      {c.result === 'agrees' && <p className="font-medium text-green-800">Agrees with the listing.</p>}
+      {c.unread?.length ? (
+        <>
+          <p className="font-medium text-amber-800">Couldn’t compare with the listing, so nothing was filed for:</p>
+          <ul className="space-y-0.5">
+            {c.unread.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {c.result === 'differs' && (
+        <>
+          <p className="font-medium text-amber-800">Differs from the listing, {queueText(c)}:</p>
+          <ul className="space-y-0.5">
+            {c.differences.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {c.note && <p className="text-xs text-muted">{c.note}</p>}
+    </div>
+  )
 }
 
 /** What it last found, in one line. A broken or stale watch says why. */
@@ -120,10 +310,21 @@ function LastLine({ watch: w, now }: { watch: Watch; now: number }) {
   // A newsletter is read when one comes, not checked on a morning.
   if (isNewsletterWatch(w)) return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Newsletter ${day(w.pageChangedAt)}${filed}` : 'No newsletter read yet.'}</p>
   if (h.state === 'waiting') return <p className="text-sm text-slate-500">Not checked yet: the first check is tomorrow morning, or press Check now.</p>
-  if (w.createdBy === MENU_WATCH_CREATOR) {
-    return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${w.lastFiled ? ': new dishes on the Main dishes tab' : ''}` : 'No change since it was added.'}</p>
+  // What its last full read found, once it has had one.
+  if (w.lastCheck && (readByAi(w) || w.lastCheck.list || refuahHospitalId(w.url))) {
+    const tone = w.lastCheck.result === 'agrees' ? 'text-slate-700' : w.lastCheck.result === 'unreadable' ? 'text-red-700' : 'text-amber-800'
+    return <p className={`text-sm ${tone}`}>{checkLine(w.lastCheck)}</p>
   }
-  if (isListingPageWatch(w)) return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${filed}` : 'No change since it was added.'}</p>
+  // Seen to open, never read by the AI: Check now reads it.
+  const notRead = <span className="block text-xs text-muted">Not read by the AI yet. Check now reads it and shows what it finds.</span>
+  if (isListingPageWatch(w)) {
+    return (
+      <p className="text-sm text-slate-700">
+        {w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${filed}` : 'No change since it was added.'}
+        {notRead}
+      </p>
+    )
+  }
   if (w.kind === 'keystone_list' || isMekorList(w.url) || refuahHospitalId(w.url)) {
     return <p className="text-sm text-slate-700">Read {day(w.lastOkAt ?? w.lastRunAt!)}{filed}</p>
   }
@@ -140,33 +341,26 @@ function WhatItDoes({ watch }: { watch: Watch }) {
   if (isNewsletterWatch(watch)) {
     return (
       <p className="text-xs text-muted" data-testid="newsletter-watch">
-        Its newsletters, read as they come in. Changed times, and anything else it says about a place in the guide, go to the moderation queue with the
-        email beside them. You&rsquo;re emailed if none comes for a month.
+        Its newsletters, read as they come in. Changed times, and anything else it says about a place in the guide, wait on the Shul times page with
+        the email beside them. You&rsquo;re emailed if none comes for a month.
       </p>
     )
   }
   if (watch.kind === 'keystone_list') {
-    return <p className="text-xs text-muted">Compared with the guide every morning. Differences go to the moderation queue, quoting the list.</p>
+    return <p className="text-xs text-muted">Compared with the guide every morning. Differences wait on the Kosher certification page, quoting the list.</p>
   }
   if (isMekorList(watch.url)) {
     return (
       <p className="text-xs text-muted" data-testid="mekor-watch">
         Compared with the guide every morning. A place it lists that the guide lacks, and any hechsher the guide shows that it doesn&rsquo;t (IKC
-        above all), go to the moderation queue, quoting the list. Nothing is taken off without you.
+        above all), wait on the Kosher certification page, quoting the list. Nothing is taken off without you.
       </p>
     )
   }
   if (refuahHospitalId(watch.url)) {
     return (
       <p className="text-xs text-muted">
-        Compared with the hospital every morning. A new contact, or a changed phone, email or website, goes to the moderation queue as from Refuah.
-      </p>
-    )
-  }
-  if (watch.createdBy === MENU_WATCH_CREATOR) {
-    return (
-      <p className="text-xs text-muted" data-testid="menu-watch">
-        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Added for every place with a menu link: pause it to stop it.
+        Compared with the hospital every morning. A new contact, or a changed phone, email or website, waits on the Hospitals page as from Refuah.
       </p>
     )
   }
@@ -174,7 +368,7 @@ function WhatItDoes({ watch }: { watch: Watch }) {
     return (
       <p className="text-xs text-muted" data-testid="listing-page-watch">
         Checked every morning. When the page changes, the AI reads it, and davening times or hours that differ from the listing go to the
-        moderation queue with the page beside them. A page that agrees changes nothing, not even the listing&rsquo;s date.
+        moderation queue with the page beside them. Check now reads it straight away. A page that agrees changes nothing, not even the listing&rsquo;s date.
       </p>
     )
   }
@@ -244,7 +438,6 @@ function GroupSection({
   label,
   total,
   needs,
-  note,
   collapsibleGroup,
   open,
   onToggle,
@@ -253,7 +446,6 @@ function GroupSection({
   label: string
   total: number
   needs: string | null
-  note?: string
   collapsibleGroup: boolean
   open: boolean
   onToggle: () => void
@@ -280,7 +472,6 @@ function GroupSection({
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">{heading}</span>
         )}
       </h3>
-      {note && <p className="px-4 pb-3 text-xs text-muted">{note}</p>}
       {children}
     </section>
   )
@@ -315,49 +506,35 @@ function NewsletterLink({ listings, busy, onLink, onIgnore }: { listings: Listin
   )
 }
 
-/** An eruv's state as a watch: no source, can't be read, an email to
- *  read, or working. */
-function eruvPill(e: AdminEruv): Pill {
-  if (!e.statusUrl && !e.statusEmail) return { tone: 'todo', text: 'No source' }
-  if (e.statusEmailKept) return { tone: 'todo', text: 'Email to read' }
-  if (e.statusUrl && e.statusErrorAt && (!e.statusCheckedAt || Date.parse(e.statusErrorAt) > Date.parse(e.statusCheckedAt))) return { tone: 'bad', text: 'Not working' }
-  return { tone: 'ok', text: 'Working' }
-}
-
 /** What "Add a watch" says will happen, once it knows enough to say. */
-function planFor(purpose: WatchPurpose, source: string, place: string | null): { main: string; small: string } {
+function planFor(purpose: AddPurpose, source: string, place: string | null, job: string | null): { main: string; small: string } {
   const s = shortUrl(source.trim())
   const p = place ?? 'the listing'
   const email = sourceKind(source) === 'email'
+  // Step 6: what a job reads waits on its page, beside the listing.
+  const goes = job ? `wait on the ${job} page, beside what the listing says` : 'go to the moderation queue, with the page beside them'
   switch (purpose) {
-    case 'eruv':
-      return email
-        ? { main: `Each email from ${s} is read for “up” or “down” and shown on ${p} at once, through that week’s Shabbos.`, small: 'The guide’s Gmail must get its emails. One it can’t make out waits for you on its row.' }
-        : { main: `The guide reads ${s} every 15 minutes on Friday afternoon, and shows ${p}’s status at once.`, small: 'It never sets a status itself: a page it can’t make out shows no status.' }
     case 'times':
       return email
-        ? { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs goes to the moderation queue with the email beside it.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
-        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s, usual or dated, go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
+        ? { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs ${job ? `waits on the ${job} page, beside what the listing says` : 'goes to the moderation queue with the email beside it'}.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
+        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s ${goes}; a calendar is read a week at a time, and its week goes as this week’s schedule.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
     case 'hours':
-      return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing.' }
-    case 'kosher': {
-      const url = normalizeWatchUrl(source)
-      return url && (kindForUrl(url) === 'keystone_list' || isMekorList(url))
-        ? { main: 'Every morning the list is compared with the guide, place by place. Differences go to the moderation queue, quoting the list.', small: 'Nothing is taken off the site without you.' }
-        : { main: `Every morning the guide checks ${s}, and marks its row when it changes.`, small: 'The guide reads a list place by place only once it has learned that list, as it has Keystone-K’s and Mekor Habracha’s. Until then it tells you the page changed.' }
-    }
+      return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s ${goes}.`, small: 'A page that agrees changes nothing.' }
     case 'hospital':
-      return { main: `Every morning Refuah’s contacts for ${p} are compared with the listing. A new or changed phone, email or website goes to the moderation queue.`, small: 'When Refuah agrees, the listing is dated as confirmed by Refuah.' }
+      return { main: `Every morning Refuah’s contacts for ${p} are compared with the listing. A new or changed phone, email or website waits on the Hospitals page, beside what the listing says.`, small: 'When Refuah agrees, the listing is dated as confirmed by Refuah.' }
     default:
       return { main: `Every morning the guide checks ${s}, and marks its row when the page changes.`, small: 'It reads nothing into it: you look and decide.' }
   }
 }
 
-const SOURCE_HELP: Record<WatchPurpose, string> = {
-  eruv: 'The eruv’s status page, or the address its “The eruv is up” emails come from (a mailing list’s own address, …@groups.io, for a list).',
+/** What "Add a watch" offers. An eruv's status and a kosher list are set on
+ *  their own job pages (EruvJob, KosherJob). */
+type AddPurpose = Exclude<WatchPurpose, 'eruv' | 'kosher'>
+const ON_A_JOB_PAGE: readonly WatchPurpose[] = ['eruv', 'kosher']
+
+const SOURCE_HELP: Record<AddPurpose, string> = {
   times: 'The shul’s own page of davening times or its calendar, or the address its newsletter comes from.',
   hours: 'The place’s own page of hours: a mikvah’s, or any place with hours.',
-  kosher: 'A hechsher’s list of the places it supervises.',
   menu: '',
   hospital: 'The hospital’s own page on Refuah (refuah.com/hospitals/…).',
   other: 'Any page you want to hear about when it changes.',
@@ -367,43 +544,34 @@ const SOURCE_HELP: Record<WatchPurpose, string> = {
  *  read from, then what will happen. */
 function AddWatch({
   listings,
-  eruvim,
-  start,
   busy,
   onAdd,
   onCancel,
 }: {
   listings: Listing[]
-  eruvim: AdminEruv[] | null
-  start: { purpose: WatchPurpose; eruvId?: string } | null
   busy: boolean
-  onAdd: (a: { purpose: WatchPurpose; source: string; listing: Listing | null; eruv: AdminEruv | null; statusDated: boolean }) => Promise<boolean>
+  onAdd: (a: { purpose: AddPurpose; source: string; listing: Listing | null }) => Promise<boolean>
   onCancel: () => void
 }) {
-  const [purpose, setPurpose] = useState<WatchPurpose | null>(start?.purpose ?? null)
+  const [purpose, setPurpose] = useState<AddPurpose | null>(null)
   const [placeName, setPlaceName] = useState('')
-  const [eruvId, setEruvId] = useState(start?.eruvId ?? '')
   const [source, setSource] = useState('')
-  const [statusDated, setStatusDated] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const info = purpose ? purposeInfo(purpose) : null
   const choices = info?.placeReads ? listings.filter((l) => l.reads === info.placeReads) : listings
   const listing = info?.place === 'listing' ? (choices.find((l) => l.name === placeName.trim()) ?? null) : null
-  const eruv = info?.place === 'eruv' ? (eruvim?.find((e) => e.id === eruvId) ?? null) : null
-  const placeLabel = info?.place === 'eruv' ? eruv?.name ?? null : listing?.name ?? null
   const kind = sourceKind(source)
   const problem = purpose && source.trim() ? sourceProblem(purpose, source) : null
-  const ready = !!purpose && !!source.trim() && !problem && (info?.place === null || (info?.place === 'listing' ? !!listing : !!eruv))
-  const plan = purpose && source.trim() && !problem ? planFor(purpose, source, placeLabel) : null
+  const ready = !!purpose && !!source.trim() && !problem && (info?.place !== 'listing' || !!listing)
+  const plan = purpose && source.trim() && !problem ? planFor(purpose, source, listing?.name ?? null, purpose === 'hospital' ? null : (listing?.job ?? null)) : null
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!purpose) return
     if (info?.place === 'listing' && !listing) return setError(`Pick the ${purpose === 'times' ? 'shul' : 'place'} from the list.`)
-    if (info?.place === 'eruv' && !eruv) return setError('Pick the eruv.')
     if (problem) return setError(problem)
     setError(null)
-    await onAdd({ purpose, source, listing, eruv, statusDated })
+    await onAdd({ purpose, source, listing })
   }
 
   return (
@@ -420,13 +588,13 @@ function AddWatch({
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-slate-800">What should it keep current?</legend>
         <div className="flex flex-wrap gap-2">
-          {WATCH_PURPOSES.filter((p) => p.addable).map((p) => (
+          {WATCH_PURPOSES.filter((p) => p.addable && !ON_A_JOB_PAGE.includes(p.key)).map((p) => (
             <button
               key={p.key}
               type="button"
               aria-pressed={purpose === p.key}
               onClick={() => {
-                setPurpose(p.key)
+                setPurpose(p.key as AddPurpose)
                 setPlaceName('')
                 setError(null)
               }}
@@ -453,19 +621,6 @@ function AddWatch({
               </datalist>
             </label>
           )}
-          {info.place === 'eruv' && (
-            <label className="block text-sm">
-              <span className="font-semibold text-slate-800">Which eruv?</span>
-              <select value={eruvId} onChange={(e) => setEruvId(e.target.value)} className={INPUT}>
-                <option value="">Pick one</option>
-                {(eruvim ?? []).map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <label className="block text-sm">
             <span className="font-semibold text-slate-800">Where does the guide read it?</span>
             <input
@@ -484,15 +639,6 @@ function AddWatch({
               <span className="mt-1 block text-xs font-medium text-green-800">{kind === 'email' ? 'An email address: read as each email arrives.' : 'A web page.'}</span>
             ) : null}
           </label>
-          {purpose === 'eruv' && kind === 'page' && (
-            <label className="flex items-start gap-2 text-sm text-slate-700">
-              <input type="checkbox" className="mt-0.5" checked={statusDated} onChange={(e) => setStatusDated(e.target.checked)} />
-              <span>
-                It dates each week’s post
-                <span className="block text-xs text-muted">Then last week’s “up” shows as “Not posted yet this week”. Leave off for an eruv whose date is only when it last changed.</span>
-              </span>
-            </label>
-          )}
           {plan && (
             <div className="space-y-1 rounded-md bg-amber-50/60 px-3 py-2.5 text-sm text-slate-800" data-testid="add-watch-plan">
               <p>{plan.main}</p>
@@ -512,14 +658,28 @@ function AddWatch({
   )
 }
 
+/** What the tab last showed, per community, so coming back to it (from a
+ *  job's page) shows that at once while it's read again, rather than
+ *  "Loading watches…" every time (the user, Oct 22). */
+const lastSeen = new Map<string, { data: Loaded; jobs: Jobs }>()
+const NO_JOBS: Jobs = {}
+
+/** For tests: start from nothing. */
+export function forgetWatchesTab() {
+  lastSeen.clear()
+}
+
 export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
-  const [data, setData] = useState<Loaded | null>(null)
-  const [eruvData, setEruvData] = useState<Eruvim | null>(null)
+  const [data, setData] = useState<Loaded | null>(() => lastSeen.get(community)?.data ?? null)
+  const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community)?.jobs ?? NO_JOBS)
+  // The list waits for the hours and shul times jobs, which take their
+  // places' pages out of it, so rows don't show and then go.
+  const [listReady, setListReady] = useState(() => lastSeen.has(community))
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [adding, setAdding] = useState<{ purpose: WatchPurpose; eruvId?: string } | 'open' | null>(null)
+  const [adding, setAdding] = useState(false)
   // Read once per render pass for every row alike; the tab is reloaded to refresh.
   const [now] = useState(() => Date.now())
   // Long groups the admin has opened, and the rows they've acted on.
@@ -535,20 +695,31 @@ export default function WatchesManager({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     setError(null)
+    const headers = { Authorization: `Bearer ${token}` }
+    // The jobs' counts are a part of the tab, not the whole: each fills in
+    // as its own read comes back, and the list doesn't wait for them. One
+    // that fails keeps what it last showed.
+    const get = <T,>(path: string) => fetchJson<T>(withCommunity(path, community), { headers }, '').catch(() => null)
+    const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => setJobs((j) => ({ ...j, [key]: value }))
+    const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
+    const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
+    void get<{ places: DishPlace[] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes')))
+    void get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals')))
+    const hours = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours')))
+    const times = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times')))
+    void Promise.all([hours, times]).then(() => setListReady(true))
+    void get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim')))
+    void get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher')))
     try {
-      const headers = { Authorization: `Bearer ${token}` }
-      const [watches, eruvim] = await Promise.all([
-        fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'),
-        // The eruvim are a part of the tab, not the whole: without them, the
-        // rest still shows.
-        fetchJson<Eruvim>(withCommunity('/api/admin/eruvim', community), { headers }, 'Failed to load the eruvim.').catch(() => null),
-      ])
-      setData(watches)
-      setEruvData(eruvim)
+      setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token, community])
+
+  useEffect(() => {
+    if (data) lastSeen.set(community, { data, jobs })
+  }, [community, data, jobs])
 
   useLoadOnMount(load)
 
@@ -574,32 +745,7 @@ export default function WatchesManager({ token }: { token: string }) {
     }
   }
 
-  /** An eruvim action; the eruv comes back as it now is. */
-  async function eruvPost(id: string, body: Record<string, unknown>): Promise<boolean> {
-    setSaveError(null)
-    setBusy(`eruv:${id}`)
-    try {
-      const res = await post<{ eruv?: AdminEruv }>('/api/admin/eruvim', { id, ...body })
-      if (res.eruv) setEruvData((d) => d && { ...d, eruvim: d.eruvim.map((e) => (e.id === id ? res.eruv! : e)) })
-      return true
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save.')
-      return false
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function add(a: { purpose: WatchPurpose; source: string; listing: Listing | null; eruv: AdminEruv | null; statusDated: boolean }): Promise<boolean> {
-    if (a.purpose === 'eruv' && a.eruv) {
-      const email = sourceKind(a.source) === 'email'
-      // One source for its status (eruvEdit.ts): the other is emptied.
-      const edit = email ? { statusEmail: a.source.trim(), statusUrl: '' } : { statusUrl: a.source.trim(), statusEmail: '', statusDated: a.statusDated }
-      if (!(await eruvPost(a.eruv.id, { action: 'save', edit }))) return false
-      if (!email) await eruvPost(a.eruv.id, { action: 'check' })
-      setAdding(null)
-      return true
-    }
+  async function add(a: { purpose: AddPurpose; source: string; listing: Listing | null }): Promise<boolean> {
     setSaveError(null)
     setBusy('add')
     try {
@@ -611,7 +757,7 @@ export default function WatchesManager({ token }: { token: string }) {
         setOpened((o) => new Set(o).add(watchGroupOf(added, readsOf)))
         setKept((k) => new Map(k).set(added.id, 2))
       }
-      setAdding(null)
+      setAdding(false)
       return true
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not add that.')
@@ -633,11 +779,29 @@ export default function WatchesManager({ token }: { token: string }) {
     void actOn(row.watch, action, resourceId)
   }
 
-  const groups = data.available ? groupWatches(data.watches, now, kept, readsOf) : []
-  const eruvim = eruvData?.available ? eruvData.eruvim : []
-  const eruvNeeds = eruvim.filter((e) => eruvPill(e).tone !== 'ok').length
-  const counted = data.watches.filter((w) => !isIgnoredSender(w)).length + eruvim.length
-  const needs = groups.reduce((n, g) => n + g.counts.notWorking + g.counts.toLink, 0) + eruvNeeds
+  // A hospital's Refuah page is on the Hospitals page, a mikvah's hours
+  // pages on the hours page, a shul's pages on the Shul times page, and
+  // the kosher lists on the Kosher certification page, an eruv's website
+  // on Eruv status, and a food place's menu watch on Main dishes.
+  const jobIds = new Set([...(jobs.hours?.places ?? []), ...(jobs.times?.places ?? [])].map((p) => p.id))
+  const listed = data.watches.filter(
+    (w) =>
+      !isHospitalWatch(w) &&
+      !isHoursOff(w) &&
+      !isHoursSearched(w) &&
+      !isStoppedPage(w) &&
+      watchGroupOf(w) !== 'kosher' &&
+      !isEruvWebsiteWatch(w) &&
+      w.createdBy !== MENU_WATCH_CREATOR &&
+      !(w.resourceId && jobIds.has(w.resourceId) && isListingPageWatch(w)),
+  )
+  const groups = data.available && listReady ? groupWatches(listed, now, kept, readsOf) : []
+  const counted = listed.filter((w) => !isIgnoredSender(w)).length
+  const base = adminBase(community)
+  // As the Hospitals page counts them: a finding waiting there is to check.
+  const hospitalStates = jobs.hospitals?.map((h) => ({ ...h, waiting: h.findings?.length }))
+  const hospitalsNothing = hospitalStates ? hospitalCounts(hospitalStates, now).nothing : 0
+  const needs = groups.reduce((n, g) => n + g.counts.notWorking + g.counts.toLink, 0)
 
   function renderRow(row: WatchRow) {
     const w = row.watch
@@ -655,12 +819,13 @@ export default function WatchesManager({ token }: { token: string }) {
         alwaysShown={unlinked && <NewsletterLink listings={listings} busy={busy !== null} onLink={(id) => act(row, 'link', id)} onIgnore={() => act(row, 'ignore')} />}
       >
         <WhatItDoes watch={w} />
+        {w.lastCheck && <CheckResult check={w.lastCheck} />}
         {listing && w.label && w.label !== listing.name && <p className="text-xs text-slate-600">Named: {w.label}</p>}
         <div className="flex flex-wrap gap-2">
           {!unlinked && !ignored && (
             <>
               <button type="button" disabled={busy !== null || !w.active} onClick={() => act(row, 'check')} className={BUTTON}>
-                {busy === w.id ? 'Checking…' : 'Check now'}
+                {busy === w.id ? (readByAi(w) ? 'Reading…' : 'Checking…') : 'Check now'}
               </button>
               <button type="button" disabled={busy !== null} onClick={() => act(row, w.active ? 'pause' : 'resume')} className={BUTTON}>
                 {w.active ? 'Pause' : 'Resume'}
@@ -675,101 +840,77 @@ export default function WatchesManager({ token }: { token: string }) {
     )
   }
 
-  function renderEruv(e: AdminEruv) {
-    const view = eruvView(e, new Date(now), eruvData!.timezone, null)
-    const source = e.statusUrl || (e.statusEmail ? `mailto:${e.statusEmail}` : null)
-    const noSource = !source
-    const failing = eruvPill(e).tone === 'bad'
-    return (
-      <Row
-        key={e.id}
-        testId="eruv-watch-row"
-        name={e.name}
-        source={<Source url={source} />}
-        pill={eruvPill(e)}
-        last={
-          noSource ? (
-            <p className="text-sm text-slate-500">Shows no status until it has a source.</p>
-          ) : failing && e.statusError ? (
-            <p className="text-sm font-medium text-red-700">Last read failed: {e.statusError}</p>
-          ) : (
-            <p className="text-sm text-slate-700">
-              {view.label}
-              {view.checked ? ` · ${view.checked}` : ''}
-              {!e.active ? ' · hidden on the site' : ''}
-            </p>
-          )
-        }
-        alwaysShown={
-          noSource ? (
-            <button type="button" onClick={() => setAdding({ purpose: 'eruv', eruvId: e.id })} className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white">
-              Add its source
-            </button>
-          ) : (
-            <EruvKeptEmail eruv={e} timezone={eruvData!.timezone} busy={busy !== null} onSays={(says) => void eruvPost(e.id, { action: 'email-says', says })} />
-          )
-        }
-      >
-        {!noSource && (
-          <>
-            <p className="text-xs text-muted">
-              {e.statusUrl
-                ? 'Its status page, read every 15 minutes on Friday afternoon until candle lighting. What it says shows on the site at once.'
-                : 'Its emails, read as each arrives. Up or down shows on the site at once, through that week’s Shabbos.'}
-            </p>
-            {e.statusWords && <p className="text-xs text-muted">Read from: “{e.statusWords}”</p>}
-            {e.statusUrl && (
-              <label className="flex items-start gap-2 text-sm text-slate-700">
-                <input type="checkbox" className="mt-0.5" checked={e.statusDated} disabled={busy !== null} onChange={(ev) => void eruvPost(e.id, { action: 'save', edit: { statusDated: ev.target.checked } })} />
-                <span>
-                  It dates each week’s post
-                  <span className="block text-xs text-muted">Then last week’s “up” shows as “Not posted yet this week”.</span>
-                </span>
-              </label>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {e.statusUrl && (
-                <button type="button" disabled={busy !== null} onClick={() => void eruvPost(e.id, { action: 'check' })} className={BUTTON}>
-                  {busy === `eruv:${e.id}` ? 'Checking…' : 'Check now'}
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => {
-                  if (window.confirm(`Stop reading ${e.name}’s status? It shows no status until it has a source again.`)) void eruvPost(e.id, { action: 'save', edit: { statusUrl: '', statusEmail: '' } })
-                }}
-                className="rounded border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-              >
-                Stop reading
-              </button>
-            </div>
-          </>
-        )}
-      </Row>
-    )
-  }
-
-  const MENU_NOTE = 'Added on their own for each place with a menu link.'
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds goes to the moderation queue for you to approve</strong>, except an eruv&rsquo;s status, which shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
+        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds waits on each job&rsquo;s page, beside what the listing says, for you to update or skip</strong>; a page no job reads goes to the moderation queue, and an eruv&rsquo;s status shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
       </p>
+      <section className="rounded-lg border border-slate-200 bg-white" aria-label="Jobs">
+        <ul className="divide-y divide-slate-100">
+          <JobRow
+            href={`${base}/watches/dishes`}
+            name="Dishes"
+            about={jobs.dishes ? `${jobs.dishes.length} food places, from their menus` : 'Food places, from their menus'}
+            counts={jobs.dishes && dishCounts(jobs.dishes, now)}
+          />
+          <JobRow
+            href={`${base}/watches/hospitals`}
+            name="Hospitals"
+            about={
+              jobs.hospitals
+                ? `${jobs.hospitals.length} hospital${jobs.hospitals.length === 1 ? '' : 's'}, from Refuah${hospitalsNothing ? ` · ${hospitalsNothing} with nothing there yet` : ''}`
+                : 'Hospitals, from Refuah'
+            }
+            counts={hospitalStates ? hospitalCounts(hospitalStates, now) : jobs.hospitals === undefined ? undefined : null}
+          />
+          {jobs.hours && jobs.hours.places.length > 0 && (
+            <JobRow
+              href={`${base}/watches/hours`}
+              name={jobs.hours.name}
+              about={`${jobs.hours.places.length} place${jobs.hours.places.length === 1 ? '' : 's'}, from their websites`}
+              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length })), now)}
+            />
+          )}
+          {jobs.times && jobs.times.places.length > 0 && (
+            <JobRow
+              href={`${base}/watches/times`}
+              name={jobs.times.name}
+              about={`${jobs.times.places.length} shul${jobs.times.places.length === 1 ? '' : 's'}, from their websites`}
+              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length })), now)}
+            />
+          )}
+          <JobRow
+            href={`${base}/watches/eruv`}
+            name="Eruv status"
+            about={
+              jobs.eruvim
+                ? `${jobs.eruvim.eruvim.length} eruv${jobs.eruvim.eruvim.length === 1 ? '' : 'im'}. Status goes live on its own; its website’s hotline and email alerts wait here`
+                : 'Eruvim. Status goes live on its own; its website’s hotline and email alerts wait here'
+            }
+            counts={jobs.eruvim && eruvJobCounts(jobs.eruvim, new Date(now))}
+          />
+          <JobRow
+            href={`${base}/watches/kosher`}
+            name="Kosher certification"
+            about={jobs.kosher ? `${jobs.kosher.places.length} food places, from Keystone-K’s and Mekor Habracha’s lists` : 'Food places, from Keystone-K’s and Mekor Habracha’s lists'}
+            counts={jobs.kosher && jobs.kosher.counts}
+          />
+        </ul>
+      </section>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Keeping a list here needs database migration 070. Until it&rsquo;s run, Keystone-K&rsquo;s list is still read every morning.
+          Keeping a watch here needs database migration 070. Until it&rsquo;s run, Keystone-K&rsquo;s list is still read every morning.
         </p>
       )}
 
-      {data.available && (
+      {data.available && !listReady && <p className="text-sm text-muted">Loading watches…</p>}
+      {data.available && listReady && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-800" data-testid="watch-summary">
             <strong>{counted} watches</strong> · {needs === 0 ? 'all working' : <span className="font-semibold text-amber-800">{needs} need{needs === 1 ? 's' : ''} you</span>}
           </p>
           {!adding && (
-            <button type="button" onClick={() => setAdding('open')} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
+            <button type="button" onClick={() => setAdding(true)} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
               Add a watch
             </button>
           )}
@@ -778,23 +919,7 @@ export default function WatchesManager({ token }: { token: string }) {
       {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
 
       {data.available && adding && (
-        <AddWatch
-          key={adding === 'open' ? 'open' : `${adding.purpose}:${adding.eruvId ?? ''}`}
-          listings={listings}
-          eruvim={eruvim}
-          start={adding === 'open' ? null : adding}
-          busy={busy !== null}
-          onAdd={add}
-          onCancel={() => setAdding(null)}
-        />
-      )}
-
-      {eruvim.length > 0 && (
-        <GroupSection label="Eruv status" total={eruvim.length} needs={eruvNeeds ? `${eruvNeeds} need${eruvNeeds === 1 ? 's' : ''} you` : null} collapsibleGroup={false} open onToggle={() => {}}>
-          <ul className="divide-y divide-slate-100 border-t border-slate-100">
-            {[...eruvim].sort((a, b) => Number(eruvPill(a).tone === 'ok') - Number(eruvPill(b).tone === 'ok') || a.sortOrder - b.sortOrder).map(renderEruv)}
-          </ul>
-        </GroupSection>
+        <AddWatch listings={listings} busy={busy !== null} onAdd={add} onCancel={() => setAdding(false)} />
       )}
 
       {groups.map((g) => {
@@ -808,7 +933,6 @@ export default function WatchesManager({ token }: { token: string }) {
             label={g.label}
             total={g.rows.length}
             needs={parts.length ? parts.join(' · ') : null}
-            note={g.key === 'menu' ? MENU_NOTE : undefined}
             collapsibleGroup={collapsible(g)}
             open={open}
             onToggle={() => toggle(g.key)}
@@ -817,7 +941,7 @@ export default function WatchesManager({ token }: { token: string }) {
           </GroupSection>
         )
       })}
-      {data.available && data.watches.length === 0 && eruvim.length === 0 && (
+      {data.available && data.watches.length === 0 && (
         <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-muted">Nothing watched yet. Add a watch to start.</p>
       )}
 

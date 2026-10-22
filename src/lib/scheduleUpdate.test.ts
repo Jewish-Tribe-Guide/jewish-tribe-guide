@@ -92,6 +92,69 @@ describe('the same time', () => {
   })
 })
 
+describe('a website’s times for both seasons', () => {
+  // Mekor's website, Oct 21: Friday "7:00 PM · Summer", "around
+  // candle-lighting · Winter"; the listing, "At Candle Lighting (not after
+  // 7:00 PM)" all year. The website wins, said its way (the user, Oct 21:
+  // "we really want to mimic the website"), so both seasons are compared,
+  // whatever the season is now.
+  const capped: Minyan = { id: 'f', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting', offsetMinutes: 0, notAfter: '19:00' }
+  const page: RegularReading = {
+    ...WINTER,
+    season: null,
+    startsOn: null,
+    complete: true,
+    times: [
+      t({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', notes: 'Summer only' }),
+      t({ tefillah: 'mincha_maariv', days: ['fri'], time: 'At candle lighting', anchor: 'candle_lighting', offsetMinutes: 0, notes: 'Winter only' }),
+      t({ tefillah: 'shacharis', days: ['sat'], time: '9:15am' }),
+    ],
+  }
+  const seasoned = (rows: { season?: string }[] & Parameters<typeof brief>[0]) => brief(rows).map((b, i) => `${b}${rows[i].season ? ` · ${rows[i].season}` : ''}`)
+  const show = (ms: Minyan[]) => ms.map((m) => `${m.days.join(',')} ${m.tefillah} ${m.time}${m.season ? ` ${m.season}` : ''}${m.notes ? ` (${m.notes})` : ''}`).sort()
+  const listing: Minyan[] = [capped, { id: 's', tefillah: 'shacharis', days: ['sat'], time: '9:15am' }]
+
+  it('compares each season’s time in its season, in either season', () => {
+    for (const season of ['summer', 'winter'] as const) {
+      expect(seasoned(compareTimes(listing, page, { season, newId }).rows)).toEqual([
+        'fri mincha_maariv 7:00 PM changed was At Candle Lighting (not after 7:00 PM) · summer',
+        'fri mincha_maariv At candle lighting changed was At Candle Lighting (not after 7:00 PM) · winter',
+        'sat shacharis 9:15am same',
+      ])
+    }
+  })
+
+  it('applies it as the website has it: summer’s 7:00 PM, winter’s candle lighting', () => {
+    const { minyanim, changes } = applyUpdate(listing, [], compareTimes(listing, page, { season: 'summer', newId }), { newId })
+    expect(show(minyanim)).toEqual(['fri mincha_maariv 7:00 PM summer', 'fri mincha_maariv At candle lighting winter', 'sat shacharis 9:15am'])
+    expect(changes).toEqual([
+      'Changed: mincha maariv · Fri · 7:00 PM, was At Candle Lighting (not after 7:00 PM) (summer)',
+      'Changed: mincha maariv · Fri · At candle lighting, was At Candle Lighting (not after 7:00 PM) (winter)',
+    ])
+  })
+
+  it('a listing with both seasons’ times, as the page has them, agrees', () => {
+    const fridays = MEKOR.filter((m) => m.days.includes('fri'))
+    const u = compareTimes(fridays, { ...page, times: page.times.slice(0, 2) }, { season: 'summer', newId })
+    expect(seasoned(u.rows)).toEqual(['fri mincha_maariv 7:00pm same · summer', 'fri mincha_maariv At Candle Lighting same · winter'])
+    expect(changesAnything(u)).toBe(false)
+  })
+
+  it('a time for one season only takes nothing off the other', () => {
+    const winterOnly: RegularReading = { ...page, times: [page.times[1]] }
+    const u = compareTimes(MEKOR.filter((m) => m.days.includes('fri')), winterOnly, { season: 'winter', newId })
+    expect(seasoned(u.rows)).toEqual(['fri mincha_maariv 7:00pm gone · summer', 'fri mincha_maariv At Candle Lighting same · winter'])
+  })
+
+  it('a rule with a limit isn’t the same rule without it, except on a date it comes to the same minute', () => {
+    const plain = { time: 'At candle lighting', anchor: 'candle_lighting' as const, offsetMinutes: 0 }
+    expect(sameTime(capped, plain)).toBe(false)
+    // Oct 9: candle lighting 6:12 PM, before the 7:00 PM limit.
+    expect(sameTime(capped, plain, ZMANIM['2026-10-09'])).toBe(true)
+    expect(sameTime(capped, { ...plain, notAfter: '19:00' })).toBe(true)
+  })
+})
+
 describe('a whole new winter schedule', () => {
   const u = compareTimes(MEKOR, WINTER, { season: 'summer', newId })
   it('marks each time, and leaves the summer one out', () => {
@@ -210,6 +273,35 @@ describe('one Shabbos’s times', () => {
     const r = compareTimes(MEKOR, same, { season: 'summer', zmanim: ZMANIM, newId })
     expect(changesAnything(r)).toBe(false)
     expect(applyUpdate(MEKOR, [], r, { newId }).schedules).toEqual([])
+  })
+
+  // The user, Oct 20, on a calendar's week: "if anything is dated it
+  // should go in this week's schedule even if it fully matches usual times".
+  it('a week that matches everything is posted when asked, named as asked, and says it matches', () => {
+    const same: RegularReading = { ...BEREISHIS, complete: false, times: [BEREISHIS.times[0], t({ tefillah: 'shacharis', date: '2026-10-10', time: '9:15am' })] }
+    const r = compareTimes(MEKOR, same, { season: 'summer', zmanim: ZMANIM, newId })
+    const { schedules, changes, minyanim } = applyUpdate(MEKOR, [], r, { newId, postedBy: 'website', evenIfSame: true, name: 'Times for Oct 4 – Oct 10' })
+    expect(minyanim.map((m) => m.time).sort()).toEqual(MEKOR.map((m) => m.time).sort())
+    expect(schedules).toEqual([expect.objectContaining({ name: 'Times for Oct 4 – Oct 10', from: '2026-10-09', to: '2026-10-10', kind: 'week', mode: 'replace', postedBy: 'website' })])
+    // The usual times it gave, and the ones it didn't mention, kept.
+    expect(schedules[0].minyanim.map((m) => `${m.on[0]} ${m.tefillah} ${m.time}`)).toEqual([
+      '2026-10-09 mincha_maariv 6:12pm',
+      '2026-10-09 mincha_maariv 7:00pm',
+      '2026-10-10 shacharis 9:15am',
+      '2026-10-10 mincha 12:20pm',
+      '2026-10-10 mincha_maariv 30 min before Sunset',
+    ])
+    expect(changes[0]).toBe('Times for Oct 4 – Oct 10: the same as their usual times, posted as this week’s schedule')
+    // Nothing to post, nothing posted.
+    expect(applyUpdate(MEKOR, [], { ...r, rows: [] }, { newId, evenIfSame: true }).schedules).toEqual([])
+  })
+
+  it('a week sent again replaces every day of it, a day it now has nothing for too', () => {
+    const first = applyUpdate(MEKOR, [], u, { newId }).schedules
+    const fridayOnly = { ...u, rows: u.rows.filter((r) => r.day === '2026-10-09' && r.status === 'same') }
+    const [merged] = applyUpdate(MEKOR, first, fridayOnly, { newId, evenIfSame: true, name: 'Shabbos Bereishis' }).schedules
+    expect(merged.minyanim.map((m) => `${m.on[0]} ${m.time}`)).toEqual(['2026-10-09 6:12pm'])
+    expect([merged.from, merged.to]).toEqual(['2026-10-09', '2026-10-10'])
   })
 })
 

@@ -96,6 +96,9 @@ export type UpdateRow = {
   keep?: boolean
   /** For a changed time in a week's message: their usual time now. */
   everyWeek?: boolean
+  /** The season it's for, when the message gives both seasons' times
+   *  (compareTimes). None: all year, or the message's own season. */
+  season?: Season
 }
 
 export type TimesUpdate = {
@@ -176,7 +179,16 @@ export function minutesOn(t: Timed, zm: DayZmanim | undefined): number | null {
 /** Whether two times are the same minyan time: the same rule, the same
  *  clock time, or a clock time within two minutes of a rule on that date. */
 export function sameTime(a: Timed, b: Timed, zm?: DayZmanim): boolean {
-  if (a.anchor && b.anchor) return a.anchor === b.anchor && (a.offsetMinutes ?? 0) === (b.offsetMinutes ?? 0)
+  if (a.anchor && b.anchor) {
+    if (a.anchor !== b.anchor || (a.offsetMinutes ?? 0) !== (b.offsetMinutes ?? 0)) return false
+    if ((a.notBefore ?? null) === (b.notBefore ?? null) && (a.notAfter ?? null) === (b.notAfter ?? null)) return true
+    // "At candle lighting (not after 7:00 PM)" isn't the website's "around
+    // candle-lighting" (Mekor, Oct 21): a usual time said another way is a
+    // change. On a date, the same minute is the same time.
+    const x = minutesOn(a, zm)
+    const y = minutesOn(b, zm)
+    return x !== null && y !== null && Math.abs(x - y) <= SAME_WITHIN_MINUTES
+  }
   if (!a.anchor && !b.anchor) {
     const x = parseTimeToMinutes(a.time)
     const y = parseTimeToMinutes(b.time)
@@ -267,6 +279,26 @@ export function compareTimes(
   reading: RegularReading,
   { season, zmanim = {}, newId = () => crypto.randomUUID() }: { season: Season | null; zmanim?: Record<string, DayZmanim>; newId?: () => string },
 ): TimesUpdate {
+  // Usual times that say which are each season's ("7:00 PM · Summer"
+  // beside "around candle-lighting · Winter", Mekor's website, Oct 21) are
+  // the whole year's: compared season by season, each row marked with its
+  // season, and one the same in both left all year. The website wins, said
+  // its way (the user, Oct 21: "we really want to mimic the website").
+  if (reading.kind === 'schedule' && !reading.season && reading.times.some((t) => seasonOf({ notes: t.notes }))) {
+    const pass = (s: Season) =>
+      compareTimes(current, { ...reading, season: s, times: reading.times.filter((t) => (seasonOf({ notes: t.notes }) ?? s) === s) }, { season: s, zmanim, newId }).rows
+    const summer = pass('summer')
+    const winter = pass('winter')
+    const inWinter = new Set(winter.map(rowKey))
+    const allYear = new Set(summer.map(rowKey).filter((k) => inWinter.has(k)))
+    const rows = [
+      ...summer.map((r): UpdateRow => (allYear.has(rowKey(r)) ? r : { ...r, season: 'summer' })),
+      ...winter.filter((r) => !allYear.has(rowKey(r))).map((r): UpdateRow => ({ ...r, season: 'winter' })),
+    ]
+    const at = (r: UpdateRow) => [DAY_KEYS.indexOf(r.day as DayKey) === -1 ? 7 : DAY_KEYS.indexOf(r.day as DayKey), TEFILLAH_ORDER.indexOf(r.tefillah)]
+    rows.sort((a, b) => at(a)[0] - at(b)[0] || at(a)[1] - at(b)[1] || (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+    return { kind: 'schedule', complete: reading.complete, season: null, title: reading.title, startsOn: reading.startsOn, from: null, to: null, rows, otherSeason: 0 }
+  }
   // A schedule is for a season: the other season's times are left alone.
   // A week's times are what's happening those days, whatever the season:
   // compared with all the shul's times, since the guide's season (from the
@@ -278,11 +310,18 @@ export function compareTimes(
     return !s || !target || s === target
   }
   const scoped = current.filter(inScope)
+  // And what was read for the other season ("7:00 PM · Summer" in a
+  // table beside "around candle-lighting · Winter", Mekor's website, Oct
+  // 21) isn't compared: the listing's own times for it were left out above,
+  // so it would come out as new. Said their way, not the listing's, it's a
+  // change to suggest (the user, Oct 21: "if they say it one way we can
+  // adjust and show it on our site that way").
+  const readInScope = (t: ReadRegularTime) => inScope({ notes: t.notes } as Minyan)
   const rows: UpdateRow[] = []
   const pair = (day: string, weekday: DayKey, read: ReadRegularTime[], zm?: DayZmanim) => {
     for (const tefillah of TEFILLAH_ORDER) {
       const c = scoped.filter((m) => m.tefillah === tefillah && m.days.includes(weekday)).map((row) => ({ row }))
-      const r = read.filter((t) => t.tefillah === tefillah)
+      const r = read.filter((t) => t.tefillah === tefillah && readInScope(t))
       if (c.length || r.length) rows.push(...pairDay(day, c, r, { complete: reading.complete, zm, newId }))
     }
   }
@@ -320,6 +359,10 @@ export function compareTimes(
     otherSeason: current.length - scoped.length,
   }
 }
+
+/** A row, whatever its id: the same in both seasons' passes is all year. */
+const rowKey = (r: UpdateRow) =>
+  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null])
 
 /** Whether a result changes anything: otherwise it only confirms. */
 export function changesAnything(u: Pick<TimesUpdate, 'rows'>): boolean {
@@ -381,7 +424,10 @@ export function mergeSchedule(
   const i = existing.findIndex((s) => s.name.toLowerCase() === incoming.name.toLowerCase())
   if (i === -1) return [...existing, incoming]
   const old = existing[i]
-  const covered = new Set([...coveredBy(incoming)].flatMap((d) => [d, ...expand(d, incoming)]))
+  // A week stands for every date in it: a day it has nothing for has
+  // nothing, not what an earlier read of the same week had.
+  const whole = incoming.kind === 'week' ? datesBetween(incoming.from, incoming.to) : []
+  const covered = new Set([...coveredBy(incoming), ...whole].flatMap((d) => [d, ...expand(d, incoming)]))
   const kept = old.minyanim.flatMap((m) => {
     const on = m.on.flatMap((d) => {
       if (covered.has(d)) return []
@@ -437,7 +483,26 @@ export function applyUpdate(
   current: readonly Minyan[],
   schedules: readonly SpecialSchedule[],
   update: Omit<TimesUpdate, 'otherSeason'>,
-  { newId = () => crypto.randomUUID(), now = Date.now(), postedBy }: { newId?: () => string; now?: number; postedBy?: 'website' } = {},
+  {
+    newId = () => crypto.randomUUID(),
+    now = Date.now(),
+    postedBy,
+    name: weekName,
+    evenIfSame = false,
+  }: {
+    newId?: () => string
+    now?: number
+    postedBy?: 'website'
+    /** The week's name, in place of its dates from `from`: a calendar's
+     *  week is named for the whole week, so reading it again on a later
+     *  day merges with it (mergeSchedule). */
+    name?: string
+    /** Post the week even when every time is the usual one: a calendar's
+     *  week is this week's schedule all the same (the user, Oct 20:
+     *  "usual times doesn't read as reliable as something that says this
+     *  is confirmed this week's schedule"). */
+    evenIfSame?: boolean
+  } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
   // The shul's times, one per day, each remembering which minyan it was.
@@ -446,7 +511,7 @@ export function applyUpdate(
 
   /** The shul's time on a day comes off; one it keeps all year stays for
    *  the other season when the message is one season's. */
-  const takeOff = (r: UpdateRow): DaySlot | null => {
+  const takeOff = (r: UpdateRow, seasonal: Season | null): DaySlot | null => {
     const i = slots.findIndex((s) => s.from === r.rowId && s.day === r.day)
     if (i === -1) return null
     const s = slots[i]
@@ -475,15 +540,18 @@ export function applyUpdate(
         if (r.status === 'new') dated.push(r)
         continue
       }
-      const was = r.status === 'changed' ? takeOff(r) : null
+      // A row compared in one season (both seasons' times, compareTimes)
+      // is that season's.
+      const season = r.season ?? seasonal
+      const was = r.status === 'changed' ? takeOff(r, season) : null
       if (was) {
-        add(r, seasonal, was)
-        changes.push(`Changed: ${rowText(r)}, was ${r.was}${seasonal ? ` (${seasonal})` : ''}`)
+        add(r, season, was)
+        changes.push(`Changed: ${rowText(r)}, was ${r.was}${season ? ` (${season})` : ''}`)
       } else if (r.status === 'new') {
-        add(r, seasonal)
-        changes.push(`New: ${rowText(r)}${seasonal ? ` (${seasonal})` : ''}`)
-      } else if (r.status === 'gone' && !r.keep && takeOff(r)) {
-        changes.push(`Off: ${rowText(r)}${seasonal ? ` (for ${seasonal})` : ''}`)
+        add(r, season)
+        changes.push(`New: ${rowText(r)}${season ? ` (${season})` : ''}`)
+      } else if (r.status === 'gone' && !r.keep && takeOff(r, season)) {
+        changes.push(`Off: ${rowText(r)}${season ? ` (for ${season})` : ''}`)
       }
     }
   } else {
@@ -505,9 +573,10 @@ export function applyUpdate(
   let nextSchedules = [...schedules]
 
   // …and the week itself, dated, in place of the regular times those days.
-  if (update.kind === 'week' && update.from && update.to && changesAnything(update)) {
+  const posting = update.rows.some((r) => r.status !== 'gone' || r.keep)
+  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting))) {
     const heading = weekKeepsHeading({ from: update.from, to: update.to }) ? update.title?.trim() : null
-    const name = heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
+    const name = weekName || heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
     const minyanimOn = update.rows
       .filter((r) => r.status !== 'gone' || r.keep)
       .map((r) => ({ id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) }))
@@ -531,6 +600,7 @@ export function applyUpdate(
       if (r.status === 'new') changes.push(`${name}: new, ${rowText(r)}`)
       if (r.status === 'gone' && !r.keep) changes.push(`${name}: not held, ${rowText(r)}`)
     }
+    if (!changesAnything(update)) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
   }
 
   // One-offs on their dates, as well as the regular times.

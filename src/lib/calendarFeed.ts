@@ -9,10 +9,10 @@
 //
 // So the page is searched for its calendar's own data, by code, never the
 // AI: an iCal feed it links to (a `.ics` file, `?ical=1`, `webcal:`, a
-// Google Calendar it embeds), or an event list in its scripts. The coming
-// weeks' entries become one line each, with the date, and are read with
-// the page as any shul's page is (listingPageRun.ts): the reader says
-// which are services, and when.
+// Google Calendar it embeds), or an event list in its scripts. Its entries
+// become one line each, with the date, and are read a week at a time
+// (calendarWeeks; listingPageRun.ts): the reader says which are services,
+// and when, and the week is that week's schedule.
 //
 // Pure: listingPageRun.ts fetches.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,14 +25,26 @@ export type CalendarEntry = {
   title: string
 }
 
-/** How far ahead the lines go: the days the shul's reader is told about
- *  (shulWeekReading.ts). */
-export const CALENDAR_DAYS = 21
-/** At most this many lines: a busy shul's three weeks, well inside what the
+/** At most this many lines: a busy shul's two weeks, well inside what the
  *  reader is given. */
 const MAX_LINES = 120
 
 const ICS_LINK = /(?:\.ics(?:[?#]|$)|[?&]ical=1\b|^webcal:)/i
+
+/** A Google Calendar embed's calendar, as its feed is addressed. Google's
+ *  embed code may give it in base64 (Kol Tzedek's, Oct 21:
+ *  "a29sdHplZGVr…" for koltzedekcommunications@gmail.com), and the feed
+ *  at that address is a 404. */
+function googleCalendarId(src: string): string {
+  if (src.includes('@') || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(src)) return src
+  const decoded = Buffer.from(src, 'base64').toString('utf8')
+  return /^[^\s@]+@[^\s@]+\.[a-z.]+$/i.test(decoded) ? decoded : src
+}
+
+/** How big a calendar feed may be. Google's public feed is every event
+ *  the calendar ever had: Kol Tzedek's was 4.8 MB on Oct 21, over what a
+ *  page may be (menuReader.ts). */
+export const MAX_FEED_BYTES = 20_000_000
 
 /** The iCal feeds a page links to or embeds, as addresses to fetch, the
  *  page's own first. A Google Calendar embed (`calendar/embed?src=…`) has
@@ -54,7 +66,7 @@ export function calendarFeeds(html: string, pageUrl: string): string[] {
     const google = /calendar\.google\.com\/calendar\/(?:u\/\d+\/)?embed\?([^"'\s]+)/i.exec(raw)
     if (google) {
       for (const src of new URLSearchParams(google[1].replace(/&amp;/g, '&')).getAll('src')) {
-        add(`https://calendar.google.com/calendar/ical/${encodeURIComponent(src)}/public/basic.ics`)
+        add(`https://calendar.google.com/calendar/ical/${encodeURIComponent(googleCalendarId(src))}/public/basic.ics`)
       }
     }
   }
@@ -147,6 +159,23 @@ function addDays(date: string, n: number): string {
   return new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 }
 
+const weekdayNumber = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay()
+
+/** One week of a calendar, as it's read: Sunday to Shabbos, from `from`
+ *  (today, in this week), with that week's lines (calendarLines). */
+export type CalendarWeek = { sunday: string; from: string; to: string; lines: string[] }
+
+/** The weeks a calendar is read for (the user, Oct 20: "only read one week
+ *  at a time so we just show this week's"): this week, from today to
+ *  Shabbos, and from Thursday, when people plan for the next one, next
+ *  week too. Each is read on its own, so each is that week's schedule. */
+export function calendarWeeks(today: string): Omit<CalendarWeek, 'lines'>[] {
+  const sunday = addDays(today, -weekdayNumber(today))
+  const weeks = [{ sunday, from: today, to: addDays(sunday, 6) }]
+  if (weekdayNumber(today) >= 4) weeks.push({ sunday: addDays(sunday, 7), from: addDays(sunday, 7), to: addDays(sunday, 13) })
+  return weeks
+}
+
 /** The entries of an iCal feed between `from` and `to` inclusive. A weekly
  *  repeat (RRULE FREQ=WEEKLY, as Google Calendar keeps a regular minyan) is
  *  laid out over those days; any other repeat is left at its first date. */
@@ -209,15 +238,13 @@ export function isIcs(text: string): boolean {
   return /^\s*BEGIN:VCALENDAR/i.test(text)
 }
 
-/** The calendar's coming days, a line each, for the reader: "2026-10-30
- *  (Fri) 7:30 PM: Kabbalat Shabbat Service". From `today`, for
- *  CALENDAR_DAYS days, in order, each entry once. Empty when there's
- *  nothing in that time. */
-export function calendarLines(entries: readonly CalendarEntry[], today: string): string[] {
-  const last = addDays(today, CALENDAR_DAYS - 1)
+/** The calendar's days from `from` to `to`, a line each, for the reader:
+ *  "2026-10-30 (Fri) 7:30 PM: Kabbalat Shabbat Service". In order, each
+ *  entry once. Empty when there's nothing in that time. */
+export function calendarLines(entries: readonly CalendarEntry[], from: string, to: string): string[] {
   const seen = new Set<string>()
   return entries
-    .filter((e) => e.date >= today && e.date <= last && e.title)
+    .filter((e) => e.date >= from && e.date <= to && e.title)
     .sort((a, b) => a.date.localeCompare(b.date) || minutes(a.time) - minutes(b.time))
     .map((e) => {
       const weekday = new Date(`${e.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
@@ -233,5 +260,9 @@ function minutes(time: string | null): number {
   return m ? ((Number(m[1]) % 12) + (m[3] === 'P' ? 12 : 0)) * 60 + Number(m[2]) : -1
 }
 
-/** What heads the calendar's lines in the text the reader is given. */
-export const CALENDAR_HEADING = 'Their calendar, the coming weeks, one entry per line (date, weekday, time: what it is):'
+/** What heads the calendar's lines in the text the reader is given. It
+ *  tells the reader each is that date's only: a service on every Friday
+ *  of the calendar isn't the shul saying it's every Friday (the user,
+ *  Oct 20). */
+export const CALENDAR_HEADING =
+  'Their calendar, one entry per line (date, weekday, time: what it is). Each entry is for its date only, however often it repeats: give it that date, never a weekday:'

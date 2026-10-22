@@ -139,10 +139,10 @@ export function parseKeystoneList(html: string): KeystoneEntry[] {
     const benefitAt = rest.findIndex((l) => BENEFIT.test(l))
     const kept = benefitAt < 0 ? rest : rest.slice(0, benefitAt)
 
-    const certAt = kept.findIndex((l) => /^kosher certification:?/i.test(l))
+    const certAt = kept.findIndex((l) => /^kosher certification\s*:?/i.test(l))
     const certification = (
       certAt >= 0
-        ? [kept[certAt].replace(/^kosher certification:?\s*/i, ''), ...kept.slice(certAt + 1)]
+        ? [kept[certAt].replace(/^kosher certification\s*:?\s*/i, ''), ...kept.slice(certAt + 1)]
         : kept.filter((l) => levelsIn(l).length > 0 || /kosher|pas yis|cholov|yoshon/i.test(l))
     )
       .filter((l) => l && !/^website$/i.test(l) && !/^https?:/i.test(l))
@@ -222,7 +222,7 @@ function sameByName(listing: WatchedListing, entry: KeystoneEntry): boolean {
  *  still on the list, otherwise by name. A link the list no longer has (the
  *  page was renamed, "Wells Fargo Center" to "Xfinity Center") falls back to
  *  the name, so a moved page reads as a moved link, not a lost hechsher. */
-function entryFor(listing: WatchedListing, entries: KeystoneEntry[]): KeystoneEntry | undefined {
+export function entryFor(listing: WatchedListing, entries: KeystoneEntry[]): KeystoneEntry | undefined {
   const slug = keystoneSlug(listing.details)
   return (slug ? entries.find((e) => e.slug === slug) : undefined) ?? entries.find((e) => sameByName(listing, e))
 }

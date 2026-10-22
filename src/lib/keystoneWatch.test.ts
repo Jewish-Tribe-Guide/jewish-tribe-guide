@@ -64,6 +64,15 @@ describe('parseKeystoneList', () => {
     expect(e.levels).toEqual(['Meat'])
   })
 
+  // Seen on the Kosher certification page (Oct 21): “: Dairy – Cholov
+  // Stam & Glatt Meat”, from a label whose colon sits outside its <strong>.
+  it('reads a certification whose colon comes after its label’s bold', () => {
+    const moved = html.replace('Kosher Certification:</strong> Dairy &#8211; Chalav Yisroel', 'Kosher Certification</strong>: Dairy &#8211; Chalav Yisroel')
+    expect(moved).not.toBe(html)
+    const e = parseKeystoneList(moved).find((x) => x.slug === 'chalavita-kosher-dairy-catering')!
+    expect(e.certification).toBe('Dairy – Chalav Yisroel')
+  })
+
   it('reads a certification written in Hebrew', () => {
     expect(bySlug('judah-mediterranian-grille').levels).toEqual(['Meat'])
   })

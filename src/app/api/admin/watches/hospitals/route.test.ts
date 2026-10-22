@@ -1,0 +1,240 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
+import type { Watch } from '@/lib/watches'
+
+const m = vi.hoisted(() => ({
+  getAdminUserForCommunity: vi.fn(),
+  listApprovedResources: vi.fn(),
+  listWatches: vi.fn(),
+  addWatch: vi.fn(),
+  updateWatch: vi.fn(),
+  removeWatch: vi.fn(),
+  runAndRecord: vi.fn(),
+  readRefuahNear: vi.fn(),
+  pending: [] as { target_id: string }[],
+  jobFindings: vi.fn(),
+  listCategories: vi.fn(),
+}))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
+vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
+vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
+vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, updateWatch: m.updateWatch, removeWatch: m.removeWatch }))
+vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
+vi.mock('@/lib/refuahRun', () => ({ readRefuahNear: m.readRefuahNear }))
+vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
+vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
+vi.mock('@/lib/supabase/admin', () => ({
+  getAdminClient: () => ({
+    from: () => {
+      const q = { select: () => q, eq: () => q, in: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.pending, error: null }).then(ok) }
+      return q
+    },
+  }),
+}))
+
+const { GET, POST } = await import('./route')
+const { REFUAH_MATCH_CREATOR, REFUAH_NOT_LISTED_CREATOR, REFUAH_STOPPED_CREATOR, notOnRefuahUrl, refuahPageUrl } = await import('@/lib/refuahMatch')
+
+const PA_ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
+const FAR_ID = '7d1f3c2a-9b8e-4c6d-a5f4-3e2d1c0b9a87'
+const PA = { _id: 'jx75q42dv17pxq7zckc9sx31v589mzem', name: 'Pennsylvania Hospital', formattedAddress: '800 Spruce St, Philadelphia, PA 19107, USA', latitude: 39.9451, longitude: -75.1556 }
+const HUP = { _id: 'jx77h9d00qztqgbbe8e0rfj1r589mgf5', name: 'Hospital of the University of Pennsylvania', formattedAddress: '3400 Spruce St, Philadelphia, PA 19104, USA', latitude: 39.9496, longitude: -75.1925 }
+const req = (method: string, body?: unknown) => new Request('http://x/api/admin/watches/hospitals', { method, body: body === undefined ? undefined : JSON.stringify(body) })
+const w = (over: Partial<Watch>) => ({ id: 'w1', communityId: 'philly', kind: 'website', active: true, createdBy: REFUAH_MATCH_CREATOR, lastCheck: null, ...over }) as Watch
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  m.pending = []
+  m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
+  m.listCategories.mockResolvedValue([])
+  m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
+  m.listApprovedResources.mockResolvedValue([
+    makeListing({ id: PA_ID, category: 'hospital', name: 'Pennsylvania Hospital', geo: { lat: 39.9451, lng: -75.1556 } }),
+    makeListing({ id: FAR_ID, category: 'hospital', name: 'Shriners', geo: { lat: 39.99, lng: -75.15 } }),
+    makeListing({ id: 'shul', category: 'synagogue', name: 'A shul' }),
+  ])
+  m.listWatches.mockResolvedValue({ watches: [], available: true })
+  m.readRefuahNear.mockResolvedValue([PA, HUP])
+  m.addWatch.mockImplementation(async (_c: string, x: Partial<Watch>) => w({ id: 'new', ...x }))
+  m.runAndRecord.mockImplementation(async (x: Watch) => ({ watch: { ...x, lastRunAt: 'now' } }))
+})
+
+describe('GET /api/admin/watches/hospitals', () => {
+  it('refuses anyone who isn’t this community’s admin', async () => {
+    m.getAdminUserForCommunity.mockResolvedValue(null)
+    expect((await GET(req('GET'))).status).toBe(401)
+    expect((await POST(req('POST', { action: 'off', resourceId: PA_ID }))).status).toBe(401)
+  })
+
+  it('lists each hospital with where its Refuah page came from, or why it has none, what Refuah found waiting to compare, and when one was decided', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ url: refuahPageUrl(PA._id), resourceId: PA_ID })], available: true })
+    // What it found, waiting to compare; and another's, decided.
+    const finding = { id: 'f1', targetId: PA_ID, operation: 'update', lines: [] }
+    const decided = { at: '2026-10-21T09:00:00Z', status: 'rejected' }
+    m.jobFindings.mockResolvedValue({ findings: [finding, { ...finding, id: 'f2', targetId: 'elsewhere' }], decided: new Map([[FAR_ID, decided]]) })
+    const body = await (await GET(req('GET'))).json()
+    expect(body.hospitals.map((h: { name: string }) => h.name)).toEqual(['Pennsylvania Hospital', 'Shriners'])
+    const [pa, far] = body.hospitals
+    expect(pa).toMatchObject({ source: 'match', line: 'Matched to Refuah’s Pennsylvania Hospital, 800 Spruce St · same spot on the map', findings: [finding], decided: null, refuah: { name: 'Pennsylvania Hospital', street: '800 Spruce St' } })
+    expect(far.decided).toEqual(decided)
+    expect(far).toMatchObject({ source: null, watch: null, line: expect.stringMatching(/^Not found on Refuah\. The nearest hospital on Refuah is 3\.\d mi away/) })
+    // Nearest first, for "Give its Refuah page".
+    expect(far.nearby.map((r: { id: string }) => r.id)).toEqual([PA._id, HUP._id])
+  })
+
+  it('a page given by hand says so, and wins over the run’s own', async () => {
+    m.listWatches.mockResolvedValue({
+      watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID }), w({ id: 'hand', url: refuahPageUrl(HUP._id), resourceId: PA_ID, createdBy: 'me@x.co' })],
+      available: true,
+    })
+    const [pa] = (await (await GET(req('GET'))).json()).hospitals
+    expect(pa.watch.id).toBe('hand')
+    expect(pa.line).toMatch(/^Given by hand: Refuah’s Hospital of the University of Pennsylvania, 3400 Spruce St · 2 mi apart on the map$/)
+  })
+
+  it('gives each hospital its listing’s boxes of contacts, with what each has now', async () => {
+    m.listCategories.mockResolvedValue([
+      makeCategory({
+        id: 'hospital',
+        detailFields: [
+          { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
+          { key: 'transportation', label: 'Transportation', type: 'contacts' },
+        ],
+        listingParts: { boxes: [{ title: 'Rides', fields: ['transportation'] }] },
+      }),
+    ])
+    const rides = [{ name: 'Darchei Chesed', phones: ['+1 845-425-4070'] }]
+    m.listApprovedResources.mockResolvedValue([makeListing({ id: PA_ID, category: 'hospital', name: 'Pennsylvania Hospital', geo: { lat: 39.9451, lng: -75.1556 }, transportation: rides } as never)])
+    const [pa] = (await (await GET(req('GET'))).json()).hospitals
+    expect(pa.boxes).toEqual([
+      { title: 'Rides', keys: ['transportation'], labels: ['Transportation'], now: { transportation: rides } },
+      { title: 'Liaisons', keys: ['liaisons'], labels: ['Liaisons'], now: { liaisons: null } },
+    ])
+  })
+
+  it('?item: one hospital’s listing and category, for a box’s Edit', async () => {
+    const category = makeCategory({ id: 'hospital' })
+    m.listCategories.mockResolvedValue([category])
+    const body = await (await GET(new Request(`http://x/api/admin/watches/hospitals?item=${PA_ID}`))).json()
+    expect(body).toMatchObject({ ok: true, item: { id: PA_ID }, category: { id: 'hospital' } })
+    expect((await GET(new Request('http://x/api/admin/watches/hospitals?item=shul'))).status).toBe(400)
+    expect((await GET(new Request('http://x/api/admin/watches/hospitals?item=11111111-2222-4333-8444-555555555555'))).status).toBe(404)
+  })
+
+  it('a page an admin stopped reading isn’t its page', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'stopped', url: refuahPageUrl(PA._id), resourceId: PA_ID, createdBy: REFUAH_STOPPED_CREATOR, active: false })], available: true })
+    const [pa] = (await (await GET(req('GET'))).json()).hospitals
+    expect(pa.watch).toBeNull()
+  })
+
+  it('asks Refuah about the hospitals on the map, from where each is', async () => {
+    await GET(req('GET'))
+    expect(m.readRefuahNear).toHaveBeenCalledWith([
+      { lat: 39.9451, lng: -75.1556 },
+      { lat: 39.99, lng: -75.15 },
+    ])
+  })
+
+  // Oct 22: the Watches tab asked Refuah every time it opened, for counts
+  // that come from the watches and findings alone.
+  it('?counts: the tab’s, without asking Refuah', async () => {
+    const page = w({ url: refuahPageUrl(PA._id), resourceId: PA_ID })
+    m.listWatches.mockResolvedValue({ watches: [page], available: true })
+    const finding = { id: 'f1', targetId: PA_ID, operation: 'update', lines: [] }
+    m.jobFindings.mockResolvedValue({ findings: [finding], decided: new Map() })
+    const body = await (await GET(new Request('http://x/api/admin/watches/hospitals?counts'))).json()
+    expect(m.readRefuahNear).not.toHaveBeenCalled()
+    expect(body.hospitals.map((h: { watch: unknown; notOnRefuah: boolean; findings: unknown[] }) => [h.watch !== null, h.notOnRefuah, h.findings.length])).toEqual([
+      [true, false, 1],
+      [false, false, 0],
+    ])
+  })
+
+  it('Refuah down: still lists them, and says so', async () => {
+    m.readRefuahNear.mockResolvedValue({ error: 'Refuah answered 502' })
+    const body = await (await GET(req('GET'))).json()
+    expect(body.refuahError).toBe('Refuah answered 502')
+    expect(body.hospitals).toHaveLength(2)
+  })
+})
+
+describe('POST /api/admin/watches/hospitals', () => {
+  it('choose: the chosen page replaces its other one and a "Not on Refuah", given by hand, and is read at once', async () => {
+    m.listWatches.mockResolvedValue({
+      watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID }), w({ id: 'n', url: notOnRefuahUrl(PA_ID), resourceId: PA_ID, createdBy: REFUAH_NOT_LISTED_CREATOR })],
+      available: true,
+    })
+    const res = await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: 'refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5' }))
+    expect(res.status).toBe(200)
+    expect(m.removeWatch.mock.calls.map((c) => c[1])).toEqual(['auto', 'n'])
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: refuahPageUrl(HUP._id), resourceId: PA_ID, label: 'Pennsylvania Hospital on Refuah', createdBy: 'me@x.co' })
+    expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'new' }), undefined, undefined, { full: true })
+  })
+
+  it('choose: never a Refuah search, nor a page another hospital has', async () => {
+    expect((await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: 'https://refuah.com/search?q=penn' }))).status).toBe(400)
+    m.listWatches.mockResolvedValue({ watches: [w({ url: refuahPageUrl(HUP._id), resourceId: FAR_ID })], available: true })
+    const taken = await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: refuahPageUrl(HUP._id) }))
+    expect(taken.status).toBe(409)
+    expect((await taken.json()).errors[0]).toBe('That Refuah page is already read for Shriners.')
+    expect(m.addWatch).not.toHaveBeenCalled()
+  })
+
+  it('off: a page is turned off, not removed; with none, it’s kept as "Not on Refuah"', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID })], available: true })
+    await POST(req('POST', { action: 'off', resourceId: PA_ID }))
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'auto', { active: false })
+    expect(m.removeWatch).not.toHaveBeenCalled()
+
+    m.listWatches.mockResolvedValue({ watches: [], available: true })
+    const body = await (await POST(req('POST', { action: 'off', resourceId: FAR_ID }))).json()
+    expect(body.notOnRefuah).toBe(true)
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: notOnRefuahUrl(FAR_ID), resourceId: FAR_ID, createdBy: REFUAH_NOT_LISTED_CREATOR, active: false }))
+  })
+
+  it('on: a page turned off is read again at once; a "Not on Refuah" goes and the hospital is matched again', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID, active: false })], available: true })
+    await POST(req('POST', { action: 'on', resourceId: PA_ID }))
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'auto', { active: true })
+    expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'auto', active: true }), undefined, undefined, { full: true })
+
+    vi.clearAllMocks()
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'n', url: notOnRefuahUrl(PA_ID), resourceId: PA_ID, createdBy: REFUAH_NOT_LISTED_CREATOR, active: false })], available: true })
+    await POST(req('POST', { action: 'on', resourceId: PA_ID }))
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'n')
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: refuahPageUrl(PA._id), resourceId: PA_ID, label: 'Pennsylvania Hospital on Refuah', createdBy: REFUAH_MATCH_CREATOR })
+    expect(m.runAndRecord).toHaveBeenCalledTimes(1)
+  })
+
+  it('stop: its page isn’t read, and is kept so the morning’s match doesn’t add it again', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID })], available: true })
+    const body = await (await POST(req('POST', { action: 'stop', resourceId: PA_ID }))).json()
+    expect(body).toMatchObject({ ok: true, watch: null, notOnRefuah: false })
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'auto', { createdBy: REFUAH_STOPPED_CREATOR, active: false })
+    expect(m.removeWatch).not.toHaveBeenCalled()
+    const { wantedRefuahWatches, matchRefuah } = await import('@/lib/refuahMatch')
+    const pa = makeListing({ id: PA_ID, category: 'hospital', name: 'Pennsylvania Hospital', geo: { lat: 39.9451, lng: -75.1556 } })
+    expect(wantedRefuahWatches([pa], matchRefuah([pa], [PA]), [{ url: refuahPageUrl(PA._id), resourceId: PA_ID, createdBy: REFUAH_STOPPED_CREATOR }])).toEqual([])
+  })
+
+  it('none: its page goes, and it’s said not to be on Refuah', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID })], available: true })
+    const body = await (await POST(req('POST', { action: 'none', resourceId: PA_ID }))).json()
+    expect(body).toMatchObject({ ok: true, watch: null, notOnRefuah: true })
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'auto')
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: notOnRefuahUrl(PA_ID), createdBy: REFUAH_NOT_LISTED_CREATOR, active: false }))
+  })
+
+  it('choose: a page it stopped reading goes too', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'stopped', url: refuahPageUrl(PA._id), resourceId: PA_ID, createdBy: REFUAH_STOPPED_CREATOR, active: false })], available: true })
+    await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: refuahPageUrl(PA._id) }))
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'stopped')
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: refuahPageUrl(PA._id), createdBy: 'me@x.co' }))
+  })
+
+  it('refuses a listing that isn’t one of the guide’s hospitals', async () => {
+    expect((await POST(req('POST', { action: 'off', resourceId: '11111111-2222-4333-8444-555555555555' }))).status).toBe(400)
+    expect((await POST(req('POST', { action: 'nonsense', resourceId: PA_ID }))).status).toBe(400)
+  })
+})

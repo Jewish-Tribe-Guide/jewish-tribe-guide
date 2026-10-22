@@ -19,9 +19,14 @@ import { readContact, readContacts, contactLine, type ContactEntry } from './con
 // hospitals; call to arrange."), so a word-for-word comparison would call
 // every entry changed. What's compared is what a visitor acts on: is the
 // entry there (by name, or by a phone only it has), and are its phones,
-// email and website the same. Wording is left alone. Nothing is removed:
-// an entry Refuah no longer has is said on the card, for the admin to
-// decide.
+// email and website the same. Wording is left alone.
+//
+// An entry Refuah no longer has is taken off only if it came from Refuah
+// (the user, Oct 22: one added by hand is kept). Entries carry no mark of
+// where they came from, so the watch remembers (`refuahHad` on its check):
+// every entry it has ever matched to one of Refuah's, by field and name.
+// One it remembers that Refuah no longer has is proposed crossed out, "Not
+// on Refuah"; one it never matched was added by hand, and is kept.
 //
 // Pure: no network, no database. refuahRun.ts runs it.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,6 +125,10 @@ const phoneSet = (e: ContactEntry) => new Set((e.phones ?? []).map(digits).filte
 const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x))
 const sameWeb = (a: string, b: string) => loose(a.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')) === loose(b.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''))
 
+/** How the watch remembers an entry came from Refuah: its field, and its
+ *  name, loosely. */
+export const refuahEntryId = (key: string, e: Pick<ContactEntry, 'name'>) => `${key}:${loose(e.name)}`
+
 /** The guide's entry that's Refuah's: the same name, or failing that a
  *  phone only one of the guide's entries has. */
 function matchOf(r: ContactEntry, guide: ContactEntry[], taken: Set<number>): number {
@@ -133,6 +142,34 @@ function matchOf(r: ContactEntry, guide: ContactEntry[], taken: Set<number>): nu
   return -1
 }
 
+/** Each of Refuah's entries with the guide's it matches (-1, none). */
+function pairs(ours: ContactEntry[], theirs: readonly ContactEntry[]): { r: ContactEntry; i: number }[] {
+  const taken = new Set<number>()
+  return theirs.map((r) => {
+    const i = matchOf(r, ours, taken)
+    if (i >= 0) taken.add(i)
+    return { r, i }
+  })
+}
+
+/** The entries the watch now knows came from Refuah: the guide's that
+ *  match one of Refuah's now, Refuah's own (for one put on since), and
+ *  those it knew before that the guide still has. */
+export function refuahHadNow(details: Record<string, unknown>, refuah: Record<string, ContactEntry[]>, had: readonly string[] = []): string[] {
+  const out = new Set<string>()
+  const keys = new Set([...Object.keys(refuah), ...had.map((h) => h.slice(0, h.indexOf(':')))])
+  for (const key of keys) {
+    const ours = readContacts(details[key])
+    const theirs = refuah[key] ?? []
+    for (const { r, i } of pairs(ours, theirs)) {
+      out.add(refuahEntryId(key, r))
+      if (i >= 0) out.add(refuahEntryId(key, ours[i]))
+    }
+    for (const e of ours) if (had.includes(refuahEntryId(key, e))) out.add(refuahEntryId(key, e))
+  }
+  return [...out].sort()
+}
+
 export type FieldDifference = {
   key: string
   /** The field as it would be: the guide's entries with Refuah's phones,
@@ -141,47 +178,63 @@ export type FieldDifference = {
   /** For the card: "+ Darchei Chesed · (845) 425-4070", "Bikur Cholim of
    *  Philadelphia: phone (215) 805-8668 → (215) 805-9000". */
   lines: string[]
-  /** The guide's entries Refuah doesn't have, by name. Kept. */
+  /** The guide's entries Refuah doesn't have and that were added by
+   *  hand, by name. Kept. */
   notOnRefuah: string[]
+  /** The guide's entries that came from Refuah and that Refuah no longer
+   *  has, by name. Taken off in `after`. */
+  gone: string[]
 }
 
 /** Where a listing differs from Refuah, field by field. Empty when every
- *  entry Refuah has is in the guide with the same phones, email and site. */
-export function compareRefuah(details: Record<string, unknown>, refuah: Record<string, ContactEntry[]>, labels: Record<string, string> = {}): FieldDifference[] {
+ *  entry Refuah has is in the guide with the same phones, email and site,
+ *  and none it gave is gone from it. `had`: the entries the watch knows
+ *  came from Refuah (refuahHadNow), the only ones it takes off. */
+export function compareRefuah(details: Record<string, unknown>, refuah: Record<string, ContactEntry[]>, labels: Record<string, string> = {}, had: readonly string[] = []): FieldDifference[] {
   const out: FieldDifference[] = []
-  for (const [key, theirs] of Object.entries(refuah)) {
+  const keys = [...new Set([...Object.keys(refuah), ...had.map((h) => h.slice(0, h.indexOf(':')))])]
+  for (const key of keys) {
+    const theirs = refuah[key] ?? []
     const ours = readContacts(details[key])
-    const after = ours.map((e) => ({ ...e }))
+    const after: (ContactEntry | null)[] = ours.map((e) => ({ ...e }))
     const lines: string[] = []
-    const taken = new Set<number>()
     const label = labels[key] ?? key
-    for (const r of theirs) {
-      const i = matchOf(r, ours, taken)
+    const matched = pairs(ours, theirs)
+    const taken = new Set(matched.map((p) => p.i).filter((i) => i >= 0))
+    for (const { r, i } of matched) {
       if (i < 0) {
         after.push(r)
         lines.push(`+ ${label}: ${contactLine(r)}`)
         continue
       }
-      taken.add(i)
       const g = ours[i]
+      const e = after[i]!
       const said: string[] = []
       if (r.phones?.length && !sameSet(phoneSet(r), phoneSet(g))) {
         said.push(`phone ${(g.phones ?? []).join(', ') || 'none'} → ${r.phones.join(', ')}`)
-        after[i].phones = r.phones
+        e.phones = r.phones
       }
       if (r.email && r.email.toLowerCase() !== (g.email ?? '').toLowerCase()) {
         said.push(`email ${g.email ?? 'none'} → ${r.email}`)
-        after[i].email = r.email
+        e.email = r.email
       }
       if (r.web && !(g.web && sameWeb(g.web, r.web))) {
         said.push(`website ${g.web ?? 'none'} → ${r.web}`)
-        after[i].web = r.web
+        e.web = r.web
       }
       if (said.length) lines.push(`${label}, ${g.name}: ${said.join('; ')}`)
     }
+    const notOnRefuah: string[] = []
+    const gone: string[] = []
+    ours.forEach((g, i) => {
+      if (taken.has(i)) return
+      if (!had.includes(refuahEntryId(key, g))) return void notOnRefuah.push(g.name)
+      gone.push(g.name)
+      after[i] = null
+      lines.push(`− ${label}: ${g.name} (not on Refuah)`)
+    })
     if (lines.length === 0) continue
-    const notOnRefuah = ours.filter((_, i) => !taken.has(i)).map((e) => e.name)
-    out.push({ key, after: readContacts(after), lines, notOnRefuah })
+    out.push({ key, after: readContacts(after.filter(Boolean)), lines, notOnRefuah, gone })
   }
   return out
 }
@@ -193,7 +246,7 @@ export function refuahNote(hospital: string, url: string, diffs: FieldDifference
   return [
     `Refuah’s page for ${hospital} differs from the guide:`,
     diffs.flatMap((d) => d.lines).join('\n'),
-    kept.length ? `In the guide, not on Refuah (kept, not removed): ${kept.join(', ')}` : '',
+    kept.length ? `In the guide, added by hand, not on Refuah (kept): ${kept.join(', ')}` : '',
     url,
   ]
     .filter(Boolean)

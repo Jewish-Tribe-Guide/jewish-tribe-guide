@@ -105,6 +105,42 @@ describe('BoxEditor, this week’s schedule', () => {
     expect(sent).toMatchObject({ id: 'w1', from: '2026-10-09', to: '2026-10-10', kind: 'week' })
     expect(sent.minyanim).toEqual([week.minyanim[0], { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '8:45am', notes: 'Kiddush after davening' }])
   })
+
+  // Shul times' Edit (Oct 21): the week its website posted, not on the
+  // listing yet, opened in the listing's own box and saved the admin's way.
+  it('opened from a preset, a week only the website has; Save to the listing goes the admin’s way, unchallenged', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const via = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const onSaved = vi.fn()
+    const bare = makeListing({ ...shul, minyanim_schedules: [] })
+    renderWithProviders(<BoxEditSheet item={bare} category={shuls} edit={{ ...edit, preset: { minyanim_schedules: [week] }, save: { label: 'Save to the listing', via, onSaved } }} onClose={vi.fn()} />)
+    expect(within(screen.getByTestId('minyan-box-list')).getAllByRole('button', { name: /^(Mincha|Shacharis)/ })).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Save to the listing' }))
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const details = via.mock.calls[0][0].payload.details
+    expect(details.minyanim_schedules).toEqual([week])
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Verifying/)).not.toBeInTheDocument()
+  })
+})
+
+// A page's phone and email (Oct 22, contactRead.ts): Edit opens the
+// listing's own contact box, filled in with the website's.
+describe('the contact box, opened from a website’s phone and email', () => {
+  it('starts from the website’s phone, and saves it the admin’s way', async () => {
+    const email: CategoryField = { key: 'e', label: 'Email', type: 'text', renderAs: 'row' }
+    const food = makeCategory({ id: 'restaurant', hasPhone: true, detailFields: [email] })
+    const place = makeListing({ id: '7d1f3c2a-9b8e-4c6d-a5f4-3e2d1c0b9a87', category: 'restaurant', name: 'Chalavita', phone: '(215) 555-0100', e: 'old@chalavita.com' })
+    const via = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const onSaved = vi.fn()
+    renderWithProviders(<BoxEditSheet item={place} category={food} edit={{ title: 'Phone', fields: [], rows: ['contact'], preset: { phone: '2155550123', e: 'hi@chalavita.com' }, save: { label: 'Save to the listing', via, onSaved } }} onClose={vi.fn()} />)
+    expect(document.getElementById('edit-phone')).toHaveValue('(215) 555-0123')
+    fireEvent.click(screen.getByRole('button', { name: 'Save to the listing' }))
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const { payload } = via.mock.calls[0][0]
+    expect(payload.phone).toBe('(215) 555-0123')
+    expect(payload.details.e).toBe('hi@chalavita.com')
+  })
 })
 
 describe('BoxEditor, a shul’s usual Shabbos times', () => {

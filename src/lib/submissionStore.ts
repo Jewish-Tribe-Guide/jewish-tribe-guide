@@ -11,9 +11,13 @@ import { recordActivity } from './activityStore'
 import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
 import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
-import { isCommunityEdit, submissionSource } from './submissionSource'
+import { isCommunityEdit, statedSource, submissionSource } from './submissionSource'
+import { rebasePart } from './timesParts'
+import { rebaseSection } from './hoursSections'
+import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
-import type { EruvSuggestion } from './eruvSuggestion'
+import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
+import { jobCategories, keepOnly, onAJobPage, watchNameOf } from './watchFindings'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -108,10 +112,15 @@ export async function listSubmissionsByStatus(
     .order(status === 'pending' ? 'created_at' : 'reviewed_at', { ascending: false })
 
   if (error) throw new Error(`Failed to load submissions: ${error.message}`)
-  const submissions = data as SubmissionRow[]
+  const all = data as SubmissionRow[]
 
   // Resolve category labels for display.
   const categories = await listCategories(community)
+  // What a watch found waits on the job page that reads the place, next to
+  // what the listing says, not here: "The queue keeps what people send in"
+  // (watchFindings.ts). Decided ones stay in the history either way.
+  const jobs = status === 'pending' && all.some((s) => watchNameOf(s)) ? jobCategories(categories) : null
+  const submissions = jobs ? all.filter((s) => !onAJobPage(s, (s.payload as { category?: string }).category, jobs)) : all
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label
@@ -214,6 +223,21 @@ export async function submitListingUpdate(
     note,
     submitted_by: submittedBy,
   })
+}
+
+/** A pending suggestion said again better: the same part of a shul's
+ *  times read more fully off another page (listingPageRun.ts). Only while
+ *  it's pending, so one an admin decided meanwhile stays as decided. */
+export async function replacePendingSuggestion(community: string, id: string, payload: ResourceSubmission, note: string | null): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .update({ payload: payload as unknown as Record<string, unknown>, note })
+    .eq('community_id', community)
+    .eq('id', id)
+    .eq('status', 'pending')
+    .select('id')
+  if (error) throw new Error(`Couldn’t update the suggestion: ${error.message}`)
+  return (data ?? []).length > 0
 }
 
 // Records a suggested fix to an eruv's listing (eruvSuggestion.ts).
@@ -360,7 +384,16 @@ export class ReviewEditError extends Error {}
 // `edited`, when given: the admin's copy of the listing, fixed in the opened
 // card before approving (reviewEdits.ts). It's what goes live, and it's
 // saved on the submission with a record of what the admin changed.
-export async function approveSubmission(id: string, community?: string, reviewedBy?: string, edited?: unknown): Promise<SubmissionRow> {
+// `only`, instead: the lines of a watch's finding the admin ticked on its job
+// page (watchFindings.ts); every other line stays as the listing says now,
+// recorded the same way.
+export async function approveSubmission(
+  id: string,
+  community?: string,
+  reviewedBy?: string,
+  edited?: unknown,
+  only?: readonly string[],
+): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -376,6 +409,28 @@ export async function approveSubmission(id: string, community?: string, reviewed
   }
 
   let savedPayload: Record<string, unknown> | null = null
+  // An eruv's, from Eruv status: Use this's rows, or the admin's Edit.
+  if (submission.target_type === 'eruv' && submission.operation === 'update' && (only !== undefined || edited !== undefined)) {
+    const sent = submission.payload as unknown as EruvSuggestion
+    const eruv = (await listEruvimForAdmin(submission.community_id)).eruvim.find((e) => e.id === sent.eruvId)
+    if (!eruv) throw new ReviewEditError('The eruv this changes couldn’t be found.')
+    const next = eruvAsDecided(sent, eruv, { edited, only })
+    if (!next.ok) throw new ReviewEditError(next.errors.join(' '))
+    savedPayload = next.suggestion as unknown as Record<string, unknown>
+    submission.payload = savedPayload
+    only = undefined
+    edited = undefined
+  }
+  if (only !== undefined) {
+    if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) {
+      throw new ReviewEditError('Only an edit can be approved line by line.')
+    }
+    const { data: row, error: rowErr } = await supabase.from('resource').select('*').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const sent = submission.payload as unknown as ResourceSubmission
+    const category = await getCategoryById(submission.community_id, sent.category)
+    edited = keepOnly(sent, row as ResourceRow, only, category?.detailFields ?? [])
+  }
   if (edited !== undefined) {
     if (submission.target_type !== 'listing' || submission.operation === 'delete') {
       throw new ReviewEditError('Only a new listing or an edit can be changed before approving.')
@@ -392,6 +447,53 @@ export async function approveSubmission(id: string, community?: string, reviewed
       savedPayload = structuredClone(next) as unknown as Record<string, unknown>
       submission.payload = next as unknown as Record<string, unknown>
     }
+  }
+
+  // A shul's times read as one of the three parts (timesParts.ts): only
+  // that part goes on the listing, and everything else stays as the
+  // listing has it now. Approving the Shabbos times then never undoes
+  // weekday times, a week's schedule or a new phone number approved since
+  // they were read.
+  const part = submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id ? statedSource(submission.payload)?.part : undefined
+  if (part) {
+    const { data: row, error: rowErr } = await supabase.from('resource').select('name, address, phone, details').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const sent = submission.payload as unknown as ResourceSubmission
+    const now = row as Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>
+    const current = now.details ?? {}
+    const times = new Set([part.field, schedulesKey(part.field)])
+    // The finding's own keys, each as the listing has it now (none, gone).
+    const listing = Object.fromEntries(Object.keys({ ...sent.details, ...Object.fromEntries([...times].map((k) => [k, null])) }).map((k) => [k, current[k] ?? null]))
+    submission.payload = {
+      ...sent,
+      name: now.name,
+      address: now.address ?? '',
+      phone: now.phone ?? '',
+      details: rebasePart(part, listing, sent.details ?? {}),
+    } as unknown as Record<string, unknown>
+  }
+
+  // A mikvah's hours read as one section (hoursSections.ts), the same way:
+  // using the women's hours never undoes men's hours approved since. A
+  // page's phone and email are a section too (contactRead.ts), its phone
+  // the listing's own, not a detail.
+  const section = submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id && !part ? statedSource(submission.payload)?.section : undefined
+  if (section) {
+    const { data: row, error: rowErr } = await supabase.from('resource').select('name, address, phone, details').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const sent = submission.payload as unknown as ResourceSubmission
+    const now = row as Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>
+    // And whatever the admin changed in Edit, which may be more of the box
+    // than the page gave (the listing's whole contact box).
+    const keys = [...new Set([...section.keys, ...((sent as { reviewEdit?: { fields?: string[] } }).reviewEdit?.fields ?? [])])]
+    const own = (k: 'name' | 'address' | 'phone') => (keys.includes(k) ? (sent[k] ?? '') : (now[k] ?? ''))
+    submission.payload = {
+      ...sent,
+      name: own('name'),
+      address: own('address'),
+      phone: own('phone'),
+      details: rebaseSection({ ...section, keys }, now.details ?? {}, sent.details ?? {}),
+    } as unknown as Record<string, unknown>
   }
 
   let affectedResourceId: string | null = null

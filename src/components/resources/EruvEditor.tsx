@@ -22,18 +22,24 @@ import { EditorSent, editorFieldLabel, editorInputClass, sendChangesLabel } from
 // are the admin's. It goes to the moderation queue and shows once an admin
 // approves it.
 
-type Values = Record<EruvSuggestionField, string>
+export type EruvValues = Record<EruvSuggestionField, string>
+type Values = EruvValues
 
-export default function EruvEditor({ eruv, onClose, onHasChanges }: {
+export default function EruvEditor({ eruv, onClose, onHasChanges, adminSave }: {
   eruv: Eruv
   onClose: () => void
   /** Whether anything's been changed and not yet sent, for a host that
    *  asks before something else takes the editor's place (the desktop map). */
   onHasChanges?: (has: boolean) => void
+  /** An admin's save straight to the eruv, from Eruv status's Edit (Oct
+   *  22): filled with what its website says (`values`), and saved by its
+   *  own button ("Save to the listing"). No check, no Sent. `onSave` gives
+   *  back what was wrong, or null once it's saved. */
+  adminSave?: { label: string; values?: Partial<Values>; onSave: (values: Values) => Promise<string[] | null> }
 }) {
   const uid = useId()
   const community = useCommunitySlug()
-  const [values, setValues] = useState<Values>(() => ({ covers: eruv.covers ?? '', website: eruv.website ?? '', hotline: eruv.hotline ?? '', alertsUrl: eruv.alertsUrl ?? '' }))
+  const [values, setValues] = useState<Values>(() => ({ covers: eruv.covers ?? '', website: eruv.website ?? '', hotline: eruv.hotline ?? '', alertsUrl: eruv.alertsUrl ?? '', ...adminSave?.values }))
   const [honeypot, setHoneypot] = useState('')
   const [token, setToken] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
@@ -49,13 +55,20 @@ export default function EruvEditor({ eruv, onClose, onHasChanges }: {
   // In the admin's category Preview, Send files nothing and there's no
   // check to pass (see previewSend.tsx).
   const fetchOrPreview = useFetchOrPreview()
-  const turnstileActive = useTurnstileActive()
+  const turnstileActive = useTurnstileActive() && !adminSave
   const verifying = turnstileActive && !token
 
   async function send() {
     if (changes === 0 || sending || verifying) return
     setErrors([])
     setSending(true)
+    if (adminSave) {
+      const wrong = await adminSave.onSave(values).catch(() => ['Could not save that.'])
+      setSending(false)
+      if (wrong) setErrors(wrong)
+      else onClose()
+      return
+    }
     try {
       const res = await fetchOrPreview(withCommunity('/api/submissions', community), {
         method: 'POST',
@@ -92,7 +105,7 @@ export default function EruvEditor({ eruv, onClose, onHasChanges }: {
         void send()
       }}
     >
-      <Honeypot value={honeypot} onChange={setHoneypot} />
+      {!adminSave && <Honeypot value={honeypot} onChange={setHoneypot} />}
       <p className="px-1 text-[16px] font-extrabold text-slate-900">{eruv.name}</p>
       <Card>
         <div className="space-y-3 py-2">
@@ -129,7 +142,7 @@ export default function EruvEditor({ eruv, onClose, onHasChanges }: {
         </ul>
       )}
       <button type="submit" disabled={changes === 0 || sending || verifying} className={SUBMIT_PILL}>
-        {sendChangesLabel(changes, sending, verifying)}
+        {adminSave ? (sending ? 'Saving…' : adminSave.label) : sendChangesLabel(changes, sending, verifying)}
       </button>
       {changes > 0 && turnstileActive && <TurnstileWidget ref={turnstileRef} onVerify={setToken} />}
     </form>
