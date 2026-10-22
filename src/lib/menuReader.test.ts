@@ -35,6 +35,19 @@ describe('only the public internet', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
+  // Oct 21: Moishe Zvi's watch read the guide's own listing page for it.
+  it('the guide’s own pages aren’t read, a redirect to one included', async () => {
+    const fetchImpl = vi.fn()
+    const troubles: Trouble[] = []
+    expect(await fetchPublic('https://phillyjewishguide.com/philly/mikvah', { fetchImpl, resolve: publicDns, trouble: (t) => troubles.push(t) })).toBeNull()
+    expect(fetchImpl).not.toHaveBeenCalled()
+    fetchImpl.mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: 'https://www.phillyjewishguide.com/philly' } }))
+    expect(await fetchPublic('https://moishezvi.example', { fetchImpl, resolve: publicDns, trouble: (t) => troubles.push(t) })).toBeNull()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(troubles).toEqual([{ why: 'guide_page' }, { why: 'guide_page' }])
+    expect(troubleClause(troubles[0])).toBe('it’s a page of this guide, not the place’s own')
+  })
+
   it('follows a public redirect, and reads a PDF as a file', async () => {
     const fetchImpl = vi
       .fn()

@@ -1,4 +1,5 @@
 import { lookup } from 'node:dns/promises'
+import { isGuidePage } from './guidePage'
 import { isIP } from 'node:net'
 import { ITEM_NAMES, itemName, itemWords } from './itemNames'
 import { words } from './ask'
@@ -140,6 +141,7 @@ export type Trouble =
   | { why: 'error'; status: number }
   | { why: 'unreachable'; timedOut: boolean }
   | { why: 'not_public' }
+  | { why: 'guide_page' }
   | { why: 'not_a_page' }
   | { why: 'ordering_app' }
   | { why: 'person_check' }
@@ -159,6 +161,8 @@ export function troubleClause(t: Trouble): string {
       return t.timedOut ? 'it didn’t answer in time' : 'it couldn’t be reached'
     case 'not_public':
       return 'its address doesn’t lead to a public website'
+    case 'guide_page':
+      return 'it’s a page of this guide, not the place’s own'
     case 'not_a_page':
       return 'it sent something that isn’t a page, a PDF or a picture'
     case 'ordering_app':
@@ -204,6 +208,7 @@ export async function fetchPublic(
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const url = await publicUrl(next, resolve)
     if (!url) return fail({ why: 'not_public' })
+    if (isGuidePage(url)) return fail({ why: 'guide_page' })
     let res: Response
     try {
       res = await fetchImpl(url, {

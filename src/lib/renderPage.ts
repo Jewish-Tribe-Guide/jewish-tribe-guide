@@ -1,3 +1,4 @@
+import { isGuidePage } from './guidePage'
 import { dnsLookup, htmlToText, isOrderingApp, MENU_FETCH_HEADERS, publicUrl, refusal, type Lookup, type Render, type Trouble } from './menuReader'
 
 // ── Drawing a page as a browser does (the user, Oct 20) ─────────────────────
@@ -83,6 +84,7 @@ export function pageRenderer(opts: { resolve?: Lookup } = {}): { render: Render 
     }
     if (isOrderingApp(url)) return fail({ why: 'ordering_app' })
     if (!(await publicUrl(url, resolve))) return fail({ why: 'not_public' })
+    if (isGuidePage(url)) return fail({ why: 'guide_page' })
     let context: Awaited<ReturnType<Browser['newContext']>> | null = null
     try {
       browser ??= launch()
@@ -106,6 +108,7 @@ export function pageRenderer(opts: { resolve?: Lookup } = {}): { render: Render 
       const finalUrl = page.url()
       if (isOrderingApp(finalUrl)) return fail({ why: 'ordering_app' })
       if (!(await publicUrl(finalUrl, resolve))) return fail({ why: 'not_public' })
+      if (isGuidePage(finalUrl)) return fail({ why: 'guide_page' })
       const html = await page.content()
       if (isChallenge(await page.title(), html)) return fail({ why: 'person_check' })
       return { url: finalUrl, body: html }

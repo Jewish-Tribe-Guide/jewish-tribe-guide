@@ -333,14 +333,22 @@ agreed:
 **Decided before building:**
 - An item an admin added by hand is never crossed out because a read missed
   it. The reader is asked to look for it next time.
-- Watches never read the guide's own pages; this is built first.
+- Watches never read the guide's own pages. **Built Oct 21:**
+  - `guidePage.ts` knows the guide's hosts: phillyjewishguide.com, plus
+    `NEXT_PUBLIC_SITE_URL` and Vercel's addresses.
+  - `fetchPublic` and the browser render refuse those hosts, a redirect
+    to one included. The reason given is "it's a page of this guide, not
+    the place's own".
+  - Both add-a-page routes refuse one.
+  - Dev's one such watch, Moishe Zvi's, is removed. Production had none,
+    so nothing there changed.
 - A read that agrees with the listing clears that watch's older finding.
 - The uncommitted filing-side work is committed as it was, then built on.
 - Mikvah hours given as notes ("by appointment, 48 hours ahead") waits for
   the user.
 
 **Order:**
-1. The own-pages fix.
+1. The own-pages fix (built).
 2. Main dishes, which sets the shared box, Reads and Edit pieces.
 3. Shul times.
 4. Mikvah hours.

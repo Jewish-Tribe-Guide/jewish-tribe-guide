@@ -1,3 +1,4 @@
+import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { jobFindings } from '@/lib/watchFindingStore'
@@ -208,6 +209,7 @@ export async function POST(request: Request) {
     if (action === 'give') {
       const url = normalizeWatchUrl(typeof body?.url === 'string' ? body.url : '')
       if (!url) return Response.json({ ok: false, errors: ['That isn’t a web address.'] }, { status: 400 })
+      if (isGuidePage(url)) return Response.json({ ok: false, errors: [GUIDE_PAGE_ERROR] }, { status: 400 })
       const watched = watches.find((w) => samePage(w.url, url))
       // Given again after it was stopped: read again.
       if (watched && watched.resourceId === resourceId && isStoppedPage(watched)) {

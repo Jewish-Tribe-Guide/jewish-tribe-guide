@@ -1,3 +1,4 @@
+import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -145,6 +146,7 @@ export async function POST(request: Request) {
         label ??= listingPageLabel(listing.name, reads)
         createdBy = LISTING_PAGE_WATCH_CREATOR
       }
+      if (isGuidePage(url)) return Response.json({ ok: false, errors: [GUIDE_PAGE_ERROR] }, { status: 400 })
       const added = await addWatch(community.slug, { kind: kindForUrl(url), url, resourceId, label, createdBy })
       if (!added) return Response.json({ ok: false, errors: ['The guide already watches that page.'] }, { status: 409 })
       const { watch } = await runAndRecord(added, undefined, undefined, { full: true })

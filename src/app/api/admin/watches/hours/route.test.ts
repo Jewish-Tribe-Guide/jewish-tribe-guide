@@ -263,6 +263,11 @@ describe('POST /api/admin/watches/hours', () => {
     expect(taken.status).toBe(409)
     expect((await taken.json()).errors[0]).toBe('That page is read for Lower Merion Community Mikvah already.')
     expect((await POST(req('POST', { action: 'give', resourceId: MEI, url: 'mailto:x@y.org' }))).status).toBe(400)
+    // Oct 21: Moishe Zvi's was given the guide's own listing page.
+    const own = await POST(req('POST', { action: 'give', resourceId: MEI, url: 'https://phillyjewishguide.com/philly/mikvah?item=af8839dc' }))
+    expect(own.status).toBe(400)
+    expect((await own.json()).errors[0]).toBe('That’s a page of this guide. Give the place’s own website.')
+    expect(m.addWatch).not.toHaveBeenCalled()
   })
 
   it('off: kept, so the search leaves it alone, and its pages stay, not read', async () => {
