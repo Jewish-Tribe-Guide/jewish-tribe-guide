@@ -2,7 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { keepsMenuLink, menuWebsite, readElsewhere } from '@/lib/menuLink'
-import { findMenus, isOrderingApp, readMenu, readMenuPage, readMenus, troubleClause, type Render, type Trouble } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, menuPages, readMenu, readMenuPage, readMenus, troubleClause, type Render, type Trouble } from '@/lib/menuReader'
 import { getMenuReading, listMenuReadings, saveMenuReading } from '@/lib/menuReadingStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import {
@@ -158,7 +158,13 @@ export async function runMenuWatch(
   const listed = listedDishes(listing, category)
   let read
   try {
-    read = await readMenu(source, listing.name, { apiKey, fetchImpl: opts.fetchImpl, listed })
+    // With the rest of its menu on the website (menuPages), so a dish
+    // from another page isn't "not on the menu"; each page an AI read.
+    const website = menuWebsite(listing, category)
+    const pages = menuPages(source, website ? await findMenus(website, { fetchImpl: opts.fetchImpl }).catch(() => []) : [])
+    const reading = budget && !opts.full ? pages.slice(0, 1 + Math.max(0, budget.aiReads)) : pages
+    if (budget && !opts.full) budget.aiReads -= reading.length - 1
+    read = reading.length > 1 ? (await readMenus(reading, listing.name, { apiKey, fetchImpl: opts.fetchImpl, listed }))! : await readMenu(source, listing.name, { apiKey, fetchImpl: opts.fetchImpl, listed })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The menu changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }

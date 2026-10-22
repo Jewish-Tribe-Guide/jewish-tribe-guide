@@ -64,6 +64,11 @@ const PORT = process.env.CACHE_E2E_PORT || '3211'
 // its server on the wrong one without this same line — that's the bug this
 // comment is here so nobody reintroduces.
 process.env.CACHE_E2E_PORT = PORT
+// Only this suite's own server puts its fixture category's name back
+// (run-test-project-server.mjs): the form and admin-write servers, and
+// anyone's local run, start against the same project while this suite is
+// renaming it, and once reset it mid-test (#342, Oct 22).
+process.env.CACHE_ROUNDTRIP_OWNS_FIXTURE = '1'
 const BASE_URL = `http://localhost:${PORT}`
 
 export default defineConfig({

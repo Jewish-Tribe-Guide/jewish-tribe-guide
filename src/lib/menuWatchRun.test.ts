@@ -111,6 +111,26 @@ describe('runMenuWatch', () => {
     expect(m.saveMenuReading).not.toHaveBeenCalled()
   })
 
+  // Rita's, Oct 22: its menu link is its location's page; its flavors are
+  // on the site's Treats page. Each page is an AI read from the budget.
+  it('a changed menu is read with the other menu pages on its website, each an AI read', async () => {
+    m.listCategoriesUncached.mockResolvedValue([site])
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, website: 'https://judah.example' } })
+    const treats = { url: 'https://judah.example/treats', text: 'Blendini.', pdf: null }
+    m.findMenus.mockResolvedValue([page, treats])
+    m.readMenus.mockResolvedValue(twoDishes)
+    const budget = { aiReads: 5 }
+    await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k' })
+    expect(m.findMenus).toHaveBeenCalledWith('https://judah.example', expect.anything())
+    expect(m.readMenus).toHaveBeenCalledWith([page, treats], 'Judah', expect.objectContaining({ apiKey: 'k' }))
+    expect(budget.aiReads).toBe(3)
+    // With one read left, only its own page.
+    const last = { aiReads: 1 }
+    await runMenuWatch({ ...watch, pageHash: 'old' }, last, { apiKey: 'k' })
+    expect(m.readMenu).toHaveBeenCalledWith(page, 'Judah', expect.anything())
+    expect(last.aiReads).toBe(0)
+  })
+
   it('without the AI, or with the run’s reads spent, the old fingerprint stays so the change is still news', async () => {
     expect(await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: undefined })).toEqual({ ok: true, filed: 0 })
     const budget = { aiReads: 1 }

@@ -5,7 +5,7 @@ import { getResourceById, listApprovedResources } from '@/lib/resourceStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks } from '@/lib/itemMarks'
-import { isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, type MenuDish, type Trouble } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, menuPages, readMenu, readMenus, readMenuPage, troubleClause, type MenuDish, type Trouble } from '@/lib/menuReader'
 import { menuWebsite, readMenuLink } from '@/lib/menuLink'
 import { dishKinds, listedNames, menuLinkOf, newestMenuDate, readPlaceMenu } from '@/lib/menuPlaceRead'
 import {
@@ -56,7 +56,8 @@ import type { DirectoryResource } from '@/types'
 // POST body: { action: 'save', resourceId, always: string[], sometimes: string[] }
 //      Edit's "Save to the listing": the list as the admin left it. The
 //      ones the reading found on its menu are dated; ones added by hand
-//      aren't, so a later read that misses them never crosses them out.
+//      aren't, so a later read that misses them never crosses them out:
+//      a new one is dated "seen" instead.
 // POST /api/admin/main-dishes   body: { action: 'skip', resourceId }
 //      "Keep the listing": the reading stays, marked skipped.
 // POST body: { action: 'unlink', resourceId }
@@ -124,6 +125,25 @@ function forTab(r: StoredMenuReading) {
 function listedDishes(item: DirectoryResource, field: CategoryField) {
   const marks = itemMarks(item, field)
   return { dishes: marks.map((m) => m.name), sometimes: marks.filter((m) => m.sometimes).map((m) => m.name), menuDated: marks.filter((m) => m.menuAt).map((m) => m.name) }
+}
+
+/** A read at an admin's asking (a menu added, Read them now, photos) that
+ *  changes nothing: the dishes it found are dated from the menu straight
+ *  away, as Use this would, with nothing left to decide (the user, Oct 22:
+ *  "If I add the menu it should have that as its date"). Else the reading
+ *  as it is. */
+async function dateAgreeing(slug: string, listing: DirectoryResource, field: CategoryField, reading: StoredMenuReading, by: string) {
+  if (reading.status !== 'proposed') return { reading }
+  const listed = listedDishes(listing, field)
+  const proposal = dishProposal(listed, reading)
+  const found = proposal.rows.filter((r) => r.status === 'same').map((r) => r.name)
+  if (proposal.updates || !found.length) return { reading }
+  const at = new Date().toISOString()
+  if (!(await setMenuDishes(slug, listing.id, field.key, { always: proposal.always, sometimes: proposal.sometimes }, { names: found, at, menuUrl: reading.sourceUrl }))) return { reading }
+  await decideMenuReading(slug, listing.id, 'approved', by)
+  await revalidatePublicContent()
+  const dated = new Set([...found, ...listed.menuDated].map((n) => n.toLowerCase()))
+  return { reading: { ...reading, status: 'approved' as const, decidedAt: at, decidedBy: by }, menuDated: listed.dishes.filter((n) => dated.has(n.toLowerCase())) }
 }
 
 /** At most this many dishes saved at once. */
@@ -232,8 +252,8 @@ export async function POST(request: Request) {
       const pages: Watch[] = []
       for (const w of pagesOf((await listWatches(community.slug)).watches, resourceId).filter((x) => x.active)) pages.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
       // Its menu (menuPlaceRead.ts).
-      const reading = await readPlaceMenu(community.slug, listing, kind, apiKey)
-      return Response.json({ ok: true, reading, pages })
+      const read = await readPlaceMenu(community.slug, listing, kind, apiKey)
+      return Response.json({ ok: true, ...(read ? await dateAgreeing(community.slug, listing, kind.field, read, admin.email) : { reading: read }), pages })
     }
 
     if (action === 'link') {
@@ -245,8 +265,12 @@ export async function POST(request: Request) {
       if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
       const renderer = pageRenderer()
       const linkTrouble: { t?: Trouble } = {}
-      const source = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) }).finally(() => renderer.close())
-      const read = source ? (await readMenus([source], listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
+      // With the rest of the place's menu on its website (menuPages).
+      const website = menuWebsite(listing, kind.category)
+      const sources = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) })
+        .then(async (source) => (source ? menuPages(source, website ? await findMenus(website, { render: renderer.render }).catch(() => []) : []) : []))
+        .finally(() => renderer.close())
+      const read = sources.length ? (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read?.dishes.length ? 'proposed' : 'failed',
         sourceUrl: read?.sourceUrl ?? url,
@@ -259,7 +283,7 @@ export async function POST(request: Request) {
             : `Saved as its menu link, but it couldn’t be read${linkTrouble.t ? `: ${troubleClause(linkTrouble.t)}` : ''}. Add photos of the menu.`,
         model: read?.model ?? null,
       })
-      return Response.json({ ok: true, menuUrl: url, reading })
+      return Response.json({ ok: true, menuUrl: url, ...(await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)) })
     }
 
     if (action === 'unlink') {
@@ -289,7 +313,7 @@ export async function POST(request: Request) {
         note: dishes.length ? null : (read.note ?? 'No dishes in those photos.'),
         model: read.model,
       })
-      return Response.json({ ok: true, reading })
+      return Response.json({ ok: true, ...(await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)) })
     }
 
     if (action === 'no_menu') {
@@ -312,6 +336,7 @@ export async function POST(request: Request) {
     const at = new Date().toISOString()
     let lists: { always: string[]; sometimes: string[] }
     let found: string[]
+    let seen: string[] = []
     if (action === 'use') {
       if (stored.status !== 'proposed') return Response.json({ ok: false, errors: ['Read its menu again first.'] }, { status: 409 })
       const proposal = dishProposal(listedDishes(listing, kind.field), stored)
@@ -323,9 +348,12 @@ export async function POST(request: Request) {
       lists = { always, sometimes: cleanNames(body?.sometimes).filter((n) => !taken.has(n.toLowerCase())) }
       const onMenu = new Set(stored.dishes.map((d) => d.name.toLowerCase()))
       found = [...lists.always, ...lists.sometimes].filter((n) => onMenu.has(n.toLowerCase()))
+      // Typed in by hand: "seen" today, never a menu date (withMenuDishes).
+      const listed = new Set(listedDishes(listing, kind.field).dishes.map((n) => n.toLowerCase()))
+      seen = [...lists.always, ...lists.sometimes].filter((n) => !onMenu.has(n.toLowerCase()) && !listed.has(n.toLowerCase()))
     }
     if (lists.always.length + lists.sometimes.length > MAX_DISHES) return Response.json({ ok: false, errors: ['That’s too many dishes.'] }, { status: 400 })
-    if (!(await setMenuDishes(community.slug, resourceId, kind.field.key, lists, { names: found, at, menuUrl: stored.sourceUrl }))) {
+    if (!(await setMenuDishes(community.slug, resourceId, kind.field.key, lists, { names: found, at, menuUrl: stored.sourceUrl, seen }))) {
       return Response.json({ ok: false, errors: ['That listing isn’t live any more.'] }, { status: 404 })
     }
     await decideMenuReading(community.slug, resourceId, 'approved', admin.email)

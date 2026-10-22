@@ -507,6 +507,10 @@ agreed:
      in) / Leave it out. One left out isn't shown again.
    - An older finding wider than the box shows whole, with Compare. A
      grocery has no hechsher, so no Kosher box: its findings show whole.
+   - Food only (the user, Oct 22: "We only need to check Food, not grocery
+     stores"). Groceries aren't on the page and no new grocery is
+     suggested; they're still matched with the lists, so one on a list
+     isn't a new place (`KOSHER_JOB_CATEGORIES`, `kosherJob.ts`).
    - Not as drawn: the tabs show their counts on all four (the other job
      pages hide an empty one), and "It's … now" uses the list's full
      name for the place.
@@ -599,6 +603,47 @@ agreed:
      never runs that. Now the box says "Read from its website · not read
      yet", and Read them now gives the website its watch and reads it
      (`POST /api/admin/watches/eruv { action: 'read' }`).
+   - Main dishes: a menu read that agrees with the listing is kept (the
+     user, Oct 22: "If I add the menu it should have that as it's date last
+     seen"). Adding a menu, Read now or a photo whose dishes are all the
+     listing's already dates them "seen" from that menu, as Use this would,
+     and the row goes to Checked. A read with anything new still waits.
+   - Shul times: a calendar's week that's the same now shows what it
+     read (Rodeph Shalom, Leyv Ha-Ir: "Same" with nothing under it). The
+     week's dated lines show in a "This week's schedule" box, "Same as" its
+     page, until an update to it is kept.
+   - Shul times: the South Philadelphia Shtiebel's calendar is read from
+     its "Add our Calendar" link (`calendar/u/0?cid=…`); its embed is drawn
+     by a script. It still needs its page: Add a page,
+     southphiladelphiashtiebel.org/calendar.
+   - Mikvah hours: notes as updates (the user, Oct 22). Ohel Leah's pages
+     hadn't changed since notes began to be read, so the morning run never
+     read their notes. A page last read before then (`NOTES_READ_FROM`, the
+     merge of #340) is read once more. A note that differs from the
+     listing's only in its spacing (Lower Merion's blank lines) is the same
+     note. On dev, Read them now reads them.
+   - Main dishes: menus read better (the user, Oct 22). A menu page's
+     pictures that say they're the menu are read beside words that name
+     dishes, and add what only they name (LUHV: four products in words, its
+     menus as pictures). A holiday's menu link comes after the everyday
+     one (House of Kosher's Thanksgiving PDF came first). House of Kosher's
+     menu link is still the Thanksgiving PDF: set it to the catering menu.
+   - Main dishes: up to three menu pages per place, put together (the
+     user, Oct 22). A menu link is read with the other menu pages its
+     website links to (Rita's location page and Treats page, Playa Bowls'
+     Bowls and Smoothies, the Sweet Shop's Catering and Sweet Shop);
+     dishes from the first page come first, each once, ten at most. Each
+     page is an AI read, from the morning run's budget too. A picture's
+     alt text counts as the page's words (Rita's Blendini, Concrete and
+     Shakes are named only in pictures); a Wix picture's address is read
+     whole (the Sweet Shop's Bakery Menu came out broken). A chain's
+     "Find a bakery" or locations page is never a menu page. A menu page
+     whose pictures have alt text has a new fingerprint, so the morning
+     run reads it once more. On dev, Read now on each.
+   - A dish added by hand on the Dishes page (Edit, Save to the listing)
+     is dated "seen" that day, as one added through the queue is; it
+     showed no date until a reading found it (the user, Oct 22). Never an
+     "on its menu" date, so a read that misses it still can't cross it out.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
@@ -882,6 +927,16 @@ compare, and one it can't read, on desktop and phone.
      as "Summer only"/"Winter only", and compared only in its season
      (`compareTimes`), so a listing with both seasons' times isn't
      offered the other season's.
+   - **Reader fixes, BUILT Oct 22** (`scheduleReader.ts`): a rule in a
+     sentence is the rule the listing keeps: Sons of Israel's
+     "Approximately 15 minutes before shkiah." is 15 min before Sunset,
+     not a change (a full stop, "shkiya", "within 10 minutes after",
+     "following", and times up to 60 characters). "Within 10 minutes
+     of" candle lighting or havdalah is still kept as written: it
+     doesn't say before or after. A morning "Shabbat service" or
+     "Services" is that day's Shacharis (Kesher Israel's was left out as
+     a program), its start the time and its end in the notes; a range
+     with no am/pm ("9:00–11:30") is its start.
    - **Dry run again after the fixes (Oct 21, nothing saved):** the
      Tehillim call, the monthly family service and Kesher Israel's end
      times are gone. What would be filed: Rodeph Shalom's Thursday

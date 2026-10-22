@@ -182,13 +182,17 @@ const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 const KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const MONTH_DAY = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w* \d{1,2}\b/
 
+/** A read line for one date ("Shacharis Thu Oct 22 8:10 AM"): this week's,
+ *  not a usual time. */
+export const isDatedLine = (line: string): boolean => MONTH_DAY.test(line)
+
 /** The same from a check's read lines ("Shacharis Mon–Fri 6:45 AM",
  *  "Shacharis Wed Oct 21 6:45 AM"), for a page last read before checks
  *  kept their parts. A line counts once for each part its days touch. */
 export function partsFromRead(lines: readonly string[]): PartGiven[] {
   return tally(
     lines.flatMap((line) => {
-      if (MONTH_DAY.test(line)) return ['week' as const]
+      if (isDatedLine(line)) return ['week' as const]
       const shacharis = /^Shacharis\b/.test(line)
       const days = new Set<string>()
       for (const m of line.matchAll(/\b(Sun|Mon|Tue|Wed|Thu|Fri|Sat)(?:–(Sun|Mon|Tue|Wed|Thu|Fri|Sat))?\b/g)) {

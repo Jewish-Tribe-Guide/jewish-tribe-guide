@@ -115,6 +115,13 @@ const CACHE_ROUNDTRIP_CATEGORY_ID = 'cache-roundtrip-seed'
 const CACHE_ROUNDTRIP_RESOURCE_ID = '00000000-0000-4000-8000-0000cace0001'
 
 async function ensureCacheRoundtripFixtureCategory(supabase) {
+  // Its name is put back only by the cache-roundtrip suite's own server,
+  // which starts before its tests do (CACHE_ROUNDTRIP_OWNS_FIXTURE, set in
+  // playwright.cache.config.ts). Any other server starting against this
+  // project only creates the category if it's missing: a reset from one
+  // landed in the middle of a test renaming it, and the test read its
+  // original name back instead of its own (#342, Oct 22).
+  const ownsFixture = process.env.CACHE_ROUNDTRIP_OWNS_FIXTURE === '1'
   const { error: categoryError } = await supabase.from('category').upsert({
     id: CACHE_ROUNDTRIP_CATEGORY_ID,
     label: 'Cache Round-trip Seed',
@@ -128,7 +135,7 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
     has_address: true,
     has_phone: true,
     capabilities: {},
-  })
+  }, { ignoreDuplicates: !ownsFixture })
   if (categoryError) throw new Error(`Could not seed cache-roundtrip fixture category: ${categoryError.message}`)
 
   const { error: resourceError } = await supabase.from('resource').upsert({

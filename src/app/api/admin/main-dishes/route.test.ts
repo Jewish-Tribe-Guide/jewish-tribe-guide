@@ -193,7 +193,8 @@ describe('/api/admin/main-dishes', () => {
     m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu.pdf', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: false }], note: null, model: 'gpt' })
     await POST(req('POST', { action: 'read', resourceId: ID }))
     expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf', { render, trouble: expect.any(Function) })
-    expect(m.findMenu).not.toHaveBeenCalled()
+    // Its website is looked at too, for the rest of its menu (Oct 22).
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
     expect(m.readMenu).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://judah.example/menu.pdf' }), 'Judah', expect.anything())
 
     m.readMenuPage.mockResolvedValue(null)
@@ -273,6 +274,15 @@ describe('/api/admin/main-dishes', () => {
     expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'approved', 'me@x.co')
   })
 
+  // The user, Oct 22: a dish added by hand showed no date on the site until
+  // a reading found it. Dated "seen" now, never "on its menu", so a later
+  // read that misses it still can't cross it out.
+  it('Save to the listing dates a dish typed in by hand as seen, and only a new one', async () => {
+    m.getMenuReading.mockResolvedValue({ ...reading, dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }] })
+    await POST(req('POST', { action: 'save', resourceId: ID, always: ['Falafel', 'Shawarma', 'Kugel'], sometimes: ['Soup'] }))
+    expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', { always: ['Falafel', 'Shawarma', 'Kugel'], sometimes: ['Soups'] }, { names: ['Shawarma'], seen: ['Kugel', 'Soups'], at: expect.any(String), menuUrl: 'https://judah.example/menu' })
+  })
+
   it('nothing used before a reading, nor from a reading already decided, nor at a place without a dish list', async () => {
     m.getMenuReading.mockResolvedValueOnce(null)
     expect((await POST(req('POST', { action: 'use', resourceId: ID }))).status).toBe(409)
@@ -324,8 +334,18 @@ describe('/api/admin/main-dishes', () => {
       expect(m.revalidatePublicContent).toHaveBeenCalled()
       expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu', { render, trouble: expect.any(Function) })
       expect(closeRenderer).toHaveBeenCalled()
-      expect(m.findMenu).not.toHaveBeenCalled()
+      expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
       expect(body).toMatchObject({ ok: true, menuUrl: 'https://judah.example/menu', reading: { status: 'proposed' } })
+    })
+
+    // Rita's, Oct 22: its menu link is its location's page, and its flavors
+    // are on the site's Treats page; both are read, the link first.
+    it('a menu link is read with the other menu pages on the place’s website', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      m.findMenu.mockResolvedValue({ url: 'https://judah.example/treats/', text: 'treats', pdf: null })
+      m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu', dishes: [], note: null, model: 'gpt' })
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'judah.example/menu' }))
+      expect(m.readMenu.mock.calls.map(([s]) => s.url)).toEqual(['https://judah.example/menu', 'https://judah.example/treats/'])
     })
 
     it('a link that can’t be read is still saved, and says what to do instead; an ordering app’s says why', async () => {
@@ -435,6 +455,33 @@ describe('/api/admin/main-dishes', () => {
       await POST(new Request('http://x/api/admin/main-dishes?community=philly', { method: 'POST', body: form }))
       expect(m.readMenu).toHaveBeenLastCalledWith(expect.anything(), 'Judah', expect.objectContaining({ listed: ['Falafel', 'Kugel'] }))
       expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ missing: ['Kugel'] }))
+    })
+
+    // The user, Oct 22: "If I add the menu it should have that as its date".
+    it('a read that agrees with the listing dates what its menu names, as Use this would, with nothing left to decide', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      const body = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))).json()
+      expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', { always: ['Falafel'], sometimes: ['Kugel'] }, { names: ['Falafel'], at: expect.any(String), menuUrl: 'https://judah.example/menu' })
+      expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'approved', 'me@x.co')
+      expect(body).toMatchObject({ reading: { status: 'approved', decidedBy: 'me@x.co' }, menuDated: ['Falafel'] })
+
+      for (const action of ['read', 'photos']) {
+        vi.clearAllMocks()
+        m.findMenu.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+        const form = new FormData()
+        form.append('action', 'photos')
+        form.append('resourceId', ID)
+        form.append('file', new File(['PDF'], 'menu.pdf', { type: 'application/pdf' }))
+        await POST(action === 'read' ? req('POST', { action, resourceId: ID }) : new Request('http://x/api/admin/main-dishes?community=philly', { method: 'POST', body: form }))
+        expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', expect.anything(), expect.objectContaining({ names: ['Falafel'] }))
+      }
+
+      // One with something new waits for an admin.
+      vi.clearAllMocks()
+      m.readMenu.mockResolvedValue({ ...read, dishes: [...read.dishes, { name: 'Shawarma', quote: 'Shawarma', checked: true }] })
+      const waiting = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))).json()
+      expect(m.setMenuDishes).not.toHaveBeenCalled()
+      expect(waiting).toMatchObject({ reading: { status: 'proposed' } })
     })
 
     it('lists which of them are "not always", and which a reader found on its menu before', async () => {

@@ -37,6 +37,11 @@ test.afterEach(async () => {
   }
 })
 
+// Each save below waits 30s: it is several database round trips against the
+// shared test project, and on CI one has taken over 10s, still "Sending…"
+// when a 10s wait ran out (Oct 18 on main, after Create; Oct 22 on #342,
+// after Add listing). Written out, so e2eTimeouts.test.ts can see them.
+
 test('creating a category through the real editor makes it live, and deleting it removes it', async ({ page }) => {
   const name = `E2E Admin Write ${randomUUID().slice(0, 8)}`
   pendingCategoryNames.push(name)
@@ -56,7 +61,7 @@ test('creating a category through the real editor makes it live, and deleting it
 
   // Saving navigates back to the list and reloads it.
   const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: name })
-  await expect(row).toBeVisible({ timeout: 10_000 })
+  await expect(row).toBeVisible({ timeout: 30_000 })
 
   const supabase = getAdminClient()
   const { data: created } = await supabase
@@ -103,7 +108,7 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   await visible(page.getByRole('button', { name: 'Create category' })).click()
 
   const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: categoryName })
-  await expect(row).toBeVisible({ timeout: 10_000 })
+  await expect(row).toBeVisible({ timeout: 30_000 })
   await expect(row.getByRole('button', { name: 'Hidden' })).toBeVisible()
 
   const supabase = getAdminClient()
@@ -130,7 +135,7 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   await addButton.click()
 
   // Closing the form navigates back to the category list.
-  await expect(row).toBeVisible({ timeout: 10_000 })
+  await expect(row).toBeVisible({ timeout: 30_000 })
 
   const { data: listing } = await supabase
     .from('resource')

@@ -287,6 +287,19 @@ describe('reading a shul’s regular times', () => {
     expect(asRegularTime('mincha', '12:30 until 1:00pm')).toEqual({ time: '12:30pm' })
   })
 
+  // Kesher Israel's website, Oct 22: its Shabbos morning "Shabbat service"
+  // was left out as "a program or an event".
+  it('reads a morning “Shabbat service” as that day’s Shacharis, from its start', () => {
+    const [system] = regularMessages({ text: POST }, DAYS, 'Kesher Israel') as { content: string }[]
+    expect(system.content).toMatch(/"Shabbat service", "Shabbat morning service" or "Services"[^\n]*is that day's Shacharis \(shacharis\)/)
+    expect(system.content).toMatch(/range \("9:00–11:30"\), "time" is the start \("9:00"\) and the end goes in "notes"/)
+    // However the AI gives the range, the start is the time.
+    expect(asRegularTime('shacharis', '9:00–11:30')).toEqual({ time: '9:00am' })
+    expect(asRegularTime('shacharis', '9:00 - 11:30')).toEqual({ time: '9:00am' })
+    // Not a bare "10-15", which could be minutes.
+    expect(asRegularTime('mincha', '10-15')).toEqual({ time: '10-15' })
+  })
+
   it('asks for a time given for one season to say so (Mekor’s “7:00 PM · Summer”)', () => {
     const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
     expect(system.content).toContain('"season": "summer" or "winter" for a time held in one season only')
@@ -376,6 +389,40 @@ describe('reading a shul’s regular times', () => {
     expect(asRegularTime('shacharis', '9:00 A.M.')).toEqual({ time: '9:00am' })
     expect(asRegularTime('mincha', '2:00 p.m.')).toEqual({ time: '2:00pm' })
     expect(asRegularTime('mincha_maariv', 'around candle-lighting')).toMatchObject({ anchor: 'candle_lighting', offsetMinutes: 0 })
+  })
+
+  it('reads a rule in a sentence, with its hedge and full stop, as the rule the listing keeps', () => {
+    // Sons of Israel's page (soicherryhill.org/tefillot, Oct 21): kept as
+    // written, its weekday Mincha & Maariv was a "change" from the
+    // listing's own 15 min before Sunset.
+    expect(asRegularTime('mincha_maariv', 'Approximately 15 minutes before shkiah.')).toEqual({ time: '15 min before Sunset', anchor: 'sunset', offsetMinutes: -15 })
+    expect(readSunsetTime('15 minutes before Shkiya')).toBe(-15)
+    expect(readSunsetTime('10 min before the shkiyah.')).toBe(-10)
+    expect(readSunsetTime('Approx. 20 minutes before sunset,')).toBe(-20)
+    expect(readZmanTime('Within 10 minutes after candle-lighting.')).toEqual({ anchor: 'candle_lighting', offsetMinutes: 10 })
+    expect(readZmanTime('5 minutes following havdala')).toEqual({ anchor: 'havdalah', offsetMinutes: 5 })
+    expect(readZmanTime('approximately 18 minutes before candlelighting.')).toEqual({ anchor: 'candle_lighting', offsetMinutes: -18 })
+    // "Within 10 minutes of" says neither before nor after: kept as written.
+    expect(readZmanTime('Within 10 minutes of candle-lighting')).toBeNull()
+    expect(readZmanTime('within 5 minutes of havdalah')).toBeNull()
+    // Through the whole read, the long way written, not cut short.
+    const page = 'Mincha & Maariv: Approximately 15 minutes before shkiah. Friday Mincha: Approximately 15 minutes before candle lighting.'
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: 'Approximately 15 minutes before shkiah.', quote: 'Approximately 15 minutes before shkiah' },
+          { tefillah: 'mincha', days: ['fri'], time: 'Approximately 15 minutes before candle lighting.', quote: 'Approximately 15 minutes before candle lighting' },
+        ],
+      },
+      { text: page },
+      DAYS,
+      id,
+    )
+    expect(r.times.map(({ tefillah, time, anchor, offsetMinutes }) => ({ tefillah, time, anchor, offsetMinutes }))).toEqual([
+      { tefillah: 'mincha_maariv', time: '15 min before Sunset', anchor: 'sunset', offsetMinutes: -15 },
+      { tefillah: 'mincha', time: '15 min before Candle Lighting', anchor: 'candle_lighting', offsetMinutes: -15 },
+    ])
   })
 
   it('asks the model and tidies its answer', async () => {

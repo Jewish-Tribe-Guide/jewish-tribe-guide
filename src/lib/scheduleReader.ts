@@ -39,6 +39,9 @@ export type ScheduleReading = {
 export type ScheduleSource = { text: string } | { image: string; mime: string } | { pdf: string } | { images: { mime: string; b64: string }[] }
 
 const MAX_TEXT = 8_000
+/** Room for a rule in words: "Approximately 15 minutes before candle
+ *  lighting." is 48 characters, and cut at 40 it was no rule at all. */
+const MAX_TIME = 60
 
 /** The user's message: the intro, then what was sent. */
 function messageContent(intro: string, source: ScheduleSource): unknown {
@@ -85,26 +88,39 @@ Answer in JSON only: {"times": [{"tefillah": "...", "on": ["..."], "time": "..."
   ]
 }
 
-const SUNSET = "(?:sunset|sundown|sh(?:e|')?kiah?)"
+// Shkiah however it's spelled: shkia, shkiah, shkiya, shkiyah, shekiah,
+// sh'kia.
+const SUNSET = "(?:sunset|sundown|sh(?:e|')?kiy?ah?)"
 
-/** A rule as written, without a hedge in front: "around 15 minutes before
- *  sunset", "~30 min before sundown" (Mekor Habracha's page, Oct 19). Shuls
- *  round; a time within two minutes is the rule anyway (scheduleUpdate.ts). */
+/** A rule as written, without a hedge in front or a full stop after:
+ *  "around 15 minutes before sunset", "~30 min before sundown" (Mekor
+ *  Habracha's page, Oct 19), "Approximately 15 minutes before shkiah."
+ *  (Sons of Israel's, Oct 21: as written, it was a "change" from the
+ *  listing's own 15 min before Sunset). Shuls round; a time within two
+ *  minutes is the rule anyway (scheduleUpdate.ts). */
 function unhedged(time: string): string {
   return time
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim()
+    .replace(/[.,;!]+$/, '')
     .replace(/^(?:~|approx(?:\.|imately)?|around|about|ca\.?|circa)\s*/, '')
+}
+
+/** "15 min before" the zman, "10 minutes after", "within 10 minutes
+ *  after" (no later than, which is the rule): signed minutes, or null.
+ *  "Within 10 minutes of" isn't read: it doesn't say before or after, and
+ *  code doesn't pick one. */
+function minutesFrom(t: string, zman: string): number | null {
+  const m = t.match(new RegExp(`^(?:within )?(\\d{1,3}) ?(?:min(?:ute)?s?\\.?|m) (before|prior to|after|past|following) (?:the )?${zman}$`))
+  return m ? Number(m[1]) * (m[2] === 'before' || m[2] === 'prior to' ? -1 : 1) : null
 }
 
 /** "10 min before sunset", "15 minutes after shkia", "at sunset", "sunset":
  *  minutes from sunset (negative before), or null for anything else. */
 export function readSunsetTime(time: string): number | null {
   const t = unhedged(time)
-  const offset = t.match(new RegExp(`^(\\d{1,3}) ?(?:min(?:ute)?s?\\.?|m) (before|prior to|after|past) (?:the )?${SUNSET}$`))
-  if (offset) return Number(offset[1]) * (offset[2] === 'before' || offset[2] === 'prior to' ? -1 : 1)
-  return new RegExp(`^(?:at )?${SUNSET}$`).test(t) ? 0 : null
+  return minutesFrom(t, SUNSET) ?? (new RegExp(`^(?:at )?${SUNSET}$`).test(t) ? 0 : null)
 }
 
 /** A time as the guide keeps it: a clock time as written, or a time from
@@ -145,7 +161,7 @@ export function tidyScheduleReading(raw: unknown, f: Festival, source: ScheduleS
     if (!t || typeof t !== 'object') continue
     const x = t as Record<string, unknown>
     const tefillah = TEFILLAH_ORDER.find((o) => o === x.tefillah) as Tefillah | undefined
-    const time = typeof x.time === 'string' ? x.time.trim().slice(0, 40) : ''
+    const time = typeof x.time === 'string' ? x.time.trim().slice(0, MAX_TIME) : ''
     const quote = typeof x.quote === 'string' ? x.quote.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
     const on = (Array.isArray(x.on) ? x.on : []).filter(
       (d): d is ScheduleDay => (d === 'yom_tov' && hasYomTov) || (d === 'chol_hamoed' && hasChm) || (typeof d === 'string' && dates.has(d)),
@@ -208,8 +224,8 @@ export function readZmanTime(time: string): { anchor: ZmanAnchor; offsetMinutes:
   if (sunset !== null) return { anchor: 'sunset', offsetMinutes: sunset }
   const t = unhedged(time)
   for (const [anchor, words] of ZMAN_WORDS) {
-    const offset = t.match(new RegExp(`^(\\d{1,3}) ?(?:min(?:ute)?s?\\.?|m) (before|prior to|after|past) (?:the )?${words}$`))
-    if (offset) return { anchor, offsetMinutes: Number(offset[1]) * (offset[2] === 'before' || offset[2] === 'prior to' ? -1 : 1) }
+    const offset = minutesFrom(t, words)
+    if (offset !== null) return { anchor, offsetMinutes: offset }
     if (new RegExp(`^(?:at )?${words}$`).test(t)) return { anchor, offsetMinutes: 0 }
   }
   return null
@@ -226,10 +242,13 @@ export function asRegularTime(tefillah: Tefillah, time: string): { time: string;
   // its end isn't a time anyone comes for (Kesher, Oct 21: six "changes"
   // that were the same 8:00am with an end on it). The start takes the
   // end's am/pm unless it's earlier in the clock's cycle: 11:30 to 1:00 pm.
-  const range = time.trim().match(/^(\d{1,2})(:\d{2})?\s*([ap]\.?m\.?)?\s*(?:–|—|-|to|until)\s*(\d{1,2})(?::\d{2})?\s*([ap])\.?m\.?$/i)
-  if (range) {
+  // With no am/pm at all ("9:00–11:30", Kesher's Shabbat service, Oct
+  // 22), the start is a bare time, read as the tefillah means it.
+  const range = time.trim().match(/^(\d{1,2})(:\d{2})?\s*([ap]\.?m\.?)?\s*(?:–|—|-|to|until)\s*(\d{1,2})(?::\d{2})?(?:\s*([ap])\.?m\.?)?$/i)
+  if (range && (range[3] || range[5] || range[2])) {
     const [, h, min = ':00', own, endH, endAp] = range
     if (own) return asRegularTime(tefillah, `${h}${min} ${own}`)
+    if (!endAp) return asRegularTime(tefillah, `${h}${min}`)
     const flip = Number(h) !== 12 && Number(h) > Number(endH)
     const ap = flip ? (endAp.toLowerCase() === 'p' ? 'a' : 'p') : endAp.toLowerCase()
     return { time: `${Number(h)}${min}${ap}m` }
@@ -282,6 +301,7 @@ First, what the message is:
 Then "times", one entry per prayer time:
 - "tefillah" is one of: ${TEFILLOS}. A combined "Mincha/Maariv" is mincha_maariv, and so is one line naming several evening prayers held together ("Mincha / Kabbalat Shabbat / Ma'ariv 7:00 PM"): one entry, never one per prayer. Candle lighting, Shabbos ends, havdalah, a kiddush, a class or a shiur are not prayers: leave them out, or put them in "notes" of the nearest prayer.
 - Only the shul's own davening, held every week as given. A service not held every week ("once a month", "the last Shabbat of the month", "first Friday"), a phone or online call run by someone else, a class, a program or an event: leave it out.
+- A morning "Shabbat service", "Shabbat morning service" or "Services", on Shabbos or a weekday, is that day's Shacharis (shacharis): the shul's own davening, not a program or an event. When it gives a range ("9:00–11:30"), "time" is the start ("9:00") and the end goes in "notes" ("until 11:30").
 - For "schedule": "days" lists the weekdays it's held, as sun, mon, tue, wed, thu, fri, sat ("Shabbos" is sat, "Sunday–Thursday" is sun to thu). A time for one date only ("Thanksgiving, Thu Nov 26") has "date" (YYYY-MM-DD, the next such date from today, even past the days listed) and "occasion" ("Thanksgiving") instead, never a weekday. Only when the message gives the date or names a day with a fixed date; otherwise leave that time out.
 - For "week": every time has "date", from the days above.
 - Dates are calendar days, midnight to midnight, not Jewish days that start at nightfall. Friday night's Mincha, Maariv or Kabbalas Shabbos is on the Friday.
@@ -327,7 +347,7 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     if (!t || typeof t !== 'object') continue
     const x = t as Record<string, unknown>
     const tefillah = TEFILLAH_ORDER.find((o) => o === x.tefillah) as Tefillah | undefined
-    const time = str(x.time, 40)
+    const time = str(x.time, MAX_TIME)
     const quote = typeof x.quote === 'string' ? x.quote.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
     // A one-off can be months ahead (Thanksgiving); a week's dates are
     // checked against the days ahead below.

@@ -10,7 +10,7 @@ import type { Finding } from '@/lib/watchFindings'
 import { MEKOR_LIST_URL, MEKOR_WATCH_NAME, isMekorList, submissionKey as mekorSubmissionKey, type GuideListing, type MekorEntry } from '@/lib/mekorWatch'
 import { readKeystoneList } from '@/lib/keystoneRun'
 import { CATEGORIES, readMekorList } from '@/lib/mekorRun'
-import { kosherCounts, kosherPlaces, type Filed, type KosherList } from '@/lib/kosherJob'
+import { KOSHER_JOB_CATEGORIES, kosherCounts, kosherPlaces, type Filed, type KosherList } from '@/lib/kosherJob'
 import { listingSlug } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
 import { UUID } from '@/lib/itemMarkRoutes'
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
         return true
       })
     // Each Kosher box as the listing has it, and as each finding would make it.
-    const food = categories.filter((c) => CATEGORIES.includes(c.id))
+    const food = categories.filter((c) => KOSHER_JOB_CATEGORIES.includes(c.id))
     const boxKeys = new Map(food.map((c) => [c.id, kosherBoxKeys(c)]))
     const details = new Map((listingRows.data ?? []).map((l) => [l.id as string, (l.details ?? {}) as Record<string, unknown>]))
     const sent = new Map([...keystoneFiled, ...mekorFiled].flatMap((s) => (s.id ? [[s.id, s.payload] as const] : [])))
