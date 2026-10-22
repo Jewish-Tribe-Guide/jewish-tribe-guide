@@ -70,6 +70,14 @@ describe('embeddedEntries: a calendar widget’s event list in the page’s scri
     ])
   })
 
+  it('keeps an event’s end that day', () => {
+    const html = `[{"title":"Shacharis","start":"2026-10-25T08:10:00","end":"2026-10-25T08:40:00"},{"title":"Retreat","start":"2026-10-25T18:00:00","end":"2026-10-27"}]`
+    expect(embeddedEntries(html, TZ)).toEqual([
+      { date: '2026-10-25', time: '8:10 AM', end: '8:40 AM', title: 'Shacharis' },
+      { date: '2026-10-25', time: '6:00 PM', title: 'Retreat' },
+    ])
+  })
+
   it('skips anything that isn’t an event', () => {
     expect(embeddedEntries(`{"title":"No start"} {"start":"2026-10-25"} {"title": broken, "start": "x"}`, TZ)).toEqual([])
   })
@@ -88,6 +96,21 @@ describe('icsEntries: an iCal feed’s entries in the coming days', () => {
     expect(icsEntries(feed, TZ, '2026-10-20', '2026-11-09')).toEqual([
       { date: '2026-10-30', time: '6:00 PM', title: 'Shabbat Evening Service' },
       { date: '2026-10-31', time: '10:45 AM', title: 'Shabbat Morning Services, Sanctuary' },
+    ])
+  })
+
+  // Oct 22: Rodeph Shalom's Thursday minyan is 8:10–8:40, and the reader,
+  // given only its start, never had its end.
+  it('keeps an event’s end that day, also over a weekly repeat; one ending another day has none', () => {
+    const feed = ics(
+      'BEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261022T081000\r\nDTEND;TZID=America/New_York:20261022T084000\r\nSUMMARY:Online Community Morning Minyan\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20260901T071500\r\nDTEND;TZID=America/New_York:20260901T080000\r\nRRULE:FREQ=WEEKLY;BYDAY=MO\r\nSUMMARY:Shacharis\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261024T200000\r\nDTEND;TZID=America/New_York:20261025T010000\r\nSUMMARY:Late Havdalah\r\nEND:VEVENT\r\n',
+    )
+    expect(icsEntries(feed, TZ, '2026-10-20', '2026-10-26')).toEqual([
+      { date: '2026-10-22', time: '8:10 AM', end: '8:40 AM', title: 'Online Community Morning Minyan' },
+      { date: '2026-10-26', time: '7:15 AM', end: '8:00 AM', title: 'Shacharis' },
+      { date: '2026-10-24', time: '8:00 PM', title: 'Late Havdalah' },
     ])
   })
 
@@ -137,6 +160,10 @@ describe('calendarLines: what the reader is given', () => {
       '2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service',
       '2026-10-31 (Sat) 10:45 AM: Shabbat Morning Services',
     ])
+  })
+
+  it('an entry’s end, beside its start', () => {
+    expect(calendarLines([{ date: '2026-10-22', time: '8:10 AM', end: '8:40 AM', title: 'Online Community Morning Minyan' }], '2026-10-22', '2026-10-24')).toEqual(['2026-10-22 (Thu) 8:10 AM–8:40 AM: Online Community Morning Minyan'])
   })
 })
 
