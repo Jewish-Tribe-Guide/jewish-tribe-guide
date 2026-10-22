@@ -130,7 +130,7 @@ export function changedMenuNote(found: MenuDish[], missing: readonly string[] = 
 }
 
 /** The note on a reading from the page a menu moved to. Approving it makes
- *  that page the menu link (approve_menu_dishes), so it says so. */
+ *  that page the menu link (setMenuDishes), so it says so. */
 export function menuMovedNote(url: string, found: MenuDish[], missing: readonly string[] = []): string {
   return `Its menu page stopped opening, and the menu is now at ${url}. Approving makes that its menu link.${dishDifferences(found, missing)}`
 }

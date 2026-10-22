@@ -1,37 +1,47 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DirectoryResource } from '@/types'
+import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { adminBase } from '@/lib/adminNav'
 import { readElsewhere } from '@/lib/menuLink'
-import { dishSections, sentThroughSite } from '@/lib/watchJobs'
-import CollapsibleSection from './CollapsibleSection'
+import { itemsField } from '@/lib/listingView'
+import { samePage } from '@/lib/hoursJob'
+import { dishProposal, updatesPill, type DishProposal, type ReadDish } from '@/lib/dishProposal'
+import { dishStatus, sentThroughSite, type DishPlace, type DishPlaceStatus } from '@/lib/watchJobs'
+import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { GivePage, JobPage, day, jobTabs, shortUrl, type JobTab } from './JobPage'
+import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
 
-// ── The "Main dishes" tab: each food place's dishes, read off its menu ───────
-// (agreed Oct 1). The AI reads a place's own menu page or PDF once, when
-// asked, and proposes up to ten main dishes, each with the menu's own words
-// it read it from. Nothing shows on the site until an admin approves it:
-// untick what's wrong, add what's missing, approve. Approved dishes say "on
-// its menu Oct 2" on the listing until a visitor says "Still served".
+// ── The Watches tab's Main dishes page (drawn Oct 21: 7EYjgU1WcHrXG2W6Qpigb7) ─
+// Each food place's dishes, read off its own menu by the AI, compared with
+// the listing's. On the page every job has (JobPage.tsx), in its tabs. A
+// place opened is its listing's Main dishes box, the listing's list marked
+// by what its menu says (dishProposal.ts): a dish the menu no longer names
+// crossed out, "Not on the menu"; a new one highlighted; each with the
+// menu's own words under it, so a misread shows. Then Use this, Edit (the
+// listing's own Edit for its dishes, saved straight to the listing), or
+// Keep the listing.
 //
-// A place whose menu couldn't be read gets three ways on (the user, Oct 20):
-// give its menu link, add photos of the menu, or say it has no menu. And a
-// place whose dishes came from a menu someone sent through the site says
-// so, instead of a stale "Couldn't read".
+// Use this takes off the dishes its menu no longer names. A dish added by
+// hand is never taken off that way: the reader missed it once, so missing
+// it again says nothing (the user, Oct 21). It's looked for on every read.
 //
-// A new read looks for the dishes the listing has already, ones added by
-// hand too (the user, Oct 21). Those it finds come ticked, so approving
-// dates them again; those it doesn't are flagged, never taken off. Listed
-// dishes no reading has looked for say so.
+// Reads, last: the page it read, as what it is ("Menu link · Main
+// dishes"), with Add a page (its menu link), Read them now and Open its
+// listing; for one that can't be read, photos of the menu or No menu too.
+// Its Reading switch is "No menu": off, it isn't read.
+//
+// A place not read yet is read as the page opens, a few at a time.
 
-type Dish = { name: string; quote: string; checked: boolean; named?: boolean; picture?: true; onListing?: true }
 type Reading = {
   status: 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
   sourceUrl: string | null
-  dishes: Dish[]
-  /** Dishes on the listing this menu doesn't name. */
+  dishes: (ReadDish & { onListing?: true })[]
   missing?: string[]
   note: string | null
   model: string | null
@@ -39,292 +49,237 @@ type Reading = {
   decidedAt: string | null
   decidedBy: string | null
 }
-type Place = {
+type Place = DishPlace & {
   id: string
   name: string
+  href: string
   categoryLabel: string
   facts: string[]
-  website: string | null
-  menuUrl: string | null
   dishes: string[]
-  /** The newest "on its menu" date among the dishes it lists. */
-  menuAt?: string | null
   reading: Reading | null
 }
 type Loaded = { places: Place[]; available: boolean; readerOn: boolean }
+type Decided = 'used' | 'kept'
 
-const BATCH = 5
+/** Places not read yet, read on their own when the page loads, at most. */
+export const READ_ON_LOAD = 5
+const TITLE = 'Main dishes'
 
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+const STATUS: Record<DishPlaceStatus, 'differs' | 'not_read' | 'cant_read' | 'same' | 'off'> = { differs: 'differs', not_read: 'not_read', cant_read: 'cant_read', same: 'same', off: 'off' }
 
 /** A menu read somewhere other than the place's own site (readElsewhere). */
-function elsewhere(place: Place): boolean {
-  return readElsewhere(place.reading?.sourceUrl ?? null, place.website, place.menuUrl)
+function elsewhere(p: Place): boolean {
+  return readElsewhere(p.reading?.sourceUrl ?? null, p.website, p.menuUrl)
 }
 
 /** A reading of photos an admin added: it has no address. */
 const fromPhotos = (r: Reading | null) => !!r && !r.sourceUrl && !!r.model
 
-function shortUrl(url: string): string {
-  return url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')
+const proposalOf = (p: Place): DishProposal | null =>
+  p.reading && (p.reading.status === 'proposed' || p.reading.status === 'approved' || p.reading.status === 'skipped') ? dishProposal(p, p.reading) : null
+
+/** The sentence over the page: does anything need you? */
+export function dishSay(statuses: readonly DishPlaceStatus[]): { head: string } {
+  const n = (s: DishPlaceStatus) => statuses.filter((x) => x === s).length
+  const differs = n('differs')
+  const head = differs === 1 ? '1 place has an update from its menu.' : differs ? `${differs} places have an update from their menus.` : 'No place’s menu has an update.'
+  return { head: n('not_read') ? `${head} ${n('not_read')} not read yet.` : head }
 }
 
-function PlaceCard({
-  place,
+/** Its row's pill. */
+function rowPill(p: Place, status: DishPlaceStatus, decided: Decided | undefined, reading: boolean): { text: string; tone: Tone } {
+  if (decided) return { text: `${decided === 'used' ? 'Used' : 'Kept'} ${day(new Date().toISOString())}`, tone: 'grey' }
+  if (reading) return { text: 'Reading…', tone: 'grey' }
+  if (status === 'differs') return { text: updatesPill(1), tone: 'amber' }
+  if (status === 'not_read') return { text: 'Not read yet', tone: 'grey' }
+  if (status === 'cant_read') return { text: p.website || p.menuUrl ? 'No menu found' : 'Nothing to read', tone: 'grey' }
+  if (status === 'off') return { text: 'Reading off', tone: 'grey' }
+  return { text: 'Same', tone: 'green' }
+}
+
+/** What's said beside the source once, for dishes whose words couldn't be
+ *  checked on the page. */
+function uncheckedNote(p: DishProposal, r: Reading): string | undefined {
+  if (fromPhotos(r)) return undefined
+  const unchecked = p.rows.filter((x) => x.quote !== undefined && x.checked === false)
+  if (!unchecked.length) return undefined
+  return unchecked.some((x) => x.picture) ? 'from pictures on the page, open it to check' : 'from a PDF, open it to check'
+}
+
+/** The pages it reads, for Reads. */
+function readPages(p: Place, status: DishPlaceStatus, act: (body: Record<string, unknown>) => void): ReadPage[] {
+  const r = p.reading
+  const off = status === 'off'
+  const dishes = r && (r.status === 'proposed' || r.status === 'approved' || r.status === 'skipped') && r.dishes.length > 0
+  const from = (url: string) => (p.menuUrl && samePage(url, p.menuUrl) ? 'Menu link' : 'Website')
+  const pages: ReadPage[] = []
+  if (fromPhotos(r)) pages.push({ key: 'photos', url: null, name: 'Photos of the menu', label: dishes ? `Added ${day(r!.readAt)} · ${TITLE}` : 'Nothing from them', right: `read ${day(r!.readAt)}`, none: !dishes })
+  // Its menu link, when it has one the last read didn't come from.
+  if (p.menuUrl && !(r?.sourceUrl && samePage(r.sourceUrl, p.menuUrl))) {
+    const tried = r && r.status !== 'no_menu' && Date.parse(r.readAt) > 0 && !fromPhotos(r)
+    pages.push({ key: 'link', url: p.menuUrl, label: tried ? 'Menu link · Nothing from it' : 'Menu link', right: tried ? 'couldn’t read' : r ? '' : 'not read yet', none: !!tried, onRemove: off ? undefined : () => act({ action: 'unlink' }) })
+  }
+  // The page its last read came from; else its website, when that's what's read.
+  const url = r?.sourceUrl ?? (fromPhotos(r) || p.menuUrl ? null : p.website)
+  if (url) {
+    const what = from(url)
+    const failed = r?.status === 'failed'
+    pages.push({
+      key: 'read',
+      url,
+      label: elsewhere(p) ? 'Its website sent the reader to another site' : failed ? (r!.note ?? `${what} · Nothing from it`) : dishes ? `${what} · ${TITLE}` : what,
+      warn: elsewhere(p),
+      right: off ? '' : !r ? 'not read yet' : failed ? 'no menu' : `read ${day(r.readAt)}`,
+      none: failed,
+      onRemove: off ? undefined : what === 'Menu link' ? () => act({ action: 'unlink' }) : () => act({ action: 'no_menu' }),
+    })
+  }
+  return pages
+}
+
+function DishRowView({
+  place: p,
+  status,
+  decided,
   busy,
+  reading,
   readerOn,
-  onRead,
-  onApprove,
-  onSkip,
-  onLink,
+  onAct,
   onPhotos,
-  onNoMenu,
-  onUndoNoMenu,
+  onEdit,
 }: {
   place: Place
+  status: DishPlaceStatus
+  decided?: Decided
   busy: boolean
+  reading: boolean
   readerOn: boolean
-  onRead: () => void
-  onApprove: (dishes: string[]) => void
-  onSkip: () => void
-  onLink: (url: string) => void
+  onAct: (body: Record<string, unknown>) => void
   onPhotos: (files: File[]) => void
-  onNoMenu: () => void
-  onUndoNoMenu: () => void
+  onEdit: (proposal: DishProposal) => void
 }) {
-  const r = place.reading
-  const proposed = r?.dishes ?? []
-  const [off, setOff] = useState<Set<string>>(new Set())
-  const [added, setAdded] = useState<string[]>([])
-  const [typing, setTyping] = useState('')
-  const [giving, setGiving] = useState(false)
-  const [link, setLink] = useState('')
-  const elsewhereDishes = sentThroughSite(place)
-  // Couldn't be read: a failed reading, or nothing to read it from.
-  const stuck = !elsewhereDishes && (r?.status === 'failed' || (!r && !place.website && !place.menuUrl))
-  const kept = [...proposed.map((d) => d.name).filter((n) => !off.has(n)), ...added]
-  // The listing's dishes this reading didn't look for, or couldn't say of
-  // (read before it looked, from pictures, or added by hand at approval).
-  const missing = r?.status === 'failed' || r?.status === 'no_menu' ? [] : (r?.missing ?? [])
-  const looked = new Set([...proposed.map((d) => d.name), ...missing].map((n) => n.toLowerCase()))
-  const unchecked = r && r.status !== 'failed' && r.status !== 'no_menu' && proposed.length > 0 ? place.dishes.filter((n) => !looked.has(n.toLowerCase())) : []
-  const toggle = (name: string) =>
-    setOff((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-  const add = () => {
-    const name = typing.trim().replace(/\s+/g, ' ')
-    if (name.length >= 2 && !kept.some((k) => k.toLowerCase() === name.toLowerCase())) setAdded((a) => [...a, name])
-    setTyping('')
-  }
-  const pill = 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold'
+  const [adding, setAdding] = useState(false)
+  const r = p.reading
+  const proposal = proposalOf(p)
+  const sent = sentThroughSite(p)
+  const off = status === 'off'
+  const cant = status === 'cant_read'
+  const open = status === 'differs' && !decided && r?.status === 'proposed'
+  const canRead = !off && readerOn && !!(p.website || p.menuUrl)
 
-  return (
-    <li className="px-4 py-3" data-testid="dish-place">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-sm font-semibold text-slate-900">
-          {place.name}
-          {place.facts.length > 0 && <span className="font-normal text-muted"> · {place.facts.join(' · ')}</span>}
-        </p>
-        {r && (
-          <p className="text-xs text-muted">
-            {r.status === 'approved'
-              ? `Approved ${formatDay(r.decidedAt ?? r.readAt)}${r.decidedBy ? ` by ${r.decidedBy}` : ''}`
-              : r.status === 'skipped'
-                ? 'Skipped'
-                : r.status === 'no_menu'
-                  ? `No menu, said ${formatDay(r.decidedAt ?? r.readAt)}${r.decidedBy ? ` by ${r.decidedBy}` : ''}`
-                  : `Read ${formatDay(r.readAt)}`}
-          </p>
-        )}
-      </div>
-      {place.dishes.length > 0 && <p className="mt-0.5 text-xs text-slate-600">Listed now: {place.dishes.join(', ')}</p>}
-      {r?.sourceUrl && (
-        <p className="mt-1 text-xs text-slate-600">
-          Read from{' '}
-          <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-            {shortUrl(r.sourceUrl)} ↗
-          </a>
-        </p>
-      )}
-      {fromPhotos(r) && <p className="mt-1 text-xs text-slate-600">Read from photos of the menu, added {formatDay(r!.readAt)}</p>}
-      {elsewhereDishes && (
-        <p className="mt-1 text-xs text-slate-600" data-testid="dish-sent-through-site">
-          Its dishes came from a menu sent through the site, approved {formatDay(place.menuAt!)}.
-        </p>
-      )}
-      {elsewhere(place) && (
-        <p className="mt-1 text-xs font-semibold text-amber-800" data-testid="dish-elsewhere">
-          Its website ({shortUrl(place.website!)}) sent the reader to another site. Check the listing’s website.
-        </p>
-      )}
-      {/* Its menu link, which the reader reads first (menuLink.ts). */}
-      {place.menuUrl && !r && (
-        <p className="mt-1 text-xs text-slate-600" data-testid="dish-menu-link">
-          Reads its menu link{' '}
-          <a href={place.menuUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-            {shortUrl(place.menuUrl)} ↗
-          </a>
-        </p>
-      )}
-      {!place.website && !place.menuUrl && !r && !elsewhereDishes && <p className="mt-1 text-xs text-muted">No website or menu link to read.</p>}
-      {r?.status === 'failed' && !elsewhereDishes && <p className="mt-1 text-xs text-amber-800">{r.note ?? 'Couldn’t read a menu.'}</p>}
+  const boxPill: { text: string; tone: Tone } | undefined = open
+    ? { text: proposal!.pill ?? 'Same', tone: 'amber' }
+    : decided
+      ? { text: `${decided === 'used' ? 'Used' : 'Kept'} ${day(new Date().toISOString())}`, tone: 'grey' }
+      : r?.status === 'approved' && r.decidedAt
+        ? { text: `Used ${day(r.decidedAt)}`, tone: 'grey' }
+        : r?.status === 'skipped' && r.decidedAt
+          ? { text: `Kept ${day(r.decidedAt)}`, tone: 'grey' }
+          : { text: 'Same', tone: 'grey' }
 
-      {r && r.status !== 'failed' && proposed.length > 0 && (
-        <>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {proposed.map((d) => {
-              const on = !off.has(d.name)
-              return (
-                <button
-                  key={d.name}
-                  type="button"
-                  aria-pressed={on}
-                  disabled={busy || r.status === 'approved'}
-                  onClick={() => toggle(d.name)}
-                  title={`“${d.quote}”`}
-                  className={`${pill} ${on ? 'border-primary/40 bg-primary/5 text-primary' : 'border-slate-200 bg-white text-slate-400 line-through'} disabled:cursor-default`}
-                >
-                  <span aria-hidden="true">{on ? '✓' : ''}</span>
-                  {d.name}
-                </button>
-              )
-            })}
-            {added.map((name) => (
-              <span key={name} className={`${pill} border-primary/40 bg-primary/5 text-primary`}>
-                ✓ {name}
-                <button type="button" aria-label={`Take ${name} off`} onClick={() => setAdded((a) => a.filter((x) => x !== name))} className="text-slate-400 hover:text-slate-700">
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-          <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
-            {proposed.map((d) => (
-              <li key={d.name}>
-                <span className="font-semibold text-slate-700">{d.name}</span> from “{d.quote}”
-                {d.onListing && <span className="text-muted"> (on the listing)</span>}
-                {!d.checked && <span className="text-amber-800"> ({d.picture ? 'from a picture of the menu' : 'from a PDF'}: open the menu to check)</span>}
-                {d.checked && d.named === false && <span className="text-amber-800"> (these words don’t name it: check)</span>}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {missing.length > 0 && (
-        <p className="mt-1.5 text-xs font-semibold text-amber-800" data-testid="dish-missing">
-          Not on this menu any more? {missing.join(', ')}. {missing.length === 1 ? 'It stays' : 'They stay'} on the listing until you take {missing.length === 1 ? 'it' : 'them'} off.
-        </p>
-      )}
-      {unchecked.length > 0 && (
-        <p className="mt-1 text-xs text-muted" data-testid="dish-unchecked">
-          Not checked against this menu: {unchecked.join(', ')}.
-        </p>
-      )}
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
-        {r && r.status === 'proposed' && (
-          <>
-            <input
-              value={typing}
-              onChange={(e) => setTyping(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') add()
-              }}
-              placeholder="Add a dish"
-              aria-label={`Add a dish at ${place.name}`}
-              maxLength={60}
-              className="h-8 w-36 rounded-md border border-slate-300 px-2 text-xs"
+  const dishes =
+    proposal && r ? (
+      <Box key={`${decided ?? ''}`} name={TITLE} pill={boxPill} defaultOpen={open}>
+        <BoxRows>
+          {proposal.rows.map((d) => (
+            <BoxRow
+              key={d.name}
+              name={d.name}
+              mark={d.status === 'gone' ? 'gone' : d.status === 'new' && open ? 'new' : 'same'}
+              why="Not on the menu"
+              sub={
+                d.quote ? (
+                  <>
+                    “{d.quote}”{d.named === false && <span className="text-amber-800"> · these words don’t name it</span>}
+                  </>
+                ) : d.status === 'not_found' ? (
+                  'Not found on the menu'
+                ) : undefined
+              }
             />
-            <button type="button" onClick={add} disabled={busy} className="font-semibold text-primary hover:underline disabled:opacity-50">
-              + Add
-            </button>
-            <button
-              type="button"
-              disabled={busy || kept.length === 0}
-              onClick={() => onApprove(kept)}
-              className="rounded-md bg-primary px-3 py-1.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
-            >
-              Approve {kept.length} {kept.length === 1 ? 'dish' : 'dishes'}
-            </button>
-            <button type="button" disabled={busy} onClick={onSkip} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
-              Skip for now
-            </button>
-          </>
-        )}
-        {(place.website || place.menuUrl) && readerOn && r?.status !== 'no_menu' && (
-          <button type="button" disabled={busy} onClick={onRead} className="font-semibold text-primary hover:underline disabled:opacity-50">
-            {busy ? 'Reading…' : r ? 'Read again' : 'Read its menu'}
-          </button>
-        )}
-        {stuck && !giving && (
-          <>
-            <button type="button" disabled={busy} onClick={() => setGiving(true)} className="font-semibold text-primary hover:underline disabled:opacity-50">
-              Give its menu link
-            </button>
-            {readerOn && (
-              <label className={`font-semibold text-primary hover:underline ${busy ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
-                Add photos of the menu
-                <input
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg,image/webp,application/pdf"
-                  aria-label={`Photos of ${place.name}’s menu`}
-                  className="sr-only"
-                  disabled={busy}
-                  onChange={(e) => {
-                    const files = [...(e.target.files ?? [])]
-                    e.target.value = ''
-                    if (files.length) onPhotos(files)
-                  }}
-                />
-              </label>
-            )}
-            <button type="button" disabled={busy} onClick={onNoMenu} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
-              No menu
-            </button>
-          </>
-        )}
-        {stuck && giving && (
-          <form
-            className="flex flex-wrap items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!link.trim()) return
-              onLink(link.trim())
-              setGiving(false)
+          ))}
+        </BoxRows>
+        {open && <BoxActions busy={busy} onUse={() => onAct({ action: 'use' })} onEdit={() => onEdit(proposal)} onKeep={() => onAct({ action: 'skip' })} />}
+        <SourceLine url={r.sourceUrl} what={fromPhotos(r) ? 'photos of the menu' : undefined} at={r.readAt} extra={uncheckedNote(proposal, r)} />
+      </Box>
+    ) : sent ? (
+      <Box name={TITLE} pill={{ text: 'Same', tone: 'grey' }}>
+        <BoxRows>
+          {p.dishes.map((d) => (
+            <BoxRow key={d} name={d} />
+          ))}
+        </BoxRows>
+        <SourceLine what="a menu sent through the site" extra={p.menuAt ? `used ${day(p.menuAt)}` : undefined} />
+      </Box>
+    ) : null
+
+  const pages = readPages(p, status, onAct)
+  const links = (
+    <>
+      {!off && !adding && (
+        <button type="button" disabled={busy} onClick={() => setAdding(true)} className={LINK}>
+          Add a page
+        </button>
+      )}
+      {canRead && (
+        <button type="button" disabled={busy} onClick={() => onAct({ action: 'read' })} className={LINK}>
+          {busy ? 'Reading…' : 'Read them now'}
+        </button>
+      )}
+      {cant && readerOn && (
+        <label className={`${LINK} ${busy ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
+          Add photos of the menu
+          <input
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            aria-label={`Photos of ${p.name}’s menu`}
+            className="sr-only"
+            disabled={busy}
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])]
+              e.target.value = ''
+              if (files.length) onPhotos(files)
             }}
-          >
-            <input
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder="Their menu page or PDF"
-              aria-label={`${place.name}’s menu link`}
-              inputMode="url"
-              className="h-8 w-64 rounded-md border border-slate-300 px-2 text-xs"
-              autoFocus
+          />
+        </label>
+      )}
+      {cant && (
+        <button type="button" disabled={busy} onClick={() => onAct({ action: 'no_menu' })} className={LINK}>
+          No menu
+        </button>
+      )}
+      <a href={p.href} target="_blank" rel="noopener noreferrer" className={LINK}>
+        Open its listing
+      </a>
+    </>
+  )
+  return (
+    <PlaceRow name={p.name} pill={rowPill(p, status, decided, reading)} back={TITLE}>
+      {dishes}
+      <Reads
+        on={!off}
+        busy={busy}
+        onSwitch={(on) => onAct({ action: on ? 'undo_no_menu' : 'no_menu' })}
+        pages={pages}
+        defaultOpen={!dishes || cant || off || status === 'not_read'}
+        below={
+          adding && (
+            <GivePage
+              label="Its menu page or PDF"
+              placeholder="https://"
+              busy={busy}
+              onGive={(url) => {
+                setAdding(false)
+                onAct({ action: 'link', url })
+              }}
+              onCancel={() => setAdding(false)}
             />
-            <button type="submit" disabled={busy || !link.trim()} className="rounded-md bg-primary px-3 py-1.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-50">
-              {readerOn ? 'Save and read' : 'Save'}
-            </button>
-            <button type="button" onClick={() => setGiving(false)} className="font-medium text-muted hover:text-slate-800">
-              Cancel
-            </button>
-          </form>
-        )}
-        {r?.status === 'no_menu' && (
-          <button type="button" disabled={busy} onClick={onUndoNoMenu} className="font-semibold text-primary hover:underline disabled:opacity-50">
-            Undo
-          </button>
-        )}
-        {r?.model && <span className="text-muted">Read by {r.model}</span>}
-      </div>
-    </li>
+          )
+        }
+        links={links}
+      />
+    </PlaceRow>
   )
 }
 
@@ -333,220 +288,206 @@ export default function MainDishes({ token }: { token: string }) {
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<Set<string>>(new Set())
-  const [batch, setBatch] = useState(false)
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
+  // Each place's tab as it was when the page loaded, and the one showing.
+  const [tabOf, setTabOf] = useState<ReadonlyMap<string, JobTab>>(new Map())
+  const [tab, setTab] = useState<JobTab>('to_check')
+  // Used or kept this visit: said where it was.
+  const [decided, setDecided] = useState<ReadonlyMap<string, Decided>>(new Map())
+  // Edit: the listing's own Edit for its dishes, started from its menu's.
+  const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit } | null>(null)
+  const headers = { Authorization: `Bearer ${token}` }
+  const api = withCommunity('/api/admin/main-dishes', community)
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(await fetchJson<Loaded>(withCommunity('/api/admin/main-dishes', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the food places.'))
+      const got = await fetchJson<Loaded>(withCommunity('/api/admin/main-dishes', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the food places.')
+      const { rows, tabs, first } = jobTabs(got.places, (p) => STATUS[dishStatus(p)], (p) => p.name)
+      setData({ ...got, places: rows })
+      setTabOf(tabs)
+      setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token, community])
-
   useLoadOnMount(load)
 
+  const patch = (id: string, p: Partial<Place>) => setData((d) => d && { ...d, places: d.places.map((x) => (x.id === id ? { ...x, ...p } : x)) })
   const mark = (id: string, on: boolean) =>
-    setBusy((prev) => {
-      const next = new Set(prev)
+    setBusy((b) => {
+      const next = new Set(b)
       if (on) next.add(id)
       else next.delete(id)
       return next
     })
-  const patch = (id: string, p: Partial<Place>) => setData((d) => d && { ...d, places: d.places.map((x) => (x.id === id ? { ...x, ...p } : x)) })
-  const post = (body: unknown) =>
-    fetchJson<{ reading?: Reading | null; dishes?: string[]; menuUrl?: string }>(
-      withCommunity('/api/admin/main-dishes', community),
-      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-      'Could not do that.',
-    )
+  /** After Use this or Save to the listing: the listing as it is now. */
+  const used = (p: Place, res: { dishes?: string[]; sometimes?: string[]; menuDated?: string[] }) => {
+    patch(p.id, {
+      dishes: res.dishes ?? p.dishes,
+      sometimes: res.sometimes ?? p.sometimes,
+      menuDated: res.menuDated ?? p.menuDated,
+      reading: p.reading && { ...p.reading, status: 'approved', decidedAt: new Date().toISOString(), decidedBy: 'you' },
+    })
+    setDecided((m) => new Map(m).set(p.id, 'used'))
+  }
 
-  async function read(id: string) {
+  async function act(p: Place, body: Record<string, unknown>) {
     setSaveError(null)
-    mark(id, true)
+    mark(p.id, true)
     try {
-      const { reading } = await post({ action: 'read', resourceId: id })
-      if (reading) patch(id, { reading })
+      const res = await fetchJson<{ reading?: Reading | null; menuUrl?: string | null; dishes?: string[]; sometimes?: string[]; menuDated?: string[] }>(
+        api,
+        { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ resourceId: p.id, ...body }) },
+        'Could not do that.',
+      )
+      if (body.action === 'use') used(p, res)
+      else if (body.action === 'skip') {
+        patch(p.id, { reading: p.reading && { ...p.reading, status: 'skipped', decidedAt: new Date().toISOString(), decidedBy: 'you' } })
+        setDecided((m) => new Map(m).set(p.id, 'kept'))
+      } else {
+        patch(p.id, {
+          ...(res.menuUrl !== undefined ? { menuUrl: res.menuUrl } : {}),
+          ...(res.reading !== undefined ? { reading: res.reading } : {}),
+        })
+        setDecided((m) => {
+          const next = new Map(m)
+          next.delete(p.id)
+          return next
+        })
+      }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not read that menu.')
+      setSaveError(err instanceof Error ? err.message : 'Could not save.')
     } finally {
-      mark(id, false)
+      mark(p.id, false)
     }
   }
 
-  /** "Give its menu link": saved on the listing, then read. */
-  async function giveLink(id: string, url: string) {
+  async function addPhotos(p: Place, files: File[]) {
     setSaveError(null)
-    mark(id, true)
-    try {
-      const res = await post({ action: 'link', resourceId: id, url })
-      patch(id, { menuUrl: res.menuUrl ?? url, ...(res.reading ? { reading: res.reading } : {}) })
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save that link.')
-    } finally {
-      mark(id, false)
-    }
-  }
-
-  async function addPhotos(id: string, files: File[]) {
-    setSaveError(null)
-    mark(id, true)
+    mark(p.id, true)
     try {
       const body = new FormData()
       body.append('action', 'photos')
-      body.append('resourceId', id)
+      body.append('resourceId', p.id)
       for (const f of files) body.append('file', f)
-      const { reading } = await fetchJson<{ reading?: Reading }>(
-        withCommunity('/api/admin/main-dishes', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body },
-        'Could not read those photos.',
-      )
-      if (reading) patch(id, { reading })
+      const { reading } = await fetchJson<{ reading?: Reading }>(api, { method: 'POST', headers, body }, 'Could not read those photos.')
+      if (reading) patch(p.id, { reading })
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not read those photos.')
     } finally {
-      mark(id, false)
+      mark(p.id, false)
     }
   }
 
-  async function noMenu(id: string, on: boolean) {
+  async function edit(p: Place, proposal: DishProposal) {
     setSaveError(null)
-    mark(id, true)
     try {
-      const { reading } = await post({ action: on ? 'no_menu' : 'undo_no_menu', resourceId: id })
-      patch(id, { reading: reading ?? null })
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save.')
-    } finally {
-      mark(id, false)
-    }
-  }
-
-  async function decide(place: Place, action: 'approve' | 'skip', dishes: string[] = []) {
-    setSaveError(null)
-    mark(place.id, true)
-    try {
-      const res = await post({ action, resourceId: place.id, dishes })
-      const now = new Date().toISOString()
-      patch(place.id, {
-        dishes: action === 'approve' ? (res.dishes ?? dishes).reduce((all, d) => (all.some((x) => x.toLowerCase() === d.toLowerCase()) ? all : [...all, d]), place.dishes) : place.dishes,
-        reading: place.reading && { ...place.reading, status: action === 'approve' ? 'approved' : 'skipped', decidedAt: now, decidedBy: 'you' },
+      const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/main-dishes?item=${p.id}`, community), { headers }, 'Could not open its dishes.')
+      const field = itemsField(category)
+      if (!field) return
+      setEditing({
+        item,
+        category,
+        edit: {
+          title: field.label,
+          fields: [],
+          rows: ['items'],
+          preset: { [field.key]: proposal.always, [`${field.key}_sometimes`]: proposal.sometimes },
+          save: {
+            label: 'Save to the listing',
+            via: async ({ payload }) => {
+              const d = (payload.details ?? {}) as Record<string, unknown>
+              const res = await fetch(api, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'save', resourceId: p.id, always: d[field.key] ?? [], sometimes: d[`${field.key}_sometimes`] ?? [] }),
+              })
+              if (res.ok) used(p, await res.clone().json())
+              return res
+            },
+            onSaved: () => setEditing(null),
+          },
+        },
       })
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save.')
-    } finally {
-      mark(place.id, false)
+      setSaveError(err instanceof Error ? err.message : 'Could not open its dishes.')
     }
   }
 
-  async function readNext(list: Place[]) {
-    setBatch(true)
-    for (const p of list.slice(0, BATCH)) await read(p.id)
-    setBatch(false)
+  // Places not read yet, read now, one after another.
+  const readOnLoad = useRef(false)
+  useEffect(() => {
+    if (!data || readOnLoad.current) return
+    readOnLoad.current = true
+    if (!data.readerOn) return
+    const unread = data.places.filter((p) => dishStatus(p) === 'not_read').slice(0, READ_ON_LOAD)
+    void (async () => {
+      for (const p of unread) await act(p, { action: 'read' })
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
+  const backHref = `${adminBase(community)}/watches`
+  if (error || !data) {
+    const notice = error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : <p className="text-sm text-muted">Loading food places…</p>
+    return <JobPage backHref={backHref} title={TITLE} intro="" needYou={0} total={0} noun="place" notice={notice} />
   }
 
-  if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
-  if (!data) return <p className="text-sm text-muted">Loading food places…</p>
-
-  const { approved, toCheck, unread, failed, noMenus, done } = dishSections(data.places)
-  const rows = (list: Place[]) => (
-    <ul className="divide-y divide-slate-100">
-      {list.map((p) => (
-        <PlaceCard
-          key={`${p.id}:${p.reading?.readAt ?? ''}`}
-          place={p}
-          busy={busy.has(p.id)}
-          readerOn={data.readerOn}
-          onRead={() => void read(p.id)}
-          onApprove={(dishes) => void decide(p, 'approve', dishes)}
-          onSkip={() => void decide(p, 'skip')}
-          onLink={(url) => void giveLink(p.id, url)}
-          onPhotos={(files) => void addPhotos(p.id, files)}
-          onNoMenu={() => void noMenu(p.id, true)}
-          onUndoNoMenu={() => void noMenu(p.id, false)}
-        />
-      ))}
-    </ul>
-  )
-
+  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
+  for (const p of data.places) counts[tabOf.get(p.id) ?? 'to_check']++
+  const moved = data.places.filter(elsewhere)
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted">
-        The AI reads each food place&rsquo;s own menu page once, when you ask, and picks its main dishes, showing the
-        menu&rsquo;s own words it read each from. A dish whose words aren&rsquo;t on the page is dropped before you see it.
-        <strong> Nothing shows on the site until you approve it.</strong> Untick what&rsquo;s wrong, add what&rsquo;s missing.
-        Approved dishes say &ldquo;seen&rdquo; with the date the menu was read, until a visitor says they&rsquo;re still served.
-      </p>
-      {!data.available && (
-        <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Reading menus needs database migration 065.</p>
-      )}
-      {!data.readerOn && (
-        <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">The AI reader isn&rsquo;t set up here (no OPENAI_API_KEY).</p>
-      )}
-      {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
-      {/* Said up top: these are usually in "Couldn't be read", folded away,
-          and a listing sending visitors somewhere else matters more than
-          its dishes. */}
-      {data.places.some(elsewhere) && (
-        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-900" data-testid="dish-moved-sites">
-          <p className="font-semibold">Websites that sent the reader to another site:</p>
-          <ul className="mt-1 list-disc pl-5">
-            {data.places.filter(elsewhere).map((p) => (
-              <li key={p.id}>
-                {p.name}: {shortUrl(p.website!)} → {shortUrl(p.reading!.sourceUrl!)}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1">The site may have lapsed or been taken over. Check each listing’s website.</p>
-        </div>
-      )}
-      <p className="text-sm font-semibold text-slate-800" data-testid="dish-counts">
-        {approved.length} of {data.places.length} approved · {toCheck.length} to check · {unread.length} not read yet · {failed.length} couldn&rsquo;t be read
-        {noMenus.length > 0 && <> · {noMenus.length} no menu</>}
-      </p>
-      {data.available && (
-        <>
-          <section className="bg-white border border-slate-200 rounded-lg shadow-sm">
-            <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">To check ({toCheck.length})</h3>
-            <p className="px-4 pb-2 text-xs text-muted">Read by the AI, not yet checked by a person.</p>
-            {toCheck.length > 0 ? rows(toCheck) : <p className="px-4 pb-3 text-sm text-slate-600">None right now.</p>}
-          </section>
-          <section className="bg-white border border-slate-200 rounded-lg shadow-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-3">
-              <h3 className="text-sm font-semibold text-slate-800">Not read yet ({unread.length})</h3>
-              {data.readerOn && unread.length > 0 && (
-                <button type="button" disabled={batch} onClick={() => void readNext(unread)} className="text-xs font-semibold text-primary hover:underline disabled:opacity-50">
-                  {batch ? 'Reading…' : `Read the next ${Math.min(BATCH, unread.length)}`}
-                </button>
-              )}
-            </div>
-            <p className="px-4 pb-2 text-xs text-muted">Each takes a few seconds: the AI reads the place&rsquo;s menu link, or its own website.</p>
-            {unread.length > 0 ? rows(unread) : <p className="px-4 pb-3 text-sm text-slate-600">All read.</p>}
-          </section>
-          <CollapsibleSection
-            title="Couldn’t be read"
-            description="No website or menu link, or no menu the reader could read. Give its menu link, add photos of the menu, or say it has none."
-            count={failed.length}
-            contentClassName=""
-          >
-            {rows(failed)}
-          </CollapsibleSection>
-          {noMenus.length > 0 && (
-            <CollapsibleSection title="No menu" description="Said to have no menu to read. Not read again; Undo puts one back." count={noMenus.length} contentClassName="">
-              {rows(noMenus)}
-            </CollapsibleSection>
-          )}
-          <CollapsibleSection
-            title="Approved and skipped"
-            description="Read again any time; approving again only adds and re-dates. Places whose dishes came from a menu sent through the site are here too."
-            count={done.length}
-            contentClassName=""
-          >
-            {rows(done)}
-          </CollapsibleSection>
-        </>
-      )}
-    </div>
+    <>
+      <JobPage
+        backHref={backHref}
+        title={TITLE}
+        intro=""
+        needYou={0}
+        total={data.places.length}
+        noun="place"
+        say={dishSay(data.places.map(dishStatus))}
+        tabs={{ counts, active: tab, onChange: setTab }}
+        notice={
+          <>
+            {!data.available && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Reading menus needs database migration 065.</p>}
+            {!data.readerOn && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The AI reader isn&rsquo;t set up here (no OPENAI_API_KEY).</p>}
+            {saveError && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
+            {/* A listing sending visitors somewhere else matters more than
+                its dishes, so it's said up top. */}
+            {moved.length > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="dish-moved-sites">
+                <p className="font-semibold">Websites that sent the reader to another site:</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {moved.map((p) => (
+                    <li key={p.id}>
+                      {p.name}: {shortUrl(p.website!)} → {shortUrl(p.reading!.sourceUrl!)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        }
+      >
+        {data.places
+          .filter((p) => (tabOf.get(p.id) ?? 'to_check') === tab)
+          .map((p) => (
+            <DishRowView
+              key={`${p.id}:${p.reading?.readAt ?? ''}`}
+              place={p}
+              status={dishStatus(p)}
+              decided={decided.get(p.id)}
+              busy={busy.has(p.id)}
+              reading={busy.has(p.id) && dishStatus(p) === 'not_read'}
+              readerOn={data.readerOn}
+              onAct={(body) => void act(p, body)}
+              onPhotos={(files) => void addPhotos(p, files)}
+              onEdit={(proposal) => void edit(p, proposal)}
+            />
+          ))}
+      </JobPage>
+      {editing && <BoxEditSheet item={editing.item} category={editing.category} edit={editing.edit} onClose={() => setEditing(null)} />}
+    </>
   )
 }

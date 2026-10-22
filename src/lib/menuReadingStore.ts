@@ -169,17 +169,84 @@ export async function clearMenuReading(community: string, resourceId: string): P
   if (error) throw new Error(`Failed to clear the menu reading: ${error.message}`)
 }
 
-/** Puts a menu link on a live listing (details.menuUrl, menuLink.ts): the
+/** Puts a menu link on a live listing, or takes it off (null) (details.menuUrl, menuLink.ts): the
  *  admin's "Give its menu link". From then on the tab reads it first and
  *  the menu watch watches it (syncMenuWatches). Read, then written whole,
  *  as other admin writes to details are. False when the listing isn't live. */
-export async function saveMenuLink(community: string, resourceId: string, url: string): Promise<boolean> {
+export async function saveMenuLink(community: string, resourceId: string, url: string | null): Promise<boolean> {
   const supabase = getAdminClient()
   const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
   if (error) throw new Error(`Failed to load the listing: ${error.message}`)
   if (!data) return false
-  const details = { ...((data as { details: Record<string, unknown> | null }).details ?? {}), [MENU_LINK_KEY]: url }
+  // null: "Stop reading it", the link taken off.
+  const details: Record<string, unknown> = { ...((data as { details: Record<string, unknown> | null }).details ?? {}) }
+  if (url) details[MENU_LINK_KEY] = url
+  else delete details[MENU_LINK_KEY]
   const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
   if (saveError) throw new Error(`Failed to save the menu link: ${saveError.message}`)
+  return true
+}
+
+// ── Use this, and Edit's "Save to the listing" (Oct 21) ─────────────────────
+// The Dishes page sets a place's list whole: the dishes its menu no longer
+// names off, the new ones on (dishProposal.ts), or the list as an admin
+// edited it. Each dish keeps its dates under whichever part it's in now;
+// a dish taken off loses them. The ones its menu names are dated "on its
+// menu" now (details.itemMenu, as approve_menu_dishes did): an admin saw
+// them there. A dish added by hand gets no menu date, so a later read that
+// misses it never crosses it out.
+
+const DATE_MAPS = ['itemMenu', 'itemSeen', 'itemGone'] as const
+
+/** The listing's details with its dish lists set. Pure, for its tests. */
+export function withMenuDishes(
+  details: Record<string, unknown>,
+  fieldKey: string,
+  lists: { always: readonly string[]; sometimes: readonly string[] },
+  dated: { names: readonly string[]; at: string; menuUrl: string | null },
+): Record<string, unknown> {
+  const sk = `${fieldKey}_sometimes`
+  const out: Record<string, unknown> = { ...details, [fieldKey]: [...lists.always], [sk]: [...lists.sometimes] }
+  if (lists.sometimes.length === 0) delete out[sk]
+  const onMenu = new Set(dated.names.map((n) => n.trim().toLowerCase()))
+  for (const map of DATE_MAPS) {
+    const all = details[map] && typeof details[map] === 'object' ? { ...(details[map] as Record<string, Record<string, string>>) } : {}
+    const was = new Map<string, string>()
+    for (const key of [fieldKey, sk]) for (const [label, at] of Object.entries(all[key] ?? {})) if (typeof at === 'string') was.set(label.trim().toLowerCase(), at)
+    for (const [key, names] of [
+      [fieldKey, lists.always],
+      [sk, lists.sometimes],
+    ] as const) {
+      const next: Record<string, string> = {}
+      for (const name of names) {
+        const at = map === 'itemMenu' && onMenu.has(name.trim().toLowerCase()) ? dated.at : was.get(name.trim().toLowerCase())
+        if (at) next[name] = at
+      }
+      if (Object.keys(next).length) all[key] = next
+      else delete all[key]
+    }
+    if (Object.keys(all).length) out[map] = all
+    else delete out[map]
+  }
+  if (dated.menuUrl) out[MENU_LINK_KEY] = dated.menuUrl
+  return out
+}
+
+/** Sets a live listing's dish lists (withMenuDishes). Read, then written
+ *  whole, as saveMenuLink. False when the listing isn't live. */
+export async function setMenuDishes(
+  community: string,
+  resourceId: string,
+  fieldKey: string,
+  lists: { always: readonly string[]; sometimes: readonly string[] },
+  dated: { names: readonly string[]; at: string; menuUrl: string | null },
+): Promise<boolean> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
+  if (error) throw new Error(`Failed to load the listing: ${error.message}`)
+  if (!data) return false
+  const details = withMenuDishes((data as { details: Record<string, unknown> | null }).details ?? {}, fieldKey, lists, dated)
+  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
+  if (saveError) throw new Error(`Failed to save the dishes: ${saveError.message}`)
   return true
 }

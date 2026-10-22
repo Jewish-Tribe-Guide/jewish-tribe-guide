@@ -152,7 +152,8 @@ describe('WatchesManager', () => {
     const brokenMenu = watch({ id: 'm', url: 'https://judah.example/menu', resourceId: 'f1', createdBy: 'menu links', failingSince: ago(1), lastError: 'The page answered 404' })
     const place = (status: string | null) => ({ website: 'https://x.example', menuUrl: null, dishes: [], reading: status && { status, readAt: ago(1) } })
     await renderTab([refuah, empty, brokenMenu], {
-      dishes: [place('approved'), place('approved'), place('proposed'), place('failed'), place(null)],
+      // A reading proposes a change only when its menu has one (dishProposal).
+      dishes: [place('approved'), place('approved'), { ...place('proposed'), reading: { status: 'proposed', readAt: ago(1), dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }] } }, place('failed'), place(null)],
       hospitals: [
         { id: 'h1', watch: refuah, notOnRefuah: false },
         { id: 'h2', watch: empty, notOnRefuah: false },
@@ -162,7 +163,7 @@ describe('WatchesManager', () => {
     const [dishes, hospitals] = screen.getAllByTestId('job-row')
     expect(dishes).toHaveAttribute('href', '/philly/admin/watches/dishes')
     expect(dishes).toHaveTextContent('5 food places, from their menus')
-    expect(dishes).toHaveTextContent('2checked1to check1can’t be read1didn’t load today')
+    expect(dishes).toHaveTextContent('2checked2to check1can’t be read1didn’t load today')
     expect(hospitals).toHaveAttribute('href', '/philly/admin/watches/hospitals')
     expect(hospitals).toHaveTextContent('3 hospitals, from Refuah · 1 with nothing there yet')
     expect(hospitals).toHaveTextContent('1checked0to check1can’t be read0didn’t load today')

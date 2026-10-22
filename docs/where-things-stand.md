@@ -298,8 +298,7 @@ agreed:
   it holds one kind ("1 new", "2 changes", "3 not on the menu"), and says
   "N updates" only when it mixes kinds.
 - The buttons are Use this / Edit / Keep the listing. Use this takes off
-  what the source no longer has; the old "flagged, never taken off"
-  comment in `MainDishes.tsx` is wrong. Each box ends with "From X · read
+  what the source no longer has. Each box ends with "From X · read
   Oct 21". After Use this, the box shows a grey "Used Oct 21".
 - Edit is the listing's own per-box Edit sheet (`BoxEditSheet`), filled
   with the source's version, with the button "Save to the listing".
@@ -350,6 +349,26 @@ agreed:
 **Order:**
 1. The own-pages fix (built).
 2. Main dishes, which sets the shared box, Reads and Edit pieces.
+   **Built Oct 21** (compared with its drawing on dev, computer and phone):
+   - The shared pieces are in `JobBoxes.tsx`: a place's row (full screen
+     on a phone, "‹ Main dishes"), Box, its rows (gone crossed out with
+     its tag, new highlighted), Use this / Edit / Keep the listing, the
+     source line, and Reads with its switch and a × per page.
+   - `dishProposal.ts` marks the listing's list by the menu. A dish with
+     a menu date (`itemMenu`) that the menu no longer names is crossed out
+     and Use this takes it off. One with no menu date (added by hand or
+     by a visitor) is kept, "Not found on the menu", and looked for again.
+   - Edit is the listing's own dishes editor (`ListingEditor`'s new
+     `preset` and `adminSave`), saved through the route's `save`; its menu
+     link field is hidden there, since Reads has it. The route's `use` and
+     `save` write the list whole (`setMenuDishes`), so
+     `approve_menu_dishes` (migration 065) is no longer called.
+   - Reading switch off = No menu; the × on a menu link takes the link
+     off; on a website, No menu. Places not read yet are read as the page
+     opens, five at most.
+   - Not built, as the drawing says: board 3 (Hours and Phone boxes for a
+     place Google doesn't keep, part of "keeping listings current") and
+     board 5 (a menu that moved, a "New menu link" update in Reads).
 3. Shul times.
 4. Mikvah hours.
 5. Hospitals.
@@ -465,7 +484,7 @@ compare, and one it can't read, on desktop and phone.
    and doesn't do yet:
    - **Already true before this, and easy to miss:** approving a reading
      on Main dishes writes the page it was read from as the place's menu
-     link (`approve_menu_dishes`, migration 065). So most "menu links" are
+     link (`approve_menu_dishes`; since Oct 21 `setMenuDishes`). So most "menu links" are
      the reader's own finds, and were watched daily already.
    - **New: a place with no menu link yet** is watched on the page its
      latest reading found the menu on. Conditions: dishes were read there

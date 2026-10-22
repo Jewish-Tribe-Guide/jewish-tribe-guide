@@ -98,7 +98,7 @@ export function JobPage({
   noun: string
   /** In place of the counts, a sentence saying whether anything needs
    *  you, and a line under it (Shul times, Oct 21). */
-  say?: { head: string; sub: string }
+  say?: { head: string; sub?: string }
   notice?: ReactNode
   /** How many rows each tab holds, and which is showing. */
   tabs?: { counts: Readonly<Record<JobTab, number>>; active: JobTab; onChange: (t: JobTab) => void }
@@ -114,7 +114,7 @@ export function JobPage({
         {say ? (
           <p className="text-[15px] font-semibold text-slate-900" data-testid="job-counts">
             {say.head}
-            <span className="block text-sm font-normal text-slate-600">{say.sub}</span>
+            {say.sub && <span className="block text-sm font-normal text-slate-600">{say.sub}</span>}
           </p>
         ) : (
           <>

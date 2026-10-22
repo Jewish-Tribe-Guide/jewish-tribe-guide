@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type ComponentProps } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isMinyanim, type Minyan } from '@/lib/davening'
@@ -50,6 +50,9 @@ export type BoxEdit = {
    *  address and phone, the dishes, About (Oct 15). Then `fields` is
    *  unused, and the sheet holds that editor, narrowed to these rows. */
   rows?: readonly string[]
+  /** With `rows`: an admin's save straight to the listing, in place of
+   *  sending an edit (ListingEditor's adminSave). */
+  save?: ComponentProps<typeof ListingEditor>['adminSave']
 }
 
 export default function BoxEditSheet({
@@ -83,7 +86,7 @@ export default function BoxEditSheet({
   const body =
     edit &&
     (edit.rows ? (
-      <ListingEditor key={edit.title} item={item} category={category} onlyRows={edit.rows} onClose={onClose} onStep={onEditorStep} />
+      <ListingEditor key={edit.title} item={item} category={category} onlyRows={edit.rows} onClose={onClose} onStep={onEditorStep} preset={edit.preset} adminSave={edit.save} />
     ) : (
       <BoxEditor key={edit.title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} onStep={onStep} />
     ))

@@ -13,6 +13,7 @@ import type { ZmanimData } from '@/types'
 import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 import FindingCompare, { decidedLine, type Decision } from './FindingCompare'
 import { GivePage, day, shortUrl, type JobStatus } from './JobPage'
+import { ReadingSwitch } from './JobBoxes'
 import type { HoursPlace } from './HoursJob'
 
 // ── Shul times: what each shul's website proposes (the user, Oct 21) ────────
@@ -70,19 +71,6 @@ export function shulSummary(findings: readonly Finding[]): { pill: string; line:
     return { pill: w.isWeek ? 'This week' : 'New dates', line: first ? `${w.title}: ${first.day}, ${first.what} ${first.when}${first.usually ? `, usually ${first.usually}` : ''}` : w.title }
   }
   return null
-}
-
-/** Reading its website, on or off. */
-function ReadingSwitch({ on, busy, onChange }: { on: boolean; busy: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} disabled={busy} onClick={() => onChange(!on)} className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-900 disabled:opacity-50">
-      <span aria-hidden="true" className={`relative h-5 w-9 rounded-full transition-colors ${on ? 'bg-primary' : 'bg-slate-300'}`}>
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? 'left-[1.125rem]' : 'left-0.5'}`} />
-      </span>
-      <span className="sm:hidden">Reading</span>
-      <span className="hidden sm:inline">Reading its website</span>
-    </button>
-  )
 }
 
 /** Today's zman beside a time held relative to it: a note, not the time. */
@@ -455,7 +443,17 @@ export function ShulRow({
                 </p>
               )}
             </div>
-            <ReadingSwitch on={!off} busy={busy} onChange={(on) => onAct({ action: on ? 'on' : 'off' })} />
+            <ReadingSwitch
+              on={!off}
+              busy={busy}
+              onChange={(on) => onAct({ action: on ? 'on' : 'off' })}
+              label={
+                <>
+                  <span className="sm:hidden">Reading</span>
+                  <span className="hidden sm:inline">Reading its website</span>
+                </>
+              }
+            />
           </div>
           <Body place={p} status={status} reading={reading} waiting={waiting} findings={findings} token={token} community={community} jobName={jobName} settled={settled} onDecided={onDecided} />
           {!off && <Pages place={p} status={status} busy={busy} words={words} onAct={onAct} />}

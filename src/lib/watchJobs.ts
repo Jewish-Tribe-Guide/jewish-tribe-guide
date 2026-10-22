@@ -1,4 +1,5 @@
 import { settles, watchHealth, type Watch } from './watches'
+import { dishProposal, type ListedDishes, type ReadDish } from './dishProposal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab's jobs (the user, Oct 21): a row per thing the guide keeps
@@ -18,12 +19,11 @@ export type JobCounts = { checked: number; toCheck: number; cantRead: number; di
 // ── Dishes ──────────────────────────────────────────────────────────────────
 
 export type DishReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
-export type DishPlace = {
+export type DishPlace = ListedDishes & {
   website: string | null
   menuUrl: string | null
-  dishes: readonly string[]
   menuAt?: string | null
-  reading: { status: DishReadingStatus; readAt: string } | null
+  reading: { status: DishReadingStatus; readAt: string; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
 }
 
 /** Its dishes came from a menu someone sent through the site ("+ Add"),
@@ -35,17 +35,22 @@ export function sentThroughSite(place: DishPlace): boolean {
   return !r || ((r.status === 'failed' || r.status === 'no_menu') && Date.parse(place.menuAt) > Date.parse(r.readAt))
 }
 
-/** The Dishes page's sections. */
-export function dishSections<P extends DishPlace>(places: readonly P[]) {
-  const of = (status: DishReadingStatus) => places.filter((p) => p.reading?.status === status && !sentThroughSite(p))
-  return {
-    approved: of('approved'),
-    toCheck: of('proposed'),
-    unread: places.filter((p) => !p.reading && (p.website || p.menuUrl) && !sentThroughSite(p)),
-    failed: [...of('failed'), ...places.filter((p) => !p.reading && !p.website && !p.menuUrl && !sentThroughSite(p))],
-    noMenus: of('no_menu'),
-    done: [...of('approved'), ...of('skipped'), ...places.filter(sentThroughSite)],
-  }
+/** Where a place is on the Dishes page (its tab, JobPage.tsx):
+ *   differs    its menu would change the listing's dishes (dishProposal)
+ *   not_read   never read, with a website or menu link to read
+ *   cant_read  no menu could be read, or nothing to read it from
+ *   same       read, and its menu agrees, or decided (used or kept)
+ *   off        said to have no menu: not read */
+export type DishPlaceStatus = 'differs' | 'not_read' | 'cant_read' | 'same' | 'off'
+
+export function dishStatus(p: DishPlace): DishPlaceStatus {
+  const r = p.reading
+  if (sentThroughSite(p)) return 'same'
+  if (!r) return p.website || p.menuUrl ? 'not_read' : 'cant_read'
+  if (r.status === 'no_menu') return 'off'
+  if (r.status === 'failed') return 'cant_read'
+  if (r.status === 'proposed') return dishProposal(p, { dishes: r.dishes ?? [], missing: r.missing }).updates > 0 ? 'differs' : 'same'
+  return 'same'
 }
 
 /** A watch whose page didn't open on its last run, or that hasn't run in
@@ -56,8 +61,8 @@ export function didntLoad(w: Pick<Watch, 'active' | 'lastRunAt' | 'lastOkAt' | '
 }
 
 export function dishCounts(places: readonly DishPlace[], menuWatches: readonly Watch[], now: number): JobCounts {
-  const s = dishSections(places)
-  return { checked: s.done.length, toCheck: s.toCheck.length, cantRead: s.failed.length, didntLoad: menuWatches.filter((w) => didntLoad(w, now)).length }
+  const n = (...of: DishPlaceStatus[]) => places.filter((p) => of.includes(dishStatus(p))).length
+  return { checked: n('same'), toCheck: n('differs', 'not_read'), cantRead: n('cant_read'), didntLoad: menuWatches.filter((w) => didntLoad(w, now)).length }
 }
 
 // ── Hospitals ───────────────────────────────────────────────────────────────

@@ -15,10 +15,10 @@ const m = vi.hoisted(() => ({
   markNoMenu: vi.fn(),
   clearMenuReading: vi.fn(),
   saveMenuLink: vi.fn(),
+  setMenuDishes: vi.fn(),
   findMenu: vi.fn(),
   readMenuPage: vi.fn(),
   readMenu: vi.fn(),
-  rpc: vi.fn(),
   revalidatePublicContent: vi.fn(),
 }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -36,6 +36,7 @@ vi.mock('@/lib/menuReadingStore', () => ({
   markNoMenu: m.markNoMenu,
   clearMenuReading: m.clearMenuReading,
   saveMenuLink: m.saveMenuLink,
+  setMenuDishes: m.setMenuDishes,
   NO_MENU_NOTE: 'No menu',
   isNoMenu: (r: { status: string; note: string | null; dishes: unknown[] }) => r.status === 'skipped' && r.note === 'No menu' && r.dishes.length === 0,
 }))
@@ -60,7 +61,6 @@ vi.mock('@/lib/menuReader', async (orig) => ({
     return first
   },
 }))
-vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ rpc: m.rpc }) }))
 // A page drawn in a browser (renderPage.ts): never a real one here.
 const render = vi.hoisted(() => vi.fn())
 const closeRenderer = vi.hoisted(() => vi.fn())
@@ -98,7 +98,7 @@ beforeEach(() => {
   m.saveMenuReading.mockImplementation(async (_c, id, r) => ({ ...reading, ...r, resourceId: id }))
   m.saveMenuLink.mockResolvedValue(true)
   m.markNoMenu.mockImplementation(async (_c, id, by) => ({ ...reading, resourceId: id, status: 'skipped', dishes: [], note: 'No menu', sourceUrl: null, model: null, decidedBy: by }))
-  m.rpc.mockResolvedValue({ data: [{ out_community: 'philly', out_labels: ['Falafel', 'Shawarma'] }], error: null })
+  m.setMenuDishes.mockResolvedValue(true)
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
 })
 afterEach(() => vi.unstubAllEnvs())
@@ -127,7 +127,7 @@ describe('/api/admin/main-dishes', () => {
     expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render, trouble: expect.any(Function) })
     expect(m.saveMenuReading).toHaveBeenCalledWith('philly', ID, expect.objectContaining({ status: 'proposed', dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }] }))
     // Proposed is not shown: nothing touches the listing.
-    expect(m.rpc).not.toHaveBeenCalled()
+    expect(m.setMenuDishes).not.toHaveBeenCalled()
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 
@@ -198,28 +198,58 @@ describe('/api/admin/main-dishes', () => {
     expect((await POST(req('POST', { action: 'read', resourceId: ID }))).status).toBe(503)
   })
 
-  it('approving puts the kept dishes on the listing, with the reading’s own menu address, never the request’s', async () => {
-    const res = await POST(req('POST', { action: 'approve', resourceId: ID, dishes: ['shawarma', 'Burger', 'burger', 'x', 42], sourceUrl: 'https://evil.example' }))
+  // Oct 21: Use this, from the stored reading and the listing alone.
+  it('Use this takes off what its menu no longer names, adds what’s new, dates what it names, from the reading, never the request', async () => {
+    m.getResourceById.mockResolvedValue({ ...judah, dishes: ['Falafel', 'Tofu', 'Laffa'], itemMenu: { dishes: { Falafel: '2026-10-01T12:00:00Z', Tofu: '2026-10-01T12:00:00Z' } } })
+    m.getMenuReading.mockResolvedValue({ ...reading, dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }, { name: 'Shawarma', quote: 'Shawarma plate', checked: true }], missing: ['Tofu', 'Laffa'] })
+    const res = await POST(req('POST', { action: 'use', resourceId: ID, dishes: ['Evil'], sourceUrl: 'https://evil.example' }))
     expect(res.status).toBe(200)
-    expect(m.rpc).toHaveBeenCalledWith('approve_menu_dishes', expect.objectContaining({ p_id: ID, p_field: 'dishes', p_items: ['Shawarma', 'Burgers'], p_menu_url: 'https://judah.example/menu' }))
+    // Tofu was found on its menu before: off. Laffa was added by hand: kept.
+    expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', { always: ['Falafel', 'Laffa', 'Shawarma'], sometimes: [] }, expect.objectContaining({ names: ['Falafel', 'Shawarma'], menuUrl: 'https://judah.example/menu' }))
     expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'approved', 'me@x.co')
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
+    expect(await res.json()).toEqual({ ok: true, dishes: ['Falafel', 'Laffa', 'Shawarma'], sometimes: [], menuDated: ['Falafel', 'Shawarma'] })
+  })
+
+  it('Save to the listing keeps the list as edited, and dates only what the menu named', async () => {
+    m.getMenuReading.mockResolvedValue({ ...reading, dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }] })
+    const res = await POST(req('POST', { action: 'save', resourceId: ID, always: ['shawarma', 'Laffa Wraps', 'laffa wraps', 'x', 42], sometimes: ['Soup', 'Shawarma'] }))
+    expect(res.status).toBe(200)
+    expect(m.setMenuDishes).toHaveBeenCalledWith('philly', ID, 'dishes', { always: ['Shawarma', 'Laffa Wraps'], sometimes: ['Soups'] }, expect.objectContaining({ names: ['Shawarma'] }))
+    expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'approved', 'me@x.co')
+  })
+
+  it('nothing used before a reading, nor from a reading already decided, nor at a place without a dish list', async () => {
+    m.getMenuReading.mockResolvedValueOnce(null)
+    expect((await POST(req('POST', { action: 'use', resourceId: ID }))).status).toBe(409)
+    m.getMenuReading.mockResolvedValueOnce({ ...reading, status: 'approved' })
+    expect((await POST(req('POST', { action: 'use', resourceId: ID }))).status).toBe(409)
+    m.getResourceById.mockResolvedValueOnce(makeListing({ id: ID, category: 'grocery', name: 'Acme' }))
+    expect((await POST(req('POST', { action: 'use', resourceId: ID }))).status).toBe(404)
+    expect((await POST(req('POST', { action: 'use', resourceId: 'not-a-uuid' }))).status).toBe(400)
+    expect((await POST(req('POST', { action: 'approve', resourceId: ID, dishes: ['Falafel'] }))).status).toBe(400)
+    expect(m.setMenuDishes).not.toHaveBeenCalled()
+  })
+
+  it('Keep the listing marks the reading, and touches nothing else', async () => {
+    await POST(req('POST', { action: 'skip', resourceId: ID }))
+    expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'skipped', 'me@x.co')
+    expect(m.setMenuDishes).not.toHaveBeenCalled()
+  })
+
+  it('stops reading its menu link by taking it off the listing', async () => {
+    const res = await POST(req('POST', { action: 'unlink', resourceId: ID }))
+    expect(res.status).toBe(200)
+    expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, null)
     expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 
-  it('nothing approved before a reading, nor with no dishes, nor at a place without a dish list', async () => {
-    m.getMenuReading.mockResolvedValueOnce(null)
-    expect((await POST(req('POST', { action: 'approve', resourceId: ID, dishes: ['Falafel'] }))).status).toBe(409)
-    expect((await POST(req('POST', { action: 'approve', resourceId: ID, dishes: [] }))).status).toBe(400)
+  it('gives one place’s listing and category, for Edit', async () => {
+    const res = await GET(new Request(`http://x/api/admin/main-dishes?community=philly&item=${ID}`))
+    expect(await res.json()).toEqual({ ok: true, item: judah, category: food })
     m.getResourceById.mockResolvedValueOnce(makeListing({ id: ID, category: 'grocery', name: 'Acme' }))
-    expect((await POST(req('POST', { action: 'approve', resourceId: ID, dishes: ['Falafel'] }))).status).toBe(404)
-    expect((await POST(req('POST', { action: 'approve', resourceId: 'not-a-uuid', dishes: ['Falafel'] }))).status).toBe(400)
-    expect(m.rpc).not.toHaveBeenCalled()
-  })
-
-  it('skipping marks the reading, and touches nothing else', async () => {
-    await POST(req('POST', { action: 'skip', resourceId: ID }))
-    expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'skipped', 'me@x.co')
-    expect(m.rpc).not.toHaveBeenCalled()
+    expect((await GET(new Request(`http://x/api/admin/main-dishes?community=philly&item=${ID}`))).status).toBe(404)
+    expect((await GET(new Request('http://x/api/admin/main-dishes?community=philly&item=nope'))).status).toBe(400)
   })
 
   // Oct 20: three ways on for a place whose menu couldn't be read.
@@ -280,7 +310,7 @@ describe('/api/admin/main-dishes', () => {
       })
       expect(body.ok).toBe(true)
       expect(m.saveMenuLink).not.toHaveBeenCalled()
-      expect(m.rpc).not.toHaveBeenCalled()
+      expect(m.setMenuDishes).not.toHaveBeenCalled()
 
       m.readMenu.mockResolvedValue({ sourceUrl: null, dishes: [], note: null, model: 'gpt' })
       await POST(photosReq([jpeg()]))
@@ -353,10 +383,10 @@ describe('/api/admin/main-dishes', () => {
       expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ missing: ['Kugel'] }))
     })
 
-    it('approving dates the ones its menu still names, however many the listing has', async () => {
-      const many = Array.from({ length: 30 }, (_, i) => `Dish ${i + 1}`)
-      expect((await POST(req('POST', { action: 'approve', resourceId: ID, dishes: many }))).status).toBe(200)
-      expect(m.rpc).toHaveBeenCalledWith('approve_menu_dishes', expect.objectContaining({ p_items: many }))
+    it('lists which of them are "not always", and which a reader found on its menu before', async () => {
+      m.listApprovedResources.mockResolvedValue([{ ...listingOf, itemMenu: { dishes: { Falafel: '2026-10-01T12:00:00Z' } } }])
+      const place = (await (await GET(req('GET'))).json()).places[0]
+      expect(place).toMatchObject({ dishes: ['Falafel', 'Kugel'], sometimes: ['Kugel'], menuDated: ['Falafel'], href: expect.stringContaining('/philly/restaurant/') })
     })
   })
 })

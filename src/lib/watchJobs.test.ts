@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dishCounts, dishSections, eruvCounts, eruvSection, hospitalCounts, hospitalSection, sentThroughSite, type DishPlace, type DishReadingStatus } from './watchJobs'
+import { dishCounts, dishStatus, eruvCounts, eruvSection, hospitalCounts, hospitalSection, sentThroughSite, type DishPlace, type DishReadingStatus } from './watchJobs'
 import type { Watch, WatchCheck } from './watches'
 
 const NOW = Date.parse('2026-10-21T12:00:00Z')
@@ -48,7 +48,7 @@ describe('hospitalSection', () => {
   })
 })
 
-describe('dishSections and dishCounts', () => {
+describe('dishStatus and dishCounts', () => {
   const place = (status: DishReadingStatus, over: Partial<DishPlace> = {}): DishPlace => ({
     website: 'https://x.example',
     menuUrl: null,
@@ -56,24 +56,36 @@ describe('dishSections and dishCounts', () => {
     reading: { status, readAt: ago(2) },
     ...over,
   })
+  const read = (dishes: string[], missing: string[] = []) => ({ status: 'proposed' as const, readAt: ago(1), dishes: dishes.map((name) => ({ name, quote: name, checked: true })), missing })
 
-  it('counts what the Dishes page shows: done, to check, couldn’t be read, and menu pages that didn’t load', () => {
+  it('puts a read in To check only when its menu would change the listing', () => {
+    // A dish on the menu the listing doesn't have.
+    expect(dishStatus(place('proposed', { dishes: ['Sliders'], menuDated: ['Sliders'], reading: read(['Sliders', 'Tacos']) }))).toBe('differs')
+    // A dish a reader found before that the menu doesn't name now.
+    expect(dishStatus(place('proposed', { dishes: ['Sliders', 'Tofu'], menuDated: ['Sliders', 'Tofu'], reading: read(['Sliders'], ['Tofu']) }))).toBe('differs')
+    // One added by hand that it still can't find: nothing to change.
+    expect(dishStatus(place('proposed', { dishes: ['Sliders', 'Tofu'], menuDated: ['Sliders'], reading: read(['Sliders'], ['Tofu']) }))).toBe('same')
+    // The menu and the listing agree.
+    expect(dishStatus(place('proposed', { dishes: ['Sliders'], menuDated: ['Sliders'], reading: read(['Sliders']) }))).toBe('same')
+  })
+
+  it('counts what the Dishes page shows: checked, to check (not read yet too), couldn’t be read, and menu pages that didn’t load', () => {
     const places = [
       place('approved'),
       place('skipped'),
-      place('proposed'),
+      place('proposed', { reading: read(['Falafel']) }),
       place('failed'),
       // No website and no menu link: can't be read.
       { website: null, menuUrl: null, dishes: [], reading: null },
-      // Not read yet: in none of the four.
+      // Not read yet: read when the page opens, so in To check.
       { website: 'https://y.example', menuUrl: null, dishes: [], reading: null },
-      // Sent through the site after a failed read: done.
+      // Sent through the site after a failed read: checked.
       place('failed', { dishes: ['Falafel'], menuAt: ago(1) }),
+      place('no_menu'),
     ]
     expect(sentThroughSite(places[6])).toBe(true)
-    const s = dishSections(places)
-    expect([s.done.length, s.toCheck.length, s.failed.length, s.unread.length]).toEqual([3, 1, 2, 1])
-    expect(dishCounts(places, [watch({ failingSince: ago(1), lastError: '404' }), watch()], NOW)).toEqual({ checked: 3, toCheck: 1, cantRead: 2, didntLoad: 1 })
+    expect(places.map(dishStatus)).toEqual(['same', 'same', 'differs', 'cant_read', 'cant_read', 'not_read', 'same', 'off'])
+    expect(dishCounts(places, [watch({ failingSince: ago(1), lastError: '404' }), watch()], NOW)).toEqual({ checked: 3, toCheck: 2, cantRead: 2, didntLoad: 1 })
   })
 })
 
