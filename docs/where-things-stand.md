@@ -541,6 +541,18 @@ agreed:
    - **Live once it reaches `main`:** the daily run then adds a website
      watch per eruv in production and files what differs. Nothing is
      written before that.
+8. Watches tab tidy-up. **Built Oct 22** (the user's go-ahead):
+   - The "Menu" section is gone: the daily run's menu watches aren't
+     listed (an admin's own watch on a menu still is). A menu page that
+     didn't open this morning is now on Main dishes instead: the place is
+     in Can't be read, "Menu didn't load", and its line in Reads says
+     "didn't load" (`menuDidntLoad`, `watchJobs.ts`). A read of that page
+     since (Read now) clears it. The Dishes row's "didn't load" counts the
+     same places.
+   - The tab no longer looks like it reloads: the list shows once its own
+     read is back, each job row's counts as theirs are ("Loading…" until
+     then), and coming back to it shows what it last showed while it reads
+     again. Job pages still load afresh each visit.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
@@ -965,7 +977,8 @@ compare, and one it can't read, on desktop and phone.
      page's 4).
    - **Next, once the user has seen it:** Dishes, Hospitals, Eruv and
      Kosher onto the same page; the Watches tab's "Menu" list goes (it is
-     Dishes again); and the tab's row counts come from the same statuses.
+     Dishes again; done Oct 22, item 8 under the job pages); and the tab's
+     row counts come from the same statuses.
    - **Decided Oct 21 (the user):** a read that agrees with the listing
      clears that watch's older finding still waiting (Mekor Habracha's
      Oct 20 finding, which its Oct 21 read agrees with). Not built; see

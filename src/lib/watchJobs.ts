@@ -1,5 +1,6 @@
 import { settles, watchHealth, type Watch } from './watches'
 import { dishProposal, type ListedDishes, type ReadDish } from './dishProposal'
+import { samePage } from './hoursJob'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab's jobs (the user, Oct 21): a row per thing the guide keeps
@@ -23,11 +24,16 @@ export type DishPlace = ListedDishes & {
   website: string | null
   menuUrl: string | null
   menuAt?: string | null
-  reading: { status: DishReadingStatus; readAt: string; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
+  reading: { status: DishReadingStatus; readAt: string; sourceUrl?: string | null; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
   /** What its website's pages found, waiting: its hours or phone, for a
    *  place Google doesn't keep (Main dishes board 3, Oct 22). */
   findings?: readonly unknown[]
+  /** Its menu watch (menuWatch.ts): its menu link, or the page its menu
+   *  was found on, checked every morning. */
+  menuWatch?: MenuWatchState | null
 }
+
+export type MenuWatchState = Pick<Watch, 'url' | 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'>
 
 /** Its dishes came from a menu someone sent through the site ("+ Add"),
  *  approved after the tab last failed to read one, or said it had none.
@@ -67,9 +73,27 @@ export function didntLoad(w: Pick<Watch, 'active' | 'lastRunAt' | 'lastOkAt' | '
   return state === 'failing' || state === 'stale'
 }
 
-export function dishCounts(places: readonly DishPlace[], menuWatches: readonly Watch[], now: number): JobCounts {
-  const n = (...of: DishPlaceStatus[]) => places.filter((p) => of.includes(dishStatus(p))).length
-  return { checked: n('same'), toCheck: n('differs', 'not_read'), cantRead: n('cant_read'), didntLoad: menuWatches.filter((w) => didntLoad(w, now)).length }
+/** Its menu page didn't open on the morning's check, and hasn't been read
+ *  from that page since (Read now on the Dishes page). */
+export function menuDidntLoad(p: Pick<DishPlace, 'menuWatch' | 'reading'>, now: number): boolean {
+  const w = p.menuWatch
+  if (!w || !didntLoad(w, now)) return false
+  const r = p.reading
+  const readSince = !!r && r.status !== 'failed' && !!r.sourceUrl && samePage(r.sourceUrl, w.url) && !!w.lastRunAt && Date.parse(r.readAt) > Date.parse(w.lastRunAt)
+  return !readSince
+}
+
+/** Where a place is on the Dishes page, its menu page not loading
+ *  included: an update or "no menu" said first. */
+export type DishJobStatus = DishPlaceStatus | 'didnt_load'
+export function dishJobStatus(p: DishPlace, now: number): DishJobStatus {
+  const s = dishStatus(p)
+  return s !== 'differs' && s !== 'off' && menuDidntLoad(p, now) ? 'didnt_load' : s
+}
+
+export function dishCounts(places: readonly DishPlace[], now: number): JobCounts {
+  const n = (...of: DishJobStatus[]) => places.filter((p) => of.includes(dishJobStatus(p, now))).length
+  return { checked: n('same'), toCheck: n('differs', 'not_read'), cantRead: n('cant_read'), didntLoad: n('didnt_load') }
 }
 
 // ── Hospitals ───────────────────────────────────────────────────────────────

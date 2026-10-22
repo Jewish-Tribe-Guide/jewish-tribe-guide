@@ -176,6 +176,21 @@ describe('MainDishes', () => {
     expect(posted()).toEqual([{ action: 'no_menu', resourceId: 'p3' }])
   })
 
+  // Oct 22: the Watches tab no longer lists menu watches, so a menu page
+  // that stopped opening is said here.
+  it('a menu page that didn’t open this morning: Can’t be read, and its line in Reads says so', async () => {
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
+    const menuWatch = { url: 'https://charlie.example/menu', active: true, lastRunAt: hoursAgo(2), lastOkAt: hoursAgo(30), lastError: 'The page answered 404', failingSince: hoursAgo(2) }
+    const approved = { ...charlie, dishes: ['Sliders', 'Tacos', 'Kofta'], menuDated: ['Sliders', 'Tacos', 'Kofta'], reading: { ...read, status: 'approved', missing: [], readAt: hoursAgo(30) }, menuWatch }
+    await renderPage([approved])
+    expect(screen.getByRole('tab', { name: 'Can’t be read 1' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('job-status').textContent).toBe('Menu didn’t load')
+    const place = await open('Charlie was a sinner.')
+    const line = within(within(place).getByTestId('job-reads')).getByTestId('job-source')
+    expect(line.textContent).toContain('charlie.example/menu')
+    expect(line.textContent).toContain('didn’t load')
+  })
+
   it('photos of the menu are sent as a form', async () => {
     await renderPage([failed], { readerOn: true, post: { reading: { ...read, sourceUrl: null } } })
     const place = await open('Slices')

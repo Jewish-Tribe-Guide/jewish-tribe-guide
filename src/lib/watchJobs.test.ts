@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dishCounts, dishStatus, eruvSection, hospitalCounts, hospitalSection, sentThroughSite, type DishPlace, type DishReadingStatus } from './watchJobs'
+import { dishCounts, dishJobStatus, dishStatus, eruvSection, hospitalCounts, hospitalSection, sentThroughSite, type DishPlace, type DishReadingStatus } from './watchJobs'
 import type { Watch, WatchCheck } from './watches'
 
 const NOW = Date.parse('2026-10-21T12:00:00Z')
@@ -95,7 +95,29 @@ describe('dishStatus and dishCounts', () => {
     ]
     expect(sentThroughSite(places[6])).toBe(true)
     expect(places.map(dishStatus)).toEqual(['same', 'same', 'differs', 'cant_read', 'cant_read', 'not_read', 'same', 'off'])
-    expect(dishCounts(places, [watch({ failingSince: ago(1), lastError: '404' }), watch()], NOW)).toEqual({ checked: 3, toCheck: 2, cantRead: 2, didntLoad: 1 })
+    expect(dishCounts(places, NOW)).toEqual({ checked: 3, toCheck: 2, cantRead: 2, didntLoad: 0 })
+  })
+
+  // Removing the Watches tab's Menu section (Oct 22): a menu page that
+  // stopped opening has to show on the Dishes page instead.
+  it('a menu page that didn’t open this morning: Didn’t load, on the page and in the count', () => {
+    const menu = 'https://x.example/menu'
+    const failing = watch({ url: menu, failingSince: ago(0.5), lastError: '404' })
+    const read = (status: DishReadingStatus, readAt: string, sourceUrl = menu) => ({ status, readAt, sourceUrl, dishes: [] })
+    const places = [
+      place('approved', { menuWatch: failing }),
+      place('approved', { menuWatch: watch({ url: menu }) }),
+      // Paused: not a problem.
+      place('approved', { menuWatch: watch({ url: menu, active: false, failingSince: ago(1), lastError: '404' }) }),
+      // Read since, from that page (Read now): loads again.
+      place('approved', { menuWatch: failing, reading: read('approved', ago(0)) }),
+      // Read since, but from another page: its watch's page still doesn't.
+      place('approved', { menuWatch: failing, reading: read('approved', ago(0), 'https://x.example/other') }),
+      // An update or "no menu" is said first.
+      place('no_menu', { menuWatch: failing }),
+    ]
+    expect(places.map((p) => dishJobStatus(p, NOW))).toEqual(['didnt_load', 'same', 'same', 'same', 'didnt_load', 'off'])
+    expect(dishCounts(places, NOW)).toEqual({ checked: 3, toCheck: 0, cantRead: 0, didntLoad: 2 })
   })
 })
 

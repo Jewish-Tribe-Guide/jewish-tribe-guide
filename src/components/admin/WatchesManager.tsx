@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
@@ -49,18 +49,20 @@ type Listing = { id: string; name: string; categoryLabel: string; reads: Listing
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
 type PagesJob = { name: string; places: HoursPlace[] } | null
+/** Each job's, as loaded: undefined while it's still loading, null when it
+ *  couldn't be. */
 type Jobs = {
-  dishes: DishPlace[] | null
-  hospitals: Hospital[] | null
-  hours: PagesJob
-  times: PagesJob
-  eruvim: EruvJobLoaded | null
-  kosher: KosherLoaded | null
+  dishes?: DishPlace[] | null
+  hospitals?: Hospital[] | null
+  hours?: PagesJob
+  times?: PagesJob
+  eruvim?: EruvJobLoaded | null
+  kosher?: KosherLoaded | null
 }
 
 /** One job's row: what it is and its four counts; the whole row opens its
- *  page. Null counts: they couldn't be loaded. */
-function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | null }) {
+ *  page. Null counts: they couldn't be loaded; undefined, still loading. */
+function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | null | undefined }) {
   const stat = (n: number, label: string, flag: boolean) => (
     <span className="flex min-w-[4.5rem] flex-col">
       <span className={`text-base font-semibold ${flag && n > 0 ? 'text-amber-800' : 'text-slate-900'}`}>{n}</span>
@@ -81,8 +83,10 @@ function JobRow({ href, name, about, counts }: { href: string; name: string; abo
             {stat(counts.cantRead, 'can’t be read', true)}
             {stat(counts.didntLoad, 'didn’t load today', true)}
           </span>
-        ) : (
+        ) : counts === null ? (
           <span className="text-sm text-slate-500">Couldn&rsquo;t load its counts.</span>
+        ) : (
+          <span className="text-sm text-slate-500" data-testid="job-loading">Loading…</span>
         )}
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="shrink-0 text-slate-400">
           <path d="M6 4l4 4-4 4" />
@@ -156,10 +160,9 @@ function Source({ url }: { url: string | null }) {
   )
 }
 
-/** A page the AI reads for the listing: a shul's or mikvah's own, or a
- *  menu. */
+/** A page the AI reads for the listing: a shul's or mikvah's own. */
 function readByAi(w: Watch): boolean {
-  return isListingPageWatch(w) || w.createdBy === MENU_WATCH_CREATOR
+  return isListingPageWatch(w)
 }
 
 /** A watch's state, in a word or two. A page the AI has never read has
@@ -314,14 +317,6 @@ function LastLine({ watch: w, now }: { watch: Watch; now: number }) {
   }
   // Seen to open, never read by the AI: Check now reads it.
   const notRead = <span className="block text-xs text-muted">Not read by the AI yet. Check now reads it and shows what it finds.</span>
-  if (w.createdBy === MENU_WATCH_CREATOR) {
-    return (
-      <p className="text-sm text-slate-700">
-        {w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${w.lastFiled ? ': new dishes on the Main dishes tab' : ''}` : 'No change since it was added.'}
-        {notRead}
-      </p>
-    )
-  }
   if (isListingPageWatch(w)) {
     return (
       <p className="text-sm text-slate-700">
@@ -366,13 +361,6 @@ function WhatItDoes({ watch }: { watch: Watch }) {
     return (
       <p className="text-xs text-muted">
         Compared with the hospital every morning. A new contact, or a changed phone, email or website, waits on the Hospitals page as from Refuah.
-      </p>
-    )
-  }
-  if (watch.createdBy === MENU_WATCH_CREATOR) {
-    return (
-      <p className="text-xs text-muted" data-testid="menu-watch">
-        Its menu, checked every morning: its menu link, or the page the reader found its menu on. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. If the page stops opening, its website is searched again, and a menu found on another page waits there too. Check now reads it straight away. Added for every place whose menu is known: pause it to stop it.
       </p>
     )
   }
@@ -450,7 +438,6 @@ function GroupSection({
   label,
   total,
   needs,
-  note,
   collapsibleGroup,
   open,
   onToggle,
@@ -459,7 +446,6 @@ function GroupSection({
   label: string
   total: number
   needs: string | null
-  note?: string
   collapsibleGroup: boolean
   open: boolean
   onToggle: () => void
@@ -486,7 +472,6 @@ function GroupSection({
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">{heading}</span>
         )}
       </h3>
-      {note && <p className="px-4 pb-3 text-xs text-muted">{note}</p>}
       {children}
     </section>
   )
@@ -673,10 +658,24 @@ function AddWatch({
   )
 }
 
+/** What the tab last showed, per community, so coming back to it (from a
+ *  job's page) shows that at once while it's read again, rather than
+ *  "Loading watches…" every time (the user, Oct 22). */
+const lastSeen = new Map<string, { data: Loaded; jobs: Jobs }>()
+const NO_JOBS: Jobs = {}
+
+/** For tests: start from nothing. */
+export function forgetWatchesTab() {
+  lastSeen.clear()
+}
+
 export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
-  const [data, setData] = useState<Loaded | null>(null)
-  const [jobs, setJobs] = useState<Jobs>({ dishes: null, hospitals: null, hours: null, times: null, eruvim: null, kosher: null })
+  const [data, setData] = useState<Loaded | null>(() => lastSeen.get(community)?.data ?? null)
+  const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community)?.jobs ?? NO_JOBS)
+  // The list waits for the hours and shul times jobs, which take their
+  // places' pages out of it, so rows don't show and then go.
+  const [listReady, setListReady] = useState(() => lastSeen.has(community))
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -696,33 +695,31 @@ export default function WatchesManager({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     setError(null)
+    const headers = { Authorization: `Bearer ${token}` }
+    // The jobs' counts are a part of the tab, not the whole: each fills in
+    // as its own read comes back, and the list doesn't wait for them. One
+    // that fails keeps what it last showed.
+    const get = <T,>(path: string) => fetchJson<T>(withCommunity(path, community), { headers }, '').catch(() => null)
+    const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => setJobs((j) => ({ ...j, [key]: value }))
+    const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
+    const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
+    void get<{ places: DishPlace[] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes')))
+    void get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals')))
+    const hours = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours')))
+    const times = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times')))
+    void Promise.all([hours, times]).then(() => setListReady(true))
+    void get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim')))
+    void get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher')))
     try {
-      const headers = { Authorization: `Bearer ${token}` }
-      const [watches, dishes, hospitals, hours, times, eruvim, kosher] = await Promise.all([
-        fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'),
-        // The jobs' counts are a part of the tab, not the whole: without
-        // them, the rest still shows.
-        fetchJson<{ places: DishPlace[] }>(withCommunity('/api/admin/main-dishes', community), { headers }, '').catch(() => null),
-        fetchJson<{ hospitals: Hospital[] }>(withCommunity('/api/admin/watches/hospitals', community), { headers }, '').catch(() => null),
-        fetchJson<{ name: string; places: HoursPlace[] }>(withCommunity('/api/admin/watches/hours?counts', community), { headers }, '').catch(() => null),
-        fetchJson<{ name: string; places: HoursPlace[] }>(withCommunity('/api/admin/watches/hours?counts&job=times', community), { headers }, '').catch(() => null),
-        fetchJson<EruvJobLoaded>(withCommunity('/api/admin/watches/eruv', community), { headers }, '').catch(() => null),
-        fetchJson<KosherLoaded>(withCommunity('/api/admin/watches/kosher', community), { headers }, '').catch(() => null),
-      ])
-      setData(watches)
-      const job = (j: { name: string; places: HoursPlace[] } | null): PagesJob => (j?.places ? { name: j.name, places: j.places } : null)
-      setJobs({
-        dishes: dishes?.places ?? null,
-        hospitals: hospitals?.hospitals ?? null,
-        hours: job(hours),
-        times: job(times),
-        eruvim: eruvim?.available ? eruvim : null,
-        kosher: kosher?.lists ? kosher : null,
-      })
+      setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token, community])
+
+  useEffect(() => {
+    if (data) lastSeen.set(community, { data, jobs })
+  }, [community, data, jobs])
 
   useLoadOnMount(load)
 
@@ -784,8 +781,8 @@ export default function WatchesManager({ token }: { token: string }) {
 
   // A hospital's Refuah page is on the Hospitals page, a mikvah's hours
   // pages on the hours page, a shul's pages on the Shul times page, and
-  // the kosher lists on the Kosher certification page, and an eruv's
-  // website on Eruv status.
+  // the kosher lists on the Kosher certification page, an eruv's website
+  // on Eruv status, and a food place's menu watch on Main dishes.
   const jobIds = new Set([...(jobs.hours?.places ?? []), ...(jobs.times?.places ?? [])].map((p) => p.id))
   const listed = data.watches.filter(
     (w) =>
@@ -794,12 +791,12 @@ export default function WatchesManager({ token }: { token: string }) {
       !isStoppedPage(w) &&
       watchGroupOf(w) !== 'kosher' &&
       !isEruvWebsiteWatch(w) &&
+      w.createdBy !== MENU_WATCH_CREATOR &&
       !(w.resourceId && jobIds.has(w.resourceId) && isListingPageWatch(w)),
   )
-  const groups = data.available ? groupWatches(listed, now, kept, readsOf) : []
+  const groups = data.available && listReady ? groupWatches(listed, now, kept, readsOf) : []
   const counted = listed.filter((w) => !isIgnoredSender(w)).length
   const base = adminBase(community)
-  const menuWatches = data.watches.filter((w) => w.createdBy === MENU_WATCH_CREATOR)
   // As the Hospitals page counts them: a finding waiting there is to check.
   const hospitalStates = jobs.hospitals?.map((h) => ({ ...h, waiting: h.findings?.length }))
   const hospitalsNothing = hospitalStates ? hospitalCounts(hospitalStates, now).nothing : 0
@@ -842,8 +839,6 @@ export default function WatchesManager({ token }: { token: string }) {
     )
   }
 
-  const MENU_NOTE = 'Added on their own for each place whose menu is known: its menu link, or the page the reader found it on.'
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
@@ -855,7 +850,7 @@ export default function WatchesManager({ token }: { token: string }) {
             href={`${base}/watches/dishes`}
             name="Dishes"
             about={jobs.dishes ? `${jobs.dishes.length} food places, from their menus` : 'Food places, from their menus'}
-            counts={jobs.dishes && dishCounts(jobs.dishes, menuWatches, now)}
+            counts={jobs.dishes && dishCounts(jobs.dishes, now)}
           />
           <JobRow
             href={`${base}/watches/hospitals`}
@@ -865,7 +860,7 @@ export default function WatchesManager({ token }: { token: string }) {
                 ? `${jobs.hospitals.length} hospital${jobs.hospitals.length === 1 ? '' : 's'}, from Refuah${hospitalsNothing ? ` · ${hospitalsNothing} with nothing there yet` : ''}`
                 : 'Hospitals, from Refuah'
             }
-            counts={hospitalStates ? hospitalCounts(hospitalStates, now) : null}
+            counts={hospitalStates ? hospitalCounts(hospitalStates, now) : jobs.hospitals === undefined ? undefined : null}
           />
           {jobs.hours && jobs.hours.places.length > 0 && (
             <JobRow
@@ -897,7 +892,7 @@ export default function WatchesManager({ token }: { token: string }) {
             href={`${base}/watches/kosher`}
             name="Kosher certification"
             about={jobs.kosher ? `${jobs.kosher.places.length} food places, from Keystone-K’s and Mekor Habracha’s lists` : 'Food places, from Keystone-K’s and Mekor Habracha’s lists'}
-            counts={jobs.kosher?.counts ?? null}
+            counts={jobs.kosher && jobs.kosher.counts}
           />
         </ul>
       </section>
@@ -907,7 +902,8 @@ export default function WatchesManager({ token }: { token: string }) {
         </p>
       )}
 
-      {data.available && (
+      {data.available && !listReady && <p className="text-sm text-muted">Loading watches…</p>}
+      {data.available && listReady && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-800" data-testid="watch-summary">
             <strong>{counted} watches</strong> · {needs === 0 ? 'all working' : <span className="font-semibold text-amber-800">{needs} need{needs === 1 ? 's' : ''} you</span>}
@@ -936,7 +932,6 @@ export default function WatchesManager({ token }: { token: string }) {
             label={g.label}
             total={g.rows.length}
             needs={parts.length ? parts.join(' · ') : null}
-            note={g.key === 'menu' ? MENU_NOTE : undefined}
             collapsibleGroup={collapsible(g)}
             open={open}
             onToggle={() => toggle(g.key)}

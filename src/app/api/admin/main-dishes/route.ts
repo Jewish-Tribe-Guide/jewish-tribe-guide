@@ -30,7 +30,7 @@ import { runAndRecord } from '@/lib/watchRunner'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
 import { listedContact } from '@/lib/contactRead'
-import type { Watch } from '@/lib/watches'
+import { MENU_WATCH_CREATOR, type Watch } from '@/lib/watches'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -90,6 +90,10 @@ import type { DirectoryResource } from '@/types'
 // hours, when its website is read for them) and `contact` (its phone as
 // listed, when its website is read for it: contactRead.ts). "Read them
 // now" (action 'read') reads those pages too.
+//
+// And `menuWatch`, its menu watch (menuWatch.ts), so a menu page that
+// stopped opening shows here (watchJobs.ts's menuDidntLoad), the Watches
+// tab no longer listing those watches (Oct 22).
 
 export const maxDuration = 60
 
@@ -102,6 +106,12 @@ const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unli
 
 /** A place's website pages the daily run reads for its hours and phone. */
 const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) => w.resourceId === id && isListingPageWatch(w))
+
+/** A place's menu watch, as the tab needs it. */
+function menuWatchOf(watches: readonly Watch[], id: string) {
+  const w = watches.find((x) => x.resourceId === id && x.createdBy === MENU_WATCH_CREATOR)
+  return w ? { url: w.url, active: w.active, lastRunAt: w.lastRunAt, lastOkAt: w.lastOkAt, lastError: w.lastError, failingSince: w.failingSince } : null
+}
 
 /** A reading as the tab gets it: "no menu" said as its own status. */
 function forTab(r: StoredMenuReading) {
@@ -194,6 +204,7 @@ export async function GET(request: Request) {
           menuAt: newestMenuDate(l, field),
           reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
           pages: pagesOf(watches, l.id),
+          menuWatch: menuWatchOf(watches, l.id),
           findings: findings.filter((f) => f.targetId === l.id),
           hours: homePageReads(category, l as unknown as Record<string, unknown>).includes('hours') ? (l.hours ?? null) : undefined,
           contact: listedContact(category, l as unknown as Record<string, unknown>),

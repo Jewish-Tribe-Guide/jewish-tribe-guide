@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson } from '@/lib/fetchJson'
 import type { Watch } from '@/lib/watches'
 import type { AdminEruv } from '@/lib/eruvStore'
-import WatchesManager from './WatchesManager'
+import WatchesManager, { forgetWatchesTab } from './WatchesManager'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -104,6 +104,8 @@ async function renderTab(
   })
   renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
   await screen.findByText(/What the guide reads on its own/)
+  // The jobs' counts come in after the list's own read.
+  await act(() => new Promise((r) => setTimeout(r, 0)))
 }
 
 const jobRow = (page: string) => screen.getAllByTestId('job-row').find((r) => r.getAttribute('href') === `/philly/admin/watches/${page}`)!
@@ -115,6 +117,7 @@ afterEach(() => {
   cleanup()
   vi.mocked(fetchJson).mockReset()
   vi.unstubAllGlobals()
+  forgetWatchesTab()
 })
 
 describe('WatchesManager', () => {
@@ -153,7 +156,7 @@ describe('WatchesManager', () => {
     const place = (status: string | null) => ({ website: 'https://x.example', menuUrl: null, dishes: [], reading: status && { status, readAt: ago(1) } })
     await renderTab([refuah, empty, brokenMenu], {
       // A reading proposes a change only when its menu has one (dishProposal).
-      dishes: [place('approved'), place('approved'), { ...place('proposed'), reading: { status: 'proposed', readAt: ago(1), dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }] } }, place('failed'), place(null)],
+      dishes: [{ ...place('approved'), menuWatch: brokenMenu }, place('approved'), { ...place('proposed'), reading: { status: 'proposed', readAt: ago(1), dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }] } }, place('failed'), place(null)],
       hospitals: [
         { id: 'h1', watch: refuah, notOnRefuah: false },
         { id: 'h2', watch: empty, notOnRefuah: false },
@@ -163,13 +166,15 @@ describe('WatchesManager', () => {
     const [dishes, hospitals] = screen.getAllByTestId('job-row')
     expect(dishes).toHaveAttribute('href', '/philly/admin/watches/dishes')
     expect(dishes).toHaveTextContent('5 food places, from their menus')
-    expect(dishes).toHaveTextContent('2checked2to check1can’t be read1didn’t load today')
+    expect(dishes).toHaveTextContent('1checked2to check1can’t be read1didn’t load today')
     expect(hospitals).toHaveAttribute('href', '/philly/admin/watches/hospitals')
     expect(hospitals).toHaveTextContent('3 hospitals, from Refuah · 1 with nothing there yet')
     expect(hospitals).toHaveTextContent('1checked0to check1can’t be read0didn’t load today')
-    // Their watches aren't listed below, nor counted.
+    // Their watches aren't listed below, nor counted; the menu's either
+    // (Oct 22: it's on the Dishes page).
     expect(screen.queryByRole('region', { name: 'Hospital contacts' })).toBeNull()
-    expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
+    expect(screen.queryByRole('region', { name: 'Menu' })).toBeNull()
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('0 watches')
   })
 
   // Oct 21: a mikvah's hours pages are on the Mikvah hours page, found from
@@ -266,20 +271,17 @@ describe('WatchesManager', () => {
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
   })
 
-  // Oct 17: a food place's menu watch, made by the daily run, says what it
-  // does and how to stop it (taking it off only brings it back tomorrow).
-  it('says a menu watch is the run’s own, that the AI reads only a change, and to pause it to stop it', async () => {
-    await renderTab([watch({ url: 'https://judah.example/menu', resourceId: 'shul-1', createdBy: 'menu links', lastFiled: 1, pageChangedAt: ago(1) })])
-    const group = screen.getByRole('region', { name: 'Menu' })
-    expect(group).toHaveTextContent('Added on their own for each place whose menu is known: its menu link, or the page the reader found it on.')
-    expect(group).toHaveTextContent(/Changed .*: new dishes on the Main dishes tab/)
-    await open(within(group).getByTestId('watch-row'))
-    const line = screen.getByTestId('menu-watch')
-    expect(line).toHaveTextContent(/When the menu changes, the AI reads it/)
-    expect(line).toHaveTextContent(/pause it to stop it/)
-    // Oct 21: and that a page that stops opening sends it looking.
-    expect(line).toHaveTextContent(/If the page stops opening, its website is searched again/)
-    expect(screen.queryByText(/worth a look/)).toBeNull()
+  // Oct 22: a food place's menu watch is on the Dishes page, which says
+  // when its page didn't load (watchJobs.ts's menuDidntLoad). An admin's
+  // own watch on a menu is still listed.
+  it('lists no menu watch the daily run made', async () => {
+    await renderTab([
+      watch({ id: 'm', url: 'https://judah.example/menu', resourceId: 'shul-1', createdBy: 'menu links', failingSince: ago(1), lastError: '404' }),
+      watch({ id: 'a', label: 'Hand-added menu', url: 'https://other.example/menu', createdBy: 'someone@example.org' }),
+    ])
+    expect(screen.queryByRole('region', { name: 'Menu' })).toBeNull()
+    expect(names(screen.getByRole('region', { name: 'Anything else' }))).toEqual(['Hand-added menu'])
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches · all working')
   })
 
   // Oct 19: a listing's own page is listed under what it keeps current, by
@@ -482,16 +484,14 @@ describe('WatchesManager', () => {
   // newsletters. It's grouped, a long group starts closed, and a watch that
   // needs a look shows anyway, named in its group's heading.
   it('groups the watches, and a closed group still shows what’s broken', async () => {
-    const menus = ['Bar Bombon', 'Goldie', 'Mama’s', 'Rita’s', 'Zevi’s'].map((name, i) =>
-      watch({ id: `m${i}`, label: `${name} menu`, url: `https://m${i}.example/menu`, createdBy: 'menu links' }),
-    )
+    const menus = ['Bar Bombon', 'Goldie', 'Mama’s', 'Rita’s', 'Zevi’s'].map((name, i) => watch({ id: `m${i}`, label: `${name} menu`, url: `https://m${i}.example/menu` }))
     menus[3] = { ...menus[3], failingSince: ago(1), lastError: 'The page answered 404' }
     await renderTab([watch({ id: 's', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages' }), ...menus])
     const [times, menuGroup] = screen.getAllByTestId('watch-group')
     expect(times).toHaveAccessibleName('Shul’s times')
     expect(within(times).getAllByTestId('watch-row')).toHaveLength(1)
-    expect(menuGroup).toHaveAccessibleName('Menu')
-    const toggle = within(menuGroup).getByRole('button', { name: /Menu.*5.*1 not working.*Show all 5/ })
+    expect(menuGroup).toHaveAccessibleName('Anything else')
+    const toggle = within(menuGroup).getByRole('button', { name: /Anything else.*5.*1 not working.*Show all 5/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(names(menuGroup)).toEqual(['Rita’s menu'])
     await userEvent.setup().click(toggle)
@@ -513,5 +513,30 @@ describe('WatchesManager', () => {
     expect(await within(row).findByText('No newsletter read yet.')).toBeInTheDocument()
     expect(within(group).getAllByTestId('watch-row')).toEqual([row])
     expect(within(group).queryByText(/to link/)).toBeNull()
+  })
+
+  // Oct 22: the tab seemed to reload every visit, waiting on its slowest
+  // job before showing anything. The list shows once its own read is back,
+  // each job's counts as theirs are.
+  it('shows the list without waiting on every job, and says which are still loading', async () => {
+    vi.mocked(fetchJson).mockImplementation(async (url) => {
+      if (String(url).includes('/api/admin/main-dishes')) return new Promise(() => {})
+      if (String(url).includes('/api/admin/watches/')) throw new Error('down')
+      return { ok: true, available: true, watches: [watch({ label: 'A page' })], listings: [] }
+    })
+    renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
+    expect(await screen.findByTestId('watch-summary')).toHaveTextContent('1 watches')
+    expect(jobRow('dishes')).toHaveTextContent('Loading…')
+    expect(jobRow('hospitals')).toHaveTextContent('Couldn’t load its counts.')
+  })
+
+  it('coming back to it shows what it last showed at once, while it reads again', async () => {
+    await renderTab([watch({ label: 'A page' })], { dishes: [{ website: 'https://x.example', menuUrl: null, dishes: [], reading: { status: 'approved', readAt: ago(1) } }] })
+    cleanup()
+    vi.mocked(fetchJson).mockImplementation(() => new Promise(() => {}))
+    renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
+    expect(screen.queryByText('Loading watches…')).toBeNull()
+    expect(names(screen.getByRole('region', { name: 'Anything else' }))).toEqual(['A page'])
+    expect(jobRow('dishes')).toHaveTextContent('1checked')
   })
 })

@@ -12,7 +12,7 @@ import { readElsewhere } from '@/lib/menuLink'
 import { itemsField } from '@/lib/listingView'
 import { samePage } from '@/lib/hoursJob'
 import { dishProposal, updatesPill, type DishProposal, type ReadDish } from '@/lib/dishProposal'
-import { dishStatus, sentThroughSite, type DishPlace, type DishPlaceStatus } from '@/lib/watchJobs'
+import { dishJobStatus, dishStatus, sentThroughSite, type DishJobStatus, type DishPlace, type DishPlaceStatus } from '@/lib/watchJobs'
 import { watchHealth, type Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
@@ -83,7 +83,7 @@ type Settled = ReadonlyMap<string, Decision>
 export const READ_ON_LOAD = 5
 const TITLE = 'Main dishes'
 
-const STATUS: Record<DishPlaceStatus, 'differs' | 'not_read' | 'cant_read' | 'same' | 'off'> = { differs: 'differs', not_read: 'not_read', cant_read: 'cant_read', same: 'same', off: 'off' }
+const STATUS: Record<DishJobStatus, 'differs' | 'not_read' | 'cant_read' | 'didnt_load' | 'same' | 'off'> = { differs: 'differs', not_read: 'not_read', cant_read: 'cant_read', didnt_load: 'didnt_load', same: 'same', off: 'off' }
 
 /** A menu read somewhere other than the place's own site (readElsewhere). */
 function elsewhere(p: Place): boolean {
@@ -105,7 +105,7 @@ export function dishSay(statuses: readonly DishPlaceStatus[]): { head: string } 
 }
 
 /** Its row's pill. */
-function rowPill(p: Place, status: DishPlaceStatus, decided: Decided | undefined, reading: boolean, waiting = 0, last?: Decision): { text: string; tone: Tone } {
+function rowPill(p: Place, status: DishJobStatus, decided: Decided | undefined, reading: boolean, waiting = 0, last?: Decision): { text: string; tone: Tone } {
   if (reading) return { text: 'Reading…', tone: 'grey' }
   // Its menu's update, and its website's hours and phone, each one.
   if (waiting) return { text: updatesPill(waiting), tone: 'amber' }
@@ -114,6 +114,7 @@ function rowPill(p: Place, status: DishPlaceStatus, decided: Decided | undefined
   if (status === 'differs') return { text: updatesPill(1), tone: 'amber' }
   if (status === 'not_read') return { text: 'Not read yet', tone: 'grey' }
   if (status === 'cant_read') return { text: p.website || p.menuUrl ? 'No menu found' : 'Nothing to read', tone: 'grey' }
+  if (status === 'didnt_load') return { text: 'Menu didn’t load', tone: 'grey' }
   if (status === 'off') return { text: 'Reading off', tone: 'grey' }
   return { text: 'Same', tone: 'green' }
 }
@@ -128,7 +129,7 @@ function uncheckedNote(p: DishProposal, r: Reading): string | undefined {
 }
 
 /** The pages it reads, for Reads. */
-function readPages(p: Place, status: DishPlaceStatus, act: (body: Record<string, unknown>) => void): ReadPage[] {
+function readPages(p: Place, status: DishJobStatus, act: (body: Record<string, unknown>) => void): ReadPage[] {
   const r = p.reading
   const off = status === 'off'
   const dishes = r && (r.status === 'proposed' || r.status === 'approved' || r.status === 'skipped') && r.dishes.length > 0
@@ -173,6 +174,13 @@ function readPages(p: Place, status: DishPlaceStatus, act: (body: Record<string,
     }
     pages.push({ key: w.id, url: w.url, label, right: off ? '' : failed ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : `read ${day(c.at)}`, none: failed || (!!c && !names.length), onRemove: () => act({ action: 'stop', id: w.id }) })
   }
+  // Its menu page, when this morning's check of it didn't open it.
+  const watched = p.menuWatch
+  if (status === 'didnt_load' && watched) {
+    const menu = pages.find((x) => x.url && samePage(x.url, watched.url))
+    if (menu) Object.assign(menu, { right: 'didn’t load', none: true })
+    else pages.push({ key: 'menu-watch', url: watched.url, label: from(watched.url), right: 'didn’t load', none: true })
+  }
   return pages
 }
 
@@ -192,7 +200,7 @@ function DishRowView({
   onDecided,
 }: {
   place: Place
-  status: DishPlaceStatus
+  status: DishJobStatus
   decided?: Decided
   busy: boolean
   reading: boolean
@@ -211,7 +219,7 @@ function DishRowView({
   const proposal = proposalOf(p)
   const sent = sentThroughSite(p)
   const off = status === 'off'
-  const cant = status === 'cant_read'
+  const cant = status === 'cant_read' || status === 'didnt_load'
   // Its menu's own update: the place may be in To check for its hours.
   const open = !decided && r?.status === 'proposed' && (proposal?.updates ?? 0) > 0
   const findings = p.findings ?? []
@@ -352,6 +360,8 @@ function DishRowView({
 export default function MainDishes({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Loaded | null>(null)
+  // When the page opened, for whether a menu page's check is too old.
+  const [now] = useState(() => Date.now())
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
@@ -371,14 +381,14 @@ export default function MainDishes({ token }: { token: string }) {
     setError(null)
     try {
       const got = await fetchJson<Loaded>(withCommunity('/api/admin/main-dishes', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the food places.')
-      const { rows, tabs, first } = jobTabs(got.places, (p) => STATUS[dishStatus(p)], (p) => p.name)
+      const { rows, tabs, first } = jobTabs(got.places, (p) => STATUS[dishJobStatus(p, now)], (p) => p.name)
       setData({ ...got, places: rows })
       setTabOf(tabs)
       setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [token, community, now])
   useLoadOnMount(load)
 
   const patch = (id: string, p: Partial<Place>) => setData((d) => d && { ...d, places: d.places.map((x) => (x.id === id ? { ...x, ...p } : x)) })
@@ -547,7 +557,7 @@ export default function MainDishes({ token }: { token: string }) {
             <DishRowView
               key={`${p.id}:${p.reading?.readAt ?? ''}`}
               place={p}
-              status={dishStatus(p)}
+              status={dishJobStatus(p, now)}
               decided={decided.get(p.id)}
               busy={busy.has(p.id)}
               reading={busy.has(p.id) && dishStatus(p) === 'not_read'}
