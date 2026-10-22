@@ -203,13 +203,13 @@ describe('compareKeystone', () => {
     expect(compareKeystone([], [ikc])).toEqual([])
   })
 
-  it('proposes places on the list the guide lacks, but not products or wholesalers', () => {
+  // A grocery isn't checked (the user, Oct 22: "We only need to check
+  // Food, not grocery stores").
+  it('proposes food places on the list the guide lacks, but not groceries, products or wholesalers', () => {
     const findings = compareKeystone(others(['sababa-falafel', 'giant-wynnewood', 'shug-sisters']), [])
-    expect(findings.map((f) => (f.kind === 'new' ? [f.entry.slug, f.category] : f.kind))).toEqual([
-      ['giant-wynnewood', 'grocery'],
-      ['sababa-falafel', 'restaurant'],
-    ])
-    const sababa = findings[1]
+    expect(findings.map((f) => (f.kind === 'new' ? [f.entry.slug, f.category] : f.kind))).toEqual([['sababa-falafel', 'restaurant']])
+    expect(compareKeystone([{ ...bySlug('giant-wynnewood'), kinds: ['groceries', 'bakeries'] }], [])).toEqual([])
+    const sababa = findings[0]
     expect(sababa.kind === 'new' && sababa.details).toMatchObject({
       kosherCert: ['Keystone-K'],
       k: 'https://keystone-k.org/kosher/sababa-falafel/',
@@ -262,14 +262,6 @@ describe('the note and the key', () => {
             : { operation: 'update', target_id: f.listing.id, payload: { details: f.details }, note }
       expect(submissionKey(asSubmission)).toBe(findingKey(f))
     }
-  })
-
-  it('remembers a new grocery, which has no certificate link, by the link in its note', () => {
-    const [giant] = compareKeystone([bySlug('giant-wynnewood')], [])
-    expect(giant.kind === 'new' && 'k' in giant.details).toBe(false)
-    expect(submissionKey({ operation: 'create', target_id: null, payload: { details: giant.details }, note: findingNote(giant) })).toBe(
-      findingKey(giant),
-    )
   })
 
   it('makes a new key when the list changes what it would propose', () => {

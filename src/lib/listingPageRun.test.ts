@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import { menuHash } from './menuWatch'
-import { LISTING_PAGE_FOUND_CREATOR, LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
+import { LISTING_PAGE_FOUND_CREATOR, LISTING_PAGE_WATCH_NAME, NOTES_READ_FROM } from './listingPageWatch'
+import type { WatchCheck } from './watches'
 import type { TimesUpdate } from './scheduleUpdate'
 
 const m = vi.hoisted(() => ({
@@ -707,6 +708,29 @@ describe('runListingPageWatch: a mikvah’s sections, each filed on its own', ()
     const [, , payload] = m.submitListingUpdate.mock.calls[0]
     expect(payload.source.section.section).toBe('womenTevillah')
     expect(payload.details.women_s_notes).toBe('Appointments must be made at least 48 hours in advance.')
+  })
+
+  // Lower Merion's page sets its paragraphs a blank line apart (Oct 22).
+  it('a note in the listing’s words, set out differently, is the same note', async () => {
+    m.readMessage.mockResolvedValue(reading([{ key: 'women_s_notes', value: NOTE.replace(' (48', '\n\n(48 ') }]))
+    expect(await run()).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees', differences: [] } })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // The user, Oct 22: "not viewing some notes as updates". Ohel Leah's
+  // pages hadn't changed since notes began to be read, so the morning run
+  // never read them for their notes.
+  it('a page unchanged since before notes were read is read once more for them, then left alone', async () => {
+    m.readMessage.mockResolvedValue(reading([{ key: 'women_s_notes', value: 'Contact us for daytime bridal appointments.' }]))
+    const same = { ...watch, resourceId: 'mk', pageHash: await hashOfPage() }
+    const daily = (w: typeof same & { lastCheck?: WatchCheck | null }) => runListingPageWatch(w, newMenuReadBudget(), { apiKey: 'k', now: NOW })
+    expect(await daily(same)).toMatchObject({ ok: true, filed: 1, check: { result: 'differs' } })
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('read Oct 20')
+    const check = (at: string): WatchCheck => ({ at, what: 'hours', from: 'page', result: 'agrees', read: [], differences: [], queue: null })
+    expect(await daily({ ...same, lastCheck: check('2026-10-21T12:00:00Z') })).toMatchObject({ ok: true, filed: 1 })
+    m.readMessage.mockClear()
+    expect(await daily({ ...same, lastCheck: check(NOTES_READ_FROM) })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+    expect(m.readMessage).not.toHaveBeenCalled()
   })
 
   it('a section waiting holds back only that section; from this page, it’s replaced by what the page says now', async () => {

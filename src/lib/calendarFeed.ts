@@ -47,8 +47,9 @@ function googleCalendarId(src: string): string {
 export const MAX_FEED_BYTES = 20_000_000
 
 /** The iCal feeds a page links to or embeds, as addresses to fetch, the
- *  page's own first. A Google Calendar embed (`calendar/embed?src=…`) has
- *  a public feed at a known address. */
+ *  page's own first. A Google Calendar embed (`calendar/embed?src=…`), or a
+ *  link to add one (`calendar/u/0?cid=…`), has a public feed at a known
+ *  address. */
 export function calendarFeeds(html: string, pageUrl: string): string[] {
   const found: string[] = []
   const add = (raw: string) => {
@@ -63,9 +64,12 @@ export function calendarFeeds(html: string, pageUrl: string): string[] {
   for (const m of html.matchAll(/(?:href|src|data-[a-z-]+)\s*=\s*["']([^"']+)["']/gi)) {
     const raw = m[1]
     if (ICS_LINK.test(raw.replace(/&amp;/g, '&'))) add(raw)
-    const google = /calendar\.google\.com\/calendar\/(?:u\/\d+\/)?embed\?([^"'\s]+)/i.exec(raw)
+    const google = /calendar\.google\.com\/calendar\/(?:u\/\d+\/?)?(embed|r\/?)?\?([^"'\s]+)/i.exec(raw)
     if (google) {
-      for (const src of new URLSearchParams(google[1].replace(/&amp;/g, '&')).getAll('src')) {
+      // An embed names it `src`; an "Add our Calendar" link, `cid` (the
+      // South Philadelphia Shtiebel's, Oct 22: its embed is drawn by a
+      // script, so that link is all the page has).
+      for (const src of new URLSearchParams(google[2].replace(/&amp;/g, '&')).getAll(google[1] === 'embed' ? 'src' : 'cid')) {
         add(`https://calendar.google.com/calendar/ical/${encodeURIComponent(googleCalendarId(src))}/public/basic.ics`)
       }
     }

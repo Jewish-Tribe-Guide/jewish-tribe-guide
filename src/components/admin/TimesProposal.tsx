@@ -5,7 +5,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { boxPill, groupedRows, scheduleProposal, usualProposal, type ProposalRow, type RowGroup } from '@/lib/timesProposal'
-import { TIMES_PARTS, TIMES_PART_LABELS, partsFromRead, type PartGiven, type TimesPart } from '@/lib/timesParts'
+import { TIMES_PARTS, TIMES_PART_LABELS, isDatedLine, partsFromRead, type PartGiven, type TimesPart } from '@/lib/timesParts'
 import { minyanWriting } from '@/lib/minyanText'
 import { watchHealth, type Watch } from '@/lib/watches'
 import { samePage } from '@/lib/hoursJob'
@@ -288,7 +288,15 @@ export function ShulRow({
   const ordered = [...parts].sort((a, b) => Number(settled.has(a.id)) - Number(settled.has(b.id)) || TIMES_PARTS.indexOf(a.part) - TIMES_PARTS.indexOf(b.part))
   // A usual part a page gives, with no update: the same as the website.
   const same = (['weekday', 'shabbos'] as const).filter((part) => !parts.some((f) => f.part === part) && named.has(part) && !!p.times && usualRows(part, p.times.minyanim, p.times.minyanim).length > 0)
-  const boxes = ordered.length + same.length + others.length + contacts.length
+  // This week's from a page that gave it, with no update waiting: what it
+  // read, when that's what the listing has (it agreed, or its update was
+  // used since). Rodeph Shalom's and Leyv Ha-Ir's calendars give nothing
+  // else, and said "Same" with nothing under it (the user, Oct 22).
+  const weekPage = parts.some((f) => f.part === 'week') ? undefined : named.get('week')
+  const weekRead = weekPage && readOf(weekPage)
+  const weekAgrees = !!weekRead && (weekRead.result === 'agrees' || (p.decided?.status === 'approved' && p.decided.at >= weekRead.at))
+  const weekSame = weekAgrees ? weekRead.read.filter(isDatedLine) : []
+  const boxes = ordered.length + same.length + (weekSame.length ? 1 : 0) + others.length + contacts.length
 
   // Reads: a line per page, named for the parts it gives. The pages that
   // give a part first, in the parts' order; then the ones read for nothing;
@@ -345,6 +353,17 @@ export function ShulRow({
           </Box>
         )
       })}
+      {weekSame.length > 0 && (
+        <Box name={TIMES_PART_LABELS.week} pill={{ text: 'Same', tone: 'green' }}>
+          <BoxRows>
+            {weekSame.map((line) => {
+              const [, what, when] = /^(.*) (\d{1,2}:\d{2} [AP]M)$/.exec(line) ?? [line, line, undefined]
+              return <BoxRow key={line} name={what} right={when} />
+            })}
+          </BoxRows>
+          <SourceLine lead="Same as" url={weekPage!.url} at={weekRead!.at} />
+        </Box>
+      )}
       {/* Its phone, under its times (Shul times' notes, Oct 21); an
           update to it above the Same ones. */}
       <ContactBoxes placeId={p.id} contact={p.contact ?? null} findings={contacts} pages={live} settled={settled} busy={busy} token={token} community={community} itemUrl="/api/admin/watches/hours?job=times" onDecided={onDecided} show="same" />

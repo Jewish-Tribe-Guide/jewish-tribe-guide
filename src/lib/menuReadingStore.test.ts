@@ -50,6 +50,12 @@ describe('withMenuDishes', () => {
     expect(out.website).toBe('https://charlie.example')
   })
 
+  it('dates a dish added by hand as seen, never as on its menu', () => {
+    const out = withMenuDishes(details, 'dishes', { always: ['Sliders', 'Kugel'], sometimes: ['Soup'] }, { names: [], seen: ['Kugel'], at: AT, menuUrl: null })
+    expect(out.itemSeen).toEqual({ dishes: { Kugel: AT } })
+    expect(out.itemMenu).toEqual({ dishes: { Sliders: OLD }, dishes_sometimes: { Soup: OLD } })
+  })
+
   it('moves a dish’s dates with it between always and not always', () => {
     const out = withMenuDishes(details, 'dishes', { always: ['Soup'], sometimes: ['Sliders'] }, { names: [], at: AT, menuUrl: null })
     expect(out.itemMenu).toEqual({ dishes: { Soup: OLD }, dishes_sometimes: { Sliders: OLD } })

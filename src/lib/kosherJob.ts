@@ -113,6 +113,11 @@ function mekorLine(f: Exclude<MekorFinding, { kind: 'new' }>): string {
   return `Mekor Habracha says ${join(f.entry.certs, 'no hechsher')}; the listing says ${join(selectValues(f.listing.details.kosherCert), 'no hechsher')}`
 }
 
+/** The places the page checks: Food (the user, Oct 22: "We only need to
+ *  check Food, not grocery stores"). Groceries are still matched with the
+ *  lists, so one on a list isn't a new place. */
+export const KOSHER_JOB_CATEGORIES = ['restaurant']
+
 export type KosherInput = {
   /** The food places, live and archived (Mekor's read says an archived
    *  place it still lists as such). */
@@ -174,6 +179,7 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
 
   return {
     places: live
+      .filter((l) => KOSHER_JOB_CATEGORIES.includes(l.category))
       .map((l) => ({
         id: l.id,
         name: l.name,

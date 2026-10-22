@@ -553,6 +553,36 @@ describe('Shul times', () => {
     expect(within(b).getAllByRole('button')).toHaveLength(1)
   })
 
+  // Rodeph Shalom on dev, Oct 22: its calendar gives only dated times, its
+  // update was used, and it said "Same" with nothing under it.
+  it('a calendar’s week that’s the same: what it read, “Same as” its page; not once its update was kept', async () => {
+    const read = ['Shacharis Thu Oct 22 8:10 AM', 'Kabbalas Shabbos Fri Oct 23 6:00 PM']
+    const at = ago(2)
+    const rodeph = (status: 'approved' | 'rejected') =>
+      place({
+        id: 'rs',
+        name: 'Rodeph Shalom',
+        fields: ['Davening Times'],
+        times: { key: 'minyanim', minyanim: listing, schedules: [] },
+        decided: { at: ago(1.9), status },
+        pages: [timesPage('w-rs', 'https://rs.example/calendar/', { at, from: 'calendar', read, differences: ['New, that day only: shacharis · Thu Oct 22 · 8:10 AM'] })],
+      } as Partial<ShulPlace>)
+    await times$([rodeph('approved')])
+    await tab('Checked')
+    await open('Rodeph Shalom')
+    expect(boxes('Rodeph Shalom')).toEqual(['This week’s schedule | Same | false', 'Reads | 1 page | false'])
+    await userEvent.setup().click(within(shul('Rodeph Shalom')).getByRole('button', { name: /^This week’s schedule/ }))
+    const b = box('Rodeph Shalom', 'This week’s schedule')
+    expect(marked(b)).toEqual(['same: Shacharis Thu Oct 228:10 AM', 'same: Kabbalas Shabbos Fri Oct 236:00 PM'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(`Same as rs.example/calendar · read ${day(at)}`)
+
+    cleanup()
+    await times$([rodeph('rejected')])
+    await tab('Checked')
+    await open('Rodeph Shalom')
+    expect(boxes('Rodeph Shalom')).toEqual(['Reads | 1 page | true'])
+  })
+
   // Shul times' notes: a shul's phone "would be read from its website too (a
   // Phone box under its times)", when Google doesn't keep it.
   describe('its Phone, from its website', () => {

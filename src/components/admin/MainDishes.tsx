@@ -424,6 +424,8 @@ export default function MainDishes({ token }: { token: string }) {
         patch(p.id, {
           ...(res.menuUrl !== undefined ? { menuUrl: res.menuUrl } : {}),
           ...(res.reading !== undefined ? { reading: res.reading } : {}),
+          // A read that agreed with the listing dated its dishes from the menu.
+          ...(res.menuDated ? { menuDated: res.menuDated } : {}),
           // Its website's pages, read again.
           ...(res.pages ? { pages: (p.pages ?? []).map((w) => res.pages!.find((x) => x.id === w.id) ?? w) } : {}),
         })

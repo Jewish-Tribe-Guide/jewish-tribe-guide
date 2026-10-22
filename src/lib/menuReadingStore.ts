@@ -194,7 +194,9 @@ export async function saveMenuLink(community: string, resourceId: string, url: s
 // a dish taken off loses them. The ones its menu names are dated "on its
 // menu" now (details.itemMenu, as approve_menu_dishes did): an admin saw
 // them there. A dish added by hand gets no menu date, so a later read that
-// misses it never crosses it out.
+// misses it never crosses it out; it's dated "seen" instead (`seen`), as a
+// dish added through the queue is: the admin knows it's there (the user,
+// Oct 22: it showed no date until a reading found it).
 
 const DATE_MAPS = ['itemMenu', 'itemSeen', 'itemGone'] as const
 
@@ -203,12 +205,13 @@ export function withMenuDishes(
   details: Record<string, unknown>,
   fieldKey: string,
   lists: { always: readonly string[]; sometimes: readonly string[] },
-  dated: { names: readonly string[]; at: string; menuUrl: string | null },
+  dated: { names: readonly string[]; at: string; menuUrl: string | null; seen?: readonly string[] },
 ): Record<string, unknown> {
   const sk = `${fieldKey}_sometimes`
   const out: Record<string, unknown> = { ...details, [fieldKey]: [...lists.always], [sk]: [...lists.sometimes] }
   if (lists.sometimes.length === 0) delete out[sk]
   const onMenu = new Set(dated.names.map((n) => n.trim().toLowerCase()))
+  const seenNow = new Set((dated.seen ?? []).map((n) => n.trim().toLowerCase()))
   for (const map of DATE_MAPS) {
     const all = details[map] && typeof details[map] === 'object' ? { ...(details[map] as Record<string, Record<string, string>>) } : {}
     const was = new Map<string, string>()
@@ -219,7 +222,8 @@ export function withMenuDishes(
     ] as const) {
       const next: Record<string, string> = {}
       for (const name of names) {
-        const at = map === 'itemMenu' && onMenu.has(name.trim().toLowerCase()) ? dated.at : was.get(name.trim().toLowerCase())
+        const lower = name.trim().toLowerCase()
+        const at = (map === 'itemMenu' && onMenu.has(lower)) || (map === 'itemSeen' && seenNow.has(lower)) ? dated.at : was.get(lower)
         if (at) next[name] = at
       }
       if (Object.keys(next).length) all[key] = next
@@ -239,7 +243,7 @@ export async function setMenuDishes(
   resourceId: string,
   fieldKey: string,
   lists: { always: readonly string[]; sometimes: readonly string[] },
-  dated: { names: readonly string[]; at: string; menuUrl: string | null },
+  dated: { names: readonly string[]; at: string; menuUrl: string | null; seen?: readonly string[] },
 ): Promise<boolean> {
   const supabase = getAdminClient()
   const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
