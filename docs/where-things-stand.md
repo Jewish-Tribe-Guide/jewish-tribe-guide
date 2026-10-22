@@ -599,6 +599,10 @@ agreed:
      seen"). Adding a menu, Read now or a photo whose dishes are all the
      listing's already dates them "seen" from that menu, as Use this would,
      and the row goes to Checked. A read with anything new still waits.
+   - Shul times: a calendar's week that's the same now shows what it
+     read (Rodeph Shalom, Leyv Ha-Ir: "Same" with nothing under it). The
+     week's dated lines show in a "This week's schedule" box, "Same as" its
+     page, until an update to it is kept.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
