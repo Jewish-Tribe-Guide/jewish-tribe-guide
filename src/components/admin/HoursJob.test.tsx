@@ -530,6 +530,17 @@ describe('Shul times', () => {
     expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From soi\.example\/tefillot · read [A-Z][a-z]{2} \d+$/)
   })
 
+  // A newsletter's times are filed a part at a time too (Oct 22): in its
+  // part's box, from its newsletter, which has no page.
+  it('a newsletter’s update: in its part’s box, from its newsletter', async () => {
+    const fromNewsletter = { ...SHAB, id: 's-news', from: 'its newsletter', page: undefined }
+    await times$([{ ...SOI, findings: [fromNewsletter] } as ShulPlace])
+    await open(SOI.name)
+    const b = box(SOI.name, 'Usual Shabbos times')
+    expect(within(b).getAllByRole('button').slice(1).map((x) => x.textContent)).toEqual(['Use this', 'Edit', 'Keep the listing'])
+    expect(within(b).getByTestId('box-source')).toHaveTextContent(/^From its newsletter · read [A-Z][a-z]{2} \d+$/)
+  })
+
   it('this week’s: days with the same times as one, a tefillah’s times on one line, a changed one beside its usual time', async () => {
     await times$([SOI])
     await open(SOI.name)
@@ -677,6 +688,29 @@ describe('Shul times', () => {
     await waitFor(() => expect(shown(SOI.name)).toBe(false))
     await tab('Checked')
     expect(pill(SOI.name)).toBe(`Used ${today()}`)
+    fetchMock.mockRestore()
+  })
+
+  // Oct 22: Kol Tzedek's website gave this week and next, and its update
+  // had no Edit. Edit opens both weeks, and saves both.
+  it('this week’s and next: Edit opens both weeks, saved to the listing together', async () => {
+    const next: SpecialSchedule = { ...week, id: 'wk2', name: 'Times for Oct 25 – Oct 31', from: '2026-10-25', to: '2026-10-31', minyanim: [on('x1', 'shacharis', ['2026-10-26'], '7:00am')] }
+    const TWO = part('s-two', 'week', CAL, times({ proposedSchedules: [week, next] }))
+    const category = makeCategory({ id: 'synagogue', detailFields: [FIELD] })
+    const item = makeListing({ id: 'soi', category: 'synagogue', name: 'Sons of Israel', minyanim: listing })
+    await times$([place({ ...SOI, findings: [TWO] })])
+    const listed = vi.mocked(fetchJson).getMockImplementation()!
+    vi.mocked(fetchJson).mockImplementation(async (url, init, fallback) => (String(url).includes('item=soi') ? { ok: true, item, category } : listed(url, init, fallback)))
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    await open(SOI.name)
+    const user = userEvent.setup()
+    await user.click(within(box(SOI.name, 'This week’s schedule')).getByRole('button', { name: 'Edit' }))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getAllByTestId('minyan-box-list').map((l) => l.querySelector('p')!.textContent)).toEqual(['Oct 21–24', 'Oct 25–31'])
+    await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+    const [url, init] = fetchMock.mock.calls.find(([u]) => String(u).includes('/api/admin/submissions/'))!
+    expect(String(url)).toBe('/api/admin/submissions/s-two?community=philly')
+    expect(JSON.parse(String(init!.body)).payload.details.minyanim_schedules.map((s: SpecialSchedule) => s.id)).toEqual(['wk', 'wk2'])
     fetchMock.mockRestore()
   })
 

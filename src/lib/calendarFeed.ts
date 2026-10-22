@@ -22,6 +22,10 @@ export type CalendarEntry = {
   date: string
   /** "7:30 PM", or null for an all-day entry with no time in its title. */
   time: string | null
+  /** When it ends that day, "8:40 AM", when the calendar says. Rodeph
+   *  Shalom's Thursday minyan is 8:10–8:40, and the reader, given only the
+   *  start, never had its end (the user, Oct 22). */
+  end?: string | null
   title: string
 }
 
@@ -127,13 +131,17 @@ export function embeddedEntries(html: string, timezone: string): CalendarEntry[]
       out.push({ date: dateOnly[1], time: titled, title })
       continue
     }
-    const wall = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(start)
-    if (wall) {
-      out.push({ date: wall[1], time: clock(Number(wall[2]), Number(wall[3])), title })
-      continue
+    const at = (v: unknown): { date: string; time: string } | null => {
+      if (typeof v !== 'string') return null
+      const wall = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(v)
+      if (wall) return { date: wall[1], time: clock(Number(wall[2]), Number(wall[3])) }
+      const ms = Date.parse(v)
+      return Number.isFinite(ms) && !/^\d{4}-\d{2}-\d{2}$/.test(v) ? local(ms, timezone) : null
     }
-    const ms = Date.parse(start)
-    if (Number.isFinite(ms)) out.push({ ...local(ms, timezone), title })
+    const begins = at(start)
+    if (!begins) continue
+    const ends = at(o.end)
+    out.push({ ...begins, ...(ends && ends.date === begins.date && ends.time !== begins.time ? { end: ends.time } : {}), title })
   }
   return out
 }
@@ -196,6 +204,9 @@ export function icsEntries(ics: string, timezone: string, from: string, to: stri
     }
     if (line === 'END:VEVENT' && event) {
       const start = event.DTSTART && icsWhen(event.DTSTART, timezone)
+      // Its end, when on the same day.
+      const ends = start && start.time && event.DTEND ? icsWhen(event.DTEND, timezone) : null
+      const end = ends && ends.date === start!.date && ends.time && ends.time !== start!.time ? { end: ends.time } : {}
       const title = event.SUMMARY ? icsText(event.SUMMARY.value) : ''
       if (start && title && event.STATUS?.value !== 'CANCELLED') {
         const rule = event.RRULE ? Object.fromEntries(event.RRULE.value.split(';').map((kv) => kv.split('=') as [string, string])) : null
@@ -211,10 +222,10 @@ export function icsEntries(ics: string, timezone: string, from: string, to: stri
             const weeks = Math.floor((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${start.date}T12:00:00Z`)) / (7 * 86_400_000))
             if (weeks % interval !== 0 || !byDay.includes(new Date(`${d}T12:00:00Z`).getUTCDay())) continue
             n++
-            if (d >= from && !exdates.includes(d)) out.push({ date: d, time: start.time, title })
+            if (d >= from && !exdates.includes(d)) out.push({ date: d, time: start.time, ...end, title })
           }
         } else if (start.date >= from && start.date <= to) {
-          out.push({ date: start.date, time: start.time, title })
+          out.push({ date: start.date, time: start.time, ...end, title })
         }
       }
       event = null
@@ -243,7 +254,8 @@ export function isIcs(text: string): boolean {
 }
 
 /** The calendar's days from `from` to `to`, a line each, for the reader:
- *  "2026-10-30 (Fri) 7:30 PM: Kabbalat Shabbat Service". In order, each
+ *  "2026-10-30 (Fri) 7:30 PM: Kabbalat Shabbat Service", or with its end,
+ *  "2026-10-22 (Thu) 8:10 AM–8:40 AM: Online Community Morning Minyan". In order, each
  *  entry once. Empty when there's nothing in that time. */
 export function calendarLines(entries: readonly CalendarEntry[], from: string, to: string): string[] {
   const seen = new Set<string>()
@@ -252,7 +264,7 @@ export function calendarLines(entries: readonly CalendarEntry[], from: string, t
     .sort((a, b) => a.date.localeCompare(b.date) || minutes(a.time) - minutes(b.time))
     .map((e) => {
       const weekday = new Date(`${e.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
-      return `${e.date} (${weekday})${e.time ? ` ${e.time}` : ''}: ${e.title.replace(/\s+/g, ' ').slice(0, 120)}`
+      return `${e.date} (${weekday})${e.time ? ` ${e.time}${e.end ? `–${e.end}` : ''}` : ''}: ${e.title.replace(/\s+/g, ' ').slice(0, 120)}`
     })
     .filter((l) => (seen.has(l) ? false : (seen.add(l), true)))
     .slice(0, MAX_LINES)

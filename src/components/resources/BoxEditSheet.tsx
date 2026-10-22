@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useMemo, useRef, useState, type ComponentProps } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { listingChanges } from '@/lib/listingDiff'
-import { mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
+import { boxChangeCount, mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
 import { readSchedules, schedulesKey, weekPostDays, weekPostRows, withWeekRows } from '@/lib/schedules'
 import type { MinyanWriting } from '@/lib/minyanText'
+import { rangeText } from '@/lib/timesProposal'
 import { useIsMobile } from '@/lib/useIsMobile'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -40,9 +41,10 @@ export type BoxEdit = {
    *  and how the listing writes them. */
   minyanimBox?: MinyanBox
   writing?: MinyanWriting
-  /** With minyanimBox 'this_week': the id of the week the shul sent out
-   *  (schedules.ts). Its times are edited, not the usual ones. */
-  week?: string
+  /** With minyanimBox 'this_week': the ids of the weeks the shul sent out
+   *  (schedules.ts). Their times are edited, not the usual ones; more than
+   *  one (a website's this week and next), each under its dates. */
+  weeks?: readonly string[]
   /** Values already answered in the box ("Is it Shabbat friendly?" Yes). */
   preset?: Record<string, unknown>
   /** The whole-listing editor's rows for this box (editorRows ids), when
@@ -140,12 +142,33 @@ export function BoxEditor({
   const allRows: Minyan[] = minyanimField && isMinyanim(base(minyanimField.key)) ? (base(minyanimField.key) as Minyan[]) : []
   // A row stored without an id gets one here, as the old editor gave it
   // (MinyanimInput's initMinyanim): the list opens a minyan by its id.
-  // A week the shul sent out: its own rows, sent back into its schedule.
+  // The weeks the shul sent out: each its own rows, sent back into its
+  // schedule. With two (Oct 22: a website's this week and next had no
+  // Edit), a list each, one opened at a time, one Save for both.
   const sk = minyanimField ? schedulesKey(minyanimField.key) : ''
-  const weekPost = edit.week && minyanimField ? readSchedules(base(sk)).find((s) => s.id === edit.week) : undefined
-  const [boxRows] = useState(() =>
-    weekPost ? weekPostRows(weekPost) : edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : [],
+  const [weekPosts] = useState(() => (edit.weeks?.length && minyanimField ? readSchedules(base(sk)).filter((s) => edit.weeks!.includes(s.id)) : []))
+  const [weekOriginals] = useState(() => weekPosts.map(weekPostRows))
+  const [boxRows] = useState(() => (edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : []))
+  // The schedules as edited so far, every week's changes in them.
+  const schedulesNow = () => readSchedules(sk in details ? details[sk] : base(sk))
+  const setWeek = (id: string, rows: Minyan[]) => setDetail(sk, withWeekRows(schedulesNow(), id, rows))
+  // The week with a minyan open, the others hidden (kept, with their changes).
+  const [openWeek, setOpenWeek] = useState<string | null>(null)
+  const weekIds = weekPosts.map((w) => w.id).join(' ')
+  const weekSteps = useMemo(
+    () =>
+      new Map(
+        weekIds.split(' ').map((id) => [
+          id,
+          (step: { title: string; back: () => void } | null) => {
+            setOpenWeek((was) => (step ? id : was === id ? null : was))
+            onStep(step)
+          },
+        ]),
+      ),
+    [weekIds, onStep],
   )
+  const weekChanges = weekPosts.reduce((n, w, i) => n + boxChangeCount(weekOriginals[i], weekPostRows(schedulesNow().find((s) => s.id === w.id) ?? w)), 0)
 
   const changes = listingChanges(
     item,
@@ -199,19 +222,45 @@ export function BoxEditor({
       {/* The shul's list says it itself, with the box's name once a minyan is open. */}
       {!minyanimField && <p className="-mt-1 text-[14px] text-muted">{item.name}</p>}
       {edit.fields.map((f) =>
-        f === minyanimField ? (
+        f === minyanimField && weekPosts.length > 1 ? (
+          <div key={f.key} className="space-y-6">
+            {openWeek === null && <p className="-mt-1 text-[14px] text-muted">{item.name}</p>}
+            {weekPosts.map((w, i) => (
+              <div key={w.id} hidden={openWeek !== null && openWeek !== w.id}>
+                <MinyanBoxEditor
+                  original={weekOriginals[i]}
+                  box={edit.minyanimBox!}
+                  boxTitle={rangeText(w.from, w.to)}
+                  heading={rangeText(w.from, w.to)}
+                  place={item.name}
+                  writing={edit.writing!}
+                  dayChoices={weekPostDays(w)}
+                  onStep={weekSteps.get(w.id)!}
+                  onChange={(rows) => setWeek(w.id, rows)}
+                  send={() => null}
+                />
+              </div>
+            ))}
+            {openWeek === null && (
+              <>
+                {errors}
+                {sendButton(`Send ${weekChanges} change${weekChanges === 1 ? '' : 's'}`)}
+              </>
+            )}
+          </div>
+        ) : f === minyanimField ? (
           // A shul's box: its minyanim as a list, then one at a time, with
           // its own Send ("Send 2 changes") under the list.
           <MinyanBoxEditor
             key={f.key}
-            original={boxRows}
+            original={weekPosts.length ? weekOriginals[0] : boxRows}
             box={edit.minyanimBox!}
             boxTitle={edit.title}
             place={item.name}
             writing={edit.writing!}
-            dayChoices={weekPost ? weekPostDays(weekPost) : undefined}
+            dayChoices={weekPosts.length ? weekPostDays(weekPosts[0]) : undefined}
             onStep={onStep}
-            onChange={(rows) => (weekPost ? setDetail(sk, withWeekRows(readSchedules(base(sk)), weekPost.id, rows)) : setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows)))}
+            onChange={(rows) => (weekPosts.length ? setWeek(weekPosts[0].id, rows) : setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows)))}
             send={(n) => (
               <>
                 {errors}

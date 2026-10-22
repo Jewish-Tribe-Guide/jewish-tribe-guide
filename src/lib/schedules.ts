@@ -161,7 +161,12 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
     if (rows.length > 0)
       return { rows: [...rows, ...added], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
-    // the regular ones, but not presented as the festival's.
+    // the regular ones, but not presented as the festival's. A week the
+    // shul sent out that leaves a day out (a website's calendar giving only
+    // Shabbos morning) leaves it its usual times, plainly: it said "Times
+    // for Oct 18 – Oct 24 times not posted" on Kol Tzedek's Thursday (the
+    // user, Oct 22).
+    if (covering.mode === 'replace' && week && !festival) return { rows: added, skip: false, posting: added.length > 0 ? { kind: 'schedule', name: additions[0].name } : { kind: 'regular' } }
     if (covering.mode === 'replace') return { rows: added, skip: false, posting: { kind: 'not-posted', festival: festival ?? covering.name } }
     if (added.length > 0) return { rows: added, skip: false, posting: { kind: 'schedule', name: additions[0].name } }
   }

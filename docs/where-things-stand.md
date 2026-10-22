@@ -406,6 +406,26 @@ agreed:
      version; the hours route's `?item=` hands it the listing.
    - A filing from before parts (dev has three, Sons of Israel's) shows
      whole in a "From its website" box with Compare.
+   - A newsletter's times are filed by part too (the user, Oct 22), one
+     update each, boxed "From its newsletter". So a newsletter no longer
+     files one whole update that stops the website reader filing for that
+     shul. Older newsletter updates stay whole until decided.
+   - Edit on a This week's schedule that gives two weeks (Kol Tzedek's,
+     Mikveh Israel's: this week and next) had no Edit; it opens both
+     weeks now, a list each under its dates, one Save (the user, Oct 22).
+   - A day a week's schedule leaves out (Kol Tzedek's Oct 22–24 is only
+     Shabbos morning) shows the usual times plainly; it said "Times for
+     Oct 18 – Oct 24 times not posted". A Yom Tov day still says not
+     posted.
+   - A calendar's lines carry an event's end ("8:10 AM–8:40 AM"), so the
+     reader can note it (Rodeph Shalom's Thursday minyan, the user, Oct
+     22). Every calendar's lines change, so each is read once more.
+   - Not done: a Zoom link. Rodeph Shalom's is only on each event's own
+     page, and a minyan has nowhere to keep a link but its sign-up.
+   - Kol Tzedek's Friday night is on its Weekly Services page
+     (kol-tzedek.org/shabbat.html, "All Friday services begin at
+     6:30pm"), which isn't one of its watched pages; its calendar has no
+     Friday on Oct 23. **For the user:** add that page on the Watches tab.
 4. Mikvah hours. **Built Oct 22** (compared with its drawing on dev,
    computer and phone; Lower Merion's update stubbed in the browser, Moishe
    Zvi's two from a real read on dev):

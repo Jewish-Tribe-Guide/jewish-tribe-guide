@@ -187,6 +187,41 @@ describe('receiveNewsletter: what it changes', () => {
     )
   })
 
+  // The user, Oct 22: Shul times showed a newsletter's update the old way
+  // (its source and Compare), not in the box for the times it changes, and
+  // a whole update waiting held back what the shul's website read.
+  it('files the times as the part they change, as a website’s reading is', async () => {
+    await receiveNewsletter('philly', email, opts)
+    expect(m.submitListingUpdate.mock.calls[0][2].source.part).toEqual({ part: 'shabbos', field: 'minyanim' })
+    expect(m.sendWatchDigest.mock.calls[0][2]).toEqual([{ name: 'Mekor Habracha', what: 'Usual Shabbos times: Changed: shacharis · Shabbos · 9:00am, was 9:15am' }])
+  })
+
+  it('files each part a newsletter changes on its own, each changing only its own times', async () => {
+    m.readShulWeek.mockResolvedValue({
+      update: { ...changed, rows: [...changed.rows, { id: 'b', day: 'mon', tefillah: 'shacharis', time: '7:00am', status: 'new', quote: 'Shacharis Monday 7am' }] },
+      model: 'x',
+    })
+    expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 2 })
+    const filed = m.submitListingUpdate.mock.calls.map((c) => c[2])
+    const times = (p: { details: { minyanim: { tefillah: string; days: string[]; time: string }[] } }) => p.details.minyanim.map((x) => `${x.days.join('')} ${x.tefillah} ${x.time}`).sort()
+    expect(filed.map((p) => p.source.part.part)).toEqual(['weekday', 'shabbos'])
+    expect(times(filed[0])).toEqual(['mon shacharis 7:00am', 'sat mincha 12:20pm', 'sat shacharis 9:15am'])
+    expect(times(filed[1])).toEqual(['sat mincha 12:20pm', 'sat shacharis 9:00am'])
+    expect(m.sendWatchDigest.mock.calls[0][2].map((w: { what: string }) => w.what.split(':')[0])).toEqual(['Usual weekday times', 'Usual Shabbos times'])
+  })
+
+  it('files a week’s times as this week’s schedule', async () => {
+    m.readShulWeek.mockResolvedValue({
+      update: { ...changed, kind: 'week', title: 'Shabbos Noach', from: '2026-10-23', to: '2026-10-24', rows: [{ id: 'a', day: '2026-10-24', tefillah: 'shacharis', time: '9:00am', status: 'new', quote: 'Shacharis 9:00am' }] },
+      model: 'x',
+    })
+    expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 1 })
+    const payload = m.submitListingUpdate.mock.calls[0][2]
+    expect(payload.source.part).toMatchObject({ part: 'week', field: 'minyanim' })
+    expect(payload.source.part.schedules).toHaveLength(1)
+    expect(payload.details.minyanim).toEqual(regular)
+  })
+
   it('never reads a newsletter with no times as every minyan gone', async () => {
     m.readShulWeek.mockResolvedValue({ update: allGone, model: 'x' })
     expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 0 })

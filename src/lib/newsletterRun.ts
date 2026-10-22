@@ -16,6 +16,7 @@ import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
 import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
 import { applyUpdate, changesAnything, type TimesUpdate } from '@/lib/scheduleUpdate'
+import { TIMES_PART_LABELS, partLines, splitParts, type PartSource } from '@/lib/timesParts'
 import type { ScheduleSource } from '@/lib/scheduleReader'
 import type { SubmissionSource } from '@/lib/submissionSource'
 import { getWatchByUrl, listWatches, updateWatch } from '@/lib/watchStore'
@@ -197,6 +198,8 @@ async function readAndFile(
     submission: ResourceSubmission
     lines: string[]
     photoUrl?: string | null
+    /** Which of the shul's times it changes (timesParts.ts). */
+    part?: PartSource
   }[] = []
 
   // The shul's times: from the email's words, or from its PDF or picture
@@ -212,16 +215,35 @@ async function readAndFile(
     const applied = applyUpdate(regularMinyanim(shul[key]), readSchedules(shul[sk]), update.u)
     if (applied.changes.length) {
       const photoUrl = update.file && email.attachment ? await keepAttachment(email.attachment) : null
-      filings.push({
-        listingId: shul.id,
-        name: shul.name,
-        submission: editSubmission(shulCategory, shul, {
-          [key]: applied.minyanim,
-          [sk]: applied.schedules,
-        }),
-        lines: applied.changes,
-        photoUrl,
+      const whole = editSubmission(shulCategory, shul, {
+        [key]: applied.minyanim,
+        [sk]: applied.schedules,
       })
+      // A part at a time, as a website's reading is filed (timesParts.ts):
+      // Shul times shows each in its own box, and a whole one waiting
+      // holds back what the shul's website files (the user, Oct 22: some
+      // shuls' updates came the old way). What fits no part, a Yom Tov
+      // time, is filed whole as before.
+      const listed = { ...whole.details, [key]: shul[key] ?? null, [sk]: shul[sk] ?? null }
+      const parts = splitParts(listed, whole.details ?? {}, key)
+      if (parts.length)
+        for (const p of parts)
+          filings.push({
+            listingId: shul.id,
+            name: shul.name,
+            submission: { ...whole, details: p.details },
+            lines: parts.length === 1 ? applied.changes : partLines(p.source, listed, p.details),
+            photoUrl,
+            part: p.source,
+          })
+      else
+        filings.push({
+          listingId: shul.id,
+          name: shul.name,
+          submission: whole,
+          lines: applied.changes,
+          photoUrl,
+        })
     }
   }
 
@@ -258,7 +280,7 @@ async function readAndFile(
       community,
       f.listingId,
       Object.assign({}, f.submission, {
-        source: sourceFor(f.listingId, f.photoUrl),
+        source: { ...sourceFor(f.listingId, f.photoUrl), ...(f.part ? { part: f.part } : {}) },
       }),
       [heading, f.lines.join('\n')].join('\n\n'),
       { name: NEWSLETTER_WATCH_NAME },
@@ -268,7 +290,7 @@ async function readAndFile(
     await sendWatchDigest(
       community,
       from,
-      filings.map((f) => ({ name: f.name, what: f.lines.join('; ') })),
+      filings.map((f) => ({ name: f.name, what: `${f.part ? `${TIMES_PART_LABELS[f.part.part]}: ` : ''}${f.lines.join('; ')}` })),
       // A newsletter is one of its shul's sources: its findings wait on
       // Shul times, with the website's.
       findingPage(community, 'times'),

@@ -75,6 +75,15 @@ describe('what a shul has on a date', () => {
     expect(resolveDay(regular, [shabbosOnly], thu)).toEqual({ rows: [], skip: false, posting: { kind: 'not-posted', festival: 'Sukkos' } })
   })
 
+  // Oct 22: Kol Tzedek's website gave Oct 22–24 as only Shabbos morning,
+  // and its Thursday said "Times for Oct 18 – Oct 24 times not posted".
+  it('a day a week the shul sent out leaves out: its usual times, plainly; on a festival, still not posted', () => {
+    const week: SpecialSchedule = { id: 'w', kind: 'week', name: 'Times for Oct 18 – Oct 24', from: '2026-10-05', to: '2026-10-10', mode: 'replace', postedBy: 'website', minyanim: [{ id: 'ws', tefillah: 'shacharis', on: ['2026-10-10'], time: '10:00am' }] }
+    expect(resolveDay(regular, [week], mon)).toEqual({ rows: [], skip: false, posting: { kind: 'regular' } })
+    const holiday: SpecialSchedule = { ...week, from: '2026-10-01', to: '2026-10-03', minyanim: [{ id: 'ws', tefillah: 'shacharis', on: ['2026-10-03'], time: '10:00am' }] }
+    expect(resolveDay(regular, [holiday], thu).posting).toEqual({ kind: 'not-posted', festival: 'Sukkos' })
+  })
+
   // Oct 20: a calendar's dated service is a one-day addition, and as the
   // latest-starting schedule it won the day, putting off the Sukkos times
   // (or a week the shul sent out) that day.
