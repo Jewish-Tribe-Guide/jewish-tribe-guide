@@ -5,6 +5,7 @@ import { makeCategory } from '@/test/providerFixtures'
 const m = vi.hoisted(() => ({
   getAdminUserForCommunity: vi.fn(),
   listWatches: vi.fn(),
+  getListReads: vi.fn(),
   readKeystoneList: vi.fn(),
   readMekorList: vi.fn(),
   rows: {} as Record<string, unknown[]>,
@@ -31,7 +32,7 @@ vi.mock('@/lib/submissionStore', () => ({
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
-vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, getListReads: m.getListReads }))
 vi.mock('@/lib/keystoneRun', () => ({ readKeystoneList: m.readKeystoneList }))
 vi.mock('@/lib/mekorRun', () => ({ readMekorList: m.readMekorList, CATEGORIES: ['restaurant', 'grocery'] }))
 vi.mock('@/lib/supabase/admin', () => ({
@@ -92,6 +93,7 @@ beforeEach(() => {
   m.rows = { resource: [judah] }
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.listWatches.mockResolvedValue({ watches: [KEYSTONE, MEKOR], available: true })
+  m.getListReads.mockResolvedValue(new Map())
   m.readKeystoneList.mockResolvedValue({ entries: [judahEntry] })
   m.readMekorList.mockResolvedValue({ error: 'Mekor Habracha’s list answered 503' })
   m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
@@ -127,6 +129,26 @@ describe('GET /api/admin/watches/kosher', () => {
     expect(body.lists).toEqual([
       expect.objectContaining({ list: 'keystone', entries: 1, error: null, watch: expect.objectContaining({ id: 'k' }) }),
       expect.objectContaining({ list: 'mekor', entries: null, error: 'Mekor Habracha’s list answered 503' }),
+    ])
+    expect(body.counts).toMatchObject({ toCheck: 1, didntLoad: 1 })
+  })
+
+  // Oct 22: the tab opening read both lists' websites every time. A list's
+  // last read (the morning's, or Check now) is kept on its watch instead.
+  it('a list its last read kept isn’t read again; its latest run failing is said beside it', async () => {
+    m.getListReads.mockResolvedValue(
+      new Map([
+        ['k', { updated: null, entries: [judahEntry] }],
+        ['m', { updated: 'Oct 20, 2026', entries: [] }],
+      ]),
+    )
+    m.listWatches.mockResolvedValue({ watches: [KEYSTONE, { ...MEKOR, failingSince: '2026-10-22T10:00:00Z', lastError: 'Mekor Habracha’s list answered 503' }], available: true })
+    const body = await (await GET(req())).json()
+    expect(m.readKeystoneList).not.toHaveBeenCalled()
+    expect(m.readMekorList).not.toHaveBeenCalled()
+    expect(body.lists).toEqual([
+      expect.objectContaining({ list: 'keystone', entries: 1, error: null }),
+      expect.objectContaining({ list: 'mekor', entries: 0, updated: 'Oct 20, 2026', error: 'Mekor Habracha’s list answered 503' }),
     ])
     expect(body.counts).toMatchObject({ toCheck: 1, didntLoad: 1 })
   })

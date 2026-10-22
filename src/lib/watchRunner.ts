@@ -9,7 +9,7 @@ import { runMenuWatch, type MenuReadBudget } from './menuWatchRun'
 import { isListingPageWatch } from './listingPageWatch'
 import { runListingPageWatch } from './listingPageRun'
 import { updateWatch } from './watchStore'
-import { afterRun, listCheck, MENU_WATCH_CREATOR, type Watch, type WatchOutcome } from './watches'
+import { afterRun, listCheck, MENU_WATCH_CREATOR, withoutListRead, type Watch, type WatchOutcome } from './watches'
 import { isNewsletterWatch, quietError } from './newsletter'
 import { isEruvWebsiteWatch } from './eruvWebsite'
 import { runEruvWebsiteWatch } from './eruvWebsiteRun'
@@ -39,13 +39,13 @@ export async function runWatch(
     }
     if (watch.kind === 'keystone_list') {
       const run = await runKeystoneWatch(watch.communityId, watch.url)
-      return run.ok ? { ok: true, filed: run.filed, check: listCheck(run) } : { ok: false, error: run.error }
+      return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
     }
     // Mekor Habracha's kosher list, read place by place like Keystone-K's
     // (mekorWatch.ts). A website watch: no migration gave it a kind.
     if (isMekorList(watch.url)) {
       const run = await runMekorWatch(watch.communityId, watch.url)
-      return run.ok ? { ok: true, filed: run.filed, check: listCheck(run) } : { ok: false, error: run.error }
+      return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
     }
     // A hospital's page on Refuah builds itself in the browser, so it's read
     // from the data it's built from, and compared with the hospital's
@@ -77,5 +77,6 @@ export async function runAndRecord(watch: Watch, now = new Date().toISOString(),
   const outcome = await runWatch(watch, budget, undefined, { full })
   const { update, alert } = afterRun(watch, outcome, now)
   await updateWatch(watch.communityId, watch.id, update)
-  return { outcome, alert, watch: { ...watch, ...update } as Watch }
+  const recorded = { ...watch, ...update } as Watch
+  return { outcome, alert, watch: { ...recorded, lastCheck: withoutListRead(recorded.lastCheck) } }
 }

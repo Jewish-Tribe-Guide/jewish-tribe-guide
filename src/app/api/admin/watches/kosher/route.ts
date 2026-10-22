@@ -1,13 +1,13 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { listWatches } from '@/lib/watchStore'
+import { getListReads, listWatches } from '@/lib/watchStore'
 import type { Watch } from '@/lib/watches'
-import { KEYSTONE_LIST_URL, KEYSTONE_WATCH_NAME, baseName, keystoneSlug, submissionKey as keystoneSubmissionKey } from '@/lib/keystoneWatch'
+import { KEYSTONE_LIST_URL, KEYSTONE_WATCH_NAME, baseName, keystoneSlug, submissionKey as keystoneSubmissionKey, type KeystoneEntry } from '@/lib/keystoneWatch'
 import { listCategories } from '@/lib/categoryStore'
 import { jobFindings } from '@/lib/watchFindingStore'
 import type { Finding } from '@/lib/watchFindings'
-import { MEKOR_LIST_URL, MEKOR_WATCH_NAME, isMekorList, submissionKey as mekorSubmissionKey, type GuideListing } from '@/lib/mekorWatch'
+import { MEKOR_LIST_URL, MEKOR_WATCH_NAME, isMekorList, submissionKey as mekorSubmissionKey, type GuideListing, type MekorEntry } from '@/lib/mekorWatch'
 import { readKeystoneList } from '@/lib/keystoneRun'
 import { CATEGORIES, readMekorList } from '@/lib/mekorRun'
 import { kosherCounts, kosherPlaces, type Filed, type KosherList } from '@/lib/kosherJob'
@@ -21,8 +21,10 @@ import { kosherBoxKeys, renamedTo } from '@/lib/kosherBox'
 import type { ResourceSubmission } from '@/types'
 
 // GET /api/admin/watches/kosher — the Watches tab's Kosher certification
-//     page (step 5, Oct 21): Keystone-K's and Mekor Habracha's lists, read
-//     now, and every food place in the guide with what each list says about
+//     page (step 5, Oct 21): Keystone-K's and Mekor Habracha's lists, as
+//     their last read saw them (kept on each list's watch by the morning's
+//     read or Check now, Oct 22; read now only before a list's first), and
+//     every food place in the guide with what each list says about
 //     it next to what the listing says (kosherJob.ts). What each difference
 //     became comes from the suggestions those lists' daily reads filed: in
 //     here to compare, decided before, or to be filed by tomorrow morning's
@@ -96,8 +98,9 @@ export async function GET(request: Request) {
       if (error) throw new Error(error.message)
       return (data ?? []) as Submission[]
     }
-    const [{ watches, available }, listingRows, keystoneFiled, mekorFiled, [categories, { findings, decided }]] = await Promise.all([
+    const [{ watches, available }, listReads, listingRows, keystoneFiled, mekorFiled, [categories, { findings, decided }]] = await Promise.all([
       listWatches(slug),
+      getListReads(slug),
       supabase
         .from('resource')
         .select('id,category,name,address,phone,anchor_id,distance,details,status')
@@ -114,10 +117,15 @@ export async function GET(request: Request) {
     const watchOf = (list: KosherList) => watches.find(LISTS.find((l) => l.list === list)!.is) ?? null
     const keystoneWatch = watchOf('keystone')
     const mekorWatch = watchOf('mekor')
-    // Each list read now, as its daily read would; a paused one isn't.
+    // Each list as its last read saw it; read now only before its first
+    // (the tab opening must not read two outside sites every time). A
+    // paused one isn't.
+    const kept = (w: Watch | null) => (w ? (listReads.get(w.id) ?? null) : null)
+    const keptKeystone = kept(keystoneWatch)
+    const keptMekor = kept(mekorWatch)
     const [keystone, mekor] = await Promise.all([
-      keystoneWatch?.active ? readKeystoneList(keystoneWatch.url) : null,
-      mekorWatch?.active ? readMekorList(mekorWatch.url) : null,
+      !keystoneWatch?.active ? null : keptKeystone ? { entries: keptKeystone.entries as KeystoneEntry[] } : readKeystoneList(keystoneWatch.url),
+      !mekorWatch?.active ? null : keptMekor ? { updated: keptMekor.updated, entries: keptMekor.entries as MekorEntry[] } : readMekorList(mekorWatch.url),
     ])
 
     const { places, newPlaces } = kosherPlaces({
@@ -137,7 +145,9 @@ export async function GET(request: Request) {
         list,
         url: watch?.url ?? url,
         watch,
-        error: read && 'error' in read ? read.error : null,
+        // A kept read with its latest run failing: the entries are the last
+        // ones it read, and why it couldn't read again is said.
+        error: read && 'error' in read ? read.error : watch?.active && watch.failingSince ? watch.lastError : null,
         entries: read && 'entries' in read ? read.entries.length : null,
         updated: read && 'updated' in read ? read.updated : null,
       }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NEWSLETTER_WATCH_CREATOR } from './newsletter'
 import { ERUV_WEBSITE_CREATOR } from './eruvWebsite'
+import type { Watch } from './watches'
 
 // A newsletter sender's watch in the daily run: nothing fetched, only
 // whether its newsletter has gone quiet (newsletter.ts).
@@ -18,7 +19,7 @@ const eruv = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./eruvWebsiteRun', () => ({ runEruvWebsiteWatch: eruv.run }))
 vi.mock('./watchStore', () => ({ updateWatch: vi.fn() }))
 
-const { runWatch } = await import('./watchRunner')
+const { runWatch, runAndRecord } = await import('./watchRunner')
 const now = Date.parse('2026-11-20T12:00:00Z')
 const sender = { communityId: 'philly', kind: 'website' as const, url: 'mailto:info@mekor.org', createdBy: NEWSLETTER_WATCH_CREATOR, createdAt: '2026-10-01T00:00:00Z' }
 
@@ -50,6 +51,15 @@ describe('runWatch: Mekor Habracha’s list', () => {
     })
     expect(mekor.run).toHaveBeenCalledWith('philly', mekorList.url)
     expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  it('keeps what it read on the watch, for the Kosher page, but hands back the watch without it', async () => {
+    const listRead = { updated: 'Oct 20, 2026', entries: [{ name: 'Sweet Lizzy' }] }
+    mekor.run.mockResolvedValue({ ok: true, entries: 1, matching: 1, findings: 0, filed: 0, closedOnGoogle: [], listRead })
+    const { outcome, watch } = await runAndRecord({ ...mekorList, id: 'w1', createdAt: 'c', active: true } as Watch, '2026-10-22T00:00:00Z')
+    expect(outcome).toMatchObject({ ok: true, check: { listRead } })
+    expect(watch.lastCheck).toMatchObject({ what: 'list', at: '2026-10-22T00:00:00Z' })
+    expect(watch.lastCheck).not.toHaveProperty('listRead')
   })
 
   it('says why when it couldn’t be read', async () => {

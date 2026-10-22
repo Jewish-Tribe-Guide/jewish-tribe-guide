@@ -84,6 +84,23 @@ export type WatchCheck = {
    *  (contactRead.ts), by field key: the ones that match the listing, and
    *  the ones it would change. For the job page's Phone or Contact box. */
   contact?: { same: string[]; changes: string[] }
+  /** A kosher list's read, whole (Keystone-K's, Mekor Habracha's), so the
+   *  Kosher certification page compares the listings with what the last
+   *  read saw instead of reading the list again on every visit (Oct 22).
+   *  Kept off the watch as the store hands it out: getListReads. */
+  listRead?: ListRead
+}
+
+export type ListRead = { updated: string | null; entries: unknown[] }
+
+/** A check without its list's read: what's sent to a browser. */
+export function withoutListRead(c: WatchCheck): WatchCheck
+export function withoutListRead(c: WatchCheck | null): WatchCheck | null
+export function withoutListRead(c: WatchCheck | null): WatchCheck | null {
+  if (!c?.listRead) return c
+  const rest = { ...c }
+  delete rest.listRead
+  return rest
 }
 
 /** A check whose differences were filed, now or before, so they're a

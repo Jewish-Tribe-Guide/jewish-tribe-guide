@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase/admin'
-import type { Watch, WatchCheck, WatchKind } from './watches'
+import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
 
 // The watch table (migration 070): the outside pages the guide reads on its
 // own, and how each run went. Uncached: the cron and an admin screen. A
@@ -63,7 +63,8 @@ function fromRow(r: Row): Watch {
     lastFiled: r.last_filed,
     pageHash: r.page_hash,
     pageChangedAt: r.page_changed_at,
-    lastCheck: r.last_check ?? null,
+    // A kosher list's whole read stays here: getListReads.
+    lastCheck: withoutListRead(r.last_check ?? null),
   }
 }
 
@@ -111,6 +112,17 @@ export async function listWatches(community: string): Promise<{ watches: Watch[]
     throw new Error(`Failed to load watches: ${error.message}`)
   }
   return { watches: ((data ?? []) as Row[]).map(fromRow), available: true }
+}
+
+/** Each watch's kosher list read, kept on it by its last run
+ *  (WatchCheck.listRead), by watch id. Empty before migration 085. */
+export async function getListReads(community: string): Promise<Map<string, ListRead>> {
+  const { data, error } = await getAdminClient().from('watch').select('id, listRead:last_check->listRead').eq('community_id', community)
+  if (error) {
+    if (checkColumnMissing(error.message) || tableMissing(error.message)) return new Map()
+    throw new Error(`Failed to load the lists' reads: ${error.message}`)
+  }
+  return new Map(((data ?? []) as { id: string; listRead: ListRead | null }[]).flatMap((r) => (r.listRead ? [[r.id, r.listRead] as const] : [])))
 }
 
 export async function getWatch(community: string, id: string): Promise<Watch | null> {

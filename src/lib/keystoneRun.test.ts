@@ -109,7 +109,9 @@ describe('runKeystoneWatch', () => {
   it('says how many of the guide’s places match the list', async () => {
     setDb([bagel], [])
     const differs = await run()
-    expect(differs).toMatchObject({ ok: true, matching: 0 })
+    expect(differs).toMatchObject({ ok: true, matching: 0, listRead: { updated: null } })
+    // What it read is kept on the watch, for the Kosher page (WatchCheck.listRead).
+    expect(differs.ok ? differs.listRead.entries : null).toHaveLength(differs.ok ? differs.entries : -1)
     setDb([{ ...bagel, details: { ...bagel.details, t: ['Dairy', 'Parve'] } }], [])
     // A dry run: one that agrees would be dated, which this mock can't.
     expect(await run(true)).toMatchObject({ ok: true, matching: 1 })

@@ -14,7 +14,7 @@ import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
 import { confirmFromSource } from '@/lib/sourceConfirm'
-import { listDifference } from '@/lib/watches'
+import { listDifference, type ListRead } from '@/lib/watches'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import {
@@ -73,6 +73,8 @@ export type KeystoneRun =
   | {
       ok: true
       entries: number
+      /** The list as read, kept on its watch (WatchCheck.listRead). */
+      listRead: ListRead
       findings: number
       filed: number
       /** Listings the list names that agree with it. */
@@ -163,6 +165,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     return {
       ok: true,
       entries: entries.length,
+      listRead: { updated: null, entries },
       findings: findings.length,
       filed: 0,
       matching: agree.length,
@@ -219,5 +222,5 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   )
   const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated: null, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }

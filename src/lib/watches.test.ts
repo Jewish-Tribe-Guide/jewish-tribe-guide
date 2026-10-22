@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afterRun, listCheck, listDifference, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, type CheckFound, type Watch } from './watches'
+import { afterRun, listCheck, listDifference, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, withoutListRead, type CheckFound, type WatchCheck, type Watch } from './watches'
 
 const NOW = '2026-10-06T07:00:00.000Z'
 const DAY = 86_400_000
@@ -153,5 +153,14 @@ describe('watchHealth', () => {
     expect(watchHealth(watch({ lastRunAt: ran, lastOkAt: ran }), now).state).toBe('stale')
     const yesterday = new Date(now - DAY).toISOString()
     expect(watchHealth(watch({ lastRunAt: yesterday, lastOkAt: yesterday }), now).state).toBe('working')
+  })
+})
+
+describe('withoutListRead', () => {
+  it('drops only the list’s kept read', () => {
+    const check: WatchCheck = { at: 'a', what: 'list', from: null, result: 'agrees', read: [], differences: [], queue: null }
+    expect(withoutListRead({ ...check, listRead: { updated: null, entries: [1] } })).toEqual(check)
+    expect(withoutListRead(check)).toBe(check)
+    expect(withoutListRead(null)).toBeNull()
   })
 })

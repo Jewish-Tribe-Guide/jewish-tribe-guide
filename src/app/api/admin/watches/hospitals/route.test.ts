@@ -136,6 +136,21 @@ describe('GET /api/admin/watches/hospitals', () => {
     ])
   })
 
+  // Oct 22: the Watches tab asked Refuah every time it opened, for counts
+  // that come from the watches and findings alone.
+  it('?counts: the tab’s, without asking Refuah', async () => {
+    const page = w({ url: refuahPageUrl(PA._id), resourceId: PA_ID })
+    m.listWatches.mockResolvedValue({ watches: [page], available: true })
+    const finding = { id: 'f1', targetId: PA_ID, operation: 'update', lines: [] }
+    m.jobFindings.mockResolvedValue({ findings: [finding], decided: new Map() })
+    const body = await (await GET(new Request('http://x/api/admin/watches/hospitals?counts'))).json()
+    expect(m.readRefuahNear).not.toHaveBeenCalled()
+    expect(body.hospitals.map((h: { watch: unknown; notOnRefuah: boolean; findings: unknown[] }) => [h.watch !== null, h.notOnRefuah, h.findings.length])).toEqual([
+      [true, false, 1],
+      [false, false, 0],
+    ])
+  })
+
   it('Refuah down: still lists them, and says so', async () => {
     m.readRefuahNear.mockResolvedValue({ error: 'Refuah answered 502' })
     const body = await (await GET(req('GET'))).json()

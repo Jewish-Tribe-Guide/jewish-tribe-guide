@@ -704,7 +704,7 @@ export default function WatchesManager({ token }: { token: string }) {
     const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
     const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
     void get<{ places: DishPlace[] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes')))
-    void get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals')))
+    void get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals')))
     const hours = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours')))
     const times = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times')))
     void Promise.all([hours, times]).then(() => setListReady(true))

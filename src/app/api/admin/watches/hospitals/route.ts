@@ -46,6 +46,9 @@ import type { DirectoryResource } from '@/types'
 //      Refuah hospital". One request to Refuah per hospital (readRefuahNear).
 //      `boxes`: its listing's boxes of contacts, with what each has now.
 //      `?item=<id>`: one hospital's listing and category, for a box's Edit.
+//      `?counts`: the Watches tab's, which counts from the watches and
+//      findings alone: Refuah isn't asked (Oct 22), so `refuah`, `nearby`
+//      and the lines that need it come back empty.
 //      Admin only.
 // POST body: { action: 'choose', resourceId, url }
 //      "Give its Refuah page" / "Choose a different Refuah hospital": the
@@ -124,8 +127,10 @@ export async function GET(request: Request) {
       return Response.json({ ok: true, item, category })
     }
     const [{ watches, available }, hospitals] = await Promise.all([listWatches(community.slug), hospitalsIn(community.slug)])
-    // The Watches tab asks for these every time it opens: no hospitals, no request.
-    const list = await readRefuahNear(hospitals.flatMap((h) => (h.geo ? [h.geo] : [])))
+    // The Watches tab asks for its counts every time it opens: Refuah isn't
+    // asked for them. No hospitals, no request either.
+    const counts = new URL(request.url).searchParams.has('counts')
+    const list = counts ? [] : await readRefuahNear(hospitals.flatMap((h) => (h.geo ? [h.geo] : [])))
     const refuah = 'error' in list ? [] : list
     const byId = new Map(refuah.map((r) => [r._id, r]))
     const matches = matchRefuah(hospitals, refuah)

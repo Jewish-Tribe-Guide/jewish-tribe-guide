@@ -90,6 +90,9 @@ describe('runMekorWatch', () => {
     expect(byId.zevis[3]).toMatch(/doesn't have this place/)
     // Both differ from the list: none of the guide's places matches it.
     expect(body).toMatchObject({ entries: expect.any(Number), matching: 0 })
+    // What it read is kept on the watch, for the Kosher page (WatchCheck.listRead).
+    expect(body.ok && body.listRead).toMatchObject({ updated: '2026-10-12' })
+    expect(body.ok ? body.listRead.entries : null).toHaveLength(body.ok ? body.entries : -1)
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
     expect(mockDigest).toHaveBeenCalledTimes(1)
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)

@@ -553,6 +553,18 @@ agreed:
      read is back, each job row's counts as theirs are ("Loading…" until
      then), and coming back to it shows what it last showed while it reads
      again. Job pages still load afresh each visit.
+   - Faster loads (the user's go-ahead, "solve it appropriately"). Opening
+     the tab re-runs no job, but two reads fetched outside sites live: the
+     Kosher page read Keystone-K's and Mekor's lists every time, and the
+     tab's Hospitals counts asked Refuah. Now each list's run keeps what
+     it read on its watch (`last_check.listRead`, no migration) and the
+     Kosher page shows that; it reads a list live only before the list's
+     first run since this change (so once per list, on its next daily run
+     or Check now). The tab asks for Hospitals with `?counts`, which skips
+     Refuah. Every admin read also checks the sign-in and the community's
+     admins at once rather than one after the other. Still slow by design:
+     Main dishes reads up to 5 menus by AI on open, and the hours/times
+     pages search websites on open.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

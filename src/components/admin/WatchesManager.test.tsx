@@ -87,7 +87,8 @@ async function renderTab(
       if (!dishes) throw new Error('down')
       return { ok: true, places: dishes }
     }
-    if (String(url).includes('/api/admin/watches/hospitals')) {
+    // Counts only: the tab never asks Refuah.
+    if (String(url).includes('/api/admin/watches/hospitals?counts')) {
       if (!hospitals) throw new Error('down')
       return { ok: true, hospitals }
     }

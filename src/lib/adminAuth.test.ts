@@ -180,4 +180,21 @@ describe('getAdminUserForCommunity', () => {
       email: 'philly-admin@example.com',
     })
   })
+
+  // Oct 22: one round trip after the other on every admin request. Both
+  // asked before either answers.
+  it('asks for the token’s user and the community’s admins at once', async () => {
+    let answer!: () => void
+    const held = new Promise<void>((r) => (answer = r))
+    vi.mocked(createClient).mockReturnValue({
+      auth: { getUser: vi.fn(async () => (await held, { data: { user: { email: 'philly-admin@example.com' } }, error: null })) },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
+    const checking = getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')
+    await Promise.resolve()
+    expect(getCommunityAdminEmails).toHaveBeenCalledWith('philly')
+    answer()
+    expect(await checking).toEqual({ email: 'philly-admin@example.com' })
+  })
 })

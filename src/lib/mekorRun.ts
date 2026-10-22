@@ -15,7 +15,7 @@ import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { askGoogleIfOpen } from '@/lib/keystoneRun'
 import { confirmFromSource } from '@/lib/sourceConfirm'
-import { listDifference } from '@/lib/watches'
+import { listDifference, type ListRead } from '@/lib/watches'
 import {
   MEKOR_NAME,
   MEKOR_WATCH_NAME,
@@ -56,6 +56,8 @@ export type MekorRun =
   | {
       ok: true
       entries: number
+      /** The list as read, kept on its watch (WatchCheck.listRead). */
+      listRead: ListRead
       findings: number
       filed: number
       /** Listings the list names that agree with it. */
@@ -168,6 +170,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     return {
       ok: true,
       entries: entries.length,
+      listRead: { updated, entries },
       findings: findings.length,
       filed: 0,
       matching: agree.length,
@@ -223,5 +226,5 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community, 'kosher')).catch((err) => console.error('[watch-mekor] digest failed:', err))
   const confirmed = await confirmFromSource(community, agree, MEKOR_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }
