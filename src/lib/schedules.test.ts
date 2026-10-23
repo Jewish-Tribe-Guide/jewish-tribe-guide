@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, usualJoinLink, resolveDay, sendsWeekly, thisWeeksDays, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, usualJoinLink, resolveDay, sendsWeekly, signUpGroup, thisWeeksDays, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -142,6 +142,28 @@ describe('what a shul has on a date', () => {
     const shabbos: SpecialSchedule = { ...week, name: 'Shabbos Bereishis', from: '2026-10-02', to: '2026-10-03', minyanim: [{ id: 's1', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:00am' }] }
     expect(resolveDay(usual, [shabbos], sat).posting).toEqual({ kind: 'schedule', name: 'Shabbos Bereishis' })
     expect(resolveDay(usual, [{ ...sukkos, minyanim: [{ id: 'f', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:45am' }], to: '2026-10-05' }], mon).rows[0].signUp).toBeUndefined()
+  })
+
+  // Oct 23: a newsletter's "held when there is sufficient interest" makes
+  // that week's minyan a sign-up one, with its own group.
+  it('a week’s minyan marked sign-up keeps its own, even with no group yet', () => {
+    const usual: Minyan[] = [{ ...m('u1', 'maariv', ['mon'], '8:00pm'), signUp: { link: 'https://chat.whatsapp.com/Usual' } }]
+    const week: SpecialSchedule = {
+      id: 'w',
+      kind: 'week',
+      name: 'This week',
+      from: '2026-10-04',
+      to: '2026-10-08',
+      mode: 'replace',
+      minyanim: [
+        { id: 'w1', tefillah: 'maariv', on: ['2026-10-05'], time: '9:00pm', signUp: { link: 'https://chat.whatsapp.com/Late' } },
+        { id: 'w2', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:45am', signUp: {} },
+      ],
+    }
+    expect(resolveDay(usual, [week], mon).rows.map((r) => [r.id, r.signUp])).toEqual([
+      ['w1', { link: 'https://chat.whatsapp.com/Late' }],
+      ['w2', {}],
+    ])
   })
 
   it('the calendar not knowing a day doesn’t make it “not posted”', () => {
@@ -335,7 +357,8 @@ describe('editing this week’s schedule', () => {
       ...week,
       minyanim: [
         { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '8:45am' },
-        { id: 'new', tefillah: 'mincha', on: ['2026-10-09', '2026-10-10'], time: '1:30pm' },
+        // A week's minyan keeps its sign-up (Oct 23): a newsletter can say so.
+        { id: 'new', tefillah: 'mincha', on: ['2026-10-09', '2026-10-10'], time: '1:30pm', signUp: { name: 'x' } },
       ],
     })
   })
@@ -359,5 +382,28 @@ describe('usualJoinLink', () => {
   it('a schedule’s summary says it, for the moderator', () => {
     const week: SpecialSchedule = { id: 'w', name: 'Times for Oct 18 – Oct 24', from: '2026-10-22', to: '2026-10-24', mode: 'replace', minyanim: [{ id: 'a', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am', joinLink: ZOOM }] }
     expect(formatSchedulesSummary([week])).toContain('Shacharis · Thu Oct 22 · 8:10am · Online: upenn.zoom.us/j/97084263584')
+  })
+})
+
+// Mekor's newsletter "5:45pm Mincha followed by Maariv*" signs up in the
+// group their usual weekday Maariv has (the user, Oct 23).
+describe('the group a sign-up minyan signs up in', () => {
+  const late = { link: 'https://chat.whatsapp.com/Late' }
+  const early = { link: 'https://chat.whatsapp.com/Early' }
+  const usual: Minyan[] = [
+    { id: 'a', tefillah: 'maariv', days: ['mon', 'tue'], time: '8:00pm', signUp: late },
+    { id: 'b', tefillah: 'mincha_maariv', days: ['wed'], time: '6:00pm', signUp: early },
+    { id: 'c', tefillah: 'shacharis', days: ['mon'], time: '7:00am' },
+  ]
+
+  it('the usual same tefillah’s that day, else the same crowd’s', () => {
+    expect(signUpGroup(usual, 'maariv', ['mon'])).toBe(late)
+    expect(signUpGroup(usual, 'mincha_maariv', ['tue'])).toBe(late)
+    expect(signUpGroup(usual, 'maariv', ['wed'])).toBe(early)
+  })
+
+  it('none that day: sign-up, with no group yet', () => {
+    expect(signUpGroup(usual, 'shacharis', ['mon'])).toEqual({})
+    expect(signUpGroup(usual, 'maariv', ['thu'])).toEqual({})
   })
 })

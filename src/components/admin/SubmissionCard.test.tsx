@@ -509,6 +509,9 @@ const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMi
   season: 'shown',
   // Read off the shul's calendar onto a dated time (Oct 22).
   joinLink: 'shown',
+  // Read off a newsletter's "held when there is sufficient interest" onto
+  // a week's minyan (Oct 23).
+  signUp: 'shown',
   // Bookkeeping, not content.
   id: 'deliberately-hidden',
   // Set by the app when a week's times are applied, never typed by anyone:
@@ -547,6 +550,7 @@ const SCHEDULE_CHANGES: Record<string, [SpecialSchedule, SpecialSchedule]> = {
   notes: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, notes: 'Yizkor about 10:45' }] }],
   joinLink: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, joinLink: 'https://upenn.zoom.us/j/97084263584' }] }],
   season: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, season: 'winter' }] }],
+  signUp: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, signUp: { link: 'https://chat.whatsapp.com/Mekor' } }] }],
 }
 
 function renderScheduleDiff(before: SpecialSchedule[] | undefined, after: SpecialSchedule[]) {

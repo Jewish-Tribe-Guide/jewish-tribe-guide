@@ -247,6 +247,40 @@ describe('reading a shul’s regular times', () => {
     expect(r.times[0]).toMatchObject({ time: '10:00am', days: ['sat', 'sun'] })
   })
 
+  // Mekor's newsletter, Oct 23: weekday minyanim footnoted "held when there
+  // is sufficient interest", and Mikveh Israel's Mincha listed as theirs.
+  it('asks which minyanim need enough people, and which are held somewhere else', () => {
+    const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toContain('"signUp": true when the message says this minyan is held only if enough people')
+    expect(system.content).toContain('"where": when the message says this minyan is held somewhere other than the shul itself')
+  })
+
+  it('keeps which minyanim need enough people, and where one is held, through tidying', () => {
+    const msg = 'Weekday Minyanim\n2:00pm Mincha at 1818 Market or Mikveh Israel*\n5:45pm Mincha followed by Maariv*\n* Held when there is sufficient interest'
+    const r = tidyRegularReading(
+      {
+        kind: 'week',
+        from: '2026-10-08',
+        to: '2026-10-08',
+        times: [
+          { tefillah: 'mincha', date: '2026-10-08', time: '2:00pm', where: '1818 Market or Mikveh Israel', signUp: true, quote: '2:00pm Mincha at 1818 Market' },
+          // The AI's "followed by" as two times: one Mincha & Maariv, still sign-up.
+          { tefillah: 'mincha', date: '2026-10-08', time: '5:45pm', quote: '5:45pm Mincha followed by Maariv' },
+          { tefillah: 'maariv', date: '2026-10-08', time: '5:45pm', signUp: true, quote: '5:45pm Mincha followed by Maariv' },
+          { tefillah: 'shacharis', date: '2026-10-08', time: '6:45am', signUp: 'yes', where: '', quote: 'Weekday Minyanim' },
+        ],
+      },
+      { text: msg },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => [t.tefillah, t.time, t.signUp, t.where])).toEqual([
+      ['mincha', '2:00pm', true, '1818 Market or Mikveh Israel'],
+      ['mincha_maariv', '5:45pm', true, undefined],
+      ['shacharis', '6:45am', undefined, undefined],
+    ])
+  })
+
   // The Oct 21 shul pages dry run: what a website says that isn't a weekly
   // minyan, read as one.
   it('leaves out what isn’t the shul’s weekly davening: a monthly service, a call, a class', () => {

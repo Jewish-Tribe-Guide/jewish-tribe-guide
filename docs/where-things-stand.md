@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 22, 2026.
+Last updated: Oct 23, 2026.
 
 ## The branch
 
@@ -1261,6 +1261,26 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 23: sign-up minyanim and another shul's minyan, read off a message (on `redesign/oct18-fixes`, not merged)
+
+From Mekor's newsletter of Oct 23.
+
+- **"Held when there is sufficient interest"** marks that minyan "Only on
+  days enough people sign up", in a week or as a usual time. Its WhatsApp
+  group is the usual minyan's that day (the same tefillah, else Mincha &
+  Maariv for a Maariv, and back); none yet when there's no usual one. Shul
+  times and the queue show it ("Sign-up: chat.whatsapp.com/…", "· only if
+  enough sign up").
+- **A minyan held elsewhere** ("2:00pm Mincha at 1818 Market or Mikveh
+  Israel") is left out only when the place it names is another shul in
+  the guide that already has it: same tefillah, that day, within 15
+  minutes. The finding's note says "Left out: Mincha 2:00pm, already on
+  Kahal Kadosh Mikveh Israel." Anything else stays, with "at …" in its
+  note, so a shul's own second location still comes through. Plain code,
+  no extra AI read.
+- Only new reads. Mekor's waiting findings (1230–1232) still have the
+  2:00pm Mincha.
 
 ## Done Oct 22: Google is a Watches job (on `redesign/oct18-fixes`, not merged)
 

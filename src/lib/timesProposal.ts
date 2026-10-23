@@ -310,7 +310,7 @@ export function scheduleProposal(current: readonly SpecialSchedule[], proposed: 
           rows: runTogether(
             [...ms]
               .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60))
-              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: [noteText(m.notes), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ') || null, usually: usually(m, on, usual) })),
+              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: [noteText(m.notes), m.signUp && signUpText(m.signUp), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ') || null, usually: usually(m, on, usual) })),
           ),
         }))
       const dates = `${dateText(s.from)}${s.to !== s.from ? ` – ${dateText(s.to)}` : ''}`

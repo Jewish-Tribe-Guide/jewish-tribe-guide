@@ -1,7 +1,7 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { community as communityConfig } from '@/community.config'
 import { listCategoriesUncached } from '@/lib/categoryStore'
-import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
+import { getResourceRowById, listApprovedResources, normalizeRow } from '@/lib/resourceStore'
 import { fetchPublic, htmlToText, type MenuSource } from '@/lib/menuReader'
 import { menuHash } from '@/lib/menuWatch'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
@@ -308,6 +308,7 @@ export async function readPageFor(
     fetchImpl,
     now = Date.now(),
     dated = [],
+    others,
   }: {
     apiKey: string
     communityName: string
@@ -316,6 +317,9 @@ export async function readPageFor(
     /** Dated times waiting in the queue (a calendar's week another page
      *  filed): they win over this page's usual times too (yieldToDated). */
     dated?: readonly DatedTime[]
+    /** The guide's listings, for a minyan the page says is at another
+     *  shul (heldElsewhere.ts). */
+    others?: () => Promise<readonly DirectoryResource[]>
   },
 ): Promise<PageReading> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
@@ -324,11 +328,11 @@ export async function readPageFor(
     const got = await Promise.all(source.pictures.map((u) => fetchPublic(u, { fetchImpl, headers: WATCH_FETCH_HEADERS, pictures: true }).catch(() => null)))
     const images = got.flatMap((g) => (g?.type === 'picture' ? [{ mime: g.mime, b64: g.body }] : []))
     if (!images.length) return { read: [], proposal: null, note: 'Their calendar’s pictures couldn’t be opened.' }
-    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, () => ({ images }))
+    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, () => ({ images }), others)
   }
   if (reads.kind === 'times' && source.weeks) {
     const words = (w: CalendarWeek) => (w.lines.length ? { text: [CALENDAR_HEADING, ...w.lines].join('\n') } : null)
-    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, words)
+    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, words, others)
   }
   if (reads.kind === 'times') {
     // The shul's times (scheduleUpdate.ts): its usual ones, and since Oct 20
@@ -339,7 +343,7 @@ export async function readPageFor(
     // (the user, Oct 20, on Leyv Ha-Ir's monthly services).
     // Its dated times go on as their week's schedule, apart from its usual
     // times (datedAsWeeks).
-    const read = await readShulWeek(listing, reads.key, text !== null ? { text } : { pdf: source.pdf! }, apiKey)
+    const read = await readShulWeek(listing, reads.key, text !== null ? { text } : { pdf: source.pdf! }, apiKey, { others })
     const sk = schedulesKey(reads.key)
     let minyanim = regularMinyanim(listing[reads.key])
     let schedules = readSchedules(listing[sk])
@@ -370,7 +374,7 @@ export async function readPageFor(
       schedules = applied.schedules
       changes.push(...applied.changes)
     }
-    const note = [held ? NEWSLETTER_HELD : null, heldByDate ? DATED_HELD : null].filter(Boolean).join(' ') || undefined
+    const note = [held ? NEWSLETTER_HELD : null, heldByDate ? DATED_HELD : null, ...read.elsewhere.map((l) => `${l}.`)].filter(Boolean).join(' ') || undefined
     if (changes.length === 0) return { read: lines, proposal: null, note, parts }
     return {
       read: lines,
@@ -423,6 +427,7 @@ async function readCalendarWeeks(
   weeks: readonly CalendarWeek[],
   apiKey: string,
   sourceFor: (w: CalendarWeek) => ScheduleSource | null,
+  others?: () => Promise<readonly DirectoryResource[]>,
 ): Promise<PageReading> {
   const sk = schedulesKey(key)
   let minyanim = regularMinyanim(listing[key])
@@ -435,7 +440,8 @@ async function readCalendarWeeks(
   for (const w of weeks) {
     const source = sourceFor(w)
     if (!source) continue
-    const got = await readShulWeek(listing, key, source, apiKey, { week: w })
+    const got = await readShulWeek(listing, key, source, apiKey, { week: w, others })
+    notes.push(...got.elsewhere.map((l) => `${l}.`))
     read.push(...timesReadLines(got.update.rows))
     given += partsGiven([{ ...got.update, kind: 'week' }]).reduce((n, p) => n + p.size, 0)
     const week = keepUncovered(got.update)
@@ -614,7 +620,8 @@ async function readAndFile(
       const ids = new Set(part.schedules)
       return datedTimes(readSchedules(detailsOf(s)[schedulesKey(part.field)]).filter((x) => ids.has(x.id)))
     })
-    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl, now: opts.now, dated })
+    const others = () => listApprovedResources(watch.communityId)
+    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl, now: opts.now, dated, others })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The page changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }

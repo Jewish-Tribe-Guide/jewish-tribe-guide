@@ -168,9 +168,12 @@ async function readAndFile(
   const key = shulCategory.detailFields.find((f) => f.type === 'minyanim')?.key
   // All at once: three model calls one after another wouldn't fit the
   // minute a request has.
+  // A minyan it says is at another shul the guide already has (Mekor's
+  // "Mincha at … Mikveh Israel") is that shul's, not this one's.
+  const guide = async () => listings
   const [fromText, fromFile, others] = await Promise.all([
-    key && text.length >= 10 ? readShulWeek(shul, key, { text }, apiKey, { sentAt }) : null,
-    key && fileSource ? readShulWeek(shul, key, fileSource, apiKey, { sentAt }) : null,
+    key && text.length >= 10 ? readShulWeek(shul, key, { text }, apiKey, { sentAt, others: guide }) : null,
+    key && fileSource ? readShulWeek(shul, key, fileSource, apiKey, { sentAt, others: guide }) : null,
     text.length >= 10
       ? readMessage({ text, images: [] }, buildCatalog(listings, live), {
           apiKey,
@@ -204,11 +207,11 @@ async function readAndFile(
 
   // The shul's times: from the email's words, or from its PDF or picture
   // when the words had none.
-  const update: { u: TimesUpdate; file: boolean } | null =
+  const update: { u: TimesUpdate; file: boolean; elsewhere: string[] } | null =
     fromText && timesWereRead(fromText.update)
-      ? { u: fromText.update, file: false }
+      ? { u: fromText.update, file: false, elsewhere: fromText.elsewhere }
       : fromFile && timesWereRead(fromFile.update)
-        ? { u: fromFile.update, file: true }
+        ? { u: fromFile.update, file: true, elsewhere: fromFile.elsewhere }
         : null
   if (key && update && changesAnything(update.u)) {
     const sk = schedulesKey(key)
@@ -232,7 +235,7 @@ async function readAndFile(
             listingId: shul.id,
             name: shul.name,
             submission: { ...whole, details: p.details },
-            lines: parts.length === 1 ? applied.changes : partLines(p.source, listed, p.details),
+            lines: [...(parts.length === 1 ? applied.changes : partLines(p.source, listed, p.details)), ...(p === parts[0] ? update.elsewhere : [])],
             photoUrl,
             part: p.source,
           })
@@ -241,7 +244,7 @@ async function readAndFile(
           listingId: shul.id,
           name: shul.name,
           submission: whole,
-          lines: applied.changes,
+          lines: [...applied.changes, ...update.elsewhere],
           photoUrl,
         })
     }

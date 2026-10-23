@@ -97,6 +97,12 @@ describe('scheduleProposal', () => {
     expect(scheduleProposal([], [linked], []).weeks[0].days[0].rows[0]).toMatchObject({ what: 'Shacharis', note: 'Online: upenn.zoom.us/j/97084263584' })
   })
 
+  // Mekor's newsletter, Oct 23: "held when there is sufficient interest".
+  it('says a time is sign-up, and its group, so it’s never approved blind', () => {
+    const signedUp = { ...week, minyanim: [{ id: 't', tefillah: 'maariv' as const, on: ['2026-10-22'], time: '5:45pm', signUp: { link: 'https://chat.whatsapp.com/Mekor' } }] }
+    expect(scheduleProposal([], [signedUp], []).weeks[0].days[0].rows[0]).toMatchObject({ what: 'Maariv', note: 'Sign-up: chat.whatsapp.com/Mekor' })
+  })
+
   it('leaves out a schedule the listing has already, and names one it takes off', () => {
     const old = { ...week, id: 'old', name: 'Sukkos', kind: undefined }
     expect(scheduleProposal([week, old], [week], [])).toEqual({ weeks: [], gone: ['Sukkos'] })

@@ -1,6 +1,7 @@
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
 import { fetchDatesInfo } from './dateZmanim'
+import { leaveOutHeldElsewhere } from './heldElsewhere'
 import { readRegular, type ScheduleSource } from './scheduleReader'
 import { compareTimes, type RegularReading } from './scheduleUpdate'
 import { regularMinyanim } from './schedules'
@@ -19,13 +20,17 @@ function datesFrom(today: string, n: number): string[] {
  *  `week`: one week of the shul's calendar (calendarFeed.ts), read as that
  *  week's times whatever the AI calls it, dated, each date only, and every
  *  minyan those days: a calendar is the shul's whole week (the user, Oct
- *  20: "if we have the schedule for the week then it's not usual times"). */
+ *  20: "if we have the schedule for the week then it's not usual times").
+ *
+ *  `others`: the guide's listings, asked for only when a time was read as
+ *  held somewhere else, so one another shul already has is left out
+ *  (heldElsewhere.ts); `elsewhere` says which, for the admin. */
 export async function readShulWeek(
   listing: DirectoryResource,
   minyanimKey: string,
   source: ScheduleSource,
   apiKey: string,
-  { sentAt, week }: { sentAt?: number; week?: { from: string; to: string } } = {},
+  { sentAt, week, others }: { sentAt?: number; week?: { from: string; to: string }; others?: () => Promise<readonly DirectoryResource[]> } = {},
 ) {
   const now = Date.now()
   const dayOf = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: community.timezone }).format(new Date(ms))
@@ -40,14 +45,16 @@ export async function readShulWeek(
   const coords = listing.geo ?? community.mapCenter
   const ahead = await fetchDatesInfo({ latitude: coords.lat, longitude: coords.lng, timezone: community.timezone }, dates[0], dates.at(-1)!)
   const days = { today, ...(!week && first < today ? { sentOn: first } : {}), days: dates.map((date) => ({ date, names: ahead.names[date] ?? [] })) }
-  const read = await readRegular(source, days, listing.name, { apiKey })
+  const raw = await readRegular(source, days, listing.name, { apiKey })
+  const { times, left } = await leaveOutHeldElsewhere(raw.times, { shulId: listing.id, key: minyanimKey, zmanim: ahead.zmanim, others })
+  const read = { ...raw, times }
   const reading = week ? asCalendarWeek(read, week) : read
   const compare = (r: RegularReading) => compareTimes(regularMinyanim(listing[minyanimKey]), r, { season: currentSeason(now, community.timezone), zmanim: ahead.zmanim })
   const update = compare(reading)
   // A website page's: its usual times, then each week it gives dates for,
   // as that week's schedule (datedAsWeeks).
   const { usual, weeks } = datedAsWeeks(reading)
-  return { update, updates: [...(usual ? [usual] : []), ...weeks].map(compare), model: read.model }
+  return { update, updates: [...(usual ? [usual] : []), ...weeks].map(compare), model: read.model, elsewhere: left }
 }
 
 /** A page's times as the website gives them (the user, Oct 21, on Mikveh

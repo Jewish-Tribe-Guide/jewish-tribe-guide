@@ -23,7 +23,8 @@ const m = vi.hoisted(() => ({
 vi.mock('@/lib/watchStore', () => ({ getWatchByUrl: m.getWatchByUrl, addWatch: m.addWatch, updateWatch: m.updateWatch, listWatches: m.listWatches }))
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
-vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: m.readShulWeek }))
+// Nothing left out as another shul's, unless a test says.
+vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: async (...args: unknown[]) => ({ elsewhere: [], ...(await m.readShulWeek(...args)) }) }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
@@ -171,7 +172,7 @@ describe('receiveNewsletter: who it’s from', () => {
 describe('receiveNewsletter: what it changes', () => {
   it('files the shul’s changed times as from the shul, and the watch remembers the email', async () => {
     expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 1 })
-    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { text: email.text }, 'k', { sentAt: Date.parse(email.date) })
+    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { text: email.text }, 'k', { sentAt: Date.parse(email.date), others: expect.any(Function) })
     const [community, target, payload, note, by] = m.submitListingUpdate.mock.calls[0]
     expect([community, target, by]).toEqual(['philly', SHUL, { name: NEWSLETTER_WATCH_NAME }])
     expect(payload.details.minyanim.map((x: { tefillah: string; time: string }) => `${x.tefillah} ${x.time}`).sort()).toEqual(['mincha 12:20pm', 'shacharis 9:00am'])
@@ -210,6 +211,22 @@ describe('receiveNewsletter: what it changes', () => {
     expect(m.sendWatchDigest.mock.calls[0][2].map((w: { what: string }) => w.what.split(':')[0])).toEqual(['Usual weekday times', 'Usual Shabbos times'])
   })
 
+  // Mekor's newsletter, Oct 23: "2:00pm Mincha at 1818 Market or Mikveh
+  // Israel", Mikveh Israel's own Mincha. The reader is handed the guide's
+  // listings to know it by, and the admin is told, once, what was left out.
+  it('says what it left out as another shul’s, once, and hands the reader the guide to know it by', async () => {
+    m.readShulWeek.mockResolvedValue({
+      update: { ...changed, rows: [...changed.rows, { id: 'b', day: 'mon', tefillah: 'shacharis', time: '7:00am', status: 'new', quote: 'Shacharis Monday 7am' }] },
+      model: 'x',
+      elsewhere: ['Left out: Mincha 2:00pm, already on Kahal Kadosh Mikveh Israel'],
+    })
+    expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 2 })
+    const notes = m.submitListingUpdate.mock.calls.map((c) => c[3] as string)
+    expect(notes.map((n) => n.includes('Left out: Mincha 2:00pm, already on Kahal Kadosh Mikveh Israel'))).toEqual([true, false])
+    const { others } = m.readShulWeek.mock.calls[0][4] as { others: () => Promise<{ id: string }[]> }
+    expect((await others()).map((l) => l.id)).toContain(SHUL)
+  })
+
   it('files a week’s times as this week’s schedule', async () => {
     m.readShulWeek.mockResolvedValue({
       update: { ...changed, kind: 'week', title: 'Shabbos Noach', from: '2026-10-23', to: '2026-10-24', rows: [{ id: 'a', day: '2026-10-24', tefillah: 'shacharis', time: '9:00am', status: 'new', quote: 'Shacharis 9:00am' }] },
@@ -233,7 +250,7 @@ describe('receiveNewsletter: what it changes', () => {
     const pdf = { mime: 'application/pdf', b64: Buffer.from('%PDF').toString('base64') }
     m.readShulWeek.mockImplementation(async (_l: unknown, _k: string, source: Record<string, string>) => ({ update: source.pdf ? changed : allGone, model: 'x' }))
     expect(await receiveNewsletter('philly', { ...email, attachment: pdf }, opts)).toEqual({ status: 'read', filed: 1 })
-    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { pdf: pdf.b64 }, 'k', { sentAt: Date.parse(email.date) })
+    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { pdf: pdf.b64 }, 'k', { sentAt: Date.parse(email.date), others: expect.any(Function) })
     expect(m.upload).toHaveBeenCalledWith(expect.stringMatching(/^newsletter-source\/.+\.pdf$/), expect.any(Buffer), { contentType: 'application/pdf', upsert: false })
     expect(m.submitListingUpdate.mock.calls[0][2].source.photoUrl).toMatch(/^https:\/\/kept\/newsletter-source\//)
   })

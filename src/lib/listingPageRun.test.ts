@@ -26,11 +26,11 @@ vi.mock('@/lib/resourceStore', () => ({
 }))
 vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('./menuReader')>()), fetchPublic: m.fetchPublic }))
 // Its `updates` (a page's usual times, then each dated week) are its one
-// `update` unless a test gives them.
+// `update` unless a test gives them; nothing left out as another shul's.
 vi.mock('@/lib/shulWeekReading', () => ({
   readShulWeek: async (...args: unknown[]) => {
     const got = await m.readShulWeek(...args)
-    return { updates: [got.update], ...got }
+    return { updates: [got.update], elsewhere: [], ...got }
   },
 }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
@@ -152,13 +152,24 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       pageHash: await hashOfPage(),
       check: { what: 'times', from: 'page', result: 'differs', read: ['Mincha Sun 6:05 PM'], differences: ['Changed: mincha · Sun · 6:05pm, was 6:15pm'], queue: 'filed', parts: [{ part: 'weekday', size: 1 }] },
     })
-    expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }), 'minyanim', { text: expect.stringContaining('Sunday Mincha 6:05pm') }, 'k')
+    expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }), 'minyanim', { text: expect.stringContaining('Sunday Mincha 6:05pm') }, 'k', { others: expect.any(Function) })
     const [community, target, payload, note, by] = m.submitListingUpdate.mock.calls[0]
     expect([community, target, by]).toEqual(['philly', 's1', { name: LISTING_PAGE_WATCH_NAME }])
     expect(payload.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:05pm' })])
     expect(note).toBe(`From their website, changed Oct 20: ${URL_}\n\nChanged: mincha · Sun · 6:05pm, was 6:15pm`)
     expect(payload.source).toMatchObject({ readBy: 'ai', from: 'Lower Merion Synagogue’s website', note: `From their website, changed Oct 20: ${URL_}` })
     expect(payload.source.original).toContain('Sunday Mincha 6:05pm')
+  })
+
+  // A minyan the page says is held at another shul the guide already has
+  // (Mekor's "Mincha at 1818 Market or Mikveh Israel", Oct 23): the reader
+  // leaves it out, and the check says so.
+  it('says what it left out as another shul’s', async () => {
+    m.readShulWeek.mockResolvedValue({ update: moved, model: 'cheap', elsewhere: ['Left out: Mincha 2:00pm, already on Kahal Kadosh Mikveh Israel'] })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({
+      filed: 1,
+      check: { note: 'Left out: Mincha 2:00pm, already on Kahal Kadosh Mikveh Israel.' },
+    })
   })
 
   // The user's rule (Oct 19): the AI reads, it never confirms.
@@ -852,8 +863,8 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     await run()
     expect(m.readShulWeek).toHaveBeenCalledTimes(2)
     const [[, , first, , a], [, , second, , b]] = m.readShulWeek.mock.calls
-    expect(a).toEqual({ week: expect.objectContaining({ from: '2026-10-22', to: '2026-10-24' }) })
-    expect(b).toEqual({ week: expect.objectContaining({ from: '2026-10-25', to: '2026-10-31' }) })
+    expect(a).toEqual({ week: expect.objectContaining({ from: '2026-10-22', to: '2026-10-24' }), others: expect.any(Function) })
+    expect(b).toEqual({ week: expect.objectContaining({ from: '2026-10-25', to: '2026-10-31' }), others: expect.any(Function) })
     expect(first.text).toMatch(/2026-10-22 \(Thu\) 8:10 AM: Morning Minyan/)
     expect(first.text).not.toMatch(/2026-10-20|2026-10-30/)
     expect(second.text).toMatch(/2026-10-30 \(Fri\) 6:00 PM: Kabbalat Shabbat\n2026-10-31 \(Sat\) 10:45 AM: Shabbat Morning Service$/)
@@ -1056,7 +1067,7 @@ describe('a shul’s month posted as pictures', () => {
     expect(m.readShulWeek).toHaveBeenCalledTimes(2)
     for (const [, , source, , opts] of m.readShulWeek.mock.calls) {
       expect(source).toEqual({ images: [{ mime: 'image/png', b64: `b64 of ${OCT_PNG}?format=1500w` }] })
-      expect(opts).toEqual({ week: expect.objectContaining({ lines: [] }) })
+      expect(opts).toEqual({ week: expect.objectContaining({ lines: [] }), others: expect.any(Function) })
     }
     expect(out).toMatchObject({ ok: true, filed: 1, check: { from: 'pictures', result: 'differs' } })
     const weeks = m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; minyanim: { on: string[]; time: string }[] }[]

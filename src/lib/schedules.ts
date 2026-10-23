@@ -1,5 +1,5 @@
 import { DAY_KEYS, dayLabel, type DayKey } from './hours'
-import { formatAnchorRule, isMinyanim, joinText, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
+import { formatAnchorRule, isMinyanim, joinText, parseTimeToMinutes, SEASON_LABELS, signUpText, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
 import type { CalendarDay } from './jewishDays'
 
 // ── Special schedules: a shul's Yom Tov times (step 4, agreed Oct 1) ────────
@@ -22,9 +22,11 @@ import type { CalendarDay } from './jewishDays'
  *  ("2026-10-02"). */
 export type ScheduleDay = 'yom_tov' | 'chol_hamoed' | DayKey | string
 
-// No signUp: a special schedule is dated times a shul posted, and how a
-// regular minyan gets its ten (davening.ts) isn't part of what it posts.
-export type ScheduleMinyan = Omit<Minyan, 'days' | 'signUp'> & { on: ScheduleDay[] }
+// A week's minyan may say it runs only when enough people sign up (Mekor's
+// newsletter: "held when there is sufficient interest", the user, Oct 23),
+// with the group its usual minyan uses (signUpGroup). Absent, a week's
+// minyan runs under its usual one's (usualSignUp).
+export type ScheduleMinyan = Omit<Minyan, 'days'> & { on: ScheduleDay[] }
 
 export type SpecialSchedule = {
   id: string
@@ -262,7 +264,7 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
       const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
       const lines = [...s.minyanim]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
-        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))
+        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))
       return [head, ...lines.map((l) => `  ${l}`)].join('\n')
     })
     .join('\n')
@@ -365,6 +367,25 @@ export function usualSignUp(regular: readonly Minyan[], m: { tefillah: Minyan['t
   return regular.find((r) => r.signUp && r.tefillah === m.tefillah && weekdays.some((d) => r.days.includes(d)))?.signUp
 }
 
+const SAME_CROWD: Partial<Record<Minyan['tefillah'], Minyan['tefillah'][]>> = {
+  mincha_maariv: ['mincha', 'maariv'],
+  mincha: ['mincha_maariv'],
+  maariv: ['mincha_maariv'],
+}
+
+/** Tefillos that are the same minyan said another way: a newsletter's
+ *  "Mincha followed by Maariv" is the usual weekday Maariv's crowd. */
+export const sameCrowd = (a: Minyan['tefillah'], b: Minyan['tefillah']) => a === b || (SAME_CROWD[a] ?? []).includes(b)
+
+/** The group a minyan read as sign-up signs up in: the usual minyan's for
+ *  the same tefillah on one of its weekdays, else one that's the same
+ *  crowd (Mincha & Maariv for a Maariv). Empty when the shul has none
+ *  there: still sign-up, for an admin to give the group. */
+export function signUpGroup(regular: readonly Minyan[], tefillah: Minyan['tefillah'], weekdays: readonly DayKey[]): NonNullable<Minyan['signUp']> {
+  const on = (r: Minyan) => !!r.signUp && weekdays.some((d) => r.days.includes(d))
+  return regular.find((r) => on(r) && r.tefillah === tefillah)?.signUp ?? regular.find((r) => on(r) && sameCrowd(tefillah, r.tefillah))?.signUp ?? {}
+}
+
 /** The join link a week's minyan has: its own, else that of the usual
  *  minyan it is, the same tefillah on one of its weekdays at the same
  *  time. A calendar or newsletter may give the time without the Zoom link
@@ -409,9 +430,8 @@ export function withWeekRows(schedules: readonly SpecialSchedule[], postId: stri
       if (was && weekPostRows({ ...post, minyanim: [was] }).some((r) => plainRow(r) === plainRow(row))) return [was]
       const on = dates.filter((d) => row.days.includes(weekdayOfDate(d)))
       if (on.length === 0) return []
-      const { days: _days, signUp: _signUp, ...rest } = row
+      const { days: _days, ...rest } = row
       void _days
-      void _signUp
       return [{ ...rest, on }]
     })
     return { ...post, minyanim }
