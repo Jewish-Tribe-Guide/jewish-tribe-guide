@@ -934,6 +934,64 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     const tue = await readListingPage(URL_, { now: Date.parse('2026-10-20T14:00:00Z') })
     expect(tue?.weeks).toEqual([{ sunday: '2026-10-18', from: '2026-10-20', to: '2026-10-24', lines: ['2026-10-20', '2026-10-22', '2026-10-23', '2026-10-24'].map((d) => expect.stringMatching(new RegExp(`^${d}`))) }])
   })
+
+  // The user, Oct 22: the watch "didn't pick up on … zoom link for 8:10
+  // minyan". Its feed gives the minyan's page, and the page the link.
+  describe('a service’s join link, from its own page', () => {
+    const PAGE = 'https://rodephshalom.org/event/community-morning-minyan-108-2-2-2/2026-10-22/'
+    const POTLUCK = 'https://rodephshalom.org/event/potluck/2026-10-23/'
+    const ZOOM = 'https://upenn.zoom.us/j/97084263584'
+    const withPages = [
+      'BEGIN:VCALENDAR',
+      ...event('2026-10-22', '0810', 'Online Community Morning Minyan').slice(0, -1),
+      `URL:${PAGE}`,
+      `LOCATION:${PAGE}`,
+      'END:VEVENT',
+      ...event('2026-10-23', '1800', 'Kabbalat Shabbat'),
+      ...event('2026-10-23', '1900', 'Sisterhood Potluck').slice(0, -1),
+      `URL:${POTLUCK}`,
+      'END:VEVENT',
+      ...event('2026-10-24', '1045', 'Shabbat Morning Service'),
+      'END:VCALENDAR',
+    ].join('\r\n')
+    const eventPage = `<main><p>Every Thursday from 8:10-8:40 a.m. on Zoom</p><p>Join Zoom <a href="${ZOOM}">here</a>.</p></main><footer><a href="https://www.youtube.com/c/RodephShalomPhiladelphia">Youtube</a></footer>`
+
+    beforeEach(() => {
+      m.fetchPublic.mockImplementation(async (url: string) => {
+        if (url === URL_) return { url, type: 'html', body: withPages }
+        if (url === PAGE || url === POTLUCK) return { url, type: 'html', body: eventPage }
+        return null
+      })
+      byWeek({ '2026-10-22': thisWeek, '2026-10-25': weekOf('2026-10-25', '2026-10-31', []) })
+    })
+
+    it('files the minyan’s Zoom link on its date, the admin told; the reader is given the calendar’s lines alone', async () => {
+      expect(await run()).toMatchObject({ ok: true, filed: 1 })
+      const [one] = schedulesFiled() as { minyanim: { on: string[]; time: string; joinLink?: string }[] }[]
+      expect(one.minyanim.map((x) => [x.on[0], x.time, x.joinLink ?? null])).toEqual([
+        ['2026-10-22', '8:10am', ZOOM],
+        ['2026-10-23', '6:00pm', null],
+        ['2026-10-24', '10:45am', null],
+        ['2026-10-24', '5:30pm', null],
+      ])
+      expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 18 – Oct 24: Shacharis, Thu Oct 22, 8:10am · Online: upenn.zoom.us/j/97084263584')
+      expect(m.readShulWeek.mock.calls[0][2].text).not.toContain('zoom')
+    })
+
+    it('opens only a service’s page, and its link is in the page’s fingerprint', async () => {
+      const { readListingPage, JOINS_HEADING } = await import('./listingPageRun')
+      const got = await readListingPage(URL_, { now: THU })
+      const opened = m.fetchPublic.mock.calls.map(([u]) => u)
+      expect(opened).toContain(PAGE)
+      expect(opened).not.toContain(POTLUCK)
+      expect(got?.text).toContain(`${JOINS_HEADING}\n2026-10-22 8:10 AM: ${ZOOM}`)
+      expect(got?.weeks?.[0].joins).toEqual([{ date: '2026-10-22', time: '8:10 AM', link: ZOOM }])
+      m.fetchPublic.mockImplementation(async (url: string) => (url === URL_ ? { url, type: 'html', body: withPages } : null))
+      const unopened = await readListingPage(URL_, { now: THU })
+      expect(menuHash(unopened!)).not.toBe(menuHash(got!))
+      expect(unopened?.weeks?.[0]).not.toHaveProperty('joins')
+    })
+  })
 })
 
 // Mikveh Israel, Oct 21: its calendar page's event list is empty, and the

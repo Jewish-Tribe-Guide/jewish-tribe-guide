@@ -2,10 +2,10 @@
 
 import { useContext, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
+import { formatDays, isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksDays, usualSignUp, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksDays, usualJoinLink, usualSignUp, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
 import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
@@ -19,6 +19,7 @@ import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import { SignUpBox, SignUpMark } from './SignUp'
+import { JoinLink } from './JoinLink'
 import { useTappedMinyan } from './TappedMinyan'
 import type { MinyanBox } from '@/lib/minyanimBox'
 
@@ -113,14 +114,16 @@ export default function DaveningCard({
   const post = thisWeek.posts[0]
   const waiting = !post && !!todayDate && sendsWeekly(schedules, todayDate)
   // A week's minyanim, each with the sign-up of the usual minyan it stands
-  // in for (usualSignUp); a one-day addition is its own.
+  // in for (usualSignUp); a one-day addition is its own. And its usual
+  // minyan's join link, when the week gives none (usualJoinLink).
   const weekRows = thisWeek.days.map((d) => ({
     ...d,
     rows: d.minyanim.map(({ minyan: { on: _on, ...m }, from }): Minyan => {
       void _on
       const weekday = weekdayOf(d.date)
       const signUp = from.kind === 'week' ? usualSignUp(rows, m, [weekday]) : undefined
-      return { ...m, days: [weekday], ...(signUp ? { signUp } : {}) }
+      const joinLink = usualJoinLink(rows, m, [weekday])
+      return { ...m, days: [weekday], ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
     }),
   }))
   const postRows = weekRows.flatMap((d) => d.rows)
@@ -258,6 +261,11 @@ export default function DaveningCard({
               week.otherSeason,
             ]}
           />
+          {/* A cell holds times: the way to join one from home goes under
+              the table, naming it. */}
+          {week.joins.map((m) => (
+            <JoinLink key={m.id} link={m.joinLink} what={`${formatDays(m.days.filter((d) => d !== 'sat'))} ${TEFILLAH_LABELS[m.tefillah]}`.trim()} className="mt-2 block text-[14px]" />
+          ))}
           {!allSignUp && signUpBoxes(week.signUps, { section: week.everySignUp ? 'All weekday times' : undefined, tapped: tappedRow })}
           {updateIn('week')}
         </Card>,
@@ -563,6 +571,7 @@ function ShabbosLines({ lines, anchors, today, marks = true }: { lines: ShabbosL
               <b className="font-bold text-slate-900">{TEFILLAH_LABELS[l.tefillah]}</b> <span className="text-slate-800">{l.when}</span>
               {l.row.signUp && marks && <SignUpMark className="ml-1.5 align-[1px]" />}
               {sub && <span className="mt-0.5 block text-[13px] text-muted">{sub}</span>}
+              <JoinLink link={l.row.joinLink} className="mt-0.5 block text-[14px]" />
             </span>
           </div>
         )
@@ -602,6 +611,7 @@ function SpecialDay({ label, rows }: { label: string; rows: SpecialSchedule['min
               <span className="text-slate-900">
                 <b>{timeText(m)}</b>
                 {note ? <span className="text-muted"> · {note}</span> : null}
+                <JoinLink link={m.joinLink} className="block text-[14px]" />
               </span>
             </div>
           )
@@ -650,6 +660,7 @@ function WeekDays({
                     {m.signUp && marks && <SignUpMark className="ml-1.5 align-[1px]" />}
                     {at ? <span className="text-muted"> · {at}</span> : null}
                     {note ? <span className="text-muted"> · {note}</span> : null}
+                    <JoinLink link={m.joinLink} className="block text-[14px]" />
                   </span>
                 </div>
               )

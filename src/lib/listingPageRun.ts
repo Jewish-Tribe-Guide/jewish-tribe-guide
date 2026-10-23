@@ -9,7 +9,22 @@ import { readShulWeek } from '@/lib/shulWeekReading'
 import { calendarPictures } from '@/lib/calendarPictures'
 import { hasDaveningTimes } from '@/lib/hoursJob'
 import type { ScheduleSource } from '@/lib/scheduleReader'
-import { CALENDAR_HEADING, MAX_FEED_BYTES, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs, type CalendarEntry, type CalendarWeek } from '@/lib/calendarFeed'
+import {
+  CALENDAR_HEADING,
+  MAX_FEED_BYTES,
+  calendarFeeds,
+  calendarJoins,
+  calendarLines,
+  calendarWeeks,
+  embeddedEntries,
+  eventPagesToOpen,
+  icsEntries,
+  isIcs,
+  joinLinkIn,
+  withJoinLinks,
+  type CalendarEntry,
+  type CalendarWeek,
+} from '@/lib/calendarFeed'
 import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, seasonOf, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
 import { dateText, readSchedules, regularMinyanim, schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { buildCatalog, readMessage } from '@/lib/messageReader'
@@ -70,7 +85,7 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
   // From this week's Sunday, so the text is the same all week (withCalendar).
   const [first, last] = [weeks[0].sunday, weeks.at(-1)!.to]
   // The watch's address may be the calendar feed itself.
-  if (isIcs(page.body)) return withCalendar(page.url, '', icsEntries(page.body, communityConfig.timezone, first, last), weeks)
+  if (isIcs(page.body)) return withCalendar(page.url, '', await withEventJoins(icsEntries(page.body, communityConfig.timezone, first, last), today, last, opts.fetchImpl), weeks)
   // A calendar on the page: its feed (the first that reads) or the event
   // list in its scripts (calendarFeed.ts), ahead of the page's own words.
   let entries = embeddedEntries(page.body, communityConfig.timezone)
@@ -81,6 +96,7 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
       break
     }
   }
+  entries = await withEventJoins(entries, today, last, opts.fetchImpl)
   const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
   // Its phones and emails, read by code (contactRead.ts): in its words and
   // its tel: and mailto: links, its menus' included.
@@ -95,6 +111,28 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
   const got = withCalendar(page.url, text, entries, weeks)
   return got && { ...got, contacts }
 }
+
+/** The calendar's services with the join links their own pages give: a
+ *  few pages a read (eventPagesToOpen), from today on. Rodeph Shalom's
+ *  Zoom link is only on its minyan's page (the user, Oct 22). A page that
+ *  can't be opened, or gives none or several, leaves its entries as they
+ *  were. */
+async function withEventJoins(entries: CalendarEntry[], from: string, to: string, fetchImpl?: typeof fetch): Promise<CalendarEntry[]> {
+  const pages = eventPagesToOpen(entries, from, to)
+  if (!pages.length) return entries
+  const found = new Map<string, string>()
+  await Promise.all(
+    pages.map(async (url) => {
+      const got = await fetchPublic(url, { fetchImpl, headers: WATCH_FETCH_HEADERS }).catch(() => null)
+      const join = got?.type === 'html' ? joinLinkIn(got.body) : null
+      if (join) found.set(url, join)
+    }),
+  )
+  return entries.map((e) => (!e.join && e.url && found.has(e.url) ? { ...e, join: found.get(e.url)! } : e))
+}
+
+/** What heads a page's calendar's join links in its text. */
+export const JOINS_HEADING = 'Join links:'
 
 /** What heads a page whose calendar is pictures. */
 export const PICTURES_HEADING = 'Their calendar, as pictures, read a week at a time:'
@@ -123,11 +161,17 @@ function withPictures(url: string, text: string, pictures: string[], weeks: Omit
 function withCalendar(url: string, text: string, entries: CalendarEntry[], weeks: Omit<CalendarWeek, 'lines'>[]): PageSource | null {
   const lines = calendarLines(entries, weeks[0].sunday, weeks.at(-1)!.to)
   if (lines.length) {
+    // Its join links in its text too, so a new one changes its fingerprint
+    // and is read; the reader is given its lines alone (readCalendarWeeks).
+    const joins = calendarJoins(entries, weeks[0].sunday, weeks.at(-1)!.to).map((j) => `${j.date} ${j.time}: ${j.link}`)
     return {
       url,
-      text: [CALENDAR_HEADING, ...lines, '', text].join('\n').trim(),
+      text: [CALENDAR_HEADING, ...lines, ...(joins.length ? ['', JOINS_HEADING, ...joins] : []), '', text].join('\n').trim(),
       pdf: null,
-      weeks: weeks.map((w) => ({ ...w, lines: calendarLines(entries, w.from, w.to) })),
+      weeks: weeks.map((w) => {
+        const joins = calendarJoins(entries, w.from, w.to)
+        return { ...w, lines: calendarLines(entries, w.from, w.to), ...(joins.length ? { joins } : {}) }
+      }),
     }
   }
   return text.length >= 200 ? { url, text, pdf: null } : null
@@ -343,7 +387,10 @@ async function readCalendarWeeks(
     const update = yieldToNewsletter(own, schedules)
     if (changing(update) < changing(own) || (!update && own.rows.length)) notes.push(NEWSLETTER_HELD)
     if (!update || !update.rows.length) continue
-    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: `Times for ${dateText(w.sunday)} – ${dateText(w.to)}`, evenIfSame: true })
+    const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: `Times for ${dateText(w.sunday)} – ${dateText(w.to)}`, evenIfSame: true })
+    // The calendar's join links onto its times (withJoinLinks), by code.
+    const linked = withJoinLinks(posted.schedules, w.joins ?? [])
+    const applied = { ...posted, schedules: linked.schedules, changes: [...posted.changes, ...linked.changes] }
     // Already on the listing as it would be: nothing to file for this week.
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
     minyanim = applied.minyanim

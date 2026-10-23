@@ -420,10 +420,10 @@ agreed:
    - A calendar's lines carry an event's end ("8:10 AM–8:40 AM"), so the
      reader can note it (Rodeph Shalom's Thursday minyan, the user, Oct
      22). Every calendar's lines change, so each is read once more.
-   - A Zoom link from a calendar: PR #346 (a minyan's join link, read
-     off each event's page). Not from a newsletter: the Apps Script sends
-     the email's plain text, which has no links (Society Hill's "Click
-     here to Zoom", BZBI's weekday minyan).
+   - A Zoom link from a calendar: **built Oct 22**, PR #346 (see "Done
+     Oct 22: a minyan's join link" below). Not from a newsletter: the
+     Apps Script sends the email's plain text, which has no links
+     (Society Hill's "Click here to Zoom", BZBI's weekday minyan).
    - This week's schedule made only of dated services (BZBI's newsletter
      "Sat Oct 24") had no line under it; it has the confirmed line and
      Edit now (the user, Oct 22).
@@ -1240,6 +1240,38 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 22: a minyan's join link (on `redesign/minyan-join-link`)
+
+The user, Oct 22: Rodeph Shalom's watch "didn't pick up on … zoom link for
+8:10 minyan".
+
+- A minyan can have a join link (`joinLink`: Zoom, Google Meet, a YouTube
+  or Vimeo live link, or any web link). The listing shows it on the
+  minyan's own row: "Join on Zoom", "Watch on YouTube", the whole phrase
+  the link. In the usual weekday table, whose cells hold times, it goes
+  under the table and names the minyan ("Join Thu Shacharis on Zoom").
+  Also on the tapped minyan's box. A week's time with none takes its
+  usual minyan's link, the same tefillah that weekday at the same time.
+- Anyone can set it in the minyan editor under More ("Zoom or livestream
+  link"); a web link only. The queue, the admin's times proposal and the
+  schedule summary all say it ("Online: upenn.zoom.us/j/…").
+- The website reader fills it from a shul's calendar, by code (the reader
+  prompt is unchanged and never sees the links): a feed's own join link
+  (its URL, LOCATION, a Google Meet, or a short DESCRIPTION with one), or
+  the event's own page, opened for services only (minyan, service,
+  shacharit…), from today, at most 4 pages a read. A page gives its link
+  only when it has one meeting, outside its header and footer; a channel
+  link (Rodeph Shalom's footer YouTube) isn't one. The link goes on the
+  website's week's time at the same date and time, and the admin's note
+  says so. Its links are in the page's fingerprint, so a new one is read
+  the next morning.
+- Rodeph Shalom: its feed's URL and LOCATION are the minyan's page, and
+  that page's one link is `upenn.zoom.us/j/97084263584`. It fills on the
+  next read after this deploys: its fingerprint changes with the link.
+- Not done: the usual (regular) minyan isn't given the calendar's link;
+  only the week's time is. A person can add it to the usual minyan in
+  the editor.
+
 ## Done Oct 22: the admin nav is five groups (on top of the Eruvim move, #343)
 
 - The admin's one row of tabs is now two rows: the groups on top, the open
@@ -1263,6 +1295,11 @@ compare, and one it can't read, on desktop and phone.
   own. No category has a tab of its own now.
 - The Eruvim tab is gone from the admin nav. `/<community>/admin/eruvim`
   redirects to Categories (`next.config.ts`).
+- Fixed after merging: that redirect also caught `/api/admin/eruvim` (as
+  community "api"), so the Eruv row loaded the categories instead and said
+  "run migration 074". 074 was already on both databases. The redirects
+  now skip `api`, and `nextConfigRoutes.test.ts` fails if any redirect or
+  rewrite catches an API route.
 - A community without the Eruv card has nowhere to edit eruvim until it
   adds one (+ Add Eruv on Categories). The site shows eruvim only with that
   card anyway.

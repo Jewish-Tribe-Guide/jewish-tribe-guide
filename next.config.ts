@@ -171,10 +171,13 @@ const nextConfig: NextConfig = {
     return [
       { source: '/inbox', destination: '/philly/inbox', permanent: true },
       { source: '/:community/pinned', destination: '/:community/you', permanent: true },
+      // Not 'api' as the community, as in rewrites() above: /api/admin/eruvim
+      // is the Eruv row's own data, and this sent it to /api/admin/categories
+      // (nextConfigRoutes.test.ts).
       // Main dishes became the Watches tab's Dishes job (Oct 21).
-      { source: '/:community/admin/dishes', destination: '/:community/admin/watches/dishes', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/dishes', destination: '/:community/admin/watches/dishes', permanent: false },
       // Eruvim became part of the Categories tab's Eruv row (Oct 22).
-      { source: '/:community/admin/eruvim', destination: '/:community/admin/categories', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/eruvim', destination: '/:community/admin/categories', permanent: false },
     ];
   },
 };

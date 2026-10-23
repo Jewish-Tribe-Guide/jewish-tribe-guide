@@ -698,3 +698,49 @@ describe('a minyan that isn’t a shul', () => {
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Their Shabbos times aren’t listed yet.')
   })
 })
+
+// The user, Oct 22: Rodeph Shalom's Thursday minyan is on Zoom, and the
+// listing never said so. "Join on Zoom" on the minyan's own row.
+describe('a minyan people can join from home (Oct 22)', () => {
+  const ZOOM = 'https://upenn.zoom.us/j/97084263584'
+  const usual = [
+    { id: 'k', tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm' },
+    { id: 't', tefillah: 'shacharis', days: ['thu'], time: '8:10 AM' },
+  ]
+  const week = (minyanim: object[]) => ({ id: 'w', name: 'Times for Oct 18 – Oct 24', from: '2026-10-22', to: '2026-10-24', mode: 'replace', kind: 'week', postedBy: 'website', minyanim })
+  const show = (times: unknown[], schedules: unknown[] = []) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-22T07:00:00-04:00')) // Thu Oct 22
+    const shul = makeListing({ id: 'rs', name: 'Congregation Rodeph Shalom', category: 'synagogue', minyanim: times, minyanim_schedules: schedules })
+    renderWithProviders(<DaveningCard item={shul} minyanim={times} schedules={schedules} category={shuls} />, { content: { categories: [shuls] } })
+  }
+  afterEach(() => vi.useRealTimers())
+
+  it('this week’s: on the minyan’s row, opening the meeting in a new tab', () => {
+    show(usual, [week([{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am', joinLink: ZOOM }, { id: 'w2', tefillah: 'kabbalas_shabbos', on: ['2026-10-23'], time: '6:00pm' }])])
+    const box = screen.getByTestId('davening-this-week')
+    const links = within(box).getAllByRole('link', { name: 'Join on Zoom' })
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute('href', ZOOM)
+    expect(links[0]).toHaveAttribute('target', '_blank')
+    expect(links[0].closest('.grid')).toHaveTextContent('Shacharis8:10 AMJoin on Zoom')
+  })
+
+  it('a week that gives the time alone keeps its usual minyan’s link; not a different time that day', () => {
+    show([usual[0], { ...usual[1], joinLink: ZOOM }], [week([{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am' }, { id: 'w3', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:00am' }])])
+    const box = screen.getByTestId('davening-this-week')
+    expect(within(box).getAllByRole('link', { name: 'Join on Zoom' })).toHaveLength(1)
+    expect(within(box).getByRole('link', { name: 'Join on Zoom' }).closest('.grid')).toHaveTextContent('8:10 AM')
+  })
+
+  it('in the usual weekday table: under it, naming the minyan; and on a Shabbos line', () => {
+    show([{ ...usual[0], joinLink: 'https://www.youtube.com/@rodephshalom/live' }, { ...usual[1], joinLink: ZOOM }])
+    expect(within(screen.getByTestId('davening-weekday')).getByRole('link', { name: 'Join Thu Shacharis on Zoom' })).toHaveAttribute('href', ZOOM)
+    expect(within(screen.getByTestId('davening-shabbos-lines')).getByRole('link', { name: 'Watch on YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/@rodephshalom/live')
+  })
+
+  it('a link that isn’t a web link is never a link', () => {
+    show([{ ...usual[1], joinLink: 'javascript:alert(1)' }])
+    expect(screen.queryByTestId('join-link')).not.toBeInTheDocument()
+  })
+})

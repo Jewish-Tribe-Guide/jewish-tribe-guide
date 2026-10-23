@@ -368,3 +368,32 @@ describe('signing up for a minyan', () => {
     expect(formatMinyanimSummary([{ id: 'a', tefillah: 'maariv', days: ['mon'], time: '9:45pm', signUp: { name: 'Moshe', phone: '215-555-0142' } }])).toBe('Maariv · Mon · 9:45pm · Sign-up: text Moshe 215-555-0142')
   })
 })
+
+// Oct 22: a minyan people can join from home (Rodeph Shalom's Thursday
+// minyan, on Zoom). It can come from the public, so only a web link is
+// ever a link.
+describe('joining a minyan from home', () => {
+  it('says how, by where the link goes', async () => {
+    const { joinAction } = await import('./davening')
+    expect(joinAction(' https://upenn.zoom.us/j/97084263584 ')).toEqual({ href: 'https://upenn.zoom.us/j/97084263584', label: 'Join on Zoom' })
+    expect(joinAction('https://meet.google.com/abc-defg-hij')?.label).toBe('Join on Google Meet')
+    expect(joinAction('https://www.youtube.com/@shul/live')?.label).toBe('Watch on YouTube')
+    expect(joinAction('https://youtu.be/abc')?.label).toBe('Watch on YouTube')
+    expect(joinAction('https://shul.example/live')?.label).toBe('Join online')
+    expect(joinAction('https://upenn.zoom.us/j/1', 'Thu Shacharis')?.label).toBe('Join Thu Shacharis on Zoom')
+    expect(joinAction('https://shul.example/live', 'Thu Shacharis')?.label).toBe('Join Thu Shacharis online')
+  })
+
+  it('a web link only', async () => {
+    const { joinAction } = await import('./davening')
+    expect(joinAction('javascript:alert(1)')).toBeNull()
+    expect(joinAction('zoom.us/j/1')).toBeNull()
+    expect(joinAction('')).toBeNull()
+    expect(joinAction(undefined)).toBeNull()
+  })
+
+  it('says where in a summary, for the moderator', async () => {
+    const { formatMinyanimSummary } = await import('./davening')
+    expect(formatMinyanimSummary([{ id: 'a', tefillah: 'shacharis', days: ['thu'], time: '8:10 AM', joinLink: 'https://upenn.zoom.us/j/97084263584' }])).toBe('Shacharis · Thu · 8:10 AM · Online: upenn.zoom.us/j/97084263584')
+  })
+})

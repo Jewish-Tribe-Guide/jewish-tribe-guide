@@ -315,6 +315,27 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
     expect(rows.find((r) => r.id === 'sh')?.signUp).toEqual({ link: 'https://chat.whatsapp.com/Hash' })
   })
 
+  // Oct 22: a minyan people can join from home, its link under More.
+  it('a minyan’s Zoom or livestream link, a web link only, sent with it', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ ok: true, resources: [] }), { status: 200 }))
+    renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={edit} onClose={vi.fn()} />, { content: { categories: [shuls] } })
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.change(screen.getByLabelText('Zoom or livestream link'), { target: { value: 'upenn.zoom.us/j/97084263584' } })
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Zoom or livestream link'), { target: { value: 'https://upenn.zoom.us/j/97084263584' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    const list = screen.getByTestId('minyan-box-list')
+    fireEvent.click(within(list).getByRole('button', { name: /^Shacharis 9:15 AM.*Online/ }))
+    expect(screen.getByLabelText('Zoom or livestream link'), 'opens with More open').toHaveValue('https://upenn.zoom.us/j/97084263584')
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(within(screen.getByTestId('minyan-box-list')).getByRole('button', { name: 'Send 1 change' }))
+    await screen.findByTestId('box-edit-sent')
+    const send = fetchMock.mock.calls.find(([url]) => String(url).startsWith('/api/submissions'))!
+    const rows = findMinyanim(JSON.parse(String(send[1]!.body))) as { id: string; joinLink?: string }[]
+    expect(rows.find((r) => r.id === 'sh')?.joinLink).toBe('https://upenn.zoom.us/j/97084263584')
+  })
+
   it('Back from a minyan leaves it as it was', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
