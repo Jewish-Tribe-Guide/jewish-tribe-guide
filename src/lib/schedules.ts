@@ -166,7 +166,8 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   // again: BZBI's usual Shabbos 9:30 AM and that Shabbos's "9:30 AM" off its
   // newsletter were two rows (the user, Oct 23).
   const usual = regular.filter((m) => !m.season && m.days.includes(d.weekday))
-  const notUsual = (rows: ScheduledMinyan[]) => rows.filter((r) => !usual.some((m) => m.tefillah === r.tefillah && sameClock(m.time, r.time)))
+  const notAmong = (held: readonly Pick<Minyan, 'tefillah' | 'time'>[], rows: ScheduledMinyan[]) => rows.filter((r) => !held.some((m) => m.tefillah === r.tefillah && sameClock(m.time, r.time)))
+  const notUsual = (rows: ScheduledMinyan[]) => notAmong(usual, rows)
   // Every addition but the one covering the day, if it's one.
   const alsoAdded = (covering && !isOneDayAddition(covering) ? additions : additions.slice(1)).flatMap((s) => rowsOn(s, regular, d))
   const added = notUsual(alsoAdded)
@@ -176,11 +177,13 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   if (covering) {
     const week = covering.kind === 'week'
     const rows = covering.mode === 'replace' ? rowsOn(covering, regular, d) : notUsual(rowsOn(covering, regular, d))
+    // Nor one of a week's own times again: BZBI's pasted week gave that
+    // Shabbos 9:30 beside the newsletter's one-day 9:30 (the user, Oct 23).
     // Every week the shul sent out is "This week's times", a Shabbos-only one
     // ("Shabbat Lekh Lekha") too: Mikveh Israel's said "Shabbat Lekh Lekha
     // times" beside every other shul's "This week's times" (the user, Oct 23).
     if (rows.length > 0)
-      return { rows: [...rows, ...(covering.mode === 'replace' ? alsoAdded : added)], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week ? { thisWeek: true as const } : {}) } }
+      return { rows: [...rows, ...(covering.mode === 'replace' ? notAmong(rows, alsoAdded) : added)], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
     // the regular ones, but not presented as the festival's. Unless it's
     // the shul's whole week: then that day has no minyan. A week the

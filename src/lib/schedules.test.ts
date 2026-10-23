@@ -188,6 +188,15 @@ describe('what a shul has on a date', () => {
       const week: SpecialSchedule = { id: 'w', kind: 'week', name: 'Times for Sep 27 – Oct 3', from: '2026-09-27', to: '2026-10-03', mode: 'replace', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:00am' }] }
       expect(resolveDay(usual, [week, oneDay('a', 'shacharis', '9:30 AM')], sat)).toMatchObject({ skip: true, rows: [{ time: '9:00am' }, { time: '9:30 AM' }] })
     })
+
+    // BZBI, Oct 23 again: a week posted from a paste gave that Shabbos
+    // 9:30AM, and the newsletter's one-day "9:30 AM" was still there. Two
+    // 9:30 Shacharis on the Minyanim page.
+    it('isn’t one of the week’s own times again', () => {
+      const week: SpecialSchedule = { id: 'w', kind: 'week', name: 'Times for Sep 27 – Oct 3', from: '2026-09-27', to: '2026-10-03', mode: 'replace', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:30AM' }] }
+      expect(resolveDay(usual, [oneDay('a', 'shacharis', '9:30 AM'), week], sat)).toMatchObject({ skip: true, rows: [{ id: 'w1', time: '9:30AM' }] })
+      expect(resolveDay(usual, [oneDay('a', 'maariv', '7:30 PM'), week], sat).rows.map((r) => r.time)).toEqual(['9:30AM', '7:30 PM'])
+    })
   })
 
   it('the calendar not knowing a day doesn’t make it “not posted”', () => {
