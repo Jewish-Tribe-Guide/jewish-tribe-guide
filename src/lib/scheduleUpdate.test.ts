@@ -296,6 +296,20 @@ describe('one Shabbos’s times', () => {
     expect(applyUpdate(MEKOR, [], { ...r, rows: [] }, { newId, evenIfSame: true }).schedules).toEqual([])
   })
 
+  // Oct 23: a calendar that is the shul's whole week, with nothing in a
+  // week, is "reading and confirming there is nothing" (the user).
+  it('the shul’s whole week is posted as such, and with nothing in it, as no minyan', () => {
+    const r = compareTimes(MEKOR, BEREISHIS, { season: 'summer', zmanim: ZMANIM, newId })
+    expect(applyUpdate(MEKOR, [], r, { newId, whole: true }).schedules[0]).toMatchObject({ kind: 'week', whole: true })
+    const empty = { ...r, rows: [] }
+    const { schedules, changes, minyanim } = applyUpdate(MEKOR, [], empty, { newId, postedBy: 'website', whole: true, name: 'Times for Oct 4 – Oct 10' })
+    expect(schedules).toEqual([expect.objectContaining({ name: 'Times for Oct 4 – Oct 10', from: '2026-10-09', to: '2026-10-10', kind: 'week', whole: true, minyanim: [] })])
+    expect(changes[0]).toBe('Times for Oct 4 – Oct 10: no minyan')
+    expect(minyanim.map((m) => m.time)).toEqual(MEKOR.map((m) => m.time))
+    // Not the whole week: nothing posted.
+    expect(applyUpdate(MEKOR, [], empty, { newId, evenIfSame: true }).schedules).toEqual([])
+  })
+
   it('a week sent again replaces every day of it, a day it now has nothing for too', () => {
     const first = applyUpdate(MEKOR, [], u, { newId }).schedules
     const fridayOnly = { ...u, rows: u.rows.filter((r) => r.day === '2026-10-09' && r.status === 'same') }

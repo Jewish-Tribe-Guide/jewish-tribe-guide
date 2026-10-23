@@ -510,6 +510,7 @@ export function applyUpdate(
     postedBy,
     name: weekName,
     evenIfSame = false,
+    whole = false,
   }: {
     newId?: () => string
     now?: number
@@ -523,6 +524,9 @@ export function applyUpdate(
      *  "usual times doesn't read as reliable as something that says this
      *  is confirmed this week's schedule"). */
     evenIfSame?: boolean
+    /** The shul's whole week (SpecialSchedule.whole): posted even with no
+     *  times at all, as no minyan that week. */
+    whole?: boolean
   } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
@@ -604,7 +608,7 @@ export function applyUpdate(
 
   // …and the week itself, dated, in place of the regular times those days.
   const posting = update.rows.some((r) => r.status !== 'gone' || r.keep)
-  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting))) {
+  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting) || whole)) {
     const heading = weekKeepsHeading({ from: update.from, to: update.to }) ? update.title?.trim() : null
     const name = weekName || heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
     const minyanimOn = update.rows.filter((r) => r.status !== 'gone' || r.keep).map(onDate)
@@ -622,13 +626,15 @@ export function applyUpdate(
       kind: 'week',
       postedAt: new Date(now).toISOString(),
       ...(postedBy ? { postedBy } : {}),
+      ...(whole ? { whole: true as const } : {}),
     })
+    if (whole && !minyanimOn.length) changes.push(`${name}: no minyan`)
     for (const r of update.rows) {
       if (r.status === 'changed') changes.push(`${name}: ${rowText(r)}, usually ${r.was}`)
       if (r.status === 'new') changes.push(`${name}: new, ${rowText(r)}`)
       if (r.status === 'gone' && !r.keep) changes.push(`${name}: not held, ${rowText(r)}`)
     }
-    if (!changesAnything(update)) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
+    if (!changesAnything(update) && minyanimOn.length) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
   }
 
   // One-offs on their dates, as well as the regular times.

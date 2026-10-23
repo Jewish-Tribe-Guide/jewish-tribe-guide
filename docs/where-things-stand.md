@@ -281,19 +281,10 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
-9. **"No minyan this week"** (the user, Oct 23: "Not being able to read is
-   different than reading and confirming there is nothing"). Leyv Ha-Ir's
-   next minyan is Fri Oct 30 and Shivtei Yeshuron's calendar has none until
-   Nov 7, so both show only their usual times, as if this week weren't
-   known. Proposed: a calendar read with no services that week files an
-   empty week through the queue, and the listing and Minyanim list say
-   "No minyan this week · from their calendar, checked Oct 23"; Shul times
-   keeps "couldn't read" and "read: nothing that week" apart. The risk: a
-   calendar not filled in yet reads the same as an empty week.
-10. **Summer and winter times** follow the clock change (Nov 1), so a
-    Friday "7:00 PM · Summer" still counts while candle lighting is 5:50.
-    Proposed for later: for a pair of one season each, a clock time and a
-    zman, it's summer that day when the zman is later than the clock time.
+9. **Summer and winter times** follow the clock change (Nov 1), so a
+   Friday "7:00 PM · Summer" still counts while candle lighting is 5:50.
+   Agreed next (Oct 23): for a pair of one season each, a clock time and a
+   zman, it's summer that day when the zman is later than the clock time.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
@@ -1275,6 +1266,34 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 23, last: "No minyan this week" (on `redesign/oct18-fixes`, not merged)
+
+The user: "Not being able to read is different than reading and confirming
+there is nothing."
+
+- **A calendar that is the shul's whole schedule** is one that lists each
+  of the shul's usual minyanim on a date, on that weekday, within 15
+  minutes of its time. Shivtei Yeshuron's and Leyv Ha-Ir's list their
+  usual Shabbos minyan on its dates. A calendar of classes and events
+  beside a daily minyan never lists the minyan, so it never counts. A usual
+  time set by a zman never counts either, since it can't be compared with
+  a clock time.
+- **A week of such a calendar** goes to the queue as the shul's whole week.
+  A day it gives nothing for has no minyan, its usual time included, so
+  Leyv Ha-Ir's Oct 25–31 (Friday night only) has no Shabbos morning.
+- **A week with nothing in it** goes to the queue as "no minyan". The
+  queue shows "No minyan this week" with its dates. Once approved, the
+  listing shows a "This week's schedule" box saying "No minyan this week",
+  with the usual times folded under "Not this week: no minyan this week".
+  A week the newsletter (or a person) gave days of is left to it.
+- **Shul times** says what was read: "No minyan Oct 20–24 (their
+  calendar)". That's "agrees" or "differs", never "couldn't read".
+- **On the live site**, this happens only when each watch reads its
+  calendar again, and each week waits in the queue for approval.
+  Nothing was written to production.
+- **The risk** stays as agreed: a calendar not filled in yet reads the
+  same as an empty week. The admin sees "No minyan" before it goes on.
 
 ## Done Oct 23, later: this week after Shabbos, and what an unconfirmed time says (on `redesign/oct18-fixes`, not merged)
 

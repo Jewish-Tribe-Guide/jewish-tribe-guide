@@ -360,6 +360,42 @@ describe('a shul’s weekly schedule', () => {
   })
 })
 
+// Oct 23: "Not being able to read is different than reading and confirming
+// there is nothing." A calendar that is the shul's whole week (the Little
+// Shul's, Leyv Ha-Ir's) posts a week as `whole`.
+describe('the shul’s whole week', () => {
+  const usual: Minyan[] = [m('k', 'kabbalas_shabbos', ['fri'], '6:00pm'), m('s', 'shacharis', ['sat'], '10:00am')]
+  const week = (minyanim: SpecialSchedule['minyanim']): SpecialSchedule => ({ id: 'w', name: 'Times for Oct 25 – Oct 31', from: '2026-10-25', to: '2026-10-31', mode: 'replace', kind: 'week', postedBy: 'website', whole: true, minyanim })
+  const on = (date: string) => factsFor(date, [], '2026-11-07')
+
+  it('is kept through a read, and only on a week', () => {
+    expect(readSchedules([week([])])[0]).toMatchObject({ whole: true })
+    expect(readSchedules([{ ...week([]), kind: undefined }])[0]).not.toHaveProperty('whole')
+  })
+
+  it('a day it has nothing for has no minyan, its usual time included', () => {
+    const friOnly = week([{ id: 'f', tefillah: 'kabbalas_shabbos', on: ['2026-10-30'], time: '7:30pm' }])
+    expect(resolveDay(usual, [friOnly], on('2026-10-31'))).toMatchObject({ rows: [], skip: true })
+    expect(resolveDay(usual, [friOnly], on('2026-10-30')).rows.map((r) => r.time)).toEqual(['7:30pm'])
+    // Not whole: Shabbos keeps its usual time.
+    expect(resolveDay(usual, [{ ...friOnly, whole: undefined }], on('2026-10-31'))).toMatchObject({ skip: false, posting: { kind: 'regular' } })
+  })
+
+  it('with no minyanim, no minyan this week, which isn’t the same as no week posted', () => {
+    expect(thisWeeksDays([week([])], '2026-10-27')).toMatchObject({ days: [], posts: [], none: { name: 'Times for Oct 25 – Oct 31' } })
+    expect(thisWeeksDays([], '2026-10-27').none).toBeNull()
+    // A week that isn't the shul's whole week says nothing about the others.
+    expect(thisWeeksDays([{ ...week([]), whole: undefined }], '2026-10-27').none).toBeNull()
+    // Once Shabbos is over, the week ahead.
+    expect(thisWeeksDays([week([])], '2026-10-24', { shabbosOver: true }).none).not.toBeNull()
+    expect(thisWeeksDays([week([])], '2026-10-24').none).toBeNull()
+  })
+
+  it('says so in the admin’s summary', () => {
+    expect(formatSchedulesSummary([week([])])).toContain('no minyan')
+  })
+})
+
 // Oct 19: a week the shul sent out, edited from its own box: its times as
 // rows on weekdays, and back on its own dates.
 describe('editing this week’s schedule', () => {

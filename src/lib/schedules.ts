@@ -47,6 +47,14 @@ export type SpecialSchedule = {
    *  A week from anywhere else (its newsletter, a person) wins over it for
    *  the same days (the user, Oct 20). */
   postedBy?: 'website'
+  /** A week that is the shul's whole week: a day it has nothing for has no
+   *  minyan, its usual times included. A calendar that lists the shul's
+   *  usual minyanim on their dates is (calendarIsWhole): the Little Shul's
+   *  and Leyv Ha-Ir's "first Shabbos of the month" showed every Shabbos
+   *  (the user, Oct 23: "Not being able to read is different than reading
+   *  and confirming there is nothing"). With no minyanim, no minyan that
+   *  week. */
+  whole?: true
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -86,6 +94,7 @@ export function readSchedules(raw: unknown): SpecialSchedule[] {
         ...(x.kind === 'week' ? { kind: 'week' as const } : {}),
         ...(typeof x.postedAt === 'string' && !Number.isNaN(Date.parse(x.postedAt)) ? { postedAt: x.postedAt } : {}),
         ...(x.postedBy === 'website' ? { postedBy: 'website' as const } : {}),
+        ...(x.whole === true && x.kind === 'week' ? { whole: true as const } : {}),
       },
     ]
   })
@@ -173,11 +182,13 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
     if (rows.length > 0)
       return { rows: [...rows, ...(covering.mode === 'replace' ? alsoAdded : added)], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
-    // the regular ones, but not presented as the festival's. A week the
+    // the regular ones, but not presented as the festival's. Unless it's
+    // the shul's whole week: then that day has no minyan. A week the
     // shul sent out that leaves a day out (a website's calendar giving only
     // Shabbos morning) leaves it its usual times, plainly: it said "Times
     // for Oct 18 – Oct 24 times not posted" on Kol Tzedek's Thursday (the
     // user, Oct 22).
+    if (covering.whole) return { rows: added, skip: true, posting: { kind: 'schedule', name: covering.name, thisWeek: true } }
     if (covering.mode === 'replace' && week && !festival) return { rows: added, skip: false, posting: added.length > 0 ? { kind: 'schedule', name: additions[0].name } : { kind: 'regular' } }
     if (covering.mode === 'replace') return { rows: added, skip: false, posting: { kind: 'not-posted', festival: festival ?? covering.name } }
     if (added.length > 0) return { rows: added, skip: false, posting: { kind: 'schedule', name: additions[0].name } }
@@ -271,7 +282,7 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
   if (schedules.length === 0) return '—'
   return schedules
     .map((s) => {
-      const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
+      const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.whole ? (s.minyanim.length ? 'their whole week' : 'no minyan') : s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
       const lines = [...s.minyanim]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
         .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))
@@ -488,7 +499,7 @@ export function thisWeeksDays(
   schedules: readonly SpecialSchedule[],
   date: string,
   { shabbosOver = false }: { shabbosOver?: boolean } = {},
-): { days: WeekDayTimes[]; posts: SpecialSchedule[] } {
+): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null } {
   // Friday, the week ends with Shabbos, its last; once Shabbos is over
   // (shabbosIsOver), it's the week ahead, Sunday to Shabbos (the user, Oct
   // 23: "right when shabbos is over we need to show the week's schedule").
@@ -497,9 +508,11 @@ export function thisWeeksDays(
   const weeks = schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday)
   const days: WeekDayTimes[] = []
   const used = new Set<SpecialSchedule>()
+  const whole: SpecialSchedule[] = []
   for (const date of datesOf({ from: today, to: saturday })) {
     const weekday = weekdayOfDate(date)
     const post = firstCovering(weeks.filter((s) => s.from <= date && date <= s.to))
+    if (post?.whole) whole.push(post)
     const own = post ? post.minyanim.filter((m) => m.on.includes(date) || m.on.includes(weekday)).map((minyan) => ({ minyan, from: post })) : []
     if (own.length) used.add(post!)
     const extras = schedules.filter((s) => isOneDayAddition(s) && s.from === date)
@@ -516,5 +529,8 @@ export function thisWeeksDays(
     days.push({ date, occasion: named?.name ?? null, minyanim })
   }
   const posts = weeks.filter((s) => used.has(s)).sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || a.from.localeCompare(b.from))
-  return { days, posts }
+  // Nothing any day, and every day the shul's whole week's: no minyan this
+  // week, which isn't the same as no week posted (SpecialSchedule.whole).
+  const none = !days.length && whole.length === datesOf({ from: today, to: saturday }).length ? whole[0] : null
+  return { days, posts, none }
 }

@@ -78,6 +78,7 @@ describe('scheduleProposal', () => {
         title: 'This week’s schedule, Oct 19 – Oct 25',
         range: 'Oct 19–25',
         isWeek: true,
+        none: false,
         days: [
           { label: 'Fri, Oct 23', rows: [{ what: 'Mincha & Maariv', when: '6 PM', note: 'With Kabbalas Shabbos', usually: null }] },
           {
@@ -101,6 +102,13 @@ describe('scheduleProposal', () => {
   it('says a time is sign-up, and its group, so it’s never approved blind', () => {
     const signedUp = { ...week, minyanim: [{ id: 't', tefillah: 'maariv' as const, on: ['2026-10-22'], time: '5:45pm', signUp: { link: 'https://chat.whatsapp.com/Mekor' } }] }
     expect(scheduleProposal([], [signedUp], []).weeks[0].days[0].rows[0]).toMatchObject({ what: 'Maariv', note: 'Sign-up: chat.whatsapp.com/Mekor' })
+  })
+
+  // Oct 23: their calendar read, and nothing in it that week.
+  it('says a whole week with nothing in it is no minyan', () => {
+    const [w] = scheduleProposal([], [{ ...week, whole: true, minyanim: [] }], []).weeks
+    expect(w).toMatchObject({ none: true, days: [], range: 'Oct 19–25' })
+    expect(scheduleProposal([], [{ ...week, whole: true }], []).weeks[0].none).toBe(false)
   })
 
   it('leaves out a schedule the listing has already, and names one it takes off', () => {

@@ -380,6 +380,24 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.queryByTestId('davening-weekday')).not.toBeInTheDocument()
   })
 
+  // Oct 23: "leaving it out makes it seem like we don't know the schedule
+  // this week, but really we know that there is no schedule this week".
+  it('their calendar’s week with nothing in it: no minyan this week, said, the usual times folded', () => {
+    const onEditBox = vi.fn()
+    const none = { ...weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', whole: true, postedAt: '2026-10-07T15:00:00.000Z' }), minyanim: [] }
+    show([...before, none], { onEditBox })
+    expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
+    const box = screen.getByTestId('davening-no-minyan')
+    expect(box).toHaveTextContent('This week’s schedule')
+    expect(box).toHaveTextContent('Oct 4–10')
+    expect(box).toHaveTextContent('No minyan this week')
+    expect(screen.queryByTestId('davening-weekday')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('davening-folded').map((f) => f.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Not this week: no minyan this week')]))
+    fireEvent.click(within(box).getByTestId('box-edit-button'))
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'Times for Oct 4 – Oct 10')
+  })
+
   it('a shul that has never sent one out just shows its usual times', () => {
     show([])
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()

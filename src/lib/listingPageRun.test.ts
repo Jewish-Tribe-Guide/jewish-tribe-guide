@@ -817,6 +817,63 @@ describe('readListingPage: a page with a calendar', () => {
     })
   })
 
+  // Oct 23: the Little Shul's usual Shabbos 10:00am is its calendar's
+  // first-Shabbos "Sabbath Service", so an empty week there is no minyan,
+  // read as such (the user: "Not being able to read is different than
+  // reading and confirming there is nothing").
+  describe('a calendar that is the shul’s whole schedule', () => {
+    const monthly = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTART;TZID=America/New_York:20140705T100000\r\nRRULE:FREQ=MONTHLY;BYDAY=1SA\r\nSUMMARY:Sabbath Service\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+    const words = `<iframe src="https://calendar.google.com/calendar/embed?src=thelittleshul%40gmail.com&amp;ctz=America%2FNew_York"></iframe><p>${'The Little Shul, a small egalitarian congregation in Queen Village. '.repeat(4)}</p>`
+    const littleShul = (extra: object = {}) => ({ ...shul, id: 'ls', name: 'The Little Shul', details: { minyanim: [{ id: 'sat', tefillah: 'shacharis', days: ['sat'], time: '10:00am' }], ...extra } })
+    const filedWeeks = () => m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; from: string; to: string; whole?: boolean; minyanim: unknown[] }[]
+    beforeEach(() => {
+      m.fetchPublic.mockImplementation(async (url: string) => (url === URL_ ? { url, type: 'html', body: words } : { url, type: 'html', body: monthly }))
+      m.readShulWeek.mockResolvedValue({ update: { ...moved, rows: [] }, model: 'cheap' })
+    })
+
+    it('a week with nothing in it goes to the queue as no minyan that week, and is said to have been read', async () => {
+      m.getResourceRowById.mockResolvedValue(littleShul())
+      const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20, full: true })
+      expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', read: expect.arrayContaining(['No minyan Oct 20–24 (their calendar)']) } })
+      expect(filedWeeks()).toEqual([expect.objectContaining({ name: 'Times for Oct 18 – Oct 24', from: '2026-10-20', to: '2026-10-24', kind: 'week', whole: true, postedBy: 'website', minyanim: [] })])
+      expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 18 – Oct 24: no minyan')
+      // Read again, it's on the listing: nothing filed, and it agrees.
+      const posted = m.submitListingUpdate.mock.calls[0][2].details
+      vi.clearAllMocks()
+      m.getResourceRowById.mockResolvedValue({ ...shul, id: 'ls', details: posted })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20, full: true })).toMatchObject({ filed: 0, check: { result: 'agrees' } })
+    })
+
+    it('a week the newsletter gave is left to it, the empty calendar still said', async () => {
+      const newsletter = { id: 'n', name: 'Shabbos Noach', from: '2026-10-23', to: '2026-10-24', mode: 'replace', kind: 'week', minyanim: [{ id: 'n1', tefillah: 'shacharis', on: ['2026-10-24'], time: '10:00am' }] }
+      m.getResourceRowById.mockResolvedValue(littleShul({ minyanim_schedules: [newsletter] }))
+      const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20, full: true })
+      expect(out).toMatchObject({ filed: 0, check: { read: expect.arrayContaining(['No minyan Oct 20–24 (their calendar)']) } })
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+
+    it('a calendar beside the shul’s usual minyanim, never listing them, says nothing about a week', async () => {
+      m.getResourceRowById.mockResolvedValue(littleShul({ minyanim: [{ id: 'd', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00am' }] }))
+      const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20, full: true })
+      expect(out).toMatchObject({ filed: 0, check: { result: 'nothing' } })
+    })
+  })
+
+  it('calendarIsWhole: every usual minyan on a date, that weekday, about that time', async () => {
+    const { calendarIsWhole } = await import('./listingPageRun')
+    const services = [
+      { date: '2026-11-06', time: '7:30 PM', title: 'Kabbalat Shabbat' },
+      { date: '2026-11-07', time: '10:00 AM', title: 'Sabbath Service' },
+    ]
+    const at = (id: string, days: string[], time: string, extra: object = {}) => ({ id, tefillah: 'shacharis' as const, days, time, ...extra }) as never
+    expect(calendarIsWhole(services, [at('a', ['sat'], '10:00am'), at('b', ['fri'], '7:30pm')])).toBe(true)
+    expect(calendarIsWhole(services, [at('a', ['sat'], '10:15am')])).toBe(true)
+    expect(calendarIsWhole(services, [at('a', ['sat'], '10:30am')])).toBe(false)
+    expect(calendarIsWhole(services, [at('a', ['sat'], '10:00am'), at('d', ['mon'], '7:00am')])).toBe(false)
+    expect(calendarIsWhole(services, [at('a', ['sat'], '10:00am', { anchor: 'sunset', offsetMinutes: 0 })])).toBe(false)
+    expect(calendarIsWhole(services, [])).toBe(false)
+  })
+
   it('a page with no calendar and next to no words isn’t readable', async () => {
     const { readListingPage } = await import('./listingPageRun')
     m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<header>Leyv Ha-Ir</header><footer>Philadelphia</footer>' })
@@ -866,7 +923,7 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
   const byWeek = (weeks: Record<string, TimesUpdate>) =>
     m.readShulWeek.mockImplementation(async (_l: unknown, _k: unknown, _s: unknown, _a: unknown, opts: { week: { from: string } }) => ({ update: weeks[opts.week.from], model: 'cheap' }))
   const run = (over: object = {}) => runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU, ...over })
-  const schedulesFiled = () => m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; from: string; to: string; kind?: string; mode: string; postedBy?: string; minyanim: { tefillah: string; on: string[]; time: string }[] }[]
+  const schedulesFiled = () => m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; from: string; to: string; kind?: string; mode: string; postedBy?: string; whole?: boolean; minyanim: { tefillah: string; on: string[]; time: string }[] }[]
 
   beforeEach(() => {
     m.getResourceRowById.mockResolvedValue(rodeph)
@@ -940,6 +997,23 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     expect(out).toMatchObject({ ok: true, filed: 1, check: { note: 'Their calendar for Oct 22–24 has none of their usual minyanim, so only its other services go on, each on its own date, and their usual times stay.' } })
     expect(schedulesFiled()).toEqual([expect.objectContaining({ from: '2026-10-23', to: '2026-10-23', mode: 'add', postedBy: 'website', minyanim: [expect.objectContaining({ tefillah: 'kabbalas_shabbos', time: '7:30pm' })] })])
     expect(schedulesFiled()[0]).not.toHaveProperty('kind')
+  })
+
+  // Leyv Ha-Ir, Oct 23: its calendar lists its first-weekend Shabbos
+  // morning on its date, so a week with only Friday night has no Shabbos
+  // morning; it showed its usual one every Shabbos.
+  it('a calendar that lists the usual minyanim on their dates is the whole week: one it leaves out isn’t held', async () => {
+    const leyv = { ...rodeph, details: { minyanim: usual.slice(0, 2) } }
+    m.getResourceRowById.mockResolvedValue(leyv)
+    byWeek({
+      '2026-10-22': weekOf('2026-10-22', '2026-10-24', [row('2026-10-23', 'kabbalas_shabbos', '6:00pm', 'same', 'k'), row('2026-10-24', 'shacharis', '10:45am', 'same', 's')]),
+      '2026-10-25': weekOf('2026-10-25', '2026-10-31', [row('2026-10-30', 'kabbalas_shabbos', '6:00pm', 'same', 'k'), row('2026-10-31', 'shacharis', '10:45am', 'gone', 's')]),
+    })
+    await run()
+    const next = schedulesFiled().find((x) => x.name === 'Times for Oct 25 – Oct 31')!
+    expect(next).toMatchObject({ whole: true })
+    expect(next.minyanim.map((x) => [x.on[0], x.tefillah])).toEqual([['2026-10-30', 'kabbalas_shabbos']])
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 25 – Oct 31: not held, shacharis')
   })
 
   it('the newsletter keeps the days it gave; the website’s week keeps its others', async () => {
