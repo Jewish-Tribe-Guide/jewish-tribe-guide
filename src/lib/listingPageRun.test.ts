@@ -1096,6 +1096,77 @@ describe('both seasons on one page', () => {
   })
 })
 
+// The user, Oct 22, on Sons of Israel: its calendar gives this Saturday's
+// Shacharis at 9:00 AM, its Tefillot page "8:30", and the suggestion to
+// make 8:30 the usual time came back on every read. "Always go with the
+// page that has a date."
+describe('the page with a date wins', () => {
+  const row = (x: Partial<TimesUpdate['rows'][number]>): TimesUpdate['rows'][number] => ({ id: 'r', day: 'sat', tefillah: 'shacharis', time: '8:30am', status: 'changed', was: '9:00AM', rowId: 'ms', ...x })
+  const update = (rows: TimesUpdate['rows']): TimesUpdate => ({ kind: 'schedule', complete: false, season: null, title: null, startsOn: null, from: null, to: null, rows, otherSeason: 0 })
+  const sat9 = { on: '2026-10-24', tefillah: 'shacharis' as const, time: '9:00AM' }
+  const TODAY = '2026-10-20'
+
+  it('a usual time a date gives otherwise is taken out; one it agrees with stays', async () => {
+    const { yieldToDated } = await import('./listingPageRun')
+    expect(yieldToDated(update([row({})]), [sat9], TODAY).rows).toEqual([])
+    expect(yieldToDated(update([row({ status: 'new', was: undefined })]), [sat9], TODAY).rows).toEqual([])
+    expect(yieldToDated(update([row({ time: '9:00 AM', status: 'new' })]), [sat9], TODAY).rows).toHaveLength(1)
+    // Taking off a time the date gives: kept.
+    expect(yieldToDated(update([row({ time: '9:00AM', status: 'gone' })]), [sat9], TODAY).rows.map((r) => r.status)).toEqual(['kept'])
+  })
+
+  it('holds a time only against its own weekday and tefillah, a date from today on, a clock time, all year', async () => {
+    const { yieldToDated } = await import('./listingPageRun')
+    const keeps = (x: Partial<TimesUpdate['rows'][number]>, dated: Parameters<typeof yieldToDated>[1] = [sat9], u: Partial<TimesUpdate> = {}) =>
+      expect(yieldToDated({ ...update([row(x)]), ...u }, dated, TODAY).rows).toHaveLength(1)
+    keeps({ day: 'sun' })
+    keeps({ tefillah: 'mincha' })
+    keeps({}, [{ ...sat9, on: '2026-10-17' }])
+    keeps({ time: '45 min before Sunset', anchor: 'sunset', offsetMinutes: -45 })
+    keeps({}, [{ ...sat9, time: '5 min before Havdalah', anchor: 'havdalah' }])
+    keeps({ season: 'summer' })
+    keeps({}, [sat9], { season: 'winter' })
+    keeps({}, [sat9], { kind: 'week' })
+  })
+
+  const listingWith = (details: Record<string, unknown>) =>
+    m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan, { id: 'ms', tefillah: 'shacharis', days: ['sat'], time: '9:00AM', notes: 'Main Sanctuary' }], ...details } })
+  const week = { id: 'wk', kind: 'week', mode: 'replace', name: 'Times for Oct 18 – Oct 24', from: '2026-10-18', to: '2026-10-24', postedBy: 'website', minyanim: [{ id: 'x', on: ['2026-10-24'], tefillah: 'shacharis', time: '9:00AM' }] }
+  const tefillot = { ...moved, rows: [...moved.rows, row({ quote: 'Shabbat Shacharit 8:30am' })] }
+
+  it('an undated page’s Shabbos time isn’t filed against the calendar’s week on the listing, and says why', async () => {
+    listingWith({ minyanim_schedules: [week] })
+    m.readShulWeek.mockResolvedValue({ update: tefillot, model: 'cheap' })
+    const got = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW, full: true })
+    expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+    expect(got.check?.differences.join('\n')).not.toContain('8:30')
+    expect(got.check?.note).toMatch(/the date wins/)
+  })
+
+  it('nor against a calendar’s week another page filed, still waiting', async () => {
+    listingWith({})
+    m.pending = [{ id: 'p-week', payload: { details: { minyanim_schedules: [week] }, source: { readBy: 'ai', from: 'x', part: { part: 'week', field: 'minyanim', schedules: ['wk'] } } } }]
+    m.readShulWeek.mockResolvedValue({ update: tefillot, model: 'cheap' })
+    await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW, full: true })
+    expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+  })
+
+  it('nor against a date the same page gives', async () => {
+    listingWith({})
+    const dated: TimesUpdate = { ...moved, kind: 'week', from: '2026-10-18', to: '2026-10-24', rows: [{ id: 'd', day: '2026-10-24', tefillah: 'shacharis', time: '9:00AM', status: 'same', rowId: 'ms' }] }
+    m.readShulWeek.mockResolvedValue({ update: tefillot, updates: [tefillot, dated], model: 'cheap' })
+    await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW, full: true })
+    expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).not.toContain('shabbos')
+  })
+
+  it('with no date given, the usual time is filed as before', async () => {
+    listingWith({})
+    m.readShulWeek.mockResolvedValue({ update: tefillot, model: 'cheap' })
+    await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW, full: true })
+    expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday', 'shabbos'])
+  })
+})
+
 // Its phone and email (contactRead.ts, Oct 22): only what Google doesn't
 // keep, read by code, filed as a box of their own.
 describe('runListingPageWatch: a page’s phone and email', () => {

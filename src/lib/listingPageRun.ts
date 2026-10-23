@@ -39,7 +39,7 @@ import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
-import type { Minyan, Tefillah } from '@/lib/davening'
+import { parseTimeToMinutes, type Minyan, type Tefillah } from '@/lib/davening'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import {
   changedOn,
@@ -239,12 +239,51 @@ export function yieldToNewsletter(update: TimesUpdate, schedules: readonly Speci
   return left.length ? { ...update, from: left[0], to: left.at(-1)!, rows } : null
 }
 
+/** A time a page gives on a date: a calendar's week, on the listing, in
+ *  the queue or read just now. */
+export type DatedTime = { on: string; tefillah: Tefillah; time: string; anchor?: unknown }
+
+/** The dated times in a listing's weeks (and a week waiting), a row each. */
+export const datedTimes = (schedules: readonly SpecialSchedule[]): DatedTime[] =>
+  schedules.filter((s) => s.kind === 'week').flatMap((s) => s.minyanim.flatMap((m) => m.on.map((on) => ({ on, tefillah: m.tefillah, time: m.time, anchor: m.anchor }))))
+
+/** What a page with no date says that a page with one says otherwise,
+ *  taken out: the page with the date wins (the user, Oct 22, on Sons of
+ *  Israel: its calendar gives this Saturday's Shacharis at 9:00, its
+ *  Tefillot page 8:30, "since calendar has date and 9am we go with that").
+ *  A usual time is held against what a date from today on gives that
+ *  weekday, that tefillah; only clock times are, since "15 min before
+ *  sunset" can't be held against a date's 5:50 PM, and only a time for
+ *  the whole year, since a date is one season's. */
+export function yieldToDated(update: TimesUpdate, dated: readonly DatedTime[], today: string): TimesUpdate {
+  if (update.kind === 'week' || update.season) return update
+  const clock = (time: string) => parseTimeToMinutes(time)
+  const given = (r: TimesUpdate['rows'][number]) =>
+    dated.filter((d) => DATE.test(d.on) && d.on >= today && !d.anchor && weekdayOf(d.on) === r.day && sameMinyanName(d.tefillah, r.tefillah)).map((d) => clock(d.time)).filter(Number.isFinite)
+  return {
+    ...update,
+    rows: update.rows.flatMap((r) => {
+      if (r.season || r.anchor || !Number.isFinite(clock(r.time))) return [r]
+      const times = given(r)
+      if (!times.length) return [r]
+      if (r.status === 'gone') return [times.includes(clock(r.time)) ? { ...r, status: 'kept' as const } : r]
+      if (r.status === 'changed' || r.status === 'new') return times.includes(clock(r.time)) ? [r] : []
+      return [r]
+    }),
+  }
+}
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+
 /** What the AI read off the page, a short line each (listingPageWatch.ts),
  *  and what it would change on the listing. `note` says when the
  *  newsletter's days were left to the newsletter. */
 export type PageReading = { read: string[]; proposal: PageProposal; note?: string; unread?: string[]; parts?: PartGiven[] }
 
 const NEWSLETTER_HELD = 'Some days differ, but the newsletter has given those days, and it wins.'
+const DATED_HELD = 'Some usual times differ from what their calendar gives on a date, and the date wins.'
+
+/** "2026-10-22", the community's day. */
+const dayIn = (now: number) => new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(now)
 
 /** "Oct 25–31". */
 function weekText(w: Pick<CalendarWeek, 'from' | 'to'>): string {
@@ -263,7 +302,21 @@ export async function readPageFor(
   category: CategoryConfig,
   reads: PageReads,
   source: PageSource,
-  { apiKey, communityName, fetchImpl }: { apiKey: string; communityName: string; fetchImpl?: typeof fetch },
+  {
+    apiKey,
+    communityName,
+    fetchImpl,
+    now = Date.now(),
+    dated = [],
+  }: {
+    apiKey: string
+    communityName: string
+    fetchImpl?: typeof fetch
+    now?: number
+    /** Dated times waiting in the queue (a calendar's week another page
+     *  filed): they win over this page's usual times too (yieldToDated). */
+    dated?: readonly DatedTime[]
+  },
 ): Promise<PageReading> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
   if (reads.kind === 'times' && source.weeks && source.pictures?.length) {
@@ -294,11 +347,18 @@ export async function readPageFor(
     const parts = partsGiven(read.updates)
     const changes: string[] = []
     let held = false
+    let heldByDate = false
+    // What a date gives: the listing's weeks, one waiting, and this page's own.
+    const today = dayIn(now)
+    const datedRead = read.updates.flatMap((u) => (u.kind === 'week' ? u.rows.filter((r) => r.status !== 'gone' && r.status !== 'kept').map((r) => ({ on: r.day, tefillah: r.tefillah, time: r.time, anchor: r.anchor })) : []))
+    const onDates = [...datedTimes(schedules), ...dated, ...datedRead]
     for (const u of read.updates) {
       const week = u.kind === 'week'
       // A week's own times stay in it: one the listing has that weekday
       // still belongs to that week's schedule.
-      const own = week ? keepUncovered(u) : dropListed(keepUncovered(u), minyanim, schedules)
+      const listed = week ? keepUncovered(u) : dropListed(keepUncovered(u), minyanim, schedules)
+      const own = yieldToDated(listed, onDates, today)
+      if (changing(own) < changing(listed)) heldByDate = true
       const update = yieldToNewsletter(own, schedules)
       if (changing(update) < changing(own)) held = true
       if (!update || !changesAnything(update)) continue
@@ -310,7 +370,7 @@ export async function readPageFor(
       schedules = applied.schedules
       changes.push(...applied.changes)
     }
-    const note = held ? NEWSLETTER_HELD : undefined
+    const note = [held ? NEWSLETTER_HELD : null, heldByDate ? DATED_HELD : null].filter(Boolean).join(' ') || undefined
     if (changes.length === 0) return { read: lines, proposal: null, note, parts }
     return {
       read: lines,
@@ -547,7 +607,14 @@ async function readAndFile(
 
   let reading: PageReading
   try {
-    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl })
+    // A calendar's week another page filed, still waiting, has its dates too.
+    const dated = waitingNow.flatMap((s) => {
+      const part = partOf(s)
+      if (part?.part !== 'week') return []
+      const ids = new Set(part.schedules)
+      return datedTimes(readSchedules(detailsOf(s)[schedulesKey(part.field)]).filter((x) => ids.has(x.id)))
+    })
+    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl, now: opts.now, dated })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The page changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
