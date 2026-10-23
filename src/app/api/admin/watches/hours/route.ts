@@ -9,7 +9,7 @@ import { UUID } from '@/lib/itemMarkRoutes'
 import { hoursSections, offeredSections, sectionKeys } from '@/lib/hoursSections'
 import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, NOT_SEARCHED, NO_WEBSITE, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, hoursSearchedUrl, isHoursOff, isHoursSearched, isStoppedPage, jobWords, samePage, searchReason, sourceLine, type PageJob } from '@/lib/hoursJob'
-import { hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
+import { CHECK_SEARCH_MS, deadline, hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
 import { listingSlug } from '@/lib/listingSlug'
 import { listedContact } from '@/lib/contactRead'
 import { routes } from '@/lib/routes'
@@ -36,8 +36,11 @@ import type { DirectoryResource } from '@/types'
 //      `?item=<id>`: one place's listing and category, for Edit (the
 //      listing's own box editor, BoxEditSheet).
 // POST body: { action: 'check', resourceId }
-//      "Read them now", on every row: its website searched now, what it
-//      finds added, and its pages read straight away.
+//      "Read them now", on every row: its website searched now and what it
+//      finds added; `read`, its pages for the job page to read next.
+// POST body: { action: 'check', resourceId, id }
+//      One of its pages read now. One request a page, so a place with many
+//      is read whole inside the host's 60s (Sons of Israel, Oct 22).
 // POST body: { action: 'give', resourceId, url, replaces? }
 //      "Add a page": read from this page too, from now on, given by hand,
 //      so the morning's search never takes it away. A "No hours online"
@@ -47,8 +50,8 @@ import type { DirectoryResource } from '@/types'
 //      "No hours online" / "Turn off this place": kept, so the search leaves
 //      it alone, and its pages stay, not read.
 // POST body: { action: 'on', resourceId }
-//      "Turn back on": its pages are read again straight away; with none,
-//      its website is searched now.
+//      "Turn back on": `read`, its pages for the job page to read next;
+//      with none, its website is searched now.
 // POST body: { action: 'stop', resourceId, id }
 //      "Stop reading this page", found or given: kept, never read, so the
 //      morning's search never adds it again (the user, Oct 21: an admin
@@ -120,7 +123,7 @@ function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string |
  *  found none kept (recordSearch). Check now and Turn back on. */
 async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob, has = 0): Promise<{ added: Watch[]; reason: string | null }> {
   const website = websiteOf(place)
-  const got = website ? await searchHoursPages(website, undefined, job).catch(() => null) : null
+  const got = website ? await deadline(searchHoursPages(website, undefined, job).catch(() => null), CHECK_SEARCH_MS) : null
   const added: Watch[] = []
   for (const p of got && !('error' in got) ? got.found : []) {
     if (watches.some((w) => samePage(w.url, p.url))) continue
@@ -220,6 +223,8 @@ export async function POST(request: Request) {
       for (const w of ws) done.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
       return done
     }
+    // The pages for the job page to read next, one request each.
+    const toRead = (ws: readonly Watch[]) => ws.filter((w) => w.active).map((w) => w.id)
     const reply = (ps: readonly Watch[], st: readonly Watch[], rest: Record<string, unknown> = {}) => Response.json({ ok: true, pages: shown(ps), stopped: shown(st), off: false, ...rest })
     const again = async (w: Watch) => {
       await updateWatch(slug, w.id, { createdBy: LISTING_PAGE_WATCH_CREATOR, active: true })
@@ -281,23 +286,36 @@ export async function POST(request: Request) {
 
     if (action === 'check') {
       if (marker || (pages.length && !pages.some((w) => w.active))) return Response.json({ ok: false, errors: ['It’s turned off. Turn it back on to read it.'] }, { status: 400 })
+      // One page, read now: the job page asks for each in turn, so every
+      // one is read however many a place has (Sons of Israel's four, Oct
+      // 22), each in a request of its own.
+      if (id) {
+        const page = pages.find((w) => w.id === id && w.active)
+        if (!page) return Response.json({ ok: false, errors: ['That page isn’t read for it.'] }, { status: 400 })
+        const [done] = await read([page])
+        return reply(
+          pages.map((w) => (w.id === id ? done : w)),
+          stopped,
+        )
+      }
       // Searched first, its pages or none, so a page its website links to
       // is read today rather than after the morning's search (the user,
       // Oct 22: the Shtiebel's calendar, Kol Tzedek's Weekly Services).
       const { added, reason } = await searchFor(slug, place, watches, job, pages.length)
-      return reply(await read([...pages.filter((w) => w.active), ...added]), stopped, pages.length ? {} : { reason })
+      const all = [...pages, ...added]
+      return reply(all, stopped, { ...(pages.length ? {} : { reason }), read: toRead(all) })
     }
 
-    // On again.
+    // On again: its pages to read, or with none, its website searched now,
+    // as the morning's run would.
     if (marker) await removeWatch(slug, marker.id)
     for (const w of pages) if (!w.active) await updateWatch(slug, w.id, { active: true })
     const on = pages.map((w) => ({ ...w, active: true }))
     if (!on.length) {
-      // Searched now, as the morning's run would.
       const { added, reason } = await searchFor(slug, place, watches, job)
-      return reply(await read(added), stopped, { reason })
+      return reply(added, stopped, { reason, read: toRead(added) })
     }
-    return reply(await read(on), stopped)
+    return reply(on, stopped, { read: toRead(on) })
   } catch (err) {
     console.error('[admin/watches/hours] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })

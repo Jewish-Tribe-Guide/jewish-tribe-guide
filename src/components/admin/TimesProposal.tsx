@@ -93,11 +93,11 @@ const readsPill = (pages: number, newsletters: number) =>
   newsletters ? [pages ? `${pages} page${pages === 1 ? '' : 's'}` : '', newsletters === 1 ? 'newsletter' : `${newsletters} newsletters`].filter(Boolean).join(' · ') : undefined
 
 /** Its row's pill. */
-export function shulPill(p: HoursPlace, status: JobStatus, reading: boolean, settled: Settled): { text: string; tone: Tone } {
+export function shulPill(p: HoursPlace, status: JobStatus, reading: boolean, settled: Settled, progress?: string): { text: string; tone: Tone } {
   const findings = p.findings ?? []
   const waiting = findings.filter((f) => !settled.has(f.id))
   if (status === 'off') return { text: 'Not read', tone: 'grey' }
-  if (reading) return { text: 'Reading…', tone: 'grey' }
+  if (reading) return { text: progress ?? 'Reading…', tone: 'grey' }
   if (findings.length && !waiting.length) return { text: `${findings.some((f) => settled.get(f.id) === 'approved') ? 'Used' : 'Kept'} ${today()}`, tone: 'grey' }
   if (waiting.length) return { text: updatesPill(waiting.length), tone: 'amber' }
   if (status === 'not_read') return { text: 'Not read yet', tone: 'grey' }
@@ -197,6 +197,7 @@ export function ShulRow({
   status,
   busy,
   reading,
+  progress,
   token,
   community,
   jobName,
@@ -211,6 +212,8 @@ export function ShulRow({
   busy: boolean
   /** Being read now, on its own (a page found and not read yet). */
   reading: boolean
+  // "Reading 2 of 4…" while its pages are read one by one.
+  progress?: string
   token: string
   community: string
   jobName: string
@@ -341,7 +344,7 @@ export function ShulRow({
   const unsure = status === 'unsure' ? live.flatMap((w) => readOf(w)?.read ?? []) : []
 
   return (
-    <PlaceRow name={p.name} pill={shulPill(p, status, reading, settled)} back={jobName}>
+    <PlaceRow name={p.name} pill={shulPill(p, status, reading, settled, progress)} back={jobName}>
       {ordered.map((f) => {
         const t = f.times
         const posted = f.part === 'week' ? t.proposedSchedules.filter((s) => !t.currentSchedules.some((c) => JSON.stringify(c) === JSON.stringify(s))) : []
@@ -428,7 +431,7 @@ export function ShulRow({
             )}
             {!off && (
               <button type="button" disabled={busy} onClick={() => onAct({ action: 'check' })} className={LINK}>
-                {busy ? 'Reading…' : 'Read them now'}
+                {busy ? (progress ?? 'Reading…') : 'Read them now'}
               </button>
             )}
             <a href={p.href} target="_blank" rel="noopener noreferrer" className={LINK}>
