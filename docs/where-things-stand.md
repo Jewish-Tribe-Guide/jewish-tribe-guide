@@ -1231,6 +1231,26 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23, later still: a monthly shul's home page gives its weeks (on `redesign/oct18-fixes`, #352)
+
+- **The Little Shul's home page now gives this week's schedule.** It says
+  "Next Shabbos Services will be: Saturday, November 7th, Saturday,
+  December 5th" and "held the 1st Saturday of each month at 10:00 AM".
+  The reader used to drop all of it as "not every week". Now it takes
+  each date it names. A week with one of them is posted as that week's
+  schedule, even at the usual time. A week between them goes to the
+  queue as "No minyan this week", read as "No minyan Oct 23–24 (their
+  website)". Checked against the real page with the AI: no minyan this
+  week and next.
+- **Only for a page that says the shul doesn't meet every week**, whose
+  dates cover each usual minyan and reach past the weeks read. A weekly
+  shul's page giving one changed date says nothing about the weeks around
+  it.
+- **A date has to fall on the weekday its words name.** The page's past
+  "Saturday, October 3rd" came back as next year's Oct 3, a Sunday, and
+  is now dropped. "1st Saturday of each month" also counts as not weekly
+  now; before, only "first" did.
+
 ## Done Oct 23, after the PR opened: a website that agrees confirms (on `redesign/oct18-fixes`, #351)
 
 - **A shul's or mikvah's own page that agrees with the listing now dates

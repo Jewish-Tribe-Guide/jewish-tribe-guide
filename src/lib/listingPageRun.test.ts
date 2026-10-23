@@ -914,6 +914,50 @@ describe('readListingPage: a page with a calendar', () => {
     })
   })
 
+  // The user, Oct 23, on the Little Shul's home page ("Next Shabbos
+  // Services will be: Saturday, November 7th, Saturday, December 5th"):
+  // this week's schedule from the main site, and "no minyan" as one.
+  describe('a page whose words list every service by date', () => {
+    const page = `<p>Next Shabbos Services will be: Saturday, November 7th. Saturday, December 5th. ${'Services are held the 1st Saturday of each month at 10:00 AM. '.repeat(4)}</p>`
+    const littleShul = (extra: object = {}) => ({ ...shul, id: 'ls', name: 'The Little Shul', details: { minyanim: [{ id: 'sat', tefillah: 'shacharis', days: ['sat'], time: '10:00am' }], ...extra } })
+    const on = (date: string): TimesUpdate => ({ ...moved, kind: 'week', from: date, to: date, rows: [{ id: `r${date}`, day: date, tefillah: 'shacharis', time: '10:00am', status: 'same', rowId: 'sat', quote: 'Saturday' }] })
+    const filedWeeks = () => m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; from: string; to: string; whole?: boolean; minyanim: unknown[] }[]
+    beforeEach(() => {
+      m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: page })
+      m.getResourceRowById.mockResolvedValue(littleShul())
+    })
+
+    it('a week between its dates goes to the queue as no minyan that week', async () => {
+      m.readShulWeek.mockResolvedValue({ update: on('2026-11-07'), updates: [on('2026-11-07'), on('2026-12-05')], model: 'cheap' })
+      const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20 })
+      expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', read: expect.arrayContaining(['No minyan Oct 20–24 (their website)']) } })
+      expect(filedWeeks()).toEqual([expect.objectContaining({ name: 'Times for Oct 18 – Oct 24', from: '2026-10-20', to: '2026-10-24', whole: true, postedBy: 'website', minyanim: [] })])
+    })
+
+    it('the week of a date is this week’s schedule, even at the usual time', async () => {
+      m.readShulWeek.mockResolvedValue({ update: on('2026-11-07'), updates: [on('2026-11-07'), on('2026-12-05')], model: 'cheap' })
+      const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: Date.parse('2026-11-03T15:00:00Z') })
+      expect(out).toMatchObject({ ok: true, filed: 1 })
+      expect(filedWeeks()).toEqual([
+        expect.objectContaining({ name: 'Times for Nov 1 – Nov 7', from: '2026-11-03', to: '2026-11-07', whole: true, minyanim: [expect.objectContaining({ on: ['2026-11-07'], time: '10:00am' })] }),
+      ])
+      expect(m.submitListingUpdate.mock.calls[0][3]).toContain('posted as this week’s schedule')
+    })
+
+    it('says nothing of a week when its dates stop before it, or leave out a usual minyan', async () => {
+      m.readShulWeek.mockResolvedValue({ update: on('2026-11-07'), updates: [on('2026-11-07')], model: 'cheap' })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: Date.parse('2026-11-05T15:00:00Z') })).toMatchObject({ filed: 0 })
+      m.getResourceRowById.mockResolvedValue(littleShul({ minyanim: [{ id: 'sat', tefillah: 'shacharis', days: ['sat'], time: '10:00am' }, { id: 'd', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] }))
+      m.readShulWeek.mockResolvedValue({ update: on('2026-11-07'), updates: [on('2026-11-07'), on('2026-12-05')], model: 'cheap' })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20 })).toMatchObject({ filed: 0 })
+      // A page that never says the shul meets less than weekly.
+      m.getResourceRowById.mockResolvedValue(littleShul())
+      m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: page.replace(/the 1st Saturday of each month/g, 'every Shabbos') })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20 })).toMatchObject({ filed: 0 })
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+  })
+
   it('calendarIsWhole: every usual minyan on a date, that weekday, about that time', async () => {
     const { calendarIsWhole } = await import('./listingPageRun')
     const services = [
