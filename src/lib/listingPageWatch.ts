@@ -25,9 +25,12 @@ import { hoursSections } from './hoursSections'
 //     shul's newsletter, so a standing difference is the newsletter being
 //     newer, not news; the note says "From their website, changed <date>"
 //     so the admin can weigh it.
-//   - Never dates the listing when the page agrees with it. Unlike
-//     Keystone-K, Mekor and Refuah (read by code, sourceConfirm.ts), this
-//     page is read by the AI, and the AI reads but never confirms.
+//   - A page that agrees with the listing dates it by name, as Keystone-K,
+//     Mekor and Refuah do (sourceConfirm.ts): "If the website shows it then
+//     the website shows it" (the user, Oct 23; it was "the AI reads but
+//     never confirms", Oct 19, and the dates sat at the last approval).
+//     An unchanged page that agreed dates it again each morning without
+//     the AI, while the listing stays as it was when read (listedAs).
 //   - The same suggestion is never filed twice, approved or rejected, and
 //     a listing with a suggestion already in the queue is left until it's
 //     settled.
@@ -260,7 +263,7 @@ export function pageCheck(
 /** Where it came from, for the queue's opened card: their own page, read by
  *  the AI, with its words beside the change. The listing is the authority
  *  on itself, as with a shul's newsletter (newsletterRun.ts), so an
- *  admin's approval dates it by name; agreement alone never does. */
+ *  admin's approval dates it by name, as the page agreeing does. */
 export function listingPageSource(listingName: string, url: string, on: string, text: string | null, seen: 'changed' | 'read' = 'changed'): SubmissionSource {
   return {
     readBy: 'ai',

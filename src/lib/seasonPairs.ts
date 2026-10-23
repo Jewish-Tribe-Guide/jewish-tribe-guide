@@ -16,14 +16,19 @@ import { resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 
 type Row = Pick<Minyan, 'tefillah' | 'days' | 'time' | 'season' | 'anchor' | 'offsetMinutes' | 'notBefore' | 'notAfter'>
 
-/** The season a one-season minyan is judged by: its pair's (one clock time,
- *  one zman, the other season, the same crowd on a shared day), else
- *  `season`. */
+/** A one-season minyan's other-season pair: one clock time, one zman, the
+ *  other season, the same crowd on a shared day. It takes the pair's place
+ *  for its season ("instead of", weekTable.ts). */
+export function seasonPartner<R extends Row>(row: R, all: readonly R[]): R | null {
+  if (!row.season) return null
+  return all.find((m) => m !== row && m.season && m.season !== row.season && !m.anchor !== !row.anchor && sameCrowd(m.tefillah, row.tefillah) && m.days.some((d) => row.days.includes(d))) ?? null
+}
+
+/** The season a one-season minyan is judged by: its pair's
+ *  (seasonPartner), else `season`. */
 export function seasonFor(row: Row, all: readonly Row[], season: Season | null, anchors: AnchorTimes | undefined): Season | null {
   if (!row.season) return season
-  const partner = all.find(
-    (m) => m !== row && m.season && m.season !== row.season && !m.anchor !== !row.anchor && sameCrowd(m.tefillah, row.tefillah) && m.days.some((d) => row.days.includes(d)),
-  )
+  const partner = seasonPartner(row, all)
   if (!partner) return season
   const [zman, clock] = row.anchor ? [row, partner] : [partner, row]
   const at = resolveAnchorTime(zman, anchors)

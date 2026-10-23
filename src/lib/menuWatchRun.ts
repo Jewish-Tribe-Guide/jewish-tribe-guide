@@ -32,7 +32,12 @@ import type { DirectoryResource, ResourceRow } from '@/types'
  *  each several seconds of a run that has a minute for every watch.
  *  `searches`: how many websites it may search again for a menu whose page
  *  stopped opening (a few pages each, and one of the run's AI reads). */
-export type MenuReadBudget = { aiReads: number; renders?: number; searches?: number }
+export type MenuReadBudget = { aiReads: number; renders?: number; searches?: number; compares?: number }
+
+/** Listing pages a cron run may read again only because their listing
+ *  changed (listingPageRun.ts), apart from the reads a page that changed
+ *  gets, so they never crowd one out. */
+export const LISTING_COMPARES_PER_RUN = 3
 
 /** Menu pages a cron run may draw in a browser. */
 export const MENU_RENDERS_PER_RUN = 1
@@ -42,7 +47,7 @@ export const MENU_RENDERS_PER_RUN = 1
 export const MENU_SEARCHES_PER_RUN = 1
 
 export function newMenuReadBudget(): MenuReadBudget {
-  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN, searches: MENU_SEARCHES_PER_RUN }
+  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN, searches: MENU_SEARCHES_PER_RUN, compares: LISTING_COMPARES_PER_RUN }
 }
 
 /** Gives every food place its menu watch, on its menu link or else the page
