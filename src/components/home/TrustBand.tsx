@@ -9,6 +9,7 @@ import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { routes } from '@/lib/routes'
 import { sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
 import { fetchEruvStatuses, useEruvStatuses } from '@/lib/useEruvStatuses'
+import { fetchChecksRun, useChecksRun } from '@/lib/useChecksRun'
 import { useNow } from '@/lib/useNow'
 
 // ── Who keeps the guide right (the user, Oct 17) ────────────────────────────
@@ -38,7 +39,10 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
   // time (the user, Oct 20). Small, and cached by the CDN. The rest it
   // names is read off the places the home already has (trustFacts).
   useEffect(() => {
-    const read = () => fetchEruvStatuses(communitySlug)
+    const read = () => {
+      fetchEruvStatuses(communitySlug)
+      fetchChecksRun(communitySlug)
+    }
     if (typeof requestIdleCallback === 'function') {
       const id = requestIdleCallback(read, { timeout: 3000 })
       return () => cancelIdleCallback(id)
@@ -78,8 +82,9 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
 // listing is dated.
 function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boolean; facts: TrustFacts; region: string; communitySlug: string; onClose: () => void }) {
   const eruv = useEruvStatuses(communitySlug, open)
+  const ran = useChecksRun(communitySlug, open)
   const now = useNow()
-  const read = eruv && now !== null ? sourcesRead(facts, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], now) : null
+  const read = eruv && ran && now !== null ? sourcesRead(facts, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], now, ran) : null
   const sentence = read ? sourcesSentence(read) : null
   return (
     <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">

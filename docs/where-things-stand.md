@@ -1231,6 +1231,25 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23, later: the trust sheet's checks; a pasted week as this week's (on `redesign/oct18-fixes`)
+
+- **"We check it every day" names minyan times, mikvah hours, kosher
+  certifications and hospitals again.** It only read the places' box
+  dates, and a check that reads a page and finds a difference dates
+  nothing, so the sheet said "Menus and eruv status" while every shul's
+  and mikvah's page, Refuah and both kosher lists were read that morning.
+  It now also asks `/api/checks` (`src/lib/checksRun.ts`): each kind of
+  check with when one of its pages was last read properly. Only the kind
+  and the time leave the server. A kind named needs a proper read in the
+  last week, as before. On live: shul pages, newsletters, Keystone-K,
+  Refuah and Mekor were all read this week.
+- **A pasted week the same as the usual times can be added as this week's
+  schedule.** The box offered only "Mark them confirmed" (the usual times)
+  and the server refused to file a week that changed nothing. Now the box
+  says "The same as their usual times." with "Add as this week's
+  schedule", and the queue reads "posted as this week's schedule". A
+  schedule (not a week) that matches still just confirms.
+
 ## Done Oct 23, after that: three small fixes (on `redesign/oct18-fixes`)
 
 - **A one-day time that's just the usual one isn't "This week's

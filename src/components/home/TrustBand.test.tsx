@@ -4,6 +4,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
+import { clearChecksRun } from '@/lib/useChecksRun'
 import TrustBand from './TrustBand'
 import type { CheckKind, TrustFacts } from '@/lib/phoneHome'
 
@@ -15,18 +16,23 @@ vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 // them, and no source by name).
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
 let eruvChecked: (string | null)[] = []
-const fetchMock = vi.fn(async () =>
-  new Response(
+// What /api/checks says ran; null for it failing.
+let ran: { kind: CheckKind; at: string }[] | null = []
+const fetchMock = vi.fn(async (url: string) => {
+  if (String(url).startsWith('/api/checks')) return ran ? new Response(JSON.stringify({ ok: true, checks: ran })) : new Response('{"ok":false,"checks":[]}', { status: 502 })
+  return new Response(
     JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: eruvChecked.map((at, i) => ({ id: `e${i}`, name: `E${i}`, statusUrl: 'https://example.org/', statusCheckedAt: at })) }),
-  ),
-)
+  )
+})
 
 beforeEach(() => {
   clearEruvStatuses()
+  clearChecksRun()
   vi.stubGlobal('fetch', fetchMock)
 })
 afterEach(() => {
   eruvChecked = []
+  ran = []
   cleanup()
   vi.unstubAllGlobals()
   fetchMock.mockClear()
@@ -60,13 +66,13 @@ describe('the trust line', () => {
     eruvChecked = [hoursAgo(1)]
     const user = userEvent.setup()
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132, checked: ['kosher'] })
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 4000 })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 })
     await new Promise((r) => setTimeout(r, 0))
     await user.click(screen.getByTestId('trust-band'))
     const sheet = screen.getByTestId('trust-sheet')
     expect(sheet.querySelector('.animate-pulse')).toBeNull()
     expect(sheet).toHaveTextContent('Kosher certifications and eruv status.')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   // The user, Oct 23, word for word.
@@ -81,6 +87,31 @@ describe('the trust line', () => {
       'Every listing says when it was last checkedSomething wrong? Open the place and tap Edit listing.',
     ])
     expect(screen.getByRole('link', { name: 'About the guide' })).toHaveAttribute('href', '/philly/about')
+  })
+
+  // The user, Oct 23: "I'm not seeing mikvah times, minyan times,
+  // hospitals, or kosher certification on what we check." Each was read
+  // that morning; a read that found a difference dates no box, so the
+  // places alone never showed it.
+  it('names the checks that ran this week, though they dated no box', async () => {
+    ran = [
+      { kind: 'times', at: hoursAgo(3) },
+      { kind: 'mikvah', at: hoursAgo(3) },
+      { kind: 'hospitals', at: hoursAgo(3) },
+      { kind: 'kosher', at: hoursAgo(30) },
+    ]
+    const user = userEvent.setup()
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132, checked: ['menus'] })
+    await user.click(screen.getByTestId('trust-band'))
+    expect((await rows())[0]).toBe('We check it every dayMinyan times, mikvah hours, kosher certifications, menus and hospitals. Places on Google Maps are checked against Google.')
+  })
+
+  it('when the checks can’t be fetched, the sheet still opens on what the places show', async () => {
+    ran = null
+    const user = userEvent.setup()
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132, checked: ['menus'] })
+    await user.click(screen.getByTestId('trust-band'))
+    expect((await rows())[0]).toBe('We check it every dayMenus. Places on Google Maps are checked against Google.')
   })
 
   it('every place dated: the band says “every listing dated”', () => {

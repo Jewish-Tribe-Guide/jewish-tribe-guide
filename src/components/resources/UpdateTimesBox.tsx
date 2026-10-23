@@ -29,8 +29,12 @@ import { recordConfirmed } from '@/lib/confirmedHere'
 // day by day. A changed time has the old one crossed out beside it, a new
 // one says New, one coming off is crossed out with Keep. Tap a time to fix
 // it; Send files it for an admin to check (/api/resource/:id/times). When
-// nothing differs, it says so and confirms the times instead. When nothing
-// could be read from it at all, it says that, never "Everything matches".
+// nothing differs, it says so and confirms the times instead; a week's
+// times the same as the usual ones are still that week's schedule, so
+// they're sent as it (the user, Oct 23, pasting BZBI's week: "the only
+// option it gave me was to confirm that this is usual schedule"). When
+// nothing could be read from it at all, it says that, never "Everything
+// matches".
 
 type Step = 'choose' | 'paste' | 'result'
 type Source = { text: string } | { file: File | null; url: string | null }
@@ -297,7 +301,9 @@ function TimesResult({
   const [showSource, setShowSource] = useState(false)
   const u = { ...initial, rows }
   const week = u.kind === 'week'
-  const anything = changesAnything(u)
+  // A week as the usual times: posted all the same, as this week's.
+  const asUsualWeek = week && !changesAnything(u) && !!u.from && !!u.to && readAnything(u)
+  const anything = changesAnything(u) || asUsualWeek
   // Sent something and no time came of it: what's below is only what the
   // guide already has, so it can't be confirmed from this (readAnything).
   const nothingRead = source !== null && !readAnything(initial)
@@ -398,13 +404,14 @@ function TimesResult({
 
       {anything ? (
         <>
+          {asUsualWeek && <p className="mt-4 text-[14px] font-semibold text-emerald-700">The same as their usual times.</p>}
           <button
             type="button"
             disabled={busy || editing !== null}
             onClick={() => onSend(u)}
             className="mt-4 h-11 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
           >
-            {busy ? 'Sending…' : 'Send'}
+            {busy ? 'Sending…' : asUsualWeek ? 'Add as this week’s schedule' : 'Send'}
           </button>
           <p className="mt-2 text-[12.5px] leading-snug text-muted">An admin checks it against {source ? 'what you sent' : 'the shul’s times'} before anyone sees it.</p>
         </>

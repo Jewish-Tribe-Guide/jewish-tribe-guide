@@ -3,6 +3,7 @@ import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { getOpenStatus, hasAnyHours } from '@/lib/hours'
 import { eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
 import { hasAnyDate, KOSHER_SECTION } from '@/lib/boxDates'
+import type { CheckRan } from '@/lib/checksRun'
 
 // ── The phone home (the user, Oct 17) ───────────────────────────────────────
 // No headline and no mission: a line saying who keeps the guide right, the
@@ -118,14 +119,20 @@ export type SourcesRead = {
   checks: CheckKind[]
 }
 
-/** What the guide actually checked in the last week, from what the page
- *  has: the trust facts and the eruvim's last checks. Only these are
- *  named: a check that's set up but hasn't run claims nothing. */
-export function sourcesRead(facts: TrustFacts, eruvChecks: readonly (string | null)[], now: number): SourcesRead {
+/** What the guide actually checked in the last week: what the places'
+ *  box dates show (trust facts), the eruvim's last checks, and the checks
+ *  that read their pages properly this week (/api/checks, checksRun.ts).
+ *  The last matters most: a check that read a shul's page and found its
+ *  times differed dates nothing, so read off the places alone, minyan
+ *  times, mikvah hours and hospitals went unnamed (the user, Oct 23).
+ *  Only these are named: a check that's set up but hasn't run claims
+ *  nothing. */
+export function sourcesRead(facts: TrustFacts, eruvChecks: readonly (string | null)[], now: number, ran: readonly CheckRan[] = []): SourcesRead {
   const eruv = eruvChecks.some((at) => recent(at, now))
+  const read = new Set(ran.filter((c) => recent(c.at, now)).map((c) => c.kind))
   return {
     google: facts.googleChecked > 0 && (facts.checkedThisWeek ?? 0) > 0,
-    checks: CHECK_ORDER.filter((k) => (k === 'eruv' ? eruv : facts.checked.includes(k))),
+    checks: CHECK_ORDER.filter((k) => read.has(k) || (k === 'eruv' ? eruv : facts.checked.includes(k))),
   }
 }
 
