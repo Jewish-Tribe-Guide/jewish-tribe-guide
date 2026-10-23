@@ -1231,6 +1231,44 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23: Northeast's eruv email reads as up (on `redesign/oct18-fixes`)
+
+- **Northeast's weekly "Eruv is UP" email was kept as unclear.** Its body
+  says "Don't assume the Eruv is down if you don't get an email message",
+  which the reader took as a "down". A status sentence that only supposes
+  one ("assume", "if", "whether", "unless") is now left out.
+- **Check now (Eruvim tab) and Read them now (Watches tab) read a waiting
+  email again**, so one kept by a reader since fixed goes live without an
+  admin choosing up or down. Still unreadable, it keeps waiting.
+- This week's (Oct 23) was marked Up by hand on the Watches tab.
+
+## Done Oct 23, last: this week's schedule from Edit listing (on `redesign/oct18-fixes`)
+
+Drawing SwWk3BLEYTtVu2k3w2UJ5s v3. The user: "You should be able to add
+this week's schedule from the main site… and that there's no minyan this
+week."
+
+- **Every shul's Edit listing has "This week's schedule"**, under "Not on
+  the listing yet" until the week has a post, then a row ("Oct 18 – Oct 24
+  · Shacharis 10 AM", or "· No minyan"). It opens the week's days from the
+  usual times (this season's), with "+ Add a minyan" and Done. Opened and
+  Done with nothing changed sends nothing.
+- **"No minyan this week" is a plain link under Done.** It goes back to
+  the list with the row Changed and "Send 1 change". Reopened, it reads
+  "No minyan this week" with "+ Add a minyan"; adding one means just that
+  minyan that week.
+- **The week is Sunday to Shabbos**, the next one once Shabbos is over.
+  Everything goes to the admin queue as a week post.
+- **A weekly shul's page is unchanged** (board 1): its waiting box keeps
+  its one "+ Add this week's schedule". No minyan is offered only in the
+  editor.
+- Not as drawn: the days are grouped as the box groups them ("Shabbos
+  morning", not "Shabbos · Oct 31"); Rosh Chodesh and Yom Tov rows of the
+  usual times aren't carried into a new week.
+- A usual minyan's note is carried into a new week with its time, since
+  the usual times are only where the week starts (the user, Oct 23, after
+  briefly having it dropped). Each minyan's note can be edited there.
+
 ## Done Oct 23, later still: a monthly shul's home page gives its weeks (on `redesign/oct18-fixes`, #352)
 
 - **The Little Shul's home page now gives this week's schedule.** It says

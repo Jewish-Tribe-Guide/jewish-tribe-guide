@@ -89,14 +89,25 @@ export type StatusReading = { status: EruvStatus; words: string | null; postedOn
  *  "The Eruv is UP!". Every such sentence on the page must agree; if one
  *  says up and another down, or none is found, it's unknown. The date is
  *  the first one written after the first sentence (Lower Merion's "Oct 2nd
- *  2026"; Center City's "Last updated: Friday, August 28, 2026"). */
+ *  2026"; Center City's "Last updated: Friday, August 28, 2026").
+ *
+ *  A sentence that only supposes a status isn't one: Northeast's weekly
+ *  email says "Don't assume the Eruv is down if you don't get an email
+ *  message", which made its every "up" unclear (Oct 23). */
 export function readStatus(text: string): StatusReading {
-  const found = [...text.matchAll(/(?:\bthe\s+(?:[\w’'-]+\s+){0,3})?\beruv\s+is\s+(?:currently\s+|now\s+)?(up|down)\b[!.]?/gi)]
+  const found = [...text.matchAll(/(?:\bthe\s+(?:[\w’'-]+\s+){0,3})?\beruv\s+is\s+(?:currently\s+|now\s+)?(up|down)\b[!.]?/gi)].filter((m) => !supposes(text.slice(0, m.index)))
   const statuses = new Set(found.map((m) => m[1].toLowerCase() as 'up' | 'down'))
   if (statuses.size !== 1) return { status: 'unknown', words: found[0]?.[0].trim() ?? null, postedOn: null }
   const first = found[0]
   const after = text.slice((first.index ?? 0) + first[0].length, (first.index ?? 0) + first[0].length + 240)
   return { status: [...statuses][0], words: first[0].trim(), postedOn: firstDate(after) }
+}
+
+/** Whether the sentence a status is in, up to it, only supposes it:
+ *  "Don't assume", "if", "whether", "unless". */
+function supposes(before: string): boolean {
+  const sentence = before.slice(Math.max(before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?'), before.lastIndexOf('\n')) + 1)
+  return /\b(assume|assuming|if|whether|unless)\b/i.test(sentence)
 }
 
 // ── When to read again ──────────────────────────────────────────────────────
