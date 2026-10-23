@@ -76,7 +76,7 @@ export default function DaveningCard({
   // "This week's schedule" (the user, Oct 20: one schedule for a week):
   // the weeks the shul sent out or its website gives, and this week's
   // one-day additions, day by day (thisWeeksDays).
-  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver }) : { days: [], posts: [], none: null }
+  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver, regular: regularMinyanim(minyanim) }) : { days: [], posts: [], none: null }
   const inThisWeek = new Set(thisWeek.days.flatMap((d) => d.minyanim.map((m) => m.from)))
   // Anything else today or tomorrow (a Yom Tov schedule) has its own box.
   const specialSchedule = posting

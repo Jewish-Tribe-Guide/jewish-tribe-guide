@@ -24,7 +24,6 @@ import {
   firstSentence,
   googleKeepsBox,
   boxDate,
-  sectionSource,
   isCertificateLink,
   isWebsite,
   siteName,
@@ -79,7 +78,6 @@ import { FieldsBox } from './FieldsBox'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
-import { KOSHER_SECTION } from '@/lib/boxDates'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -220,7 +218,6 @@ export default function ListingView({ item, category, color, place = null, upvot
   const distance = listingDistance(item, community.region)
   const kindLine = [listingKind(item, category), category.hasAddress === false ? null : place].filter(Boolean).join(' · ')
   const facts = listingFacts(item, category)
-  const certChecked = sectionSource(item, KOSHER_SECTION) ? boxDate(item, KOSHER_SECTION) : null
   const note = listingRowNote(item, category, now, { shulNote: shul?.note })
   const caveat = note?.kind === 'exception' && note.tone === 'caution' ? note : null
   // Food: what isn't kosher is its own box, first after the buttons (the
@@ -311,14 +308,6 @@ export default function ListingView({ item, category, color, place = null, upvot
             <p className="mt-1 text-[14.5px] font-bold text-slate-900" data-testid="listing-facts">
               {facts.join(' · ')}
             </p>
-          )}
-          {/* The hechsher's own date, under it, once a kosher list has
-              read it (the user, Oct 23: every check dates what it
-              checked): "Certification confirmed by Keystone-K, Oct 23." */}
-          {facts.length > 0 && certChecked && (
-            <div className="mt-1" data-testid="listing-cert-date">
-              <FreshnessFooter resourceId={item.id} {...certChecked} subject="Certification" ask={false} />
-            </div>
           )}
           {/* The warning alone, on one line: it decides the visit. What
               isn't kosher is said in full in the details. */}

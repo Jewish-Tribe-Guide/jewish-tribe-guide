@@ -1175,7 +1175,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       bool: written.is ? written.is.split(',') : null,
       select: written.sel ? Object.fromEntries(written.sel.split(',').map((pair) => [pair.slice(0, pair.indexOf(':')), pair.slice(pair.indexOf(':') + 1).split('|')])) : null,
       place: selectedPointId ?? null,
-      pinned: pinnedSelected,
+      pinned: pinnedSelected && !allSelected,
       // The lines alone say so: no `cat` would mean every category.
       eruvim: eruvimOn && selected?.size === 0 && !pinnedSelected ? 'only' : eruvimOn,
     })
@@ -1290,14 +1290,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, filtersKey, isMobile, readByReader])
 
-  // Whether every chip in the row — the real categories AND the Pinned chip,
-  // when it's showing — is currently on. Mirrors CategoryFilter's own `allOn`
-  // (which drives the "All" chip's highlighted state): the Pinned chip only
-  // counts when it actually renders (see pinnedChip below), so a visitor
-  // who's never pinned anything isn't blocked from "narrow to just this
-  // one" by a chip they can't see.
-  const hasPinnedChip = ui.map.pins && mappablePinnedCount > 0
-  const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
+  // Whether every category is on: everything shows, saved places with the
+  // rest, so the Saved chip doesn't count. Mirrors CategoryFilter's own
+  // `allOn` (the "All" chip's lit state). It used to need Saved on too, so
+  // with any place saved the map opened with every category lit and All
+  // not (the user, Oct 23).
+  const allChipsOn = effectiveSelected.size === options.length
   // The full-screen category picker (mobile "More") lets a visitor uncheck
   // every box while browsing its own draft (draftSelected) — see
   // toggleCategoryCheckbox — but leaving with nothing checked would filter
@@ -1375,8 +1373,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     }
     setSelected(next)
   }
-  // Resets every chip in the row, Pinned included — not just the real
-  // categories — so "All" actually means all.
+  // Every category on, and Saved off: All already shows every saved place.
+  // It used to turn Saved on too, so the address said `pinned=1` and,
+  // opened again, showed only the saved places (the user, Oct 23).
   const showAllPlaces = () => {
     // Re-tapping "All" while it's already the active filter used to still
     // build a brand-new Set — a fresh reference flows through
@@ -1385,7 +1384,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // map for no actual change in what's shown.
     if (allChipsOn) return
     setSelected(new Set(options.map((o) => o.id)))
-    setPinnedSelected(true)
+    setPinnedSelected(false)
     setSidebarCollapsed(false)
   }
   // The All chip: every place. It never touches the eruv lines. With the
@@ -1741,7 +1740,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // stays keyed on `pinnedSelected` itself.
   const pinnedHighlighted = pinnedSelected && !allChipsOn
   // "Saved" (Pin until Oct 14, canvas page "you", board YouMap): right after
-  // Filters, before All — the visitor's own places, not one more category.
+  // All, which includes it (the user, Oct 23) — the visitor's own places,
+  // not one more category.
   const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <div
       className={`relative flex shrink-0 items-stretch rounded-full border text-sm font-semibold transition-colors ${
@@ -2009,7 +2009,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       leadingChip={leadingChips}
       campaignChip={campaignChip}
       pinnedChip={pinnedChip}
-      pinnedOn={pinnedSelected}
       scrollArrow
     />
   )
@@ -2580,7 +2579,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         leadingChip={leadingChips}
                         campaignChip={campaignChip}
                         pinnedChip={pinnedChip}
-                        pinnedOn={pinnedSelected}
                       />
                       {activeFilterRow}
                     </div>

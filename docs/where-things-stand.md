@@ -1231,6 +1231,21 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23, after that: three small fixes (on `redesign/oct18-fixes`)
+
+- **A one-day time that's just the usual one isn't "This week's
+  schedule".** BZBI's newsletter gave "Sat Oct 24, 9:30 AM" (Oct 22, case
+  1199) before BZBI had a usual Shabbos time. Once it had one, the box
+  showed the usual 9:30 as this week's. The next-minyan line already left
+  it out. BZBI is the only shul with a one-day time like this on live; week
+  posts repeat usual times on purpose.
+- **Map: with a place saved, All is lit.** Every category on is All, saved
+  places included. Before, with anything saved, the map opened with every
+  category lit and All not.
+- **Map: Saved sits right of All.** Tapping All turns Saved off. It used to
+  turn it on, so the address read `?pinned=1` and, opened again, showed only
+  the saved places.
+
 ## Done Oct 23, at the end: every check dates what it checked (on `redesign/oct18-fixes`)
 
 The user: "We're dating what we're checking. We're not dating a whole
@@ -1250,9 +1265,8 @@ rewritten, and each check dates its own boxes on its next daily run.
 - **Every date shown is the date of what's beside it:** a shul row's "Times
   not confirmed" goes by its times' boxes, the question cards by the times,
   the home's dated count by any box.
-- **The certification's date shows under the hechsher** ("Certification
-  confirmed by Keystone-K, Oct 23."). This is new, because the header was
-  never dated before. **The user should look at where it sits.**
+- **The certification's date is kept but not shown** (the user: there's
+  nowhere to show it, and the hechsher already links its certificate).
 - **An admin approving a check's suggestion still dates the listing** (as
   "From Keystone-K"). Boxes ignore that date, and the check's next agreeing
   run dates the box.

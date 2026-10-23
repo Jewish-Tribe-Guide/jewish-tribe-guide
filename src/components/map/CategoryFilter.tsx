@@ -44,18 +44,12 @@ type Props = {
    *  shortlist while it's live. Absent entirely outside the campaign's date
    *  range — see activeCampaignBanner. */
   campaignChip?: React.ReactNode
-  /** The "Pinned" shortlist toggle — not one of `options`, so it can't just
+  /** The "Saved" shortlist toggle — not one of `options`, so it can't just
    *  be another entry in that array: it narrows ACROSS categories rather
-   *  than being one, and it's the single most important chip in the row, so
-   *  it renders right after the "All" chip rather than sorted in among the
-   *  regular category chips by count like everything else here. */
+   *  than being one. Right after "All" (and a campaign's chip), since All
+   *  already includes every saved place (the user, Oct 23). It doesn't
+   *  count toward "All": every category on is everything, saved places too. */
   pinnedChip?: React.ReactNode
-  /** Whether the Pinned chip (above) is currently on — folded into "is
-   *  everything on" below (only while `pinnedChip` is actually rendered, so
-   *  its absence — nothing pinned yet — can't read as "something's off")
-   *  so the "All" chip's own highlighted state, and what tapping it does,
-   *  accounts for Pinned too, not just the real categories. */
-  pinnedOn?: boolean
   /** Bumped by the parent each time the full-screen category picker (the
    *  compact row's own "More" chip opens it) closes — the only thing,
    *  besides first mount or the category list itself changing, that
@@ -107,11 +101,10 @@ export default function CategoryFilter({
   leadingChip,
   campaignChip,
   pinnedChip,
-  pinnedOn,
   resortToken,
   scrollArrow,
 }: Props) {
-  const allOn = options.every((o) => selected.has(o.id)) && (!pinnedChip || !!pinnedOn)
+  const allOn = options.every((o) => selected.has(o.id))
 
   // The compact row's own display order — deliberately NOT re-derived from
   // `selected` on every render/tap. Once a visitor has scanned this row
@@ -232,7 +225,6 @@ export default function CategoryFilter({
           chip, filled to match whenever it's already the active state,
           rather than a Show all/Hide all pair. */}
       {leadingChip}
-      {pinnedChip}
       <button
         onClick={onAll}
         aria-pressed={allOn}
@@ -245,6 +237,7 @@ export default function CategoryFilter({
         All
       </button>
       {campaignChip}
+      {pinnedChip}
       {visible.map((o) => {
         const selectedState = selected.has(o.id)
         // Display only — while "All" is active every category is technically

@@ -133,8 +133,9 @@ describe('ListingView — who and whether', () => {
 })
 
 // The user, Oct 23: every check dates what it checked. A kosher list reads
-// the hechsher, so its date goes under the hechsher, and nowhere else: Sweet
-// Box's description said "Confirmed by Mekor Habracha, Oct 23".
+// the hechsher, and its date shows nowhere: the header has no place for one,
+// and the hechsher links its certificate. Sweet Box's description said
+// "Confirmed by Mekor Habracha, Oct 23".
 describe('ListingView — the certification’s own date', () => {
   const at = '2026-10-23T11:00:00.000Z'
   beforeEach(() => {
@@ -143,9 +144,10 @@ describe('ListingView — the certification’s own date', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('a kosher list’s date is said under the hechsher, by its name', () => {
+  it('a kosher list’s date is shown nowhere: not under the hechsher, not on a box', () => {
     view({ item: { ...judah, sectionConfirmed: { kosher: at }, sectionFrom: { kosher: { from: 'Keystone-K', at } } } })
-    expect(screen.getByTestId('listing-cert-date')).toHaveTextContent(/^Certification confirmed by Keystone-K, Oct 23\.$/)
+    expect(screen.getByTestId('listing-facts')).toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent('Keystone-K, Oct 23')
     expect(within(screen.getByTestId('listing-about')).getByTestId('freshness')).not.toHaveTextContent('Keystone-K')
   })
 
