@@ -11,7 +11,7 @@ import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { editSubmission } from '@/lib/editSubmission'
 import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
-import { applyUpdate, changesAnything, cleanUpdate } from '@/lib/scheduleUpdate'
+import { applyUpdate, changesAnything, cleanUpdate, readAnything } from '@/lib/scheduleUpdate'
 import { UUID } from '@/lib/itemMarkRoutes'
 
 // POST /api/resource/:id/times   { update, source?, sourceUrl?, turnstileToken, company }
@@ -24,7 +24,10 @@ import { UUID } from '@/lib/itemMarkRoutes'
 //
 // `source` / `sourceUrl`: what it was read from, kept in the queue's note so
 // the admin checks the times against it. A result that changes nothing
-// isn't filed: the card confirms the times instead (/confirm).
+// isn't filed: the card confirms the times instead (/confirm). Except a
+// week: the same as the usual times, it's still that week's schedule, and
+// is posted as it (the user, Oct 23).
+const postsSomething = (u: NonNullable<ReturnType<typeof cleanUpdate>>) => changesAnything(u) || (u.kind === 'week' && readAnything(u))
 
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
 
@@ -38,7 +41,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   if (body && isHoneypotTripped(body)) return Response.json({ ok: true })
   const update = cleanUpdate(body?.update)
   if (!body || !update) return Response.json({ ok: false, error: 'Those times couldn’t be read. Please try again.' }, { status: 400 })
-  if (!changesAnything(update)) return Response.json({ ok: false, error: 'Nothing to change: these are the times the guide has.' }, { status: 400 })
+  if (!postsSomething(update)) return Response.json({ ok: false, error: 'Nothing to change: these are the times the guide has.' }, { status: 400 })
   if (!(await verifyTurnstile(typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined, clientIp(request)))) {
     return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
   }
@@ -67,7 +70,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     }
 
     const key = schedulesKey(field.key)
-    const applied = applyUpdate(regularMinyanim(listing[field.key]), readSchedules(listing[key]), update)
+    const applied = applyUpdate(regularMinyanim(listing[field.key]), readSchedules(listing[key]), update, { evenIfSame: true })
     const note = [
       update.kind === 'week' ? 'Times for particular days, sent from the shul’s card.' : `${update.season ? `Their ${update.season} schedule` : 'Their schedule'}, sent from the shul’s card.`,
       applied.changes.join('\n'),

@@ -155,9 +155,9 @@ describe('Update their times', () => {
     expect(calls.some((c) => c.url === '/api/schedule/read')).toBe(false)
   })
 
-  it('a message with nothing new says so, and confirms the times instead', async () => {
-    const same = { ...BEREISHIS, complete: false, times: [BEREISHIS.times[0]] }
-    const { calls, fetchMock, onSent } = setup(compareTimes(MEKOR, same, { season: 'summer', zmanim: ZMANIM }))
+  it('a schedule with nothing new says so, and confirms the times instead', async () => {
+    const same: RegularReading = { ...WINTER, complete: false, times: [t({ tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0 })] }
+    const { calls, fetchMock, onSent } = setup(compareTimes(MEKOR, same, { season: 'winter' }))
     restore = () => fetchMock.mockRestore()
     await paste()
     expect(screen.getByText('Everything matches what the guide has.')).toBeTruthy()
@@ -165,6 +165,23 @@ describe('Update their times', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mark them confirmed' }))
     await vi.waitFor(() => expect(onSent).toHaveBeenCalledWith('confirmed'))
     expect(calls.some((c) => c.url === `/api/resource/${ID}/confirm`)).toBe(true)
+  })
+
+  // The user, Oct 23, pasting BZBI's week, every time its usual one: "the
+  // only option it gave me was to confirm that this is usual schedule. Even
+  // though I was trying to add this week's schedule."
+  it('a week the same as the usual times: added as this week’s schedule, not confirmed as the usual', async () => {
+    const same = { ...BEREISHIS, complete: false, times: [BEREISHIS.times[0]] }
+    const { calls, fetchMock, onSent } = setup(compareTimes(MEKOR, same, { season: 'summer', zmanim: ZMANIM }))
+    restore = () => fetchMock.mockRestore()
+    await paste()
+    expect(screen.getByText('The same as their usual times.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Mark them confirmed' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Add as this week’s schedule' }))
+    await vi.waitFor(() => expect(onSent).toHaveBeenCalledWith('sent'))
+    const sent = calls.find((c) => c.url === `/api/resource/${ID}/times`)!.body as { update: { kind: string; from: string; to: string } }
+    expect(sent.update).toMatchObject({ kind: 'week', from: '2026-10-09', to: '2026-10-10' })
+    expect(calls.some((c) => c.url.endsWith('/confirm'))).toBe(false)
   })
 
   // Oct 23: Chabad Mainline's schedule link, pasted bare, read nothing (the

@@ -1231,7 +1231,7 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
-## Done Oct 23, later: the trust sheet names every check that ran (on `redesign/oct18-fixes`)
+## Done Oct 23, later: the trust sheet's checks; a pasted week as this week's (on `redesign/oct18-fixes`)
 
 - **"We check it every day" names minyan times, mikvah hours, kosher
   certifications and hospitals again.** It only read the places' box
@@ -1243,6 +1243,12 @@ compare, and one it can't read, on desktop and phone.
   and the time leave the server. A kind named needs a proper read in the
   last week, as before. On live: shul pages, newsletters, Keystone-K,
   Refuah and Mekor were all read this week.
+- **A pasted week the same as the usual times can be added as this week's
+  schedule.** The box offered only "Mark them confirmed" (the usual times)
+  and the server refused to file a week that changed nothing. Now the box
+  says "The same as their usual times." with "Add as this week's
+  schedule", and the queue reads "posted as this week's schedule". A
+  schedule (not a week) that matches still just confirms.
 
 ## Done Oct 23, after that: three small fixes (on `redesign/oct18-fixes`)
 

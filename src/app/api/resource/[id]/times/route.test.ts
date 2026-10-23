@@ -101,6 +101,20 @@ describe('POST /api/resource/:id/times', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
+  // The user, Oct 23: a week pasted with every time its usual one could
+  // only confirm the usual times. It's still that week's schedule.
+  it('a week the same as the usual times is filed, posted as that week’s schedule', async () => {
+    const week = { kind: 'week', complete: false, season: null, title: null, from: '2026-10-03', to: '2026-10-03', rows: [{ id: 'a', day: '2026-10-03', tefillah: 'shacharis', time: '9:15am', status: 'same', rowId: 'm1' }] }
+    expect(await (await POST(req({ update: week, turnstileToken: 't' }), ctx())).json()).toEqual({ ok: true })
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(payload.details.minyanim_schedules).toEqual([expect.objectContaining({ kind: 'week', from: '2026-10-03', to: '2026-10-03', minyanim: [expect.objectContaining({ on: ['2026-10-03'], time: '9:15am' })] })])
+    expect(note).toContain('the same as their usual times, posted as this week’s schedule')
+    // A week where nothing was read, only the shul's own times kept, still files nothing.
+    const kept = { ...week, rows: [{ ...week.rows[0], status: 'kept' }] }
+    expect((await POST(req({ update: kept, turnstileToken: 't' }), ctx())).status).toBe(400)
+    expect(m.submitListingUpdate).toHaveBeenCalledTimes(1)
+  })
+
   it('needs the bot check, and edits switched on', async () => {
     m.verifyTurnstile.mockResolvedValue(false)
     expect((await POST(req({ update: winter, turnstileToken: 't' }), ctx())).status).toBe(403)
