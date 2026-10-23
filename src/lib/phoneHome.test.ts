@@ -16,8 +16,8 @@ describe('the trust line', () => {
 
   it('counts the places, and those Google checked this week', () => {
     const facts = trustFacts([synced('a', 0.5), synced('b', 3), synced('c', 9), synced('d', null, 'shuls')], [food, shuls], now)
-    expect(facts).toEqual({ places: 4, googleChecked: 3, checkedThisWeek: 2, dated: 3 })
-    expect(trustLine(facts)).toBe('4 places · hours checked with Google every night')
+    expect(facts).toEqual({ places: 4, googleChecked: 3, checkedThisWeek: 2, dated: 3, checked: [] })
+    expect(trustLine(facts)).toBe('4 places · checked with Google')
   })
 
   it('only places in a category the guide shows', () => {
@@ -37,7 +37,7 @@ describe('the trust line', () => {
   it('“every listing dated” once every place has a date, and not before', () => {
     const confirmed = (id: string) => makeListing({ id, category: 'food', confirmedAt: new Date(now - 30 * DAY).toISOString() })
     expect(trustLine(trustFacts([synced('a', 1), confirmed('b')], [food], now))).toBe('2 places · every listing dated')
-    expect(trustLine(trustFacts([synced('a', 1), confirmed('b'), synced('c', null)], [food], now))).toBe('3 places · hours checked with Google every night')
+    expect(trustLine(trustFacts([synced('a', 1), confirmed('b'), synced('c', null)], [food], now))).toBe('3 places · checked with Google')
     expect(trustLine(trustFacts([], [food], now))).toBe('0 places')
   })
 
@@ -46,7 +46,7 @@ describe('the trust line', () => {
   it('before there’s a clock, says Google if anything was ever checked', () => {
     const facts = trustFacts([synced('a', 12), synced('b', null)], [food], null)
     expect(facts.checkedThisWeek).toBeNull()
-    expect(trustLine(facts)).toBe('2 places · hours checked with Google every night')
+    expect(trustLine(facts)).toBe('2 places · checked with Google')
   })
 })
 
@@ -221,40 +221,59 @@ describe('the eruvim, on the Friday card, for someone who hasn’t said where th
   })
 })
 
-describe('how this guide stays right: the sources it read this week', () => {
+describe('how this guide stays right: what it checked this week', () => {
   const now = Date.parse('2026-10-16T17:30:00Z')
   const ago = (days: number) => new Date(now - days * DAY).toISOString()
-  const facts = { places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 }
+  const facts = { places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132, checked: [] }
+  const from = (days: number) => ({ from: 'A source', at: ago(days) })
+  const shuls = makeCategory({ id: 'shuls' })
+  const mikvahs = makeCategory({ id: 'mikvahs', detailFields: [{ key: 'women', label: 'Women', type: 'boolean' }, { key: 'womenHours', label: 'Hours', type: 'hours', audienceKey: 'women' }] })
+  const hospitals = makeCategory({ id: 'hospitals', detailFields: [{ key: 'call', label: 'Who to call', type: 'contacts' }] })
+  const food = makeCategory({ id: 'food' })
+  const cats = [shuls, mikvahs, hospitals, food]
 
-  it('names each source that ran this week, as the idea with its examples', () => {
-    const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: ago(0.4) }], [ago(0.01), null], now)
-    expect(read).toEqual({ google: true, lists: ['Keystone-K’s list'], eruv: true })
-    expect(sourcesSentence(read)).toBe(
-      'Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, hours every week.',
-    )
+  // The user, Oct 23: everything the checks read, each by the dates it left
+  // on the places (boxDates.ts), and only this week's.
+  it('reads off the places what each check dated this week', () => {
+    const listings = [
+      makeListing({ id: 's', category: 'shuls', sectionFrom: { weekday: from(0.5), contact: from(0.5) } }),
+      makeListing({ id: 'm', category: 'mikvahs', sectionFrom: { women: from(1) } }),
+      makeListing({ id: 'h', category: 'hospitals', sectionFrom: { call: from(9) } }),
+      makeListing({ id: 'k', category: 'food', sectionFrom: { kosher: from(2) }, itemMenu: { dishes: { Kugel: ago(3) } } }),
+    ]
+    expect(trustFacts(listings, cats, now).checked).toEqual(['times', 'mikvah', 'kosher', 'menus'])
+    expect(trustFacts(listings, cats, null).checked).toEqual([])
   })
 
-  // As on the live site today: the Keystone K watch is set up but has
-  // never run, and no eruv status has been read.
-  it('a check that’s set up but hasn’t run, or stopped over a week ago, claims nothing', () => {
-    const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: null }, { label: 'Old list', okAt: ago(9) }], [null, ago(8)], now)
-    expect(read).toEqual({ google: true, lists: [], eruv: false })
-    expect(sourcesSentence(read)).toBe('Hours from Google. Read again every week.')
+  it('a place dated by a check counts as dated', () => {
+    expect(trustFacts([makeListing({ id: 'k', category: 'food', sectionConfirmed: { kosher: ago(1) }, sectionFrom: { kosher: from(1) } })], cats, now).dated).toBe(1)
   })
 
-  // Oct 19: Google's hours are read weekly, the lists and eruv sites daily.
-  it('without Google, every day', () => {
-    expect(sourcesSentence({ google: false, lists: ['Keystone-K’s list'], eruv: false })).toBe('Hechshers from Keystone-K’s list. Read again every day.')
+  it('names everything checked, no source, then Google', () => {
+    const read = sourcesRead({ ...facts, checked: ['times', 'mikvah', 'kosher', 'menus', 'hospitals'] }, [ago(0.01), null], now)
+    expect(read).toEqual({ google: true, checks: ['times', 'mikvah', 'kosher', 'menus', 'hospitals', 'eruv'] })
+    expect(sourcesSentence(read)).toBe('Minyan times, mikvah hours, kosher certifications, menus, hospitals and eruv status. Places on Google Maps are checked against Google.')
+  })
+
+  it('a check that stopped over a week ago claims nothing', () => {
+    const read = sourcesRead(facts, [null, ago(8)], now)
+    expect(read).toEqual({ google: true, checks: [] })
+    expect(sourcesSentence(read)).toBe('Places on Google Maps are checked against Google.')
+  })
+
+  it('without Google, just what was checked', () => {
+    expect(sourcesSentence({ google: false, checks: ['kosher'] })).toBe('Kosher certifications.')
+    expect(sourcesSentence({ google: false, checks: ['times', 'eruv'] })).toBe('Minyan times and eruv status.')
   })
 
   it('nothing read at all: no sentence, and Google only when it checked this week', () => {
-    expect(sourcesRead({ ...facts, checkedThisWeek: 0 }, [], [], now).google).toBe(false)
-    expect(sourcesSentence({ google: false, lists: [], eruv: false })).toBeNull()
+    expect(sourcesRead({ ...facts, checkedThisWeek: 0 }, [], now).google).toBe(false)
+    expect(sourcesSentence({ google: false, checks: [] })).toBeNull()
   })
 
   // A phone a few minutes slow sees a check made just now as still to come.
   it('a check a few minutes ahead of the phone’s clock still counts; a day ahead doesn’t', () => {
-    expect(sourcesRead(facts, [], [new Date(now + 3 * 60_000).toISOString()], now).eruv).toBe(true)
-    expect(sourcesRead(facts, [], [new Date(now + DAY).toISOString()], now).eruv).toBe(false)
+    expect(sourcesRead(facts, [new Date(now + 3 * 60_000).toISOString()], now).checks).toEqual(['eruv'])
+    expect(sourcesRead(facts, [new Date(now + DAY).toISOString()], now).checks).toEqual([])
   })
 })

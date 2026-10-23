@@ -14,6 +14,7 @@ import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
 import { confirmFromSource } from '@/lib/sourceConfirm'
+import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
@@ -220,7 +221,8 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   await sendWatchDigest(community, "Keystone-K's list", items, findingPage(community, 'kosher')).catch((err) =>
     console.error('[watch-keystone] digest failed:', err),
   )
-  const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME)
+  // What a kosher list says is the certification: that's what it dates.
+  const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME, [KOSHER_SECTION])
 
   return { ok: true, entries: entries.length, listRead: { updated: null, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }

@@ -17,6 +17,8 @@ import { readSectionSource, type SectionSource } from '@/lib/hoursSections'
 import { boxOf, contactBoxes } from '@/lib/hospitalBoxes'
 import { getCategoryById } from '@/lib/categoryStore'
 import { confirmFromSource } from '@/lib/sourceConfirm'
+import { boxKeysHolding } from '@/lib/listingView'
+import type { DirectoryResource } from '@/types'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import type { CheckFound, WatchCheck, WatchOutcome } from '@/lib/watches'
 import {
@@ -153,8 +155,11 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
     refuahHad,
   })
   if (diffs.length === 0) {
-    // Refuah agrees: the hospital's date moves forward (sourceConfirm.ts).
-    if (refuahHasEntries(record)) await confirmFromSource(community, [row.id], REFUAH_NAME)
+    // Refuah agrees: each box it gave contacts for is dated by it
+    // (sourceConfirm.ts), and no other.
+    const read = Object.entries(refuah).flatMap(([key, entries]) => (entries.length ? [key] : []))
+    const boxes = (d: Record<string, unknown>) => (category ? boxKeysHolding({ ...d, id: row.id, name: row.name, category: row.category } as DirectoryResource, category, read) : [])
+    if (refuahHasEntries(record)) await confirmFromSource(community, [row.id], REFUAH_NAME, boxes)
     return { ok: true, filed: 0, pageHash, check: check(null) }
   }
 

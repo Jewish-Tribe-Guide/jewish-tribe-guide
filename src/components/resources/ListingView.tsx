@@ -23,8 +23,8 @@ import {
   confirmPlace,
   firstSentence,
   googleKeepsBox,
-  sectionConfirmedAt,
-  confirmedByFor,
+  boxDate,
+  sectionSource,
   isCertificateLink,
   isWebsite,
   siteName,
@@ -36,7 +36,7 @@ import {
   mainThing,
   nearbyListings,
   primaryLink,
-  boxConfirmKey,
+  listingBoxes,
   type ActionSpec,
   type AudienceGroup,
 } from '@/lib/listingView'
@@ -79,6 +79,7 @@ import { FieldsBox } from './FieldsBox'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
+import { KOSHER_SECTION } from '@/lib/boxDates'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -219,6 +220,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const distance = listingDistance(item, community.region)
   const kindLine = [listingKind(item, category), category.hasAddress === false ? null : place].filter(Boolean).join(' · ')
   const facts = listingFacts(item, category)
+  const certChecked = sectionSource(item, KOSHER_SECTION) ? boxDate(item, KOSHER_SECTION) : null
   const note = listingRowNote(item, category, now, { shulNote: shul?.note })
   const caveat = note?.kind === 'exception' && note.tone === 'caution' ? note : null
   // Food: what isn't kosher is its own box, first after the buttons (the
@@ -309,6 +311,14 @@ export default function ListingView({ item, category, color, place = null, upvot
             <p className="mt-1 text-[14.5px] font-bold text-slate-900" data-testid="listing-facts">
               {facts.join(' · ')}
             </p>
+          )}
+          {/* The hechsher's own date, under it, once a kosher list has
+              read it (the user, Oct 23: every check dates what it
+              checked): "Certification confirmed by Keystone-K, Oct 23." */}
+          {facts.length > 0 && certChecked && (
+            <div className="mt-1" data-testid="listing-cert-date">
+              <FreshnessFooter resourceId={item.id} {...certChecked} subject="Certification" ask={false} />
+            </div>
           )}
           {/* The warning alone, on one line: it decides the visit. What
               isn't kosher is said in full in the details. */}
@@ -456,20 +466,12 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromItem={item} /> : null
   }
 
-  // The admin's boxes (a hospital's "Who to call", "Kosher food", Oct 6),
-  // then any list of contacts in none of them, as a box of its own. Each
+  // The admin's boxes, and lists of contacts in none (listingBoxes). Each
   // dated on its own.
-  const configured = boxesOf(category)
-  const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
-  // Each with its editor row's id (editorRows), for its Edit.
-  const boxDefs = [
-    ...configured.map((b) => ({ ...b, row: `box:${b.title}` })),
-    ...category.detailFields
-      .filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key))
-      .map((f) => ({ title: f.label, fields: [f], row: `box:${f.key}` })),
-  ]
+  const placed = new Set([...boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
+  const boxDefs = listingBoxes(item, category)
   const boxes = boxDefs.map((b) => {
-    const key = boxConfirmKey(item, b.fields)
+    const key = b.key
     const edit = editRows(b.title, [b.row])
     const dated = !!key && confirmAt?.at === 'boxes'
     return (
@@ -478,7 +480,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         item={item}
         title={b.title}
         fields={b.fields}
-        footer={dated ? <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, key)} confirmedAt={sectionConfirmedAt(item, key)} section={key} onEdit={edit} /> : undefined}
+        footer={dated ? <FreshnessFooter resourceId={item.id} {...boxDate(item, key)} section={key} onEdit={edit} /> : undefined}
         onEdit={dated ? undefined : edit}
       />
     )
@@ -555,7 +557,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const detailsFoot = googleLead ? (
     <span data-testid="listing-google">{googleLead}.</span>
   ) : contactDated ? (
-    <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, CONTACT_SECTION)} confirmedAt={sectionConfirmedAt(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
+    <FreshnessFooter resourceId={item.id} {...boxDate(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
   ) : undefined
   const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
@@ -657,7 +659,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const aboutFoot = fromGoogle ? (
     <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
   ) : aboutKey ? (
-    <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, aboutKey)} confirmedAt={sectionConfirmedAt(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
+    <FreshnessFooter resourceId={item.id} {...boxDate(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined
   const about = aboutFields.length > 0 && (
     <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
@@ -688,7 +690,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       fields={shabbosFields}
       zmanim={zmanim}
       candlesAt={candlesAt}
-      footer={shabbosKey ? <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, shabbosKey)} confirmedAt={sectionConfirmedAt(item, shabbosKey)} section={shabbosKey} onEdit={editShabbos} /> : undefined}
+      footer={shabbosKey ? <FreshnessFooter resourceId={item.id} {...boxDate(item, shabbosKey)} section={shabbosKey} onEdit={editShabbos} /> : undefined}
       onEdit={shabbosKey ? undefined : editShabbos}
     />
   ) : null
@@ -1272,7 +1274,7 @@ function GroupBox({
   return (
     <Card
       title={group.label}
-      footer={(!!hoursF || !!onEdit) && <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, group.key)} confirmedAt={sectionConfirmedAt(item, group.key)} section={group.key} onEdit={onEdit} />}
+      footer={(!!hoursF || !!onEdit) && <FreshnessFooter resourceId={item.id} {...boxDate(item, group.key)} section={group.key} onEdit={onEdit} />}
     >
       <div className="divide-y divide-slate-100">
         {today && shut && (

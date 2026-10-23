@@ -7,9 +7,9 @@ import { haversineMiles, milesText, roundMiles } from './geo'
 import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
 import { parseWalkLists } from './walkList'
-import { boxesOf, mainCardOf } from './listingParts'
+import { boxesOf, mainCardOf, shabbosFieldsOf } from './listingParts'
 import { readContacts } from './contacts'
-import type { ConfirmedBy, DirectoryResource } from '@/types'
+import type { DirectoryResource } from '@/types'
 
 // ── An opened listing ────────────────────────────────────────────────────────
 // Every listing opens to the same seven parts, in the same order, whatever
@@ -405,25 +405,28 @@ export function firstSentence(text: string): { first: string; rest: string } {
   return { first, rest: t.slice(first.length).trim() }
 }
 
-/** When a section was last confirmed: its own date, or the listing's when
- *  that's later (an admin's approval, or a confirmation from before
- *  sections had their own, which spoke for all of them). A mikvah's
- *  women's, men's and keilim hours; a shul's weekday and Shabbos times. */
-export function sectionConfirmedAt(item: DirectoryResource, key: string): string | undefined {
-  const own = (item.sectionConfirmed as Record<string, string> | undefined)?.[key]
-  const all = item.confirmedAt
-  if (!own) return all
-  if (!all) return own
-  return Date.parse(own) >= Date.parse(all) ? own : all
+// A box's date: boxDates.ts, which the row's code reads too.
+export { sectionConfirmedAt, confirmedByFor, sectionSource, boxDate } from './boxDates'
+
+/** A place's boxes (a hospital's "Who to call", "Kosher food", Oct 6): the
+ *  admin's, then any list of contacts in none of them, or in the main card
+ *  or the Shabbos card, as a box of its own. Each with its editor row's id
+ *  (editorRows), and the key it's dated under (boxConfirmKey). */
+export function listingBoxes(item: DirectoryResource, category: CategoryConfig): { title: string; fields: CategoryField[]; row: string; key: string | null }[] {
+  const configured = boxesOf(category)
+  const named = mainThing(item, category) === 'section' ? mainCardOf(category) : null
+  const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
+  return [
+    ...configured.map((b) => ({ ...b, row: `box:${b.title}` })),
+    ...category.detailFields.filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key)).map((f) => ({ title: f.label, fields: [f], row: `box:${f.key}` })),
+  ].map((b) => ({ ...b, key: boxConfirmKey(item, b.fields) }))
 }
 
-/** Who gave the date a box shows (sectionConfirmedAt): a section's own date
- *  is only ever a visitor's tap (confirm_section), the listing's date is
- *  whoever gave it (`confirmedBy`). Without a key, the listing's own. */
-export function confirmedByFor(item: DirectoryResource, key?: string): ConfirmedBy | undefined {
-  const own = key ? (item.sectionConfirmed as Record<string, string> | undefined)?.[key] : undefined
-  if (own && own === sectionConfirmedAt(item, key!)) return { by: 'visitor', at: own }
-  return item.confirmedBy
+/** The keys of the boxes holding any of these fields: what a check that
+ *  read them dates (Refuah's read of a hospital's contacts). */
+export function boxKeysHolding(item: DirectoryResource, category: CategoryConfig, fieldKeys: readonly string[]): string[] {
+  const read = new Set(fieldKeys)
+  return listingBoxes(item, category).flatMap((b) => (b.key && b.fields.some((f) => read.has(f.key)) ? [b.key] : []))
 }
 
 /** The key a box is confirmed under (migration 073): its first list of

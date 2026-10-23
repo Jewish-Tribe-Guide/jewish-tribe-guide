@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   readMenus: vi.fn(),
   listMenuReadings: vi.fn(),
   saveMenuReading: vi.fn(),
+  dateMenuDishes: vi.fn(),
   addWatch: vi.fn(),
   listWatches: vi.fn(),
   removeWatch: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('@/lib/resourceStore', () => ({
   normalizeRow: (r: { details?: Record<string, unknown> }) => ({ ...r, ...(r.details ?? {}) }),
 }))
 vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('./menuReader')>()), readMenuPage: m.readMenuPage, readMenu: m.readMenu, findMenus: m.findMenus, readMenus: m.readMenus }))
-vi.mock('@/lib/menuReadingStore', () => ({ saveMenuReading: m.saveMenuReading, getMenuReading: m.getMenuReading, listMenuReadings: m.listMenuReadings }))
+vi.mock('@/lib/menuReadingStore', () => ({ saveMenuReading: m.saveMenuReading, getMenuReading: m.getMenuReading, listMenuReadings: m.listMenuReadings, dateMenuDishes: m.dateMenuDishes }))
 vi.mock('@/lib/watchStore', () => ({ addWatch: m.addWatch, listWatches: m.listWatches, removeWatch: m.removeWatch }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -88,6 +89,20 @@ describe('runMenuWatch', () => {
     expect(m.readMenu).not.toHaveBeenCalled()
   })
 
+  // The user, Oct 23: "Everything should date what they check." A menu
+  // that hasn't changed still names what it named.
+  it('an unchanged menu dates again each dish dated from it, not one its last read found missing', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, dishes: ['Falafel', 'Kugel', 'Soup'], itemMenu: { dishes: { Falafel: '2026-10-01T00:00:00Z', Kugel: '2026-10-01T00:00:00Z' } } } })
+    m.getMenuReading.mockResolvedValue({ status: 'proposed', dishes: [], missing: ['kugel'] })
+    await runMenuWatch({ ...watch, pageHash: menuHash(page) }, undefined, { apiKey: 'k' })
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r1', 'dishes', ['Falafel'])
+  })
+
+  it('the first read dates nothing', async () => {
+    await runMenuWatch(watch, undefined, { apiKey: 'k' })
+    expect(m.dateMenuDishes).not.toHaveBeenCalled()
+  })
+
   it('a changed menu is read by the AI, and dishes the listing doesn’t have wait on the Main dishes tab', async () => {
     const out = await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })
     expect(out).toEqual({
@@ -109,6 +124,8 @@ describe('runMenuWatch', () => {
       check: { what: 'dishes', from: 'page', result: 'agrees', read: ['Falafel'], differences: [], queue: null },
     })
     expect(m.saveMenuReading).not.toHaveBeenCalled()
+    // …and dates the dishes it read (the user, Oct 23).
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r1', 'dishes', ['Falafel'])
   })
 
   // Rita's, Oct 22: its menu link is its location's page; its flavors are

@@ -1231,6 +1231,42 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23, at the end: every check dates what it checked (on `redesign/oct18-fixes`)
+
+The user: "We're dating what we're checking. We're not dating a whole
+listing." No exceptions by category. Going forward only: no live data was
+rewritten, and each check dates its own boxes on its next daily run.
+
+- **Each check dates only the box it read** (`details.sectionConfirmed`,
+  with which check in `details.sectionFrom`; `src/lib/boxDates.ts`):
+  Google the contact box, a menu read its dishes, Keystone-K and Mekor
+  Habracha the certification, a shul's website its times (weekday,
+  Shabbos, this week), Refuah the hospital boxes it gave contacts for, a
+  mikvah's website the hours it read. The listing's own date is now only
+  a person's.
+- **A date a check gave the whole listing before today is no box's.**
+  Mekor's read of a bakery's hechsher no longer dates its description. Until
+  the next runs, those boxes show their older date or none.
+- **Every date shown is the date of what's beside it:** a shul row's "Times
+  not confirmed" goes by its times' boxes, the question cards by the times,
+  the home's dated count by any box.
+- **The certification's date shows under the hechsher** ("Certification
+  confirmed by Keystone-K, Oct 23."). This is new, because the header was
+  never dated before. **The user should look at where it sits.**
+- **An admin approving a check's suggestion still dates the listing** (as
+  "From Keystone-K"). Boxes ignore that date, and the check's next agreeing
+  run dates the box.
+- **Trust sheet:** "We check it every day": what ran this week (minyan
+  times, mikvah hours, kosher certifications, menus, hospitals, eruv
+  status), then "Places on Google Maps are checked against Google." No
+  sources by name. "People fill in the rest" now reads: "New places, kosher
+  items at grocery stores, and Shabbos-friendly hotels. A person reviews
+  every change before it shows." The third line reads: "Something wrong?
+  Open the place and tap Edit listing." `/api/sources` is gone, since the
+  sheet reads what was checked off the listings it already has.
+- **Home trust line:** "· checked with Google" (was "hours checked with
+  Google every night").
+
 ## Done Oct 23: Northeast's eruv email reads as up (on `redesign/oct18-fixes`)
 
 - **Northeast's weekly "Eruv is UP" email was kept as unclear.** Its body
@@ -1305,8 +1341,8 @@ week."
   way is never filed: the page said nothing new, so the listing is the
   newer one. Each page already watched is read once this way, since none
   had been compared yet.
-- **The whole listing gets the date**, as with the other sources, even
-  where the page gives only part of it (say, weekday times only).
+- ~~**The whole listing gets the date**~~ (changed later Oct 23: only the
+  boxes the page gave are dated).
 - **The summer/winter line names the minyan and says "instead of"**:
   "In summer, Friday: Mincha 7 PM instead of 5 min before candle
   lighting." "Also" is kept only for a one-season minyan with no pair,
@@ -2241,7 +2277,8 @@ build").
   eruvim's status on it and Before candles; on Shabbos, the card with the
   eruvim. Never weekday minyanim.
 - **Trust sheet ("How this guide stays right"):** the idea in three lines,
-  each source named only once its check ran that week. No reading
+  naming only the checks that ran that week, by what they check, never by
+  source (Oct 23). No reading
   schedules beyond "every day" (Oct 18).
 - **Search box** on the phone home is the category pages' blue-edged box.
 - **Try asking keeps the minyan questions** (Oct 17). On a phone, up to six

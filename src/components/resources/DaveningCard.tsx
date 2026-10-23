@@ -8,7 +8,8 @@ import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } fr
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksDays, usualJoinLink, usualSignUp, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
-import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
+import { boxDate, isMinyanOnly } from '@/lib/listingView'
+import { THIS_WEEK_SECTION } from '@/lib/boxDates'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -182,15 +183,13 @@ export default function DaveningCard({
     onEditBox ? (
       <FreshnessFooter
         resourceId={item.id}
-        source={item.confirmedFrom}
-        by={confirmedByFor(item, section)}
-        confirmedAt={sectionConfirmedAt(item, section)}
+        {...boxDate(item, section)}
         section={section}
         onEdit={() => onEditBox(section, section === 'weekday' ? 'Usual weekday times' : 'Usual Shabbos times')}
       />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
-        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, section)} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
+        <FreshnessFooter resourceId={item.id} {...boxDate(item, section)} subject={subject} section={section} />
         {canAdd && updatingIn !== key && updated?.in !== key && (
           <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
             Update their times
@@ -327,20 +326,24 @@ export default function DaveningCard({
   // week posted: the first of them, or the box had no line at all (BZBI,
   // the user, Oct 22).
   const footPost = post ?? thisWeek.days[0]?.minyanim[0]?.from
-  const postConfirmedAt = footPost && (!item.confirmedAt || (footPost.postedAt && footPost.postedAt > item.confirmedAt) ? footPost.postedAt : item.confirmedAt)
+  // When it was posted, or the date the shul's website last gave the
+  // week's times (THIS_WEEK_SECTION) or a person the whole place, if later:
+  // never a date a check gave the whole listing (boxDates.ts).
+  const weekDate = boxDate(item, THIS_WEEK_SECTION)
+  const postedLater = !!footPost && (!weekDate.confirmedAt || (!!footPost.postedAt && footPost.postedAt > weekDate.confirmedAt))
+  const postConfirmedAt = footPost && (postedLater ? footPost.postedAt : weekDate.confirmedAt)
+  const postDate = { confirmedAt: postConfirmedAt, ...(postedLater ? {} : { source: weekDate.source, by: weekDate.by }) }
   const postFoot =
     footPost &&
     (onEditBox ? (
       <FreshnessFooter
         resourceId={item.id}
-        source={item.confirmedFrom}
-        by={item.confirmedBy}
-        confirmedAt={postConfirmedAt}
+        {...postDate}
         onEdit={() => onEditBox('this_week', 'This week’s schedule', footPost.id)}
       />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
-        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={item.confirmedBy} confirmedAt={postConfirmedAt} subject="Times" ask={false} />
+        <FreshnessFooter resourceId={item.id} {...postDate} subject="Times" ask={false} />
         {canAdd && updatingIn !== 'this-week' && updated?.in !== 'this-week' && (
           <button type="button" onClick={() => open('this-week')} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
             Update their times

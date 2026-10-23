@@ -263,6 +263,18 @@ describe('listingRowNote: a third line only for an exception', () => {
     expect(listingRowNote({ ...shul, ...confirmed }, category, FRIDAY_2PM)).toBeNull()
   })
 
+  // The user, Oct 23: a date is the date of what it's beside. The row says
+  // the times' own date, not another box's or one a check gave the whole
+  // listing.
+  it('a shul’s times go by their own boxes’ dates', () => {
+    const category = makeCategory({ detailFields: [minyanim] })
+    const shul = makeListing({ minyanim: [{ tefillah: 'mincha', time: '1:30pm', days: ['fri'] }] })
+    expect(listingRowNote({ ...shul, sectionConfirmed: { weekday: '2026-10-01T06:00:00Z' } }, category, FRIDAY_2PM)).toBeNull()
+    expect(listingRowNote({ ...shul, sectionConfirmed: { contact: '2026-10-01T06:00:00Z' } }, category, FRIDAY_2PM)?.text).toBe('Times not confirmed by anyone yet')
+    const checkedWhole = { confirmedAt: '2026-10-01T06:00:00Z', confirmedFrom: { from: 'Mekor Habracha', at: '2026-10-01T06:00:00Z' } }
+    expect(listingRowNote({ ...shul, ...checkedWhole }, category, FRIDAY_2PM)?.text).toBe('Times not confirmed by anyone yet')
+  })
+
   it('gives a shul’s own note on its davening the line, after unconfirmed times', () => {
     const category = makeCategory({ detailFields: [minyanim] })
     const shul = makeListing({ ...confirmed, minyanim: [{ tefillah: 'mincha', time: 'Call to confirm', days: ['fri'] }] })

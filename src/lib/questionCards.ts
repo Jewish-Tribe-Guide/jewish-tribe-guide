@@ -2,6 +2,7 @@ import type { DirectoryResource, ResourceSubmission } from '@/types'
 import { fieldIsVisible, selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { rowItems } from './listingRow'
 import { editSubmission } from './editSubmission'
+import { confirmedAnywhere, timesConfirmedAt } from './boxDates'
 
 // ── One question card per list ───────────────────────────────────────────────
 // The cheapest way to help the guide: a single tap, in the list, below the
@@ -165,14 +166,16 @@ export function pickQuestion(
     }
   }
 
-  // Confirm: a place nobody has confirmed, in the list's order.
-  const item = shown.find((i) => !i.confirmedAt && !asked.has(i.id))
+  // Confirm: a place nobody has confirmed what it would ask about (its
+  // times by their own date, the user, Oct 23), in the list's order.
+  const hasTimes = (i: DirectoryResource) => category.detailFields.some((f) => f.type === 'minyanim' && Array.isArray(i[f.key]) && (i[f.key] as unknown[]).length > 0)
+  const isConfirmed = (i: DirectoryResource) => (hasTimes(i) ? !!timesConfirmedAt(i) : confirmedAnywhere(i))
+  const item = shown.find((i) => !isConfirmed(i) && !asked.has(i.id))
   if (!item) return null
   const itemsField = category.detailFields.find((f) => f.type === 'tags' && f.showCountInHeader)
   const items = itemsField ? rowItems(item, itemsField.key) : null
-  const hasTimes = category.detailFields.some((f) => f.type === 'minyanim' && Array.isArray(item[f.key]) && (item[f.key] as unknown[]).length > 0)
-  const what = items ? `still has ${items.charAt(0).toLowerCase()}${items.slice(1)}?` : hasTimes ? 'are its davening times still right?' : 'is everything here still right?'
-  const confirmed = all.filter((i) => i.confirmedAt).length
+  const what = items ? `still has ${items.charAt(0).toLowerCase()}${items.slice(1)}?` : hasTimes(item) ? 'are its davening times still right?' : 'is everything here still right?'
+  const confirmed = all.filter(isConfirmed).length
   return {
     kind: 'confirm',
     item,

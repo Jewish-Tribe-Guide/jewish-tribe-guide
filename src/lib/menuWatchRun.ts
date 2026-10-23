@@ -3,7 +3,7 @@ import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { keepsMenuLink, menuWebsite, readElsewhere } from '@/lib/menuLink'
 import { findMenus, isOrderingApp, menuPages, readMenu, readMenuPage, readMenus, troubleClause, type Render, type Trouble } from '@/lib/menuReader'
-import { getMenuReading, listMenuReadings, saveMenuReading } from '@/lib/menuReadingStore'
+import { dateMenuDishes, getMenuReading, listMenuReadings, saveMenuReading } from '@/lib/menuReadingStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import {
   changedMenuNote,
@@ -18,6 +18,7 @@ import {
 } from '@/lib/menuWatch'
 import { checkFrom, pageCheck } from '@/lib/listingPageWatch'
 import { pageRenderer } from '@/lib/renderPage'
+import { itemsField } from '@/lib/listingView'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
@@ -147,8 +148,17 @@ export async function runMenuWatch(
   }
   const pageHash = menuHash(source)
   const changed = !!watch.pageHash && watch.pageHash !== pageHash
-  // The first read sets the baseline; an unchanged menu is left alone.
-  if (!opts.full && !changed) return { ok: true, filed: 0, pageHash }
+  // The first read sets the baseline; an unchanged menu is left alone, but
+  // still names the dishes it named, so their dates move (withMenuChecked):
+  // not one the last read found missing from it, still waiting or skipped.
+  const field = itemsField(category)
+  if (!opts.full && !changed) {
+    if (watch.pageHash && field) {
+      const missing = new Set(((await getMenuReading(watch.communityId, listing.id))?.missing ?? []).map((n) => n.trim().toLowerCase()))
+      await dateMenuDishes(watch.communityId, listing.id, field.key, menuDated(listing).filter((n) => !missing.has(n.trim().toLowerCase())))
+    }
+    return { ok: true, filed: 0, pageHash }
+  }
 
   // Changed. Without the AI, or with this run's reads spent, the old
   // fingerprint stays, so the change is still news next time.
@@ -183,7 +193,11 @@ export async function runMenuWatch(
       ],
       queue,
     })
-  if (found.length === 0 && missing.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
+  if (found.length === 0 && missing.length === 0) {
+    // It agrees: every dish it named is dated from it.
+    if (field) await dateMenuDishes(watch.communityId, listing.id, field.key, read.dishes.map((d) => d.name))
+    return { ok: true, filed: 0, pageHash, check: check(null) }
+  }
   if (opts.full) {
     const kept = await getMenuReading(watch.communityId, listing.id)
     const lower = (n: string) => n.trim().toLowerCase()
@@ -254,4 +268,11 @@ async function lookElsewhere(
     model: read.model,
   })
   return `. Its menu was found at ${url}, waiting on the Main dishes tab.`
+}
+
+/** The dishes the listing has dated from its menu (details.itemMenu). */
+function menuDated(listing: DirectoryResource): string[] {
+  const all = listing.itemMenu
+  if (!all || typeof all !== 'object') return []
+  return Object.values(all as Record<string, unknown>).flatMap((m) => (m && typeof m === 'object' ? Object.keys(m) : []))
 }

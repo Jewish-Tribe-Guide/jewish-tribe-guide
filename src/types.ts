@@ -195,6 +195,13 @@ export type DirectoryResource = {
    *  `at` is the confirmedAt it dated, as with confirmedFrom, so a later
    *  admin stamp says "Confirmed" again. */
   confirmedBy?: ConfirmedBy
+  /** Each box's own date (confirm_section): a visitor's tap, or a check
+   *  that read the box and found it right (sourceConfirm.ts). */
+  sectionConfirmed?: Record<string, string>
+  /** Which check gave a box its date, by name: "Keystone-K", Refuah, a
+   *  shul's own website. `at` is the date it gave, so once a visitor taps
+   *  Yes (a new date) the line says "Confirmed by community" again. */
+  sectionFrom?: Record<string, ConfirmedFrom>
   /** 'OPERATIONAL'' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** An admin's correction, which wins over `businessStatus` everywhere the

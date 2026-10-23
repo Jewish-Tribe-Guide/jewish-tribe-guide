@@ -11,6 +11,8 @@ import { formatDays, parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type M
 import { DAY_KEYS, fmt12, formatHoursSummary } from './hours'
 import { dateText } from './schedules'
 import { hoursSections } from './hoursSections'
+import { CONTACT_SECTION, googleKeeps } from './contactRead'
+import { THIS_WEEK_SECTION } from './boxDates'
 
 // ── Watching a listing's own web page (the user, Oct 19) ────────────────────
 // A shul's page of its usual minyan times, or a mikvah's page of its hours,
@@ -76,6 +78,22 @@ export function pageReadsFor(category: Pick<CategoryConfig, 'detailFields'>): Pa
   // ahead" can be all a mikvah's page says of its hours.
   const notes = hoursSections(category, keys).flatMap((s) => (s.notes ? [s.notes] : []))
   return hours.length ? { kind: 'hours', keys, notes } : null
+}
+
+/** The boxes a page that agrees with the listing dates (sourceConfirm.ts):
+ *  only what it read (the user, Oct 23). A shul's usual weekday and Shabbos
+ *  times and this week's (its schedules are read beside them); a mikvah's section for each of its hours and notes read, and the
+ *  contact box for plain hours Google doesn't keep; the contact box too
+ *  when its phone or email were read and agree (`contactAgrees`). */
+export function pageReadBoxes(category: Pick<CategoryConfig, 'detailFields'>, listing: Record<string, unknown>, reads: PageReads, contactAgrees: boolean): string[] {
+  const boxes = new Set<string>(contactAgrees ? [CONTACT_SECTION] : [])
+  if (reads.kind === 'times') return [...new Set(['weekday', 'shabbos', THIS_WEEK_SECTION, ...boxes])]
+  for (const key of [...reads.keys, ...reads.notes]) {
+    const audience = category.detailFields.find((f) => f.key === key)?.audienceKey
+    if (audience) boxes.add(audience)
+    else if (!(key === PLAIN_HOURS_KEY && googleKeeps(listing, 'hours'))) boxes.add(CONTACT_SECTION)
+  }
+  return [...boxes]
 }
 
 /** For the AI reading a page for hours: what each field holds now, so it

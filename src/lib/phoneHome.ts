@@ -2,6 +2,7 @@ import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { getOpenStatus, hasAnyHours } from '@/lib/hours'
 import { eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
+import { hasAnyDate, KOSHER_SECTION } from '@/lib/boxDates'
 
 // ── The phone home (the user, Oct 17) ───────────────────────────────────────
 // No headline and no mission: a line saying who keeps the guide right, the
@@ -9,10 +10,24 @@ import { eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
 // tiles. What those say is worked out here, so it can be tested with a fixed
 // clock.
 
-/** Google's nightly check counts as recent for a week. */
+/** A check counts as recent for a week. */
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 /** How far ahead of the device's clock a check may seem to be. */
 const SKEW_MS = 10 * 60 * 1000
+
+/** What the guide's own checks read (sourceConfirm.ts, the menu watch),
+ *  in the order the sheet names them. */
+export type CheckKind = 'times' | 'mikvah' | 'kosher' | 'menus' | 'hospitals' | 'eruv'
+
+const CHECK_WORDS: Record<CheckKind, string> = {
+  times: 'minyan times',
+  mikvah: 'mikvah hours',
+  kosher: 'kosher certifications',
+  menus: 'menus',
+  hospitals: 'hospitals',
+  eruv: 'eruv status',
+}
+const CHECK_ORDER = Object.keys(CHECK_WORDS) as CheckKind[]
 
 export type TrustFacts = {
   /** Places in the guide's categories. */
@@ -22,23 +37,60 @@ export type TrustFacts = {
   googleChecked: number
   /** Of those, checked in the last 7 days. Null before there's a clock. */
   checkedThisWeek: number | null
-  /** Places that say a date on them: confirmed by someone, or updated from
-   *  Google. The rest say "Not confirmed by anyone yet". */
+  /** Places that say a date on them: confirmed by someone, a check that
+   *  read them, or Google. The rest say "Not confirmed by anyone yet". */
   dated: number
+  /** What the guide's checks dated in the last 7 days, read off the dates
+   *  they left on the places (boxDates.ts): a check that's set up but
+   *  hasn't run claims nothing. Empty before there's a clock. */
+  checked: CheckKind[]
 }
 
 /** The trust line's numbers, from the listings the home already holds. Only
  *  places in a category the guide shows count. */
 export function trustFacts(listings: readonly DirectoryResource[], categories: readonly CategoryConfig[], now: number | null): TrustFacts {
-  const shown = new Set(categories.map((c) => c.id))
-  const places = listings.filter((l) => shown.has(l.category))
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  const places = listings.filter((l) => byId.has(l.category))
   const synced = places.map((l) => (l.googleSyncedAt ? Date.parse(l.googleSyncedAt) : NaN)).filter((t) => !Number.isNaN(t))
+  const checked = new Set<CheckKind>()
+  if (now !== null) {
+    for (const l of places) for (const kind of checksOn(l, byId.get(l.category)!, now)) checked.add(kind)
+  }
   return {
     places: places.length,
     googleChecked: synced.length,
     checkedThisWeek: now === null ? null : synced.filter((t) => t <= now && now - t < WEEK_MS).length,
-    dated: places.filter((l) => l.confirmedAt || l.googleSyncedAt).length,
+    dated: places.filter(hasAnyDate).length,
+    checked: CHECK_ORDER.filter((k) => checked.has(k)),
   }
+}
+
+// A phone's clock can run a few minutes behind the server's, so a check
+// made just now can look like it's still to come.
+const recent = (iso: unknown, now: number) => {
+  const t = typeof iso === 'string' ? Date.parse(iso) : NaN
+  return !Number.isNaN(t) && t <= now + SKEW_MS && now - t < WEEK_MS
+}
+
+/** What the checks read on one place this week, by the box each dated: a
+ *  shul's times, the certification, a mikvah's section (its audience's
+ *  yes/no field), a hospital's box (a list of contacts); its dishes, by
+ *  their menu dates. A contact box a website agreed with isn't named. */
+function checksOn(l: DirectoryResource, category: CategoryConfig, now: number): CheckKind[] {
+  const out: CheckKind[] = []
+  for (const [key, from] of Object.entries(l.sectionFrom ?? {})) {
+    if (!recent(from?.at, now)) continue
+    if (key === 'weekday' || key === 'shabbos') out.push('times')
+    else if (key === KOSHER_SECTION) out.push('kosher')
+    else {
+      const type = category.detailFields.find((f) => f.key === key)?.type
+      if (type === 'boolean') out.push('mikvah')
+      else if (type === 'contacts') out.push('hospitals')
+    }
+  }
+  const menu = l.itemMenu && typeof l.itemMenu === 'object' ? Object.values(l.itemMenu as Record<string, Record<string, unknown>>) : []
+  if (menu.some((m) => m && typeof m === 'object' && Object.values(m).some((at) => recent(at, now)))) out.push('menus')
+  return out
 }
 
 /** Every place says a date on it. */
@@ -46,69 +98,47 @@ export const everyListingDated = (facts: TrustFacts) => facts.places > 0 && fact
 
 /** The line under "Kept up by the community": "155 places · every listing
  *  dated" (the user, Oct 17), once that's so; until then "155 places ·
- *  hours checked with Google every night". Google is left out where nothing
- *  is checked, and, once the clock is known, where nothing was checked this
- *  week: the nightly check has stopped, so "every night" would no longer be
- *  true. */
+ *  checked with Google" (the user, Oct 23: Google checks more than hours,
+ *  and not all of it every night). Google is left out where nothing is
+ *  checked, and, once the clock is known, where nothing was checked this
+ *  week: the check has stopped. */
 export function trustLine(facts: TrustFacts): string {
   const places = `${facts.places} ${facts.places === 1 ? 'place' : 'places'}`
   if (everyListingDated(facts)) return `${places} · every listing dated`
   const google = facts.googleChecked > 0 && facts.checkedThisWeek !== 0
-  return google ? `${places} · hours checked with Google every night` : places
+  return google ? `${places} · checked with Google` : places
 }
 
 // ── How this guide stays right (the sheet the trust line opens) ─────────────
 
 export type SourcesRead = {
-  /** Google's nightly check ran this week. */
+  /** Google's check ran this week. */
   google: boolean
-  /** Each outside list read on its own this week, by its name: "Keystone-K's
-   *  list". */
-  lists: string[]
-  /** Some eruv's own site was read this week. */
-  eruv: boolean
+  /** What the guide's own checks read this week, in the sheet's order. */
+  checks: CheckKind[]
 }
 
-/** Which sources the guide actually read in the last week, from what the
- *  page has: the trust facts, the watched lists' last good reads
- *  (/api/sources) and the eruvim's last checks. Only these are named: a
- *  check that's set up but hasn't run claims nothing. */
-export function sourcesRead(
-  facts: TrustFacts,
-  lists: readonly { label: string | null; okAt: string | null }[],
-  eruvChecks: readonly (string | null)[],
-  now: number,
-): SourcesRead {
-  // A phone's clock can run a few minutes behind the server's, so a check
-  // made just now can look like it's still to come.
-  const recent = (iso: string | null) => {
-    const t = iso ? Date.parse(iso) : NaN
-    return !Number.isNaN(t) && t <= now + SKEW_MS && now - t < WEEK_MS
-  }
+/** What the guide actually checked in the last week, from what the page
+ *  has: the trust facts and the eruvim's last checks. Only these are
+ *  named: a check that's set up but hasn't run claims nothing. */
+export function sourcesRead(facts: TrustFacts, eruvChecks: readonly (string | null)[], now: number): SourcesRead {
+  const eruv = eruvChecks.some((at) => recent(at, now))
   return {
     google: facts.googleChecked > 0 && (facts.checkedThisWeek ?? 0) > 0,
-    lists: lists.filter((l) => recent(l.okAt)).map((l) => l.label?.trim() || 'the kashrus agency’s list'),
-    eruv: eruvChecks.some(recent),
+    checks: CHECK_ORDER.filter((k) => (k === 'eruv' ? eruv : facts.checked.includes(k))),
   }
 }
 
-/** The sheet's first line, the idea with its examples (the user, Oct 17:
- *  people want the philosophy, not each source): "Hours from Google,
- *  hechshers from Keystone-K's list, eruv status from each eruv’s own site.
- *  Read again every day, hours every week." The eruv's Friday rhythm is left to the Eruv page
- *  (the user, Oct 18: too much detail for an overview). Null when nothing
- *  was read, and the sheet leaves the line out. */
+/** The sheet's first line (the user, Oct 23): everything the guide checks,
+ *  with no source named, then Google: "Minyan times, mikvah hours, kosher
+ *  certifications, menus, hospitals and eruv status. Places on Google Maps
+ *  are checked against Google." Null when nothing was checked, and the
+ *  sheet leaves the line out. */
 export function sourcesSentence(read: SourcesRead): string | null {
-  const parts = [read.google && 'hours from Google', ...read.lists.map((l) => `hechshers from ${l}`), read.eruv && 'eruv status from each eruv’s own site'].filter(
-    (p): p is string => !!p,
-  )
-  if (parts.length === 0) return null
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
-  // Google's hours are read once a week (sync-hours: every night only asks
-  // whether a place is open), so "every day" alone overstated them (the
-  // user, Oct 19).
-  const when = !read.google ? 'every day' : parts.length === 1 ? 'every week' : 'every day, hours every week'
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)}. Read again ${when}.`
+  const words = read.checks.map((k) => CHECK_WORDS[k])
+  const list = words.length === 0 ? null : words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
+  const sentences = [list && `${list.charAt(0).toUpperCase()}${list.slice(1)}.`, read.google && 'Places on Google Maps are checked against Google.'].filter((x): x is string => !!x)
+  return sentences.length ? sentences.join(' ') : null
 }
 
 // ── Right now, on a weekday ─────────────────────────────────────────────────

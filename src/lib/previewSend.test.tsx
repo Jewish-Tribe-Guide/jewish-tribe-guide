@@ -84,7 +84,6 @@ const BARE_FETCH_ALLOWED: Record<string, string> = {
   'src/components/resources/useMenuRead.ts': 'reads a menu link; ListingEditor turns it off in the preview',
   'src/components/ManageSubscriptionForm.tsx': 'its own page, not in the preview',
   'src/components/home/SubscribeSection.tsx': 'the home page, not in the preview',
-  'src/components/home/TrustBand.tsx': 'reads which sources ran this week, on the home page, not in the preview',
   'src/components/auth/MagicLinkLogin.tsx': 'sign-in, not in the preview',
   'src/components/RefreshContentOnReturn.tsx': 'reads the content version, a GET that changes nothing',
 }

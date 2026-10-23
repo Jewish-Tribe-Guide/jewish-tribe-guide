@@ -74,7 +74,10 @@ describe('runRefuahWatch', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     // …and dates the hospital by Refuah (Oct 19: agreement used to leave
     // the date where the last approval put it).
-    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', [HOSPITAL], 'Refuah')
+    // Only the boxes Refuah gave contacts for (the user, Oct 23).
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', [HOSPITAL], 'Refuah', expect.any(Function))
+    const boxes = m.confirmFromSource.mock.calls[0][3] as (d: Record<string, unknown>) => string[]
+    expect(boxes(m.listing!.details as Record<string, unknown>)).toEqual(['liaisons'])
   })
 
   it('files a difference as a suggestion from Refuah, named, so approval dates it “From Refuah”', async () => {
