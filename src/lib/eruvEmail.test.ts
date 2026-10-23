@@ -24,6 +24,20 @@ describe('readEruvEmail', () => {
     expect(readEruvEmail(mail('Eruv is DOWN', 'Repairs are underway. Please do not carry.'), FRIDAY, TZ)).toMatchObject({ kind: 'read', write: { status: 'down' } })
   })
 
+  // The real one, Oct 23, kept for an admin as "unclear" before.
+  it('Northeast’s weekly email: up, its reminder not to assume down left out', () => {
+    const body = [
+      '----- Forwarded Message -----',
+      'From: Shlomo Y. Katz',
+      'Subject: Fwd: Parshas Lech Lecha 5787 - Eruv is UP',
+      '',
+      'The Eruv has been checked from Bleigh Ave North for Friday, October 23rd, 2026.',
+      "Don't assume the Eruv is down if you don't get an email message.",
+      'Candle Lighting Friday Night is at 5:50 PM.',
+    ].join('\n')
+    expect(readEruvEmail(mail('[JCOR] Fw: Fwd: Parshas Lech Lecha 5787 - Eruv is UP', body), FRIDAY, TZ)).toMatchObject({ kind: 'read', write: { status: 'up', words: 'Eruv is UP.' } })
+  })
+
   it('never takes a date from its words: an email is about the week it came in', () => {
     const r = readEruvEmail(mail('Eruv', 'The eruv is up. Next inspection Oct 30, 2026.'), FRIDAY, TZ)
     expect(r).toMatchObject({ write: { postedOn: '2026-10-09' } })

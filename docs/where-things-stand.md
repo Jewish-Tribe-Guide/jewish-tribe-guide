@@ -1231,6 +1231,16 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23: Northeast's eruv email reads as up (on `redesign/oct18-fixes`)
+
+- **Northeast's weekly "Eruv is UP" email was kept as unclear.** Its body
+  says "Don't assume the Eruv is down if you don't get an email message",
+  which the reader took as a "down". A status sentence that only supposes
+  one ("assume", "if", "whether", "unless") is now left out.
+- **This week's (Oct 23) is still waiting on the admin Eruvim tab**, since
+  an email is read once. Mark it Up there; next week's reads by itself
+  once this is deployed.
+
 ## Done Oct 23, last: this week's schedule from Edit listing (on `redesign/oct18-fixes`)
 
 Drawing SwWk3BLEYTtVu2k3w2UJ5s v3. The user: "You should be able to add

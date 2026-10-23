@@ -47,6 +47,14 @@ describe('readStatus', () => {
     expect(readStatus('The North Eruv is up. The South Eruv is down.').status).toBe('unknown')
     expect(readStatus('Welcome to our community. Check back Friday.').status).toBe('unknown')
   })
+
+  // Northeast's weekly email, Oct 23: "Don't assume the Eruv is down if you
+  // don't get an email message" says nothing about this week.
+  it('leaves out a sentence that only supposes a status', () => {
+    expect(readStatus('The Eruv is UP. Don’t assume the Eruv is down if you don’t get an email message.')).toMatchObject({ status: 'up', words: 'The Eruv is UP.' })
+    expect(readStatus('The eruv is down. If the eruv is up by Friday we will post it.').status).toBe('down')
+    expect(readStatus('Do not assume the eruv is up.').status).toBe('unknown')
+  })
 })
 
 describe('pageText and firstDate', () => {
