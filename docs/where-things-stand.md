@@ -1231,6 +1231,30 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23, last: this week's schedule from Edit listing (on `redesign/oct18-fixes`)
+
+Drawing SwWk3BLEYTtVu2k3w2UJ5s v3. The user: "You should be able to add
+this week's schedule from the main site… and that there's no minyan this
+week."
+
+- **Every shul's Edit listing has "This week's schedule"**, under "Not on
+  the listing yet" until the week has a post, then a row ("Oct 18 – Oct 24
+  · Shacharis 10 AM", or "· No minyan"). It opens the week's days from the
+  usual times (this season's), with "+ Add a minyan" and Done. Opened and
+  Done with nothing changed sends nothing.
+- **"No minyan this week" is a plain link under Done.** It goes back to
+  the list with the row Changed and "Send 1 change". Reopened, it reads
+  "No minyan this week" with "+ Add a minyan"; adding one means just that
+  minyan that week.
+- **The week is Sunday to Shabbos**, the next one once Shabbos is over.
+  Everything goes to the admin queue as a week post.
+- **A weekly shul's page is unchanged** (board 1): its waiting box keeps
+  its one "+ Add this week's schedule". No minyan is offered only in the
+  editor.
+- Not as drawn: the days are grouped as the box groups them ("Shabbos
+  morning", not "Shabbos · Oct 31"); Rosh Chodesh and Yom Tov rows of the
+  usual times aren't carried into a new week.
+
 ## Done Oct 23, later still: a monthly shul's home page gives its weeks (on `redesign/oct18-fixes`, #352)
 
 - **The Little Shul's home page now gives this week's schedule.** It says

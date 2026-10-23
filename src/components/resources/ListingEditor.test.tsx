@@ -452,6 +452,38 @@ describe('ListingEditor — boxes with their own editors', () => {
     expect(screen.getByTestId('minyan-box-list')).toBeInTheDocument()
   })
 
+  // The user, Oct 23 (drawing SwWk3BLEYTtVu2k3w2UJ5s v3).
+  it('a shul’s this week: opened and Done changes nothing; No minyan this week under Done is one change', async () => {
+    const u = user()
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const shul = makeListing({ id: 'mi', category: 'synagogue', name: 'Mikveh Israel', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
+    renderWithProviders(<ListingEditor item={shul} category={SHUL} onClose={() => {}} />)
+    await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'This week’s schedule' }))
+    expect(screen.getByText('Oct 11 – Oct 17')).toBeInTheDocument()
+    expect(screen.getByTestId('minyan-box-list')).toHaveTextContent('9 AM')
+    await u.click(done())
+    expect(sendButton()).toHaveTextContent('No changes yet')
+
+    await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'This week’s schedule' }))
+    await u.click(screen.getByRole('button', { name: 'No minyan this week' }))
+    expect(row('minyans:this_week')).toHaveTextContent('Oct 11 – Oct 17 · No minyan')
+    expect(row('minyans:this_week')).toHaveTextContent('Changed')
+    expect(sendButton()).toHaveTextContent(/^(Send 1 change|Verifying…)$/)
+
+    await u.click(row('minyans:this_week'))
+    expect(screen.getByText('No minyan this week')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'No minyan this week' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add a minyan/ })).toBeInTheDocument()
+    await u.click(done())
+
+    await u.click(sendButton())
+    const sends = () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/submissions'))
+    await waitFor(() => expect(sends()).toHaveLength(1))
+    const [week] = JSON.parse(sends()[0][1].body).payload.details.minyanim_schedules
+    expect(week).toMatchObject({ kind: 'week', from: '2026-10-11', to: '2026-10-17', whole: true, minyanim: [] })
+  })
+
   it('a mikvah’s section: its hours and note, and a phone only once someone adds one', async () => {
     const u = user()
     const mikvah = makeListing({ id: 'lm', category: 'mikvah', name: 'Lower Merion Mikvah', womenTevillah: true, women_s_notes: 'By appointment' })

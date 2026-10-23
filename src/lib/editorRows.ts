@@ -9,6 +9,8 @@ import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from '.
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
 import { MENU_LINK_KEY, MENU_LINK_LABEL } from './menuLink'
+import { readSchedules, schedulesKey, weekPostRows } from './schedules'
+import { isNoMinyan, weekDates, weekPostFor, type EditWeek } from './thisWeekEdit'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
 // "Suggest an edit" is the listing's own boxes, in the listing's order, one
@@ -28,8 +30,10 @@ export type EditorRow = {
   title: string
   kind: 'name' | 'fields' | 'contact' | 'items' | 'minyans' | 'audience'
   fields: CategoryField[]
-  /** A shul's usual-times box. */
+  /** A shul's usual-times box, or 'this_week'. */
   box?: MinyanBox
+  /** With box 'this_week': the week it's for (thisWeekEdit.ts). */
+  week?: EditWeek
   /** A section's own yes/no ("Women’s Tevillah"): the row is there while
    *  it's on. */
   flag?: string
@@ -75,7 +79,9 @@ export function opensInPlace(row: EditorRow): boolean {
  *  a list or a week of hours, which are rows of their own. */
 const BROUGHT_UP: Partial<Record<FieldType, true>> = { url: true, text: true, textarea: true, tel: true, number: true, select: true, boolean: true }
 
-export function editorRows(category: CategoryConfig, details: Record<string, unknown>): EditorRow[] {
+/** `week`: a shul's "This week's schedule" row is offered for it, on a
+ *  listing's own edit only (thisWeekEdit.ts). */
+export function editorRows(category: CategoryConfig, details: Record<string, unknown>, { week }: { week?: EditWeek | null } = {}): EditorRow[] {
   const fields = category.detailFields
   const placed = new Set<string>()
   const take = (list: CategoryField[]) => {
@@ -148,9 +154,11 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
     take([minyanim])
     rows.push({ id: 'minyans:weekday', title: 'Usual weekday times', kind: 'minyans', fields: [minyanim], box: 'weekday' })
     rows.push({ id: 'minyans:shabbos', title: 'Usual Shabbos times', kind: 'minyans', fields: [minyanim], box: 'shabbos' })
-    // No Yom Tov and special schedules row (the user, Oct 11): a shul
-    // doesn't have those ahead of time; they're added when posted, from
-    // the listing's own schedule box.
+    // This week's, or that there's no minyan this week (the user, Oct 23).
+    // No Yom Tov schedules row (the user, Oct 11): a shul doesn't have
+    // those ahead of time; they're added when posted, from the listing's
+    // own schedule box.
+    if (week) rows.push({ id: 'minyans:this_week', title: 'This week’s schedule', kind: 'minyans', fields: [minyanim], box: 'this_week', week })
   }
   if (items && !placed.has(items.key)) rows.push({ id: 'items', title: items.label, kind: 'items', fields: take([items]) })
   // A section per audience (a mikvah's Women’s, Men’s, Keilim), while it's on.
@@ -255,6 +263,11 @@ function minyanText(m: Minyan, timeText: (m: Minyan) => string): string {
 export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: Minyan) => string): string {
   const d = values.details
   const shown = row.fields.filter((f) => fieldIsVisible(f, d))
+  if (row.kind === 'minyans' && row.week) {
+    const post = weekPostOf(row, d)
+    if (!post) return ''
+    return [weekDates(row.week), ...(isNoMinyan(post) ? ['No minyan'] : weekPostRows(post).map((m) => minyanText(m, timeText)))].join(' · ')
+  }
   if (row.kind === 'minyans') {
     const rows = minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!)
     return rows.map((m) => minyanText(m, timeText)).join(' · ')
@@ -306,6 +319,7 @@ function hasMenuLink(row: EditorRow, d: Record<string, unknown>): boolean {
 export function rowIsEmpty(row: EditorRow, values: EditorValues): boolean {
   if (row.kind === 'name') return false
   const d = values.details
+  if (row.kind === 'minyans' && row.week) return !weekPostOf(row, d)
   if (row.kind === 'minyans') return minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!).length === 0
   if (row.kind === 'items') return blank(row.fields[0], d[row.fields[0].key]) && selectValues(d[`${row.fields[0].key}_sometimes`]).length === 0 && !hasMenuLink(row, d)
   if (row.kind === 'contact' && (values.address.trim() || values.phone.trim())) return false
@@ -320,6 +334,7 @@ export function rowChanged(row: EditorRow, item: DirectoryResource, values: Edit
   const d = values.details
   if (row.kind === 'name' && !sameFieldValue('name', item.name, values.name)) return true
   if (row.kind === 'contact' && (!sameFieldValue('address', item.address, values.address) || !sameFieldValue('phone', item.phone, values.phone))) return true
+  if (row.kind === 'minyans' && row.week) return JSON.stringify(weekPostOf(row, item)) !== JSON.stringify(weekPostOf(row, d))
   if (row.kind === 'minyans') {
     const key = row.fields[0].key
     const was = isMinyanim(item[key]) ? (item[key] as Minyan[]) : []
@@ -338,6 +353,11 @@ export function rowChanged(row: EditorRow, item: DirectoryResource, values: Edit
     if (f.type === 'tags' && !sameFieldValue('tags', item[`${f.key}_sometimes`], d[`${f.key}_sometimes`])) return true
     return !sameFieldValue(f.type, item[f.key], after)
   })
+}
+
+/** The week post a "This week's schedule" row edits, in these details. */
+function weekPostOf(row: EditorRow, details: Record<string, unknown>) {
+  return weekPostFor(readSchedules(details[schedulesKey(row.fields[0].key)]), row.week!)
 }
 
 /** A box's minyanim as one string, ids left out and keys in order. */

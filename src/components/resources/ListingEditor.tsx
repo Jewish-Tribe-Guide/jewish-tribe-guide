@@ -9,6 +9,9 @@ import { editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type Edit
 import { sameFieldValue } from '@/lib/listingDiff'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { mergeMinyanimBox, minyanimForBox } from '@/lib/minyanimBox'
+import { readSchedules, schedulesKey, weekPostDays } from '@/lib/schedules'
+import { isNoMinyan, usualWeekRows, weekDates, weekPostFor, weekRowsFor, withNoMinyan, withWeekTimes } from '@/lib/thisWeekEdit'
+import { useEditWeek } from '@/lib/useEditWeek'
 import { minyanWriting, timeText } from '@/lib/minyanText'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -294,7 +297,10 @@ export default function ListingEditor({
   })
 
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
-  const rows = editorRows(category, details)
+  // A shul's "This week's schedule" row, on a listing's own edit, not one
+  // box's or an admin's (thisWeekEdit.ts).
+  const thisWeek = useEditWeek(!creating && !onlyRows && !adminSave && category.detailFields.some((f) => f.type === 'minyanim'), item.geo)
+  const rows = editorRows(category, details, { week: thisWeek?.week })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -612,6 +618,31 @@ export default function ListingEditor({
         </>
       )
     }
+    if (r.kind === 'minyans' && r.week && thisWeek) {
+      // The week the guide has, else the usual times to start from; a new
+      // week only once they differ (withWeekTimes).
+      const f = r.fields[0]
+      const sk = schedulesKey(f.key)
+      const week = r.week
+      const usual = usualWeekRows(draftMinyanim(f.key), thisWeek.season, thisWeek.anchors)
+      const post = weekPostFor(readSchedules(details[sk]), week)
+      return (
+        <MinyanBoxEditor
+          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), usual)}
+          initial={weekRowsFor(post, usual)}
+          box="this_week"
+          boxTitle={r.title}
+          heading={weekDates(week)}
+          empty={isNoMinyan(post) ? 'No minyan this week' : undefined}
+          place={item.name || draft.name}
+          writing={minyanWriting}
+          dayChoices={weekPostDays(week)}
+          onStep={stepFor[f.key]}
+          onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { usual, id: crypto.randomUUID(), now: new Date().toISOString() }))}
+          send={() => null}
+        />
+      )
+    }
     if (r.kind === 'minyans') {
       const f = r.fields[0]
       const all = draftMinyanim(f.key)
@@ -667,12 +698,35 @@ export default function ListingEditor({
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
       {!child &&
         foot(
-          <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
-            Done
-          </button>,
+          <div className="space-y-1">
+            <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
+              Done
+            </button>
+            {noMinyanLink(row)}
+          </div>,
         )}
     </div>
   ) : null
+
+  // Under a week's Done, the rare case, quietly (the user, Oct 23): the
+  // week set to none, and back to the list, where its row says so.
+  function noMinyanLink(r: EditorRow): ReactNode {
+    if (!r.week) return null
+    const sk = schedulesKey(r.fields[0].key)
+    if (isNoMinyan(weekPostFor(readSchedules(details[sk]), r.week))) return null
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setDetail(sk, withNoMinyan(readSchedules(details[sk]), r.week!, { id: crypto.randomUUID(), now: new Date().toISOString() }))
+          setOpenId(null)
+        }}
+        className="min-h-11 w-full cursor-pointer text-center text-[15px] font-bold text-primary hover:underline"
+      >
+        No minyan this week
+      </button>
+    )
+  }
 
   // One box's rows, open, and Send: what its Edit opens. A row's own step
   // (a minyan, a person) shows just that, without Send, as on the list.

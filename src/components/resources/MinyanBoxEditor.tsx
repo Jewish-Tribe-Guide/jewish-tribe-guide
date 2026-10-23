@@ -59,6 +59,7 @@ export default function MinyanBoxEditor({
   writing,
   dayChoices,
   heading,
+  empty,
   onChange,
   onStep,
   send,
@@ -83,6 +84,9 @@ export default function MinyanBoxEditor({
   /** Over the list in place of the shul's name: one of several weeks
    *  edited together ("Oct 25–31"), the name said once above them. */
   heading?: string
+  /** What the list says with no minyanim in it: "No minyan this week"
+   *  for a week set to none (thisWeekEdit.ts). */
+  empty?: string
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
@@ -167,7 +171,7 @@ export default function MinyanBoxEditor({
           </ul>
         </div>
       ))}
-      {rows.length === 0 && <p className="text-[15px] text-slate-600">No times listed yet.</p>}
+      {rows.length === 0 && (empty ? <p className="text-[15.5px] font-bold text-slate-900">{empty}</p> : <p className="text-[15px] text-slate-600">No times listed yet.</p>)}
       <button
         type="button"
         onClick={() => setOpen('new')}

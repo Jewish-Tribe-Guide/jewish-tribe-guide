@@ -203,3 +203,39 @@ describe('every field type has a row', () => {
     for (const f of fields) expect(placed, f.type).toContain(f.key)
   })
 })
+
+// The user, Oct 23: Edit listing adds this week's schedule, or that there's
+// no minyan this week (thisWeekEdit.ts).
+describe('a shul’s This week’s schedule row', () => {
+  const week = { from: '2026-10-25', to: '2026-10-31' }
+  const row = (details: Record<string, unknown>) => editorRows(SHUL, details, { week }).find((r) => r.id === 'minyans:this_week')!
+  const post = (extra: object) => ({ id: 'p', name: 'Times for Oct 25 – Oct 31', from: week.from, to: week.to, mode: 'replace', kind: 'week', ...extra })
+  const none = { minyanim_schedules: [post({ whole: true, minyanim: [] })] }
+  const times = { minyanim_schedules: [post({ minyanim: [{ id: 'x', tefillah: 'shacharis', on: ['2026-10-31'], time: '9:30am' }] })] }
+
+  it('comes after the usual times, for the week it’s given, and only then', () => {
+    expect(titles(editorRows(SHUL, {}, { week }))).toEqual(['Name', 'Denomination', 'Usual weekday times', 'Usual Shabbos times', 'This week’s schedule', 'Address, phone and website'])
+    expect(row({})).toMatchObject({ kind: 'minyans', box: 'this_week', week })
+    expect(opensInPlace(row({}))).toBe(false)
+  })
+
+  it('with no week posted, it’s under Not on the listing yet', () => {
+    expect(rowIsEmpty(row({}), values({}))).toBe(true)
+    // Last week's doesn't fill it.
+    const last = { minyanim_schedules: [{ ...post({ minyanim: [] }), from: '2026-10-18', to: '2026-10-24' }] }
+    expect(rowIsEmpty(row(last), values(last))).toBe(true)
+  })
+
+  it('says the week’s dates, then its times, or No minyan', () => {
+    expect(rowIsEmpty(row(none), values(none))).toBe(false)
+    expect(rowSummary(row(none), values(none), timeText)).toBe('Oct 25 – Oct 31 · No minyan')
+    expect(rowSummary(row(times), values(times), timeText)).toBe('Oct 25 – Oct 31 · Shacharis 9:30 AM')
+  })
+
+  it('is Changed when the week is', () => {
+    const was = { id: 'r', name: 'A place', category: 'synagogue' } as unknown as DirectoryResource
+    expect(rowChanged(row({}), was, values({}))).toBe(false)
+    expect(rowChanged(row(none), was, values(none))).toBe(true)
+    expect(rowChanged(row(none), { ...was, ...none } as unknown as DirectoryResource, values(none))).toBe(false)
+  })
+})
