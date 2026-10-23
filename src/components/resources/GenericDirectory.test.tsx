@@ -2178,9 +2178,11 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       // The row goes: the view's own answer says what's next.
       expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
       expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)).toEqual([
-        '6:20 PMMekor HabrachaMincha · 0.2 mi',
-        '6:20 PMAleph ShulMincha · 8.2 mi',
-        '6:25 PMLower Merion SynagogueMincha · 5.1 mi',
+        // None sent this week's times: each says its usual one, and when
+        // it was last checked (a listing with no date, just that).
+        '6:20 PMMekor HabrachaMincha · 0.2 miUsual time',
+        '6:20 PMAleph ShulMincha · 8.2 miUsual time · last checked Aug 31',
+        '6:25 PMLower Merion SynagogueMincha · 5.1 miUsual time · last checked Aug 31',
       ])
     })
 
@@ -2266,7 +2268,11 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         renderWithProviders(<GenericDirectory category={denominated} items={mixed()} openMinyanimView {...handlers} />, { content: { categories: [denominated] } })
       const heading = () => within(screen.getByTestId('minyanim-view')).getByTestId('list-heading')
       const sheet = () => screen.getByRole('dialog', { name: 'Filters' })
-      const rows = () => within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)
+      // Each row without its "Usual time · last checked" line.
+      const rows = () =>
+        within(screen.getByTestId('minyanim-rows'))
+          .getAllByRole('link')
+          .map((a) => a.textContent!.replace(a.querySelector('[data-testid="minyan-whose"]')?.textContent ?? '', ''))
 
       it('says how many are left today, and each minyan its shul’s denomination', async () => {
         fivePm()

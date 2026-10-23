@@ -376,6 +376,15 @@ export function compareTimes(
 const rowKey = (r: UpdateRow) =>
   JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null, r.signUp ?? null])
 
+/** Whether any time was read from what was sent: a read time is the same
+ *  as one the guide has, a change to one or a new one. With none, the
+ *  result is only the guide's own times, marked kept, and looked like a
+ *  reading that agreed: Chabad Mainline's link, pasted bare, came back as
+ *  "Everything matches what the guide has" (the user, Oct 23). */
+export function readAnything(u: Pick<TimesUpdate, 'rows'>): boolean {
+  return u.rows.some((r) => r.status === 'same' || r.status === 'changed' || r.status === 'new')
+}
+
 /** Whether a result changes anything: otherwise it only confirms. */
 export function changesAnything(u: Pick<TimesUpdate, 'rows'>): boolean {
   return u.rows.some((r) => r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && !r.keep))

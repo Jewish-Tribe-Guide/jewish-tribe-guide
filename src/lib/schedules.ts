@@ -167,8 +167,11 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   if (covering) {
     const week = covering.kind === 'week'
     const rows = covering.mode === 'replace' ? rowsOn(covering, regular, d) : notUsual(rowsOn(covering, regular, d))
+    // Every week the shul sent out is "This week's times", a Shabbos-only one
+    // ("Shabbat Lekh Lekha") too: Mikveh Israel's said "Shabbat Lekh Lekha
+    // times" beside every other shul's "This week's times" (the user, Oct 23).
     if (rows.length > 0)
-      return { rows: [...rows, ...(covering.mode === 'replace' ? alsoAdded : added)], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
+      return { rows: [...rows, ...(covering.mode === 'replace' ? alsoAdded : added)], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
     // the regular ones, but not presented as the festival's. A week the
     // shul sent out that leaves a day out (a website's calendar giving only
@@ -465,13 +468,31 @@ const sameClock = (a: string, b: string) => (Number.isFinite(parseTimeToMinutes(
  *  for ("Thanksgiving"), and its times, each with the post it's from. */
 export type WeekDayTimes = { date: string; occasion: string | null; minyanim: { minyan: ScheduleMinyan; from: SpecialSchedule }[] }
 
+/** Whether this Shabbos is over: a Saturday, once its havdalah (the
+ *  zmanim's, for today) has passed. Without one, not over: the card keeps
+ *  Shabbos rather than guess, and a Shabbos running into Yom Tov has no
+ *  havdalah that night (the next is the Yom Tov's, days on). */
+export function shabbosIsOver(today: string, nowMs: number, havdalahIso: string | null | undefined): boolean {
+  if (weekdayOfDate(today) !== 'sat' || !havdalahIso) return false
+  const at = Date.parse(havdalahIso)
+  return Number.isFinite(at) && nowMs >= at
+}
+
 /** "This week's schedule" (the user, Oct 20: "There's only one schedule
  *  for a given week"), day by day from today to Shabbos: on each day the
  *  week post that has it (the newsletter's over the website's, as
  *  resolveDay picks), then that day's one-day additions, less any time
  *  the week already gives. `posts` are the week posts it shows, the
  *  newsletter's first. Days with nothing are left out. */
-export function thisWeeksDays(schedules: readonly SpecialSchedule[], today: string): { days: WeekDayTimes[]; posts: SpecialSchedule[] } {
+export function thisWeeksDays(
+  schedules: readonly SpecialSchedule[],
+  date: string,
+  { shabbosOver = false }: { shabbosOver?: boolean } = {},
+): { days: WeekDayTimes[]; posts: SpecialSchedule[] } {
+  // Friday, the week ends with Shabbos, its last; once Shabbos is over
+  // (shabbosIsOver), it's the week ahead, Sunday to Shabbos (the user, Oct
+  // 23: "right when shabbos is over we need to show the week's schedule").
+  const today = shabbosOver ? new Date(Date.parse(`${date}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10) : date
   const saturday = saturdayOf(today)
   const weeks = schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday)
   const days: WeekDayTimes[] = []

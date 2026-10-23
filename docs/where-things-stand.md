@@ -281,15 +281,16 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
-9. **This week's schedule on a Friday** shows only Friday and Shabbos:
-   it runs today through Shabbos. Mekor's week posted Oct 23 (to Oct 30)
-   and Leyv Ha-Ir's Fri Oct 30 show from Sunday. Recommended: from
-   Thursday (when a calendar's next week is read), show next week's
-   posted days too, under their dates.
-10. **A minyan nobody has confirmed** (a usual time on a day with no
-    posted schedule) shows no line at all; a posted one says "✓ This
-    week's times". Wording for the unconfirmed line not chosen yet.
-11. **Summer and winter times** follow the clock change (Nov 1), so a
+9. **"No minyan this week"** (the user, Oct 23: "Not being able to read is
+   different than reading and confirming there is nothing"). Leyv Ha-Ir's
+   next minyan is Fri Oct 30 and Shivtei Yeshuron's calendar has none until
+   Nov 7, so both show only their usual times, as if this week weren't
+   known. Proposed: a calendar read with no services that week files an
+   empty week through the queue, and the listing and Minyanim list say
+   "No minyan this week · from their calendar, checked Oct 23"; Shul times
+   keeps "couldn't read" and "read: nothing that week" apart. The risk: a
+   calendar not filled in yet reads the same as an empty week.
+10. **Summer and winter times** follow the clock change (Nov 1), so a
     Friday "7:00 PM · Summer" still counts while candle lighting is 5:50.
     Proposed for later: for a pair of one season each, a clock time and a
     zman, it's summer that day when the zman is later than the clock time.
@@ -1274,6 +1275,27 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 23, later: this week after Shabbos, and what an unconfirmed time says (on `redesign/oct18-fixes`, not merged)
+
+- **This week's schedule** runs from today through Shabbos, so on Friday
+  Shabbos is last. Once havdalah has passed on Saturday night (today's,
+  from the zmanim), it is the week ahead, Sunday to Shabbos. With no
+  havdalah known, Shabbos stays.
+- **A minyan with no posted times that day** says "Usual time · last
+  checked Oct 12" under it, in grey, on the Minyanim list and a hotel's
+  walk list. The date is its own box's: the usual Shabbos box's for a
+  Friday-night or Saturday row, else the weekday box's.
+- **Every week a shul sent out** is "✓ This week's times" on the Minyanim
+  list, a Shabbos-only one too. Mikveh Israel's "Shabbat Lekh Lekha" said
+  "Shabbat Lekh Lekha times". The card's own heading still has the name.
+- **The public times box, when nothing could be read** from what was sent
+  (a bare link, which it never opens), says "No times could be read from
+  it" and, for a link, "A link isn't opened here. Paste the times
+  themselves, or add a photo of them", with Try again. Before, it showed
+  the guide's own times as "How they'll show in the guide", then
+  "Everything matches what the guide has" and Mark them confirmed. That is
+  what made Chabad Mainline's link look read.
 
 ## Done Oct 23: sign-up minyanim and another shul's minyan, read off a message (on `redesign/oct18-fixes`, not merged)
 

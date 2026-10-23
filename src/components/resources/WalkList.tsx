@@ -36,6 +36,7 @@ import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { Card } from './listingParts'
 import { WalkOnMapContext } from './walkOnMap'
 import { pointerHover } from '@/lib/pointerHover'
+import { usualCheckedAt } from '@/lib/usualChecked'
 
 // ── Other categories' places within a walk: a hotel's shuls, a hospital's
 // food, shuls, hotels and mikvah ─────────────────────────────────────────────
@@ -395,6 +396,7 @@ function WalkMinyanim({
                       far={walkText(s.shulId)}
                       kind={shul ? listingKind(shul, target) : ''}
                       posting={(s.shulId && schedule.posting[s.shulId]?.[day.date]) || { kind: 'regular' }}
+                      checkedAt={shul ? usualCheckedAt(shul, schedule.shuls.find((x) => x.id === shul.id)?.minyanim.find((m) => m.id === s.minyanId)) : undefined}
                       // Opens the shul on this minyan (TappedMinyan).
                       href={shul ? `${routes.listing(community, target.id, listingSlug(shul))}${s.minyanId ? `?minyan=${encodeURIComponent(tappedMinyanParam(s.minyanId, day.date, s.minutes))}` : ''}` : null}
                       onHover={onMap ? onMap.highlight.set : undefined}

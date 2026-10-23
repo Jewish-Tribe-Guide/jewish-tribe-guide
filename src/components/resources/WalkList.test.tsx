@@ -171,8 +171,10 @@ describe('A hotel’s synagogues within a walk', () => {
       minyanim: minyanim.map((m, i) => ({ id: `${s.id}${i}`, ...m })),
     })
     const withMinyanim = () => [
-      davening(nearby[0], { tefillah: 'mincha', days: ['mon'], time: '6:30pm' }, { tefillah: 'shacharis', days: ['tue'], time: '7:00am' }),
-      davening(nearby[1], { tefillah: 'mincha', days: ['mon'], time: '6:20pm' }, { tefillah: 'shacharis', days: ['mon'], time: '7:00am' }),
+      // When their usual times were last checked: the weekday box's date
+      // under a weekday minyan, never the Shabbos box's.
+      { ...davening(nearby[0], { tefillah: 'mincha', days: ['mon'], time: '6:30pm' }, { tefillah: 'shacharis', days: ['tue'], time: '7:00am' }), confirmedAt: '2026-09-01T12:00:00Z', sectionConfirmed: { shabbos: '2026-09-20T12:00:00Z' } },
+      { ...davening(nearby[1], { tefillah: 'mincha', days: ['mon'], time: '6:20pm' }, { tefillah: 'shacharis', days: ['mon'], time: '7:00am' }), sectionConfirmed: { weekday: '2026-09-14T12:00:00Z' } },
       nearby[2],
       // Out of the walk: not here.
       davening(nearby[3], { tefillah: 'maariv', days: ['mon'], time: '8:00pm' }),
@@ -201,8 +203,8 @@ describe('A hotel’s synagogues within a walk', () => {
       const section = line.closest('[data-testid="walk-minyanim"]') as HTMLElement
       expect(within(section).getByRole('heading', { level: 4 })).toHaveTextContent('Today · 2')
       expect(within(section).getAllByRole('link').map((a) => a.textContent)).toEqual([
-        '6:20 PMMikveh IsraelMincha · Orthodox (Ashkenazi) · 15 min walk',
-        '6:30 PMSociety Hill SynagogueMincha · Conservative · 8 min walk',
+        '6:20 PMMikveh IsraelMincha · Orthodox (Ashkenazi) · 15 min walkUsual time · last checked Sep 14',
+        '6:30 PMSociety Hill SynagogueMincha · Conservative · 8 min walkUsual time · last checked Sep 1',
       ])
       expect(within(section).getAllByRole('link')[0].getAttribute('href')).toMatch(/^\/test-community\/synagogue\/mikveh-israel/)
       // One open at a time: the shuls' own line closed.

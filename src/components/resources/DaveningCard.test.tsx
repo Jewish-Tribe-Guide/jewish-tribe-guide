@@ -21,6 +21,8 @@ vi.mock('@/lib/useZmanim', () => ({
         { date: '2026-10-03', yomTov: true, cholHamoed: false, name: 'Shemini Atzeres', festival: 'Sukkos' },
         { date: '2026-10-04', yomTov: true, cholHamoed: false, name: 'Simchas Torah', festival: 'Sukkos' },
       ],
+      // Shabbos Bereishis's: when this week becomes the week ahead.
+      shabbos: { candleLighting: null, havdalah: { label: 'Havdalah', time: '7:05 PM', iso: '2026-10-10T19:05:00-04:00' } },
     },
   }),
 }))
@@ -421,6 +423,16 @@ describe('this week’s one-day additions (Oct 20)', () => {
     // Nothing of the usual times is folded away.
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 10:45 AM')
     expect(screen.queryByTestId('davening-folded')).not.toBeInTheDocument()
+  })
+
+  // Oct 23: "on Friday people want to see shabbos as last. But right when
+  // shabbos is over we need to show the week's schedule."
+  it('on Shabbos, that day’s; after havdalah, the week ahead’s', () => {
+    show('2026-10-10T15:00:00-04:00', thursdays) // Sat Oct 10, 3 PM
+    expect(screen.queryByTestId('davening-this-week')).not.toBeInTheDocument()
+    cleanup()
+    show('2026-10-10T19:30:00-04:00', thursdays) // after havdalah
+    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 15Shacharis8:10 AM')
   })
 
   it('the day before, it stays there rather than in a box of its own', () => {
