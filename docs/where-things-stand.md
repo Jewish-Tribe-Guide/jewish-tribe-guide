@@ -444,6 +444,13 @@ agreed:
      and the row says "Reading 2 of 4…". The search gets 10s, and an
      answer that isn't JSON says "That took too long. Try again." on any
      admin page. "Turn back on" reads the same way.
+   - Sons of Israel was read again every time Shul times opened (Oct 22):
+     its newsletter-links page was never reached, so it always counted as
+     not read yet, and opening the page searched and re-read all its
+     pages, filing its suggestions afresh. Opening the page now reads only
+     pages never read, and only those. Still open: its home page (Shabbos
+     Shacharis 9:00) and tefillot page (8:30) disagree, so whichever is
+     used, the other files again on its next read.
    - A shul's newsletter is one of its reads (the user, Oct 22): a line in
      its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
      a shul read from one is Checked, not Can't be read. Off the Watches

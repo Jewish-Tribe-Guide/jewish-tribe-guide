@@ -355,14 +355,15 @@ describe('Mikvah hours', () => {
       (body) => {
         if (body.action !== 'check') return {}
         now = LOWER
-        return { pages: LOWER.pages, stopped: [] }
+        // The search first, reading nothing; then each page, a request of its own.
+        return body.id ? { pages: LOWER.pages, stopped: [] } : { pages: LOWER.pages, stopped: [], read: LOWER.pages.map((x) => x.watch.id) }
       },
     )
     await tab('Checked')
     await open(LOWER.name)
     await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: /^Reads/ }))
     await userEvent.setup().click(within(mikvah(LOWER.name)).getByRole('button', { name: 'Read them now' }))
-    expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'lmc', action: 'check' } })
+    await waitFor(() => expect(posts.map((x) => x.body)).toEqual([{ resourceId: 'lmc', action: 'check' }, ...LOWER.pages.map((x) => ({ resourceId: 'lmc', action: 'check', id: x.watch.id }))]))
     // An update: to To check.
     await waitFor(() => expect(shown(LOWER.name)).toBe(false))
     await tab('To check')
@@ -383,16 +384,19 @@ describe('Mikvah hours', () => {
     renderWithProviders(<HoursJob token="tok" />, { community: { slug: 'philly' } })
     await screen.findByRole('heading', { name: 'Mikvah hours' })
     await waitFor(() => expect(pill('Unread Mikvah')).toBe('Reading…'))
-    expect(posts.map((p) => p.body)).toEqual([{ resourceId: 'u', action: 'check' }])
+    expect(posts.map((p) => p.body)).toEqual([{ resourceId: 'u', action: 'check', id: 'w-u' }])
     answer({ ok: true, pages: [read], stopped: [] })
     await waitFor(() => expect(shown('Unread Mikvah')).toBe(false))
     await tab('Checked')
     expect(pill('Unread Mikvah')).toBe('Same')
   })
 
-  it('reads a place’s pages one request each, in order, saying how far it is', async () => {
+  it('on load, reads only its pages not read yet, one request each, in order, saying how far it is', async () => {
     const pageOf = (id: string, c: ReturnType<typeof check> | null = null) => ({ watch: watch({ id, lastRunAt: c ? 'now' : null, lastCheck: c }), source: 'Found from its website' })
-    const unread = place({ id: 'u', name: 'Unread Mikvah', pages: [pageOf('w-a'), pageOf('w-b')] })
+    // Sons of Israel (Oct 22): its home page read, its newsletter page never
+    // reached. Opening the page searched and re-read them all, filing its
+    // suggestions afresh each time.
+    const unread = place({ id: 'u', name: 'Unread Mikvah', pages: [pageOf('w-home', check('agrees')), pageOf('w-a'), pageOf('w-b')] })
     const answers: ((v: Record<string, unknown>) => void)[] = []
     vi.mocked(fetchJson).mockImplementation(async (url, init) => {
       if (init?.method === 'POST') {
@@ -403,24 +407,20 @@ describe('Mikvah hours', () => {
     })
     renderWithProviders(<HoursJob token="tok" />, { community: { slug: 'philly' } })
     await screen.findByRole('heading', { name: 'Mikvah hours' })
-    // The search first, reading nothing: all of Sons of Israel's pages in
-    // one request passed the host's 60s (Oct 22).
     await waitFor(() => expect(posts).toHaveLength(1))
-    expect(posts[0].body).toEqual({ resourceId: 'u', action: 'check' })
-    answers[0]({ ok: true, pages: unread.pages, stopped: [], read: ['w-a', 'w-b'] })
-    await waitFor(() => expect(posts).toHaveLength(2))
-    expect(posts[1].body).toEqual({ resourceId: 'u', action: 'check', id: 'w-a' })
-    expect(pill('Unread Mikvah')).toBe('Reading 1 of 2…')
+    expect(posts[0].body).toEqual({ resourceId: 'u', action: 'check', id: 'w-a' })
+    await waitFor(() => expect(pill('Unread Mikvah')).toBe('Reading 1 of 2…'))
     // The next only once the one before it is back.
-    answers[1]({ ok: true, pages: [pageOf('w-a', check('agrees')), pageOf('w-b')], stopped: [] })
-    await waitFor(() => expect(posts).toHaveLength(3))
-    expect(posts[2].body).toEqual({ resourceId: 'u', action: 'check', id: 'w-b' })
+    answers[0]({ ok: true, pages: [pageOf('w-home', check('agrees')), pageOf('w-a', check('agrees')), pageOf('w-b')], stopped: [] })
+    await waitFor(() => expect(posts).toHaveLength(2))
+    expect(posts[1].body).toEqual({ resourceId: 'u', action: 'check', id: 'w-b' })
     await waitFor(() => expect(pill('Unread Mikvah')).toBe('Reading 2 of 2…'))
-    answers[2]({ ok: true, pages: [pageOf('w-a', check('agrees')), pageOf('w-b', check('agrees'))], stopped: [] })
+    answers[1]({ ok: true, pages: [pageOf('w-home', check('agrees')), pageOf('w-a', check('agrees')), pageOf('w-b', check('agrees'))], stopped: [] })
     await waitFor(() => expect(shown('Unread Mikvah')).toBe(false))
     await tab('Checked')
     expect(pill('Unread Mikvah')).toBe('Same')
-    expect(posts).toHaveLength(3)
+    // No search, and the page already read isn't read again.
+    expect(posts).toHaveLength(2)
   })
 
   it('reads at most a few on its own, leaving the rate limit for Read them now', async () => {

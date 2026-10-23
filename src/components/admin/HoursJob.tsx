@@ -124,7 +124,8 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
   }, [token, community, api])
   useLoadOnMount(load)
 
-  async function act(p: HoursPlace, body: Record<string, unknown>) {
+  // `body` null: no first request, just `ids`, its pages to read (on load).
+  async function act(p: HoursPlace, body: Record<string, unknown> | null, ids: readonly string[] = []) {
     setSaveError(null)
     setBusy((b) => new Set(b).add(p.id))
     const post = (b: Record<string, unknown>) =>
@@ -144,15 +145,15 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
       setData((d) => d && { ...d, places: d.places.map((x) => (x.id === p.id ? next(x) : x)) })
     }
     try {
-      const res = await post(body)
+      const res: Saved = body ? await post(body) : { read: [...ids] }
       apply(res)
       // Then its pages, one request each and in order, so each read sees
       // what the one before it filed. One that fails doesn't stop the rest.
       let pages = res.pages ?? []
       let failed: string | null = null
-      const ids = res.read ?? []
-      for (const [i, id] of ids.entries()) {
-        setProgress((m) => new Map(m).set(p.id, `Reading ${i + 1} of ${ids.length}…`))
+      const read = res.read ?? []
+      for (const [i, id] of read.entries()) {
+        if (read.length > 1) setProgress((m) => new Map(m).set(p.id, `Reading ${i + 1} of ${read.length}…`))
         try {
           const one = await post({ action: 'check', id })
           apply(one)
@@ -185,14 +186,22 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
     }
   }
 
-  // Pages not read yet, read now, one place after another.
+  // Pages not read yet, read now, one place after another: only those
+  // pages, without searching its website again or re-reading the ones
+  // already read. Re-reading them all filed Sons of Israel's suggestions
+  // afresh every time the page opened, since one page of its was never
+  // reached (Oct 22).
   const readOnLoad = useRef(false)
   useEffect(() => {
     if (!data || readOnLoad.current) return
     readOnLoad.current = true
-    const unread = data.places.filter((p) => hoursSection(asPlace(p, new Map()), now) === 'waiting' && p.pages.some((x) => x.watch.active)).slice(0, READ_ON_LOAD)
+    const unread = data.places
+      .filter((p) => hoursSection(asPlace(p, new Map()), now) === 'waiting')
+      .map((p) => ({ p, ids: p.pages.filter((x) => x.watch.active && !x.watch.lastRunAt).map((x) => x.watch.id) }))
+      .filter((x) => x.ids.length)
+      .slice(0, READ_ON_LOAD)
     void (async () => {
-      for (const p of unread) await act(p, { action: 'check' })
+      for (const { p, ids } of unread) await act(p, null, ids)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
