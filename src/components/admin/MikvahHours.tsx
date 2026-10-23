@@ -98,6 +98,7 @@ export function MikvahRow({
   status,
   busy,
   reading,
+  progress,
   token,
   community,
   jobName,
@@ -111,6 +112,8 @@ export function MikvahRow({
   status: JobStatus
   busy: boolean
   reading: boolean
+  // "Reading 2 of 4…" while its pages are read one by one.
+  progress?: string
   token: string
   community: string
   jobName: string
@@ -223,7 +226,7 @@ export function MikvahRow({
   const unsure = status === 'unsure' ? live.flatMap((w) => readOf(w)?.read ?? []) : []
 
   return (
-    <PlaceRow name={p.name} pill={shulPill(p, status, reading, settled)} back={jobName}>
+    <PlaceRow name={p.name} pill={shulPill(p, status, reading, settled, progress)} back={jobName}>
       {ordered.map((f) => {
         const s = sectionOf(f)
         const decided = settled.get(f.id)
@@ -304,7 +307,7 @@ export function MikvahRow({
             )}
             {!off && (
               <button type="button" disabled={busy} onClick={() => onAct({ action: 'check' })} className={LINK}>
-                {busy ? 'Reading…' : 'Read them now'}
+                {busy ? (progress ?? 'Reading…') : 'Read them now'}
               </button>
             )}
             <a href={p.href} target="_blank" rel="noopener noreferrer" className={LINK}>

@@ -439,10 +439,11 @@ agreed:
      (403), so only BZBI's newsletter is read.
    - "Read them now" on Sons of Israel said "Unexpected token 'A'…"
      (Oct 22): its pages, read by the AI one after another, passed the
-     host's 60s and the host's error page isn't JSON. It now starts no
-     page after 30s (the rest keep their last read, for the morning), the
-     search gets 10s, and an answer that isn't JSON says "That took too
-     long. Try again." on any admin page.
+     host's 60s and the host's error page isn't JSON. Now every page is
+     read: the job page asks for each one in its own request, in order,
+     and the row says "Reading 2 of 4…". The search gets 10s, and an
+     answer that isn't JSON says "That took too long. Try again." on any
+     admin page. "Turn back on" reads the same way.
    - A shul's newsletter is one of its reads (the user, Oct 22): a line in
      its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
      a shul read from one is Checked, not Can't be read. Off the Watches

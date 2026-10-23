@@ -390,6 +390,39 @@ describe('Mikvah hours', () => {
     expect(pill('Unread Mikvah')).toBe('Same')
   })
 
+  it('reads a place’s pages one request each, in order, saying how far it is', async () => {
+    const pageOf = (id: string, c: ReturnType<typeof check> | null = null) => ({ watch: watch({ id, lastRunAt: c ? 'now' : null, lastCheck: c }), source: 'Found from its website' })
+    const unread = place({ id: 'u', name: 'Unread Mikvah', pages: [pageOf('w-a'), pageOf('w-b')] })
+    const answers: ((v: Record<string, unknown>) => void)[] = []
+    vi.mocked(fetchJson).mockImplementation(async (url, init) => {
+      if (init?.method === 'POST') {
+        posts.push({ url: String(url), body: JSON.parse(String(init.body)) })
+        return new Promise((done) => answers.push(done))
+      }
+      return { ok: true, available: true, name: 'Mikvah hours', places: [unread] }
+    })
+    renderWithProviders(<HoursJob token="tok" />, { community: { slug: 'philly' } })
+    await screen.findByRole('heading', { name: 'Mikvah hours' })
+    // The search first, reading nothing: all of Sons of Israel's pages in
+    // one request passed the host's 60s (Oct 22).
+    await waitFor(() => expect(posts).toHaveLength(1))
+    expect(posts[0].body).toEqual({ resourceId: 'u', action: 'check' })
+    answers[0]({ ok: true, pages: unread.pages, stopped: [], read: ['w-a', 'w-b'] })
+    await waitFor(() => expect(posts).toHaveLength(2))
+    expect(posts[1].body).toEqual({ resourceId: 'u', action: 'check', id: 'w-a' })
+    expect(pill('Unread Mikvah')).toBe('Reading 1 of 2…')
+    // The next only once the one before it is back.
+    answers[1]({ ok: true, pages: [pageOf('w-a', check('agrees')), pageOf('w-b')], stopped: [] })
+    await waitFor(() => expect(posts).toHaveLength(3))
+    expect(posts[2].body).toEqual({ resourceId: 'u', action: 'check', id: 'w-b' })
+    await waitFor(() => expect(pill('Unread Mikvah')).toBe('Reading 2 of 2…'))
+    answers[2]({ ok: true, pages: [pageOf('w-a', check('agrees')), pageOf('w-b', check('agrees'))], stopped: [] })
+    await waitFor(() => expect(shown('Unread Mikvah')).toBe(false))
+    await tab('Checked')
+    expect(pill('Unread Mikvah')).toBe('Same')
+    expect(posts).toHaveLength(3)
+  })
+
   it('reads at most a few on its own, leaving the rate limit for Read them now', async () => {
     const unread = Array.from({ length: READ_ON_LOAD + 2 }, (_, i) => place({ id: `u${i}`, name: `Unread ${i}`, pages: [{ watch: watch({ id: `w-u${i}`, lastRunAt: null, lastCheck: null }), source: 'Found from its website' }] }))
     await renderPage(unread, () => ({ pages: [], stopped: [] }))
