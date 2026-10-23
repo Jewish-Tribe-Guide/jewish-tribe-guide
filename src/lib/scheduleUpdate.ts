@@ -1,6 +1,6 @@
 import { DAY_KEYS, type DayKey } from './hours'
 import { formatAnchorRule, parseTimeToMinutes, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah, type ZmanAnchor } from './davening'
-import { dateText, weekKeepsHeading, type ScheduleDay, type SpecialSchedule } from './schedules'
+import { dateText, signUpGroup, weekKeepsHeading, type ScheduleDay, type SpecialSchedule } from './schedules'
 import type { Season } from './season'
 
 // ── Updating a shul's times from what it sent (agreed Oct 1) ────────────────
@@ -48,6 +48,14 @@ export type ReadRegularTime = {
   quote: string
   checked: boolean
   unsure?: string
+  /** It runs only when enough people come ("held when there is sufficient
+   *  interest", Mekor's newsletter, Oct 23): a sign-up minyan. */
+  signUp?: true
+  /** Where it's held, as written, when that isn't the shul itself ("at
+   *  1818 Market or Mikveh Israel"): another shul's minyan the guide has
+   *  already is left out (heldElsewhere.ts); else it's the shul's own,
+   *  somewhere else, and this goes in its note. */
+  where?: string
 }
 
 /** What a message is. `schedule`: the shul's usual times (perhaps for one
@@ -99,6 +107,8 @@ export type UpdateRow = {
   /** The season it's for, when the message gives both seasons' times
    *  (compareTimes). None: all year, or the message's own season. */
   season?: Season
+  /** The message says it runs only when enough people sign up. */
+  signUp?: true
 }
 
 export type TimesUpdate = {
@@ -226,7 +236,7 @@ function pairDay(
       continue
     }
     const [c] = cur.splice(i, 1)
-    out.push({ ...rowFrom(c.row, day, newId), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...timeOf(r, c.row) })
+    out.push({ ...rowFrom(c.row, day, newId), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...timeOf(r, c.row) })
   }
   left.sort((a, b) => sortKey(a, zm) - sortKey(b, zm))
   cur.sort((a, b) => sortKey(a.row, zm) - sortKey(b.row, zm))
@@ -243,6 +253,7 @@ function pairDay(
       quote: r.quote,
       ...(r.unsure ? { unsure: r.unsure } : {}),
       ...(r.occasion ? { occasion: r.occasion } : {}),
+      ...(r.signUp ? { signUp: true as const } : {}),
     })
   }
   for (const c of cur) out.push({ ...rowFrom(c.row, day, newId), status: complete ? 'gone' : 'kept' })
@@ -344,6 +355,7 @@ export function compareTimes(
         quote: t.quote,
         ...(t.unsure ? { unsure: t.unsure } : {}),
         ...(t.occasion ? { occasion: t.occasion } : {}),
+        ...(t.signUp ? { signUp: true as const } : {}),
       })
     }
   }
@@ -362,7 +374,16 @@ export function compareTimes(
 
 /** A row, whatever its id: the same in both seasons' passes is all year. */
 const rowKey = (r: UpdateRow) =>
-  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null])
+  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null, r.signUp ?? null])
+
+/** Whether any time was read from what was sent: a read time is the same
+ *  as one the guide has, a change to one or a new one. With none, the
+ *  result is only the guide's own times, marked kept, and looked like a
+ *  reading that agreed: Chabad Mainline's link, pasted bare, came back as
+ *  "Everything matches what the guide has" (the user, Oct 23). */
+export function readAnything(u: Pick<TimesUpdate, 'rows'>): boolean {
+  return u.rows.some((r) => r.status === 'same' || r.status === 'changed' || r.status === 'new')
+}
 
 /** Whether a result changes anything: otherwise it only confirms. */
 export function changesAnything(u: Pick<TimesUpdate, 'rows'>): boolean {
@@ -469,7 +490,7 @@ function withoutWebsiteDays(schedules: readonly SpecialSchedule[], dates: Readon
 /** "Mincha · Fri · 6:12 PM", for the admin's note. */
 function rowText(r: UpdateRow): string {
   const day = (DAY_KEYS as readonly string[]).includes(r.day) ? (r.day === 'sat' ? 'Shabbos' : r.day[0].toUpperCase() + r.day.slice(1)) : dateText(r.day, { weekday: true })
-  return `${r.tefillah.replace(/_/g, ' ')} · ${day}${r.occasion ? ` (${r.occasion})` : ''} · ${r.time}`
+  return `${r.tefillah.replace(/_/g, ' ')} · ${day}${r.occasion ? ` (${r.occasion})` : ''} · ${r.time}${r.signUp ? ' · only if enough sign up' : ''}`
 }
 
 /**
@@ -489,6 +510,7 @@ export function applyUpdate(
     postedBy,
     name: weekName,
     evenIfSame = false,
+    whole = false,
   }: {
     newId?: () => string
     now?: number
@@ -502,6 +524,9 @@ export function applyUpdate(
      *  "usual times doesn't read as reliable as something that says this
      *  is confirmed this week's schedule"). */
     evenIfSame?: boolean
+    /** The shul's whole week (SpecialSchedule.whole): posted even with no
+     *  times at all, as no minyan that week. */
+    whole?: boolean
   } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
@@ -520,16 +545,25 @@ export function applyUpdate(
     return s
   }
   // A sign-up minyan whose time changes is still a sign-up minyan: the
-  // message gives its new time, not how it gets its ten.
-  const add = (r: UpdateRow, season: Season | null, was?: DaySlot) =>
+  // message gives its new time, not how it gets its ten. One the message
+  // says is sign-up signs up where the usual one does (signUpGroup).
+  const signUpOf = (r: UpdateRow, weekday: DayKey, was?: Pick<Minyan, 'signUp'>) => was?.signUp ?? (r.signUp ? signUpGroup(current, r.tefillah, [weekday]) : undefined)
+  const add = (r: UpdateRow, season: Season | null, was?: DaySlot) => {
+    const signUp = signUpOf(r, r.day as DayKey, was)
     slots.push({
       tefillah: r.tefillah,
       ...pickTime(r),
       ...(r.notes ? { notes: r.notes } : {}),
       ...(season ? { season } : {}),
-      ...(was?.signUp ? { signUp: was.signUp } : {}),
+      ...(signUp ? { signUp } : {}),
       day: r.day as DayKey,
     })
+  }
+  /** A dated row as a schedule's minyan, sign-up with its group. */
+  const onDate = (r: UpdateRow) => {
+    const signUp = signUpOf(r, weekdayOf(r.day))
+    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}), ...(signUp ? { signUp } : {}) }
+  }
 
   const weekly = (r: UpdateRow) => (DAY_KEYS as readonly string[]).includes(r.day)
   const dated: UpdateRow[] = []
@@ -574,12 +608,10 @@ export function applyUpdate(
 
   // …and the week itself, dated, in place of the regular times those days.
   const posting = update.rows.some((r) => r.status !== 'gone' || r.keep)
-  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting))) {
+  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting) || whole)) {
     const heading = weekKeepsHeading({ from: update.from, to: update.to }) ? update.title?.trim() : null
     const name = weekName || heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
-    const minyanimOn = update.rows
-      .filter((r) => r.status !== 'gone' || r.keep)
-      .map((r) => ({ id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) }))
+    const minyanimOn = update.rows.filter((r) => r.status !== 'gone' || r.keep).map(onDate)
     // A week from the newsletter or a person wins over one read off the
     // website for the same days (the user, Oct 20): the website's come off.
     if (!postedBy) nextSchedules = withoutWebsiteDays(nextSchedules, new Set(datesBetween(update.from, update.to)))
@@ -594,13 +626,15 @@ export function applyUpdate(
       kind: 'week',
       postedAt: new Date(now).toISOString(),
       ...(postedBy ? { postedBy } : {}),
+      ...(whole ? { whole: true as const } : {}),
     })
+    if (whole && !minyanimOn.length) changes.push(`${name}: no minyan`)
     for (const r of update.rows) {
       if (r.status === 'changed') changes.push(`${name}: ${rowText(r)}, usually ${r.was}`)
       if (r.status === 'new') changes.push(`${name}: new, ${rowText(r)}`)
       if (r.status === 'gone' && !r.keep) changes.push(`${name}: not held, ${rowText(r)}`)
     }
-    if (!changesAnything(update)) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
+    if (!changesAnything(update) && minyanimOn.length) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
   }
 
   // One-offs on their dates, as well as the regular times.
@@ -614,7 +648,7 @@ export function applyUpdate(
       from: date,
       to: date,
       mode: 'add',
-      minyanim: rs.map((r) => ({ id: newId(), tefillah: r.tefillah, on: [date], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) })),
+      minyanim: rs.map(onDate),
       ...(postedBy ? { postedBy } : {}),
     })
     for (const r of rs) changes.push(`New, that day only: ${rowText(r)}`)
@@ -682,6 +716,7 @@ export function cleanUpdate(raw: unknown, now = Date.now()): Omit<TimesUpdate, '
       ...(s(y.occasion, 40) ? { occasion: s(y.occasion, 40) } : {}),
       ...(y.keep === true ? { keep: true } : {}),
       ...(y.everyWeek === true ? { everyWeek: true } : {}),
+      ...(y.signUp === true ? { signUp: true as const } : {}),
     })
   }
   return {

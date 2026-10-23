@@ -166,4 +166,31 @@ describe('Update their times', () => {
     await vi.waitFor(() => expect(onSent).toHaveBeenCalledWith('confirmed'))
     expect(calls.some((c) => c.url === `/api/resource/${ID}/confirm`)).toBe(true)
   })
+
+  // Oct 23: Chabad Mainline's schedule link, pasted bare, read nothing (the
+  // box never opens a link) and came back as "Everything matches what the
+  // guide has", with Mark them confirmed.
+  it('a link pasted bare: says nothing could be read, and never that it matches', async () => {
+    const { calls, fetchMock } = setup(compareTimes(MEKOR, { ...BEREISHIS, kind: 'schedule', complete: false, from: null, to: null, title: null, times: [] }, { season: 'summer' }))
+    restore = () => fetchMock.mockRestore()
+    fireEvent.click(screen.getByRole('button', { name: /Paste their message/ }))
+    fireEvent.change(screen.getByLabelText('Their message'), { target: { value: 'https://www.chabadmainline.org/templates/articlecco_cdo/aid/1628794/jewish/Schedule.htm' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Read the times' }))
+    await screen.findByTestId('times-result')
+    expect(screen.getByTestId('times-nothing-read')).toHaveTextContent('No times could be read from itA link isn’t opened here. Paste the times themselves, or add a photo of them.')
+    expect(screen.queryByText('Everything matches what the guide has.')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Mark them confirmed' })).toBeNull()
+    expect(screen.queryByText(/How they’ll show/)).toBeNull()
+    // Back to the start, to paste the times or add a photo.
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(screen.getByRole('button', { name: /Paste their message/ })).toBeTruthy()
+    expect(calls.some((c) => c.url.includes('/confirm'))).toBe(false)
+  })
+
+  it('or add one time, nothing having been sent, isn’t “nothing read”', async () => {
+    const { fetchMock } = setup(compareTimes(MEKOR, WINTER, { season: 'summer' }))
+    restore = () => fetchMock.mockRestore()
+    fireEvent.click(screen.getByRole('button', { name: /Or add one time/ }))
+    expect(screen.queryByTestId('times-nothing-read')).toBeNull()
+  })
 })

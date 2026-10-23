@@ -154,6 +154,35 @@ describe('icsEntries: an iCal feed’s entries in the coming days', () => {
     expect(icsEntries(feed, TZ, '2026-10-01', '2026-11-30').map((e) => e.date)).toEqual(['2026-10-04', '2026-10-18', '2026-11-01'])
   })
 
+  // The Little Shul's Google Calendar (Oct 23): "Sabbath Service" the
+  // first Shabbos of every month, which was read as nothing at all.
+  it('lays a monthly repeat over the days: its nth weekday, its last, its day of the month', () => {
+    const feed = ics(
+      'BEGIN:VEVENT\r\nUID:a\r\nDTSTART;TZID=America/New_York:20140705T100000\r\nRRULE:FREQ=MONTHLY;BYDAY=1SA\r\nSUMMARY:Sabbath Service\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nUID:b\r\nDTSTART;TZID=America/New_York:20260130T180000\r\nRRULE:FREQ=MONTHLY;BYDAY=-1FR\r\nSUMMARY:Kabbalat Shabbat\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nUID:c\r\nDTSTART;TZID=America/New_York:20260115T190000\r\nRRULE:FREQ=MONTHLY;INTERVAL=2\r\nSUMMARY:Board\r\nEND:VEVENT\r\n',
+    )
+    expect(icsEntries(feed, TZ, '2026-10-01', '2026-12-31').map((e) => `${e.date} ${e.title}`)).toEqual([
+      '2026-10-03 Sabbath Service',
+      '2026-11-07 Sabbath Service',
+      '2026-12-05 Sabbath Service',
+      '2026-10-30 Kabbalat Shabbat',
+      '2026-11-27 Kabbalat Shabbat',
+      '2026-12-25 Kabbalat Shabbat',
+      '2026-11-15 Board',
+    ])
+  })
+
+  // How Google keeps one date of a repeat moved: an event of its own, its
+  // RECURRENCE-ID the date it replaces. Once, not twice.
+  it('a date of a repeat moved on its own is that event, not the repeat’s', () => {
+    const feed = ics(
+      'BEGIN:VEVENT\r\nUID:s\r\nDTSTART;TZID=America/New_York:20260905T100000\r\nRRULE:FREQ=WEEKLY;BYDAY=SA\r\nSUMMARY:Shabbat Service\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nUID:s\r\nRECURRENCE-ID;TZID=America/New_York:20261107T100000\r\nDTSTART;TZID=America/New_York:20261108T100000\r\nSUMMARY:Shabbat Service\r\nEND:VEVENT\r\n',
+    )
+    expect(icsEntries(feed, TZ, '2026-11-01', '2026-11-14').map((e) => e.date).sort()).toEqual(['2026-11-08', '2026-11-14'])
+  })
+
   it('knows a feed from a page', () => {
     expect(isIcs(ics(''))).toBe(true)
     expect(isIcs('<html>BEGIN:VCALENDAR</html>')).toBe(false)

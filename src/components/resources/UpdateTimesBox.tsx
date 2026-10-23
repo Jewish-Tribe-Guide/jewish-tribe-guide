@@ -5,7 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { parseTimeToMinutes, RELATIVE_ELIGIBLE, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type Tefillah } from '@/lib/davening'
 import { DAY_KEYS, dayLabel, type DayKey } from '@/lib/hours'
 import { dateText } from '@/lib/schedules'
-import { changesAnything, compareTimes, datesBetween, seasonFromNotes, type TimesUpdate, type UpdateRow } from '@/lib/scheduleUpdate'
+import { changesAnything, compareTimes, datesBetween, readAnything, seasonFromNotes, type TimesUpdate, type UpdateRow } from '@/lib/scheduleUpdate'
 import { clockTime } from '@/lib/upcomingDavening'
 import { PREVIEW_READ_ERROR, useFetchOrPreview } from '@/lib/previewSend'
 import { RelativeTimeFields, TimeModeToggle, useTimeModes, ZMAN_ANCHOR_ORDER } from '@/components/intake/ZmanTimeFields'
@@ -29,7 +29,8 @@ import { recordConfirmed } from '@/lib/confirmedHere'
 // day by day. A changed time has the old one crossed out beside it, a new
 // one says New, one coming off is crossed out with Keep. Tap a time to fix
 // it; Send files it for an admin to check (/api/resource/:id/times). When
-// nothing differs, it says so and confirms the times instead.
+// nothing differs, it says so and confirms the times instead. When nothing
+// could be read from it at all, it says that, never "Everything matches".
 
 type Step = 'choose' | 'paste' | 'result'
 type Source = { text: string } | { file: File | null; url: string | null }
@@ -247,6 +248,11 @@ export default function UpdateTimesBox({
           busy={busy === 'send'}
           onSend={(u) => start('send', (token) => void send(token, u))}
           onConfirm={() => void confirm()}
+          onAgain={() => {
+            setUpdate(null)
+            setSource(null)
+            setStep('choose')
+          }}
         />
       )}
 
@@ -275,6 +281,7 @@ function TimesResult({
   busy,
   onSend,
   onConfirm,
+  onAgain,
 }: {
   name: string
   initial: TimesUpdate
@@ -283,6 +290,7 @@ function TimesResult({
   busy: boolean
   onSend: (u: TimesUpdate) => void
   onConfirm: () => void
+  onAgain: () => void
 }) {
   const [rows, setRows] = useState(initial.rows)
   const [editing, setEditing] = useState<string | null>(addFirst ? 'new' : null)
@@ -290,6 +298,11 @@ function TimesResult({
   const u = { ...initial, rows }
   const week = u.kind === 'week'
   const anything = changesAnything(u)
+  // Sent something and no time came of it: what's below is only what the
+  // guide already has, so it can't be confirmed from this (readAnything).
+  const nothingRead = source !== null && !readAnything(initial)
+  // The box reads what's pasted; it never opens a link in it.
+  const aLink = source !== null && 'text' in source && /https?:\/\/|www\./i.test(source.text)
 
   // Days in order: the week's dates, or Sunday to Shabbos then one-offs.
   const days = week && u.from && u.to ? datesBetween(u.from, u.to) : [...DAY_KEYS, ...[...new Set(rows.map((r) => r.day).filter((d) => !isWeekday(d)))].sort()]
@@ -320,11 +333,22 @@ function TimesResult({
 
       <p className="mt-3 text-[17px] leading-tight font-extrabold text-slate-900">{title}</p>
       {week && u.title && <p className="mt-0.5 text-[13.5px] font-semibold text-slate-700">{u.title}</p>}
-      <p className="mt-1 text-[13.5px] leading-snug text-slate-600">
-        How they’ll show in the guide.{week ? ' Other weeks stay as they are.' : ''}
-      </p>
-
-      {byDay.length === 0 && <p className="mt-3 text-[13.5px] font-semibold text-caution">No times could be read from it. Add them below.</p>}
+      {nothingRead ? (
+        <div className="mt-2 rounded-[10px] bg-caution/10 px-3 py-2.5" role="status" data-testid="times-nothing-read">
+          <p className="text-[14.5px] font-bold text-slate-900">No times could be read from it</p>
+          <p className="mt-0.5 text-[13.5px] leading-snug text-slate-700">
+            {aLink ? 'A link isn’t opened here. Paste the times themselves, or add a photo of them.' : 'Paste the times themselves, or add a photo of them.'}
+          </p>
+          <button type="button" onClick={onAgain} className="mt-1.5 cursor-pointer text-[14.5px] font-bold text-primary hover:underline">
+            Try again
+          </button>
+        </div>
+      ) : (
+        <p className="mt-1 text-[13.5px] leading-snug text-slate-600">
+          How they’ll show in the guide.{week ? ' Other weeks stay as they are.' : ''}
+        </p>
+      )}
+      {nothingRead && byDay.length > 0 && <p className="mt-3 text-[13.5px] text-slate-600">What the guide has now:</p>}
 
       {byDay.map(({ day, rows: dayRows }) => (
         <div key={day} className="mt-3" data-testid="result-day">
@@ -386,6 +410,7 @@ function TimesResult({
         </>
       ) : (
         rows.length > 0 &&
+        !nothingRead &&
         editing === null && (
           <>
             <p className="mt-4 text-[14px] font-semibold text-emerald-700">Everything matches what the guide has.</p>

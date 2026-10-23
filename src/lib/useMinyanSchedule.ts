@@ -7,7 +7,7 @@ import { useNow } from '@/lib/useNow'
 import { currentSeason, type Season } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone, type DayKey } from '@/lib/hours'
 import type { MinyanDayKey } from '@/lib/davening'
-import { dateKey, factsFor, readSchedules, regularMinyanim, schedulesKey, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
+import { dateKey, factsFor, readSchedules, regularMinyanim, schedulesKey, shabbosIsOver, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
 import { dayInTimezone } from '@/lib/activity'
 import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
 import type { AnswerSchedule } from '@/lib/askAnswer'
@@ -44,6 +44,9 @@ export type MinyanSchedule = {
   posting: Record<string, Record<string, DayPosting>>
   nowMinutes: number
   season: Season | null
+  /** Saturday night after havdalah: "this week" is the week ahead
+   *  (shabbosIsOver). */
+  shabbosOver: boolean
 }
 
 /**
@@ -119,7 +122,9 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const todayDayKeys = dayKeysFor(today)
   const tomorrowDayKeys = dayKeysFor(tomorrow)
 
-  return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, tomorrowDayKeys, today, tomorrow, week: dates, posting, nowMinutes, season }
+  const shabbosOver = shabbosIsOver(today.date, now, zmanimData?.shabbos?.havdalah?.iso)
+
+  return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, tomorrowDayKeys, today, tomorrow, week: dates, posting, nowMinutes, season, shabbosOver }
 }
 
 /** The day keys a date's minyanim match: its weekday, its own date (a

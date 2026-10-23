@@ -75,7 +75,7 @@ export default function DaveningCard({
   // "This week's schedule" (the user, Oct 20: one schedule for a week):
   // the weeks the shul sent out or its website gives, and this week's
   // one-day additions, day by day (thisWeeksDays).
-  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date) : { days: [], posts: [] }
+  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver }) : { days: [], posts: [], none: null }
   const inThisWeek = new Set(thisWeek.days.flatMap((d) => d.minyanim.map((m) => m.from)))
   // Anything else today or tomorrow (a Yom Tov schedule) has its own box.
   const specialSchedule = posting
@@ -101,17 +101,19 @@ export default function DaveningCard({
   // nothing else; no asking for the Shabbos or weekday times it won't have.
   const minyanOnly = !!category && isMinyanOnly(item, category)
   const season = schedule?.season ?? null
-  const week = weekdayTable(rows, season)
-  const shab = shabbosList(rows, season)
   const anchors = schedule?.anchors[geoKey(geoOrCommunityDefault(item.geo))]
+  // A summer/winter pair goes by its zman (seasonPairs.ts).
+  const week = weekdayTable(rows, season, anchors)
+  const shab = shabbosList(rows, season, anchors)
   const today = schedule?.todayKey ?? null
   const shabbosFirst = !!schedule && (today === 'fri' || today === 'sat' || (today === 'thu' && schedule.nowMinutes >= 18 * 60))
 
   // This week's schedule, when the shul sends one out (Oct 6): what it sent
   // for this week, or a box waiting for it.
   const todayDate = schedule?.today.date ?? null
-  // The week it shows that Edit opens: the newsletter's, if there's one.
-  const post = thisWeek.posts[0]
+  // The week it shows that Edit opens: the newsletter's, if there's one;
+  // or their calendar's week with no minyan in it (SpecialSchedule.whole).
+  const post = thisWeek.posts[0] ?? thisWeek.none ?? undefined
   const waiting = !post && !!todayDate && sendsWeekly(schedules, todayDate)
   // A week's minyanim, each with the sign-up of the usual minyan it stands
   // in for (usualSignUp); a one-day addition is its own. And its usual
@@ -138,9 +140,13 @@ export default function DaveningCard({
       : // Shabbos's usual times fold only for a week with Shabbos's own: a
         // newsletter ending Friday night (Mekor, Oct 18) left Shabbos
         // morning's usual time folded away, greyed as not this week's.
-        post && (key === 'shabbos' ? postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey)))
-        ? 'Not this week: this week’s schedule replaces them'
-        : null
+        // Their whole week (their calendar) replaces both, a day it has
+        // nothing for included.
+        thisWeek.none
+        ? 'Not this week: no minyan this week'
+        : post && (post.whole || (key === 'shabbos' ? postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey))))
+          ? 'Not this week: this week’s schedule replaces them'
+          : null
 
   // On a category page, the regular "+ Add" box about the shul (Oct 6): one
   // way to send a schedule everywhere, a photo or PDF or pasted email, its
@@ -359,6 +365,15 @@ export default function DaveningCard({
               postRows.filter((m) => m.signUp),
               { section: postRows.every((m) => m.signUp) ? 'All this week’s times' : undefined, tapped: tappedRow },
             )}
+          {updateIn('this-week')}
+        </Card>
+      )}
+      {/* Their calendar read, and nothing in it this week: said, never left
+          out, which reads as not knowing (the user, Oct 23). */}
+      {thisWeek.none && !weekRows.length && (
+        <Card title="This week’s schedule" testId="davening-no-minyan" footer={postFoot}>
+          <p className="text-[14.5px] font-semibold text-slate-700">{postTitle(thisWeek.none)}</p>
+          <p className="mt-1 text-[15.5px] font-bold text-slate-900">No minyan this week</p>
           {updateIn('this-week')}
         </Card>
       )}

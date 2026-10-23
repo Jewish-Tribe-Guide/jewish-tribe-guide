@@ -161,6 +161,11 @@ function WeekRows({ t }: { t: FindingTimes }) {
       {weeks.map((w) => (
         <div key={w.title} className="grid gap-2.5">
           {(weeks.length > 1 || !w.isWeek) && <p className="text-sm font-semibold text-slate-900">{w.title}</p>}
+          {w.none && (
+            <BoxRows>
+              <BoxRow name="No minyan this week" right={w.range} mark="changed" />
+            </BoxRows>
+          )}
           <Groups groups={w.days} row={(r, i) => <BoxRow key={i} name={r.what} sub={r.note} right={r.when} mark={r.usually ? 'changed' : 'same'} was={r.usually} />} />
         </div>
       ))}

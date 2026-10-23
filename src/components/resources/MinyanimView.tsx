@@ -21,6 +21,8 @@ import AddScheduleBox from './AddScheduleBox'
 import { pointerHover } from '@/lib/pointerHover'
 import { SignUpMark } from './SignUp'
 import { tappedMinyanParam } from './TappedMinyan'
+import { shortDate } from './listingParts'
+import { usualCheckedAt } from '@/lib/usualChecked'
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
@@ -143,6 +145,11 @@ export default function MinyanimView({
     return s.minyanId ? `${page}?minyan=${encodeURIComponent(tappedMinyanParam(s.minyanId, day.date, s.minutes))}` : page
   }
   const postingOf = (id: string | undefined): DayPosting => (id && schedule.posting[id]?.[day.date]) || { kind: 'regular' }
+  const shulRows = new Map(schedule.shuls.map((s) => [s.id, s.minyanim]))
+  const checkedOf = (s: MinyanSlot) => {
+    const item = s.shulId ? byId.get(s.shulId) : undefined
+    return item && usualCheckedAt(item, shulRows.get(item.id)?.find((m) => m.id === s.minyanId))
+  }
 
   // On the same minute, the nearer shul first, as the Next minyan card has
   // it (then by name).
@@ -257,7 +264,7 @@ export default function MinyanimView({
       {(upcoming.length > 0 || canAdd) && (
       <ul className={`mt-2 ${BOX}`} data-testid="minyanim-rows">
         {upcoming.map((s, i) => (
-          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} inset />
+          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} checkedAt={checkedOf(s)} href={hrefOf(s)} onHover={onHoverShul} inset />
         ))}
         {/* Adding a minyan where the minyanim are, as the list's last row
             (the user's note 2): on the day being looked at. */}
@@ -295,7 +302,7 @@ export default function MinyanimView({
           {earlier && (
             <ul className={`${BOX} opacity-60`}>
               {past.map((s, i) => (
-                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} inset />
+                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} checkedAt={checkedOf(s)} href={hrefOf(s)} onHover={onHoverShul} inset />
               ))}
             </ul>
           )}
@@ -359,7 +366,7 @@ export default function MinyanimView({
           {notPostedOpen && (
             <ul className="mt-1 divide-y divide-amber-200">
               {folded.map((s, i) => (
-                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} />
+                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} checkedAt={checkedOf(s)} href={hrefOf(s)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
@@ -370,12 +377,16 @@ export default function MinyanimView({
 }
 
 /** ", its Sukkos times", or ", regular times · Sukkos not posted". A week
- *  the shul sent out that goes by its dates is "This week's times". */
-function whose(p: DayPosting, inSentence = false): string {
+ *  the shul sent out is "This week's times"; anything else under a row is
+ *  "Usual time · last checked Oct 12", so a time nobody has sent for this
+ *  week doesn't look like one (the user, Oct 23: "Trust is our biggest
+ *  thing"). */
+function whose(p: DayPosting, inSentence = false, checkedAt?: string): string {
   if (p.kind === 'schedule' && p.thisWeek) return inSentence ? ', its times for this week' : 'This week’s times'
   if (p.kind === 'schedule') return inSentence ? `, its ${p.name.replace(/\s+\d{4}$/, '')} times` : `${p.name.replace(/\s+\d{4}$/, '')} times`
   if (p.kind === 'not-posted') return inSentence ? `, regular times (${p.festival} not posted)` : `Regular times · ${p.festival} not posted`
-  return ''
+  if (inSentence) return ''
+  return checkedAt ? `Usual time · last checked ${shortDate(checkedAt)}` : 'Usual time'
 }
 
 /** Reports how many the list shows, after it changes: its own component,
@@ -395,6 +406,7 @@ export function MinyanRow({
   far,
   kind,
   posting,
+  checkedAt,
   href,
   onHover,
   inset = false,
@@ -404,13 +416,16 @@ export function MinyanRow({
   /** The shul's denomination: "Orthodox". */
   kind: string
   posting: DayPosting
+  /** When its usual time was last checked (usualCheckedAt): said under a
+   *  row with no posting of its own. */
+  checkedAt?: string
   href: string | null
   onHover?: (shulId: string | null) => void
   /** Padded in from the sides, in Minyanim by time's white box. A hotel's
    *  walk list has its card's own padding. */
   inset?: boolean
 }) {
-  const tag = whose(posting)
+  const tag = whose(posting, false, checkedAt)
   const body = (
     <>
         <span className="w-[4.5rem] shrink-0 text-[16.5px] font-extrabold text-slate-900">{clockTime(slot.minutes)}</span>
@@ -426,8 +441,8 @@ export function MinyanRow({
             {slot.signUp && <SignUpMark className="ml-1.5 align-[1px]" />}
           </span>
           {tag && (
-            <span className={`mt-0.5 block text-[13px] font-semibold ${posting.kind === 'schedule' ? 'text-green-700' : 'text-caution'}`} data-testid="minyan-whose">
-              {posting.kind === 'schedule' ? '✓ ' : '⚠ '}
+            <span className={`mt-0.5 block text-[13px] ${posting.kind === 'schedule' ? 'font-semibold text-green-700' : posting.kind === 'not-posted' ? 'font-semibold text-caution' : 'text-slate-500'}`} data-testid="minyan-whose">
+              {posting.kind === 'schedule' ? '✓ ' : posting.kind === 'not-posted' ? '⚠ ' : ''}
               {tag}
             </span>
           )}

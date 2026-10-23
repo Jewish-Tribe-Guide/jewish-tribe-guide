@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { applyUpdate, changesAnything, compareTimes, datesHeldOverWebsite, mergeSchedule, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
+import { applyUpdate, changesAnything, cleanUpdate, compareTimes, datesHeldOverWebsite, mergeSchedule, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
 
 // Mekor Habracha's times as the guide has them (test copy, Oct 1): the
 // seasons are in the notes, not the season field.
@@ -296,6 +296,20 @@ describe('one Shabbos’s times', () => {
     expect(applyUpdate(MEKOR, [], { ...r, rows: [] }, { newId, evenIfSame: true }).schedules).toEqual([])
   })
 
+  // Oct 23: a calendar that is the shul's whole week, with nothing in a
+  // week, is "reading and confirming there is nothing" (the user).
+  it('the shul’s whole week is posted as such, and with nothing in it, as no minyan', () => {
+    const r = compareTimes(MEKOR, BEREISHIS, { season: 'summer', zmanim: ZMANIM, newId })
+    expect(applyUpdate(MEKOR, [], r, { newId, whole: true }).schedules[0]).toMatchObject({ kind: 'week', whole: true })
+    const empty = { ...r, rows: [] }
+    const { schedules, changes, minyanim } = applyUpdate(MEKOR, [], empty, { newId, postedBy: 'website', whole: true, name: 'Times for Oct 4 – Oct 10' })
+    expect(schedules).toEqual([expect.objectContaining({ name: 'Times for Oct 4 – Oct 10', from: '2026-10-09', to: '2026-10-10', kind: 'week', whole: true, minyanim: [] })])
+    expect(changes[0]).toBe('Times for Oct 4 – Oct 10: no minyan')
+    expect(minyanim.map((m) => m.time)).toEqual(MEKOR.map((m) => m.time))
+    // Not the whole week: nothing posted.
+    expect(applyUpdate(MEKOR, [], empty, { newId, evenIfSame: true }).schedules).toEqual([])
+  })
+
   it('a week sent again replaces every day of it, a day it now has nothing for too', () => {
     const first = applyUpdate(MEKOR, [], u, { newId }).schedules
     const fridayOnly = { ...u, rows: u.rows.filter((r) => r.day === '2026-10-09' && r.status === 'same') }
@@ -406,5 +420,58 @@ describe('a minyan that only runs when enough sign up', () => {
     const u = compareTimes(shul, { ...schedule([t({ tefillah: 'shacharis', days: ['tue'], time: '7:00am' })]), complete: false }, { season: null, newId })
     const { minyanim } = applyUpdate(shul, [], u, { newId })
     expect(minyanim.filter((m) => m.tefillah === 'maariv').map((m) => `${m.days.join(',')}${m.signUp ? ' sign-up' : ''}`).sort()).toEqual(['mon sign-up', 'sun'])
+  })
+  // Mekor's newsletter, Oct 23: weekday minyanim footnoted "held when there
+  // is sufficient interest". The user: that's "Only on days enough people
+  // sign up", and the WhatsApp group is the one their usual Maariv has.
+  describe('a message saying a minyan needs enough people', () => {
+    const shul: Minyan[] = [
+      { id: 'r', tefillah: 'maariv', days: ['mon', 'tue', 'wed', 'thu'], time: '8:00pm', signUp },
+      { id: 's', tefillah: 'shacharis', days: ['sun'], time: '8:00am' },
+    ]
+    const week: RegularReading = {
+      kind: 'week',
+      complete: false,
+      season: null,
+      title: 'This week',
+      startsOn: null,
+      from: '2026-10-12',
+      to: '2026-10-13',
+      times: [
+        t({ tefillah: 'mincha_maariv', date: '2026-10-12', time: '5:45pm', signUp: true }),
+        t({ tefillah: 'shacharis', date: '2026-10-12', time: '6:45am', signUp: true }),
+        t({ tefillah: 'mincha', date: '2026-10-13', time: '1:00pm' }),
+      ],
+    }
+    const u = compareTimes(shul, week, { season: null, newId })
+
+    it('this week’s minyan gets sign-up, with the group their usual Maariv has', () => {
+      expect(u.rows.filter((r) => r.signUp).map((r) => `${r.day} ${r.tefillah}`)).toEqual(['2026-10-12 shacharis', '2026-10-12 mincha_maariv'])
+      const { schedules, changes } = applyUpdate(shul, [], u, { newId })
+      const got = schedules[0].minyanim.map((m) => [m.on[0], m.tefillah, m.signUp])
+      expect(got).toEqual(
+        expect.arrayContaining([
+          // Mincha & Maariv: the same crowd as the usual Maariv.
+          ['2026-10-12', 'mincha_maariv', signUp],
+          // No usual Shacharis group that day: sign-up with no group yet.
+          ['2026-10-12', 'shacharis', {}],
+          ['2026-10-13', 'mincha', undefined],
+        ]),
+      )
+      expect(changes.join('\n')).toContain('5:45pm · only if enough sign up')
+    })
+
+    it('is kept when the admin’s copy comes back to be applied', () => {
+      const back = cleanUpdate(JSON.parse(JSON.stringify(u)), Date.parse('2026-10-11T12:00:00Z'))
+      expect(back?.rows.filter((r) => r.signUp).map((r) => r.tefillah)).toEqual(['shacharis', 'mincha_maariv'])
+    })
+
+    // A minyan they don't have yet, not a new time for one they do.
+    it('a new usual minyan gets it too', () => {
+      const v = compareTimes(shul, { kind: 'schedule', complete: false, season: null, title: 'New times', startsOn: null, from: null, to: null, times: [t({ tefillah: 'mincha_maariv', days: ['tue'], time: '6:00pm', signUp: true })] }, { season: null, newId })
+      expect(v.rows.find((r) => r.tefillah === 'mincha_maariv')?.status).toBe('new')
+      const { minyanim } = applyUpdate(shul, [], v, { newId })
+      expect(minyanim.find((m) => m.time === '6:00pm')).toMatchObject({ tefillah: 'mincha_maariv', days: ['tue'], signUp })
+    })
   })
 })

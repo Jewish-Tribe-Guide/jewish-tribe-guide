@@ -21,6 +21,8 @@ vi.mock('@/lib/useZmanim', () => ({
         { date: '2026-10-03', yomTov: true, cholHamoed: false, name: 'Shemini Atzeres', festival: 'Sukkos' },
         { date: '2026-10-04', yomTov: true, cholHamoed: false, name: 'Simchas Torah', festival: 'Sukkos' },
       ],
+      // Shabbos Bereishis's: when this week becomes the week ahead.
+      shabbos: { candleLighting: null, havdalah: { label: 'Havdalah', time: '7:05 PM', iso: '2026-10-10T19:05:00-04:00' } },
     },
   }),
 }))
@@ -378,6 +380,24 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.queryByTestId('davening-weekday')).not.toBeInTheDocument()
   })
 
+  // Oct 23: "leaving it out makes it seem like we don't know the schedule
+  // this week, but really we know that there is no schedule this week".
+  it('their calendar’s week with nothing in it: no minyan this week, said, the usual times folded', () => {
+    const onEditBox = vi.fn()
+    const none = { ...weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', whole: true, postedAt: '2026-10-07T15:00:00.000Z' }), minyanim: [] }
+    show([...before, none], { onEditBox })
+    expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
+    const box = screen.getByTestId('davening-no-minyan')
+    expect(box).toHaveTextContent('This week’s schedule')
+    expect(box).toHaveTextContent('Oct 4–10')
+    expect(box).toHaveTextContent('No minyan this week')
+    expect(screen.queryByTestId('davening-weekday')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('davening-folded').map((f) => f.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Not this week: no minyan this week')]))
+    fireEvent.click(within(box).getByTestId('box-edit-button'))
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'Times for Oct 4 – Oct 10')
+  })
+
   it('a shul that has never sent one out just shows its usual times', () => {
     show([])
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
@@ -421,6 +441,16 @@ describe('this week’s one-day additions (Oct 20)', () => {
     // Nothing of the usual times is folded away.
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 10:45 AM')
     expect(screen.queryByTestId('davening-folded')).not.toBeInTheDocument()
+  })
+
+  // Oct 23: "on Friday people want to see shabbos as last. But right when
+  // shabbos is over we need to show the week's schedule."
+  it('on Shabbos, that day’s; after havdalah, the week ahead’s', () => {
+    show('2026-10-10T15:00:00-04:00', thursdays) // Sat Oct 10, 3 PM
+    expect(screen.queryByTestId('davening-this-week')).not.toBeInTheDocument()
+    cleanup()
+    show('2026-10-10T19:30:00-04:00', thursdays) // after havdalah
+    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 15Shacharis8:10 AM')
   })
 
   it('the day before, it stays there rather than in a box of its own', () => {

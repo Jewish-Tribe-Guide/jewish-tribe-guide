@@ -238,6 +238,8 @@ export type WeekProposal = {
   /** "Oct 19–25". */
   range: string
   isWeek: boolean
+  /** Their calendar's whole week, with nothing in it: no minyan that week. */
+  none: boolean
   days: { label: string; rows: WeekRow[] }[]
 }
 
@@ -310,11 +312,11 @@ export function scheduleProposal(current: readonly SpecialSchedule[], proposed: 
           rows: runTogether(
             [...ms]
               .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60))
-              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: [noteText(m.notes), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ') || null, usually: usually(m, on, usual) })),
+              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: [noteText(m.notes), m.signUp && signUpText(m.signUp), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ') || null, usually: usually(m, on, usual) })),
           ),
         }))
       const dates = `${dateText(s.from)}${s.to !== s.from ? ` – ${dateText(s.to)}` : ''}`
-      return { title: s.kind === 'week' ? `This week’s schedule, ${dates}` : `${s.name}, ${dates}`, range: rangeText(s.from, s.to), isWeek: s.kind === 'week', days: sameDays(days) }
+      return { title: s.kind === 'week' ? `This week’s schedule, ${dates}` : `${s.name}, ${dates}`, range: rangeText(s.from, s.to), isWeek: s.kind === 'week', none: !!s.whole && !s.minyanim.length, days: sameDays(days) }
     })
   const kept = new Set(proposed.map((s) => s.id))
   return { weeks, gone: current.filter((s) => !kept.has(s.id)).map((s) => s.name) }

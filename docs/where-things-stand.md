@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 22, 2026.
+Last updated: Oct 23, 2026.
 
 ## The branch
 
@@ -50,40 +50,12 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
-1a. **Watches on shuls' and mikvahs' own pages** (built Oct 19, see Done).
-   None is on the live site. Dry run against live (reads only, Oct 19,
-   `scripts/listing-pages-dry-run.mts`), what each would file the first
-   time its page changes:
-   - Mekor Habracha, mekorhabracha.org/davening: nothing differs.
-   - B'nai Abraham Chabad, phillyshul.com/minyans: nothing differs.
-   - Society Hill Synagogue, societyhillsynagogue.org/minyan: nothing.
-   - Kol Tzedek, kol-tzedek.org/shabbat.html: "New: kabbalas shabbos ·
-     Fri · 6:30pm" (the page: Friday services at 6:30pm, twice a month;
-     the listing has no Friday time).
-   - Temple Beth Zion-Beth Israel, bzbi.org/worship: "New: shacharis ·
-     Shabbos · 9:30 AM" (the listing has no times); waits while its
-     current queue suggestion is there.
-   - Mikvah Mei Shalva (philamikvah.org/appointments), LMC Mikvah
-     (lmcmikvah.org/appointments-and-membership), Ohel Leah
-     (mikvahohelleah.org/make-an-appointment), Moishe Zvi
-     (mikvahwestphilly.com): nothing differs.
-   - Can't be read (blocked to servers): Lower Merion Synagogue, Sons of
-     Israel (406), Chabad of the Main Line (403). Not worth a watch.
-   Adding the nine readable ones is Admin → Watches → Add a watch →
-   "Shul’s times" (or "Hours" for a mikvah), pick the place, give the
-   page. Needs the user's yes.
-   Two more with calendars (dry run Oct 20, read a week at a time, would
-   file if the page changed today): Rodeph Shalom's
-   rodephshalom.org/calendar, "Times for Oct 18 – Oct 24: new, shacharis ·
-   Thu Oct 22 · 8:10 AM" (its online morning minyan; its Friday and
-   Shabbos times match, and go on as this week's schedule too). Leyv
-   Ha-Ir's calendar page has nothing this week, so files nothing; dry run
-   as of Thu Oct 22, next week's "kabbalas shabbos · Fri Oct 30 · 7:30 PM"
-   goes on by itself (an events-only week, below). Leyv Ha-Ir has a watch
-   on dev; Rodeph Shalom has none on dev or live.
-   Two calendars the reader doesn't find yet: thelittleshul.org/calendar
-   and mikvehisrael.org/calendar-B4BK6 (their pages' words are read
-   instead).
+1a. **Watches on shuls' and mikvahs' own pages** are on the live site
+   (checked Oct 23): Mekor, B'nai Abraham, Society Hill, Kol Tzedek,
+   Rodeph Shalom, Leyv Ha-Ir, the Little Shul, Mikveh Israel, Sons of
+   Israel, Lower Merion, Chabad of the Main Line, South Philadelphia
+   Shtiebel and the mikvahs, among others.
+
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
@@ -93,11 +65,8 @@ for that exact change, in the same conversation. Show the dry run first.
    category search reads ("havdalah" finds it). Until the three-line tiles are
    live, the phone home cuts the name to "Candle Lighting &…".
 
-1d. **Migration 085 (`watch.last_check`)** keeps what a watch's last check
-   read (Check now, below). Run on neither database: this environment has
-   no SQL access, so it needs pasting into the SQL editor, dev first (no
-   yes needed there), then live with a yes. Until then everything works,
-   and a check's result shows only until the Watches tab is reloaded.
+1d. **Migration 085 (`watch.last_check`)** is run on both databases
+   (checked Oct 23). A watch's last check is kept across reloads.
 
 ## For the user or the community
 
@@ -1261,6 +1230,106 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 23, last of all: summer and winter by the zman (on `redesign/oct18-fixes`, not merged)
+
+- **A shul's summer/winter pair** goes by the zman. A pair is one clock
+  time and one zman, for the same minyan on a shared day. It's summer
+  while the zman is later than the clock time. Mekor's Friday is 7:00 PM
+  in summer and at candle lighting in winter. With candle lighting at 5:48
+  on Oct 23, and the clocks not back until Nov 1, it now shows candle
+  lighting. Its weekdays (15 min before sunset, or Maariv 6:30 PM) and
+  B'nai Abraham's Friday work the same way.
+- **This applies everywhere a season is used:** the next minyan, the
+  Minyanim list, the listing's weekday table and Shabbos list (with "In
+  summer, …" under them), and the dimmed rows.
+- **Anything else** (no pair, or a zman not known yet) keeps the clock
+  change's season, as before.
+- **Reading a newsletter or website** still compares against the clock
+  change's season. A week's times are compared with every time the shul
+  has, so this only affects a whole new schedule with no season named.
+
+## Done Oct 23, last: "No minyan this week" (on `redesign/oct18-fixes`, not merged)
+
+The user: "Not being able to read is different than reading and confirming
+there is nothing."
+
+- **A calendar that is the shul's whole schedule** is one that lists each
+  of the shul's usual minyanim on a date, on that weekday, within 15
+  minutes of its time. Shivtei Yeshuron's and Leyv Ha-Ir's list their
+  usual Shabbos minyan on its dates. A calendar of classes and events
+  beside a daily minyan never lists the minyan, so it never counts. A usual
+  time set by a zman never counts either, since it can't be compared with
+  a clock time.
+- **A week of such a calendar** goes to the queue as the shul's whole week.
+  A day it gives nothing for has no minyan, its usual time included, so
+  Leyv Ha-Ir's Oct 25–31 (Friday night only) has no Shabbos morning.
+- **A week with nothing in it** goes to the queue as "no minyan". The
+  queue shows "No minyan this week" with its dates. Once approved, the
+  listing shows a "This week's schedule" box saying "No minyan this week",
+  with the usual times folded under "Not this week: no minyan this week".
+  A week the newsletter (or a person) gave days of is left to it.
+- **Shul times** says what was read: "No minyan Oct 20–24 (their
+  calendar)". That's "agrees" or "differs", never "couldn't read".
+- **On the live site**, this happens only when each watch reads its
+  calendar again, and each week waits in the queue for approval.
+  Nothing was written to production.
+- **The risk** stays as agreed: a calendar not filled in yet reads the
+  same as an empty week. The admin sees "No minyan" before it goes on.
+
+## Done Oct 23, later: this week after Shabbos, and what an unconfirmed time says (on `redesign/oct18-fixes`, not merged)
+
+- **This week's schedule** runs from today through Shabbos, so on Friday
+  Shabbos is last. Once havdalah has passed on Saturday night (today's,
+  from the zmanim), it is the week ahead, Sunday to Shabbos. With no
+  havdalah known, Shabbos stays.
+- **A minyan with no posted times that day** says "Usual time · last
+  checked Oct 12" under it, in grey, on the Minyanim list and a hotel's
+  walk list. The date is its own box's: the usual Shabbos box's for a
+  Friday-night or Saturday row, else the weekday box's.
+- **Every week a shul sent out** is "✓ This week's times" on the Minyanim
+  list, a Shabbos-only one too. Mikveh Israel's "Shabbat Lekh Lekha" said
+  "Shabbat Lekh Lekha times". The card's own heading still has the name.
+- **The public times box, when nothing could be read** from what was sent
+  (a bare link, which it never opens), says "No times could be read from
+  it" and, for a link, "A link isn't opened here. Paste the times
+  themselves, or add a photo of them", with Try again. Before, it showed
+  the guide's own times as "How they'll show in the guide", then
+  "Everything matches what the guide has" and Mark them confirmed. That is
+  what made Chabad Mainline's link look read.
+
+## Done Oct 23: sign-up minyanim and another shul's minyan, read off a message (on `redesign/oct18-fixes`, not merged)
+
+From Mekor's newsletter of Oct 23.
+
+- **"Held when there is sufficient interest"** marks that minyan "Only on
+  days enough people sign up", in a week or as a usual time. Its WhatsApp
+  group is the usual minyan's that day (the same tefillah, else Mincha &
+  Maariv for a Maariv, and back); none yet when there's no usual one. Shul
+  times and the queue show it ("Sign-up: chat.whatsapp.com/…", "· only if
+  enough sign up").
+- **A minyan held elsewhere** ("2:00pm Mincha at 1818 Market or Mikveh
+  Israel") is left out only when the place it names is another shul in
+  the guide that already has it: same tefillah, that day, within 15
+  minutes. The finding's note says "Left out: Mincha 2:00pm, already on
+  Kahal Kadosh Mikveh Israel." Anything else stays, with "at …" in its
+  note, so a shul's own second location still comes through. Plain code,
+  no extra AI read.
+- Only new reads. Mekor's waiting findings (1230–1232) still have the
+  2:00pm Mincha.
+- **A calendar's monthly repeat** ("first Shabbos of the month", the
+  Little Shul's Google Calendar) is laid out over the days, as a weekly one
+  was. A date of a repeat moved on its own (Google's RECURRENCE-ID) is that
+  event, not the repeat's too.
+- **A calendar with no services in the weeks read** says so and names its
+  next ("Their calendar has no services Oct 18 – Oct 31. Next: Sat Nov 7,
+  10:00 AM, Sabbath Service."), not just "can't find times".
+- **A dated time that's one of the usual times** isn't shown twice (BZBI's
+  Shabbos 9:30). Every dated time on a day shows, not only the first.
+- **Chabad of the Main Line's schedule page** can't be watched: it sends a
+  "Just a moment" check to every program, which the guide gives up on by
+  design. The public box doesn't open links for shul times either (only
+  for menus); it reads the words sent.
 
 ## Done Oct 22: Google is a Watches job (on `redesign/oct18-fixes`, not merged)
 

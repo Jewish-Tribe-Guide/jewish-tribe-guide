@@ -1,5 +1,7 @@
 import { formatDays, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
-import { isOutOfSeason, type Season } from './season'
+import type { Season } from './season'
+import { outOfSeason } from './seasonPairs'
+import type { AnchorTimes } from './useZmanAnchors'
 import type { DayKey } from './hours'
 import { clockMinutes, clockText, noteText, partOf, PART_ORDER, timeText, type ShabbosPart } from './minyanText'
 
@@ -34,8 +36,12 @@ function joinTimes(times: number[]): string {
   return sorted.map(clockText).join(', ')
 }
 
-const inSeason = (m: Minyan, season: Season | null) => !isOutOfSeason(m.season, season)
-const otherSeason = (season: Season | null): Season | null => (season === 'summer' ? 'winter' : season === 'winter' ? 'summer' : null)
+/** "In winter, …": the other season's rows (outOfSeason, a summer/winter
+ *  pair going by its zman), a sentence per season. */
+function otherSeasonLine<T>(rows: readonly T[], seasonOf: (r: T) => Season | undefined, say: (rs: T[]) => string): string | null {
+  const lines = (['winter', 'summer'] as const).map((s) => rows.filter((r) => seasonOf(r) === s)).flatMap((rs) => (rs.length ? [`In ${seasonOf(rs[0])}, ${say(rs)}.`] : []))
+  return lines.length ? lines.join(' ') : null
+}
 
 export type WeekRow = {
   days: DayKey[]
@@ -78,8 +84,9 @@ export type WeekdayTable = {
 const onWeekday = (m: Minyan, day: DayKey) => m.days.includes(day) && (day !== 'fri' || m.tefillah === 'shacharis')
 
 /** The weekday table, or null when the shul has no weekday minyan. */
-export function weekdayTable(minyanim: readonly Minyan[], season: Season | null): WeekdayTable | null {
-  const now = minyanim.filter((m) => inSeason(m, season) && WEEKDAYS.some((d) => onWeekday(m, d)))
+export function weekdayTable(minyanim: readonly Minyan[], season: Season | null, anchors?: AnchorTimes): WeekdayTable | null {
+  const out = (m: Minyan) => outOfSeason(m, minyanim, season, anchors)
+  const now = minyanim.filter((m) => !out(m) && WEEKDAYS.some((d) => onWeekday(m, d)))
   if (now.length === 0) return null
   const columns = TEFILLAH_ORDER.filter((t) => now.some((m) => m.tefillah === t))
 
@@ -125,11 +132,12 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null)
     if (extra.length) notes.push(`${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)} also on ${extra.map((d) => (d === 'holiday' ? 'public holidays' : 'Rosh Chodesh')).join(' and ')}.`)
   }
 
-  const other = otherSeason(season)
-  const offSeason = other ? minyanim.filter((m) => m.season === other && WEEKDAYS.some((d) => onWeekday(m, d))) : []
-  const otherLine = offSeason.length
-    ? `In ${other}, ${offSeason.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}, ${formatDays(m.days.filter((d) => WEEKDAYS.includes(d as DayKey) && onWeekday(m, d as DayKey)) as MinyanDayKey[])}`).join('; ')}.`
-    : null
+  const offSeason = minyanim.filter((m) => out(m) && WEEKDAYS.some((d) => onWeekday(m, d)))
+  const otherLine = otherSeasonLine(
+    offSeason,
+    (m) => m.season,
+    (ms) => ms.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}, ${formatDays(m.days.filter((d) => WEEKDAYS.includes(d as DayKey) && onWeekday(m, d as DayKey)) as MinyanDayKey[])}`).join('; '),
+  )
 
   return { columns, rows, rules, notes, otherSeason: otherLine, signUps: now.filter((m) => m.signUp), everySignUp: now.every((m) => m.signUp), joins: now.filter((m) => m.joinLink?.trim()) }
 }
@@ -146,7 +154,8 @@ export type ShabbosLine = {
 
 /** A shul's usual Shabbos, in the order it happens; null when it has none
  *  listed. `otherSeason`: "In winter, also Mincha 12:20 PM, after Kiddush." */
-export function shabbosList(minyanim: readonly Minyan[], season: Season | null): { lines: ShabbosLine[]; otherSeason: string | null } | null {
+export function shabbosList(minyanim: readonly Minyan[], season: Season | null, anchors?: AnchorTimes): { lines: ShabbosLine[]; otherSeason: string | null } | null {
+  const out = (m: Minyan) => outOfSeason(m, minyanim, season, anchors)
   const lineOf = (m: Minyan, day: 'fri' | 'sat'): ShabbosLine => ({ part: partOf(m, day), tefillah: m.tefillah, when: timeText(m), note: noteText(m.notes), row: m })
   const of = (keep: (m: Minyan) => boolean) =>
     minyanim.filter(keep).flatMap((m) => [
@@ -157,12 +166,13 @@ export function shabbosList(minyanim: readonly Minyan[], season: Season | null):
     PART_ORDER.indexOf(a.part) - PART_ORDER.indexOf(b.part) ||
     (clockMinutes(a.row.time) ?? 24 * 60) - (clockMinutes(b.row.time) ?? 24 * 60) ||
     TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah)
-  const lines = of((m) => inSeason(m, season)).sort(order)
-  const other = otherSeason(season)
-  const offSeason = other ? of((m) => m.season === other).sort(order) : []
+  const lines = of((m) => !out(m)).sort(order)
+  const offSeason = of(out).sort(order)
   if (lines.length === 0 && offSeason.length === 0) return null
-  const otherLine = offSeason.length
-    ? `In ${other}, also ${offSeason.map((l) => `${TEFILLAH_LABELS[l.tefillah]} ${l.when}${l.note ? `, ${l.note.charAt(0).toLowerCase()}${l.note.slice(1)}` : ''}`).join('; ')}.`
-    : null
+  const otherLine = otherSeasonLine(
+    offSeason,
+    (l) => l.row.season,
+    (ls) => `also ${ls.map((l) => `${TEFILLAH_LABELS[l.tefillah]} ${l.when}${l.note ? `, ${l.note.charAt(0).toLowerCase()}${l.note.slice(1)}` : ''}`).join('; ')}`,
+  )
   return { lines, otherSeason: otherLine }
 }

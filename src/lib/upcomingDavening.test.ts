@@ -157,6 +157,23 @@ describe('nextUpcomingDavening', () => {
     expect(result).toBeNull()
   })
 
+  // Oct 23: Mekor's Friday, 7:00 PM in summer and at candle lighting in
+  // winter. Candle lighting 5:48, clocks not back until Nov 1: winter's.
+  it('a summer/winter pair goes by its zman, not the clock change', () => {
+    const mekor: ShulMinyanim = {
+      name: 'Mekor Habracha',
+      geo: { lat: 39.9526, lng: -75.1652 },
+      minyanim: [
+        { id: 'f1', tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'summer' },
+        { id: 'f2', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0, season: 'winter' },
+      ],
+    }
+    const at = (candleLightingIso: string) =>
+      nextUpcomingDavening([mekor], { today: ['fri'], tomorrow: ['sat'], nowMinutes: 12 * 60, season: 'summer', anchors: { [geoKey(mekor.geo!)]: { candleLightingIso } } })?.time
+    expect(at('2026-10-23T17:48:00-04:00')).toBe('5:48 PM')
+    expect(at('2026-07-10T20:13:00-04:00')).toBe('7:00 PM')
+  })
+
   it('excludes an out-of-season row from candidacy entirely, not just dims it', () => {
     const winterOnly: ShulMinyanim = {
       name: 'Winter Shul',
