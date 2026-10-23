@@ -19,6 +19,11 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
+// A Wednesday. On a Friday a status read that day says "Up for this
+// Shabbos", not what these tests expect, and they failed every Friday.
+// Only Date is faked: userEvent and waitFor keep real timers.
+vi.useFakeTimers({ toFake: ['Date'] })
+vi.setSystemTime(new Date('2026-10-21T14:00:00Z'))
 const NOW = Date.now()
 const ago = (hours: number) => new Date(NOW - hours * 3_600_000).toISOString()
 const READ = ago(2)
