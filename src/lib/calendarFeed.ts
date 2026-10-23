@@ -327,47 +327,21 @@ export function calendarWeeks(today: string): Omit<CalendarWeek, 'lines'>[] {
 }
 
 /** The entries of an iCal feed between `from` and `to` inclusive. A weekly
- *  repeat (RRULE FREQ=WEEKLY, as Google Calendar keeps a regular minyan) is
- *  laid out over those days; any other repeat is left at its first date. */
+ *  or monthly repeat (RRULE, as Google Calendar keeps a regular minyan) is
+ *  laid out over those days; any other repeat is left at its first date. A
+ *  date of a repeat moved or changed on its own (RECURRENCE-ID, Google's
+ *  way) is that event, not the repeat's. */
 export function icsEntries(ics: string, timezone: string, from: string, to: string): CalendarEntry[] {
   const lines = ics.replace(/\r\n?/g, '\n').replace(/\n[ \t]/g, '').split('\n')
-  const out: CalendarEntry[] = []
-  let event: Record<string, Prop> | null = null
-  let exdates: string[] = []
+  const events: { props: Record<string, Prop>; exdates: string[] }[] = []
+  let event: (typeof events)[number] | null = null
   for (const line of lines) {
     if (line === 'BEGIN:VEVENT') {
-      event = {}
-      exdates = []
+      event = { props: {}, exdates: [] }
       continue
     }
     if (line === 'END:VEVENT' && event) {
-      const start = event.DTSTART && icsWhen(event.DTSTART, timezone)
-      // Its end, when on the same day.
-      const ends = start && start.time && event.DTEND ? icsWhen(event.DTEND, timezone) : null
-      const ending = ends && ends.date === start!.date && ends.time && ends.time !== start!.time ? { end: ends.time } : {}
-      const title = event.SUMMARY ? icsText(event.SUMMARY.value) : ''
-      // Its page and its join link (eventLinks), the same on every date of a repeat.
-      const end = { ...ending, ...eventLinks(event) }
-      if (start && title && event.STATUS?.value !== 'CANCELLED') {
-        const rule = event.RRULE ? Object.fromEntries(event.RRULE.value.split(';').map((kv) => kv.split('=') as [string, string])) : null
-        if (rule?.FREQ === 'WEEKLY') {
-          const interval = Math.max(1, Number(rule.INTERVAL ?? 1))
-          // Its end, where the shul is: a UTC end at midnight is the evening before.
-          const until = rule.UNTIL ? icsWhen({ params: {}, value: rule.UNTIL }, timezone) : null
-          const count = rule.COUNT ? Number(rule.COUNT) : Infinity
-          const byDay = rule.BYDAY ? rule.BYDAY.split(',').map((d) => WEEKDAYS.indexOf(d.slice(-2))) : [new Date(`${start.date}T12:00:00Z`).getUTCDay()]
-          let n = 0
-          for (let d = start.date; d <= to && n < count; d = addDays(d, 1)) {
-            if (until && (d > until.date || (d === until.date && until.time && minutes(start.time) > minutes(until.time)))) break
-            const weeks = Math.floor((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${start.date}T12:00:00Z`)) / (7 * 86_400_000))
-            if (weeks % interval !== 0 || !byDay.includes(new Date(`${d}T12:00:00Z`).getUTCDay())) continue
-            n++
-            if (d >= from && !exdates.includes(d)) out.push({ date: d, time: start.time, ...end, title })
-          }
-        } else if (start.date >= from && start.date <= to) {
-          out.push({ date: start.date, time: start.time, ...end, title })
-        }
-      }
+      events.push(event)
       event = null
       continue
     }
@@ -380,13 +354,80 @@ export function icsEntries(ics: string, timezone: string, from: string, to: stri
     if (name === 'EXDATE') {
       for (const v of value.split(',')) {
         const w = icsWhen({ params, value: v }, timezone)
-        if (w) exdates.push(w.date)
+        if (w) event.exdates.push(w.date)
       }
       continue
     }
-    event[name.toUpperCase()] = { params, value }
+    event.props[name.toUpperCase()] = { params, value }
+  }
+  // The dates of each repeat that are events of their own.
+  const moved = new Set(
+    events.flatMap(({ props }) => {
+      const at = props['RECURRENCE-ID'] && icsWhen(props['RECURRENCE-ID'], timezone)
+      return at && props.UID ? [`${props.UID.value}|${at.date}`] : []
+    }),
+  )
+  const out: CalendarEntry[] = []
+  for (const { props, exdates } of events) {
+    const start = props.DTSTART && icsWhen(props.DTSTART, timezone)
+    // Its end, when on the same day.
+    const ends = start && start.time && props.DTEND ? icsWhen(props.DTEND, timezone) : null
+    const ending = ends && ends.date === start!.date && ends.time && ends.time !== start!.time ? { end: ends.time } : {}
+    const title = props.SUMMARY ? icsText(props.SUMMARY.value) : ''
+    // Its page and its join link (eventLinks), the same on every date of a repeat.
+    const end = { ...ending, ...eventLinks(props) }
+    if (!start || !title || props.STATUS?.value === 'CANCELLED') continue
+    const rule = props.RRULE ? Object.fromEntries(props.RRULE.value.split(';').map((kv) => kv.split('=') as [string, string])) : null
+    const on = rule && repeatsOn(rule, start.date)
+    if (on) {
+      // Its end, where the shul is: a UTC end at midnight is the evening before.
+      const until = rule.UNTIL ? icsWhen({ params: {}, value: rule.UNTIL }, timezone) : null
+      const count = rule.COUNT ? Number(rule.COUNT) : Infinity
+      let n = 0
+      for (let d = start.date; d <= to && n < count; d = addDays(d, 1)) {
+        if (until && (d > until.date || (d === until.date && until.time && minutes(start.time) > minutes(until.time)))) break
+        if (!on(d)) continue
+        n++
+        if (d >= from && !exdates.includes(d) && !moved.has(`${props.UID?.value}|${d}`)) out.push({ date: d, time: start.time, ...end, title })
+      }
+    } else if (start.date >= from && start.date <= to) {
+      out.push({ date: start.date, time: start.time, ...end, title })
+    }
   }
   return out
+}
+
+/** Whether a repeat falls on a date, for the repeats laid out: weekly (on
+ *  its days, every so many weeks) and monthly (its nth weekday, "1SA", the
+ *  Little Shul's first Shabbos; its day of the month; or its first
+ *  date's). Null for any other. */
+function repeatsOn(rule: Record<string, string>, first: string): ((date: string) => boolean) | null {
+  const interval = Math.max(1, Number(rule.INTERVAL ?? 1))
+  const at = (d: string) => new Date(`${d}T12:00:00Z`)
+  if (rule.FREQ === 'WEEKLY') {
+    const byDay = rule.BYDAY ? rule.BYDAY.split(',').map((d) => WEEKDAYS.indexOf(d.slice(-2))) : [at(first).getUTCDay()]
+    return (d) => Math.floor((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${first}T12:00:00Z`)) / (7 * 86_400_000)) % interval === 0 && byDay.includes(at(d).getUTCDay())
+  }
+  if (rule.FREQ !== 'MONTHLY') return null
+  const monthOf = (d: Date) => d.getUTCFullYear() * 12 + d.getUTCMonth()
+  const lastDay = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+  const days = rule.BYDAY?.split(',').map((x) => /^([+-]?\d+)?([A-Z]{2})$/.exec(x)).filter((m) => m !== null && WEEKDAYS.includes(m[2])) as RegExpExecArray[] | undefined
+  const monthDays = rule.BYMONTHDAY?.split(',').map(Number).filter((n) => Number.isInteger(n) && n !== 0)
+  return (d) => {
+    const x = at(d)
+    if ((monthOf(x) - monthOf(at(first))) % interval !== 0) return false
+    const day = x.getUTCDate()
+    if (days?.length) {
+      return days.some(([, nth, wd]) => {
+        if (x.getUTCDay() !== WEEKDAYS.indexOf(wd)) return false
+        if (!nth) return true
+        const n = Number(nth)
+        return n > 0 ? Math.ceil(day / 7) === n : Math.ceil((lastDay(x) - day + 1) / 7) === -n
+      })
+    }
+    if (monthDays?.length) return monthDays.some((n) => (n > 0 ? day === n : day === lastDay(x) + n + 1))
+    return day === at(first).getUTCDate()
+  }
 }
 
 export function isIcs(text: string): boolean {

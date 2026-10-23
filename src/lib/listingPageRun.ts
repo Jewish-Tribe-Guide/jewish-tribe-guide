@@ -20,6 +20,7 @@ import {
   eventPagesToOpen,
   icsEntries,
   isIcs,
+  isServiceTitle,
   joinLinkIn,
   withJoinLinks,
   type CalendarEntry,
@@ -70,7 +71,23 @@ import {
  *  and when it has a calendar, its weeks (calendarWeeks), each read on its
  *  own for the shul's times. A calendar posted as pictures has its
  *  pictures' addresses (`pictures`), fetched only when the AI reads them. */
-export type PageSource = MenuSource & { weeks?: CalendarWeek[]; contacts?: PageContacts }
+export type PageSource = MenuSource & { weeks?: CalendarWeek[]; contacts?: PageContacts; calendarEmpty?: CalendarEmpty }
+
+/** A calendar with no services in the weeks it's read for, and its next
+ *  one: the Little Shul's, which meets the first Shabbos of the month,
+ *  read as "can't find times" for the weeks between (the user, Oct 23). */
+export type CalendarEmpty = { from: string; to: string; next: CalendarEntry | null }
+
+/** How far ahead a calendar with nothing in its weeks is looked at for
+ *  its next service: two months, a monthly minyan's next and then some. */
+const NEXT_SERVICE_DAYS = 62
+
+/** "Their calendar has no services Oct 18 – Oct 31. Next: Sat Nov 7,
+ *  10:00 AM, Sabbath Service." */
+export function calendarEmptyNote({ from, to, next }: CalendarEmpty): string {
+  const none = `Their calendar has no services ${dateText(from)} – ${dateText(to)}.`
+  return next ? `${none} Next: ${dateText(next.date, { weekday: true })}${next.time ? `, ${next.time}` : ''}, ${next.title}.` : `${none} None in the two months after either.`
+}
 
 /** A page as the readers take it. Without its menus (<nav>): a shul
  *  site's runs to thousands of words, crowding out the times in what the
@@ -89,13 +106,20 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
   // A calendar on the page: its feed (the first that reads) or the event
   // list in its scripts (calendarFeed.ts), ahead of the page's own words.
   let entries = embeddedEntries(page.body, communityConfig.timezone)
+  let feedBody: string | null = null
   for (const feed of calendarFeeds(page.body, page.url).slice(0, 2)) {
     const got = await fetchPublic(feed, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS, maxBytes: MAX_FEED_BYTES })
     if (got?.type === 'html' && isIcs(got.body)) {
       entries = icsEntries(got.body, communityConfig.timezone, first, last)
+      feedBody = got.body
       break
     }
   }
+  const after = (n: number) => new Date(Date.parse(`${last}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+  const calendarEmpty: CalendarEmpty | null =
+    feedBody !== null && !calendarLines(entries, first, last).length
+      ? { from: first, to: last, next: icsEntries(feedBody, communityConfig.timezone, after(1), after(NEXT_SERVICE_DAYS)).find((e) => isServiceTitle(e.title)) ?? null }
+      : null
   entries = await withEventJoins(entries, today, last, opts.fetchImpl)
   const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
   // Its phones and emails, read by code (contactRead.ts): in its words and
@@ -109,7 +133,7 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
     if (pictures.length) return { ...withPictures(page.url, text, pictures, weeks), contacts }
   }
   const got = withCalendar(page.url, text, entries, weeks)
-  return got && { ...got, contacts }
+  return got && { ...got, contacts, ...(calendarEmpty ? { calendarEmpty } : {}) }
 }
 
 /** The calendar's services with the join links their own pages give: a
@@ -625,6 +649,7 @@ async function readAndFile(
   } catch (err) {
     return { ok: false, error: `${changed ? 'The page changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
+  if (source.calendarEmpty && !reading.read.length) reading = { ...reading, note: [reading.note, calendarEmptyNote(source.calendarEmpty)].filter(Boolean).join(' ') }
   const { proposal } = reading
   const check = (queue: WatchCheck['queue']) =>
     pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread, parts: reading.parts })

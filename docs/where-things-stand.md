@@ -281,6 +281,19 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
+9. **This week's schedule on a Friday** shows only Friday and Shabbos:
+   it runs today through Shabbos. Mekor's week posted Oct 23 (to Oct 30)
+   and Leyv Ha-Ir's Fri Oct 30 show from Sunday. Recommended: from
+   Thursday (when a calendar's next week is read), show next week's
+   posted days too, under their dates.
+10. **A minyan nobody has confirmed** (a usual time on a day with no
+    posted schedule) shows no line at all; a posted one says "✓ This
+    week's times". Wording for the unconfirmed line not chosen yet.
+11. **Summer and winter times** follow the clock change (Nov 1), so a
+    Friday "7:00 PM · Summer" still counts while candle lighting is 5:50.
+    Proposed for later: for a pair of one season each, a clock time and a
+    zman, it's summer that day when the zman is later than the clock time.
+
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
 The user, Oct 21: "great, let's do it". There is one drawing per page, all
@@ -1281,6 +1294,19 @@ From Mekor's newsletter of Oct 23.
   no extra AI read.
 - Only new reads. Mekor's waiting findings (1230–1232) still have the
   2:00pm Mincha.
+- **A calendar's monthly repeat** ("first Shabbos of the month", the
+  Little Shul's Google Calendar) is laid out over the days, as a weekly one
+  was. A date of a repeat moved on its own (Google's RECURRENCE-ID) is that
+  event, not the repeat's too.
+- **A calendar with no services in the weeks read** says so and names its
+  next ("Their calendar has no services Oct 18 – Oct 31. Next: Sat Nov 7,
+  10:00 AM, Sabbath Service."), not just "can't find times".
+- **A dated time that's one of the usual times** isn't shown twice (BZBI's
+  Shabbos 9:30). Every dated time on a day shows, not only the first.
+- **Chabad of the Main Line's schedule page** can't be watched: it sends a
+  "Just a moment" check to every program, which the guide gives up on by
+  design. The public box doesn't open links for shul times either (only
+  for menus); it reads the words sent.
 
 ## Done Oct 22: Google is a Watches job (on `redesign/oct18-fixes`, not merged)
 

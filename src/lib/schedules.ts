@@ -153,15 +153,22 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   // Thursday minyan on Chol HaMoed put the Sukkos times off that day.
   const additions = covers.filter(isOneDayAddition)
   const covering = firstCovering(covers.filter((s) => !isOneDayAddition(s))) ?? additions[0]
-  const added = covering && !isOneDayAddition(covering) ? additions.flatMap((s) => rowsOn(s, regular, d)) : []
+  // A time the day has as well as its usual times, but not one of them
+  // again: BZBI's usual Shabbos 9:30 AM and that Shabbos's "9:30 AM" off its
+  // newsletter were two rows (the user, Oct 23).
+  const usual = regular.filter((m) => !m.season && m.days.includes(d.weekday))
+  const notUsual = (rows: ScheduledMinyan[]) => rows.filter((r) => !usual.some((m) => m.tefillah === r.tefillah && sameClock(m.time, r.time)))
+  // Every addition but the one covering the day, if it's one.
+  const alsoAdded = (covering && !isOneDayAddition(covering) ? additions : additions.slice(1)).flatMap((s) => rowsOn(s, regular, d))
+  const added = notUsual(alsoAdded)
   const festival = d.yomTov || d.cholHamoed ? (d.festival ?? d.name) : null
   // A shul that already tags regular rows "Yom Tov" has posted for it.
   const taggedYomTov = d.yomTov === true && regular.some((m) => m.days.includes('yom_tov'))
   if (covering) {
     const week = covering.kind === 'week'
-    const rows = rowsOn(covering, regular, d)
+    const rows = covering.mode === 'replace' ? rowsOn(covering, regular, d) : notUsual(rowsOn(covering, regular, d))
     if (rows.length > 0)
-      return { rows: [...rows, ...added], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
+      return { rows: [...rows, ...(covering.mode === 'replace' ? alsoAdded : added)], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
     // the regular ones, but not presented as the festival's. A week the
     // shul sent out that leaves a day out (a website's calendar giving only

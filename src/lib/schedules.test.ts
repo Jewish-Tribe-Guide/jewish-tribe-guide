@@ -166,6 +166,27 @@ describe('what a shul has on a date', () => {
     ])
   })
 
+  // BZBI, Oct 23: its usual Shabbos 9:30AM, and "Sat Oct 24" 9:30 AM off
+  // its newsletter, were two rows on the Minyanim page.
+  describe('a dated time as well as the usual ones', () => {
+    const usual = [m('u1', 'shacharis', ['sat'], '9:30AM'), m('u2', 'mincha', ['sat'], '1:30pm')]
+    const oneDay = (id: string, tefillah: Minyan['tefillah'], time: string): SpecialSchedule => ({ id, name: 'Sat Oct 3', from: '2026-10-03', to: '2026-10-03', mode: 'add', minyanim: [{ id: `${id}m`, tefillah, on: ['2026-10-03'], time }] })
+
+    it('isn’t one of the usual times again', () => {
+      expect(resolveDay(usual, [oneDay('a', 'shacharis', '9:30 AM')], sat)).toMatchObject({ rows: [], skip: false })
+      expect(resolveDay(usual, [oneDay('a', 'shacharis', '8:00 AM')], sat).rows.map((r) => r.time)).toEqual(['8:00 AM'])
+    })
+
+    it('every one that day is shown, not just the first', () => {
+      expect(resolveDay(usual, [oneDay('a', 'shacharis', '8:00 AM'), oneDay('b', 'maariv', '7:30 PM')], sat).rows.map((r) => r.time)).toEqual(['8:00 AM', '7:30 PM'])
+    })
+
+    it('a week that replaces the usual times keeps it, the usual time being gone that day', () => {
+      const week: SpecialSchedule = { id: 'w', kind: 'week', name: 'Times for Sep 27 – Oct 3', from: '2026-09-27', to: '2026-10-03', mode: 'replace', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:00am' }] }
+      expect(resolveDay(usual, [week, oneDay('a', 'shacharis', '9:30 AM')], sat)).toMatchObject({ skip: true, rows: [{ time: '9:00am' }, { time: '9:30 AM' }] })
+    })
+  })
+
   it('the calendar not knowing a day doesn’t make it “not posted”', () => {
     expect(resolveDay(regular, [], factsFor('2026-10-01', undefined, undefined)).posting).toEqual({ kind: 'regular' })
   })

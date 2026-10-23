@@ -802,6 +802,21 @@ describe('readListingPage: a page with a calendar', () => {
     expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-10-24 (Sat) 10:30 AM: Shabbat Morning Service')
   })
 
+  // The Little Shul (Oct 23): its Google Calendar's one service is the
+  // first Shabbos of the month, so most weeks it has none, and the watch
+  // said only that it couldn't find times.
+  it('a calendar with no services in its weeks says so, and names its next', async () => {
+    const { readListingPage, runListingPageWatch } = await import('./listingPageRun')
+    const monthly = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTART;TZID=America/New_York:20140705T100000\r\nRRULE:FREQ=MONTHLY;BYDAY=1SA\r\nSUMMARY:Sabbath Service\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+    const words = `<iframe src="https://calendar.google.com/calendar/embed?src=thelittleshul%40gmail.com&amp;ctz=America%2FNew_York"></iframe><p>${'The Little Shul, a small egalitarian congregation in Queen Village. '.repeat(4)}</p>`
+    m.fetchPublic.mockImplementation(async (url: string) => (url === URL_ ? { url, type: 'html', body: words } : { url, type: 'html', body: monthly }))
+    expect((await readListingPage(URL_, { now: OCT_20 }))?.calendarEmpty).toEqual({ from: '2026-10-18', to: '2026-10-24', next: { date: '2026-11-07', time: '10:00 AM', title: 'Sabbath Service' } })
+    m.readShulWeek.mockResolvedValue({ update: { ...moved, rows: [] }, model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: OCT_20, full: true })).toMatchObject({
+      check: { result: 'nothing', note: 'Their calendar has no services Oct 18 – Oct 24. Next: Sat Nov 7, 10:00 AM, Sabbath Service.' },
+    })
+  })
+
   it('a page with no calendar and next to no words isn’t readable', async () => {
     const { readListingPage } = await import('./listingPageRun')
     m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<header>Leyv Ha-Ir</header><footer>Philadelphia</footer>' })
