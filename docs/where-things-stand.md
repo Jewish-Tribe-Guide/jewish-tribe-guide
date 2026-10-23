@@ -448,9 +448,17 @@ agreed:
      its newsletter-links page was never reached, so it always counted as
      not read yet, and opening the page searched and re-read all its
      pages, filing its suggestions afresh. Opening the page now reads only
-     pages never read, and only those. Still open: its home page (Shabbos
-     Shacharis 9:00) and tefillot page (8:30) disagree, so whichever is
-     used, the other files again on its next read.
+     pages never read, and only those.
+   - The page with a date wins (the user, Oct 22: "since calendar has date
+     and 9am we go with that"). Sons of Israel's calendar gives this
+     Saturday's Shacharis at 9:00, its Tefillot page 8:30. A usual time a
+     page gives is no longer filed where a date from today on (a week on
+     the listing, one waiting in the queue, or the same page's) gives that
+     weekday's tefillah another clock time, and its check says so
+     (`yieldToDated`, listingPageRun.ts). Relative times and one season's
+     times aren't held against a date. Its 8:30 suggestions already in
+     production's queue (37673a26, f113d578) and the home page's "Off:
+     9:00" (b5dde002) are still there for the user to decide.
    - A shul's newsletter is one of its reads (the user, Oct 22): a line in
      its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
      a shul read from one is Checked, not Can't be read. Off the Watches
