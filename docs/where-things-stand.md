@@ -1254,9 +1254,9 @@ week."
 - Not as drawn: the days are grouped as the box groups them ("Shabbos
   morning", not "Shabbos · Oct 31"); Rosh Chodesh and Yom Tov rows of the
   usual times aren't carried into a new week.
-- A usual minyan's note isn't carried into the week either (the user:
-  "drop the usual minyan's note from the week"), so The Little Shul's
-  week no longer says "Meets the first weekend of every month".
+- A usual minyan's note is carried into a new week with its time, since
+  the usual times are only where the week starts (the user, Oct 23, after
+  briefly having it dropped). Each minyan's note can be edited there.
 
 ## Done Oct 23, later still: a monthly shul's home page gives its weeks (on `redesign/oct18-fixes`, #352)
 

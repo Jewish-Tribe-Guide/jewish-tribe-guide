@@ -45,11 +45,11 @@ describe('the usual times a new week starts from', () => {
     expect(rows.find((m) => m.id === 'rc')!.days).toEqual(['thu'])
   })
 
-  // The user, Oct 23: "Meets the first weekend of every month" is about the
-  // usual times, not this week's.
-  it('without the usual minyan’s note', () => {
+  // The user, Oct 23: it's only where the week starts, so it keeps
+  // everything the usual row says, its note too.
+  it('with the usual minyan’s note', () => {
     const [row] = usualWeekRows([{ id: 's', tefillah: 'shacharis', days: ['sat'], time: '10:00am', notes: 'Meets the first weekend of every month' }], null)
-    expect(row).toEqual({ id: 's', tefillah: 'shacharis', days: ['sat'], time: '10:00am' })
+    expect(row).toEqual({ id: 's', tefillah: 'shacharis', days: ['sat'], time: '10:00am', notes: 'Meets the first weekend of every month' })
   })
 })
 
