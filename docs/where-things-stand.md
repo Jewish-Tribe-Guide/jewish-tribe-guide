@@ -433,9 +433,14 @@ agreed:
      by hand: the morning's search follows the links on a shul's Google
      website, like Main dishes, and finds it (and calendar.html, and
      the Shtiebel's /calendar; checked Oct 22, fetch only). It went live
-     Oct 22, so its first morning is Oct 23. BZBI's and Chabad of the
-     Main Line's websites turn the reader away (403), so only BZBI's
-     newsletter is read.
+     Oct 22, so its first morning is Oct 23. "Read them now" searches
+     first too now, a shul with pages or without (the user, Oct 22).
+     BZBI's and Chabad of the Main Line's websites turn the reader away
+     (403), so only BZBI's newsletter is read.
+   - A shul's newsletter is one of its reads (the user, Oct 22): a line in
+     its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
+     a shul read from one is Checked, not Can't be read. Off the Watches
+     tab's list once linked; a sender not tied to a shul yet stays there.
    - A page whose read waited behind a suggestion already in the queue
      kept "In the queue" after that suggestion was decided, with nothing
      to open (Sons of Israel's home page, Oct 22). It settles once a

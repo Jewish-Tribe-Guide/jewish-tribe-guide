@@ -216,6 +216,24 @@ describe('hoursSection', () => {
     expect(s([filed('before')])).toBe('to_check')
   })
 
+  // The user, Oct 22: a shul's newsletter is one of its reads, not a watch
+  // apart. BZBI's website turns the reader away; its newsletter is read.
+  it('a shul read from its newsletter is checked, not can’t be read', () => {
+    const news = (over: Partial<Watch> = {}) => watch({ id: 'nl', url: 'mailto:communications@bzbi.org', createdBy: 'shul newsletters', lastCheck: null, pageChangedAt: ago(30), ...over })
+    const at = (pages: Watch[], newsletters: Watch[], waiting = 0) => hoursSection({ pages, off: false, waiting, newsletters }, NOW)
+    expect(at([], [news()])).toBe('checked')
+    expect(at([watch({ lastCheck: check('unreadable') })], [news()])).toBe('checked')
+    expect(at([watch({ failingSince: ago(1), lastError: 'HTTP 403' })], [news()])).toBe('checked')
+    // Its finding waits: to check, as a page's does.
+    expect(at([], [news()], 1)).toBe('to_check')
+    // No email yet, gone quiet, or paused: not a read.
+    expect(at([], [news({ pageChangedAt: null })])).toBe('cant_read')
+    expect(at([], [news({ failingSince: ago(1), lastError: 'No newsletter from them since Sep 1' })])).toBe('cant_read')
+    expect(at([], [news({ active: false })])).toBe('cant_read')
+    // A page that differs is still to check.
+    expect(at([watch({ lastCheck: check('differs') })], [news()])).toBe('to_check')
+  })
+
   it('counts them for the Watches tab’s row', () => {
     const places = [
       { pages: [watch({ lastCheck: check('differs') }), watch({ failingSince: ago(1), lastError: 'HTTP 500' })], off: false },

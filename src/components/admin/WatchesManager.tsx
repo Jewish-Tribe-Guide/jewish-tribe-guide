@@ -784,6 +784,7 @@ export default function WatchesManager({ token }: { token: string }) {
   // the kosher lists on the Kosher certification page, an eruv's website
   // on Eruv status, and a food place's menu watch on Main dishes.
   const jobIds = new Set([...(jobs.hours?.places ?? []), ...(jobs.times?.places ?? [])].map((p) => p.id))
+  const shulIds = new Set((jobs.times?.places ?? []).map((p) => p.id))
   const listed = data.watches.filter(
     (w) =>
       !isHospitalWatch(w) &&
@@ -793,7 +794,10 @@ export default function WatchesManager({ token }: { token: string }) {
       watchGroupOf(w) !== 'kosher' &&
       !isEruvWebsiteWatch(w) &&
       w.createdBy !== MENU_WATCH_CREATOR &&
-      !(w.resourceId && jobIds.has(w.resourceId) && isListingPageWatch(w)),
+      !(w.resourceId && jobIds.has(w.resourceId) && isListingPageWatch(w)) &&
+      // A linked shul's newsletter is one of its reads on Shul times (the
+      // user, Oct 22); one linked this visit stays in view.
+      !(w.resourceId && shulIds.has(w.resourceId) && isNewsletterWatch(w) && !isIgnoredSender(w) && !kept.has(w.id)),
   )
   const groups = data.available && listReady ? groupWatches(listed, now, kept, readsOf) : []
   const counted = listed.filter((w) => !isIgnoredSender(w)).length
@@ -868,7 +872,7 @@ export default function WatchesManager({ token }: { token: string }) {
               href={`${base}/watches/hours`}
               name={jobs.hours.name}
               about={`${jobs.hours.places.length} place${jobs.hours.places.length === 1 ? '' : 's'}, from their websites`}
-              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at })), now)}
+              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters })), now)}
             />
           )}
           {jobs.times && jobs.times.places.length > 0 && (
@@ -876,7 +880,7 @@ export default function WatchesManager({ token }: { token: string }) {
               href={`${base}/watches/times`}
               name={jobs.times.name}
               about={`${jobs.times.places.length} shul${jobs.times.places.length === 1 ? '' : 's'}, from their websites`}
-              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at })), now)}
+              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters })), now)}
             />
           )}
           <JobRow
