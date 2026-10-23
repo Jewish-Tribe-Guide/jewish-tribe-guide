@@ -256,6 +256,15 @@ describe('Eruv status', () => {
     expect(posts.map((p) => [p.url, p.body])).toEqual([['/api/admin/watches/eruv?community=philly', { action: 'read', id: 'northeast' }]])
   })
 
+  // Oct 23: an email kept by a reader since fixed is read again by Check.
+  it('Read them now reads a waiting email again', async () => {
+    const kept = { messageId: 'g1', subject: 'Eruv is UP', sentAt: '2026-10-23T17:56:17.000Z', text: 'Eruv is UP.', words: 'Eruv is UP.' }
+    await renderPage({ findings: [], watches: [], eruvim: [{ ...NORTHEAST, website: null, statusEmail: 'jcor-ne-philadelphia@groups.io', statusEmailKept: kept }] })
+    await open('Northeast Eruv')
+    await user().click(within(box('Northeast Eruv', 'Reads')).getByRole('button', { name: 'Read them now' }))
+    expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'check' }])
+  })
+
   it('an eruv with no website still stops reading its status', async () => {
     await renderPage()
     await tab('Checked')

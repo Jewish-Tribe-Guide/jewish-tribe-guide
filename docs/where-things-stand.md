@@ -1237,9 +1237,10 @@ compare, and one it can't read, on desktop and phone.
   says "Don't assume the Eruv is down if you don't get an email message",
   which the reader took as a "down". A status sentence that only supposes
   one ("assume", "if", "whether", "unless") is now left out.
-- **This week's (Oct 23) is still waiting on the admin Eruvim tab**, since
-  an email is read once. Mark it Up there; next week's reads by itself
-  once this is deployed.
+- **Check now (Eruvim tab) and Read them now (Watches tab) read a waiting
+  email again**, so one kept by a reader since fixed goes live without an
+  admin choosing up or down. Still unreadable, it keeps waiting.
+- This week's (Oct 23) was marked Up by hand on the Watches tab.
 
 ## Done Oct 23, last: this week's schedule from Edit listing (on `redesign/oct18-fixes`)
 

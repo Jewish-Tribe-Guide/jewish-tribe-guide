@@ -1,7 +1,7 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { addEruv, listEruvimForAdmin, removeEruv, saveLineMissing, saveLineRead, saveStatusRead, saveEmailRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
-import { keptEmailSays } from '@/lib/eruvEmail'
+import { keptEmailSays, rereadKeptEmail } from '@/lib/eruvEmail'
 import { readEruvPage } from '@/lib/eruvReader'
 import { readEruvMap } from '@/lib/eruvLines'
 import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
@@ -13,7 +13,8 @@ import { enforceRateLimit } from '@/lib/rateLimit'
 //      the last read of its map. Admin only.
 // POST /api/admin/eruvim  body: { action: 'save', id, edit } | { action: 'add', name }
 //      | { action: 'remove' | 'check', id }
-//      'check' reads its status page and its map now.
+//      'check' reads its status page and its map now, and an email from
+//      it that's waiting for an admin again.
 //      | { action: 'email-says', id, says: 'up' | 'down' | 'neither' }
 //      an admin reading the email from it the guide couldn't (eruvEmail.ts):
 //      its status from that email, live at once, or the email put away.
@@ -95,6 +96,9 @@ export async function POST(request: Request) {
     if (action === 'check') {
       const now = new Date()
       if (eruv.statusUrl) await saveStatusRead(community.slug, id, await readEruvPage(eruv.statusUrl, now))
+      // Read now, it goes live and is put away; still unreadable, it waits.
+      const reread = eruv.statusEmailKept && rereadKeptEmail(eruv.statusEmailKept, community.timezone)
+      if (reread) await saveEmailRead(community.slug, id, reread, null)
       if (eruv.lineUrl) {
         const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
         // Read now: dated even when the map is the same, so its "read" is today.

@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   saveStatusRead: vi.fn(),
   saveLineRead: vi.fn(),
   readEruvMap: vi.fn(),
+  saveEmailRead: vi.fn(),
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -22,7 +23,7 @@ vi.mock('@/lib/eruvStore', () => ({
   removeEruv: vi.fn(),
   saveLineMissing: vi.fn(),
   saveLineRead: m.saveLineRead,
-  saveEmailRead: vi.fn(),
+  saveEmailRead: m.saveEmailRead,
 }))
 
 const { POST } = await import('./route')
@@ -72,6 +73,22 @@ describe("POST /api/admin/eruvim { action: 'check' }", () => {
     m.readEruvMap.mockResolvedValue({ map: null, save: undefined, missing: [] })
     expect((await POST(req({ action: 'check', id: 'center-city' }))).status).toBe(200)
     expect(m.saveLineRead).toHaveBeenCalledWith('philly', 'center-city', { ok: true, file: null, at: expect.any(String) })
+  })
+
+  // Oct 23: Northeast's email was kept as unclear by a reader since fixed.
+  // Check now reads a waiting email again, as the reader reads today.
+  it('reads a waiting email again: read now, it goes live and is put away', async () => {
+    const kept = { messageId: 'g1', subject: '[JCOR] Fw: Fwd: Parshas Lech Lecha 5787 - Eruv is UP', sentAt: '2026-10-23T17:56:17.000Z', text: 'Parshas Lech Lecha 5787 - Eruv is UP. Don’t assume the Eruv is down if you don’t get an email message.', words: 'Eruv is UP.' }
+    m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ id: 'northeast', statusEmail: 'jcor-ne-philadelphia@groups.io', statusEmailKept: kept })], available: true })
+    await POST(req({ action: 'check', id: 'northeast' }))
+    expect(m.saveEmailRead).toHaveBeenCalledWith('philly', 'northeast', { ok: true, status: 'up', words: 'Eruv is UP.', postedOn: '2026-10-23', at: kept.sentAt }, null)
+  })
+
+  it('a waiting email it still can’t read stays waiting', async () => {
+    const kept = { messageId: 'g2', subject: 'Eruv dinner', sentAt: '2026-10-23T17:56:17.000Z', text: 'Eruv dinner. Join us Sunday.', words: null }
+    m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ id: 'northeast', statusEmailKept: kept })], available: true })
+    await POST(req({ action: 'check', id: 'northeast' }))
+    expect(m.saveEmailRead).not.toHaveBeenCalled()
   })
 
   it('saves a failed read as it is', async () => {

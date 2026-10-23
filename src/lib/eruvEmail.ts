@@ -81,6 +81,16 @@ export function keptEmailSays(kept: KeptEmail, says: 'up' | 'down' | 'neither', 
   return { ok: true, status: says, words: `Read by an admin from their email “${kept.subject.slice(0, 120)}”`, postedOn: localParts(new Date(kept.sentAt), tz).date, at: kept.sentAt }
 }
 
+/** A waiting email read again, as the reader reads today: up or down,
+ *  dated by the email, or null if it still can't be made out. "Check
+ *  now" does this, so an email kept by a reader since fixed needn't wait
+ *  for an admin (Northeast's, Oct 23). */
+export function rereadKeptEmail(kept: KeptEmail, tz: string): (Extract<StatusWrite, { ok: true }> & { status: 'up' | 'down' }) | null {
+  const reading = readStatus(kept.text)
+  if (reading.status === 'unknown') return null
+  return { ok: true, status: reading.status as 'up' | 'down', words: reading.words, postedOn: localParts(new Date(kept.sentAt), tz).date, at: kept.sentAt }
+}
+
 /** An email address as the guide keeps a sender: trimmed, lower case. Null
  *  for anything that isn't one. A groups.io list's other addresses (its
  *  owner's, its sign-up: "JCOR-NE-Philadelphia+owner@groups.io", the one

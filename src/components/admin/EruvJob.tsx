@@ -379,7 +379,8 @@ export default function EruvJob({ token }: { token: string }) {
 
   async function readNow(e: AdminEruv, w: Watch | null) {
     await run(e.id, async () => {
-      if (e.statusUrl || e.lineUrl) await post('/api/admin/eruvim', { id: e.id, action: 'check' })
+      // Its page, its map, and an email from it that's waiting, read again.
+      if (e.statusUrl || e.lineUrl || e.statusEmailKept) await post('/api/admin/eruvim', { id: e.id, action: 'check' })
       // Its website, given its watch first when the daily run hasn't yet.
       if (e.website && (!w || w.active)) await post('/api/admin/watches/eruv', { action: 'read', id: e.id })
       await refresh()
