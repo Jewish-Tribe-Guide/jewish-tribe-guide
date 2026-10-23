@@ -31,6 +31,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 
 const { GET, POST } = await import('./route')
+const { READ_START_BY_MS } = await import('@/lib/hoursJobRun')
 const { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_STOPPED_CREATOR, hoursOffUrl, hoursSearchedUrl } = await import('@/lib/hoursJob')
 const { LISTING_PAGE_WATCH_CREATOR } = await import('@/lib/listingPageWatch')
 
@@ -317,6 +318,25 @@ describe('POST /api/admin/watches/hours', () => {
     m.addWatch.mockImplementation(async (_c: string, x: Partial<Watch>) => w({ id: 'found', lastRunAt: null, lastCheck: null, ...x }))
     await POST(req('POST', { action: 'check', resourceId: MEI }))
     expect(m.removeWatch).toHaveBeenCalledWith('philly', 'searched')
+  })
+
+  // Sons of Israel, Oct 22: four pages read by the AI one after another
+  // passed the host's 60s, which cut it off with a page that isn't JSON.
+  it('check: starts no page once READ_START_BY_MS has gone; the rest keep their last read', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const pages = ['a', 'b', 'c'].map((id) => w({ id, url: `https://lmcmikvah.org/${id}/` }))
+      m.listWatches.mockResolvedValue({ watches: pages, available: true })
+      m.runAndRecord.mockImplementation(async (x: Watch) => {
+        vi.setSystemTime(Date.now() + READ_START_BY_MS / 2 + 1)
+        return { watch: { ...x, lastRunAt: 'now' } }
+      })
+      const body = await (await POST(req('POST', { action: 'check', resourceId: LMC }))).json()
+      expect(m.runAndRecord.mock.calls.map(([x]) => x.id)).toEqual(['a', 'b'])
+      expect(body.pages.map((p: { watch: Watch }) => [p.watch.id, p.watch.lastRunAt])).toEqual([['a', 'now'], ['b', 'now'], ['c', pages[2].lastRunAt]])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('check: not a place that’s turned off', async () => {

@@ -9,7 +9,7 @@ import { UUID } from '@/lib/itemMarkRoutes'
 import { hoursSections, offeredSections, sectionKeys } from '@/lib/hoursSections'
 import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, NOT_SEARCHED, NO_WEBSITE, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, hoursSearchedUrl, isHoursOff, isHoursSearched, isStoppedPage, jobWords, samePage, searchReason, sourceLine, type PageJob } from '@/lib/hoursJob'
-import { hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
+import { CHECK_SEARCH_MS, READ_START_BY_MS, deadline, hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
 import { listingSlug } from '@/lib/listingSlug'
 import { listedContact } from '@/lib/contactRead'
 import { routes } from '@/lib/routes'
@@ -120,7 +120,7 @@ function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string |
  *  found none kept (recordSearch). Check now and Turn back on. */
 async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob, has = 0): Promise<{ added: Watch[]; reason: string | null }> {
   const website = websiteOf(place)
-  const got = website ? await searchHoursPages(website, undefined, job).catch(() => null) : null
+  const got = website ? await deadline(searchHoursPages(website, undefined, job).catch(() => null), CHECK_SEARCH_MS) : null
   const added: Watch[] = []
   for (const p of got && !('error' in got) ? got.found : []) {
     if (watches.some((w) => samePage(w.url, p.url))) continue
@@ -186,6 +186,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const started = Date.now()
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
@@ -217,7 +218,7 @@ export async function POST(request: Request) {
     // times at once (Sons of Israel, Oct 21).
     const read = async (ws: Watch[]) => {
       const done: Watch[] = []
-      for (const w of ws) done.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
+      for (const w of ws) done.push(Date.now() - started < READ_START_BY_MS ? (await runAndRecord(w, undefined, undefined, { full: true })).watch : w)
       return done
     }
     const reply = (ps: readonly Watch[], st: readonly Watch[], rest: Record<string, unknown> = {}) => Response.json({ ok: true, pages: shown(ps), stopped: shown(st), off: false, ...rest })

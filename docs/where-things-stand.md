@@ -437,6 +437,12 @@ agreed:
      first too now, a shul with pages or without (the user, Oct 22).
      BZBI's and Chabad of the Main Line's websites turn the reader away
      (403), so only BZBI's newsletter is read.
+   - "Read them now" on Sons of Israel said "Unexpected token 'A'…"
+     (Oct 22): its pages, read by the AI one after another, passed the
+     host's 60s and the host's error page isn't JSON. It now starts no
+     page after 30s (the rest keep their last read, for the morning), the
+     search gets 10s, and an answer that isn't JSON says "That took too
+     long. Try again." on any admin page.
    - A shul's newsletter is one of its reads (the user, Oct 22): a line in
      its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
      a shul read from one is Checked, not Can't be read. Off the Watches

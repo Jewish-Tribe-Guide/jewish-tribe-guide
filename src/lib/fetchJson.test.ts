@@ -30,6 +30,15 @@ describe('parseOkJson', () => {
     await expect(parseOkJson(res, 'Failed.')).rejects.toThrow('Name is required. Email is invalid.')
   })
 
+  // Sons of Israel's Read them now, Oct 22: the host cut the function off
+  // at its time limit and answered with its own page, which said
+  // "Unexpected token 'A', "An error o"... is not valid JSON".
+  it('says so plainly when the answer isn’t JSON', async () => {
+    const page = (status: number) => new Response('An error occurred with your deployment\n\nFUNCTION_INVOCATION_TIMEOUT', { status })
+    await expect(parseOkJson(page(504), 'Failed.')).rejects.toThrow(/^That took too long\. Try again\.$/)
+    await expect(parseOkJson(page(500), 'Couldn’t read it.')).rejects.toThrow(/^Couldn’t read it\.$/)
+  })
+
   it('falls back to the given message when the body carries no errors', async () => {
     const res = jsonResponse(500, {})
     await expect(parseOkJson(res, 'Save failed.')).rejects.toThrow('Save failed.')

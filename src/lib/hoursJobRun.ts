@@ -56,7 +56,16 @@ export async function searchHoursPages(website: string, reach: HoursReach = {}, 
  *  run its time for the reads (its 60s, /api/cron/watches). */
 export const SEARCH_DEADLINE_MS = 20_000
 
-const deadline = <T,>(work: Promise<T>, ms: number): Promise<T | null> =>
+/** A job page's "Read them now" answers inside its route's 60s: no page
+ *  is started once this much has gone, since one read by the AI can take
+ *  20s. The ones not reached keep their last read, for the morning's run
+ *  (Sons of Israel's four pages, Oct 22: the host cut it off at 60s, and
+ *  its error page came back as "Unexpected token 'A'"). */
+export const READ_START_BY_MS = 30_000
+/** Its website searched first, given at most this long. */
+export const CHECK_SEARCH_MS = 10_000
+
+export const deadline = <T,>(work: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([work, new Promise<null>((done) => setTimeout(() => done(null), ms))])
 
 /** The places with the job in one community, and their categories. */
