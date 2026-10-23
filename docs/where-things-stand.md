@@ -93,11 +93,8 @@ for that exact change, in the same conversation. Show the dry run first.
    category search reads ("havdalah" finds it). Until the three-line tiles are
    live, the phone home cuts the name to "Candle Lighting &…".
 
-1d. **Migration 085 (`watch.last_check`)** keeps what a watch's last check
-   read (Check now, below). Run on neither database: this environment has
-   no SQL access, so it needs pasting into the SQL editor, dev first (no
-   yes needed there), then live with a yes. Until then everything works,
-   and a check's result shows only until the Watches tab is reloaded.
+1d. **Migration 085 (`watch.last_check`)** is run on both databases
+   (checked Oct 23). A watch's last check is kept across reloads.
 
 ## For the user or the community
 
@@ -280,14 +277,6 @@ for that exact change, in the same conversation. Show the dry run first.
    anywhere the nav can read it, and the agreement was no new requests just
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
-
-9. **Two shuls' seasons on the live site need a fix** (a production
-   write, so it needs a yes). Congregation Sons of Israel's Friday Mincha
-   is "7:00pm" and "5 min before candle lighting", both marked Summer; the
-   second's note says "Rest of the Year", so it should be Winter. Until
-   then both show all summer. Chabad of the Main Line's one-season rows
-   don't pair up (no winter Friday time), so the clock change still
-   decides theirs.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
