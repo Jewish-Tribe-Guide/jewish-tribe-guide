@@ -5,6 +5,7 @@ import {
   googleHoursToStructured,
   namesOverlap,
   nextGoogleFields,
+  searchPlaces,
   syncMayWrite,
 } from './googlePlaces'
 
@@ -386,5 +387,37 @@ describe('namesOverlap', () => {
 
   it('matches when one short name is a substring of the other', () => {
     expect(namesOverlap('P.S. & Co.', 'P.S. & Co. Deli')).toBe(true)
+  })
+})
+
+// ── searchPlaces (the Watches tab's Find it on Google) ──────────────────────
+
+describe('searchPlaces', () => {
+  beforeEach(() => {
+    process.env.GOOGLE_MAPS_SERVER_KEY = 'server-key'
+  })
+
+  it('up to five places, each with its address', async () => {
+    const results = Array.from({ length: 7 }, (_, i) => ({ place_id: `p${i}`, name: `Chalavita ${i}`, formatted_address: `${i} Tomlinson Rd` }))
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'OK', results: [{ name: 'no id' }, ...results] }) })
+    vi.stubGlobal('fetch', fetchSpy)
+    const found = await searchPlaces('Chalavita')
+    expect(found).toHaveLength(5)
+    expect(found![0]).toEqual({ placeId: 'p0', name: 'Chalavita 0', address: '0 Tomlinson Rd' })
+    expect(fetchSpy.mock.calls[0][0]).toContain('query=Chalavita')
+  })
+
+  it('nothing found is an empty list; Google refusing is null, so the page says it didn’t answer', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ZERO_RESULTS' }) }))
+    expect(await searchPlaces('Nowhere')).toEqual([])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'REQUEST_DENIED' }) }))
+    expect(await searchPlaces('Chalavita')).toBeNull()
+  })
+
+  it('asks nothing for a blank search', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    expect(await searchPlaces('  ')).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

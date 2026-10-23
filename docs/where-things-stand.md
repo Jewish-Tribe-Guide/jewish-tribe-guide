@@ -1262,6 +1262,40 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 22: Google is a Watches job (on `redesign/oct18-fixes`, not merged)
+
+Drawn and agreed: https://claude.ai/artifact/6gCnW6nVTDXySkcYENvAqF (v2,
+"Google: who checks each field"). Compared with the boards on dev,
+computer and phone.
+
+- **Watches row:** "Google · N listings, from Google Maps", with checked /
+  to check / can't be read (no "didn't load": it loads no pages).
+- **Its page** (`/admin/<community>/watches/google`, `GoogleJob.tsx`):
+  "N listings have a field nothing checks", tabs To check / Can't be read
+  / Checked. Every approved listing in a category with an address.
+- **Fields box:** Name, Hours, Phone, Website, each with who checks it:
+  Google (it keeps the field), Its website (a page a job reads that
+  loads), You (kept by hand, for good) or Nothing, lit. Worked out each
+  load (`googleJobRun.ts`), nothing stored for it.
+- **Check against Google** is one Places call, on a tap only. Changed rows
+  show "was …"; Use Google's / Edit / Keep the listing. Use and Edit are
+  filed as Google Maps and approved, like a sync change. What already
+  matches is handed to Google to keep.
+- **No match:** Find it on Google (a search sheet, This one) and Not on
+  Google. **Can't be read:** "Not read since …", Find it on Google, Open
+  its listing.
+- **A closure** is its own Open or closed box, Show as open, on the site
+  at once. Its read date is Google's latest answer on it (the closure
+  check runs more often than the full sync).
+- The Metrics tab's old Google sync coverage panel and its four routes
+  are gone.
+- **Live numbers (read Oct 22):** 141 listings, 122 checked, 18 to check,
+  1 can't be read; the drawing had 123/17/1. Chalavita's hours and phone
+  and Sababa's hours say Nothing on live, not Its website: their home-page
+  watches (board 3, Dishes) come with this branch's next deploy and the
+  morning run after it.
+- Rita's has two listings on South St, one closed: maybe a duplicate.
+
 ## Done Oct 22: a minyan's join link (on `redesign/minyan-join-link`)
 
 The user, Oct 22: Rodeph Shalom's watch "didn't pick up on … zoom link for

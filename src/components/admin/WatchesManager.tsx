@@ -58,11 +58,13 @@ type Jobs = {
   times?: PagesJob
   eruvim?: EruvJobLoaded | null
   kosher?: KosherLoaded | null
+  google?: { counts: JobCounts; total: number } | null
 }
 
 /** One job's row: what it is and its four counts; the whole row opens its
- *  page. Null counts: they couldn't be loaded; undefined, still loading. */
-function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | null | undefined }) {
+ *  page. Null counts: they couldn't be loaded; undefined, still loading.
+ *  `pages` false: a job that loads no pages (Google), so no "didn't load". */
+function JobRow({ href, name, about, counts, pages = true }: { href: string; name: string; about: string; counts: JobCounts | null | undefined; pages?: boolean }) {
   const stat = (n: number, label: string, flag: boolean) => (
     <span className="flex min-w-[4.5rem] flex-col">
       <span className={`text-base font-semibold ${flag && n > 0 ? 'text-amber-800' : 'text-slate-900'}`}>{n}</span>
@@ -81,7 +83,14 @@ function JobRow({ href, name, about, counts }: { href: string; name: string; abo
             {stat(counts.checked, 'checked', false)}
             {stat(counts.toCheck, 'to check', true)}
             {stat(counts.cantRead, 'can’t be read', true)}
-            {stat(counts.didntLoad, 'didn’t load today', true)}
+            {pages ? (
+              stat(counts.didntLoad, 'didn’t load today', true)
+            ) : (
+              // Held open, so its counts line up with the rows above.
+              <span aria-hidden="true" className="invisible">
+                {stat(0, 'didn’t load today', false)}
+              </span>
+            )}
           </span>
         ) : counts === null ? (
           <span className="text-sm text-slate-500">Couldn&rsquo;t load its counts.</span>
@@ -710,6 +719,7 @@ export default function WatchesManager({ token }: { token: string }) {
     void Promise.all([hours, times]).then(() => setListReady(true))
     void get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim')))
     void get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher')))
+    void get<{ counts: JobCounts; total: number }>('/api/admin/watches/google?counts').then((d) => (d ? fill('google', d.counts ? d : null) : failed('google')))
     try {
       setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'))
     } catch (err) {
@@ -899,6 +909,7 @@ export default function WatchesManager({ token }: { token: string }) {
             about={jobs.kosher ? `${jobs.kosher.places.length} food places, from Keystone-K’s and Mekor Habracha’s lists` : 'Food places, from Keystone-K’s and Mekor Habracha’s lists'}
             counts={jobs.kosher && jobs.kosher.counts}
           />
+          <JobRow href={`${base}/watches/google`} name="Google" about={jobs.google ? `${jobs.google.total} listings, from Google Maps` : 'Listings, from Google Maps'} counts={jobs.google && jobs.google.counts} pages={false} />
         </ul>
       </section>
       {!data.available && (

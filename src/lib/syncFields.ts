@@ -18,6 +18,13 @@ import { MENU_LINK_KEY, readMenuLink } from './menuLink'
 // added here.
 export const SYNC_INTERNAL_FIELDS = [
   'googleSyncedAt',
+  // The Watches tab's Google page (googleJob.ts, Oct 22): the fields an
+  // admin checked themselves (Keep the listing), when they said it isn't on
+  // Google, and what the last Check against Google found. An admin's,
+  // never a submitter's.
+  'googleKept',
+  'notOnGoogle',
+  'googleCheck',
   'googleStatusCheckedAt',
   'lastSyncError',
   'lastSyncFailedAt',
