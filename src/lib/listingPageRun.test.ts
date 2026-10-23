@@ -36,8 +36,8 @@ vi.mock('@/lib/shulWeekReading', () => ({
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, replacePendingSuggestion: m.replacePendingSuggestion }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
-// Never called: a page the AI read never dates a listing. Mocked so a call
-// would be seen, not made.
+// A page that agrees dates the listing by name (Oct 23). Mocked so a call
+// is seen, not made.
 vi.mock('@/lib/sourceConfirm', () => ({ confirmFromSource: m.confirmFromSource }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -68,7 +68,8 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 
-const { runListingPageWatch } = await import('./listingPageRun')
+const { runListingPageWatch, listedAs } = await import('./listingPageRun')
+const { pageReadsFor } = await import('./listingPageWatch')
 const { newMenuReadBudget } = await import('./menuWatchRun')
 
 const shulCategory = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] })
@@ -81,6 +82,17 @@ const page = { url: URL_, type: 'html', body: html }
 const watch = { communityId: 'philly', url: URL_, resourceId: 's1', pageHash: null as string | null }
 const changed = { ...watch, pageHash: 'old' }
 const NOW = Date.parse('2026-10-20T11:00:00Z')
+/** The last check, made with the listing as it is now (listedAs). */
+const lastRead = (row: { details?: Record<string, unknown> }, category: typeof shulCategory, result: WatchCheck['result'] = 'agrees'): WatchCheck => ({
+  at: '2026-10-19T11:00:00Z',
+  what: category === shulCategory ? 'times' : 'hours',
+  from: 'page',
+  result,
+  read: [],
+  differences: [],
+  queue: null,
+  listedAs: listedAs({ ...row, ...(row.details ?? {}) } as never, pageReadsFor(category)!),
+})
 
 /** What the schedule reader makes of the page: Sunday's Mincha moved. */
 const moved: TimesUpdate = {
@@ -133,15 +145,51 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     // Once read, it's read again only when it changes.
-    expect(await runListingPageWatch({ ...found, pageHash: await hashOfPage() }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+    expect(await runListingPageWatch({ ...found, pageHash: await hashOfPage(), lastCheck: lastRead(shul, shulCategory, 'differs') }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
   })
 
-  it('an unchanged page is left alone: no AI, nothing filed, the listing not dated', async () => {
-    const out = await runListingPageWatch({ ...watch, pageHash: await hashOfPage() }, undefined, { apiKey: 'k' })
+  it('an unchanged page that differed is left alone: no AI, nothing filed, the listing not dated', async () => {
+    const out = await runListingPageWatch({ ...watch, pageHash: await hashOfPage(), lastCheck: lastRead(shul, shulCategory, 'differs') }, undefined, { apiKey: 'k' })
     expect(out).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     expect(m.confirmFromSource).not.toHaveBeenCalled()
     expect(m.writes).toEqual([])
+  })
+
+  // The user, Oct 23: "If the website shows it then the website shows it".
+  // B'nai Abraham's and Society Hill's dates sat at their last approval
+  // while their pages agreed every morning.
+  it('an unchanged page that agreed, the listing as it was, dates the listing again without the AI', async () => {
+    const out = await runListingPageWatch({ ...watch, pageHash: await hashOfPage(), lastCheck: lastRead(shul, shulCategory) }, undefined, { apiKey: 'k', now: NOW })
+    expect(out).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+    expect(m.readShulWeek).not.toHaveBeenCalled()
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], 'Lower Merion Synagogue', '2026-10-20T11:00:00.000Z')
+  })
+
+  // The listing changed since (an approval, a newsletter): whether the page
+  // agrees is about the listing as it stands, so it's read again, once.
+  it('an unchanged page is read again once the listing moves, dating it if they agree and filing nothing if not', async () => {
+    const before = lastRead({ ...shul, details: { minyanim: [{ ...minyan, time: '6:00pm' }] } }, shulCategory)
+    m.readShulWeek.mockResolvedValue({ update: agrees, model: 'cheap' })
+    const same = { ...watch, pageHash: await hashOfPage(), lastCheck: before }
+    expect(await runListingPageWatch(same, newMenuReadBudget(), { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees', listedAs: lastRead(shul, shulCategory).listedAs } })
+    expect(m.confirmFromSource).toHaveBeenCalledTimes(1)
+    // A standing difference is the listing being newer: said, never filed.
+    m.confirmFromSource.mockClear()
+    m.readShulWeek.mockResolvedValue({ update: moved, model: 'cheap' })
+    expect(await runListingPageWatch(same, newMenuReadBudget(), { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, check: { result: 'differs', queue: null } })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    expect(m.confirmFromSource).not.toHaveBeenCalled()
+    // Never compared yet (a check from before Oct 23): read once too.
+    m.readShulWeek.mockClear()
+    await runListingPageWatch({ ...same, lastCheck: { ...before, listedAs: undefined } }, newMenuReadBudget(), { apiKey: 'k', now: NOW })
+    expect(m.readShulWeek).toHaveBeenCalledTimes(1)
+    // From its own reads, never a changed page's.
+    const budget = { aiReads: 1, compares: 0 }
+    m.readShulWeek.mockClear()
+    expect(await runListingPageWatch(same, budget, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0 })
+    expect(m.readShulWeek).not.toHaveBeenCalled()
+    expect(budget.aiReads).toBe(1)
   })
 
   it('a changed page is read by the AI, and a changed time goes to the queue as from their website', async () => {
@@ -150,7 +198,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       ok: true,
       filed: 1,
       pageHash: await hashOfPage(),
-      check: { what: 'times', from: 'page', result: 'differs', read: ['Mincha Sun 6:05 PM'], differences: ['Changed: mincha · Sun · 6:05pm, was 6:15pm'], queue: 'filed', parts: [{ part: 'weekday', size: 1 }] },
+      check: { what: 'times', from: 'page', result: 'differs', read: ['Mincha Sun 6:05 PM'], differences: ['Changed: mincha · Sun · 6:05pm, was 6:15pm'], queue: 'filed', parts: [{ part: 'weekday', size: 1 }], listedAs: expect.any(String) },
     })
     expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }), 'minyanim', { text: expect.stringContaining('Sunday Mincha 6:05pm') }, 'k', { others: expect.any(Function) })
     const [community, target, payload, note, by] = m.submitListingUpdate.mock.calls[0]
@@ -172,17 +220,18 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     })
   })
 
-  // The user's rule (Oct 19): the AI reads, it never confirms.
-  it('a changed page that agrees with the listing files nothing, and doesn’t date it', async () => {
+  // The user, Oct 23 (it was "the AI reads, it never confirms", Oct 19):
+  // "If the website shows it then the website shows it".
+  it('a changed page that agrees with the listing files nothing, and dates it by name', async () => {
     m.readShulWeek.mockResolvedValue({ update: agrees, model: 'cheap' })
-    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toEqual({
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toEqual({
       ok: true,
       filed: 0,
       pageHash: await hashOfPage(),
-      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }] },
+      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }], listedAs: lastRead(shul, shulCategory).listedAs },
     })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
-    expect(m.confirmFromSource).not.toHaveBeenCalled()
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], 'Lower Merion Synagogue', '2026-10-20T11:00:00.000Z')
     expect(m.writes).toEqual([])
   })
 
@@ -319,6 +368,12 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(await runListingPageWatch({ ...watch, resourceId: null })).toEqual({ ok: false, error: 'Tie this watch to the listing it keeps current' })
     m.fetchPublic.mockResolvedValue(null)
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toEqual({ ok: false, error: 'Couldn’t read the page (blocked, moved, or built in the browser)' })
+    // What the site said, when it said something.
+    m.fetchPublic.mockImplementation(async (_url: string, o: { trouble?: (t: unknown) => void }) => (o.trouble?.({ why: 'refused', status: 403 }), null))
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toEqual({ ok: false, error: 'Couldn’t read the page: it turned the reader away (403)' })
+    m.fetchPublic.mockImplementation(async (_url: string, o: { trouble?: (t: unknown) => void }) => (o.trouble?.({ why: 'unreachable', timedOut: true }), null))
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toEqual({ ok: false, error: 'Couldn’t read the page: it didn’t answer in time' })
+    m.fetchPublic.mockReset()
     m.fetchPublic.mockResolvedValue(page)
     m.readShulWeek.mockRejectedValue(new Error('Schedule reader: 500'))
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toEqual({ ok: false, error: 'The page changed, and the AI couldn’t read it (Schedule reader: 500)' })
@@ -466,18 +521,18 @@ describe('runListingPageWatch: a shul’s page of times', () => {
 describe('runListingPageWatch: "Check now", the full check', () => {
   const full = { apiKey: 'k', now: NOW, full: true }
 
-  it('reads an unchanged page with the AI and says it agrees, filing and dating nothing', async () => {
+  it('reads an unchanged page with the AI and says it agrees, filing nothing and dating the listing', async () => {
     m.readShulWeek.mockResolvedValue({ update: agrees, model: 'cheap' })
     const out = await runListingPageWatch({ ...watch, pageHash: await hashOfPage() }, undefined, full)
     expect(out).toEqual({
       ok: true,
       filed: 0,
       pageHash: await hashOfPage(),
-      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }] },
+      check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }], listedAs: expect.any(String) },
     })
     expect(m.readShulWeek).toHaveBeenCalled()
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
-    expect(m.confirmFromSource).not.toHaveBeenCalled()
+    expect(m.confirmFromSource).toHaveBeenCalledTimes(1)
   })
 
   it('files a difference on an unchanged page as the daily run would, saying it was read, not changed', async () => {
@@ -574,11 +629,11 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     })
   })
 
-  it('files nothing, and dates nothing, when the hours agree', async () => {
+  it('files nothing, and dates the listing, when the hours agree', async () => {
     m.readMessage.mockResolvedValue(reading('19:00'))
-    expect(await runListingPageWatch({ ...changed, resourceId: 'mk1' }, undefined, { apiKey: 'k' })).toMatchObject({ ok: true, filed: 0 })
+    expect(await runListingPageWatch({ ...changed, resourceId: 'mk1' }, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
-    expect(m.confirmFromSource).not.toHaveBeenCalled()
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['mk1'], 'Mikvah Ohel Leah', '2026-10-20T11:00:00.000Z')
     expect(m.writes).toEqual([])
   })
 })
@@ -737,7 +792,7 @@ describe('runListingPageWatch: a mikvah’s sections, each filed on its own', ()
     const daily = (w: typeof same & { lastCheck?: WatchCheck | null }) => runListingPageWatch(w, newMenuReadBudget(), { apiKey: 'k', now: NOW })
     expect(await daily(same)).toMatchObject({ ok: true, filed: 1, check: { result: 'differs' } })
     expect(m.submitListingUpdate.mock.calls[0][3]).toContain('read Oct 20')
-    const check = (at: string): WatchCheck => ({ at, what: 'hours', from: 'page', result: 'agrees', read: [], differences: [], queue: null })
+    const check = (at: string): WatchCheck => ({ ...lastRead(place, category), at })
     expect(await daily({ ...same, lastCheck: check('2026-10-21T12:00:00Z') })).toMatchObject({ ok: true, filed: 1 })
     m.readMessage.mockClear()
     expect(await daily({ ...same, lastCheck: check(NOTES_READ_FROM) })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
@@ -1276,7 +1331,7 @@ describe('runListingPageWatch: a page’s phone and email', () => {
     return menuHash({ url: URL_, text: htmlToText(body), pdf: null })
   }
   const leyv = { ...shul, phone: '(215) 629-1995' }
-  const lastCheck = { at: '2026-10-19T11:00:00Z', what: 'times' as const, from: 'page' as const, result: 'agrees' as const, read: ['Mincha Sun 6:15 PM'], differences: [], queue: null }
+  const lastCheck = { ...lastRead(shul, shulCategory), read: ['Mincha Sun 6:15 PM'] }
 
   it('reads an unchanged page never read for its phone, without the AI, keeping what it last read', async () => {
     m.getResourceRowById.mockResolvedValue(leyv)

@@ -1231,6 +1231,36 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 23, after the PR opened: a website that agrees confirms (on `redesign/oct18-fixes`, #351)
+
+- **A shul's or mikvah's own page that agrees with the listing now dates
+  it**, as Keystone-K, Mekor and Refuah do. The line reads "Confirmed by
+  <the shul>, <date>", the same line an approved website suggestion gives.
+  (The user: "If the website shows it then the website shows it.") Before
+  this, B'nai Abraham Chabad and Society Hill kept the date of their last
+  approval while their pages agreed every morning.
+- **An unchanged page that agreed dates the listing again each morning,
+  with no AI**, while the listing stays as it was when the page was last
+  read. If the listing changes (an approval, a newsletter, an admin's
+  edit), the page is read once more to compare, from its own 3 reads a
+  run, separate from the 3 a changed page gets. A difference found that
+  way is never filed: the page said nothing new, so the listing is the
+  newer one. Each page already watched is read once this way, since none
+  had been compared yet.
+- **The whole listing gets the date**, as with the other sources, even
+  where the page gives only part of it (say, weekday times only).
+- **The summer/winter line names the minyan and says "instead of"**:
+  "In summer, Friday: Mincha 7 PM instead of 5 min before candle
+  lighting." "Also" is kept only for a one-season minyan with no pair,
+  which really is held as well ("In winter, also Mincha 12:20 PM,
+  following Kiddush.").
+- **A page that can't be read says why, when the site said**: "Couldn't
+  read the page: it turned the reader away (403)", or "it didn't answer
+  in time". Shivtei Yeshuron's two pages read fine at 8:31 AM on Oct 23,
+  failed at 10:54 AM, and read fine from here afterwards (its calendar's
+  next service is Nov 7). That points to the site, not the reader. The
+  next run will say what it answered.
+
 ## Done Oct 23, last of all: summer and winter by the zman (on `redesign/oct18-fixes`, not merged)
 
 - **A shul's summer/winter pair** goes by the zman. A pair is one clock
@@ -1968,7 +1998,7 @@ build").
   change does the AI read it (sharing the menu watches' 3 reads a run),
   and what differs goes to the queue as "Their website (automated)", noted
   "From their website, changed <date>", with the page beside it. Agreeing
-  never dates the listing; the same suggestion is never filed twice; a
+  never dates the listing (changed Oct 23: it does now); the same suggestion is never filed twice; a
   listing with anything in the queue waits. Shuls use the schedule reader
   (usual times only, never one week's); mikvahs the any-field reader, hours
   only. What the live dry run taught it: a page's menus are dropped before

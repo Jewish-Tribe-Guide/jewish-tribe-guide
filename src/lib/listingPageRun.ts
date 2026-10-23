@@ -2,7 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { community as communityConfig } from '@/community.config'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, listApprovedResources, normalizeRow } from '@/lib/resourceStore'
-import { fetchPublic, htmlToText, type MenuSource } from '@/lib/menuReader'
+import { fetchPublic, htmlToText, troubleClause, type MenuSource, type Trouble } from '@/lib/menuReader'
 import { menuHash } from '@/lib/menuWatch'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readShulWeek } from '@/lib/shulWeekReading'
@@ -36,6 +36,7 @@ import { TIMES_PART_LABELS, partKey, partLines, partSize, partsGiven, readPartSo
 import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
 import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
 import { sendWatchDigest } from '@/lib/email'
+import { confirmFromSource } from '@/lib/sourceConfirm'
 import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
@@ -121,8 +122,8 @@ export function calendarEmptyNote({ from, to, next }: CalendarEmpty): string {
  *  site's runs to thousands of words, crowding out the times in what the
  *  AI is given, and a new menu item isn't a change to the page.
  *  `pictures`: a shul's page, whose calendar may be posted as pictures. */
-export async function readListingPage(url: string, opts: { fetchImpl?: typeof fetch; now?: number; pictures?: boolean } = {}): Promise<PageSource | null> {
-  const page = await fetchPublic(url, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS })
+export async function readListingPage(url: string, opts: { fetchImpl?: typeof fetch; now?: number; pictures?: boolean; trouble?: (t: Trouble) => void } = {}): Promise<PageSource | null> {
+  const page = await fetchPublic(url, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS, trouble: opts.trouble })
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(new Date(opts.now ?? Date.now()))
@@ -641,9 +642,17 @@ export async function earlierSuggestions(community: string, listingId: string): 
   return (data ?? []) as { payload: unknown }[]
 }
 
+/** The listing's own times or hours, as a fingerprint: what a page's read
+ *  agreed or differed with. */
+export function listedAs(listing: DirectoryResource, reads: PageReads): string {
+  const keys = reads.kind === 'times' ? [reads.key, schedulesKey(reads.key)] : [...reads.keys, ...reads.notes]
+  return suggestionKey(listing as unknown as Record<string, unknown>, keys)
+}
+
 /** One listing's page: read it, and when its words changed, have the AI
  *  read it and file what differs from the listing. A page that agrees
- *  leaves the listing's date alone (listingPageWatch.ts).
+ *  dates the listing by name, as an approval of its suggestion would
+ *  (listingPageWatch.ts).
  *
  *  `full` is the admin's "Check now" (the user, Oct 20): the AI reads the
  *  page whether or not it changed, files what differs just as a change
@@ -663,11 +672,15 @@ export async function runListingPageWatch(
   const reads = category && pageReadsFor(category)
   if (!category || !reads) return { ok: false, error: 'The listing this page belongs to has no davening times or hours to keep current' }
 
-  const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl, now: opts.now, pictures: reads.kind === 'times' })
+  // Why it couldn't, when the site said (the user, Oct 23: Shivtei
+  // Yeshuron's page read at 8:31 and "couldn't be read" at 10:54).
+  let trouble: Trouble | null = null
+  const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl, now: opts.now, pictures: reads.kind === 'times', trouble: (t) => void (trouble ??= t) })
   if (!source) {
+    const why: Trouble | null = trouble
     return {
       ok: false,
-      error: 'Couldn’t read the page (blocked, moved, or built in the browser)',
+      error: why ? `Couldn’t read the page: ${troubleClause(why)}` : 'Couldn’t read the page (blocked, moved, or built in the browser)',
       ...(opts.full ? { check: { what: reads.kind, from: null, result: 'unreadable', read: [], differences: [], queue: null } as const } : {}),
     }
   }
@@ -687,9 +700,20 @@ export async function runListingPageWatch(
   const contactUnread = !!contactReading && !watch.lastCheck?.contact
   // A mikvah's page read before its notes were (NOTES_READ_FROM).
   const notesUnread = reads.kind === 'hours' && reads.notes.length > 0 && !!watch.pageHash && !(watch.lastCheck && watch.lastCheck.at >= NOTES_READ_FROM)
-  // Else the first read sets the baseline; an unchanged page is left
-  // alone, and its listing's date with it.
-  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread) return { ok: true, filed: 0, pageHash }
+  // The listing as it is, beside the one the last read compared with: read
+  // again once the listing changes (an approval, an admin's edit) or was
+  // never compared, so whether the page agrees is always about the listing
+  // as it stands. While both stay as they were, a page that agreed still
+  // agrees, and dates the listing without the AI.
+  const listed = listedAs(listing, reads)
+  const listingMoved = !!watch.pageHash && watch.lastCheck?.listedAs !== listed
+  const stillAgrees = watch.lastCheck?.result === 'agrees' && !listingMoved
+  const dated = async (o: WatchOutcome, agrees: boolean): Promise<WatchOutcome> => {
+    if (o.ok && agrees) await confirmFromSource(watch.communityId, [listing.id], listing.name, new Date(opts.now ?? Date.now()).toISOString())
+    return o
+  }
+  // Else the first read sets the baseline; an unchanged page is left alone.
+  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread && !listingMoved) return dated({ ok: true, filed: 0, pageHash }, stillAgrees)
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A
@@ -704,7 +728,10 @@ export async function runListingPageWatch(
   const contact = contactReading ? await fileContact(watch, category, listing, contacts, contactReading, waitingNow, blocked, source.text, { now: opts.now, seen }) : null
   const merge = (o: WatchOutcome): WatchOutcome => withContact(o, contact, watch.lastCheck ?? null, reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }))
   // Read for its phone and email alone: the rest waits for the page to change.
-  if (!opts.full && !changed && !firstFound && !notesUnread) return merge({ ok: true, filed: 0, pageHash })
+  if (!opts.full && !changed && !firstFound && !notesUnread && !listingMoved) {
+    const o = merge({ ok: true, filed: 0, pageHash })
+    return dated(o, stillAgrees && o.check?.result === 'agrees')
+  }
   // Hours Google keeps on this listing are Google's to check, not the website's.
   const ownReads: PageReads = reads.kind === 'hours' ? { ...reads, keys: reads.keys.filter((k) => !(k === 'hours' && googleKeeps(listing, 'hours'))) } : reads
   if (ownReads.kind === 'hours' && !ownReads.keys.length && !ownReads.notes.length) return merge({ ok: true, filed: 0, pageHash })
@@ -714,11 +741,19 @@ export async function runListingPageWatch(
     if (!opts.full) return merge({ ok: true, filed: 0 })
     return merge({ ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source, { pictures: !!source.pictures?.length }), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } })
   }
+  // Read again only because the listing moved: the page said nothing new,
+  // so a standing difference is the listing being newer (a newsletter, an
+  // approval), never filed; it says whether the two still agree. Its own
+  // few reads a run, so it never takes a changed page's.
+  const compareOnly = !opts.full && !changed && !firstFound && !notesUnread
   if (budget && !opts.full) {
-    if (budget.aiReads <= 0) return merge({ ok: true, filed: 0 })
-    budget.aiReads--
+    const left = compareOnly ? (budget.compares ?? 0) : budget.aiReads
+    if (left <= 0) return merge({ ok: true, filed: 0 })
+    if (compareOnly) budget.compares = left - 1
+    else budget.aiReads--
   }
-  return merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash }))
+  const o = merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash, compareOnly }))
+  return dated(o.check ? { ...o, check: { ...o.check, listedAs: listed } } : o, o.check?.result === 'agrees')
 }
 
 /** The AI's read of a page that changed (or a check's), and what it files:
@@ -732,7 +767,7 @@ async function readAndFile(
   source: PageSource,
   waitingNow: readonly Filed[],
   blocked: boolean,
-  opts: { fetchImpl?: typeof fetch; apiKey: string; now?: number; full?: boolean; changed: boolean; pageHash: string },
+  opts: { fetchImpl?: typeof fetch; apiKey: string; now?: number; full?: boolean; changed: boolean; pageHash: string; compareOnly?: boolean },
 ): Promise<WatchOutcome> {
   const { apiKey, changed, pageHash } = opts
   const pending = waitingNow.length > 0
@@ -755,7 +790,7 @@ async function readAndFile(
   const { proposal } = reading
   const check = (queue: WatchCheck['queue']) =>
     pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread, parts: reading.parts })
-  if (!proposal) return { ok: true, filed: 0, pageHash, check: check(null) }
+  if (!proposal || opts.compareOnly) return { ok: true, filed: 0, pageHash, check: check(null) }
   // A shul's times: filed as the parts they change, each on its own.
   const [timesKey, sk] = proposal.keys
   const parts =

@@ -89,6 +89,11 @@ export type WatchCheck = {
    *  read saw instead of reading the list again on every visit (Oct 22).
    *  Kept off the watch as the store hands it out: getListReads. */
   listRead?: ListRead
+  /** A listing's page: the listing's own times or hours as they were when
+   *  it read (listedAs in listingPageRun.ts). While the page and the
+   *  listing both stay as they were, a page that agreed still agrees, and
+   *  the daily run dates the listing again without the AI (Oct 23). */
+  listedAs?: string
 }
 
 export type ListRead = { updated: string | null; entries: unknown[] }

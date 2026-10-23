@@ -48,7 +48,7 @@ describe('the usual weekday times, as one table', () => {
       ['Tue, Wed', '6:55 AM', '15 min before sunset'],
       ['Fri', '6:55 AM', '—'],
     ])
-    expect(t.otherSeason).toBe('In winter, Maariv 6:30 PM, Sun–Thu.')
+    expect(t.otherSeason).toBe('In winter, Sun–Thu: Maariv 6:30 PM instead of Mincha & Maariv 15 min before sunset.')
     expect(t.notes).toEqual([
       'Sun Shacharis: followed by bagels, lox, and Torah.',
       'Shacharis 8:30 AM also on public holidays.',
@@ -57,7 +57,7 @@ describe('the usual weekday times, as one table', () => {
     // In winter, the other way round.
     const w = weekdayTable(mekor, 'winter')!
     expect(w.columns).toEqual(['shacharis', 'maariv'])
-    expect(w.otherSeason).toBe('In summer, Mincha & Maariv 15 min before sunset, Sun–Thu.')
+    expect(w.otherSeason).toBe('In summer, Sun–Thu: Mincha & Maariv 15 min before sunset instead of Maariv 6:30 PM.')
   })
 
   // Oct 23: seasons follow the zman, not the clock change (seasonPairs.ts).
@@ -65,7 +65,7 @@ describe('the usual weekday times, as one table', () => {
     const oct23 = { sunsetIso: '2026-10-23T18:06:00-04:00' }
     const t = weekdayTable(mekor, 'summer', oct23)!
     expect(t.columns).toEqual(['shacharis', 'maariv'])
-    expect(t.otherSeason).toBe('In summer, Mincha & Maariv 15 min before sunset, Sun–Thu.')
+    expect(t.otherSeason).toBe('In summer, Sun–Thu: Mincha & Maariv 15 min before sunset instead of Maariv 6:30 PM.')
     // Saturday's winter Mincha has no pair: the clock change's season.
     expect(shabbosList(mekor, 'summer', oct23)!.otherSeason).toBe('In winter, also Mincha 12:20 PM, following Kiddush.')
   })
@@ -109,6 +109,21 @@ describe('the usual Shabbos times, in the order Shabbos happens', () => {
       ['afternoon', 'mincha_maariv', '30 min before sunset'],
     ])
     expect(s.otherSeason).toBe('In winter, also Mincha 12:20 PM, following Kiddush.')
+  })
+
+  // The user, Oct 23: "In summer, also Mincha 7 PM" under Sons of Israel's
+  // winter Friday didn't say which Mincha, and it isn't as well: it's
+  // instead of the winter one.
+  it('a summer/winter pair says which minyan, and that it’s instead of the other (Sons of Israel)', () => {
+    const sonsOfIsrael = [
+      m({ tefillah: 'mincha', days: ['fri'], anchor: 'candle_lighting', offsetMinutes: -5, time: '5 min before Candle Lighting', season: 'winter' }),
+      m({ tefillah: 'mincha', days: ['fri'], time: '7:00pm', season: 'summer' }),
+      m({ tefillah: 'mincha', days: ['sat'], time: '1:00pm', season: 'summer' }),
+    ]
+    const s = shabbosList(sonsOfIsrael, 'winter')!
+    expect(s.lines.map((l) => l.when)).toEqual(['5 min before candle lighting'])
+    expect(s.otherSeason).toBe('In summer, Friday: Mincha 7 PM instead of 5 min before candle lighting; also Mincha 1 PM.')
+    expect(shabbosList(sonsOfIsrael, 'summer')!.otherSeason).toBe('In winter, Friday: Mincha 5 min before candle lighting instead of 7 PM.')
   })
 
   it('Friday’s Shacharis stays with the weekdays; Motzei Shabbos is its own part', () => {

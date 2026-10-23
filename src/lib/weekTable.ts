@@ -1,6 +1,6 @@
 import { formatDays, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import type { Season } from './season'
-import { outOfSeason } from './seasonPairs'
+import { outOfSeason, seasonPartner } from './seasonPairs'
 import type { AnchorTimes } from './useZmanAnchors'
 import type { DayKey } from './hours'
 import { clockMinutes, clockText, noteText, partOf, PART_ORDER, timeText, type ShabbosPart } from './minyanText'
@@ -36,6 +36,13 @@ function joinTimes(times: number[]): string {
   return sorted.map(clockText).join(', ')
 }
 
+/** "instead of 5 min before candle lighting": the time a one-season minyan
+ *  takes the place of (seasonPartner), its tefillah named only where it
+ *  differs ("instead of Maariv 6:30 PM"). Not "also": the user, Oct 23. */
+function insteadOf(m: Minyan, pair: Minyan): string {
+  return `instead of ${pair.tefillah === m.tefillah ? '' : `${TEFILLAH_LABELS[pair.tefillah]} `}${timeText(pair)}`
+}
+
 /** "In winter, …": the other season's rows (outOfSeason, a summer/winter
  *  pair going by its zman), a sentence per season. */
 function otherSeasonLine<T>(rows: readonly T[], seasonOf: (r: T) => Season | undefined, say: (rs: T[]) => string): string | null {
@@ -66,7 +73,8 @@ export type WeekdayTable = {
    *  bagels, lox and Torah") and when it's also held ("Shacharis 6:45 AM
    *  also on Rosh Chodesh"). */
   notes: string[]
-  /** "In winter, Maariv 6:30 PM, Sun–Thu.": the other season's, briefly. */
+  /** "In winter, Sun–Thu: Maariv 6:30 PM instead of Mincha & Maariv 15 min
+   *  before sunset.": the other season's, briefly. */
   otherSeason: string | null
   /** The table's minyanim that only run when enough sign up, for the box
    *  under it that says where. */
@@ -133,10 +141,17 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null,
   }
 
   const offSeason = minyanim.filter((m) => out(m) && WEEKDAYS.some((d) => onWeekday(m, d)))
+  const weekdays = (m: Minyan) => formatDays(m.days.filter((d) => WEEKDAYS.includes(d as DayKey) && onWeekday(m, d as DayKey)) as MinyanDayKey[])
   const otherLine = otherSeasonLine(
     offSeason,
     (m) => m.season,
-    (ms) => ms.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}, ${formatDays(m.days.filter((d) => WEEKDAYS.includes(d as DayKey) && onWeekday(m, d as DayKey)) as MinyanDayKey[])}`).join('; '),
+    (ms) =>
+      ms
+        .map((m) => {
+          const pair = seasonPartner(m, minyanim)
+          return pair ? `${weekdays(m)}: ${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)} ${insteadOf(m, pair)}` : `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}, ${weekdays(m)}`
+        })
+        .join('; '),
   )
 
   return { columns, rows, rules, notes, otherSeason: otherLine, signUps: now.filter((m) => m.signUp), everySignUp: now.every((m) => m.signUp), joins: now.filter((m) => m.joinLink?.trim()) }
@@ -153,7 +168,9 @@ export type ShabbosLine = {
 }
 
 /** A shul's usual Shabbos, in the order it happens; null when it has none
- *  listed. `otherSeason`: "In winter, also Mincha 12:20 PM, after Kiddush." */
+ *  listed. `otherSeason`: "In winter, also Mincha 12:20 PM, after Kiddush.",
+ *  or for a pair, "In summer, Friday: Mincha 7 PM instead of 5 min before
+ *  candle lighting." */
 export function shabbosList(minyanim: readonly Minyan[], season: Season | null, anchors?: AnchorTimes): { lines: ShabbosLine[]; otherSeason: string | null } | null {
   const out = (m: Minyan) => outOfSeason(m, minyanim, season, anchors)
   const lineOf = (m: Minyan, day: 'fri' | 'sat'): ShabbosLine => ({ part: partOf(m, day), tefillah: m.tefillah, when: timeText(m), note: noteText(m.notes), row: m })
@@ -169,10 +186,22 @@ export function shabbosList(minyanim: readonly Minyan[], season: Season | null, 
   const lines = of((m) => !out(m)).sort(order)
   const offSeason = of(out).sort(order)
   if (lines.length === 0 && offSeason.length === 0) return null
+  // One that takes another's place says which, and on which day ("Friday:
+  // Mincha 7 PM instead of 5 min before candle lighting"); one held as well
+  // is "also".
+  const said = (l: ShabbosLine) => `${TEFILLAH_LABELS[l.tefillah]} ${l.when}${l.note ? `, ${l.note.charAt(0).toLowerCase()}${l.note.slice(1)}` : ''}`
+  const pairOf = (l: ShabbosLine) => {
+    const pair = seasonPartner(l.row, minyanim)
+    return pair && pair.days.includes(l.part === 'friday' ? 'fri' : 'sat') ? pair : null
+  }
   const otherLine = otherSeasonLine(
     offSeason,
     (l) => l.row.season,
-    (ls) => `also ${ls.map((l) => `${TEFILLAH_LABELS[l.tefillah]} ${l.when}${l.note ? `, ${l.note.charAt(0).toLowerCase()}${l.note.slice(1)}` : ''}`).join('; ')}`,
+    (ls) => {
+      const paired = ls.filter(pairOf).map((l) => `${l.part === 'friday' ? 'Friday' : 'Shabbos'}: ${said(l)} ${insteadOf(l.row, pairOf(l)!)}`)
+      const extra = ls.filter((l) => !pairOf(l))
+      return [...paired, ...(extra.length ? [`also ${extra.map(said).join('; ')}`] : [])].join('; ')
+    },
   )
   return { lines, otherSeason: otherLine }
 }
