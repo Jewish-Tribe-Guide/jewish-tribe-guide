@@ -163,8 +163,13 @@ describe('a shul’s times, for its boxes and its Edit (?job=times)', () => {
   })
 
   it('each shul comes with its listing’s times, so a box can mark them; the hours page has none', async () => {
+    // And its newsletter, one of its reads (the user, Oct 22); not a sender
+    // skipped as not a shul.
+    const news = w({ id: 'nl', resourceId: SOI, url: 'mailto:office@soi.example', createdBy: 'shul newsletters' })
+    m.listWatches.mockResolvedValue({ watches: [news, w({ id: 'skip', resourceId: SOI, url: 'mailto:x@soi.example', createdBy: 'shul newsletters: not a shul' })], available: true })
     const body = await (await GET(req('GET', undefined, '?job=times'))).json()
     expect(body.places[0].times).toEqual({ key: 'minyanim', minyanim, schedules: [week] })
+    expect(body.places[0].newsletters.map((x: Watch) => x.id)).toEqual(['nl'])
     m.hoursJobPlaces.mockResolvedValue({ categories: [MIKVAH], places: [makeListing({ id: LMC, category: 'mikvah', name: 'Lower Merion Community Mikvah' })] })
     expect((await (await GET(req('GET'))).json()).places[0]).not.toHaveProperty('times')
   })
@@ -262,13 +267,19 @@ describe('POST /api/admin/watches/hours', () => {
 
 
   // The user, Oct 21: "A way to have it check again", on every row.
-  it('check: its pages read straight away; with none, its website searched now and what it finds read', async () => {
+  it('check: its website searched now, what it finds added, and its pages read straight away', async () => {
     m.listWatches.mockResolvedValue({ watches: [w({ id: 'home' }), w({ id: 'mens', url: 'https://lmcmikvah.org/mens-mikvah/', lastCheck: check('differs') })], available: true })
+    // Its pages and one more its website links to (the Shtiebel's
+    // calendar, Oct 22): read today, not after the morning's search.
+    m.searchHoursPages.mockResolvedValueOnce({ found: [{ url: 'https://lmcmikvah.org/mens-mikvah/', link: 'Men' }, { url: 'https://lmcmikvah.org/keilim/', link: 'Keilim' }], unloaded: [] })
+    m.addWatch.mockImplementationOnce(async (_c: string, x: Partial<Watch>) => w({ id: 'keilim', lastRunAt: null, lastCheck: null, ...x }))
     const body = await (await POST(req('POST', { action: 'check', resourceId: LMC }))).json()
-    expect(m.runAndRecord.mock.calls.map(([x]) => x.id)).toEqual(['home', 'mens'])
+    expect(m.searchHoursPages).toHaveBeenCalledWith('http://lmcmikvah.org/', undefined, 'hours')
+    expect(m.addWatch).toHaveBeenCalledTimes(1)
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: 'https://lmcmikvah.org/keilim/', resourceId: LMC, createdBy: HOURS_FOUND_CREATOR }))
+    expect(m.runAndRecord.mock.calls.map(([x]) => x.id)).toEqual(['home', 'mens', 'keilim'])
     expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'home' }), undefined, undefined, { full: true })
-    expect(body.pages.map((p: { watch: Watch }) => p.watch.lastRunAt)).toEqual(['now', 'now'])
-    expect(m.searchHoursPages).not.toHaveBeenCalled()
+    expect(body.pages.map((p: { watch: Watch }) => p.watch.lastRunAt)).toEqual(['now', 'now', 'now'])
 
     // One page after another, never at once: else each files what the
     // next would have seen waiting (Sons of Israel's three findings).

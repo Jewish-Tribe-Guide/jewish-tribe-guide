@@ -13,6 +13,7 @@ import { hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib
 import { listingSlug } from '@/lib/listingSlug'
 import { listedContact } from '@/lib/contactRead'
 import { routes } from '@/lib/routes'
+import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
 import type { CategoryConfig } from '@/lib/categories'
@@ -35,8 +36,8 @@ import type { DirectoryResource } from '@/types'
 //      `?item=<id>`: one place's listing and category, for Edit (the
 //      listing's own box editor, BoxEditSheet).
 // POST body: { action: 'check', resourceId }
-//      "Check now", on every row: its pages read straight away; with none,
-//      its website searched now and what it finds added and read.
+//      "Read them now", on every row: its website searched now, what it
+//      finds added, and its pages read straight away.
 // POST body: { action: 'give', resourceId, url, replaces? }
 //      "Add a page": read from this page too, from now on, given by hand,
 //      so the morning's search never takes it away. A "No hours online"
@@ -65,6 +66,9 @@ const CHECK_LIMIT = { limit: 20, windowSec: 600 }
 function placeWatches(watches: readonly Watch[], id: string) {
   return {
     pages: watches.filter((w) => w.resourceId === id && isListingPageWatch(w)),
+    // A shul's newsletter, read as part of it (the user, Oct 22): a line in
+    // its Reads, not a watch of its own on the Watches tab.
+    newsletters: watches.filter((w) => w.resourceId === id && isNewsletterWatch(w) && !isIgnoredSender(w)),
     stopped: watches.filter((w) => w.resourceId === id && isStoppedPage(w)),
     marker: watches.find((w) => w.resourceId === id && isHoursOff(w)) ?? null,
   }
@@ -114,7 +118,7 @@ function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string |
 /** A place with no page: its website searched now (fetches only, no AI),
  *  what it finds added, as the morning's run would add them, and why it
  *  found none kept (recordSearch). Check now and Turn back on. */
-async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob): Promise<{ added: Watch[]; reason: string | null }> {
+async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob, has = 0): Promise<{ added: Watch[]; reason: string | null }> {
   const website = websiteOf(place)
   const got = website ? await searchHoursPages(website, undefined, job).catch(() => null) : null
   const added: Watch[] = []
@@ -123,7 +127,7 @@ async function searchFor(slug: string, place: DirectoryResource, watches: readon
     const w = await addWatch(slug, { kind: 'website', url: p.url, resourceId: place.id, label: foundPageLabel(place.name, p.link), createdBy: HOURS_FOUND_CREATOR })
     if (w) added.push(w)
   }
-  const reason = searchReason(website, got, added.length, job)
+  const reason = searchReason(website, got, has + added.length, job)
   await recordSearch(slug, place, job, reason, watches)
   return { added, reason }
 }
@@ -152,7 +156,7 @@ export async function GET(request: Request) {
     const { findings, decided } = await jobFindings(community.slug, job, categories)
 
     const rows = places.map((p) => {
-      const { pages, stopped, marker } = placeWatches(watches, p.id)
+      const { pages, stopped, marker, newsletters } = placeWatches(watches, p.id)
       const category = categories.find((c) => c.id === p.category)!
       const reason = marker ? null : pages.length ? reasonFor(pages, now, job) : searchedReason(watches, p, job)
       return {
@@ -162,6 +166,7 @@ export async function GET(request: Request) {
         website: websiteOf(p),
         pages: shown(pages),
         stopped: shown(stopped),
+        ...(job === 'times' ? { newsletters } : {}),
         off: !!marker,
         offSince: marker?.createdAt ?? null,
         reason,
@@ -276,11 +281,11 @@ export async function POST(request: Request) {
 
     if (action === 'check') {
       if (marker || (pages.length && !pages.some((w) => w.active))) return Response.json({ ok: false, errors: ['It’s turned off. Turn it back on to read it.'] }, { status: 400 })
-      if (!pages.length) {
-        const { added, reason } = await searchFor(slug, place, watches, job)
-        return reply(await read(added), stopped, { reason })
-      }
-      return reply(await read(pages.filter((w) => w.active)), stopped)
+      // Searched first, its pages or none, so a page its website links to
+      // is read today rather than after the morning's search (the user,
+      // Oct 22: the Shtiebel's calendar, Kol Tzedek's Weekly Services).
+      const { added, reason } = await searchFor(slug, place, watches, job, pages.length)
+      return reply(await read([...pages.filter((w) => w.active), ...added]), stopped, pages.length ? {} : { reason })
     }
 
     // On again.

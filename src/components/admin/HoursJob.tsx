@@ -54,6 +54,8 @@ export type HoursPlace = {
   findings?: Finding[]
   /** When its last finding was decided, and how. */
   decided?: Decided | null
+  /** A shul's newsletters, read as part of it (Shul times only). */
+  newsletters?: Watch[]
   fields: string[]
   /** Its phone and email as listed, less what Google keeps, for its
    *  Phone or Contact box (ContactBoxes.tsx). */
@@ -66,7 +68,7 @@ const listed = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -
 type Settled = ReadonlyMap<string, Decision>
 /** Its findings not decided yet, this visit included. */
 const waitingOf = (p: HoursPlace, settled: Settled) => (p.findings ?? []).filter((f) => !settled.has(f.id))
-const asPlace = (p: HoursPlace, settled: Settled) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: waitingOf(p, settled).length })
+const asPlace = (p: HoursPlace, settled: Settled) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: waitingOf(p, settled).length, decidedAt: p.decided?.at, newsletters: p.newsletters })
 /** Pages not read yet, read on their own when the page loads, at most. */
 export const READ_ON_LOAD = 5
 

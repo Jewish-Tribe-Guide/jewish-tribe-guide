@@ -234,6 +234,16 @@ describe('WatchesManager', () => {
     expect(screen.queryByRole('region', { name: 'Shul’s times' })).toBeNull()
   })
 
+  // The user, Oct 22: a shul's newsletter is one of its reads on Shul
+  // times, not a watch apart; a sender not tied to a shul yet stays here.
+  it('a shul’s newsletter is on Shul times, counted read there, and not listed below', async () => {
+    const news = watch({ id: 'nl', resourceId: 'shul-1', url: 'mailto:office@lms.org', createdBy: 'shul newsletters', pageChangedAt: ago(1) })
+    const sender = watch({ id: 'n', url: 'mailto:info@other.org', label: 'info@other.org', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
+    await renderTab([news, sender], { times: [{ id: 'shul-1', pages: [], newsletters: [news], off: false }] })
+    expect(jobRow('times')).toHaveTextContent('1checked0to check0can’t be read')
+    expect(names(screen.getByRole('region', { name: 'Shul’s times' }))).toEqual(['info@other.org'])
+  })
+
   it('a job whose counts didn’t load still opens', async () => {
     await renderTab([])
     const [dishes] = screen.getAllByTestId('job-row')

@@ -260,27 +260,34 @@ export type HoursSection = 'to_check' | 'waiting' | 'checked' | 'cant_read' | 'o
  *  some, which the morning's run will watch and read. `waiting`: how many
  *  of its findings wait on the job page (watchFindings.ts); given, a page
  *  that differs only because of one already decided (Update or Skip) is
- *  settled, not to check. */
-export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number }
+ *  settled, not to check. `decidedAt`: when its last finding was decided.
+ *  `newsletters`: a shul's, read as part of it (the user, Oct 22). */
+export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number; decidedAt?: string | null; newsletters?: readonly Watch[] }
 
 const loads = (w: Watch, now: number) => {
   const state = watchHealth(w, now).state
   return state !== 'failing' && state !== 'stale'
 }
 
+/** A newsletter of its that has come and been read, and hasn't gone quiet:
+ *  a shul read only from its newsletter (BZBI, whose website turns the
+ *  reader away) is read, not can't be read. */
+export const newsletterReads = (w: Watch, now: number) => w.active && !!w.pageChangedAt && loads(w, now)
+
 export function hoursSection(p: HoursPlace, now: number): HoursSection {
   if (p.off) return 'off'
   // A finding to compare, whatever its pages say this morning.
   if (p.waiting) return 'to_check'
+  const read = (p.newsletters ?? []).some((w) => newsletterReads(w, now))
   const live = p.pages.filter((w) => w.active)
-  if (!live.length) return p.pages.length ? 'off' : p.found ? 'waiting' : 'cant_read'
+  if (!live.length) return read ? 'checked' : p.pages.length ? 'off' : p.found ? 'waiting' : 'cant_read'
   const ok = live.filter((w) => loads(w, now))
-  if (!ok.length) return 'cant_read'
+  if (!ok.length) return read ? 'checked' : 'cant_read'
   const results = ok.map((w) => (w.lastRunAt && w.lastCheck ? w.lastCheck.result : null))
-  const open = ok.some((w) => w.lastRunAt && w.lastCheck && (w.lastCheck.result === 'differs' || w.lastCheck.result === 'unsure') && !settles(w.lastCheck, p.waiting))
+  const open = ok.some((w) => w.lastRunAt && w.lastCheck && (w.lastCheck.result === 'differs' || w.lastCheck.result === 'unsure') && !settles(w.lastCheck, p.waiting, p.decidedAt))
   if (open) return 'to_check'
   if (results.some((r) => r === null)) return 'waiting'
-  if (results.every((r) => r === 'nothing' || r === 'unreadable')) return 'cant_read'
+  if (results.every((r) => r === 'nothing' || r === 'unreadable')) return read ? 'checked' : 'cant_read'
   return 'checked'
 }
 

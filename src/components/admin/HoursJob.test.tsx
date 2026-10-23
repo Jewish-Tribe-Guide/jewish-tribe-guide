@@ -509,6 +509,27 @@ describe('Shul times', () => {
     expect(pill(KESHER.name)).toBe('Same')
   })
 
+  // The user, Oct 22: a shul's newsletter is one of its reads, not a watch
+  // apart. BZBI's website turns the reader away; its newsletter is read.
+  it('a shul read from its newsletter: Same, and the newsletter a line in its Reads', async () => {
+    const BZBI = place({
+      id: 'bz',
+      name: 'Temple Beth Zion-Beth Israel',
+      fields: ['Davening Times'],
+      website: 'https://bzbi.example/',
+      reason: 'Its website wouldn’t open: it turned the reader away (403).',
+      times: { key: 'minyanim', minyanim: listing, schedules: [] },
+      newsletters: [watch({ id: 'nl', url: 'mailto:communications@bzbi.example', createdBy: 'shul newsletters', lastCheck: null, pageChangedAt: ago(30) })],
+    } as Partial<ShulPlace>)
+    await times$([BZBI])
+    await tab('Checked')
+    expect(pill(BZBI.name)).toBe('Same')
+    await open(BZBI.name)
+    expect(boxes(BZBI.name)).toEqual(['Reads | 1 page · newsletter | true'])
+    const lines = within(shul(BZBI.name)).getAllByTestId('job-source').map((l) => l.textContent)
+    expect(lines).toEqual([`communications@bzbi.exampleNewsletterread ${day(ago(30))}`, expect.stringMatching(/^bzbi\.example/)])
+  })
+
   it('a quiet day says so', async () => {
     await times$([KESHER])
     expect(screen.getByTestId('job-counts')).toHaveTextContent('No shul’s website has an update.')

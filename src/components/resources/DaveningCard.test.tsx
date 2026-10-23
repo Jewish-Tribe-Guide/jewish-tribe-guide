@@ -435,6 +435,21 @@ describe('this week’s one-day additions (Oct 20)', () => {
     expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 1TodayShacharis8:10 AMFri Oct 2Shacharis8:10 AM')
   })
 
+  // Oct 22: BZBI's week was only its newsletter's "Sat Oct 24", and the box
+  // had no line under it: who confirmed it, Edit.
+  it('a week of only dated services ends with the line every box has, Edit opening them', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T10:00:00-04:00'))
+    const onEditBox = vi.fn()
+    const schedules = [day('2026-10-08', 'Thu Oct 8')]
+    const shul = makeListing({ id: 'k', name: 'BZBI', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules, confirmedAt: '2026-10-05T18:00:00.000Z', confirmedFrom: { from: 'BZBI', at: '2026-10-05T18:00:00.000Z' } })
+    renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} onEditBox={onEditBox} />, { content: { categories: [shuls] } })
+    const box = screen.getByTestId('davening-this-week')
+    expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed by BZBI, Oct 5/)
+    fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', '2026-10-08')
+  })
+
   it('keeps an occasion’s name beside its date', () => {
     show('2026-10-06T10:00:00-04:00', [day('2026-10-08', 'Thanksgiving')])
     expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thanksgiving, Thu Oct 8Shacharis8:10 AM')

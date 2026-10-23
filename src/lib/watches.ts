@@ -105,9 +105,13 @@ export function withoutListRead(c: WatchCheck | null): WatchCheck | null {
 
 /** A check whose differences were filed, now or before, so they're a
  *  finding (watchFindings.ts): settled once none of the place's findings
- *  waits, since the admin updated the listing or skipped it. `waiting`
- *  unknown, nothing is settled. */
-export const settles = (c: WatchCheck, waiting: number | undefined) => waiting === 0 && c.result === 'differs' && (c.queue === 'filed' || c.queue === 'before')
+ *  waits, since the admin updated the listing or skipped it. One that
+ *  waited behind a suggestion already in the queue is settled too once a
+ *  finding was decided after it (`decidedAt`), since that was the one it
+ *  waited behind (Sons of Israel's home page, Oct 22: "In the queue" with
+ *  nothing to open). `waiting` unknown, nothing is settled. */
+export const settles = (c: WatchCheck, waiting: number | undefined, decidedAt?: string | null) =>
+  waiting === 0 && c.result === 'differs' && (c.queue === 'filed' || c.queue === 'before' || (c.queue === 'waiting' && !!decidedAt && decidedAt >= c.at))
 
 /** A check as a runner makes it; the run dates it. */
 export type CheckFound = Omit<WatchCheck, 'at'>

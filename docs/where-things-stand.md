@@ -420,12 +420,31 @@ agreed:
    - A calendar's lines carry an event's end ("8:10 AM–8:40 AM"), so the
      reader can note it (Rodeph Shalom's Thursday minyan, the user, Oct
      22). Every calendar's lines change, so each is read once more.
-   - A Zoom link: **built Oct 22** on `redesign/minyan-join-link` (see
-     "Done Oct 22: a minyan's join link" below).
+   - A Zoom link from a calendar: **built Oct 22**, PR #346 (see "Done
+     Oct 22: a minyan's join link" below). Not from a newsletter: the
+     Apps Script sends the email's plain text, which has no links
+     (Society Hill's "Click here to Zoom", BZBI's weekday minyan).
+   - This week's schedule made only of dated services (BZBI's newsletter
+     "Sat Oct 24") had no line under it; it has the confirmed line and
+     Edit now (the user, Oct 22).
    - Kol Tzedek's Friday night is on its Weekly Services page
      (kol-tzedek.org/shabbat.html, "All Friday services begin at
-     6:30pm"), which isn't one of its watched pages; its calendar has no
-     Friday on Oct 23. **For the user:** add that page on the Watches tab.
+     6:30pm"), which isn't one of its watched pages yet. Nothing to add
+     by hand: the morning's search follows the links on a shul's Google
+     website, like Main dishes, and finds it (and calendar.html, and
+     the Shtiebel's /calendar; checked Oct 22, fetch only). It went live
+     Oct 22, so its first morning is Oct 23. "Read them now" searches
+     first too now, a shul with pages or without (the user, Oct 22).
+     BZBI's and Chabad of the Main Line's websites turn the reader away
+     (403), so only BZBI's newsletter is read.
+   - A shul's newsletter is one of its reads (the user, Oct 22): a line in
+     its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
+     a shul read from one is Checked, not Can't be read. Off the Watches
+     tab's list once linked; a sender not tied to a shul yet stays there.
+   - A page whose read waited behind a suggestion already in the queue
+     kept "In the queue" after that suggestion was decided, with nothing
+     to open (Sons of Israel's home page, Oct 22). It settles once a
+     finding is decided after the read (`settles`, watches.ts).
 4. Mikvah hours. **Built Oct 22** (compared with its drawing on dev,
    computer and phone; Lower Merion's update stubbed in the browser, Moishe
    Zvi's two from a real read on dev):

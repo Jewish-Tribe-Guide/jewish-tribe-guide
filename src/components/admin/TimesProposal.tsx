@@ -8,7 +8,7 @@ import { boxPill, groupedRows, scheduleProposal, usualProposal, type ProposalRow
 import { TIMES_PARTS, TIMES_PART_LABELS, isDatedLine, partsFromRead, type PartGiven, type TimesPart } from '@/lib/timesParts'
 import { minyanWriting } from '@/lib/minyanText'
 import { watchHealth, type Watch } from '@/lib/watches'
-import { samePage } from '@/lib/hoursJob'
+import { newsletterReads, samePage } from '@/lib/hoursJob'
 import { updatesPill } from '@/lib/dishProposal'
 import type { Finding, FindingTimes } from '@/lib/watchFindings'
 import type { CategoryConfig } from '@/lib/categories'
@@ -87,6 +87,10 @@ const today = () => day(new Date().toISOString())
 /** A box decided this visit: "Used Oct 21", "Kept Oct 21", a week's
  *  "Skipped Oct 21". */
 const doneText = (d: Decision, part?: TimesPart) => `${d === 'approved' ? 'Used' : part === 'week' ? 'Skipped' : 'Kept'} ${today()}`
+
+/** Reads' pill when a newsletter is one of them: "1 page · newsletter". */
+const readsPill = (pages: number, newsletters: number) =>
+  newsletters ? [pages ? `${pages} page${pages === 1 ? '' : 's'}` : '', newsletters === 1 ? 'newsletter' : `${newsletters} newsletters`].filter(Boolean).join(' · ') : undefined
 
 /** Its row's pill. */
 export function shulPill(p: HoursPlace, status: JobStatus, reading: boolean, settled: Settled): { text: string; tone: Tone } {
@@ -322,6 +326,17 @@ export function ShulRow({
     })
     .sort((a, b) => a.rank - b.rank)
     .map(({ page }) => page)
+  // Its newsletter, read as each one comes in: a line of its own, as a
+  // page is (the user, Oct 22), not a watch apart on the Watches tab.
+  for (const w of p.newsletters ?? [])
+    pages.push({
+      key: w.id,
+      url: null,
+      name: w.url.replace(/^mailto:/, ''),
+      label: 'Newsletter',
+      right: off ? '' : !w.active ? 'paused' : !loads(w, now) ? `none since ${day(w.pageChangedAt ?? w.createdAt)}` : w.pageChangedAt ? `read ${day(w.pageChangedAt)}` : 'no email yet',
+      none: !newsletterReads(w, now),
+    })
   if (!p.pages.length && p.website) pages.push({ key: 'website', url: p.website, label: '', right: cantRead(p.reason).short, none: true })
   const unsure = status === 'unsure' ? live.flatMap((w) => readOf(w)?.read ?? []) : []
 
@@ -379,7 +394,7 @@ export function ShulRow({
         busy={busy}
         onSwitch={(on) => onAct({ action: on ? 'on' : 'off' })}
         pages={pages}
-        pill={off ? 'Off' : undefined}
+        pill={off ? 'Off' : readsPill(pages.length - (p.newsletters?.length ?? 0), p.newsletters?.length ?? 0)}
         defaultOpen={boxes === 0}
         below={
           <>

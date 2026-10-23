@@ -317,16 +317,20 @@ export default function DaveningCard({
   // confirmed it and when, Edit at its end, opening its own times. The
   // approval that put it up dated the listing, so that date, unless the
   // week was posted later than any confirmation (an older row).
-  const postConfirmedAt = post && (!item.confirmedAt || (post.postedAt && post.postedAt > item.confirmedAt) ? post.postedAt : item.confirmedAt)
+  // A week of only dated services (a newsletter's "Shabbat Oct 24"), no
+  // week posted: the first of them, or the box had no line at all (BZBI,
+  // the user, Oct 22).
+  const footPost = post ?? thisWeek.days[0]?.minyanim[0]?.from
+  const postConfirmedAt = footPost && (!item.confirmedAt || (footPost.postedAt && footPost.postedAt > item.confirmedAt) ? footPost.postedAt : item.confirmedAt)
   const postFoot =
-    post &&
+    footPost &&
     (onEditBox ? (
       <FreshnessFooter
         resourceId={item.id}
         source={item.confirmedFrom}
         by={item.confirmedBy}
         confirmedAt={postConfirmedAt}
-        onEdit={() => onEditBox('this_week', 'This week’s schedule', post.id)}
+        onEdit={() => onEditBox('this_week', 'This week’s schedule', footPost.id)}
       />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
