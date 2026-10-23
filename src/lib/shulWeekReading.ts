@@ -3,7 +3,8 @@ import type { DirectoryResource } from '@/types'
 import { fetchDatesInfo } from './dateZmanim'
 import { leaveOutHeldElsewhere } from './heldElsewhere'
 import { readRegular, type ScheduleSource } from './scheduleReader'
-import { compareTimes, type RegularReading } from './scheduleUpdate'
+import { compareTimes, weekdayOf, type RegularReading } from './scheduleUpdate'
+import { editWeek, type EditWeek } from './thisWeekEdit'
 import { regularMinyanim } from './schedules'
 import { currentSeason } from './season'
 
@@ -48,7 +49,10 @@ export async function readShulWeek(
   const raw = await readRegular(source, days, listing.name, { apiKey })
   const { times, left } = await leaveOutHeldElsewhere(raw.times, { shulId: listing.id, key: minyanimKey, zmanim: ahead.zmanim, others })
   const read = { ...raw, times }
-  const reading = week ? asCalendarWeek(read, week) : read
+  // "This week", given by weekday: the guide's week, Sunday to Shabbos,
+  // the next once Shabbos is over, as Edit listing's (thisWeekEdit.ts).
+  const shabbosOver = first === today && weekdayOf(today) === 'sat' && localMinutes(now) >= (ahead.zmanim[today]?.havdalah ?? Infinity)
+  const reading = week ? asCalendarWeek(read, week) : weekdaysOnGuideWeek(read, editWeek(first, shabbosOver))
   const compare = (r: RegularReading) => compareTimes(regularMinyanim(listing[minyanimKey]), r, { season: currentSeason(now, community.timezone), zmanim: ahead.zmanim })
   const update = compare(reading)
   // A website page's: its usual times, then each week it gives dates for,
@@ -82,6 +86,37 @@ export function datedAsWeeks(reading: RegularReading): { usual: RegularReading |
     return { kind: 'week', complete: false, season: null, title: occasions.size === 1 ? occasion : null, startsOn: null, from: times[0].date!, to: shabbos, times }
   })
   return { usual: undated.length ? { ...reading, times: undated } : null, weeks }
+}
+
+// Minutes past midnight in the community's timezone.
+function localMinutes(ms: number): number {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: community.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms)).split(':').map(Number)
+  return h * 60 + m
+}
+
+// "Oct 24", "October 24th", "10/24", "the 24th": the message names a date.
+const NAMES_A_DATE = /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}\/\d{1,2}\b|\b\d{1,2}(?:st|nd|rd|th)\b/i
+
+/** A week given by weekday ("this week's schedule: Sunday 9:00 AM…"), on
+ *  the guide's week, Sunday to Shabbos (the user, Oct 23: BZBI's, pasted on
+ *  a Friday, was dated Fri Oct 23 – Thu Oct 29 one read and Sun Oct 25 –
+ *  Sat Oct 31 the next, the AI choosing). Each time keeps its weekday. A
+ *  message that names its dates is left as read: a newsletter's "Shabbos
+ *  Oct 24, weekdays Oct 25–29" really does run past Shabbos. */
+export function weekdaysOnGuideWeek(reading: RegularReading, week: EditWeek): RegularReading {
+  if (reading.kind !== 'week' || reading.times.some((t) => NAMES_A_DATE.test(t.quote))) return reading
+  const days = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(`${week.from}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10))
+  const onWeek = (date: string) => days.find((d) => weekdayOf(d) === weekdayOf(date))!
+  const seen = new Set<string>()
+  const times = reading.times.flatMap((t) => {
+    if (!t.date) return [t]
+    const date = onWeek(t.date)
+    const key = JSON.stringify([date, t.tefillah, t.time, t.anchor ?? null, t.offsetMinutes ?? null])
+    if (seen.has(key)) return []
+    seen.add(key)
+    return [{ ...t, date }]
+  })
+  return { ...reading, from: week.from, to: week.to, times }
 }
 
 /** A calendar's week as the reader read it, held to what a calendar is:
