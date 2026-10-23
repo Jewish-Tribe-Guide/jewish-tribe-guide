@@ -3,6 +3,7 @@ import { CLOSURE_LABELS, getOpenStatus, hoursNextOpening } from './hours'
 import { travelParts } from './listingTravel'
 import type { DirectoryResource, ZmanimData } from '@/types'
 import { parseTimeToMinutes } from './davening'
+import { confirmedAnywhere, timesConfirmedAt } from './boxDates'
 import type { ShulRowStatus } from './upcomingDavening'
 
 /** A restaurant's dishes, not a store's items: the noun itemWording reads
@@ -228,7 +229,9 @@ export function listingRowNote(
   // are unconfirmed until a person confirms them, whatever Google synced.
   const minyanKeys = fields.filter((f) => f.type === 'minyanim').map((f) => f.key)
   const hasTimes = minyanKeys.some((k) => Array.isArray(item[k]) && (item[k] as unknown[]).length > 0)
-  if (hasTimes && !item.confirmedAt) return { text: 'Times not confirmed by anyone yet', tone: 'quiet', kind: 'exception' }
+  // The times' own date (the user, Oct 23: a date is the date of what it's
+  // beside), not another box's.
+  if (hasTimes && !timesConfirmedAt(item)) return { text: 'Times not confirmed by anyone yet', tone: 'quiet', kind: 'exception' }
   if (!hasTimes && opts.flagUnconfirmed && now && !isVouchedFor(item, now)) return { text: 'Not confirmed by anyone yet', tone: 'quiet', kind: 'exception' }
   // The shul's own words about the minyan the row names: "Zoom", "call to
   // confirm". An exception: it changes whether to go.
@@ -262,12 +265,13 @@ export function candlesToday(zmanim: ZmanimData | null | undefined, now: Date | 
   return null
 }
 
-/** Whether anyone stands behind a listing now: a person confirmed it, or
- *  Google refreshed it in the last two weeks. The nightly sync touches every
+/** Whether anyone stands behind a listing now: someone confirmed something
+ *  on it (a person, or a check that read it), or Google refreshed it in the
+ *  last two weeks. The nightly sync touches every
  *  place Google still knows, so a fortnight without one means Google has
  *  lost it. */
 export function isVouchedFor(item: DirectoryResource, now: Date): boolean {
-  if (item.confirmedAt) return true
+  if (confirmedAnywhere(item)) return true
   const synced = item.googleSyncedAt ? Date.parse(item.googleSyncedAt) : NaN
   return Number.isFinite(synced) && now.getTime() - synced < 14 * 24 * 60 * 60 * 1000
 }

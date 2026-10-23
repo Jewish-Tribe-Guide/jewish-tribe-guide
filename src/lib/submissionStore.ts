@@ -958,6 +958,9 @@ async function withItemDates(
   // show.
   delete next.sectionConfirmed
   if (existing?.sectionConfirmed !== undefined) next.sectionConfirmed = existing.sectionConfirmed
+  // And which check gave each its date (sourceConfirm.ts): the check's.
+  delete next.sectionFrom
+  if (existing?.sectionFrom !== undefined) next.sectionFrom = existing.sectionFrom
   if (keys.length === 0) {
     if (existing?.itemSeen !== undefined) next.itemSeen = existing.itemSeen
     if (existing?.itemGone !== undefined) next.itemGone = existing.itemGone

@@ -15,6 +15,7 @@ import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { askGoogleIfOpen } from '@/lib/keystoneRun'
 import { confirmFromSource } from '@/lib/sourceConfirm'
+import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
 import {
   MEKOR_NAME,
@@ -224,7 +225,8 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   }
 
   await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community, 'kosher')).catch((err) => console.error('[watch-mekor] digest failed:', err))
-  const confirmed = await confirmFromSource(community, agree, MEKOR_NAME)
+  // What a kosher list says is the certification: that's what it dates.
+  const confirmed = await confirmFromSource(community, agree, MEKOR_NAME, [KOSHER_SECTION])
 
   return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }

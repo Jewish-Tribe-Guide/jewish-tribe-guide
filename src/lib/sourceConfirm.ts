@@ -3,37 +3,51 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { TAGS } from '@/lib/cacheTags'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// A watch that read its source today and found a listing just as the guide
-// has it moves the listing's date forward: "Confirmed by Keystone-K, Oct 19".
-// Before, only an approved suggestion dated a listing, so agreement, the
-// usual case, left no trace: the watches ran every day and the dates sat at
-// the day of the last approval (the user, Oct 19). Server-only.
+// A watch that read its source today and found a place just as the guide
+// has it moves the date of what it read forward: "Confirmed by Keystone-K,
+// Oct 19". Before, only an approved suggestion dated a listing, so
+// agreement, the usual case, left no trace: the watches ran every day and
+// the dates sat at the day of the last approval (the user, Oct 19).
 //
-// The same fields an approval from a named source writes (withConfirmedNow in
-// submissionStore.ts), so the date line reads the same either way.
+// Only the boxes it read (the user, Oct 23: "We're dating what we're
+// checking. We're not dating a whole listing"): a shul's website its
+// times, Refuah a hospital's boxes, a kosher list the certification. Each
+// box's own date (sectionConfirmed, as a visitor's Yes on it) with who gave
+// it (sectionFrom), read by boxDates.ts. Server-only.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const HOUR = 3_600_000
 
-/** The listing's details dated by `named` at `now`, or null when there's
- *  nothing to move: already dated by it in the last half day (a second run,
- *  "Check now"), or dated later than now. */
-export function datedBySource(details: Record<string, unknown>, named: string, now: string): Record<string, unknown> | null {
-  const at = typeof details.confirmedAt === 'string' ? Date.parse(details.confirmedAt) : NaN
-  const since = Date.parse(now) - at
-  if (since < 0) return null
-  const from = (details.confirmedFrom as { from?: unknown } | undefined)?.from
-  if (from === named && since < 12 * HOUR) return null
-  const next: Record<string, unknown> = { ...details, confirmedAt: now, confirmedFrom: { from: named, at: now } }
-  delete next.confirmedBy
-  return next
+/** The listing's details with each of `boxes` dated by `named` at `now`,
+ *  or null when there's nothing to move: each already dated by it in the
+ *  last half day (a second run, "Check now"), or dated later than now. */
+export function datedBySource(details: Record<string, unknown>, named: string, boxes: readonly string[], now: string): Record<string, unknown> | null {
+  const dates = { ...((details.sectionConfirmed as Record<string, string> | undefined) ?? {}) }
+  const from = { ...((details.sectionFrom as Record<string, { from?: unknown; at?: unknown }> | undefined) ?? {}) }
+  let moved = false
+  for (const key of new Set(boxes)) {
+    const since = Date.parse(now) - Date.parse(dates[key] ?? '')
+    if (since < 0) continue
+    if (from[key]?.from === named && from[key]?.at === dates[key] && since < 12 * HOUR) continue
+    dates[key] = now
+    from[key] = { from: named, at: now }
+    moved = true
+  }
+  return moved ? { ...details, sectionConfirmed: dates, sectionFrom: from } : null
 }
 
-/** Dates each of these live listings by `named` (datedBySource), and says
- *  how many it dated. Each is written only if its date hasn't moved since
- *  it was read: an approval or a visitor's Yes landing in between keeps
- *  theirs, and the next day's run dates it. */
-export async function confirmFromSource(community: string, ids: readonly string[], named: string, now = new Date().toISOString()): Promise<number> {
+/** Dates what each of these live listings had read (`boxes`, for each
+ *  listing's details) by `named` (datedBySource), and says how many it
+ *  dated. Each is written only if its boxes' dates haven't moved since
+ *  they were read: a visitor's Yes landing in between keeps theirs, and the
+ *  next day's run dates it. */
+export async function confirmFromSource(
+  community: string,
+  ids: readonly string[],
+  named: string,
+  boxes: readonly string[] | ((details: Record<string, unknown>) => readonly string[]),
+  now = new Date().toISOString(),
+): Promise<number> {
   const wanted = [...new Set(ids)]
   if (wanted.length === 0) return 0
   const supabase = getAdminClient()
@@ -45,11 +59,13 @@ export async function confirmFromSource(community: string, ids: readonly string[
   let dated = 0
   for (const row of (data ?? []) as { id: string; details: Record<string, unknown> | null }[]) {
     const details = row.details ?? {}
-    const next = datedBySource(details, named, now)
+    const keys = typeof boxes === 'function' ? boxes(details) : boxes
+    const next = datedBySource(details, named, keys, now)
     if (!next) continue
-    const update = supabase.from('resource').update({ details: next }).eq('id', row.id)
-    const unchanged = typeof details.confirmedAt === 'string' ? update.eq('details->>confirmedAt', details.confirmedAt) : update.is('details->>confirmedAt', null)
-    const { data: done, error: writeError } = await unchanged.select('id')
+    const was = (details.sectionConfirmed as Record<string, string> | undefined) ?? {}
+    let update = supabase.from('resource').update({ details: next }).eq('id', row.id)
+    for (const key of new Set(keys)) update = typeof was[key] === 'string' ? update.eq(`details->sectionConfirmed->>${key}`, was[key]) : update.is(`details->sectionConfirmed->>${key}`, null)
+    const { data: done, error: writeError } = await update.select('id')
     if (writeError) console.error(`[source-confirm] couldn’t date ${row.id} by ${named}:`, writeError.message)
     else dated += (done ?? []).length
   }

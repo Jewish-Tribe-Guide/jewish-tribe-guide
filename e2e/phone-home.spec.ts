@@ -70,8 +70,9 @@ test.describe('on a phone', () => {
     await band.click()
     const sheet = page.getByRole('dialog', { name: 'How this guide stays right' })
     await expect(sheet).toBeVisible()
-    // "if and when" until every place has a date (the test project's own).
-    await expect(sheet).toContainText(/Every listing says (where and when it was last|if and when it was) checked/)
+    // One title now, dated or not (Oct 23): each box carries its own date.
+    await expect(sheet).toContainText('Every listing says when it was last checked')
+    await expect(sheet).toContainText('Something wrong? Open the place and tap Edit listing.')
     await expect(sheet).toContainText('A person reviews every change before it shows')
     await expect(sheet.getByRole('link', { name: 'About the guide' })).toHaveAttribute('href', `/${community}/about`)
     await page.keyboard.press('Escape')

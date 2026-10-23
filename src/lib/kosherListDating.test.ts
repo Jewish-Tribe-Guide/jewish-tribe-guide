@@ -60,7 +60,7 @@ describe('Keystone-K’s run', () => {
     const entries = parseKeystoneList(html)
     const expected = keystoneAgrees(entries, m.resources as WatchedListing[], compareKeystone(entries, m.resources as WatchedListing[]))
     expect(expected).toEqual(['grill'])
-    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['grill'], 'Keystone-K')
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['grill'], 'Keystone-K', ['kosher'])
   })
 
   it('a dry run dates nothing', async () => {
@@ -82,6 +82,6 @@ describe('Mekor Habracha’s run', () => {
     const { entries } = parseMekorList(html)
     const expected = mekorAgrees(entries, guide, compareMekor(entries, guide, []))
     expect(expected.length).toBeGreaterThan(0)
-    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', expected, 'Mekor Habracha')
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', expected, 'Mekor Habracha', ['kosher'])
   })
 })

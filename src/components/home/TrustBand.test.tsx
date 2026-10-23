@@ -4,41 +4,37 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
-import TrustBand, { clearListsRead } from './TrustBand'
+import TrustBand from './TrustBand'
+import type { CheckKind, TrustFacts } from '@/lib/phoneHome'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
 // Who keeps the guide right, at the top of the phone home (the user, Oct 17),
 // and the sheet it opens, in front of the About page: the idea in three
-// lines, each source named only once it has run this week.
+// lines, each check named only once it has run this week (Oct 23: all of
+// them, and no source by name).
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
-let lists: { label: string | null; okAt: string | null }[] = []
 let eruvChecked: (string | null)[] = []
-const fetchMock = vi.fn(async (url: string) =>
+const fetchMock = vi.fn(async () =>
   new Response(
-    JSON.stringify(
-      String(url).startsWith('/api/sources')
-        ? { ok: true, lists }
-        : { ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: eruvChecked.map((at, i) => ({ id: `e${i}`, name: `E${i}`, statusUrl: 'https://example.org/', statusCheckedAt: at })) },
-    ),
+    JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: eruvChecked.map((at, i) => ({ id: `e${i}`, name: `E${i}`, statusUrl: 'https://example.org/', statusCheckedAt: at })) }),
   ),
 )
 
 beforeEach(() => {
   clearEruvStatuses()
-  clearListsRead()
   vi.stubGlobal('fetch', fetchMock)
 })
 afterEach(() => {
-  lists = []
   eruvChecked = []
   cleanup()
   vi.unstubAllGlobals()
   fetchMock.mockClear()
 })
 
-const show = (facts: { places: number; googleChecked: number; checkedThisWeek: number | null; dated: number }) =>
-  renderWithProviders(<TrustBand facts={facts} region="Philadelphia" communitySlug="philly" />)
+const EVERY: CheckKind[] = ['times', 'mikvah', 'kosher', 'menus', 'hospitals']
+const show = (facts: Omit<TrustFacts, 'checked'> & { checked?: CheckKind[] }) =>
+  renderWithProviders(<TrustBand facts={{ checked: [], ...facts }} region="Philadelphia" communitySlug="philly" />)
 
 const rows = async () => {
   const sheet = screen.getByRole('dialog', { name: 'How this guide stays right' })
@@ -49,9 +45,10 @@ const rows = async () => {
 }
 
 describe('the trust line', () => {
-  it('says who keeps it, how many places, and that Google checks the hours', () => {
+  // The user, Oct 23: Google checks more than hours, and not every night.
+  it('says who keeps it, how many places, and that they’re checked with Google', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
-    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · hours checked with Google every night')
+    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · checked with Google')
     // Nothing fetched while the home itself is loading.
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -60,53 +57,45 @@ describe('the trust line', () => {
   // it says was only asked for on the tap. It's asked for once the home has
   // loaded, so the sheet opens whole.
   it('opened once the home has loaded, the sheet is whole at once: no loading bar', async () => {
-    lists = [{ label: 'Keystone-K’s list', okAt: hoursAgo(6) }]
     eruvChecked = [hoursAgo(1)]
     const user = userEvent.setup()
-    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 })
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132, checked: ['kosher'] })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 4000 })
     await new Promise((r) => setTimeout(r, 0))
     await user.click(screen.getByTestId('trust-band'))
     const sheet = screen.getByTestId('trust-sheet')
     expect(sheet.querySelector('.animate-pulse')).toBeNull()
-    expect(sheet).toHaveTextContent('Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site.')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(sheet).toHaveTextContent('Kosher certifications and eruv status.')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('opens the idea in three lines: the sources it read this week, people for the rest, every listing dated', async () => {
-    lists = [{ label: 'Keystone-K’s list', okAt: hoursAgo(6) }]
+  // The user, Oct 23, word for word.
+  it('opens the idea in three lines: everything checked this week, people for the rest, every listing dated', async () => {
     eruvChecked = [hoursAgo(1), null]
     const user = userEvent.setup()
-    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132, checked: EVERY })
     await user.click(screen.getByTestId('trust-band'))
     expect(await rows()).toEqual([
-      'Where there’s a source, we check itHours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, hours every week.',
-      'People in Philadelphia fill in the restMinyan times, kosher items, mikvah hours. A person reviews every change before it shows.',
-      // 23 places say "Not confirmed by anyone yet": the "if".
-      'Every listing says if and when it was checkedSomething wrong? Open the place and tap Edit listing.',
+      'We check it every dayMinyan times, mikvah hours, kosher certifications, menus, hospitals and eruv status. Places on Google Maps are checked against Google.',
+      'People fill in the restNew places, kosher items at grocery stores, and Shabbos-friendly hotels. A person reviews every change before it shows.',
+      'Every listing says when it was last checkedSomething wrong? Open the place and tap Edit listing.',
     ])
     expect(screen.getByRole('link', { name: 'About the guide' })).toHaveAttribute('href', '/philly/about')
   })
 
-  // The user, Oct 17: once every place has a date, the band says so, and
-  // the sheet drops its "if".
-  it('every place dated: the band says “every listing dated”, the sheet “where and when it was last checked”', async () => {
-    const user = userEvent.setup()
+  it('every place dated: the band says “every listing dated”', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 155 })
     expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · every listing dated')
-    await user.click(screen.getByTestId('trust-band'))
-    expect((await rows()).at(-1)).toBe('Every listing says where and when it was last checkedSomething wrong? Open the place and tap Edit listing.')
   })
 
-  // As on the live site today: a Keystone K watch set up and never run,
-  // and no eruv status read yet. Only Google is named.
-  it('a check that’s set up but hasn’t run claims nothing', async () => {
-    lists = [{ label: 'Keystone-K’s list', okAt: null }]
+  // A check that's set up but hasn't dated anything this week, and no eruv
+  // status read yet. Only Google is named.
+  it('a check that hasn’t run this week claims nothing', async () => {
     eruvChecked = [null]
     const user = userEvent.setup()
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     await user.click(screen.getByTestId('trust-band'))
-    expect((await rows())[0]).toBe('Where there’s a source, we check itHours from Google. Read again every week.')
+    expect((await rows())[0]).toBe('We check it every dayPlaces on Google Maps are checked against Google.')
   })
 
   // A community that doesn't sync with Google and reads nothing else.

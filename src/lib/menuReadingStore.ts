@@ -1,4 +1,6 @@
+import { revalidateTag } from 'next/cache'
 import { getAdminClient } from './supabase/admin'
+import { TAGS } from './cacheTags'
 import type { MenuDish } from './menuReader'
 import { MENU_LINK_KEY } from './menuLink'
 
@@ -252,5 +254,57 @@ export async function setMenuDishes(
   const details = withMenuDishes((data as { details: Record<string, unknown> | null }).details ?? {}, fieldKey, lists, dated)
   const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
   if (saveError) throw new Error(`Failed to save the dishes: ${saveError.message}`)
+  return true
+}
+
+// ── A menu read that agrees dates its dishes (the user, Oct 23) ─────────────
+// "Everything should date what they check." The menu watch reads a place's
+// menu every day; a read that finds the dishes the listing has dates each
+// of them "seen" today (itemMenu, as an approval from the menu does), and a
+// menu that hasn't changed since still names every dish it named, so
+// those dates move too (menuWatchRun.ts). A dish added by hand that the
+// menu never named keeps its own date.
+
+/** The details with the listing's dishes among `names` (any case) dated on
+ *  the menu at `at`. Null when nothing moves. Pure, for its tests. */
+export function withMenuChecked(details: Record<string, unknown>, fieldKey: string, names: readonly string[], at: string): Record<string, unknown> | null {
+  const all = details.itemMenu && typeof details.itemMenu === 'object' ? { ...(details.itemMenu as Record<string, Record<string, string>>) } : {}
+  const named = new Set(names.map((n) => n.trim().toLowerCase()))
+  let moved = false
+  for (const key of [fieldKey, `${fieldKey}_sometimes`]) {
+    const listed = Array.isArray(details[key]) ? (details[key] as unknown[]).filter((n): n is string => typeof n === 'string') : []
+    const had = all[key] ?? {}
+    const next: Record<string, string> = { ...had }
+    for (const name of listed) {
+      if (!named.has(name.trim().toLowerCase())) continue
+      if (next[name] !== at) moved = true
+      next[name] = at
+    }
+    if (Object.keys(next).length) all[key] = next
+  }
+  return moved ? { ...details, itemMenu: all } : null
+}
+
+/** Dates a live listing's dishes from its menu (withMenuChecked). Read,
+ *  then written whole, as setMenuDishes. True when it wrote. */
+export async function dateMenuDishes(community: string, resourceId: string, fieldKey: string, names: readonly string[], at = new Date().toISOString()): Promise<boolean> {
+  if (names.length === 0) return false
+  const supabase = getAdminClient()
+  const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
+  if (error || !data) return false
+  const details = withMenuChecked((data as { details: Record<string, unknown> | null }).details ?? {}, fieldKey, names, at)
+  if (!details) return false
+  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
+  if (saveError) {
+    console.error(`[menu-watch] couldn’t date ${resourceId}’s dishes:`, saveError.message)
+    return false
+  }
+  // As sourceConfirm.ts: outside Next there's no cache, and the date is
+  // written by then.
+  try {
+    revalidateTag(TAGS.resources(community), 'max')
+  } catch (e) {
+    console.error(`[menu-watch] dated ${resourceId}’s dishes, but couldn’t refresh the cached listings:`, (e as Error).message)
+  }
   return true
 }

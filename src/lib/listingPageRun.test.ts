@@ -163,7 +163,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     const out = await runListingPageWatch({ ...watch, pageHash: await hashOfPage(), lastCheck: lastRead(shul, shulCategory) }, undefined, { apiKey: 'k', now: NOW })
     expect(out).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
     expect(m.readShulWeek).not.toHaveBeenCalled()
-    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], 'Lower Merion Synagogue', '2026-10-20T11:00:00.000Z')
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], 'Lower Merion Synagogue', ['weekday', 'shabbos', 'week'], '2026-10-20T11:00:00.000Z')
   })
 
   // The listing changed since (an approval, a newsletter): whether the page
@@ -231,7 +231,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       check: { what: 'times', from: 'page', result: 'agrees', read: ['Mincha Sun 6:15 PM'], differences: [], queue: null, parts: [{ part: 'weekday', size: 1 }], listedAs: lastRead(shul, shulCategory).listedAs },
     })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
-    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], 'Lower Merion Synagogue', '2026-10-20T11:00:00.000Z')
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], 'Lower Merion Synagogue', ['weekday', 'shabbos', 'week'], '2026-10-20T11:00:00.000Z')
     expect(m.writes).toEqual([])
   })
 
@@ -629,11 +629,12 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     })
   })
 
-  it('files nothing, and dates the listing, when the hours agree', async () => {
+  // Hours in no section are the contact box’s (pageReadBoxes).
+  it('files nothing, and dates the hours’ box, when the hours agree', async () => {
     m.readMessage.mockResolvedValue(reading('19:00'))
     expect(await runListingPageWatch({ ...changed, resourceId: 'mk1' }, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
-    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['mk1'], 'Mikvah Ohel Leah', '2026-10-20T11:00:00.000Z')
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['mk1'], 'Mikvah Ohel Leah', ['contact'], '2026-10-20T11:00:00.000Z')
     expect(m.writes).toEqual([])
   })
 })

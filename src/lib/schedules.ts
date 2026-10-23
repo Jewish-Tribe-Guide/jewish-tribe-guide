@@ -498,7 +498,7 @@ export function shabbosIsOver(today: string, nowMs: number, havdalahIso: string 
 export function thisWeeksDays(
   schedules: readonly SpecialSchedule[],
   date: string,
-  { shabbosOver = false }: { shabbosOver?: boolean } = {},
+  { shabbosOver = false, regular = [] }: { shabbosOver?: boolean; regular?: readonly Minyan[] } = {},
 ): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null } {
   // Friday, the week ends with Shabbos, its last; once Shabbos is over
   // (shabbosIsOver), it's the week ahead, Sunday to Shabbos (the user, Oct
@@ -516,9 +516,15 @@ export function thisWeeksDays(
     const own = post ? post.minyanim.filter((m) => m.on.includes(date) || m.on.includes(weekday)).map((minyan) => ({ minyan, from: post })) : []
     if (own.length) used.add(post!)
     const extras = schedules.filter((s) => isOneDayAddition(s) && s.from === date)
+    // A time the day has already isn't added: the week's, or, where the
+    // week gives none that day, the usual one (resolveDay's rule). BZBI's
+    // newsletter gave "Sat Oct 24, 9:30 AM" before it had a usual Shabbos
+    // time; once it had one, the box showed the usual time as this week's
+    // (the user, Oct 23).
+    const held = [...own.map((o) => o.minyan), ...(own.length || post?.whole ? [] : regular.filter((m) => !m.season && m.days.includes(weekday)))]
     const added = extras.flatMap((s) =>
       s.minyanim
-        .filter((m) => !own.some((o) => o.minyan.tefillah === m.tefillah && sameClock(o.minyan.time, m.time)))
+        .filter((m) => !held.some((o) => o.tefillah === m.tefillah && sameClock(o.time, m.time)))
         .map((minyan) => ({ minyan, from: s })),
     )
     const minyanim = [...own, ...added].sort(

@@ -329,6 +329,20 @@ describe('a shul’s weekly schedule', () => {
     expect(dates('2026-10-25')).toEqual(['2026-10-29']) // the Sunday after
     expect(thisWeeksDays(all, '2026-10-20').posts).toEqual([])
   })
+  // Oct 23: BZBI's newsletter gave "Sat Oct 24, 9:30 AM" before the shul
+  // had a usual Shabbos time; once it had one, This week's schedule showed
+  // the usual 9:30 as this week's.
+  it('a one-day time that’s just the usual one isn’t this week’s, unless the week replaces the usual times that day', () => {
+    const regular: Minyan[] = [{ id: 'u', tefillah: 'shacharis', days: ['sat'], time: '9:30AM' }]
+    const bzbi: SpecialSchedule = { id: 'a', name: 'Sat Oct 24', from: '2026-10-24', to: '2026-10-24', mode: 'add', minyanim: [{ id: 'm', tefillah: 'shacharis', on: ['2026-10-24'], time: '9:30 AM' }] }
+    expect(thisWeeksDays([bzbi], '2026-10-23', { regular }).days).toEqual([])
+    // Another time that day is still this week's.
+    const later = { ...bzbi, minyanim: [...bzbi.minyanim, { id: 'k', tefillah: 'mincha' as const, on: ['2026-10-24'], time: '5:30 PM' }] }
+    expect(thisWeeksDays([later], '2026-10-23', { regular }).days[0].minyanim.map((m) => m.minyan.id)).toEqual(['k'])
+    // A week that replaces Shabbos with other times: the usual 9:30 is an addition then.
+    const week: SpecialSchedule = { id: 'w', name: 'Shabbos', kind: 'week', from: '2026-10-23', to: '2026-10-24', mode: 'replace', minyanim: [{ id: 'x', tefillah: 'shacharis', on: ['2026-10-24'], time: '10:00 AM' }] }
+    expect(thisWeeksDays([week, bzbi], '2026-10-23', { regular }).days[0].minyanim.map((m) => m.minyan.id)).toEqual(['m', 'x'])
+  })
   // Oct 20: "There's only one schedule for a given week", and the
   // newsletter wins on a day the website also gives.
   it('this week’s schedule is one list: the newsletter’s day over the website’s, additions beside, a repeated time once', () => {

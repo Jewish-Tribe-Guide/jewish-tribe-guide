@@ -298,7 +298,9 @@ describe('this week’s schedule (Oct 6)', () => {
   it('ends with the line every box has: who confirmed it, and Edit opening its own times', () => {
     const onEditBox = vi.fn()
     const bereishis = weekPost('Shabbos Bereishis', '2026-10-09', '2026-10-10', { postedAt: '2026-10-07T15:00:00.000Z' })
-    show([...before, bereishis], { onEditBox, confirmedAt: '2026-10-07T18:00:00.000Z', confirmedFrom: { from: 'Mekor Habracha', at: '2026-10-07T18:00:00.000Z' } })
+    // The shul's website gave the week's times, and they agree (Oct 23:
+    // that dates this box, sourceConfirm.ts).
+    show([...before, bereishis], { onEditBox, sectionConfirmed: { week: '2026-10-07T18:00:00.000Z' }, sectionFrom: { week: { from: 'Mekor Habracha', at: '2026-10-07T18:00:00.000Z' } } })
     const box = screen.getByTestId('davening-this-week')
     expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed by Mekor Habracha, Oct 7/)
     expect(box).not.toHaveTextContent('Posted')
@@ -472,7 +474,7 @@ describe('this week’s one-day additions (Oct 20)', () => {
     vi.setSystemTime(new Date('2026-10-06T10:00:00-04:00'))
     const onEditBox = vi.fn()
     const schedules = [day('2026-10-08', 'Thu Oct 8')]
-    const shul = makeListing({ id: 'k', name: 'BZBI', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules, confirmedAt: '2026-10-05T18:00:00.000Z', confirmedFrom: { from: 'BZBI', at: '2026-10-05T18:00:00.000Z' } })
+    const shul = makeListing({ id: 'k', name: 'BZBI', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules, sectionConfirmed: { week: '2026-10-05T18:00:00.000Z' }, sectionFrom: { week: { from: 'BZBI', at: '2026-10-05T18:00:00.000Z' } } })
     renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} onEditBox={onEditBox} />, { content: { categories: [shuls] } })
     const box = screen.getByTestId('davening-this-week')
     expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed by BZBI, Oct 5/)
@@ -527,7 +529,7 @@ describe('one week, from the newsletter and the website (Oct 20)', () => {
   const show = (schedules: unknown[], onEditBox?: () => void) => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-06T10:00:00-04:00')) // Tue Oct 6
-    const confirmed = { confirmedAt: '2026-10-05T18:00:00.000Z', confirmedFrom: { from: 'Mekor Habracha', at: '2026-10-05T18:00:00.000Z' } }
+    const confirmed = { sectionConfirmed: { week: '2026-10-05T18:00:00.000Z' }, sectionFrom: { week: { from: 'Mekor Habracha', at: '2026-10-05T18:00:00.000Z' } } }
     const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules, ...confirmed })
     renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} onEditBox={onEditBox} />, { content: { categories: [shuls] } })
   }

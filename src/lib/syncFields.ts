@@ -54,6 +54,9 @@ export const SYNC_INTERNAL_FIELDS = [
   // When each of a mikvah's sections was last confirmed (confirm_section,
   // migration 071): a visitor's tap, never a submitter's or a moderator's.
   'sectionConfirmed',
+  // Which check gave a box its date (sourceConfirm.ts, Oct 23): a watch's,
+  // never a submitter's.
+  'sectionFrom',
   // Which outside source dated the listing (Keystone-K's list, Refuah), set
   // on approval from the submission's server-set source. Never a
   // submitter's: an edit can't say it came from the agency.

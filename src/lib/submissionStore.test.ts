@@ -1818,6 +1818,20 @@ describe('approveSubmission: activity log and grocery item dates', () => {
     expect(lastCallArg(resource.update).details.sectionConfirmed).toBeUndefined()
   })
 
+  // Oct 23: which check gave a box its date is the check's, kept across an
+  // approval, and never a submitter's to say.
+  it('keeps which check dated each box, and never takes one from a submission', async () => {
+    const theirs = { kosher: { from: 'Keystone-K', at: '2026-10-23T11:00:00.000Z' } }
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ details: { sectionFrom: { kosher: { from: 'Made up', at: '2099-01-01T00:00:00.000Z' } } } }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, { id: 'res-1', details: { sectionFrom: theirs } })
+    await approveSubmission('sub-1')
+    expect(lastCallArg(resource.update).details.sectionFrom).toEqual(theirs)
+  })
+
   it('logs nothing when the approval itself fails to save', async () => {
     const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
     mockFlow(sub)

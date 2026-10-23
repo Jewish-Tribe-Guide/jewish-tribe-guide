@@ -57,6 +57,7 @@ import {
   MAX_PAGE_TEXT,
   NOTES_READ_FROM,
   pageCheck,
+  pageReadBoxes,
   pageReadsFor,
   sameNoteAsListed,
   suggestionKey,
@@ -781,7 +782,11 @@ export async function runListingPageWatch(
   const listingMoved = !!watch.pageHash && watch.lastCheck?.listedAs !== listed
   const stillAgrees = watch.lastCheck?.result === 'agrees' && !listingMoved
   const dated = async (o: WatchOutcome, agrees: boolean): Promise<WatchOutcome> => {
-    if (o.ok && agrees) await confirmFromSource(watch.communityId, [listing.id], listing.name, new Date(opts.now ?? Date.now()).toISOString())
+    // What it read, and only that (pageReadBoxes): its phone and email too
+    // when the page gives them and they agree.
+    const contactAgrees = !!contactReading && Object.keys(contactReading.changes).length === 0
+    const boxes = pageReadBoxes(category, listing as unknown as Record<string, unknown>, reads, contactAgrees)
+    if (o.ok && agrees) await confirmFromSource(watch.communityId, [listing.id], listing.name, boxes, new Date(opts.now ?? Date.now()).toISOString())
     return o
   }
   // Else the first read sets the baseline; an unchanged page is left alone.

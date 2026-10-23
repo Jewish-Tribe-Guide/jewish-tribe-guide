@@ -21,6 +21,7 @@ import {
   LISTING_PAGE_WATCH_NAME,
   listingPageNote,
   listingPageSource,
+  pageReadBoxes,
   pageReadsFor,
   suggestionKey,
 } from './listingPageWatch'
@@ -42,6 +43,36 @@ describe('isListingPageWatch', () => {
     expect(isListingPageWatch({ createdBy: 'hours off' })).toBe(false)
     expect(isListingPageWatch({ createdBy: 'admin@example.org' })).toBe(false)
     expect(isListingPageWatch({ createdBy: 'menu links' })).toBe(false)
+  })
+})
+
+// The user, Oct 23: "We're dating what we're checking." A page that agrees
+// dates the boxes it read, and no others.
+describe('pageReadBoxes', () => {
+  const sections = makeCategory({
+    id: 'mikvah',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'women', label: 'Women', type: 'boolean' },
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'women' },
+      { key: 'women_notes', label: 'Notes', type: 'textarea', audienceKey: 'women' },
+      { key: 'keilim', label: 'Keilim', type: 'boolean' },
+      { key: 'keilim_hours', label: 'Keilim Hours', type: 'hours', audienceKey: 'keilim' },
+    ],
+  })
+
+  it('a shul’s page: its usual weekday and Shabbos times, and this week’s', () => {
+    expect(pageReadBoxes(shul, {}, { kind: 'times', key: 'minyanim' }, false)).toEqual(['weekday', 'shabbos', 'week'])
+  })
+
+  it('a mikvah’s page: the section of each hours and notes it read, not one it didn’t', () => {
+    expect(pageReadBoxes(sections, {}, { kind: 'hours', keys: ['women_s_hours'], notes: ['women_notes'] }, false)).toEqual(['women'])
+  })
+
+  it('plain hours are the contact box’s, unless Google keeps them; the phone and email too when they agree', () => {
+    expect(pageReadBoxes(sections, {}, { kind: 'hours', keys: ['hours'], notes: [] }, false)).toEqual(['contact'])
+    expect(pageReadBoxes(sections, { placeId: 'p', googleFields: ['hours'] }, { kind: 'hours', keys: ['hours'], notes: [] }, false)).toEqual([])
+    expect(pageReadBoxes(shul, {}, { kind: 'times', key: 'minyanim' }, true)).toEqual(['weekday', 'shabbos', 'week', 'contact'])
   })
 })
 

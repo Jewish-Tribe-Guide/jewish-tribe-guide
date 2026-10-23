@@ -7,12 +7,13 @@ import MobileSheet from '@/components/resources/MobileSheet'
 import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { routes } from '@/lib/routes'
-import { everyListingDated, sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
+import { sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
 import { fetchEruvStatuses, useEruvStatuses } from '@/lib/useEruvStatuses'
+import { useNow } from '@/lib/useNow'
 
 // ── Who keeps the guide right (the user, Oct 17) ────────────────────────────
 // The top of the phone home, where the headline and mission were: a promise
-// with its evidence ("155 places · hours checked with Google every night").
+// with its evidence ("155 places · checked with Google").
 // Tapped, a short sheet says how the guide stays right, in front of the
 // About page, which stays for "what is this".
 //
@@ -34,12 +35,10 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
   const [open, setOpen] = useState(false)
   // What the sheet names, asked for once the home has loaded rather than on
   // the tap, so the sheet opens whole instead of with a loading bar each
-  // time (the user, Oct 20). Both are small and cached by the CDN.
+  // time (the user, Oct 20). Small, and cached by the CDN. The rest it
+  // names is read off the places the home already has (trustFacts).
   useEffect(() => {
-    const read = () => {
-      fetchListsRead(communitySlug)
-      fetchEruvStatuses(communitySlug)
-    }
+    const read = () => fetchEruvStatuses(communitySlug)
     if (typeof requestIdleCallback === 'function') {
       const id = requestIdleCallback(read, { timeout: 3000 })
       return () => cancelIdleCallback(id)
@@ -71,48 +70,16 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
   )
 }
 
-type ListRead = { label: string | null; okAt: string | null }
-let listsRead: Promise<ListRead[]> | null = null
-// What arrived, and when: read at once by a sheet opened after it did.
-let listsArrived: { lists: ListRead[]; at: number } | null = null
-
-/** The outside lists the guide reads (/api/sources), once per page load;
- *  nothing when it can't be had, so the sheet just doesn't name them. */
-function fetchListsRead(communitySlug: string): Promise<ListRead[]> {
-  listsRead ??= fetch(`/api/sources?community=${encodeURIComponent(communitySlug)}`)
-    .then((r) => r.json())
-    .then((b) => (b?.ok && Array.isArray(b.lists) ? (b.lists as ListRead[]) : []))
-    .catch(() => [])
-  listsRead.then((lists) => {
-    listsArrived = { lists, at: Date.now() }
-  })
-  return listsRead
-}
-
-/** For tests. */
-export function clearListsRead(): void {
-  listsRead = null
-  listsArrived = null
-}
-
 // The site's own bottom sheet, as Filters and Edit are (it was a sheet of
 // its own until Oct 17, and looked it). Three short lines (the user,
-// Oct 17: people want the idea, not each source): where there's a source,
-// the guide reads it; people fill in the rest, reviewed; every listing is
-// dated. Each source named only once it has run this week.
+// Oct 17: people want the idea, not each source; Oct 23: everything we
+// check, no source named): what the guide checks every day, and only
+// what it checked this week; people fill in the rest, reviewed; every
+// listing is dated.
 function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boolean; facts: TrustFacts; region: string; communitySlug: string; onClose: () => void }) {
-  const [lists, setLists] = useState<{ lists: ListRead[]; at: number } | null>(null)
   const eruv = useEruvStatuses(communitySlug, open)
-  useEffect(() => {
-    if (!open) return
-    let live = true
-    fetchListsRead(communitySlug).then((l) => live && setLists({ lists: l, at: Date.now() }))
-    return () => {
-      live = false
-    }
-  }, [open, communitySlug])
-  const have = lists ?? (open ? listsArrived : null)
-  const read = have && eruv ? sourcesRead(facts, have.lists, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], have.at) : null
+  const now = useNow()
+  const read = eruv && now !== null ? sourcesRead(facts, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], now) : null
   const sentence = read ? sourcesSentence(read) : null
   return (
     <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">
@@ -121,19 +88,17 @@ function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boo
           <li aria-hidden="true" className="h-14 animate-pulse rounded-xl bg-slate-100" />
         ) : (
           sentence && (
-            <Row icon={<ShieldCheck className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" title="Where there’s a source, we check it">
+            <Row icon={<ShieldCheck className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" title="We check it every day">
               {sentence}
             </Row>
           )
         )}
-        <Row icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={sentence ? `People in ${region} fill in the rest` : `People in ${region} keep it up`}>
-          {sentence ? 'Minyan times, kosher items, mikvah hours.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
+        <Row icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={sentence ? 'People fill in the rest' : `People in ${region} keep it up`}>
+          {sentence ? 'New places, kosher items at grocery stores, and Shabbos-friendly hotels.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
         </Row>
-        {/* "when" only once every place has a date: until then some say
-            "Not confirmed by anyone yet", which is the "if". "Where" since
-            Oct 17: a date an outside source gave names it ("From
-            Keystone-K's list, Oct 12"), and "Confirmed" is a person. */}
-        <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title={everyListingDated(facts) ? 'Every listing says where and when it was last checked' : 'Every listing says if and when it was checked'}>
+        {/* Each listing dates what was checked, box by box (boxDates.ts);
+            one nobody has checked yet says so, which is its "when". */}
+        <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title="Every listing says when it was last checked">
           Something wrong? Open the place and tap <strong className="font-bold text-ink">{EDIT_LISTING_LABEL}</strong>.
         </Row>
       </ul>

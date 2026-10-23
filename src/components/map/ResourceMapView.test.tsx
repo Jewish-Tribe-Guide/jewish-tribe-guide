@@ -862,6 +862,23 @@ describe('ResourceMapView — arriving on the pins', () => {
     )
     expect(screen.getByRole('button', { name: 'Long-press Other Grocery' })).toBeInTheDocument()
   })
+
+  // The user, Oct 23: with a place saved, the map opened with every
+  // category lit and All not, since Saved (off) counted toward All.
+  it('with a place saved, opens on All, Saved not lit', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'g1', categoryId: 'grocery' }]))
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })], [grocery])
+    expect(screen.getAllByRole('button', { name: 'All' })[0]).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('button', { name: /^Saved/ })[0]).toHaveAttribute('aria-pressed', 'false')
+    // Saved alone, then All: everything, Saved off again, and the address
+    // doesn't say Saved (opened again, it showed only the saved places).
+    fireEvent.click(screen.getAllByRole('button', { name: /^Saved/ })[0])
+    expect(screen.getAllByRole('button', { name: 'All' })[0]).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getAllByRole('button', { name: 'All' })[0])
+    expect(screen.getAllByRole('button', { name: 'All' })[0]).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('button', { name: /^Saved/ })[0]).toHaveAttribute('aria-pressed', 'false')
+  })
 })
 
 describe('ResourceMapView — campaign chip', () => {

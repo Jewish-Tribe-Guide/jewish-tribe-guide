@@ -4,6 +4,7 @@ import { resolveCapabilities, type CategoryField } from './categories'
 import {
   audienceGroups,
   audienceStatus,
+  boxKeysHolding,
   compactWeek,
   confirmedByFor,
   confirmPlace,
@@ -440,5 +441,28 @@ describe('confirmedByFor', () => {
     expect(confirmedByFor(item, 'weekday')).toEqual(by)
     expect(confirmedByFor(item)).toEqual(by)
     expect(confirmedByFor(makeListing({ confirmedAt: approved }), 'contact')).toBeUndefined()
+  })
+})
+
+// Oct 23: Refuah dates the boxes it read, each under the key the box is
+// dated by (its first list of contacts with anything in it).
+describe('boxKeysHolding', () => {
+  const hospital = makeCategory({
+    id: 'hospital',
+    detailFields: [
+      { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
+      { key: 'pantry', label: 'Pantry', type: 'contacts' },
+      { key: 'packages', label: 'Packages', type: 'contacts' },
+      { key: 'transportation', label: 'Rides', type: 'contacts' },
+    ],
+    listingParts: { boxes: [{ title: 'Kosher food', fields: ['pantry', 'packages'] }, { title: 'Who to call', fields: ['liaisons'] }] },
+  })
+  const c = [{ name: 'x', phones: ['+1 215-555-0100'] }]
+  const item = makeListing({ category: 'hospital', liaisons: c, pantry: c, packages: c, transportation: c })
+
+  it('the key of each box holding a field it read, and no other box', () => {
+    expect(boxKeysHolding(item, hospital, ['packages'])).toEqual(['pantry'])
+    expect(boxKeysHolding(item, hospital, ['liaisons', 'transportation'])).toEqual(['liaisons', 'transportation'])
+    expect(boxKeysHolding(item, hospital, [])).toEqual([])
   })
 })

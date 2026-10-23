@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('./supabase/admin', () => ({ getAdminClient: () => ({}) }))
-const { isNoMenu, splitDishes, storedDishes, withMenuDishes } = await import('./menuReadingStore')
+const { isNoMenu, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
 
 // The listing's dishes a menu doesn't name (the user, Oct 21) are kept
 // among a reading's dishes, so they need no migration.
@@ -65,5 +65,29 @@ describe('withMenuDishes', () => {
   it('leaves no empty "not always" list behind', () => {
     const out = withMenuDishes(details, 'dishes', { always: ['Sliders'], sometimes: [] }, { names: ['Sliders'], at: AT, menuUrl: null })
     expect('dishes_sometimes' in out).toBe(false)
+  })
+})
+
+// The user, Oct 23: a menu read that agrees dates the dishes it named.
+describe('withMenuChecked', () => {
+  const AT = '2026-10-23T11:00:00.000Z'
+  const details = { dishes: ['Sliders', 'Kugel'], dishes_sometimes: ['Soup'], itemMenu: { dishes: { Sliders: '2026-10-01T00:00:00.000Z' } }, itemSeen: { dishes: { Kugel: '2026-10-02T00:00:00.000Z' } } }
+
+  it('dates each listed dish it names, in either list, any case', () => {
+    expect(withMenuChecked(details, 'dishes', ['sliders', 'SOUP', 'Latkes'], AT)).toEqual({
+      ...details,
+      itemMenu: { dishes: { Sliders: AT }, dishes_sometimes: { Soup: AT } },
+    })
+  })
+
+  it('leaves a dish it doesn’t name, and its other dates, alone', () => {
+    const out = withMenuChecked(details, 'dishes', ['Sliders'], AT)!
+    expect(out.itemSeen).toEqual(details.itemSeen)
+    expect((out.itemMenu as Record<string, Record<string, string>>).dishes.Kugel).toBeUndefined()
+  })
+
+  it('null when nothing moves', () => {
+    expect(withMenuChecked(details, 'dishes', ['Latkes'], AT)).toBeNull()
+    expect(withMenuChecked({ ...details, itemMenu: { dishes: { Sliders: AT } } }, 'dishes', ['Sliders'], AT)).toBeNull()
   })
 })
