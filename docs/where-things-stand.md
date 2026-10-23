@@ -50,40 +50,12 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
-1a. **Watches on shuls' and mikvahs' own pages** (built Oct 19, see Done).
-   None is on the live site. Dry run against live (reads only, Oct 19,
-   `scripts/listing-pages-dry-run.mts`), what each would file the first
-   time its page changes:
-   - Mekor Habracha, mekorhabracha.org/davening: nothing differs.
-   - B'nai Abraham Chabad, phillyshul.com/minyans: nothing differs.
-   - Society Hill Synagogue, societyhillsynagogue.org/minyan: nothing.
-   - Kol Tzedek, kol-tzedek.org/shabbat.html: "New: kabbalas shabbos ·
-     Fri · 6:30pm" (the page: Friday services at 6:30pm, twice a month;
-     the listing has no Friday time).
-   - Temple Beth Zion-Beth Israel, bzbi.org/worship: "New: shacharis ·
-     Shabbos · 9:30 AM" (the listing has no times); waits while its
-     current queue suggestion is there.
-   - Mikvah Mei Shalva (philamikvah.org/appointments), LMC Mikvah
-     (lmcmikvah.org/appointments-and-membership), Ohel Leah
-     (mikvahohelleah.org/make-an-appointment), Moishe Zvi
-     (mikvahwestphilly.com): nothing differs.
-   - Can't be read (blocked to servers): Lower Merion Synagogue, Sons of
-     Israel (406), Chabad of the Main Line (403). Not worth a watch.
-   Adding the nine readable ones is Admin → Watches → Add a watch →
-   "Shul’s times" (or "Hours" for a mikvah), pick the place, give the
-   page. Needs the user's yes.
-   Two more with calendars (dry run Oct 20, read a week at a time, would
-   file if the page changed today): Rodeph Shalom's
-   rodephshalom.org/calendar, "Times for Oct 18 – Oct 24: new, shacharis ·
-   Thu Oct 22 · 8:10 AM" (its online morning minyan; its Friday and
-   Shabbos times match, and go on as this week's schedule too). Leyv
-   Ha-Ir's calendar page has nothing this week, so files nothing; dry run
-   as of Thu Oct 22, next week's "kabbalas shabbos · Fri Oct 30 · 7:30 PM"
-   goes on by itself (an events-only week, below). Leyv Ha-Ir has a watch
-   on dev; Rodeph Shalom has none on dev or live.
-   Two calendars the reader doesn't find yet: thelittleshul.org/calendar
-   and mikvehisrael.org/calendar-B4BK6 (their pages' words are read
-   instead).
+1a. **Watches on shuls' and mikvahs' own pages** are on the live site
+   (checked Oct 23): Mekor, B'nai Abraham, Society Hill, Kol Tzedek,
+   Rodeph Shalom, Leyv Ha-Ir, the Little Shul, Mikveh Israel, Sons of
+   Israel, Lower Merion, Chabad of the Main Line, South Philadelphia
+   Shtiebel and the mikvahs, among others.
+
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
