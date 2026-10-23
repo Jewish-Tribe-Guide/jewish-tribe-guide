@@ -229,6 +229,33 @@ describe('reading a shul’s regular times', () => {
     ])
   })
 
+  // The Little Shul's home page, Oct 23: "Next Shabbos Services will be:
+  // Saturday, October 3rd / Saturday, November 7th", a month's first
+  // Shabbos. The past date came back as next year's, a Sunday.
+  it('takes a monthly service on the dates it names; a date off the weekday its words name is dropped', () => {
+    const page = { text: 'Next Shabbos Services will be:\nSaturday, October 3rd\nSaturday, November 7th\nKabbalat Shabbat October 9\nServices are held the 1st Saturday of each month at 10:00 AM.' }
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'shacharis', date: '2027-10-03', time: '10:00 AM', quote: 'Saturday, October 3rd' },
+          { tefillah: 'shacharis', date: '2026-11-07', time: '10:00 AM', quote: 'Saturday, November 7th' },
+          { tefillah: 'kabbalas_shabbos', date: '2026-10-09', time: '6:00 PM', quote: 'Kabbalat Shabbat October 9' },
+          { tefillah: 'shacharis', days: ['sat'], time: '10:00 AM', quote: 'held the 1st Saturday of each month at 10:00 AM' },
+        ],
+      },
+      page,
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => [t.tefillah, t.date])).toEqual([
+      ['shacharis', '2026-11-07'],
+      ['kabbalas_shabbos', '2026-10-09'],
+    ])
+    const [system] = regularMessages(page, DAYS, 'The Little Shul') as { content: string }[]
+    expect(system.content).toContain('unless the message names its dates')
+  })
+
   it('reads the same time given twice as one, on every day either gives', () => {
     const page = { text: 'Shabbat morning 10am\nShacharis: Shabbos 10 am, Sunday 10am' }
     const r = tidyRegularReading(

@@ -300,7 +300,7 @@ First, what the message is:
 
 Then "times", one entry per prayer time:
 - "tefillah" is one of: ${TEFILLOS}. A combined "Mincha/Maariv" is mincha_maariv, and so is one line naming several evening prayers held together ("Mincha / Kabbalat Shabbat / Ma'ariv 7:00 PM"): one entry, never one per prayer. Candle lighting, Shabbos ends, havdalah, a kiddush, a class or a shiur are not prayers: leave them out, or put them in "notes" of the nearest prayer.
-- Only the shul's own davening, held every week as given. A service not held every week ("once a month", "the last Shabbat of the month", "first Friday"), a phone or online call run by someone else, a class, a program or an event: leave it out.
+- Only the shul's own davening, held every week as given. A service not held every week ("once a month", "the last Shabbat of the month", "first Friday") isn't a weekly time: leave it out, unless the message names its dates ("Next services: Saturday, November 7th, Saturday, December 5th"). Then each date it names is a time with "date", at the time the message gives for those services, and "quote" is that date's own words. A phone or online call run by someone else, a class, a program or an event: leave it out.
 - A morning "Shabbat service", "Shabbat morning service" or "Services", on Shabbos or a weekday, is that day's Shacharis (shacharis): the shul's own davening, not a program or an event. When it gives a range ("9:00–11:30"), "time" is the start ("9:00") and the end goes in "notes" ("until 11:30").
 - For "schedule": "days" lists the weekdays it's held, as sun, mon, tue, wed, thu, fri, sat ("Shabbos" is sat, "Sunday–Thursday" is sun to thu). A time for one date only ("Thanksgiving, Thu Nov 26") has "date" (YYYY-MM-DD, the next such date from today, even past the days listed) and "occasion" ("Thanksgiving") instead, never a weekday. Only when the message gives the date or names a day with a fixed date; otherwise leave that time out.
 - For "week": every time has "date", from the days above.
@@ -323,11 +323,32 @@ Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": 
   ]
 }
 
-const NOT_EVERY_WEEK = /\b(?:once (?:a|per|each|every) month|twice (?:a|per) month|monthly|every other (?:week|shabbat|shabbos|friday|saturday)|(?:first|second|third|fourth|last) (?:shabbat|shabbos|friday|saturday|sunday)s? of (?:the|each|every)(?: english| hebrew)? month)\b/i
+const NOT_EVERY_WEEK = /\b(?:once (?:a|per|each|every) month|twice (?:a|per) month|monthly|every other (?:week|shabbat|shabbos|friday|saturday)|(?:first|second|third|fourth|last|1st|2nd|3rd|4th) (?:shabbat|shabbos|friday|saturday|sunday)s? of (?:the|each|every)(?: english| hebrew)? month)\b/i
+/** Whether a message says the shul doesn't meet every week ("Services are
+ *  held the 1st Saturday of each month"): then the dates it lists are all
+ *  there are (listedServices, listingPageRun.ts). */
+export const saysNotEveryWeek = (text: string) => NOT_EVERY_WEEK.test(text.replace(/\s+/g, ' '))
 const NOT_DAVENING = /\b(?:dial|call|tehillim|class|classes|shiur|shiurim|study|lecture|program|event)\b/i
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const isWeekday = (d: unknown): d is (typeof WEEKDAYS)[number] => (WEEKDAYS as readonly unknown[]).includes(d)
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const DAY_NAMES: [RegExp, number][] = [
+  [/\bsun(?:day)?\b/, 0],
+  [/\bmon(?:day)?\b/, 1],
+  [/\btue(?:s|sday)?\b/, 2],
+  [/\bwed(?:nesday)?\b/, 3],
+  [/\bthu(?:rs?|rsday)?\b/, 4],
+  [/\bfri(?:day)?\b/, 5],
+  [/\bsat(?:urday)?\b/, 6],
+]
+/** Whether a date falls on the one weekday its words name, when they name
+ *  one. The Little Shul's "Saturday, October 3rd", already past, came back
+ *  as next year's Oct 3, a Sunday (Oct 23). "Shabbos" isn't a weekday
+ *  here: "Kabbalat Shabbat, Oct 23" is a Friday. */
+function onDayNamed(date: string, quote: string): boolean {
+  const named = DAY_NAMES.filter(([re]) => re.test(quote.toLowerCase())).map(([, n]) => n)
+  return named.length !== 1 || new Date(`${date}T12:00:00Z`).getUTCDay() === named[0]
+}
 const seasonNote = (notes: string | undefined) => notes?.match(/\b(summer|winter)\s+only\b/i)?.[1].toLowerCase() ?? null
 const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
 
@@ -357,6 +378,7 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     const weekdays = [...new Set((Array.isArray(x.days) ? x.days : []).filter(isWeekday))]
     if (!tefillah || !time || !quote || (!date && weekdays.length === 0)) continue
     if (text !== null && !text.includes(` ${plain(quote)} `)) continue
+    if (date && !onDayNamed(date, quote)) continue
     // A time's season goes where the rest of the guide reads it, its note
     // ("Winter only", seasonFromNotes), unless the note already says.
     const said = str(x.notes, 120)
