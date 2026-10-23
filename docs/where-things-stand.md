@@ -281,10 +281,13 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
-9. **Summer and winter times** follow the clock change (Nov 1), so a
-   Friday "7:00 PM · Summer" still counts while candle lighting is 5:50.
-   Agreed next (Oct 23): for a pair of one season each, a clock time and a
-   zman, it's summer that day when the zman is later than the clock time.
+9. **Two shuls' seasons on the live site need a fix** (a production
+   write, so it needs a yes). Congregation Sons of Israel's Friday Mincha
+   is "7:00pm" and "5 min before candle lighting", both marked Summer; the
+   second's note says "Rest of the Year", so it should be Winter. Until
+   then both show all summer. Chabad of the Main Line's one-season rows
+   don't pair up (no winter Friday time), so the clock change still
+   decides theirs.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
@@ -1266,6 +1269,24 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 23, last of all: summer and winter by the zman (on `redesign/oct18-fixes`, not merged)
+
+- **A shul's summer/winter pair** goes by the zman. A pair is one clock
+  time and one zman, for the same minyan on a shared day. It's summer
+  while the zman is later than the clock time. Mekor's Friday is 7:00 PM
+  in summer and at candle lighting in winter. With candle lighting at 5:48
+  on Oct 23, and the clocks not back until Nov 1, it now shows candle
+  lighting. Its weekdays (15 min before sunset, or Maariv 6:30 PM) and
+  B'nai Abraham's Friday work the same way.
+- **This applies everywhere a season is used:** the next minyan, the
+  Minyanim list, the listing's weekday table and Shabbos list (with "In
+  summer, …" under them), and the dimmed rows.
+- **Anything else** (no pair, or a zman not known yet) keeps the clock
+  change's season, as before.
+- **Reading a newsletter or website** still compares against the clock
+  change's season. A week's times are compared with every time the shul
+  has, so this only affects a whole new schedule with no season named.
 
 ## Done Oct 23, last: "No minyan this week" (on `redesign/oct18-fixes`, not merged)
 

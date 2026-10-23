@@ -1,4 +1,5 @@
-import { isOutOfSeason, type Season } from './season'
+import type { Season } from './season'
+import { outOfSeason } from './seasonPairs'
 import { parseTimeToMinutes, SIGN_UP_MARK, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { LatLng } from './geo'
@@ -137,7 +138,8 @@ function collectCandidates(
       if (!row.days.some((d) => dayKeys.includes(d))) continue
       // A regular minyan a special schedule replaces on this date.
       if (row.skipDates?.some((date) => dayKeys.includes(`date:${date}` as MinyanDayKey))) continue
-      if (isOutOfSeason(row.season, season)) continue
+      // A summer/winter pair goes by its zman (seasonPairs.ts).
+      if (outOfSeason(row, shul.minyanim, season, anchors[geoKey(geoOrCommunityDefault(shul.geo))])) continue
 
       let time: string | null = null
       if (row.anchor) {
@@ -304,7 +306,8 @@ function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingD
   const rows = shul.minyanim
   if (rows.length === 0) return { text: 'No davening times listed', tone: 'quiet' }
 
-  const today = (row: Minyan) => row.days.some((d) => opts.today.includes(d)) && !isOutOfSeason(row.season, opts.season)
+  const shulAnchors = opts.anchors[geoKey(geoOrCommunityDefault(shul.geo))]
+  const today = (row: Minyan) => row.days.some((d) => opts.today.includes(d)) && !outOfSeason(row, rows, opts.season, shulAnchors)
   // Words where a time goes ("Call to confirm"): never the next minyan, so
   // said under it.
   const worded = rows.find((row) => today(row) && !row.anchor && row.time.trim() && !Number.isFinite(parseTimeToMinutes(row.time)))

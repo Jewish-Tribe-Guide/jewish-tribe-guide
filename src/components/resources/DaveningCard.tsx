@@ -101,9 +101,10 @@ export default function DaveningCard({
   // nothing else; no asking for the Shabbos or weekday times it won't have.
   const minyanOnly = !!category && isMinyanOnly(item, category)
   const season = schedule?.season ?? null
-  const week = weekdayTable(rows, season)
-  const shab = shabbosList(rows, season)
   const anchors = schedule?.anchors[geoKey(geoOrCommunityDefault(item.geo))]
+  // A summer/winter pair goes by its zman (seasonPairs.ts).
+  const week = weekdayTable(rows, season, anchors)
+  const shab = shabbosList(rows, season, anchors)
   const today = schedule?.todayKey ?? null
   const shabbosFirst = !!schedule && (today === 'fri' || today === 'sat' || (today === 'thu' && schedule.nowMinutes >= 18 * 60))
 

@@ -60,6 +60,16 @@ describe('the usual weekday times, as one table', () => {
     expect(w.otherSeason).toBe('In summer, Mincha & Maariv 15 min before sunset, Sun–Thu.')
   })
 
+  // Oct 23: seasons follow the zman, not the clock change (seasonPairs.ts).
+  it('a summer/winter pair goes by the zman: late October’s sunset, clocks not yet back, is winter’s', () => {
+    const oct23 = { sunsetIso: '2026-10-23T18:06:00-04:00' }
+    const t = weekdayTable(mekor, 'summer', oct23)!
+    expect(t.columns).toEqual(['shacharis', 'maariv'])
+    expect(t.otherSeason).toBe('In summer, Mincha & Maariv 15 min before sunset, Sun–Thu.')
+    // Saturday's winter Mincha has no pair: the clock change's season.
+    expect(shabbosList(mekor, 'summer', oct23)!.otherSeason).toBe('In winter, also Mincha 12:20 PM, following Kiddush.')
+  })
+
   it('a time in words stays in words', () => {
     const t = weekdayTable([m({ tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: 'Call to Confirm' })], null)!
     expect(t.rows).toEqual([{ days: ['sun', 'mon', 'tue', 'wed', 'thu'], label: 'Sun–Thu', cells: ['Call to confirm'], parts: [[{ text: 'Call to confirm' }]] }])

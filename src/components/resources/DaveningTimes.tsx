@@ -4,7 +4,8 @@ import { useCommunityTimezone } from '@/lib/communityContext'
 import { isMinyanim, groupByTefillah, mergeSameDayTimes, SEASON_LABELS } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime, anchorNoun } from '@/lib/useZmanAnchors'
-import { currentSeason, isOutOfSeason } from '@/lib/season'
+import { currentSeason } from '@/lib/season'
+import { outOfSeason } from '@/lib/seasonPairs'
 import { useNow } from '@/lib/useNow'
 
 // Shared davening-times display for any listing with a `minyanim`-type detail
@@ -102,7 +103,7 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
           <dl className="col-span-2 grid grid-cols-subgrid gap-y-1">
             {mergeSameDayTimes(group.rows).flatMap((row, i) => {
               const calc = resolveAnchorTime(row, anchors)
-              const dim = isOutOfSeason(row.season, season)
+              const dim = outOfSeason({ ...row, tefillah: group.tefillah }, minyanim, season, anchors)
               return [
                 <dt key={`d${i}`} className={`text-xs text-muted${dim ? ' opacity-45' : ''}`}>
                   {breakOnlyAtCommas(row.daysLabel || 'Daily')}
