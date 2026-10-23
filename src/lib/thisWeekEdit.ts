@@ -52,14 +52,17 @@ export const isNoMinyan = (post: SpecialSchedule | null) => !!post?.whole && pos
 
 /** The usual times a new week starts from: this season's (its summer/winter
  *  pair deciding, seasonPairs.ts), on the days of the week. A row's Rosh
- *  Chodesh or holiday days aren't dates in the week, so they're left off. */
+ *  Chodesh or holiday days aren't dates in the week, so they're left off,
+ *  and so is its note, which is about the usual times ("Meets the first
+ *  weekend of every month"), not this week's (the user, Oct 23). */
 export function usualWeekRows(regular: readonly Minyan[], season: Season | null, anchors?: AnchorTimes): Minyan[] {
   return regular.flatMap((m) => {
     if (outOfSeason(m, regular, season, anchors)) return []
     const days = m.days.filter((d): d is DayKey => (DAY_KEYS as readonly string[]).includes(d))
     if (days.length === 0) return []
-    const { season: _season, ...rest } = m
+    const { season: _season, notes: _notes, ...rest } = m
     void _season
+    void _notes
     return [{ ...rest, days }]
   })
 }
