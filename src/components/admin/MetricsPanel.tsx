@@ -8,7 +8,6 @@ import type { SubmissionFunnelStats } from '@/lib/submissionStore'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import SyncCoveragePanel from './SyncCoveragePanel'
 
 // The 'metrics' tab in /admin: how many submissions are waiting, the
 // approve/reject split, and how long an approved one sits in the queue
@@ -88,11 +87,6 @@ export default function MetricsPanel({ token }: { token: string }) {
         />
         <StatTile label="Avg. time to approval" value={formatHours(stats.avgHoursToApproval)} />
         <StatTile label="Median time to approval" value={formatHours(stats.medianHoursToApproval)} />
-      </div>
-
-      <div className="pt-2">
-        <h3 className="text-sm font-semibold text-slate-800 mb-2">Google sync coverage</h3>
-        <SyncCoveragePanel token={token} />
       </div>
 
     </div>

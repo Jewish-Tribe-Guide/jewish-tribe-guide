@@ -67,6 +67,7 @@ async function renderTab(
     hospitals = null as unknown[] | null,
     hours = null as unknown[] | null,
     times = null as unknown[] | null,
+    google = null as Record<string, unknown> | null,
   } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
@@ -78,6 +79,10 @@ async function renderTab(
     if (String(url).includes('/api/admin/watches/eruv')) {
       if (!eruvim) throw new Error('down')
       return { ok: true, available: true, timezone: 'America/New_York', eruvim, findings: [], watches: [] }
+    }
+    if (String(url).includes('/api/admin/watches/google?counts')) {
+      if (!google) throw new Error('down')
+      return { ok: true, ...google }
     }
     if (String(url).includes('/api/admin/watches/kosher')) {
       if (!kosher) throw new Error('down')
@@ -280,6 +285,16 @@ describe('WatchesManager', () => {
     expect(kosher).toHaveTextContent('2checked1to check0can’t be read1didn’t load today')
     expect(screen.queryByRole('region', { name: 'Kosher list' })).toBeNull()
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
+  })
+
+  // Oct 22: Google loads no pages, so it has no "didn't load"; the slot is
+  // held so its counts line up with the rows above.
+  it('has a Google row, its counts in line with the others', async () => {
+    await renderTab([], { google: { counts: { checked: 122, toCheck: 18, cantRead: 1, didntLoad: 0 }, total: 141 } })
+    const google = jobRow('google')
+    expect(google).toHaveTextContent('Google141 listings, from Google Maps')
+    expect(google).toHaveTextContent('122checked18to check1can’t be read')
+    expect(within(google).getByText('didn’t load today').closest('[aria-hidden="true"]')).toHaveClass('invisible')
   })
 
   // Oct 22: a food place's menu watch is on the Dishes page, which says

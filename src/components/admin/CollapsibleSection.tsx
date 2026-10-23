@@ -4,8 +4,8 @@ import { useState } from 'react'
 
 // ── A collapsed-by-default "Show ▸ / Hide ▾" card — the same disclosure
 // pattern the Metrics tab's Google sync coverage report introduced
-// (originally a one-off `Section` local to SyncCoveragePanel.tsx, which now
-// imports this instead of keeping its own copy). Reused anywhere an admin
+// (originally a one-off `Section` local to SyncCoveragePanel.tsx; that
+// report is now the Watches tab's Google page, Oct 22). Reused anywhere an admin
 // page has grown into several sizable blocks stacked on one screen (Site/
 // Desktop/Mobile's settings tabs, a community's admin roster): closed by
 // default keeps the page scannable — a list of what's editable here — and

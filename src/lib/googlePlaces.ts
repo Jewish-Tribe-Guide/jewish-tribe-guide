@@ -241,6 +241,27 @@ export async function findPlaceStatus(
   }
 }
 
+/** Places Google finds for a search, at most five: Find it on Google on
+ *  the Watches tab's Google page (Oct 22), for a listing with no match or
+ *  one whose match stopped answering. One Text Search call. Null when
+ *  Google can't be asked or doesn't answer. Server-side only. */
+export async function searchPlaces(query: string): Promise<{ placeId: string; name: string; address: string }[] | null> {
+  const key = serverKey()
+  const q = query.trim()
+  if (!key || !q) return null
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&key=${key}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = (await res.json()) as { status: string; results?: { place_id?: string; name?: string; formatted_address?: string }[] }
+    if (data.status === 'ZERO_RESULTS') return []
+    if (data.status !== 'OK') return null
+    return (data.results ?? []).flatMap((r) => (r.place_id && r.name ? [{ placeId: r.place_id, name: r.name, address: r.formatted_address ?? '' }] : [])).slice(0, 5)
+  } catch {
+    return null
+  }
+}
+
 // ── Place Details (the recurring sync) ──────────────────────────────────────
 
 type GooglePeriodEndpoint = { day: number; time: string } // time is "HHMM"
