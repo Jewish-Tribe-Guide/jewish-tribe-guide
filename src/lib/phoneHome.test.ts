@@ -261,6 +261,23 @@ describe('how this guide stays right: what it checked this week', () => {
     expect(sourcesSentence(read)).toBe('Places on Google Maps are checked against Google.')
   })
 
+  // The user, Oct 23: the sheet said "Menus and eruv status" while every
+  // shul's and mikvah's page, Refuah and both kosher lists were read each
+  // morning. A read that found a difference dates no box, so the checks
+  // that ran say it themselves.
+  it('names a check that read its pages this week, though it dated no box', () => {
+    const ran = [
+      { kind: 'times' as const, at: ago(0.2) },
+      { kind: 'mikvah' as const, at: ago(1) },
+      { kind: 'hospitals' as const, at: ago(0.2) },
+      { kind: 'kosher' as const, at: ago(6) },
+      { kind: 'eruv' as const, at: ago(9) },
+    ]
+    const read = sourcesRead({ ...facts, checked: ['menus'] }, [], now, ran)
+    expect(read.checks).toEqual(['times', 'mikvah', 'kosher', 'menus', 'hospitals'])
+    expect(sourcesSentence(read)).toBe('Minyan times, mikvah hours, kosher certifications, menus and hospitals. Places on Google Maps are checked against Google.')
+  })
+
   it('without Google, just what was checked', () => {
     expect(sourcesSentence({ google: false, checks: ['kosher'] })).toBe('Kosher certifications.')
     expect(sourcesSentence({ google: false, checks: ['times', 'eruv'] })).toBe('Minyan times and eruv status.')
