@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asCalendarWeek, datedAsWeeks } from './shulWeekReading'
+import { asCalendarWeek, datedAsWeeks, weekdaysOnGuideWeek } from './shulWeekReading'
 import type { ReadRegularTime, RegularReading } from './scheduleUpdate'
 
 const time = (x: Partial<ReadRegularTime>): ReadRegularTime => ({ id: x.date ?? 'w', tefillah: 'shacharis', days: [], time: '8:10am', quote: '8:10 AM', checked: true, ...x })
@@ -62,5 +62,39 @@ describe('datedAsWeeks', () => {
     expect(datedAsWeeks(page(usual))).toEqual({ usual: page(usual), weeks: [] })
     const week: RegularReading = { ...page([lekhLekha]), kind: 'week', from: '2026-10-23', to: '2026-10-24' }
     expect(datedAsWeeks(week)).toEqual({ usual: week, weeks: [] })
+  })
+})
+
+// The user, Oct 23: BZBI's "this week's schedule", pasted on a Friday, came
+// back Fri Oct 23 – Thu Oct 29 one read and Sun Oct 25 – Sat Oct 31 the
+// next. "This week" by weekday is the guide's week, as in Edit listing.
+describe('weekdaysOnGuideWeek', () => {
+  const WEEK = { from: '2026-10-18', to: '2026-10-24' }
+  const read = (times: ReadRegularTime[]): RegularReading => ({ kind: 'week', complete: true, season: null, title: null, startsOn: null, from: '2026-10-23', to: '2026-10-29', times })
+
+  it('a week given by weekday goes on Sunday to Shabbos, each time on its weekday', () => {
+    const got = weekdaysOnGuideWeek(
+      read([
+        time({ date: '2026-10-23', time: '7:45', quote: 'Tuesday, Wednesday, Friday 7:45 AM' }),
+        time({ date: '2026-10-24', time: '9:30AM', quote: 'Shabbat morning services 9:30 AM' }),
+        time({ date: '2026-10-25', time: '9:00 AM', quote: 'Sunday 9:00 AM Shacharit' }),
+        time({ date: '2026-10-29', time: '7:45 AM', quote: 'Monday & Thursday 7:45 AM' }),
+      ]),
+      WEEK,
+    )
+    expect([got.from, got.to]).toEqual(['2026-10-18', '2026-10-24'])
+    expect(got.times.map((t) => `${t.date} ${t.time}`)).toEqual(['2026-10-23 7:45', '2026-10-24 9:30AM', '2026-10-18 9:00 AM', '2026-10-22 7:45 AM'])
+  })
+
+  it('a time read twice on one weekday is once', () => {
+    const got = weekdaysOnGuideWeek(read([time({ date: '2026-10-24', quote: 'Shabbat 8:10' }), time({ date: '2026-10-31', quote: 'Shabbat 8:10' })]), WEEK)
+    expect(got.times.map((t) => t.date)).toEqual(['2026-10-24'])
+  })
+
+  it('leaves a message that names its dates, and a usual schedule, as read', () => {
+    const dated = read([time({ date: '2026-10-24', quote: 'Shabbos Oct 24: 9:30' }), time({ date: '2026-10-26', quote: 'Monday 7:45' })])
+    expect(weekdaysOnGuideWeek(dated, WEEK)).toBe(dated)
+    const usual: RegularReading = { ...read([time({ days: ['sun'] })]), kind: 'schedule', from: null, to: null }
+    expect(weekdaysOnGuideWeek(usual, WEEK)).toBe(usual)
   })
 })

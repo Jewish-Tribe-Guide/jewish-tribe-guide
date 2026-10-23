@@ -1249,6 +1249,19 @@ compare, and one it can't read, on desktop and phone.
   says "The same as their usual times." with "Add as this week's
   schedule", and the queue reads "posted as this week's schedule". A
   schedule (not a week) that matches still just confirms.
+- **A one-day time isn't shown again beside a week's own.** BZBI's week
+  (approved from a paste) gave Shabbos 9:30, and the newsletter's one-day
+  "Sat Oct 24 · 9:30 AM" was still stored: two 9:30 Shacharis on the
+  Minyanim page. A one-day time that a covering week already has is left
+  out (`resolveDay`), as one matching the usual times already was.
+
+- **A week given by weekday goes on Sunday to Shabbos.** BZBI's "this
+  week's schedule" (Sunday 9:00, Monday 7:45…), pasted on a Friday, came
+  back dated Fri Oct 23 – Thu Oct 29 once and Sun Oct 25 – Sat Oct 31 the
+  next: the AI chose. Now it's the guide's week, as in Edit listing: the
+  week around the day it was sent, the next once Shabbos is over
+  (`weekdaysOnGuideWeek`). A message that names its dates is left as read.
+  The live week approved earlier (Oct 23 – Oct 29) stays as it is.
 
 ## Done Oct 23, after that: three small fixes (on `redesign/oct18-fixes`)
 
