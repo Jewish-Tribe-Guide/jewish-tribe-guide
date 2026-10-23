@@ -868,7 +868,7 @@ export default function WatchesManager({ token }: { token: string }) {
               href={`${base}/watches/hours`}
               name={jobs.hours.name}
               about={`${jobs.hours.places.length} place${jobs.hours.places.length === 1 ? '' : 's'}, from their websites`}
-              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length })), now)}
+              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at })), now)}
             />
           )}
           {jobs.times && jobs.times.places.length > 0 && (
@@ -876,7 +876,7 @@ export default function WatchesManager({ token }: { token: string }) {
               href={`${base}/watches/times`}
               name={jobs.times.name}
               about={`${jobs.times.places.length} shul${jobs.times.places.length === 1 ? '' : 's'}, from their websites`}
-              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length })), now)}
+              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at })), now)}
             />
           )}
           <JobRow

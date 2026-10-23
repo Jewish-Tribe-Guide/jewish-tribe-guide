@@ -429,8 +429,17 @@ agreed:
      Edit now (the user, Oct 22).
    - Kol Tzedek's Friday night is on its Weekly Services page
      (kol-tzedek.org/shabbat.html, "All Friday services begin at
-     6:30pm"), which isn't one of its watched pages; its calendar has no
-     Friday on Oct 23. **For the user:** add that page on the Watches tab.
+     6:30pm"), which isn't one of its watched pages yet. Nothing to add
+     by hand: the morning's search follows the links on a shul's Google
+     website, like Main dishes, and finds it (and calendar.html, and
+     the Shtiebel's /calendar; checked Oct 22, fetch only). It went live
+     Oct 22, so its first morning is Oct 23. BZBI's and Chabad of the
+     Main Line's websites turn the reader away (403), so only BZBI's
+     newsletter is read.
+   - A page whose read waited behind a suggestion already in the queue
+     kept "In the queue" after that suggestion was decided, with nothing
+     to open (Sons of Israel's home page, Oct 22). It settles once a
+     finding is decided after the read (`settles`, watches.ts).
 4. Mikvah hours. **Built Oct 22** (compared with its drawing on dev,
    computer and phone; Lower Merion's update stubbed in the browser, Moishe
    Zvi's two from a real read on dev):

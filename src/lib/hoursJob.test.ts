@@ -203,8 +203,14 @@ describe('hoursSection', () => {
     expect(at([watch({ lastCheck: check('agrees') })], 1)).toBe('to_check')
     expect(at([filed('filed')], 0)).toBe('checked')
     expect(at([filed('before')], 0)).toBe('checked')
-    // Not filed, for a suggestion already waiting in the queue: still to check.
+    // Not filed, for a suggestion already waiting in the queue: still to
+    // check, until a finding is decided after it, the one it waited behind
+    // (Sons of Israel's home page, Oct 22: "In the queue", nothing to open).
     expect(at([filed('waiting')], 0)).toBe('to_check')
+    const decided = (decidedAt: string, waiting = 0) => hoursSection({ pages: [filed('waiting')], off: false, waiting, decidedAt }, NOW)
+    expect(decided(new Date(NOW).toISOString())).toBe('checked')
+    expect(decided(new Date(NOW - 3 * 86_400_000).toISOString())).toBe('to_check')
+    expect(decided(new Date(NOW).toISOString(), 1)).toBe('to_check')
     expect(at([watch({ lastCheck: check('unsure') })], 0)).toBe('to_check')
     // Not known what waits: as before.
     expect(s([filed('before')])).toBe('to_check')

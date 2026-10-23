@@ -260,8 +260,8 @@ export type HoursSection = 'to_check' | 'waiting' | 'checked' | 'cant_read' | 'o
  *  some, which the morning's run will watch and read. `waiting`: how many
  *  of its findings wait on the job page (watchFindings.ts); given, a page
  *  that differs only because of one already decided (Update or Skip) is
- *  settled, not to check. */
-export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number }
+ *  settled, not to check. `decidedAt`: when its last finding was decided. */
+export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number; decidedAt?: string | null }
 
 const loads = (w: Watch, now: number) => {
   const state = watchHealth(w, now).state
@@ -277,7 +277,7 @@ export function hoursSection(p: HoursPlace, now: number): HoursSection {
   const ok = live.filter((w) => loads(w, now))
   if (!ok.length) return 'cant_read'
   const results = ok.map((w) => (w.lastRunAt && w.lastCheck ? w.lastCheck.result : null))
-  const open = ok.some((w) => w.lastRunAt && w.lastCheck && (w.lastCheck.result === 'differs' || w.lastCheck.result === 'unsure') && !settles(w.lastCheck, p.waiting))
+  const open = ok.some((w) => w.lastRunAt && w.lastCheck && (w.lastCheck.result === 'differs' || w.lastCheck.result === 'unsure') && !settles(w.lastCheck, p.waiting, p.decidedAt))
   if (open) return 'to_check'
   if (results.some((r) => r === null)) return 'waiting'
   if (results.every((r) => r === 'nothing' || r === 'unreadable')) return 'cant_read'
