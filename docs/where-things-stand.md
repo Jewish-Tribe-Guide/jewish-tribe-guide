@@ -67,11 +67,9 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1d. **Migration 085 (`watch.last_check`)** is run on both databases
    (checked Oct 23). A watch's last check is kept across reloads.
-1e. **Migration 086 (`job_run`) is not run anywhere yet** (Oct 24). It
-   needs the Supabase SQL editor: dev first (no yes needed, but the
-   dashboard in Claude's browser isn't signed in), then live with a yes.
-   Until it's run, the nightly jobs run as before and the Watches tab's
-   Nightly runs says the migration is needed. It's safe to deploy first.
+1e. **Migration 086 (`job_run`)** is run on both databases (the user,
+   Oct 24; checked). The live jobs start recording once this branch is
+   deployed.
 
 ## For the user or the community
 
@@ -1261,8 +1259,8 @@ about the same place every morning. Nothing showed it anywhere.
   job with how it works, the last run's line, and, without opening
   anything, Failed, Cut off (started, never finished), Didn't run (no run
   in 30 hours) or Needs a look. Opening a row shows the last 14 runs.
-- **Not checked:** whether the Vercel plan allows 300 seconds. On Hobby
-  that needs fluid compute; the commit's preview build fails if not.
+- **Vercel allows the 300 seconds:** the preview of 23e02ab5 built and
+  deployed with it.
 - **Not built:** an email when a job breaks. The tab shows it; nothing is
   sent.
 
