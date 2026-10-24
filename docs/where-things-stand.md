@@ -350,6 +350,13 @@ Settled with the user so far:
   kind of place opens this way, with the box its job page already has.
   B'nai Abraham (Add a source open) and Playa Bowls redrawn the same
   way Oct 24; on the settled canvas they replace the grouped-look boards.
+  **Agreed Oct 24:** Add a source and Read now stay once per place
+  (Change is the one per source, on each box's foot). Read now says
+  "Read it now" for one page and "Read them now" for several. On a phone
+  the three links sit on one row. Recommended, not drawn: no Read now on
+  a place with only Google and a newsletter (nothing to read on demand).
+  The Final page of the original canvas shows only the latest boards;
+  earlier ones are on "Final, earlier versions".
 - **Add a source** (agreed Oct 24) sits at the bottom of every opened
   place. One box takes a web page or the email a newsletter comes from;
   an email also needs the guide's inbox subscribed, and the box says so
