@@ -325,6 +325,30 @@ Settled with the user so far:
     categories (House of Kosher) getting the same change twice.
   - The settled canvas's row 1 still shows Food's Waiting as 13; the new
     boards count 17 (13 new places, 3 closures, 1 drop).
+- **A Google match failing for more than a few nights** (agreed Oct 24):
+  the card offers only Find it on Google and Not on Google. Check again
+  (the same paid call on the same place) goes. Redrawn as Sababa, no
+  Check again, on both canvases.
+- **Up to date shows where each field comes from** (drawn Oct 24, not
+  reviewed; Synagogues, real Philly data): each row has a grey sources
+  line ("Google · its website · its newsletter"), so a shul with a
+  newsletter is told apart from one without (6 of 14 have one). An
+  opened place groups its fields by source, each with its link or
+  email and when it was last read: Mekor Habracha's Google fields, its
+  usual weekday and Shabbos times from mekorhabracha.org/davening, and
+  this week's from its newsletter. Change sits on a source you chose,
+  not on Google's.
+- **Add a source** (agreed Oct 24) sits at the bottom of every opened
+  place. One box takes a web page or the email a newsletter comes from;
+  an email also needs the guide's inbox subscribed, and the box says so
+  in one line. Drawn on B'nai Abraham Chabad. Only kinds that fit the
+  place are taken (newsletters for shul times and eruv status, as
+  `watchPurposes.ts` already allows).
+- **More than one menu page** (raised Oct 24, not decided): reading
+  already merges up to 3 menu pages (`readMenus`, `MAX_MENU_PAGES`), but
+  the nightly watch fingerprints only `details.menuUrl` and the Dishes
+  line shows one page. Recommended: watch each page that gave dishes and
+  list each on the Dishes line.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
