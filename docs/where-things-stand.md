@@ -338,6 +338,17 @@ Settled with the user so far:
   usual weekday and Shabbos times from mekorhabracha.org/davening, and
   this week's from its newsletter. Change sits on a source you chose,
   not on Google's.
+  **Redrawn Oct 24 in the live job pages' style** (the user preferred
+  it): an opened place is one box per section, laid out as the job
+  pages' `job-box` already does (day headings, what left, time right,
+  Summer/Winter under), with the source on a line at the box's foot
+  ("Same as mekorhabracha.org/davening · read Oct 23 · Change"). Boxes:
+  This week's schedule (from its newsletter), Usual weekday times, Usual
+  Shabbos times, Name and contact (its Google listing). No "Same" pills
+  in Up to date. "Add a source · Read them now · Open its listing" under
+  the boxes, replacing the job page's Reads box and "Add a page". Every
+  kind of place opens this way, with the box its job page already has.
+  The Add a source boards still use the earlier grouped look.
 - **Add a source** (agreed Oct 24) sits at the bottom of every opened
   place. One box takes a web page or the email a newsletter comes from;
   an email also needs the guide's inbox subscribed, and the box says so
