@@ -256,7 +256,10 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Being drawn Oct 24: the Watches tab by kind of place (not built)
 
 Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
-is a new board beside the old one. Settled with the user so far:
+is a new board beside the old one. Only the latest board for each screen,
+nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
+("Watches: what we're settling on"); a new settled board goes on both.
+Settled with the user so far:
 
 - Rows are the site's categories. A place's card shows only what needs
   the admin. Tabs: Waiting for you, Not checked, Up to date.
@@ -306,6 +309,22 @@ is a new board beside the old one. Settled with the user so far:
   `postedBy` in schedules.ts). An agreeing website read confirms and
   clears older findings; an approved newsletter change shows "Confirmed
   by <shul>".
+- **Waiting for you, in order**: a place off a certifier's list first
+  (red pill), then Google closures, then new places, then changes. Drawn
+  Oct 24, not yet reviewed:
+  - **Off a kosher list** (Stephen's Cafe, made up): Hechsher "None, was
+    Keystone-K", Remove the listing / Keep it / Edit. That is what the
+    Keystone-K watch's `gone` finding already proposes (archive when it
+    was the only hechsher). Never filed yet.
+  - **Closed for now, says Google** (Rita's, Grant Ave, real since Oct
+    12): a closure is on the site at once today, so the card is Keep
+    closed / Show as open, and it reopens by itself when Google says so.
+    Three such places in Philly now (two Rita's, New York Bagel Bakery).
+  - Still to decide: a person's fix that its website still contradicts
+    (the next read files the old value back), and one place in two
+    categories (House of Kosher) getting the same change twice.
+  - The settled canvas's row 1 still shows Food's Waiting as 13; the new
+    boards count 17 (13 new places, 3 closures, 1 drop).
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
