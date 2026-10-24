@@ -279,6 +279,33 @@ is a new board beside the old one. Settled with the user so far:
   14 nights need the run to save its count per kind in its `job_run`
   row (a new column, so a migration). Google's hours already have a job
   and rows of their own.
+- **Not on Google** (`notOnGoogle()`, googleJobRun.ts) changes nothing on
+  the listing: it saves the date, and every field nothing else checks
+  becomes the admin's ("You · Oct 24"), so the place moves to Up to date.
+  Picking a Google match later clears it. Two things for the build:
+  a "You" field never comes back for a fresh look (recommended: back to
+  Not checked after a year, not decided), and the code refuses Not on
+  Google for a place with a match. Sababa's drawn card has a match that
+  has failed since Sep 10, so there the button must also drop the dead
+  match.
+- **Minyan times come in every kind the live site already keeps**: the
+  usual weekday table and Shabbos, this week's times (including "No
+  minyan this week" and a whole posted week), Yom Tov schedules (replace
+  or add), zman-based times with limits, summer or winter only, minyanim
+  that need ten, minyanim at another place, and join links. The drawings
+  show only a one-off clock-time change. Built change lines say each one
+  the way the listing does: a zman rule as the rule, and a Yom Tov
+  schedule as one item ("Chanukah schedule, Dec 4–12"), not dozens of
+  times.
+- **A place with two sources** (a shul's website and its newsletter):
+  each finding is filed with its source and the page or email it came
+  from, so each source is its own group in Waiting, accepted on its own.
+  The website usually gives the usual times; the newsletter gives this
+  week's, as a week beside the usual times. For the same days a week from
+  the newsletter or a person wins over the website's (the user, Oct 20;
+  `postedBy` in schedules.ts). An agreeing website read confirms and
+  clears older findings; an approved newsletter change shows "Confirmed
+  by <shul>".
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
