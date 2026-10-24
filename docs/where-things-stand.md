@@ -351,10 +351,13 @@ Settled with the user so far:
   list each on the Dishes line. Drawn Oct 24 as Playa Bowls, Wynnewood
   (Food, Up to date): "From its menu: Bowls · Smoothies · Surf Quenchers
   · Oct 22", one link per page. Those are the three pages `findMenus`
-  really finds on its site. Not decided: Dishes holds ten in all, and
-  Bowls alone gives ten, so today the other two pages add nothing.
-  Recommended: take a few from each page so the Dishes line covers the
-  whole menu.
+  really finds on its site. Dishes holds ten in all, and today the first
+  page fills them (`readMenus` tops up from later pages only below ten),
+  so Bowls gives all ten and the other two pages add nothing. **Agreed
+  Oct 24: take a few from each page.** Redrawn with the Dishes field one
+  line per page (Bowls 4, Smoothies 4, Surf Quenchers 2, real names off
+  the pages). For the build: split the ten across the pages that gave
+  dishes, keeping anything already on the listing.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
