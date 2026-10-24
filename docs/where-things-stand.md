@@ -253,7 +253,7 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
-## Being drawn Oct 24: the Watches tab by kind of place (not built)
+## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
 Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
 is a new board beside the old one. Only the latest board for each screen,
@@ -286,11 +286,10 @@ Settled with the user so far:
   the listing: it saves the date, and every field nothing else checks
   becomes the admin's ("You · Oct 24"), so the place moves to Up to date.
   Picking a Google match later clears it. Two things for the build:
-  a "You" field never comes back for a fresh look (recommended: back to
-  Not checked after a year, not decided), and the code refuses Not on
-  Google for a place with a match. Sababa's drawn card has a match that
-  has failed since Sep 10, so there the button must also drop the dead
-  match.
+  a "You" field goes back to Not checked after a year (agreed Oct 24),
+  and Not on Google on a place whose match has died drops the dead match
+  (agreed Oct 24; the code refuses it for a place with a match today,
+  as on Sababa, failing since Sep 10).
 - **Minyan times come in every kind the live site already keeps**: the
   usual weekday table and Shabbos, this week's times (including "No
   minyan this week" and a whole posted week), Yom Tov schedules (replace
@@ -311,7 +310,7 @@ Settled with the user so far:
   by <shul>".
 - **Waiting for you, in order**: a place off a certifier's list first
   (red pill), then Google closures, then new places, then changes. Drawn
-  Oct 24, not yet reviewed:
+  Oct 24, accepted as drawn:
   - **Off a kosher list** (Stephen's Cafe, made up): Hechsher "None, was
     Keystone-K", Remove the listing / Keep it / Edit. That is what the
     Keystone-K watch's `gone` finding already proposes (archive when it
@@ -320,9 +319,10 @@ Settled with the user so far:
     12): a closure is on the site at once today, so the card is Keep
     closed / Show as open, and it reopens by itself when Google says so.
     Three such places in Philly now (two Rita's, New York Bagel Bakery).
-  - Still to decide: a person's fix that its website still contradicts
-    (the next read files the old value back), and one place in two
-    categories (House of Kosher) getting the same change twice.
+  - Agreed Oct 24: a person's fix wins over a website that still
+    contradicts it, and that source stays quiet on the field until the
+    page's text changes. One place in two categories (House of Kosher)
+    gets one finding, shown in both rows, cleared by one approval.
   - The settled canvas's row 1 still shows Food's Waiting as 13; the new
     boards count 17 (13 new places, 3 closures, 1 drop).
 - **A Google match failing for more than a few nights** (agreed Oct 24):
@@ -353,7 +353,7 @@ Settled with the user so far:
   **Agreed Oct 24:** Add a source and Read now stay once per place
   (Change is the one per source, on each box's foot). Read now says
   "Read it now" for one page and "Read them now" for several. On a phone
-  the three links sit on one row. Recommended, not drawn: no Read now on
+  the three links sit on one row. Agreed, not drawn: no Read now on
   a place with only Google and a newsletter (nothing to read on demand).
   The Final page of the original canvas shows only the latest boards;
   earlier ones are on "Final, earlier versions".
