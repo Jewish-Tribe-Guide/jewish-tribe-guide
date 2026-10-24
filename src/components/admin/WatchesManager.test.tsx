@@ -8,6 +8,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import type { Watch } from '@/lib/watches'
 import type { AdminEruv } from '@/lib/eruvStore'
 import WatchesManager, { forgetWatchesTab } from './WatchesManager'
+import { NIGHTLY_JOBS } from '@/lib/jobRuns'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -68,6 +69,7 @@ async function renderTab(
     hours = null as unknown[] | null,
     times = null as unknown[] | null,
     google = null as Record<string, unknown> | null,
+    runs = null as Record<string, unknown> | null,
   } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
@@ -79,6 +81,10 @@ async function renderTab(
     if (String(url).includes('/api/admin/watches/eruv')) {
       if (!eruvim) throw new Error('down')
       return { ok: true, available: true, timezone: 'America/New_York', eruvim, findings: [], watches: [] }
+    }
+    if (String(url).includes('/api/admin/watches/runs')) {
+      if (!runs) throw new Error('down')
+      return { ok: true, ...runs }
     }
     if (String(url).includes('/api/admin/watches/google?counts')) {
       if (!google) throw new Error('down')
@@ -574,5 +580,20 @@ describe('WatchesManager', () => {
     expect(screen.queryByText('Loading watches…')).toBeNull()
     expect(names(screen.getByRole('region', { name: 'Anything else' }))).toEqual(['A page'])
     expect(jobRow('dishes')).toHaveTextContent('1checked')
+  })
+
+  // Oct 24: the nightly jobs' runs, so a job that broke or was cut off shows.
+  it('shows the nightly runs from their own read', async () => {
+    const jobs = NIGHTLY_JOBS.map((j) => ({ ...j, runs: j.id === 'watches' ? [{ id: 'r', job: 'watches', startedAt: new Date().toISOString(), finishedAt: null, ok: null, summary: null, warning: null, error: null }] : [] }))
+    await renderTab([], { runs: { available: true, jobs } })
+    const section = screen.getByRole('region', { name: 'Nightly runs' })
+    expect(within(section).getAllByTestId('nightly-job')).toHaveLength(4)
+    expect(within(section).getByText('Running')).toBeTruthy()
+  })
+
+  it('says so when the nightly runs couldn’t be loaded, and shows the rest', async () => {
+    await renderTab([watch({ id: 'site', url: 'https://bzbi.org/worship/' })])
+    expect(within(screen.getByRole('region', { name: 'Nightly runs' })).getByText(/Couldn’t load the nightly runs/)).toBeTruthy()
+    expect(screen.getAllByTestId('watch-row')).toHaveLength(1)
   })
 })

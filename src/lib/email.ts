@@ -13,7 +13,8 @@ import {
 } from './submissionDiff'
 import { MENU_LINK_PROPOSED, SHOWN_WHEN_PROPOSED } from './syncFields'
 import { MENU_LINK_LABEL } from './menuLink'
-import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
+import { getCommunityNotifyRecipients, getReviewActionRecipients, listCommunities } from './communityStore'
+import type { JobAlert } from './jobRuns'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -729,6 +730,32 @@ export async function sendWatchHealthAlert(communitySlug: string, alerts: WatchH
       <p style="color:#334155;font-size:14px;">The pages the guide reads on its own to stay current. While a watch is broken, the guide isn't hearing from that page. You'll get one email when it works again.</p>
       <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
       ${admin ? `<p style="font-size:13px;"><a href="${admin}/${encodeURIComponent(communitySlug)}/admin/watches" style="color:#1d4ed8;">Open the Watches tab</a></p>` : ''}
+    </div>`,
+  })
+}
+
+/**
+ * A nightly job that stopped working, or works again (jobRuns.ts,
+ * jobAlert): once each way, as a watch. The jobs run for the whole site,
+ * so it goes once to every community's admins together, with the first
+ * community's Watches tab, where every community sees the same runs.
+ */
+export async function sendJobAlert(alert: JobAlert): Promise<void> {
+  const communities = await listCommunities()
+  const to = [...new Set((await Promise.all(communities.map((c) => notificationRecipients(c.slug)))).flat())]
+  if (to.length === 0) return
+  const color = alert.broke ? '#b91c1c' : '#15803d'
+  const rows = alert.lines.map((l) => `<li style="margin:4px 0;color:${color};">${escapeHtml(l)}</li>`).join('')
+  const admin = adminAppUrl()
+  const tab = admin && communities[0] ? `${admin}/${encodeURIComponent(communities[0].slug)}/admin/watches` : null
+  await sendEmail({
+    to,
+    subject: alert.broke ? `Nightly job stopped working: ${alert.name}` : `Nightly job working again: ${alert.name}`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">${escapeHtml(alert.name)}</h2>
+      <ul style="font-size:14px;padding-left:18px;">${rows}</ul>
+      ${alert.broke ? '<p style="color:#334155;font-size:14px;">You&rsquo;ll get one email when it works again.</p>' : ''}
+      ${tab ? `<p style="font-size:13px;"><a href="${tab}" style="color:#1d4ed8;">Open the Watches tab</a></p>` : ''}
     </div>`,
   })
 }

@@ -26,6 +26,8 @@ import { sendStatusChangeDigest, type StatusChange } from '@/lib/email'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { refreshNight, syncOneListing, type SyncedRow } from '@/lib/syncListing'
 import { cronAuthorized as authorized } from '@/lib/cronAuth'
+import { recordJobRun } from '@/lib/jobRunStore'
+import { syncHoursOutcome, type SyncHoursRun } from '@/lib/jobRuns'
 
 // Does network + DB work, so it's never prerendered or cached — that follows
 // from the work itself now rather than from a `dynamic` export, which Cache
@@ -57,7 +59,7 @@ function maxRecords(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 500
 }
 
-async function runSync(): Promise<NextResponse> {
+async function runSync(): Promise<SyncHoursRun> {
   const supabase = getAdminClient()
   const { data, error } = await supabase
     .from('resource')
@@ -69,7 +71,7 @@ async function runSync(): Promise<NextResponse> {
 
   if (error) {
     await pingHealthcheck(false)
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    return { ok: false, error: error.message }
   }
 
   const rows = (data ?? []) as SyncedRow[]
@@ -113,7 +115,7 @@ async function runSync(): Promise<NextResponse> {
   )
 
   await pingHealthcheck(true)
-  return NextResponse.json({
+  return {
     ok: true,
     total: rows.length,
     refreshed,
@@ -121,15 +123,17 @@ async function runSync(): Promise<NextResponse> {
     failed,
     flaggedClosed,
     statusChanged: statusChanges.length,
-  })
+  }
 }
 
 // Catches anything runSync itself doesn't (a thrown error, not just its own
 // { ok: false } responses) so an unhandled exception still registers as a
-// failed check-in instead of just vanishing.
+// failed check-in instead of just vanishing. Each run is recorded for the
+// Watches tab too (jobRunStore.ts).
 async function runSyncGuarded(): Promise<NextResponse> {
   try {
-    return await runSync()
+    const run = await recordJobRun('sync-hours', runSync, syncHoursOutcome)
+    return NextResponse.json(run, { status: run.ok ? 200 : 500 })
   } catch (err) {
     await pingHealthcheck(false)
     throw err

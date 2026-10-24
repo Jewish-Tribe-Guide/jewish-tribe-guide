@@ -10,11 +10,15 @@
 // (supabase/migrations/20240101000080_walk_route.sql), it does nothing and
 // says why; the site shows its straight-line estimates either way.
 //
+// Each run is recorded for the Watches tab (jobRunStore.ts).
+//
 // Auth: as sync-hours (cronAuth.ts).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { runWalkRoutes } from '@/lib/walkRouteJob'
+import { recordJobRun } from '@/lib/jobRunStore'
+import { walkRoutesOutcome } from '@/lib/jobRuns'
 
 export const maxDuration = 60
 
@@ -24,7 +28,7 @@ export const maxDuration = 60
 const BUDGET = 20
 
 async function runAll(): Promise<NextResponse> {
-  return NextResponse.json(await runWalkRoutes({ budget: BUDGET }))
+  return NextResponse.json(await recordJobRun('walk-routes', () => runWalkRoutes({ budget: BUDGET }), walkRoutesOutcome))
 }
 
 export async function GET(req: NextRequest) {

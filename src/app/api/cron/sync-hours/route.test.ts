@@ -42,6 +42,8 @@ vi.mock('@/lib/email', () => ({
 }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: vi.fn() }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: vi.fn().mockResolvedValue([]) }))
+// The run's own record is jobRunStore.test.ts's.
+vi.mock('@/lib/jobRunStore', () => ({ recordJobRun: (_job: string, run: () => Promise<unknown>) => run() }))
 
 const { GET } = await import('./route')
 const { refreshNight } = await import('@/lib/syncListing')

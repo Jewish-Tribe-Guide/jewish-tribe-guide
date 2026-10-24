@@ -6,18 +6,29 @@
 // current (menuWatch.ts), and "Read now" reads it whenever an admin asks.
 // Meant to run daily (vercel.json).
 //
+// Each run is recorded for the Watches tab (jobRunStore.ts).
+//
 // Auth: as sync-hours (cronAuth.ts).
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { readUnreadMenus } from '@/lib/menuPlaceRead'
+import { recordJobRun } from '@/lib/jobRunStore'
+import { readMenusOutcome } from '@/lib/jobRuns'
 
 export const maxDuration = 60
 
 async function run(): Promise<NextResponse> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return NextResponse.json({ ok: true, skipped: 'no OPENAI_API_KEY' })
   try {
-    return NextResponse.json({ ok: true, menus: await readUnreadMenus(apiKey) })
+    const body = await recordJobRun(
+      'read-menus',
+      async () => {
+        const apiKey = process.env.OPENAI_API_KEY
+        if (!apiKey) return { ok: true as const, skipped: 'no OPENAI_API_KEY' }
+        return { ok: true as const, menus: await readUnreadMenus(apiKey) }
+      },
+      readMenusOutcome,
+    )
+    return NextResponse.json(body)
   } catch (err) {
     console.error('[cron/read-menus] failed:', err)
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })
