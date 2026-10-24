@@ -348,7 +348,8 @@ Settled with the user so far:
   in Up to date. "Add a source · Read them now · Open its listing" under
   the boxes, replacing the job page's Reads box and "Add a page". Every
   kind of place opens this way, with the box its job page already has.
-  The Add a source boards still use the earlier grouped look.
+  B'nai Abraham (Add a source open) and Playa Bowls redrawn the same
+  way Oct 24; on the settled canvas they replace the grouped-look boards.
 - **Add a source** (agreed Oct 24) sits at the bottom of every opened
   place. One box takes a web page or the email a newsletter comes from;
   an email also needs the guide's inbox subscribed, and the box says so
@@ -368,7 +369,9 @@ Settled with the user so far:
   Oct 24: take a few from each page.** Redrawn with the Dishes field one
   line per page (Bowls 4, Smoothies 4, Surf Quenchers 2, real names off
   the pages). For the build: split the ten across the pages that gave
-  dishes, keeping anything already on the listing.
+  dishes, keeping anything already on the listing. In the boxed look
+  the Dishes box has a heading per page and its foot links all three
+  ("Same as its menu: Bowls · Smoothies · Surf Quenchers · read Oct 22").
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
