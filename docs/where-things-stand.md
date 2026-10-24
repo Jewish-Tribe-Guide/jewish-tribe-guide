@@ -348,7 +348,13 @@ Settled with the user so far:
   already merges up to 3 menu pages (`readMenus`, `MAX_MENU_PAGES`), but
   the nightly watch fingerprints only `details.menuUrl` and the Dishes
   line shows one page. Recommended: watch each page that gave dishes and
-  list each on the Dishes line.
+  list each on the Dishes line. Drawn Oct 24 as Playa Bowls, Wynnewood
+  (Food, Up to date): "From its menu: Bowls · Smoothies · Surf Quenchers
+  · Oct 22", one link per page. Those are the three pages `findMenus`
+  really finds on its site. Not decided: Dishes holds ten in all, and
+  Bowls alone gives ten, so today the other two pages add nothing.
+  Recommended: take a few from each page so the Dishes line covers the
+  whole menu.
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
