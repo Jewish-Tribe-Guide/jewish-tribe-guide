@@ -25,6 +25,16 @@ const mockSyncRefuah = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/refuahMatchRun', () => ({ syncRefuahWatches: mockSyncRefuah }))
 const mockSyncHours = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/hoursJobRun', () => ({ syncHoursWatches: mockSyncHours }))
+// The run's record: what the job ends with is saved (jobRunStore.test.ts
+// has the saving).
+const recordedOutcomes = vi.hoisted(() => [] as unknown[])
+vi.mock('@/lib/jobRunStore', () => ({
+  recordJobRun: async <T,>(job: string, run: () => Promise<T>, outcome: (r: T) => unknown) => {
+    const result = await run()
+    recordedOutcomes.push({ job, ...(outcome(result) as object) })
+    return result
+  },
+}))
 
 const { GET } = await import('./route')
 
@@ -65,6 +75,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs()
   for (const m of [mockList, mockUpdate, mockKeystone, mockWebsite, mockAlert]) m.mockReset()
+  recordedOutcomes.length = 0
+  vi.restoreAllMocks()
 })
 
 describe('/api/cron/watches', () => {
@@ -188,5 +200,48 @@ describe('/api/cron/watches', () => {
     vi.stubEnv('NODE_ENV', 'production')
     expect((await GET(request())).status).toBe(401)
     expect(mockList).not.toHaveBeenCalled()
+  })
+
+  // Oct 24: the run checked the watches in the order they were added and
+  // was cut off after 29 of 107 every morning, the newest never reached.
+  describe('the order, and the time it has (Oct 24)', () => {
+    it('checks the kosher lists first and the menus last, whatever order they were added in', async () => {
+      const ran: string[] = []
+      mockList.mockResolvedValue({
+        available: true,
+        watches: [
+          watch({ id: 'menu', url: 'https://judah.example/menu', resourceId: 'r1', createdBy: 'menu links', lastRunAt: '2026-10-23T07:48:00.000Z' }),
+          watch({ id: 'site', url: 'https://bzbi.org/worship/', lastRunAt: '2026-10-23T07:48:00.000Z' }),
+          watch({ id: 'k', kind: 'keystone_list', url: 'https://keystone-k.org/establishments/', lastRunAt: '2026-10-23T07:48:00.000Z' }),
+        ],
+      })
+      vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-24T07:47:00.000Z'))
+      mockKeystone.mockImplementation(async () => (ran.push('k'), { ok: true, entries: 54, findings: 0, filed: 0, closedOnGoogle: [] }))
+      mockWebsite.mockImplementation(async () => (ran.push('site'), { ok: true, filed: 0, pageHash: 'h' }))
+      mockMenu.mockImplementation(async () => (ran.push('menu'), { ok: true, filed: 0, pageHash: 'h' }))
+      await GET(request())
+      expect(ran).toEqual(['k', 'site', 'menu'])
+    })
+
+    it('starts no watch after 200 seconds, and says how many it left for the next night', async () => {
+      let clock = Date.parse('2026-10-24T07:47:00.000Z')
+      vi.spyOn(Date, 'now').mockImplementation(() => clock)
+      mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b' }), watch({ id: 'c' }), watch({ id: 'd' })] })
+      // Each page takes two minutes: a, b started; c would start at 240s.
+      mockWebsite.mockImplementation(async () => ((clock += 120_000), { ok: true, filed: 0, pageHash: 'h' }))
+      const body = await (await GET(request())).json()
+      expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b'])
+      expect(body.left).toBe(2)
+      expect(recordedOutcomes).toEqual([
+        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night' },
+      ])
+    })
+
+    it('records a run that got to everything', async () => {
+      mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b', failingSince: '2026-10-22T07:00:00.000Z' })] })
+      mockWebsite.mockResolvedValueOnce({ ok: true, filed: 0, pageHash: 'h' }).mockResolvedValueOnce({ ok: false, error: 'The page answered 403' })
+      await GET(request())
+      expect(recordedOutcomes).toEqual([{ job: 'watches', ok: true, summary: 'Checked 2 of 2 watches · 1 not working', warning: null }])
+    })
   })
 })

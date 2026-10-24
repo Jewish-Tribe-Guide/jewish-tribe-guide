@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 23, 2026.
+Last updated: Oct 24, 2026.
 
 ## The branch
 
@@ -67,6 +67,11 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1d. **Migration 085 (`watch.last_check`)** is run on both databases
    (checked Oct 23). A watch's last check is kept across reloads.
+1e. **Migration 086 (`job_run`) is not run anywhere yet** (Oct 24). It
+   needs the Supabase SQL editor: dev first (no yes needed, but the
+   dashboard in Claude's browser isn't signed in), then live with a yes.
+   Until it's run, the nightly jobs run as before and the Watches tab's
+   Nightly runs says the migration is needed. It's safe to deploy first.
 
 ## For the user or the community
 
@@ -1230,6 +1235,36 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
+
+Found Oct 24: the live watches run checked 29 of 107 watches and stopped,
+and the same the day before. 35 had never been checked. It had 60
+seconds (copied from the AI routes on Oct 5, when it ran one watch) and
+went through the watches in the order they were added, so it stopped in
+about the same place every morning. Nothing showed it anywhere.
+
+- **The watches run has five minutes, and an order.** Kosher lists first,
+  then hospitals, eruv websites, shul times and mikvah hours, other
+  websites, and menus last (the slow AI reads). A watch that missed a
+  night (36 hours, since Vercel starts a cron any time in its hour) goes
+  ahead of everything, and within each group the one checked longest ago
+  goes first (`src/lib/watchRunOrder.ts`). No watch starts after 200
+  seconds; what's left goes first the next night. The eruv maps now run
+  alongside the start, not after every watch.
+- **Every nightly job records its runs** (migration 086, `job_run`;
+  `src/lib/jobRunStore.ts`): Google hours, Watches, Menus and Walks. Each
+  run saves a row when it starts and fills it in at the end with what it
+  did in a line, a warning (ran out of time, not set up) or its error. A
+  record that can't be saved never fails the job.
+- **The Watches tab has "Nightly runs"** (`NightlyRuns.tsx`): a row per
+  job with how it works, the last run's line, and, without opening
+  anything, Failed, Cut off (started, never finished), Didn't run (no run
+  in 30 hours) or Needs a look. Opening a row shows the last 14 runs.
+- **Not checked:** whether the Vercel plan allows 300 seconds. On Hobby
+  that needs fluid compute; the commit's preview build fails if not.
+- **Not built:** an email when a job breaks. The tab shows it; nothing is
+  sent.
 
 ## Done Oct 23, later: the trust sheet's checks; a pasted week as this week's (on `redesign/oct18-fixes`)
 

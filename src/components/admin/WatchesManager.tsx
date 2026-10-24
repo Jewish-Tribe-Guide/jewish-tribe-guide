@@ -22,6 +22,7 @@ import type { Hospital } from './HospitalsJob'
 import type { HoursPlace } from './HoursJob'
 import type { KosherLoaded } from './KosherJob'
 import { hoursCounts, isHoursOff, isHoursSearched, isStoppedPage } from '@/lib/hoursJob'
+import NightlyRuns, { type NightlyRunsLoaded } from './NightlyRuns'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
 // Everything the guide reads on its own to stay current: pages every
@@ -41,7 +42,8 @@ import { hoursCounts, isHoursOff, isHoursSearched, isStoppedPage } from '@/lib/h
 // for davening times). Since step 5 (Oct 21), Eruv status (moved here
 // from the Eruvim tab on Oct 19) and Kosher certification (Keystone-K's and
 // Mekor Habracha's lists) are jobs too. The rest are still listed below,
-// until each becomes a job of its own.
+// until each becomes a job of its own. Since Oct 24, Nightly runs: what
+// each job that runs on its own every night did (NightlyRuns.tsx).
 
 /** `job`: the job page where what's read for it waits ("Shul times"); none,
  *  the moderation queue. */
@@ -59,6 +61,7 @@ type Jobs = {
   eruvim?: EruvJobLoaded | null
   kosher?: KosherLoaded | null
   google?: { counts: JobCounts; total: number } | null
+  runs?: NightlyRunsLoaded | null
 }
 
 /** One job's row: what it is and its four counts; the whole row opens its
@@ -720,6 +723,7 @@ export default function WatchesManager({ token }: { token: string }) {
     void get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim')))
     void get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher')))
     void get<{ counts: JobCounts; total: number }>('/api/admin/watches/google?counts').then((d) => (d ? fill('google', d.counts ? d : null) : failed('google')))
+    void get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.jobs ? d : null) : failed('runs')))
     try {
       setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'))
     } catch (err) {
@@ -912,6 +916,7 @@ export default function WatchesManager({ token }: { token: string }) {
           <JobRow href={`${base}/watches/google`} name="Google" about={jobs.google ? `${jobs.google.total} listings, from Google Maps` : 'Listings, from Google Maps'} counts={jobs.google && jobs.google.counts} pages={false} />
         </ul>
       </section>
+      <NightlyRuns runs={jobs.runs} now={now} />
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
           Keeping a watch here needs database migration 070. Until it&rsquo;s run, Keystone-K&rsquo;s list is still read every morning.
