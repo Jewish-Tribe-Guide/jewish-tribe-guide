@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { jobHealth, LATE_AFTER_MS, needsLook, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
+import { jobAlert, jobHealth, LATE_AFTER_MS, needsLook, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
 
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const ago = (ms: number) => new Date(NOW - ms).toISOString()
@@ -92,5 +92,56 @@ describe('each job’s run, in a line', () => {
       warning: '3 walks couldn’t be worked out',
     })
     expect(walkRoutesOutcome({ ok: true, skipped: 'OPENROUTESERVICE_API_KEY is not set' })).toMatchObject({ warning: 'Not set up: OPENROUTESERVICE_API_KEY is not set' })
+  })
+})
+
+describe('jobAlert: emailing once when a job breaks, once when it works again', () => {
+  const JOB = { id: 'watches' as const, name: 'Watches' }
+  const night = (n: number, over: Partial<JobRun> = {}) =>
+    run({ id: `n${n}`, startedAt: `2026-10-${String(24 - n).padStart(2, '0')}T07:47:00.000Z`, finishedAt: `2026-10-${String(24 - n).padStart(2, '0')}T07:49:00.000Z`, ...over })
+  const fine = night
+  const failed = (n: number) => night(n, { ok: false, error: 'Google answered 403' })
+  const cutOff = (n: number) => night(n, { finishedAt: null, ok: null, summary: null })
+
+  it('nothing while it keeps working', () => {
+    expect(jobAlert(JOB, [fine(0), fine(1), fine(2)])).toBeNull()
+  })
+
+  it('the night it breaks, with why', () => {
+    expect(jobAlert(JOB, [failed(0), fine(1)])).toEqual({ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 24: Google answered 403'] })
+  })
+
+  it('a job’s first run breaking', () => {
+    expect(jobAlert(JOB, [failed(0)])).toMatchObject({ broke: true })
+  })
+
+  it('nothing on the nights it stays broken', () => {
+    expect(jobAlert(JOB, [failed(0), failed(1), fine(2)])).toBeNull()
+  })
+
+  it('the night it works again', () => {
+    expect(jobAlert(JOB, [fine(0), failed(1)])).toEqual({ job: 'watches', name: 'Watches', broke: false, lines: ['Oct 24: working again (Checked 107 of 107 watches)'] })
+  })
+
+  it('a run that ran out of time is a break too', () => {
+    expect(jobAlert(JOB, [night(0, { warning: 'Ran out of time: 27 left for the next night' }), fine(1)])).toMatchObject({ broke: true, lines: ['Oct 24: Ran out of time: 27 left for the next night'] })
+  })
+
+  // A run cut off can't send anything: the next one tells of it.
+  it('the next run tells of a run cut off, and that it works again', () => {
+    expect(jobAlert(JOB, [fine(0), cutOff(1), fine(2)])).toEqual({
+      job: 'watches',
+      name: 'Watches',
+      broke: false,
+      lines: ['Oct 23: stopped before it finished', 'Oct 24: working again (Checked 107 of 107 watches)'],
+    })
+  })
+
+  it('a run cut off, then one that failed: one email, still broken', () => {
+    expect(jobAlert(JOB, [failed(0), cutOff(1), fine(2)])).toEqual({ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 23: stopped before it finished'] })
+  })
+
+  it('cut off night after night: told once', () => {
+    expect(jobAlert(JOB, [night(0, { warning: 'x' }), cutOff(1), cutOff(2)])).toBeNull()
   })
 })

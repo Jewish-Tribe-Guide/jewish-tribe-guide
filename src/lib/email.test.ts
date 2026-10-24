@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification, sendWatchDigest } from './email'
+import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendJobAlert, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification, sendWatchDigest } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -14,9 +14,11 @@ const minimalContact: ContactHospitalData = {
 
 const mockGetCommunityNotifyRecipients = vi.hoisted(() => vi.fn())
 const mockGetReviewActionRecipients = vi.hoisted(() => vi.fn())
+const mockListCommunities = vi.hoisted(() => vi.fn())
 vi.mock('./communityStore', () => ({
   getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients,
   getReviewActionRecipients: mockGetReviewActionRecipients,
+  listCommunities: mockListCommunities,
 }))
 
 const mockGetCategoryById = vi.hoisted(() => vi.fn())
@@ -819,5 +821,38 @@ describe('user-supplied text never reaches an inbox as live HTML', () => {
       { name: XSS, category: XSS, from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
     ])
     expect(h.last().html).not.toContain('<script>')
+  })
+})
+
+// A nightly job runs for every community at once, so its email goes to every
+// community's admins, and once to someone who admins two.
+describe('sendJobAlert — a nightly job broke or works again', () => {
+  const h = harness()
+  beforeEach(() => {
+    mockListCommunities.mockResolvedValue([{ slug: 'philly' }, { slug: 'ues' }])
+    mockGetCommunityNotifyRecipients.mockImplementation(async (slug: string) =>
+      slug === 'philly' ? ['both@example.com', 'philly@example.com'] : ['both@example.com', 'ues@example.com'],
+    )
+  })
+  afterEach(() => mockGetCommunityNotifyRecipients.mockReset())
+
+  it('one email to every community’s admins, each once', async () => {
+    await sendJobAlert({ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 24: stopped before it finished'] })
+    expect(h.last().to).toEqual(['both@example.com', 'philly@example.com', 'ues@example.com'])
+  })
+
+  it('says it broke, why, and that one more email comes when it works', async () => {
+    await sendJobAlert({ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 24: Google <answered> 403'] })
+    const { subject, html } = h.last()
+    expect(subject).toBe('Nightly job stopped working: Watches')
+    expect(html).toContain('Oct 24: Google &lt;answered&gt; 403')
+    expect(html).toMatch(/one email when it works again/)
+  })
+
+  it('says it works again', async () => {
+    await sendJobAlert({ job: 'walk-routes', name: 'Walks', broke: false, lines: ['Oct 24: working again (Worked out 12 walks)'] })
+    const { subject, html } = h.last()
+    expect(subject).toBe('Nightly job working again: Walks')
+    expect(html).not.toMatch(/when it works again/)
   })
 })

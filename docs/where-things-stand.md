@@ -1258,11 +1258,18 @@ about the same place every morning. Nothing showed it anywhere.
 - **The Watches tab has "Nightly runs"** (`NightlyRuns.tsx`): a row per
   job with how it works, the last run's line, and, without opening
   anything, Failed, Cut off (started, never finished), Didn't run (no run
-  in 30 hours) or Needs a look. Opening a row shows the last 14 runs.
+  in 30 hours) or Needs a look. Opening a row shows the runs before the
+  latest, up to 14 in all.
 - **Vercel allows the 300 seconds:** the preview of 23e02ab5 built and
   deployed with it.
-- **Not built:** an email when a job breaks. The tab shows it; nothing is
-  sent.
+- **An email when a job breaks, and one when it works again**
+  (`jobAlert` in `jobRuns.ts`, `sendJobAlert` in `email.ts`), to every
+  community's admins once. Nothing while it stays broken. A run that was
+  cut off can't send anything, so the next run tells of it. A job that
+  stops running at all sends nothing; only the tab shows "Didn't run".
+- **Seen on dev:** a real Walks run, plus sample rows (failed, ran out of
+  time, cut off) added and deleted again. The email itself has only been
+  checked by the unit tests; no real one has been sent.
 
 ## Done Oct 23, later: the trust sheet's checks; a pasted week as this week's (on `redesign/oct18-fixes`)
 

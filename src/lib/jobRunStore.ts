@@ -1,11 +1,13 @@
 import { getAdminClient } from './supabase/admin'
-import { NIGHTLY_JOBS, type JobId, type JobOutcome, type JobRun } from './jobRuns'
+import { NIGHTLY_JOBS, jobAlert, type JobId, type JobOutcome, type JobRun } from './jobRuns'
+import { sendJobAlert } from './email'
 
 // The job_run table (migration 086): each nightly job's runs (jobRuns.ts).
 // Uncached: the jobs themselves and the admin Watches tab. Saving a run
 // never fails the job it records: a job that worked is not made to look
 // broken by its own record. Without the table, jobs run as before and
-// nothing is saved.
+// nothing is saved. After each run, the admins are emailed if the job
+// just broke or works again (jobAlert).
 
 /** How long a job's runs are kept. */
 export const KEEP_DAYS = 60
@@ -47,12 +49,32 @@ async function startRun(job: JobId, now: Date): Promise<string | null> {
   return (data as { id: string }).id
 }
 
+const COLUMNS = 'id, job, started_at, finished_at, ok, summary, warning, error'
+
+/** Emails the admins when this run broke the job or mended it. */
+async function tellIfChanged(job: JobId): Promise<void> {
+  const { data, error } = await getAdminClient().from('job_run').select(COLUMNS).eq('job', job).order('started_at', { ascending: false }).limit(3)
+  if (error) throw new Error(error.message)
+  const alert = jobAlert(NIGHTLY_JOBS.find((j) => j.id === job)!, ((data ?? []) as Row[]).map(fromRow))
+  if (alert) await sendJobAlert(alert)
+}
+
 async function finishRun(id: string, outcome: JobOutcome, now: Date): Promise<void> {
   const { error } = await getAdminClient()
     .from('job_run')
     .update({ finished_at: now.toISOString(), ok: outcome.ok, summary: outcome.summary, warning: outcome.warning ?? null, error: outcome.error ?? null })
     .eq('id', id)
-  if (error) console.error('[job-run] couldn’t save the finish:', error.message)
+  if (error) throw new Error(error.message)
+}
+
+/** Saves the finish and tells the admins of a change; never throws. */
+async function finish(job: JobId, id: string, outcome: JobOutcome, now: Date): Promise<void> {
+  try {
+    await finishRun(id, outcome, now)
+    await tellIfChanged(job)
+  } catch (err) {
+    quietly(`couldn’t save ${job}’s finish or tell of it`)(err)
+  }
 }
 
 /** Runs a job and saves how it went. `outcome` reads its result; a job
@@ -65,10 +87,10 @@ export async function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome
     result = await run()
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
-    if (id) await finishRun(id, { ok: false, summary: 'Stopped with an error', error }, now()).catch(quietly('finish'))
+    if (id) await finish(job, id, { ok: false, summary: 'Stopped with an error', error }, now())
     throw err
   }
-  if (id) await finishRun(id, outcome(result), now()).catch(quietly('finish'))
+  if (id) await finish(job, id, outcome(result), now())
   return result
 }
 
@@ -78,7 +100,7 @@ export async function listJobRuns(): Promise<{ available: boolean; runs: Record<
   const runs = Object.fromEntries(NIGHTLY_JOBS.map((j) => [j.id, [] as JobRun[]])) as Record<JobId, JobRun[]>
   const results = await Promise.all(
     NIGHTLY_JOBS.map((j) =>
-      getAdminClient().from('job_run').select('id, job, started_at, finished_at, ok, summary, warning, error').eq('job', j.id).order('started_at', { ascending: false }).limit(RUNS_SHOWN),
+      getAdminClient().from('job_run').select(COLUMNS).eq('job', j.id).order('started_at', { ascending: false }).limit(RUNS_SHOWN),
     ),
   )
   for (const [i, { data, error }] of results.entries()) {

@@ -59,12 +59,20 @@ describe('Nightly runs on the Watches tab', () => {
     expect(within(row('Walks')).getByText(/Hasn’t run since/)).toBeTruthy()
   })
 
-  it('opening a row shows its last runs', async () => {
-    const runs = [run({ startedAt: ago(6) }), run({ startedAt: ago(30), finishedAt: null, ok: null, summary: null })]
+  // The latest run is already the row's line; opening it adds the ones before.
+  it('opening a row shows the runs before the latest', async () => {
+    const runs = [run({ startedAt: ago(6) }), run({ startedAt: ago(30), finishedAt: null, ok: null, summary: null }), run({ startedAt: ago(54), summary: 'Checked 99 of 107 watches' })]
     render(<NightlyRuns runs={loaded({ watches: runs })} now={NOW} />)
     await userEvent.setup().click(within(row('Watches')).getByRole('button'))
-    const list = screen.getByRole('list', { name: 'Watches: last runs' })
-    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Checked 107 of 107 watches'), expect.stringContaining('Didn’t finish')])
+    const list = screen.getByRole('list', { name: 'Watches: earlier runs' })
+    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Didn’t finish'), expect.stringContaining('Checked 99 of 107 watches')])
+  })
+
+  it('opening a row with one run says there are none before it', async () => {
+    render(<NightlyRuns runs={loaded({ watches: [run({})] })} now={NOW} />)
+    await userEvent.setup().click(within(row('Watches')).getByRole('button'))
+    expect(screen.queryByRole('list', { name: 'Watches: earlier runs' })).toBeNull()
+    expect(within(row('Watches')).getByText('No earlier runs.')).toBeTruthy()
   })
 
   it('says when migration 086 hasn’t been run', () => {

@@ -6,7 +6,7 @@ import { jobHealth, type JobHealth, type JobRun, type NightlyJob } from '@/lib/j
 // ── The Watches tab's "Nightly runs" (Oct 24) ───────────────────────────────
 // A row per job that runs on its own every night (jobRuns.ts): how it
 // works, what its last run did, and, without opening anything, when it
-// failed, was cut off or didn't run. Tapping a row opens its last runs.
+// failed, was cut off or didn't run. Tapping a row opens the runs before.
 
 export type NightlyJobLoaded = NightlyJob & { runs: JobRun[] }
 export type NightlyRunsLoaded = { available: boolean; jobs: NightlyJobLoaded[] }
@@ -95,9 +95,9 @@ function JobRow({ job, now }: { job: NightlyJobLoaded; now: number }) {
         </span>
       </button>
       {open &&
-        (job.runs.length ? (
-          <ul className="mt-2 space-y-1" aria-label={`${job.name}: last runs`}>
-            {job.runs.map((r) => (
+        (job.runs.length > 1 ? (
+          <ul className="mt-2 space-y-1" aria-label={`${job.name}: earlier runs`}>
+            {job.runs.slice(1).map((r) => (
               <li key={r.id} className="flex gap-3 text-sm">
                 <span className="w-32 shrink-0 text-slate-500">{when(r.startedAt, now)}</span>
                 <span className={!r.finishedAt || r.ok === false ? 'text-red-700' : r.warning ? 'text-amber-800' : 'text-slate-700'}>{runLine(r)}</span>
@@ -105,7 +105,7 @@ function JobRow({ job, now }: { job: NightlyJobLoaded; now: number }) {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-slate-500">Its first run is tonight.</p>
+          <p className="mt-2 text-sm text-slate-500">{job.runs.length ? 'No earlier runs.' : 'Its first run is tonight.'}</p>
         ))}
     </li>
   )

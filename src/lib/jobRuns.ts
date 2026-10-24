@@ -136,3 +136,39 @@ export function walkRoutesOutcome(run: WalkRouteRun): JobOutcome {
   if (left) parts.push(`${left} left for the next night`)
   return { ok: true, summary: parts.join(' · '), warning: failed ? `${plural(failed, 'walk')} couldn’t be worked out` : null }
 }
+
+// ── Telling the admins (Oct 24) ─────────────────────────────────────────────
+// As a broken watch is: one email when a job stops working, one when it
+// works again, nothing on the nights between. Worked out at the end of
+// each run from the job's last three. A run cut off can't send anything,
+// so the next run tells of it. A job that stops running altogether sends
+// nothing: only the tab shows that.
+
+/** What was wrong with a run, or null. The latest run has just finished,
+ *  so only an older one can be cut off. */
+function problemOf(run: JobRun | undefined, latest: boolean): string | null {
+  if (!run) return null
+  if (!run.finishedAt) return latest ? null : 'stopped before it finished'
+  if (run.ok === false) return run.error || 'stopped with an error'
+  return run.warning || null
+}
+
+/** `broke`: it isn't working now; otherwise it works again. */
+export type JobAlert = { job: JobId; name: string; broke: boolean; lines: string[] }
+
+const runDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
+
+/** `runs`: the job's latest first, the first just finished. */
+export function jobAlert(job: Pick<NightlyJob, 'id' | 'name'>, runs: readonly JobRun[]): JobAlert | null {
+  const [now, before, earlier] = runs
+  if (!now) return null
+  const lines: string[] = []
+  // The run before was cut off, and nobody was told: the one before it was fine.
+  if (before && !before.finishedAt && !problemOf(earlier, false)) lines.push(`${runDay(before.startedAt)}: stopped before it finished`)
+  const problem = problemOf(now, true)
+  const was = problemOf(before, false)
+  if (problem && !was) lines.push(`${runDay(now.startedAt)}: ${problem}`)
+  else if (!problem && was) lines.push(`${runDay(now.startedAt)}: working again${now.summary ? ` (${now.summary})` : ''}`)
+  // Broken is how it is now: cut off and then fine is working again.
+  return lines.length ? { job: job.id, name: job.name, broke: !!problem, lines } : null
+}
