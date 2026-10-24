@@ -253,6 +253,33 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
+## Being drawn Oct 24: the Watches tab by kind of place (not built)
+
+Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
+is a new board beside the old one. Settled with the user so far:
+
+- Rows are the site's categories. A place's card shows only what needs
+  the admin. Tabs: Waiting for you, Not checked, Up to date.
+- **Not checked** holds only what won't fix itself: a field no source
+  covers, a source that stopped answering, or a source never read or not
+  read for over 36 hours (with Read it now). A source not yet read stays
+  off it for its first night. A place with two problems shows one group
+  per problem, each with its own buttons (Mix 7).
+- **Waiting for you** groups a place's changes by source, each group
+  with its own Accept / Edit / Keep as is (Mix 5). No Check now there.
+  Under one checker per field, two sources never disagree on a field.
+- **Nightly runs** is one line per kind of source (Google, Kosher
+  certification, Hospitals, Eruvs, Minyan times, Websites, Menus), its
+  run time on the right and what was read under it. Every line opens to
+  what it reads, last night's misses, and its last 14 nights. Walks are
+  not on it.
+- **The 3 AM watches run stays one job** (the user, Oct 24), not one
+  run per kind. Each kind's last night comes from its watches'
+  `last_check` times. Those times keep only the latest read, so a kind's
+  14 nights need the run to save its count per kind in its `job_run`
+  row (a new column, so a migration). Google's hours already have a job
+  and rows of their own.
+
 ## Building next: the job pages, as drawn (agreed Oct 21)
 
 The user, Oct 21: "great, let's do it". There is one drawing per page, all
