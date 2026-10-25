@@ -276,8 +276,9 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    on a grocery goes under Grocery; a place only a list has goes under
    Food. Not done yet, on purpose:
    - Every row now opens in place (pieces 2 to 4).
-   - The old job rows stay under "Job pages", and the watch list and Add
-     a watch stay below them, until pieces 2 to 4 hold what they do.
+   - The old job rows stay under "Job pages" until pieces 2 to 4 hold
+     what they do. The watch list and Add a watch are gone (piece 5,
+     What's tracked).
    - On the test site Food shows 25 waiting (mostly places only a kosher
      list has), 22 not checked and 49 up to date.
 2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
@@ -398,6 +399,21 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      new menus failed"). A night it read some says "· 3 new menus read".
    - Each place missed goes by its name ("Menu · Say She Ate" is Say
      She Ate; "Center City Eruv’s website" is Center City Eruv).
+   - **What's tracked, in place of the watch list: BUILT Oct 25** (the
+     user: "I want to see everything that's being tracked"). The section
+     is renamed What's tracked. Each line opens "All N tracked": every
+     place or page it covers, one line per place, its status ("Read Oct
+     24", "Not loading since Oct 20"), problems first, each a link to its
+     job page.
+     - **Newsletters** is a line of its own, with no run time: "2
+       newsletters · last email Oct 24 · 1 to link". Needs a look lists
+       senders not linked to a shul (with the Link box and Not a shul),
+       quiet for a month, or whose last email couldn't be read.
+     - **Other pages**: pages added by hand for no shul or mikvah. Shows
+       only when there are some (none on either site).
+     - Gone with the watch list: Add a watch, and Pause, Remove and Check
+       now on leftover pages. Pages are added from a place's own box (Add
+       a source).
 
 Settled with the user so far:
 
