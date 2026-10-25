@@ -72,7 +72,7 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
       get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
       get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
       get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
-      get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.jobs ? d : null) : failed('runs'))),
+      get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
     ])
   }, [token, community])
 

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn() }))
+const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn() }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/jobRunStore', () => ({ listJobRuns: m.listJobRuns }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
+vi.mock('@/lib/googleJobRun', () => ({ loadGoogleJob: m.loadGoogleJob }))
 
 const { GET } = await import('./route')
 const get = () => GET(new Request('http://x/api/admin/watches/runs'))
@@ -14,6 +16,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.listJobRuns.mockResolvedValue({ available: true, runs: { 'sync-hours': [], watches: [RUN], 'read-menus': [], 'walk-routes': [] } })
+  m.listWatches.mockResolvedValue({ available: true, watches: [] })
+  m.loadGoogleJob.mockResolvedValue([])
 })
 
 describe('/api/admin/watches/runs', () => {
@@ -23,11 +27,12 @@ describe('/api/admin/watches/runs', () => {
     expect(m.listJobRuns).not.toHaveBeenCalled()
   })
 
-  it('every nightly job, in the order they run, with how it works and its runs', async () => {
+  it('a line per kind of source, from this community’s watches and Google places', async () => {
     const body = await (await get()).json()
     expect(body.available).toBe(true)
-    expect(body.jobs.map((j: { id: string }) => j.id)).toEqual(['sync-hours', 'watches', 'read-menus', 'walk-routes'])
-    expect(body.jobs[1]).toMatchObject({ name: 'Watches', about: expect.any(String), runs: [RUN] })
+    expect(body.kinds.map((k: { name: string }) => k.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Websites', 'Menus'])
+    expect(m.listWatches).toHaveBeenCalledWith('philly')
+    expect(m.loadGoogleJob).toHaveBeenCalledWith('philly', expect.any(Number))
   })
 
   it('says when the table isn’t there yet', async () => {

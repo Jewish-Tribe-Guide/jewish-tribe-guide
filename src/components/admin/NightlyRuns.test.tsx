@@ -2,81 +2,78 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NIGHTLY_JOBS, type JobRun } from '@/lib/jobRuns'
-import NightlyRuns, { type NightlyRunsLoaded } from './NightlyRuns'
+import type { NightKindView } from '@/lib/nightKinds'
+import NightlyRuns from './NightlyRuns'
 
-const NOW = Date.parse('2026-10-24T14:00:00Z')
-const ago = (h: number) => new Date(NOW - h * 3_600_000).toISOString()
-
-function run(over: Partial<JobRun>): JobRun {
-  return { id: Math.random().toString(36), job: 'watches', startedAt: ago(6), finishedAt: ago(5.9), ok: true, summary: 'Checked 107 of 107 watches', warning: null, error: null, ...over }
+function kind(over: Partial<NightKindView>): NightKindView {
+  return { id: 'eruvs', name: 'Eruvs', about: 'Reads each eruv’s website for its hotline and email alerts.', when: '3:00 AM', count: '5 of 5 read', trouble: null, misses: [], nights: [], ...over }
 }
 
-function loaded(runs: Partial<Record<JobRun['job'], JobRun[]>>): NightlyRunsLoaded {
-  return { available: true, jobs: NIGHTLY_JOBS.map((j) => ({ ...j, runs: runs[j.id] ?? [] })) }
-}
+const GOOGLE = kind({ id: 'google', name: 'Google', about: 'Reads every place matched on Google.', when: '2:00 AM', count: '140 places read', nights: [{ date: 'Oct 25', result: '140 read', tone: 'good' }, { date: 'Oct 24', result: 'Didn’t run', tone: 'bad' }] })
+const ERUVS = kind({
+  count: '1 of 5 read',
+  trouble: '4 never read',
+  misses: [{ name: 'Lower Merion Eruv', why: 'Never read', page: 'eruv' }, { name: 'A page', why: 'Didn’t load', page: '' }],
+  nights: [{ date: 'Oct 25', result: '1 of 5 read', tone: 'bad' }],
+})
 
-const row = (name: string) => screen.getAllByTestId('nightly-job').find((r) => within(r).queryByText(name))!
+const show = (kinds: NightKindView[]) => render(<NightlyRuns runs={{ available: true, kinds }} base="/philly/admin" />)
+const lastNight = () => screen.getByRole('region', { name: 'Last night' })
+const user = () => userEvent.setup()
 
 afterEach(cleanup)
 
-describe('Nightly runs on the Watches tab', () => {
-  it('a row per nightly job, each saying how it works', () => {
-    render(<NightlyRuns runs={loaded({})} now={NOW} />)
-    expect(screen.getAllByTestId('nightly-job')).toHaveLength(4)
-    expect(within(row('Walks')).getByText(/Works out walking times along the streets/)).toBeTruthy()
-    expect(within(row('Walks')).getByText('Not run yet')).toBeTruthy()
+describe('Last night on the Watches tab', () => {
+  it('closed, says everything was read', () => {
+    show([GOOGLE, kind({})])
+    expect(lastNight()).toHaveTextContent('Last nightEverything read')
+    expect(screen.queryAllByTestId('night-kind')).toHaveLength(0)
   })
 
-  it('what the last run did, and when', () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({})] })} now={NOW} />)
-    expect(within(row('Watches')).getByText('Worked')).toBeTruthy()
-    expect(within(row('Watches')).getByText(/Checked 107 of 107 watches/)).toBeTruthy()
+  it('closed, says which kinds weren’t all read', () => {
+    show([GOOGLE, ERUVS, kind({ id: 'menus', name: 'Menus', count: 'Didn’t run since Oct 22' })])
+    expect(lastNight()).toHaveTextContent('Eruvs and menus not all read')
   })
 
-  // Oct 24's run, as it would have shown: started, never finished.
-  it('a run that never finished shows as cut off, without opening anything', () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({ finishedAt: null, ok: null, summary: null })] })} now={NOW} />)
-    expect(within(row('Watches')).getByText('Cut off')).toBeTruthy()
-    expect(within(row('Watches')).getByText(/stopped before it finished/)).toBeTruthy()
+  it('opened, a line per kind with its time and what it read', async () => {
+    show([GOOGLE, ERUVS])
+    await user().click(within(lastNight()).getByRole('button', { name: /Last night/ }))
+    const rows = screen.getAllByTestId('night-kind')
+    expect(rows.map((r) => r.textContent)).toEqual(['Google2:00 AM140 places read', 'Eruvs3:00 AM1 of 5 read · 4 never read'])
   })
 
-  it('a failed run shows its error', () => {
-    render(<NightlyRuns runs={loaded({ 'sync-hours': [run({ job: 'sync-hours', ok: false, error: 'Google answered 403' })] })} now={NOW} />)
-    expect(within(row('Google hours')).getByText('Failed')).toBeTruthy()
-    expect(within(row('Google hours')).getByText(/Google answered 403/)).toBeTruthy()
+  // FinalNightly's Eruvs, opened.
+  it('a kind opens to what it reads, what wasn’t read, each a link, and its nights', async () => {
+    show([GOOGLE, ERUVS])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /Last night/ }))
+    await u.click(screen.getByRole('button', { name: /^Eruvs/ }))
+    const row = screen.getAllByTestId('night-kind')[1]
+    expect(within(row).getByText('Reads each eruv’s website for its hotline and email alerts.')).toBeTruthy()
+    const misses = within(row).getByRole('list', { name: 'Eruvs: not read last night' })
+    expect(within(misses).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Lower Merion EruvNever read', '/philly/admin/watches/eruv'],
+      ['A pageDidn’t load', '/philly/admin/watches'],
+    ])
+    expect(within(row).getByRole('list', { name: 'Eruvs: last 14 nights' })).toHaveTextContent('Oct 251 of 5 read')
   })
 
-  it('a run that ran out of time says what it left', () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({ summary: 'Checked 80 of 107 watches', warning: 'Ran out of time: 27 left for the next night' })] })} now={NOW} />)
-    expect(within(row('Watches')).getByText('Needs a look')).toBeTruthy()
-    expect(within(row('Watches')).getByText('Ran out of time: 27 left for the next night')).toBeTruthy()
+  it('a kind with nothing missed says so', async () => {
+    show([GOOGLE])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /Last night/ }))
+    await u.click(screen.getByRole('button', { name: /^Google/ }))
+    expect(screen.getByText('Nothing missed last night')).toBeTruthy()
+    expect(within(screen.getByRole('list', { name: 'Google: last 14 nights' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Oct 25140 read', 'Oct 24Didn’t run'])
   })
 
-  it('a job with no run since the night before last didn’t run', () => {
-    render(<NightlyRuns runs={loaded({ 'walk-routes': [run({ job: 'walk-routes', startedAt: ago(54), finishedAt: ago(53.9) })] })} now={NOW} />)
-    expect(within(row('Walks')).getByText('Didn’t run')).toBeTruthy()
-    expect(within(row('Walks')).getByText(/Hasn’t run since/)).toBeTruthy()
-  })
-
-  // The latest run is already the row's line; opening it adds the ones before.
-  it('opening a row shows the runs before the latest', async () => {
-    const runs = [run({ startedAt: ago(6) }), run({ startedAt: ago(30), finishedAt: null, ok: null, summary: null }), run({ startedAt: ago(54), summary: 'Checked 99 of 107 watches' })]
-    render(<NightlyRuns runs={loaded({ watches: runs })} now={NOW} />)
-    await userEvent.setup().click(within(row('Watches')).getByRole('button'))
-    const list = screen.getByRole('list', { name: 'Watches: earlier runs' })
-    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Didn’t finish'), expect.stringContaining('Checked 99 of 107 watches')])
-  })
-
-  it('opening a row with one run says there are none before it', async () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({})] })} now={NOW} />)
-    await userEvent.setup().click(within(row('Watches')).getByRole('button'))
-    expect(screen.queryByRole('list', { name: 'Watches: earlier runs' })).toBeNull()
-    expect(within(row('Watches')).getByText('No earlier runs.')).toBeTruthy()
-  })
-
-  it('says when migration 086 hasn’t been run', () => {
-    render(<NightlyRuns runs={{ available: false, jobs: [] }} now={NOW} />)
-    expect(screen.getByText(/needs database migration 086/)).toBeTruthy()
+  it('while loading, when it couldn’t load, and before migration 086', () => {
+    const { rerender } = render(<NightlyRuns runs={undefined} base="/philly/admin" />)
+    expect(lastNight()).toHaveTextContent('Loading…')
+    rerender(<NightlyRuns runs={null} base="/philly/admin" />)
+    expect(lastNight()).toHaveTextContent('Couldn’t load the nightly runs')
+    rerender(<NightlyRuns runs={{ available: false, kinds: [] }} base="/philly/admin" />)
+    expect(lastNight()).toHaveTextContent(/needs database migration 086/)
+    expect(within(lastNight()).getByRole('button')).toBeDisabled()
   })
 })

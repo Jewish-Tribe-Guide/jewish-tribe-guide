@@ -60,12 +60,14 @@ describe('jobHealth: how a nightly job’s last run went', () => {
 
 describe('each job’s run, in a line', () => {
   it('watches: how many of how many, and what ran out of time', () => {
-    expect(watchesOutcome({ active: 107, ran: 107, notWorking: 0, left: 0 })).toEqual({ ok: true, summary: 'Checked 107 of 107 watches', warning: null })
+    expect(watchesOutcome({ active: 107, ran: 107, notWorking: 0, left: 0 })).toEqual({ ok: true, summary: 'Checked 107 of 107 watches', warning: null, kinds: null })
     expect(watchesOutcome({ active: 107, ran: 80, notWorking: 2, left: 27 })).toEqual({
       ok: true,
       summary: 'Checked 80 of 107 watches · 2 not working',
       warning: 'Ran out of time: 27 left for the next night',
+      kinds: null,
     })
+    expect(watchesOutcome({ active: 1, ran: 1, notWorking: 0, left: 0, kinds: { philly: { eruvs: { of: 1, read: 1 } } } }).kinds).toEqual({ philly: { eruvs: { of: 1, read: 1 } } })
   })
 
   it('Google hours: what it asked, and what it couldn’t', () => {
@@ -73,6 +75,7 @@ describe('each job’s run, in a line', () => {
       ok: true,
       summary: 'Asked Google about 140 listings · refreshed 20 · 1 listing opened or closed',
       warning: '2 listings couldn’t be asked',
+      kinds: null,
     })
     expect(syncHoursOutcome({ ok: false, error: 'db down' })).toMatchObject({ ok: false, error: 'db down' })
   })

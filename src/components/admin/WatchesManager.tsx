@@ -41,8 +41,8 @@ import { forgetWatchJobs, useWatchJobs } from './useWatchJobs'
 // for davening times). Since step 5 (Oct 21), Eruv status (moved here
 // from the Eruvim tab on Oct 19) and Kosher certification (Keystone-K's and
 // Mekor Habracha's lists) are jobs too. The rest are still listed below,
-// until each becomes a job of its own. Since Oct 24, Nightly runs: what
-// each job that runs on its own every night did (NightlyRuns.tsx).
+// until each becomes a job of its own. Since Oct 25, Last night: a line
+// per kind of source, what the nightly runs read (NightlyRuns.tsx).
 //
 // Since Oct 25 the tab starts with a row per kind of place (WatchKinds.tsx,
 // watchPlaces.ts), each opening its places in three tabs. The job rows sit
@@ -834,7 +834,7 @@ export default function WatchesManager({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <WatchKinds jobs={jobs} base={base} now={now} />
-      <NightlyRuns runs={jobs.runs} now={now} />
+      <NightlyRuns runs={jobs.runs} base={base} />
       {/* Each job's own page, until the pages by kind of place hold all
           they do (pieces 2 to 4). */}
       <h2 className="pt-2 text-sm font-semibold text-slate-700">Job pages</h2>

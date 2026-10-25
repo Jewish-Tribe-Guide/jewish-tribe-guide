@@ -13,7 +13,8 @@
 // (eruvLineRun.ts). Meant to run daily (vercel.json). Each run is recorded
 // on the watch, and the admins are emailed once when a watch breaks and
 // once when it recovers. The run itself is recorded too (jobRunStore.ts),
-// for the Watches tab.
+// for the Watches tab, with how many of each kind of source it read
+// (nightKinds.ts).
 //
 // Oct 24: the run had a minute and checked the watches in the order they
 // were added, so it stopped after the first 29 of 107 every morning. Now
@@ -39,6 +40,7 @@ import { syncEruvWebsiteWatches } from '@/lib/eruvWebsiteRun'
 import { orderForRun } from '@/lib/watchRunOrder'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { watchesOutcome, type WatchesRun } from '@/lib/jobRuns'
+import { countWatchKinds } from '@/lib/nightKinds'
 
 export const maxDuration = 300
 
@@ -113,7 +115,8 @@ async function runAll(started = Date.now()): Promise<Body> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left }
+  const read = new Set(results.filter((r) => r.ok).map((r) => r.id))
+  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 

@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase/admin'
-import { NIGHTLY_JOBS, jobAlert, type JobId, type JobOutcome, type JobRun } from './jobRuns'
+import { NIGHTLY_JOBS, jobAlert, type JobId, type JobOutcome, type JobRun, type RunKinds } from './jobRuns'
 import { sendJobAlert } from './email'
 
 // The job_run table (migration 086): each nightly job's runs (jobRuns.ts).
@@ -7,7 +7,9 @@ import { sendJobAlert } from './email'
 // never fails the job it records: a job that worked is not made to look
 // broken by its own record. Without the table, jobs run as before and
 // nothing is saved. After each run, the admins are emailed if the job
-// just broke or works again (jobAlert).
+// just broke or works again (jobAlert). What a run read of each kind of
+// source is saved too (`kinds`, migration 087); without that column, the
+// rest still is.
 
 /** How long a job's runs are kept. */
 export const KEEP_DAYS = 60
@@ -24,14 +26,20 @@ type Row = {
   summary: string | null
   warning: string | null
   error: string | null
+  kinds?: RunKinds | null
 }
 
 function fromRow(r: Row): JobRun {
-  return { id: r.id, job: r.job, startedAt: r.started_at, finishedAt: r.finished_at, ok: r.ok, summary: r.summary, warning: r.warning, error: r.error }
+  return { id: r.id, job: r.job, startedAt: r.started_at, finishedAt: r.finished_at, ok: r.ok, summary: r.summary, warning: r.warning, error: r.error, kinds: r.kinds ?? null }
 }
 
 export function runTableMissing(message: string | undefined): boolean {
   return !!message && /\bjob_run\b/.test(message) && /(does not exist|schema cache)/.test(message)
+}
+
+/** Migration 087 not run yet. */
+export function kindsColumnMissing(message: string | undefined): boolean {
+  return !!message && /\bkinds\b/.test(message) && /(does not exist|schema cache)/.test(message)
 }
 
 const quietly = (what: string) => (err: unknown) => console.error(`[job-run] ${what}:`, err)
@@ -60,10 +68,10 @@ async function tellIfChanged(job: JobId): Promise<void> {
 }
 
 async function finishRun(id: string, outcome: JobOutcome, now: Date): Promise<void> {
-  const { error } = await getAdminClient()
-    .from('job_run')
-    .update({ finished_at: now.toISOString(), ok: outcome.ok, summary: outcome.summary, warning: outcome.warning ?? null, error: outcome.error ?? null })
-    .eq('id', id)
+  const row = { finished_at: now.toISOString(), ok: outcome.ok, summary: outcome.summary, warning: outcome.warning ?? null, error: outcome.error ?? null }
+  const save = (r: Record<string, unknown>) => getAdminClient().from('job_run').update(r).eq('id', id)
+  let { error } = await save(outcome.kinds ? { ...row, kinds: outcome.kinds } : row)
+  if (error && outcome.kinds && kindsColumnMissing(error.message)) ({ error } = await save(row))
   if (error) throw new Error(error.message)
 }
 
@@ -98,17 +106,16 @@ export async function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome
  *  migration 086. */
 export async function listJobRuns(): Promise<{ available: boolean; runs: Record<JobId, JobRun[]> }> {
   const runs = Object.fromEntries(NIGHTLY_JOBS.map((j) => [j.id, [] as JobRun[]])) as Record<JobId, JobRun[]>
-  const results = await Promise.all(
-    NIGHTLY_JOBS.map((j) =>
-      getAdminClient().from('job_run').select(COLUMNS).eq('job', j.id).order('started_at', { ascending: false }).limit(RUNS_SHOWN),
-    ),
-  )
+  const read = (columns: string) =>
+    Promise.all(NIGHTLY_JOBS.map((j) => getAdminClient().from('job_run').select(columns).eq('job', j.id).order('started_at', { ascending: false }).limit(RUNS_SHOWN)))
+  let results = await read(`${COLUMNS}, kinds`)
+  if (results.some((r) => kindsColumnMissing(r.error?.message))) results = await read(COLUMNS)
   for (const [i, { data, error }] of results.entries()) {
     if (error) {
       if (runTableMissing(error.message)) return { available: false, runs }
       throw new Error(`Failed to load the job runs: ${error.message}`)
     }
-    runs[NIGHTLY_JOBS[i].id] = ((data ?? []) as Row[]).map(fromRow)
+    runs[NIGHTLY_JOBS[i].id] = ((data ?? []) as unknown as Row[]).map(fromRow)
   }
   return { available: true, runs }
 }

@@ -48,9 +48,18 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
   },
 ]
 
+/** The kinds of source the tab gives a line each (nightKinds.ts). */
+export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'websites' | 'menus'
+
+/** How many of a kind's sources a run had, and how many it read. */
+export type KindCount = { of: number; read: number }
+
+/** job_run.kinds (migration 087): per community, per kind. */
+export type RunKinds = Record<string, Partial<Record<NightKindId, KindCount>>>
+
 /** What a run ends with. `warning`: it worked, but didn't get to
- *  everything, or wasn't set up. */
-export type JobOutcome = { ok: boolean; summary: string; warning?: string | null; error?: string | null }
+ *  everything, or wasn't set up. `kinds`: what it read of each kind. */
+export type JobOutcome = { ok: boolean; summary: string; warning?: string | null; error?: string | null; kinds?: RunKinds | null }
 
 export type JobRun = {
   id: string
@@ -61,6 +70,8 @@ export type JobRun = {
   summary: string | null
   warning: string | null
   error: string | null
+  /** Saved since migration 087; null before it, and on older runs. */
+  kinds?: RunKinds | null
 }
 
 /** A daily job is late once a day and a few hours have gone by: Vercel
@@ -97,22 +108,22 @@ const sum = <T,>(xs: readonly T[], f: (x: T) => number) => xs.reduce((n, x) => n
 // ── Each job's run, in a line ───────────────────────────────────────────────
 
 export type SyncHoursRun =
-  | { ok: true; total: number; refreshed: number; synced: number; failed: number; flaggedClosed: number; statusChanged: number }
+  | { ok: true; total: number; refreshed: number; synced: number; failed: number; flaggedClosed: number; statusChanged: number; kinds?: RunKinds }
   | { ok: false; error: string }
 
 export function syncHoursOutcome(run: SyncHoursRun): JobOutcome {
   if (!run.ok) return { ok: false, summary: 'Couldn’t read the listings', error: run.error }
   const parts = [`Asked Google about ${plural(run.total, 'listing')}`, `refreshed ${run.refreshed}`]
   if (run.statusChanged) parts.push(`${plural(run.statusChanged, 'listing')} opened or closed`)
-  return { ok: true, summary: parts.join(' · '), warning: run.failed ? `${plural(run.failed, 'listing')} couldn’t be asked` : null }
+  return { ok: true, summary: parts.join(' · '), warning: run.failed ? `${plural(run.failed, 'listing')} couldn’t be asked` : null, kinds: run.kinds ?? null }
 }
 
-export type WatchesRun = { active: number; ran: number; notWorking: number; left: number }
+export type WatchesRun = { active: number; ran: number; notWorking: number; left: number; kinds?: RunKinds }
 
 export function watchesOutcome(run: WatchesRun): JobOutcome {
   const parts = [`Checked ${run.ran} of ${plural(run.active, 'watch', 'watches')}`]
   if (run.notWorking) parts.push(`${run.notWorking} not working`)
-  return { ok: true, summary: parts.join(' · '), warning: run.left ? `Ran out of time: ${run.left} left for the next night` : null }
+  return { ok: true, summary: parts.join(' · '), warning: run.left ? `Ran out of time: ${run.left} left for the next night` : null, kinds: run.kinds ?? null }
 }
 
 /** readUnreadMenus's, per community. */

@@ -233,7 +233,7 @@ describe('/api/cron/watches', () => {
       expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b'])
       expect(body.left).toBe(2)
       expect(recordedOutcomes).toEqual([
-        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night' },
+        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night', kinds: { philly: { websites: { of: 4, read: 2 } } } },
       ])
     })
 
@@ -241,7 +241,22 @@ describe('/api/cron/watches', () => {
       mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b', failingSince: '2026-10-22T07:00:00.000Z' })] })
       mockWebsite.mockResolvedValueOnce({ ok: true, filed: 0, pageHash: 'h' }).mockResolvedValueOnce({ ok: false, error: 'The page answered 403' })
       await GET(request())
-      expect(recordedOutcomes).toEqual([{ job: 'watches', ok: true, summary: 'Checked 2 of 2 watches · 1 not working', warning: null }])
+      expect(recordedOutcomes).toEqual([{ job: 'watches', ok: true, summary: 'Checked 2 of 2 watches · 1 not working', warning: null, kinds: { philly: { websites: { of: 2, read: 1 } } } }])
+    })
+
+    // Oct 25: for the Watches tab's line per kind (nightKinds.ts).
+    it('records how many of each kind it read, per community', async () => {
+      mockList.mockResolvedValue({
+        available: true,
+        watches: [
+          watch({ id: 'k', kind: 'keystone_list', url: 'https://keystone-k.org/establishments/' }),
+          watch({ id: 'menu', url: 'https://judah.example/menu', resourceId: 'r1', createdBy: 'menu links', communityId: 'ues' }),
+        ],
+      })
+      mockKeystone.mockResolvedValue({ ok: true, entries: 54, findings: 0, filed: 0, closedOnGoogle: [] })
+      mockMenu.mockResolvedValue({ ok: false, error: 'The page answered 404' })
+      await GET(request())
+      expect(recordedOutcomes[0]).toMatchObject({ kinds: { philly: { kosher: { of: 1, read: 1 } }, ues: { menus: { of: 1, read: 0 } } } })
     })
   })
 })

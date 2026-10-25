@@ -70,6 +70,10 @@ for that exact change, in the same conversation. Show the dry run first.
 1e. **Migration 086 (`job_run`)** is run on both databases (the user,
    Oct 24; checked). The live jobs start recording once this branch is
    deployed.
+1f. **Migration 087 (`job_run.kinds`) is not run anywhere yet** (Oct 25).
+   It needs the SQL editor: dev is the test project, and live needs your
+   yes. Without it the runs save as before, and Last night's earlier
+   nights say "Not counted". Last night itself works without it.
 
 ## For the user or the community
 
@@ -365,8 +369,25 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      - A waiting place with nothing a group can show shows "Open it
        where it waits", a link to its job page. None seen on the test
        site.
-5. Nightly runs as one line per kind. Needs a new `job_run` column (a
-   migration: dev only, ask before production).
+5. **Last night, a line per kind: BUILT Oct 25** (`nightKinds.ts`,
+   `NightlyRuns.tsx`, FinalNightly). Closed: "Everything read", or which
+   kinds weren't ("Kosher certification, minyan times and menus not all
+   read"), amber. Opened: Google, Kosher certification, Hospitals,
+   Eruvs, Minyan times, Websites, Menus, each its run's time and "11 of
+   20 read · 9 didn’t load". A kind opens to what it reads, Not read last
+   night (Never read, Didn’t load, Not reached; a place's pages as one
+   line, "· 5 pages"), each a link to its job page, and its last 14
+   nights.
+   - Last night comes from the sources as they are now (each watch's
+     last read, each listing's last Google answer), so one read again
+     since stops showing. The nights before come from the count each run
+     saves per community and kind (migration 087, 1f).
+   - Newsletters aren't counted: they're read as each email comes in.
+     A mikvah's page of hours is under Websites.
+   - Gone from the tab: the old row per job. Walks and the read-menus
+     job have no line. Their emails when they break still go out.
+   Open, for you: should the read-menus job (menus never read yet) fold
+   into Menus, or stay off the tab?
 
 Settled with the user so far:
 
@@ -1490,11 +1511,12 @@ about the same place every morning. Nothing showed it anywhere.
   run saves a row when it starts and fills it in at the end with what it
   did in a line, a warning (ran out of time, not set up) or its error. A
   record that can't be saved never fails the job.
-- **The Watches tab has "Nightly runs"** (`NightlyRuns.tsx`): a row per
+- **The Watches tab had "Nightly runs"** (`NightlyRuns.tsx`): a row per
   job with how it works, the last run's line, and, without opening
   anything, Failed, Cut off (started, never finished), Didn't run (no run
-  in 30 hours) or Needs a look. Opening a row shows the runs before the
-  latest, up to 14 in all.
+  in 30 hours) or Needs a look. Replaced Oct 25 by Last night, a line per
+  kind (piece 5), which says the same per kind: "Didn’t run since Oct
+  22", "Failed", "stopped before it finished".
 - **Vercel allows the 300 seconds:** the preview of 23e02ab5 built and
   deployed with it.
 - **An email when a job breaks, and one when it works again**

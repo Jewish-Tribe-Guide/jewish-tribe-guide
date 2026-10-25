@@ -1,131 +1,137 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
-import { jobHealth, type JobHealth, type JobRun, type NightlyJob } from '@/lib/jobRuns'
+import { kindBad, lastNightLine, type KindNight, type NightKindView } from '@/lib/nightKinds'
 
-// ── The Watches tab's "Nightly runs" (Oct 24) ───────────────────────────────
-// A row per job that runs on its own every night (jobRuns.ts): how it
-// works, what its last run did, and, without opening anything, when it
-// failed, was cut off or didn't run. Tapping a row opens the runs before.
+// ── The Watches tab's "Last night" (Oct 25, FinalNightly) ───────────────────
+// A row that says whether everything was read last night, or which kinds
+// weren't. Opened, a line per kind of source (nightKinds.ts): its run's
+// time and what it read. A kind opens to what it reads, what wasn't read
+// last night and why, each a link to its job page, and its last 14 nights.
 
-export type NightlyJobLoaded = NightlyJob & { runs: JobRun[] }
-export type NightlyRunsLoaded = { available: boolean; jobs: NightlyJobLoaded[] }
+export type NightlyRunsLoaded = { available: boolean; kinds: NightKindView[] }
 
-const PILL: Record<'ok' | 'bad' | 'todo' | 'off', string> = {
-  ok: 'bg-green-50 text-green-800',
-  bad: 'bg-red-50 text-red-700',
-  todo: 'bg-amber-50 text-amber-800',
-  off: 'bg-slate-100 text-slate-600',
-}
-
-function pillOf(h: JobHealth): { tone: keyof typeof PILL; text: string } {
-  switch (h.state) {
-    case 'ok':
-      return { tone: 'ok', text: 'Worked' }
-    case 'warning':
-      return { tone: 'todo', text: 'Needs a look' }
-    case 'failed':
-      return { tone: 'bad', text: 'Failed' }
-    case 'cut off':
-      return { tone: 'bad', text: 'Cut off' }
-    case 'late':
-      return { tone: 'bad', text: 'Didn’t run' }
-    case 'running':
-      return { tone: 'off', text: 'Running' }
-    case 'never':
-      return { tone: 'off', text: 'Not run yet' }
-  }
-}
-
-function when(iso: string, now: number): string {
-  const d = new Date(iso)
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  const today = new Date(now).toDateString() === d.toDateString()
-  return today ? `Today ${time}` : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`
-}
-
-/** What the last run did, or what's wrong, in a line. */
-function LastLine({ health, last, now }: { health: JobHealth; last: JobRun | undefined; now: number }) {
-  if (!last) return <span className="block text-sm text-slate-500">No run recorded yet.</span>
-  const at = when(last.startedAt, now)
-  switch (health.state) {
-    case 'late':
-      return <span className="block text-sm font-medium text-red-700">Hasn&rsquo;t run since {when(health.since, now)}.</span>
-    case 'cut off':
-      return <span className="block text-sm font-medium text-red-700">{at}: stopped before it finished.</span>
-    case 'failed':
-      return <span className="block text-sm font-medium text-red-700">{at}: {health.error}</span>
-    case 'running':
-      return <span className="block text-sm text-slate-700">{at}: running now.</span>
-    default:
-      return (
-        <span className="block text-sm text-slate-700">
-          {at} · {last.summary}
-          {health.state === 'warning' && <span className="block font-medium text-amber-800">{health.warning}</span>}
-        </span>
-      )
-  }
-}
-
-function runLine(run: JobRun): string {
-  if (!run.finishedAt) return 'Didn’t finish'
-  if (run.ok === false) return run.error || 'Failed'
-  return [run.summary, run.warning].filter(Boolean).join(' · ')
-}
-
-function JobRow({ job, now }: { job: NightlyJobLoaded; now: number }) {
-  const [open, setOpen] = useState(false)
-  const health = jobHealth(job, job.runs, now)
-  const pill = pillOf(health)
+function Chevron({ open, size = 16, className = '' }: { open: boolean; size?: number; className?: string }) {
   return (
-    <li className="px-4 py-3" data-testid="nightly-job">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="block w-full cursor-pointer text-left">
-        <span className="flex items-start gap-3">
-          <span className="min-w-0 flex-1 space-y-0.5">
-            <span className="block font-semibold text-slate-900">{job.name}</span>
-            <span className="block text-xs text-muted">{job.about}</span>
-            <LastLine health={health} last={job.runs[0]} now={now} />
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={`shrink-0 text-slate-400 ${className}`}>
+      <path d={open ? 'M4 6l4 4 4-4' : 'M6 4l4 4-4 4'} />
+    </svg>
+  )
+}
+
+const NIGHT_TONE: Record<KindNight['tone'], string> = {
+  good: 'text-slate-600',
+  bad: 'font-semibold text-amber-800',
+  none: 'text-slate-400',
+}
+
+function CountLine({ kind }: { kind: NightKindView }) {
+  return kindBad(kind) ? (
+    <span className="block text-[13.5px] font-semibold text-amber-800">{[kind.count, kind.trouble].filter(Boolean).join(' · ')}</span>
+  ) : (
+    <span className="block text-[13.5px] text-slate-600">{kind.count}</span>
+  )
+}
+
+function KindRow({ kind, base }: { kind: NightKindView; base: string }) {
+  const [open, setOpen] = useState(false)
+  const page = (p: string) => (p ? `${base}/watches/${p}` : `${base}/watches`)
+  return (
+    <li className="border-t border-slate-100" data-testid="night-kind">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex min-h-11 w-full cursor-pointer items-start gap-2.5 px-3.5 py-3 text-left">
+        {open && <Chevron open className="mt-0.5" />}
+        <span className="min-w-0 flex-1 space-y-0.5">
+          <span className="flex justify-between gap-2">
+            <span className="text-[15px] font-bold text-slate-900">{kind.name}</span>
+            {kind.when && <span className="whitespace-nowrap text-[12.5px] text-slate-500">{kind.when}</span>}
           </span>
-          <span className="flex shrink-0 flex-col items-end gap-1">
-            <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${PILL[pill.tone]}`}>{pill.text}</span>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={`text-slate-400 ${open ? 'rotate-180' : ''}`}>
-              <path d="M4 6l4 4 4-4" />
-            </svg>
-          </span>
+          <CountLine kind={kind} />
         </span>
+        {!open && <Chevron open={false} className="self-center" />}
       </button>
-      {open &&
-        (job.runs.length > 1 ? (
-          <ul className="mt-2 space-y-1" aria-label={`${job.name}: earlier runs`}>
-            {job.runs.slice(1).map((r) => (
-              <li key={r.id} className="flex gap-3 text-sm">
-                <span className="w-32 shrink-0 text-slate-500">{when(r.startedAt, now)}</span>
-                <span className={!r.finishedAt || r.ok === false ? 'text-red-700' : r.warning ? 'text-amber-800' : 'text-slate-700'}>{runLine(r)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">{job.runs.length ? 'No earlier runs.' : 'Its first run is tonight.'}</p>
-        ))}
+      {open && (
+        <div className="pb-1.5">
+          <p className="pb-2.5 pl-10 pr-3.5 text-[13.5px] text-slate-600">{kind.about}</p>
+          {kind.misses.length ? (
+            <>
+              <span className="block pb-1 pl-10 pr-3.5 pt-2 text-[12.5px] font-semibold text-slate-500">Not read last night</span>
+              <ul aria-label={`${kind.name}: not read last night`}>
+                {kind.misses.map((m, i) => (
+                  <li key={i} className="ml-10 border-t border-slate-100">
+                    <Link href={page(m.page)} className="flex min-h-11 items-center gap-2.5 py-2.5 pr-3.5 text-slate-900">
+                      <span className="min-w-0 flex-1 text-sm font-semibold">{m.name}</span>
+                      <span className="whitespace-nowrap text-[12.5px] font-semibold text-amber-800">{m.why}</span>
+                      <Chevron open={false} size={14} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            kind.when &&
+            !kindBad(kind) && <span className="block pb-2.5 pl-10 pr-3.5 pt-2 text-[13.5px] font-semibold text-green-800">Nothing missed last night</span>
+          )}
+          {kind.nights.length > 0 && (
+            <>
+              <span className="block pb-1 pl-10 pr-3.5 pt-3.5 text-[12.5px] font-semibold text-slate-500">Last 14 nights</span>
+              <ul aria-label={`${kind.name}: last 14 nights`}>
+                {kind.nights.map((n) => (
+                  <li key={n.date} className="ml-10 flex justify-between gap-2 border-t border-slate-100 py-[7px] pr-3.5 text-[13.5px]">
+                    <span className="text-slate-600">{n.date}</span>
+                    <span className={NIGHT_TONE[n.tone]}>{n.result}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
     </li>
   )
 }
 
 /** `runs`: undefined while loading, null when it couldn't be loaded. */
-export default function NightlyRuns({ runs, now }: { runs: NightlyRunsLoaded | null | undefined; now: number }) {
+export default function NightlyRuns({ runs, base }: { runs: NightlyRunsLoaded | null | undefined; base: string }) {
+  const [open, setOpen] = useState(false)
+  const kinds = runs?.available ? runs.kinds : null
+  const line = kinds && lastNightLine(kinds)
+  const status =
+    runs === undefined
+      ? { tone: 'text-slate-500', text: 'Loading…' }
+      : runs === null
+        ? { tone: 'text-slate-500', text: 'Couldn’t load the nightly runs' }
+        : !line
+          ? { tone: 'text-amber-800', text: 'Keeping a record of the nightly runs needs database migration 086' }
+          : { tone: line.good ? 'text-green-800' : 'text-amber-800', text: line.text }
+  const warn = !!line && !line.good && !open
   return (
-    <section className="rounded-lg border border-slate-200 bg-white" aria-label="Nightly runs">
-      <h2 className="border-b border-slate-100 px-4 py-2 text-sm font-semibold text-slate-900">Nightly runs</h2>
-      {runs === undefined ? (
-        <p className="px-4 py-3 text-sm text-slate-500">Loading…</p>
-      ) : runs === null ? (
-        <p className="px-4 py-3 text-sm text-slate-500">Couldn&rsquo;t load the nightly runs.</p>
-      ) : !runs.available ? (
-        <p className="px-4 py-3 text-sm text-amber-800">Keeping a record of the nightly runs needs database migration 086.</p>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {runs.jobs.map((j) => (
-            <JobRow key={j.id} job={j} now={now} />
+    <section aria-label="Last night" className={`rounded-[10px] border ${warn ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        disabled={!kinds}
+        onClick={() => setOpen((o) => !o)}
+        className={`flex min-h-11 w-full items-center gap-2.5 p-3.5 text-left ${kinds ? 'cursor-pointer' : ''}`}
+      >
+        {open && <Chevron open />}
+        {open || line?.good !== false ? (
+          <span className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="flex-1 text-[15px] font-bold text-slate-900">Last night</span>
+            {!open && <span className={`text-[13.5px] font-semibold ${status.tone}`}>{status.text}</span>}
+          </span>
+        ) : (
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[15px] font-bold text-slate-900">Last night</span>
+            <span className={`text-[13.5px] font-semibold ${status.tone}`}>{status.text}</span>
+          </span>
+        )}
+        {!open && kinds && <Chevron open={false} />}
+      </button>
+      {open && kinds && (
+        <ul>
+          {kinds.map((k) => (
+            <KindRow key={k.id} kind={k} base={base} />
           ))}
         </ul>
       )}
