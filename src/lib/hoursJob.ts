@@ -229,6 +229,15 @@ export function homePageReads(category: Pick<CategoryConfig, 'hasPhone' | 'detai
   return out
 }
 
+/** Why a food place's website is read, said on What's tracked (the user,
+ *  Oct 25: make it clear it's for what Google doesn't have): "Not on
+ *  Google", "Google has no hours". '' once Google keeps both. */
+export function siteGap(category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>, place: Record<string, unknown>): string {
+  if (typeof place.placeId !== 'string' || !place.placeId) return 'Not on Google'
+  const lacks = homePageReads(category, place)
+  return lacks.length ? `Google has no ${lacks.join(' or ')}` : ''
+}
+
 /** A food place's home page watch: added when its website has something
  *  Google doesn't keep (homePageReads) and nothing watches that page yet;
  *  taken away, its own only, once Google keeps both. A page an admin gave,

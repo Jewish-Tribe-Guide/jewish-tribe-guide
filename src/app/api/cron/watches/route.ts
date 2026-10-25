@@ -122,7 +122,7 @@ async function runAll(started = Date.now()): Promise<Body> {
     console.error('[cron/watches] listing reads failed:', err)
     return undefined
   })
-  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, listings?.readsOf) }
+  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 

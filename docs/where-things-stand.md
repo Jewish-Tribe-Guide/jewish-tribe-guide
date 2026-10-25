@@ -411,6 +411,17 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        quiet for a month, or whose last email couldn't be read.
      - **Other pages**: pages added by hand for no shul or mikvah. Shows
        only when there are some (none on either site).
+     - **Phone, email and hours** ("Reads a place’s own website when
+       Google doesn’t have them."): a food place's own website, read for
+       the phone and hours Google doesn't keep. Each place says why: "Not
+       on Google · Read Oct 25", "Google has no hours · …". Five on the
+       live site (four not on Google, Sababa Falafel with no hours there),
+       which had been counted as Mikvah hours. Shows only when there are
+       some. Food has no email field, so it reads phone and hours today.
+       Proposed, not decided: the same for other kinds of place
+       (groceries, childcare…), then a free weekly check of the links a
+       listing shows that Google doesn't give (kosher certificates,
+       Refuah, WhatsApp, websites typed in), about 110.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add
        a source).
