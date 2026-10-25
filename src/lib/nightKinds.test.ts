@@ -64,9 +64,10 @@ describe('each watch’s kind of source', () => {
     expect(nightKindOf({ ...found, resourceId: 's1', label: 'Beth Am · its website' }, (id) => (id === 's1' ? 'times' : null))).toBe('times')
   })
 
-  // Oct 25 (the user): the line is mikvah hours only.
-  it('a page added by hand for no shul or mikvah isn’t counted', () => {
-    expect(nightKindOf(watch({ url: 'https://bzbi.org/worship' }))).toBeNull()
+  // Oct 25 (the user): Mikvah hours is mikvahs only; a page added by hand
+  // for no shul or mikvah is Other pages.
+  it('a page added by hand is Other pages', () => {
+    expect(nightKindOf(watch({ url: 'https://bzbi.org/worship' }))).toBe('other')
   })
 
   // Read as each email comes in, not at night.
@@ -105,8 +106,8 @@ describe('last night, a line per kind', () => {
 
   it('every kind, in order, with its run’s time', () => {
     const views = nightKinds('philly', runs, [], google, NOW)
-    expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Mikvah hours', 'Menus'])
-    expect(views.map((v) => v.when)).toEqual(['2:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM'])
+    expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Newsletters', 'Mikvah hours', 'Menus'])
+    expect(views.map((v) => v.when)).toEqual(['2:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', null, '3:00 AM', '3:00 AM'])
   })
 
   // FinalNightly's Eruvs.
@@ -164,7 +165,7 @@ describe('last night, a line per kind', () => {
       watch({ id: 'x', label: 'A page', ...never }),
     ]
     const readsOf = (id: string) => (id.startsWith('m') ? ('hours' as const) : null)
-    const views = nightKinds('philly', runs, watches, google, NOW, [], readsOf)
+    const views = nightKinds('philly', runs, watches, google, NOW, [], { readsOf, nameOf: () => null })
     expect(kind(views, 'Mikvah hours').misses).toEqual([
       { name: 'Mikvah Ohr', why: 'Never read', page: 'hours' },
       { name: 'Mikvah Moishe Zvi', why: 'Never read', page: 'hours' },
@@ -281,6 +282,90 @@ describe('the closed row', () => {
   // FinalNightly's Oct 24.
   it('which kinds weren’t all read', () => {
     const kinds = [view('Google', '140 places read'), view('Eruvs', '1 of 5 read', '4 never read'), view('Minyan times', '12 of 28 read', 'ran out of time'), view('Mikvah hours', 'Didn’t run since Oct 22'), view('Menus', 'Failed', 'boom')]
-    expect(lastNightLine(kinds)).toEqual({ good: false, text: 'Eruvs, minyan times, mikvah hours and menus not all read' })
+    expect(lastNightLine(kinds)).toEqual({ good: false, text: 'Eruvs, minyan times, mikvah hours and menus need a look' })
+  })
+})
+
+// Oct 25 (the user): "What's tracked", everything each kind keeps.
+describe('everything a kind tracks', () => {
+  const runs = { 'sync-hours': [run({ job: 'sync-hours', startedAt: GOOGLE_AT })], watches: [run({})] }
+  const views = (watches: Watch[], google: GoogleLive[] = [], unread: { id: string; name: string }[] = [], names: Record<string, string> = {}) =>
+    nightKinds('philly', runs, watches, google, NOW, unread, { readsOf: (id) => (id.startsWith('shul') ? 'times' : null), nameOf: (id) => names[id] ?? null })
+
+  it('every page, a line per place, what isn’t loading first; records not tracked', () => {
+    const shul = (id: string, over: Partial<Watch> = {}) => watch({ id, createdBy: 'listing pages', resourceId: 'shul-1', label: 'Beth Am · davening times on their website', ...over })
+    const watches = [
+      shul('a'),
+      shul('b', { failingSince: night(WATCHES_AT, 3), lastError: '500' }),
+      watch({ id: 'c', createdBy: 'listing pages', resourceId: 'shul-2', label: 'BZBI · its website', lastOkAt: night(WATCHES_AT, 1) }),
+      // A page stopped, kept as a record.
+      shul('d', { createdBy: 'listing pages (stopped)', active: false }),
+    ]
+    expect(kind(views(watches), 'Minyan times').tracked).toEqual([
+      { name: 'Beth Am · 2 pages', status: 'Not loading since Oct 22', bad: true, page: 'times' },
+      { name: 'BZBI', status: 'Read Oct 24', bad: false, page: 'times' },
+    ])
+  })
+
+  it('Menus: a place whose menu was never read, watched or not', () => {
+    const menu = watch({ id: 'm', createdBy: 'menu links', resourceId: 'f1', label: 'Menu · Bar Bombon' })
+    const tracked = kind(views([menu, watch({ id: 'k', createdBy: 'menu links', resourceId: 'f2', label: 'Menu · Kosher Corner' })], [], [{ id: 'f1', name: 'Bar Bombon' }, { id: 'f3', name: 'Hot Bagels' }]), 'Menus').tracked
+    expect(tracked.map((t) => [t.name, t.status])).toEqual([
+      ['Bar Bombon', 'Menu never read'],
+      ['Hot Bagels', 'Menu never read'],
+      ['Kosher Corner', 'Read Oct 25'],
+    ])
+  })
+
+  it('Google: every matched place, and when it last answered', () => {
+    const google: GoogleLive[] = [
+      { name: 'Kosher Corner', matched: true, failedAt: null, readAt: night(GOOGLE_AT, 0) },
+      { name: 'Closed Deli', matched: true, failedAt: night(GOOGLE_AT, 2) },
+      { name: 'Not matched', matched: false, failedAt: null },
+    ]
+    expect(kind(views([], google), 'Google').tracked).toEqual([
+      { name: 'Closed Deli', status: 'Not answering since Oct 23', bad: true, page: 'google' },
+      { name: 'Kosher Corner', status: 'Read Oct 25', bad: false, page: 'google' },
+    ])
+  })
+
+  it('Other pages only when there are any', () => {
+    expect(views([]).map((v) => v.name)).not.toContain('Other pages')
+    const other = kind(views([watch({ id: 'x', label: 'BZBI worship page', url: 'https://bzbi.org/worship' })]), 'Other pages')
+    expect(other).toMatchObject({ count: '1 of 1 read', tracked: [{ name: 'BZBI worship page', status: 'Read Oct 25', bad: false, page: '' }] })
+  })
+})
+
+describe('Newsletters', () => {
+  const news = (id: string, over: Partial<Watch> = {}) => watch({ id, url: `mailto:${id}@shul.org`, label: `${id}@shul.org`, createdBy: 'shul newsletters', resourceId: `shul-${id}`, ...over })
+  const view = (watches: Watch[]) =>
+    kind(nightKinds('philly', {}, watches, [], NOW, [], { readsOf: (id) => (id.startsWith('shul') ? 'times' : null), nameOf: (id) => ({ 'shul-a': 'Beth Am', 'shul-b': 'BZBI', 'shul-c': 'Kol Tzedek' })[id] ?? null }), 'Newsletters')
+
+  it('each by its shul, with its last email; what needs a look first', () => {
+    const v = view([
+      news('a', { pageChangedAt: night(WATCHES_AT, 1) }),
+      news('b', { failingSince: night(WATCHES_AT, 2), lastError: 'No newsletter from them since Sep 20', pageChangedAt: '2026-09-20T12:00:00.000Z' }),
+      news('c', { failingSince: night(WATCHES_AT, 2), lastError: 'Couldn’t read “This week”: boom', pageChangedAt: night(WATCHES_AT, 2) }),
+      // Not linked yet: inactive until it is.
+      news('d', { resourceId: null, active: false }),
+      // Paused: not tracked.
+      news('f', { active: false }),
+      // Not a shul: its emails are skipped, nothing is tracked.
+      news('e', { createdBy: 'shul newsletters: not a shul', resourceId: null }),
+    ])
+    expect(v).toMatchObject({ when: null, count: '4 newsletters · last email Oct 24', trouble: '1 to link · 1 quiet for a month · 1 couldn’t be read', nights: [] })
+    expect(v.tracked).toEqual([
+      { name: 'BZBI', status: 'No email since Sep 20', bad: true, page: 'times' },
+      { name: 'd@shul.org', status: 'Not linked to a shul', bad: true, page: '' },
+      { name: 'Kol Tzedek', status: 'Couldn’t read the last one', bad: true, page: 'times' },
+      { name: 'Beth Am', status: 'Email Oct 24', bad: false, page: 'times' },
+    ])
+    expect(v.misses.find((m) => m.link)).toEqual({ name: 'd@shul.org', why: 'Not linked to a shul', page: '', link: 'd' })
+    expect(v.misses).toHaveLength(3)
+  })
+
+  it('none yet, and all well', () => {
+    expect(view([])).toMatchObject({ count: 'None yet', trouble: null, tracked: [] })
+    expect(view([news('a', { pageChangedAt: null })])).toMatchObject({ count: '1 newsletter', trouble: null, tracked: [{ status: 'No email yet' }] })
   })
 })

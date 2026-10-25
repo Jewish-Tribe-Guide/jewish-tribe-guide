@@ -47,10 +47,6 @@ export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['catego
   return keys.every((k) => jobs[k] !== undefined)
 }
 
-export function useWatchJobs(token: string): Jobs {
-  return useWatchJobsAndReload(token).jobs
-}
-
 /** And `reload`, for a page that acts on a place: every job read again,
  *  done when they all are. */
 export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () => Promise<void> } {

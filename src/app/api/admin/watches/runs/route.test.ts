@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn(), listUnreadMenus: vi.fn(), loadReadsOf: vi.fn() }))
+const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn(), listUnreadMenus: vi.fn(), loadListings: vi.fn() }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/jobRunStore', () => ({ listJobRuns: m.listJobRuns }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
 vi.mock('@/lib/googleJobRun', () => ({ loadGoogleJob: m.loadGoogleJob }))
 vi.mock('@/lib/menuPlaceRead', () => ({ listUnreadMenus: m.listUnreadMenus }))
-vi.mock('@/lib/listingReads', () => ({ loadReadsOf: m.loadReadsOf }))
+vi.mock('@/lib/listingReads', () => ({ loadListings: m.loadListings }))
 
 const { GET } = await import('./route')
 const get = () => GET(new Request('http://x/api/admin/watches/runs'))
@@ -21,7 +21,7 @@ beforeEach(() => {
   m.listWatches.mockResolvedValue({ available: true, watches: [] })
   m.loadGoogleJob.mockResolvedValue([])
   m.listUnreadMenus.mockResolvedValue([])
-  m.loadReadsOf.mockResolvedValue(() => null)
+  m.loadListings.mockResolvedValue({ readsOf: () => null, nameOf: () => null })
 })
 
 describe('/api/admin/watches/runs', () => {
@@ -34,7 +34,7 @@ describe('/api/admin/watches/runs', () => {
   it('a line per kind of source, from this community’s watches and Google places', async () => {
     const body = await (await get()).json()
     expect(body.available).toBe(true)
-    expect(body.kinds.map((k: { name: string }) => k.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Mikvah hours', 'Menus'])
+    expect(body.kinds.map((k: { name: string }) => k.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Newsletters', 'Mikvah hours', 'Menus'])
     expect(m.listWatches).toHaveBeenCalledWith('philly')
     expect(m.loadGoogleJob).toHaveBeenCalledWith('philly', expect.any(Number))
   })
@@ -57,9 +57,9 @@ describe('/api/admin/watches/runs', () => {
       available: true,
       watches: [{ id: 'z', communityId: 'philly', kind: 'website', url: 'https://www.mikvahwestphilly.com/', resourceId: 'm1', label: 'Mikvah Moishe Zvi · its website', active: true, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'listing pages (found)', lastRunAt: null, lastOkAt: null }],
     })
-    m.loadReadsOf.mockResolvedValue((id: string) => (id === 'm1' ? 'hours' : null))
+    m.loadListings.mockResolvedValue({ readsOf: (id: string) => (id === 'm1' ? 'hours' : null), nameOf: () => null })
     const body = await (await get()).json()
-    expect(m.loadReadsOf).toHaveBeenCalledWith(['philly'])
+    expect(m.loadListings).toHaveBeenCalledWith(['philly'])
     expect(body.kinds.find((k: { id: string }) => k.id === 'hours')).toMatchObject({ count: '0 of 1 read', misses: [{ name: 'Mikvah Moishe Zvi', why: 'Never read', page: 'hours' }] })
     expect(body.kinds.find((k: { id: string }) => k.id === 'times')).toMatchObject({ count: 'Nothing to read' })
   })

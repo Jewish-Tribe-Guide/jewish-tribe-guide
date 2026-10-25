@@ -25,8 +25,8 @@ const mockSyncRefuah = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/refuahMatchRun', () => ({ syncRefuahWatches: mockSyncRefuah }))
 const mockSyncHours = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/hoursJobRun', () => ({ syncHoursWatches: mockSyncHours }))
-const mockReadsOf = vi.hoisted(() => vi.fn(async () => (() => null) as (id: string) => 'times' | 'hours' | null))
-vi.mock('@/lib/listingReads', () => ({ loadReadsOf: mockReadsOf }))
+const mockListings = vi.hoisted(() => vi.fn(async () => ({ readsOf: (() => null) as (id: string) => 'times' | 'hours' | null, nameOf: () => null })))
+vi.mock('@/lib/listingReads', () => ({ loadListings: mockListings }))
 const mockListingPage = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/listingPageRun', () => ({ runListingPageWatch: mockListingPage }))
 // The run's record: what the job ends with is saved (jobRunStore.test.ts
@@ -237,7 +237,7 @@ describe('/api/cron/watches', () => {
       expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b'])
       expect(body.left).toBe(2)
       expect(recordedOutcomes).toEqual([
-        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night', kinds: {} },
+        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night', kinds: { philly: { other: { of: 4, read: 2 } } } },
       ])
     })
 
@@ -245,7 +245,7 @@ describe('/api/cron/watches', () => {
       mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b', failingSince: '2026-10-22T07:00:00.000Z' })] })
       mockWebsite.mockResolvedValueOnce({ ok: true, filed: 0, pageHash: 'h' }).mockResolvedValueOnce({ ok: false, error: 'The page answered 403' })
       await GET(request())
-      expect(recordedOutcomes).toEqual([{ job: 'watches', ok: true, summary: 'Checked 2 of 2 watches · 1 not working', warning: null, kinds: {} }])
+      expect(recordedOutcomes).toEqual([{ job: 'watches', ok: true, summary: 'Checked 2 of 2 watches · 1 not working', warning: null, kinds: { philly: { other: { of: 2, read: 1 } } } }])
     })
 
     // Oct 25: for the Watches tab's line per kind (nightKinds.ts).
@@ -270,10 +270,10 @@ describe('/api/cron/watches', () => {
         available: true,
         watches: [watch({ id: 'z', url: 'https://www.mikvahwestphilly.com/', resourceId: 'm1', label: 'Mikvah Moishe Zvi · its website', createdBy: 'listing pages (found)' })],
       })
-      mockReadsOf.mockResolvedValue((id: string) => (id === 'm1' ? 'hours' : null))
+      mockListings.mockResolvedValue({ readsOf: (id: string) => (id === 'm1' ? 'hours' : null), nameOf: () => null })
       mockListingPage.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
       await GET(request())
-      expect(mockReadsOf).toHaveBeenCalledWith(['philly'])
+      expect(mockListings).toHaveBeenCalledWith(['philly'])
       expect(recordedOutcomes[0]).toMatchObject({ kinds: { philly: { hours: { of: 1, read: 1 } } } })
     })
   })

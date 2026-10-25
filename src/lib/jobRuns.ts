@@ -49,7 +49,7 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
 ]
 
 /** The kinds of source the tab gives a line each (nightKinds.ts). */
-export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'hours' | 'menus'
+export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'newsletters' | 'hours' | 'menus' | 'other'
 
 /** How many of a kind's sources a run had, and how many it read. */
 export type KindCount = { of: number; read: number }

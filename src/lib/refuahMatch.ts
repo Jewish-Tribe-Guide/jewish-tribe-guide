@@ -193,9 +193,3 @@ export function isStoppedRefuah(w: Pick<Watch, 'createdBy'>): boolean {
 export function isNotOnRefuah(w: Pick<Watch, 'createdBy'>): boolean {
   return w.createdBy === REFUAH_NOT_LISTED_CREATOR
 }
-
-/** A watch the Hospitals page shows, not the Watches list: a hospital's
- *  Refuah page, or its "Not on Refuah". */
-export function isHospitalWatch(w: Pick<Watch, 'url' | 'createdBy'>): boolean {
-  return !!refuahHospitalId(w.url) || isNotOnRefuah(w)
-}

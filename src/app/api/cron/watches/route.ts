@@ -41,7 +41,7 @@ import { orderForRun } from '@/lib/watchRunOrder'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { watchesOutcome, type WatchesRun } from '@/lib/jobRuns'
 import { countWatchKinds } from '@/lib/nightKinds'
-import { loadReadsOf } from '@/lib/listingReads'
+import { loadListings } from '@/lib/listingReads'
 
 export const maxDuration = 300
 
@@ -118,11 +118,11 @@ async function runAll(started = Date.now()): Promise<Body> {
   )
   const read = new Set(results.filter((r) => r.ok).map((r) => r.id))
   // Without them, a listing's page goes by its label (watchGroupOf).
-  const readsOf = await loadReadsOf(queue.map((w) => w.communityId)).catch((err) => {
+  const listings = await loadListings(queue.map((w) => w.communityId)).catch((err) => {
     console.error('[cron/watches] listing reads failed:', err)
     return undefined
   })
-  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, readsOf) }
+  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, listings?.readsOf) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 
