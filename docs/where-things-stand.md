@@ -373,7 +373,7 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    `NightlyRuns.tsx`, FinalNightly). Closed: "Everything read", or which
    kinds weren't ("Kosher certification, minyan times and menus not all
    read"), amber. Opened: Google, Kosher certification, Hospitals,
-   Eruvs, Minyan times, Websites, Menus, each its run's time and "11 of
+   Eruvs, Minyan times, Mikvah hours, Menus, each its run's time and "11 of
    20 read · 9 didn’t load". A kind opens to what it reads, Not read last
    night (Never read, Didn’t load, Not reached; a place's pages as one
    line, "· 5 pages"), each a link to its job page, and its last 14
@@ -383,7 +383,12 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      since stops showing. The nights before come from the count each run
      saves per community and kind (migration 087, 1f).
    - Newsletters aren't counted: they're read as each email comes in.
-     A mikvah's page of hours is under Websites.
+   - **Mikvah hours, not Websites** (the user, Oct 25): the line is the
+     mikvahs' pages of hours only. A listing's page goes by its
+     listing's category, as the watch list does (`listingReads.ts`), so
+     Mikvah Moishe Zvi's page ("its website") is no longer counted as
+     Minyan times. A page added by hand for no shul or mikvah isn't
+     counted (none on either site).
    - Gone from the tab: the old row per job. Walks have no line; their
      email when they break still goes out.
    - **The read-menus job is part of Menus** (the user, Oct 25). A food

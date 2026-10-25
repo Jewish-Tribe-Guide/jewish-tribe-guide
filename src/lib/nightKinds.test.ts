@@ -53,8 +53,20 @@ describe('each watch’s kind of source', () => {
     expect(nightKindOf(watch({ createdBy: 'eruv website', url: 'https://eruv.example/' }))).toBe('eruvs')
     expect(nightKindOf(watch({ createdBy: 'listing pages', resourceId: 's1', label: 'Beth Am · davening times on their website' }))).toBe('times')
     expect(nightKindOf(watch({ createdBy: 'menu links', resourceId: 'f1' }))).toBe('menus')
-    expect(nightKindOf(watch({ createdBy: 'listing pages', resourceId: 'm1', label: 'Mikvah Ohr · hours on their website' }))).toBe('websites')
-    expect(nightKindOf(watch({ url: 'https://bzbi.org/worship' }))).toBe('websites')
+    expect(nightKindOf(watch({ createdBy: 'listing pages', resourceId: 'm1', label: 'Mikvah Ohr · hours on their website' }))).toBe('hours')
+  })
+
+  // Oct 25: Mikvah Moishe Zvi's page, found as "its website", was counted
+  // as Minyan times; the watch list goes by its listing's category.
+  it('a listing’s page by its category, whatever its label says', () => {
+    const found = watch({ createdBy: 'listing pages (found)', resourceId: 'm1', label: 'Mikvah Moishe Zvi · its website' })
+    expect(nightKindOf(found, (id) => (id === 'm1' ? 'hours' : null))).toBe('hours')
+    expect(nightKindOf({ ...found, resourceId: 's1', label: 'Beth Am · its website' }, (id) => (id === 's1' ? 'times' : null))).toBe('times')
+  })
+
+  // Oct 25 (the user): the line is mikvah hours only.
+  it('a page added by hand for no shul or mikvah isn’t counted', () => {
+    expect(nightKindOf(watch({ url: 'https://bzbi.org/worship' }))).toBeNull()
   })
 
   // Read as each email comes in, not at night.
@@ -93,7 +105,7 @@ describe('last night, a line per kind', () => {
 
   it('every kind, in order, with its run’s time', () => {
     const views = nightKinds('philly', runs, [], google, NOW)
-    expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Websites', 'Menus'])
+    expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Mikvah hours', 'Menus'])
     expect(views.map((v) => v.when)).toEqual(['2:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM'])
   })
 
@@ -146,11 +158,18 @@ describe('last night, a line per kind', () => {
   })
 
   it('a mikvah’s page of hours links to the hours page', () => {
-    const watches = [watch({ createdBy: 'listing pages', resourceId: 'm1', label: 'Mikvah Ohr · hours on their website', ...never }), watch({ id: 'x', label: 'A page', ...never })]
-    expect(kind(nightKinds('philly', runs, watches, google, NOW), 'Websites').misses).toEqual([
+    const watches = [
+      watch({ createdBy: 'listing pages', resourceId: 'm1', label: 'Mikvah Ohr · hours on their website', ...never }),
+      watch({ id: 'z', createdBy: 'listing pages (found)', resourceId: 'm2', label: 'Mikvah Moishe Zvi · its website', ...never }),
+      watch({ id: 'x', label: 'A page', ...never }),
+    ]
+    const readsOf = (id: string) => (id.startsWith('m') ? ('hours' as const) : null)
+    const views = nightKinds('philly', runs, watches, google, NOW, [], readsOf)
+    expect(kind(views, 'Mikvah hours').misses).toEqual([
       { name: 'Mikvah Ohr', why: 'Never read', page: 'hours' },
-      { name: 'A page', why: 'Never read', page: '' },
+      { name: 'Mikvah Moishe Zvi', why: 'Never read', page: 'hours' },
     ])
+    expect(kind(views, 'Minyan times').misses).toEqual([])
   })
 
   it('Google: every matched place, and any it couldn’t ask about', () => {
@@ -261,7 +280,7 @@ describe('the closed row', () => {
 
   // FinalNightly's Oct 24.
   it('which kinds weren’t all read', () => {
-    const kinds = [view('Google', '140 places read'), view('Eruvs', '1 of 5 read', '4 never read'), view('Minyan times', '12 of 28 read', 'ran out of time'), view('Websites', 'Didn’t run since Oct 22'), view('Menus', 'Failed', 'boom')]
-    expect(lastNightLine(kinds)).toEqual({ good: false, text: 'Eruvs, minyan times, websites and menus not all read' })
+    const kinds = [view('Google', '140 places read'), view('Eruvs', '1 of 5 read', '4 never read'), view('Minyan times', '12 of 28 read', 'ran out of time'), view('Mikvah hours', 'Didn’t run since Oct 22'), view('Menus', 'Failed', 'boom')]
+    expect(lastNightLine(kinds)).toEqual({ good: false, text: 'Eruvs, minyan times, mikvah hours and menus not all read' })
   })
 })
