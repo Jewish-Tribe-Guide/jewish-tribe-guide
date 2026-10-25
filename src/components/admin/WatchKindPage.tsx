@@ -5,14 +5,16 @@ import Link from 'next/link'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { placeSourcesText, type WatchState } from '@/lib/watchPlaces'
-import { useWatchJobs } from './useWatchJobs'
+import { useWatchJobsAndReload } from './useWatchJobs'
+import OpenedPlace from './OpenedPlace'
 import { kindsOf } from './WatchKinds'
 
 // One kind of place on the Watches tab (FinalChanges2, FinalPhoneShuls,
 // Oct 24): its places in three tabs, Waiting for you, Not checked and Up to
 // date. A place waiting or not checked says why; one up to date, where
-// it's read from. For now a place opens the job page that holds it, or its
-// listing; opening it here is pieces 2 to 4.
+// it's read from. One up to date opens here, in boxes (OpenedPlace.tsx,
+// piece 2); one waiting or not checked still opens the job page that holds
+// it, until pieces 3 and 4.
 
 const TABS: { key: WatchState; label: string; none: string }[] = [
   { key: 'waiting', label: 'Waiting for you', none: 'Nothing waiting.' },
@@ -20,8 +22,9 @@ const TABS: { key: WatchState; label: string; none: string }[] = [
   { key: 'up_to_date', label: 'Up to date', none: 'None yet.' },
 ]
 
+// On the left on a computer, on the right on a phone, as drawn.
 const Chevron = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="shrink-0 text-slate-400">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="shrink-0 text-slate-400 sm:order-first">
     <path d="M6 4l4 4-4 4" />
   </svg>
 )
@@ -29,10 +32,13 @@ const Chevron = () => (
 export default function WatchKindPage({ token, category }: { token: string; category: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
-  const jobs = useWatchJobs(token)
+  const { jobs, reload } = useWatchJobsAndReload(token)
   // Read once, for every row alike; the page is reloaded to refresh.
   const [now] = useState(() => Date.now())
   const [picked, setPicked] = useState<WatchState | null>(null)
+  // The place opened, and what it was called, to say where it went when a
+  // read finds it something to check.
+  const [open, setOpen] = useState<{ id: string; name: string } | null>(null)
   const all = kindsOf(jobs, base, now)
   const kind = all?.kinds.find((k) => k.id === category)
 
@@ -50,6 +56,7 @@ export default function WatchKindPage({ token, category }: { token: string; cate
   const active = picked ?? TABS.find((t) => count[t.key] > 0)?.key ?? 'waiting'
   const places = kind.places.filter((p) => p.state === active)
   const tab = TABS.find((t) => t.key === active)!
+  const moved = open && active === 'up_to_date' ? kind.places.find((p) => p.id === open.id && p.state !== 'up_to_date') : undefined
 
   return (
     <div className="space-y-3.5">
@@ -73,24 +80,49 @@ export default function WatchKindPage({ token, category }: { token: string; cate
           )
         })}
       </div>
+      {moved && (
+        <p className="text-sm text-slate-700" role="status">
+          {moved.name}: now in {TABS.find((t) => t.key === moved.state)!.label}.
+        </p>
+      )}
       {places.length === 0 ? (
         <p role="tabpanel" className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
           {tab.none}
         </p>
       ) : (
         <ul role="tabpanel" aria-label={`${kind.label} ${tab.label.toLowerCase()}`} className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-          {places.map((p) => (
-            <li key={p.id}>
-              <Link href={p.href} className="flex min-h-11 items-center gap-2.5 px-3.5 py-2.5 hover:bg-slate-50 sm:px-4 sm:py-3" data-testid="kind-place">
+          {places.map((p) => {
+            const inner = (
+              <>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-[15px] font-bold text-slate-900">{p.name}</span>
                   {!p.pill && p.sources.length > 0 && <span className="text-[13px] text-muted">{placeSourcesText(p.sources)}</span>}
                 </span>
                 {p.pill && <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-xs font-semibold text-amber-800">{p.pill}</span>}
                 <Chevron />
-              </Link>
-            </li>
-          ))}
+              </>
+            )
+            const row = 'flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 sm:px-4 sm:py-3'
+            if (p.state !== 'up_to_date') {
+              return (
+                <li key={p.id}>
+                  <Link href={p.href} className={row} data-testid="kind-place">
+                    {inner}
+                  </Link>
+                </li>
+              )
+            }
+            if (open?.id === p.id) {
+              return <OpenedPlace key={p.id} place={p} kindLabel={kind.label} jobs={jobs} token={token} community={community} now={now} onClose={() => setOpen(null)} onChanged={reload} />
+            }
+            return (
+              <li key={p.id}>
+                <button type="button" aria-expanded="false" onClick={() => setOpen({ id: p.id, name: p.name })} className={row} data-testid="kind-place">
+                  {inner}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

@@ -271,16 +271,43 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    so the counts can't disagree with the job pages. A list's finding
    on a grocery goes under Grocery; a place only a list has goes under
    Food. Not done yet, on purpose:
-   - A place's row opens the job page that holds it, or its listing when
-     up to date. Opening it in place is pieces 2 to 4.
+   - A waiting or not checked place's row opens the job page that holds
+     it. Opening those in place is pieces 3 and 4.
    - The old job rows stay under "Job pages", and the watch list and Add
      a watch stay below them, until pieces 2 to 4 hold what they do.
    - Google closures aren't counted yet (piece 4). The year-old "You"
      field rule isn't built (piece 3).
    - On the test site Food shows 25 waiting (mostly places only a kosher
      list has), 22 not checked and 49 up to date.
-2. Up to date: an opened place in boxes, with its sources line, Add a
-   source and Read it now.
+2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
+   under itself on a computer, on its own screen on a phone, as drawn
+   (FinalShuls3, FinalPhoneShul3, FinalAddSource3, FinalFoodMenus3). A
+   box per part a source keeps, each footed "Same as <source> · read
+   <day> · Change":
+   - Shuls: this week's (from its newsletter or page), usual weekday,
+     usual Shabbos. Mikvahs: a box per section. Food: Dishes, Kosher.
+     Hospitals: their Refuah boxes. Eruvim: Status.
+   - Then Google's fields ("Name and contact", or "Hours and contact"),
+     its website's, and a person's, each a box of its own. Google's and
+     the lists' have no Change.
+   - Under them: Add a source (a shul: a page or its newsletter's email;
+     a mikvah: a page; a food place with no menu link: its menu page),
+     Read it now / Read them now (none with only Google and a
+     newsletter), Open its listing.
+   - Change gives a page in place of the one read (the old one is
+     stopped), a newsletter's new email, a new menu link, or a new
+     Refuah page.
+   - A read that finds something moves the place, and the page says
+     where it went.
+   Not done, on purpose:
+   - Dishes come in one list: a menu reading keeps one page, so the
+     drawing's heading per menu page needs the reader to keep its pages.
+   - No Add a source for hospitals or eruvim: each has one source. A
+     hospital's Change gives a new Refuah page. An eruv's box has no
+     Change yet; its job page sets the source.
+   - On the test site, 13 food places have an approved menu reading but
+     no dishes on the listing (Playa Bowls among them). They show no
+     Dishes box rather than a "Same as its menu" that isn't so.
 3. Not checked.
 4. Waiting for you by source, in the agreed order.
 5. Nightly runs as one line per kind. Needs a new `job_run` column (a

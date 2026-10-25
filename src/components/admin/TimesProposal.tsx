@@ -108,7 +108,7 @@ export function shulPill(p: HoursPlace, status: JobStatus, reading: boolean, set
   return { text: 'Same', tone: 'green' }
 }
 
-function Groups<R>({ groups, row }: { groups: RowGroup<R>[]; row: (r: R, i: number) => ReactNode }) {
+export function Groups<R>({ groups, row }: { groups: RowGroup<R>[]; row: (r: R, i: number) => ReactNode }) {
   return (
     <>
       {groups.map((g) => (
@@ -123,7 +123,7 @@ function Groups<R>({ groups, row }: { groups: RowGroup<R>[]; row: (r: R, i: numb
 
 /** One usual minyan: its name, its season and note under it, its time on
  *  the right, and what changed beside what it was. */
-function UsualRow({ r }: { r: ProposalRow }) {
+export function UsualRow({ r }: { r: ProposalRow }) {
   const sub = [r.season, r.note].filter(Boolean).join(' · ')
   const was = [r.was?.days, r.was?.season, r.was?.note].filter((w): w is string => !!w)
   return (
@@ -150,7 +150,7 @@ function UsualRow({ r }: { r: ProposalRow }) {
 }
 
 /** A usual part's rows, the website's against the listing's. */
-const usualRows = (part: 'weekday' | 'shabbos', current: readonly Minyan[], proposed: readonly Minyan[]): ProposalRow[] => usualProposal(current, proposed).find((b) => b.box === part)?.rows ?? []
+export const usualRows = (part: 'weekday' | 'shabbos', current: readonly Minyan[], proposed: readonly Minyan[]): ProposalRow[] => usualProposal(current, proposed).find((b) => b.box === part)?.rows ?? []
 
 /** This week's: each day the website posts, a time it gives instead of the
  *  usual one beside it, and what comes off. */

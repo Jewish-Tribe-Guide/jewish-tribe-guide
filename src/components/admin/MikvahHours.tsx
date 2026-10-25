@@ -50,7 +50,7 @@ export function sectionsRead(w: Watch, sections: readonly ListedSection[]): stri
 
 /** The page named for each section: the one its waiting update came from,
  *  else the first that reads it. */
-function sectionPages(pages: readonly Watch[], sections: readonly ListedSection[], findings: readonly Finding[]): Map<string, Watch> {
+export function sectionPages(pages: readonly Watch[], sections: readonly ListedSection[], findings: readonly Finding[]): Map<string, Watch> {
   const out = new Map<string, Watch>()
   for (const s of sections) {
     const from = findings.find((f) => f.section === s.section && f.page)
@@ -62,7 +62,7 @@ function sectionPages(pages: readonly Watch[], sections: readonly ListedSection[
   return out
 }
 
-function Rows({ rows }: { rows: readonly HoursRow[] }) {
+export function Rows({ rows }: { rows: readonly HoursRow[] }) {
   return (
     <div>
       <h4 className="pb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Hours</h4>
@@ -77,7 +77,7 @@ function Rows({ rows }: { rows: readonly HoursRow[] }) {
 
 /** The section's note: changed, the new one highlighted whole, the old one
  *  struck under it. */
-function Notes({ now, next }: { now: string; next: string }) {
+export function Notes({ now, next }: { now: string; next: string }) {
   if (!now && !next) return null
   const changed = noteChanged(now, next)
   return (

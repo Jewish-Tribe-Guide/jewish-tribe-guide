@@ -104,7 +104,7 @@ function hospitalPill(h: Hospital, status: JobStatus, reading: boolean, settled:
 
 /** A box's people, under each list's own name when it has more than one
  *  ("Pantry", "Food packages"). */
-function People({ box, next }: { box: ListedBox; next?: Record<string, unknown> }) {
+export function People({ box, next }: { box: ListedBox; next?: Record<string, unknown> }) {
   const many = box.keys.length > 1
   return (
     <>

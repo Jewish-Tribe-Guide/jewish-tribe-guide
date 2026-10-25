@@ -7,6 +7,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import type { CategoryConfig } from '@/lib/categories'
 import type { GooglePlace } from '@/lib/googleJob'
+import type { Watch } from '@/lib/watches'
 import type { DishPlace, JobCounts } from '@/lib/watchJobs'
 import type { EruvJobLoaded } from '@/lib/eruvJob'
 import type { Hospital } from './HospitalsJob'
@@ -24,7 +25,7 @@ export type PagesJob = { name: string; places: HoursPlace[] } | null
  *  couldn't be. */
 export type Jobs = {
   categories?: CategoryConfig[] | null
-  dishes?: (DishPlace & { id: string; name: string; href: string })[] | null
+  dishes?: (DishPlace & { id: string; name: string; href: string; pages?: Watch[] })[] | null
   hospitals?: Hospital[] | null
   hours?: PagesJob
   times?: PagesJob
@@ -47,6 +48,12 @@ export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['catego
 }
 
 export function useWatchJobs(token: string): Jobs {
+  return useWatchJobsAndReload(token).jobs
+}
+
+/** And `reload`, for a page that acts on a place: every job read again,
+ *  done when they all are. */
+export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () => Promise<void> } {
   const community = useCommunitySlug()
   const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community) ?? {})
 
@@ -56,15 +63,17 @@ export function useWatchJobs(token: string): Jobs {
     const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => setJobs((j) => ({ ...j, [key]: value }))
     const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
     const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
-    void get<{ categories: CategoryConfig[] }>('/api/admin/categories').then((d) => (d ? fill('categories', d.categories ?? null) : failed('categories')))
-    void get<{ places: Jobs['dishes'] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes')))
-    void get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals')))
-    void get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours')))
-    void get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times')))
-    void get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim')))
-    void get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher')))
-    void get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google')))
-    void get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.jobs ? d : null) : failed('runs')))
+    await Promise.all([
+      get<{ categories: CategoryConfig[] }>('/api/admin/categories').then((d) => (d ? fill('categories', d.categories ?? null) : failed('categories'))),
+      get<{ places: Jobs['dishes'] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes'))),
+      get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals'))),
+      get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours'))),
+      get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times'))),
+      get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
+      get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
+      get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
+      get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.jobs ? d : null) : failed('runs'))),
+    ])
   }, [token, community])
 
   useEffect(() => {
@@ -72,5 +81,5 @@ export function useWatchJobs(token: string): Jobs {
   }, [community, jobs])
 
   useLoadOnMount(load)
-  return jobs
+  return { jobs, reload: load }
 }
