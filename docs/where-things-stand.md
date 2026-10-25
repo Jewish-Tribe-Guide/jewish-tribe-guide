@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 24, 2026.
+Last updated: Oct 25, 2026.
 
 ## The branch
 
@@ -259,6 +259,33 @@ Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
 is a new board beside the old one. Only the latest board for each screen,
 nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
 ("Watches: what we're settling on"); a new settled board goes on both.
+
+**Building in five pieces** (agreed Oct 24, on `redesign/oct18-fixes`):
+
+1. **The tab's rows and each kind's page: BUILT Oct 25.** The tab starts
+   with a row per category in the site's order (alphabetical): its
+   sources line, then waiting for you / not checked / up to date, then
+   "Not watched:" for the kinds with no address. Each row opens
+   `/<community>/admin/watches/kind/<category>`, with the three tabs.
+   `watchPlaces.ts` puts each job's own standing for a place together,
+   so the counts can't disagree with the job pages. A list's finding
+   on a grocery goes under Grocery; a place only a list has goes under
+   Food. Not done yet, on purpose:
+   - A place's row opens the job page that holds it, or its listing when
+     up to date. Opening it in place is pieces 2 to 4.
+   - The old job rows stay under "Job pages", and the watch list and Add
+     a watch stay below them, until pieces 2 to 4 hold what they do.
+   - Google closures aren't counted yet (piece 4). The year-old "You"
+     field rule isn't built (piece 3).
+   - On the test site Food shows 25 waiting (mostly places only a kosher
+     list has), 22 not checked and 49 up to date.
+2. Up to date: an opened place in boxes, with its sources line, Add a
+   source and Read it now.
+3. Not checked.
+4. Waiting for you by source, in the agreed order.
+5. Nightly runs as one line per kind. Needs a new `job_run` column (a
+   migration: dev only, ask before production).
+
 Settled with the user so far:
 
 - Rows are the site's categories. A place's card shows only what needs

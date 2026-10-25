@@ -15,14 +15,13 @@ import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 import { WATCH_PURPOSES, purposeInfo, sourceKind, sourceProblem, type ListingReads, type WatchPurpose } from '@/lib/watchPurposes'
 import { isHospitalWatch } from '@/lib/refuahMatch'
 import { adminBase } from '@/lib/adminNav'
-import { dishCounts, hospitalCounts, type DishPlace, type JobCounts } from '@/lib/watchJobs'
-import { eruvJobCounts, type EruvJobLoaded } from '@/lib/eruvJob'
+import { dishCounts, hospitalCounts, type JobCounts } from '@/lib/watchJobs'
+import { eruvJobCounts } from '@/lib/eruvJob'
 import { isEruvWebsiteWatch } from '@/lib/eruvWebsite'
-import type { Hospital } from './HospitalsJob'
-import type { HoursPlace } from './HoursJob'
-import type { KosherLoaded } from './KosherJob'
 import { hoursCounts, isHoursOff, isHoursSearched, isStoppedPage } from '@/lib/hoursJob'
-import NightlyRuns, { type NightlyRunsLoaded } from './NightlyRuns'
+import NightlyRuns from './NightlyRuns'
+import WatchKinds from './WatchKinds'
+import { forgetWatchJobs, useWatchJobs } from './useWatchJobs'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
 // Everything the guide reads on its own to stay current: pages every
@@ -44,26 +43,16 @@ import NightlyRuns, { type NightlyRunsLoaded } from './NightlyRuns'
 // Mekor Habracha's lists) are jobs too. The rest are still listed below,
 // until each becomes a job of its own. Since Oct 24, Nightly runs: what
 // each job that runs on its own every night did (NightlyRuns.tsx).
+//
+// Since Oct 25 the tab starts with a row per kind of place (WatchKinds.tsx,
+// watchPlaces.ts), each opening its places in three tabs. The job rows sit
+// under "Job pages" until those pages hold all the jobs do.
 
 /** `job`: the job page where what's read for it waits ("Shul times"); none,
  *  the moderation queue. */
 type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads; job?: string | null }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
-type PagesJob = { name: string; places: HoursPlace[] } | null
-/** Each job's, as loaded: undefined while it's still loading, null when it
- *  couldn't be. */
-type Jobs = {
-  dishes?: DishPlace[] | null
-  hospitals?: Hospital[] | null
-  hours?: PagesJob
-  times?: PagesJob
-  eruvim?: EruvJobLoaded | null
-  kosher?: KosherLoaded | null
-  google?: { counts: JobCounts; total: number } | null
-  runs?: NightlyRunsLoaded | null
-}
-
 /** One job's row: what it is and its four counts; the whole row opens its
  *  page. Null counts: they couldn't be loaded; undefined, still loading.
  *  `pages` false: a job that loads no pages (Google), so no "didn't load". */
@@ -673,21 +662,21 @@ function AddWatch({
 /** What the tab last showed, per community, so coming back to it (from a
  *  job's page) shows that at once while it's read again, rather than
  *  "Loading watches…" every time (the user, Oct 22). */
-const lastSeen = new Map<string, { data: Loaded; jobs: Jobs }>()
-const NO_JOBS: Jobs = {}
+const lastSeen = new Map<string, Loaded>()
 
 /** For tests: start from nothing. */
 export function forgetWatchesTab() {
   lastSeen.clear()
+  forgetWatchJobs()
 }
 
 export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
-  const [data, setData] = useState<Loaded | null>(() => lastSeen.get(community)?.data ?? null)
-  const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community)?.jobs ?? NO_JOBS)
+  const [data, setData] = useState<Loaded | null>(() => lastSeen.get(community) ?? null)
+  const jobs = useWatchJobs(token)
   // The list waits for the hours and shul times jobs, which take their
   // places' pages out of it, so rows don't show and then go.
-  const [listReady, setListReady] = useState(() => lastSeen.has(community))
+  const listReady = jobs.hours !== undefined && jobs.times !== undefined
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -708,22 +697,6 @@ export default function WatchesManager({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     const headers = { Authorization: `Bearer ${token}` }
-    // The jobs' counts are a part of the tab, not the whole: each fills in
-    // as its own read comes back, and the list doesn't wait for them. One
-    // that fails keeps what it last showed.
-    const get = <T,>(path: string) => fetchJson<T>(withCommunity(path, community), { headers }, '').catch(() => null)
-    const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => setJobs((j) => ({ ...j, [key]: value }))
-    const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
-    const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
-    void get<{ places: DishPlace[] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes')))
-    void get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals')))
-    const hours = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours')))
-    const times = get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times')))
-    void Promise.all([hours, times]).then(() => setListReady(true))
-    void get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim')))
-    void get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher')))
-    void get<{ counts: JobCounts; total: number }>('/api/admin/watches/google?counts').then((d) => (d ? fill('google', d.counts ? d : null) : failed('google')))
-    void get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.jobs ? d : null) : failed('runs')))
     try {
       setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'))
     } catch (err) {
@@ -732,8 +705,8 @@ export default function WatchesManager({ token }: { token: string }) {
   }, [token, community])
 
   useEffect(() => {
-    if (data) lastSeen.set(community, { data, jobs })
-  }, [community, data, jobs])
+    if (data) lastSeen.set(community, data)
+  }, [community, data])
 
   useLoadOnMount(load)
 
@@ -860,9 +833,11 @@ export default function WatchesManager({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
-        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds waits on each job&rsquo;s page, beside what the listing says, for you to update or skip</strong>; a page no job reads goes to the moderation queue, and an eruv&rsquo;s status shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
-      </p>
+      <WatchKinds jobs={jobs} base={base} now={now} />
+      <NightlyRuns runs={jobs.runs} now={now} />
+      {/* Each job's own page, until the pages by kind of place hold all
+          they do (pieces 2 to 4). */}
+      <h2 className="pt-2 text-sm font-semibold text-slate-700">Job pages</h2>
       <section className="rounded-lg border border-slate-200 bg-white" aria-label="Jobs">
         <ul className="divide-y divide-slate-100">
           <JobRow
@@ -913,10 +888,12 @@ export default function WatchesManager({ token }: { token: string }) {
             about={jobs.kosher ? `${jobs.kosher.places.length} food places, from Keystone-K’s and Mekor Habracha’s lists` : 'Food places, from Keystone-K’s and Mekor Habracha’s lists'}
             counts={jobs.kosher && jobs.kosher.counts}
           />
-          <JobRow href={`${base}/watches/google`} name="Google" about={jobs.google ? `${jobs.google.total} listings, from Google Maps` : 'Listings, from Google Maps'} counts={jobs.google && jobs.google.counts} pages={false} />
+          <JobRow href={`${base}/watches/google`} name="Google" about={jobs.google ? `${jobs.google.places.length} listings, from Google Maps` : 'Listings, from Google Maps'} counts={jobs.google && jobs.google.counts} pages={false} />
         </ul>
       </section>
-      <NightlyRuns runs={jobs.runs} now={now} />
+      <p className="text-sm text-muted">
+        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds waits on each job&rsquo;s page, beside what the listing says, for you to update or skip</strong>; a page no job reads goes to the moderation queue, and an eruv&rsquo;s status shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
+      </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
           Keeping a watch here needs database migration 070. Until it&rsquo;s run, Keystone-K&rsquo;s list is still read every morning.

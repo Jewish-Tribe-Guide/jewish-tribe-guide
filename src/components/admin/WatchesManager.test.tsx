@@ -70,6 +70,7 @@ async function renderTab(
     times = null as unknown[] | null,
     google = null as Record<string, unknown> | null,
     runs = null as Record<string, unknown> | null,
+    categories = null as unknown[] | null,
   } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
@@ -86,9 +87,15 @@ async function renderTab(
       if (!runs) throw new Error('down')
       return { ok: true, ...runs }
     }
-    if (String(url).includes('/api/admin/watches/google?counts')) {
+    // Its places, to put with the others by kind of place: Google is
+    // asked nothing for them (googleJobRun.ts).
+    if (String(url).includes('/api/admin/watches/google')) {
       if (!google) throw new Error('down')
       return { ok: true, ...google }
+    }
+    if (String(url).includes('/api/admin/categories')) {
+      if (!categories) throw new Error('down')
+      return { ok: true, categories }
     }
     if (String(url).includes('/api/admin/watches/kosher')) {
       if (!kosher) throw new Error('down')
@@ -133,6 +140,36 @@ afterEach(() => {
 })
 
 describe('WatchesManager', () => {
+  // Oct 24 (FinalMain): a row per kind of place, in the site's order, with
+  // how many wait for you, aren't checked and are up to date; then the
+  // kinds nothing reads.
+  it('starts with a row per kind of place, each opening its page', async () => {
+    const field = (kind: string) => ({ field: 'name', label: 'Name', value: 'x', by: { kind } })
+    const place = (id: string, category: string, over = {}) => ({
+      id, name: id, street: null, address: null, category, categoryLabel: category, href: `/philly/${category}/${id}`,
+      matched: true, section: 'checked', fields: [field('google')], readAt: ago(0.5), failedAt: null, notOnGoogle: null, closure: null, compare: null, ...over,
+    })
+    await renderTab([], {
+      categories: [
+        { id: 'restaurant', pluralLabel: 'Food', kind: 'listing', hasAddress: true },
+        { id: 'mikvah', pluralLabel: 'Mikvah', kind: 'listing', hasAddress: true },
+        { id: 'whatsapp', pluralLabel: 'WhatsApp Groups', kind: 'listing', hasAddress: false },
+        { id: 'young-professional', pluralLabel: 'Networking', kind: 'listing', hasAddress: false },
+      ],
+      google: {
+        counts: { checked: 2, toCheck: 1, cantRead: 0, didntLoad: 0 },
+        places: [place('a', 'restaurant'), place('b', 'restaurant', { section: 'to_check', fields: [field('nothing')] }), place('mikvah-1', 'mikvah')],
+      },
+      hours: [{ id: 'mikvah-1', name: 'Mikvah Ohel Rivkah', href: '', website: null, pages: [{ watch: watch({ lastCheck: null }), source: '' }], off: false, offSince: null, reason: null, findings: [{ id: 'f' }], fields: [] }],
+      times: [],
+    })
+    const rows = screen.getAllByTestId('kind-row')
+    expect(rows.map((r) => r.getAttribute('href'))).toEqual(['/philly/admin/watches/kind/restaurant', '/philly/admin/watches/kind/mikvah'])
+    expect(rows[0]).toHaveTextContent('FoodGoogle0waiting for you1not checked1up to date')
+    expect(rows[1]).toHaveTextContent('MikvahGoogle · their websites1waiting for you0not checked0up to date')
+    expect(screen.getByRole('region', { name: 'What the watches keep current' })).toHaveTextContent('Not watched: WhatsApp Groups · Networking')
+  })
+
   it('says plainly which watch is broken, since when and why', async () => {
     await renderTab([
       watch({ id: 'a', label: 'A page', url: 'https://a.example/' }),
@@ -296,7 +333,7 @@ describe('WatchesManager', () => {
   // Oct 22: Google loads no pages, so it has no "didn't load"; the slot is
   // held so its counts line up with the rows above.
   it('has a Google row, its counts in line with the others', async () => {
-    await renderTab([], { google: { counts: { checked: 122, toCheck: 18, cantRead: 1, didntLoad: 0 }, total: 141 } })
+    await renderTab([], { google: { counts: { checked: 122, toCheck: 18, cantRead: 1, didntLoad: 0 }, places: Array.from({ length: 141 }, (_, i) => ({ id: `p${i}` })) } })
     const google = jobRow('google')
     expect(google).toHaveTextContent('Google141 listings, from Google Maps')
     expect(google).toHaveTextContent('122checked18to check1can’t be read')
