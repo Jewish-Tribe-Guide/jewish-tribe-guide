@@ -38,6 +38,7 @@ vi.mock('@/lib/categoryStore', () => ({
     { id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] },
     {
       id: 'restaurant',
+      kind: 'listing',
       label: 'Food',
       hasPhone: true,
       detailFields: [
@@ -45,6 +46,9 @@ vi.mock('@/lib/categoryStore', () => ({
         { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' },
       ],
     },
+    { id: 'grocery', kind: 'listing', label: 'Grocery', hasPhone: true, detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] },
+    { id: 'hotel', kind: 'listing', label: 'Hotel', hasPhone: true, detailFields: [] },
+    { id: 'cemetery', kind: 'listing', label: 'Cemetery', hasPhone: false, detailFields: [] },
   ],
 }))
 
@@ -180,6 +184,18 @@ describe('syncHoursWatches', () => {
     expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 1, removed: 0 }])
     expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://chalavita.com/', resourceId: 'cv', label: 'Chalavita · its website', createdBy: HOURS_FOUND_CREATOR })
     expect(reach.fetchHome).not.toHaveBeenCalled()
+  })
+
+  // Oct 25 (the user): every kind of place, only where Google doesn't have it.
+  it('watches any kind of place’s website for what Google doesn’t keep', async () => {
+    m.rows = [
+      { ...row('gr', 'Corner Grocery', 'https://grocery.example/', 'grocery'), details: { website: 'https://grocery.example/', placeId: 'g', googleFields: ['phone'] } },
+      { ...row('ho', 'Hotel Kept', 'https://hotel.example/', 'hotel'), details: { website: 'https://hotel.example/', placeId: 'g2', googleFields: ['phone'] } },
+      row('hn', 'Hotel New', 'https://hotelnew.example/', 'hotel'),
+      row('ce', 'Cemetery', 'https://cemetery.example/', 'cemetery'),
+    ]
+    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 2, removed: 0 }])
+    expect(m.addWatch.mock.calls.map((c) => c[1].resourceId)).toEqual(['gr', 'hn'])
   })
 
   it('takes away its own page it no longer finds', async () => {

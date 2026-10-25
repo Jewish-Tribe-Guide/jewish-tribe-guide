@@ -75,10 +75,11 @@ describe('each watch’s kind of source', () => {
   it('a food place’s own website is Phone, email and hours', () => {
     const site = watch({ createdBy: 'listing pages (found)', resourceId: 'f1', label: 'Chalavita · its website' })
     const readsOf = () => 'hours' as const
-    expect(nightKindOf(site, readsOf, (id) => (id === 'f1' ? 'Not on Google' : null))).toBe('sites')
-    expect(nightKindOf(site, readsOf, (id) => (id === 'f1' ? '' : null))).toBe('sites')
-    expect(nightKindOf({ ...site, resourceId: 'm1' }, readsOf, (id) => (id === 'f1' ? 'Not on Google' : null))).toBe('hours')
-    expect(nightKindOf(watch({ createdBy: 'menu links', resourceId: 'f1' }), readsOf, () => 'Not on Google')).toBe('menus')
+    const gap = (why: string) => (id: string) => (id === 'f1' ? { why, page: 'dishes' } : null)
+    expect(nightKindOf(site, readsOf, gap('Not on Google'))).toBe('sites')
+    expect(nightKindOf(site, readsOf, gap(''))).toBe('sites')
+    expect(nightKindOf({ ...site, resourceId: 'm1' }, readsOf, gap('Not on Google'))).toBe('hours')
+    expect(nightKindOf(watch({ createdBy: 'menu links', resourceId: 'f1' }), readsOf, gap('Not on Google'))).toBe('menus')
   })
 
   // Read as each email comes in, not at night.
@@ -104,7 +105,7 @@ describe('what a run saves', () => {
       watch({ id: 'f', createdBy: 'listing pages (found)', resourceId: 'f1' }),
       watch({ id: 'm', createdBy: 'listing pages', resourceId: 'm1' }),
     ]
-    expect(countWatchKinds(queue, new Set(['f', 'm']), () => 'hours', (id) => (id === 'f1' ? 'Not on Google' : null))).toEqual({
+    expect(countWatchKinds(queue, new Set(['f', 'm']), () => 'hours', (id) => (id === 'f1' ? { why: 'Not on Google', page: 'dishes' } : null))).toEqual({
       philly: { sites: { of: 1, read: 1 }, hours: { of: 1, read: 1 } },
     })
   })
@@ -356,15 +357,23 @@ describe('everything a kind tracks', () => {
       watch({ id: 'a', createdBy: 'listing pages (found)', resourceId: 'f1', label: 'Chalavita · its website' }),
       watch({ id: 'b', createdBy: 'listing pages (found)', resourceId: 'f2', label: 'Sababa Falafel · its website', failingSince: night(WATCHES_AT, 2), lastOkAt: night(WATCHES_AT, 3) }),
       watch({ id: 'c', createdBy: 'listing pages', resourceId: 'm1', label: 'Mikvah Ohr · hours on their website' }),
+      watch({ id: 'd', createdBy: 'listing pages (found)', resourceId: 'g1', label: 'Hotel One · its website' }),
     ]
-    const gaps: Record<string, string> = { f1: 'Not on Google', f2: 'Google has no hours' }
+    const gaps: Record<string, { why: string; page: string }> = {
+      f1: { why: 'Not on Google', page: 'dishes' },
+      f2: { why: 'Google has no hours', page: 'dishes' },
+      // Oct 25: every kind of place; what a hotel's finds goes to the queue.
+      g1: { why: 'Google has no phone', page: '' },
+    }
     const views = nightKinds('philly', runs, watches, [], NOW, [], { readsOf: () => 'hours', nameOf: () => null, siteGap: (id) => gaps[id] ?? null })
     const sites = kind(views, 'Phone, email and hours')
-    expect(sites).toMatchObject({ about: 'Reads a place’s own website when Google doesn’t have them.', count: '1 of 2 read' })
+    expect(sites).toMatchObject({ about: 'Reads a place’s own website when Google doesn’t have them.', count: '2 of 3 read' })
     expect(sites.tracked).toEqual([
       { name: 'Sababa Falafel', status: 'Google has no hours · Not loading since Oct 23', bad: true, page: 'dishes' },
       { name: 'Chalavita', status: 'Not on Google · Read Oct 25', bad: false, page: 'dishes' },
+      { name: 'Hotel One', status: 'Google has no phone · Read Oct 25', bad: false, page: '' },
     ])
+    expect(sites.misses).toEqual([{ name: 'Sababa Falafel', why: 'Didn’t load', page: 'dishes' }])
     expect(kind(views, 'Mikvah hours').tracked.map((t) => t.name)).toEqual(['Mikvah Ohr'])
     expect(kind(nightKinds('philly', runs, [], [], NOW), 'Phone, email and hours')).toBeUndefined()
   })

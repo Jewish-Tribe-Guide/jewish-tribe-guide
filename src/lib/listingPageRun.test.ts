@@ -1428,4 +1428,17 @@ describe('runListingPageWatch: a page’s phone and email', () => {
     expect(m.readMessage).not.toHaveBeenCalled()
     expect(out).toMatchObject({ ok: true, filed: 0, pageHash: await hashOf(body), check: { what: 'hours', result: 'nothing', contact: { same: ['phone'], changes: [] } } })
   })
+  // Oct 25 (the user): every kind of place. A hotel has no hours to read,
+  // so its page is read for its phone and email alone, by code.
+  it('reads a place with no hours field for its phone and email, without the AI', async () => {
+    const hotel = makeCategory({ id: 'hotel', detailFields: [{ key: 'front_desk_email', label: 'Email', type: 'text' }] })
+    m.listCategoriesUncached.mockResolvedValue([hotel])
+    m.getResourceRowById.mockResolvedValue({ id: 'h1', category: 'hotel', name: 'Hotel One', status: 'approved', phone: '(215) 555-0199', details: { front_desk_email: 'desk@hotel.example' } })
+    const body = `<html><body><p>Call 215-555-0100 or write to stay@hotel.example. ${'Rooms near the hospital. '.repeat(15)}</p></body></html>`
+    m.fetchPublic.mockResolvedValue({ ...page, body })
+    const out = await runListingPageWatch({ ...watch, resourceId: 'h1', pageHash: 'old' }, undefined, { apiKey: 'k', now: NOW })
+    expect(m.readMessage).not.toHaveBeenCalled()
+    expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', contact: { same: [], changes: ['phone', 'front_desk_email'] } } })
+    expect(m.submitListingUpdate.mock.calls[0][2]).toMatchObject({ phone: '(215) 555-0100', details: { front_desk_email: 'stay@hotel.example' }, source: { section: { section: 'contact' } } })
+  })
 })

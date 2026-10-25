@@ -417,9 +417,22 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        on Google · Read Oct 25", "Google has no hours · …". Five on the
        live site (four not on Google, Sababa Falafel with no hours there),
        which had been counted as Mikvah hours. Shows only when there are
-       some. Food has no email field, so it reads phone and hours today.
-       Proposed, not decided: the same for other kinds of place
-       (groceries, childcare…), then a free weekly check of the links a
+       some.
+     - **Every kind of place: BUILT Oct 25** (the user: "read phone,
+       email and hours from the website for the other kinds of place
+       too, only where Google doesn't have them"). `ownSiteCategories`:
+       every kind of place but shuls, mikvahs and hospitals (their own
+       jobs), with a phone, an email or hours to read. A place with no
+       hours field (a hotel) is read for phone and email alone, by code,
+       no AI. Hours are read by the AI only when the page changes. What a
+       food place's site finds waits on Dishes; anything else's goes to
+       the moderation queue (no job page of their own), so the kind
+       rows' "Waiting for you" doesn't count it yet. Dry run on the live
+       site: the next morning adds GIANT (grocery, Google has no phone),
+       CKids Philly (not on Google) and BZBI's Early Childhood (Google
+       has no hours). Schools and hotels have no gaps today; cemeteries
+       have no phone field.
+     - Proposed, not decided: a free weekly check of the links a
        listing shows that Google doesn't give (kosher certificates,
        Refuah, WhatsApp, websites typed in), about 110.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check

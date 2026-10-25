@@ -742,7 +742,9 @@ export async function runListingPageWatch(
   if (!row || row.status !== 'approved') return { ok: false, error: 'The listing this page belongs to isn’t in the guide any more' }
   const listing = normalizeRow(row)
   const category = (await listCategoriesUncached(watch.communityId)).find((c) => c.id === listing.category)
-  const reads = category && pageReadsFor(category)
+  // A place with no hours field (a hotel) is read for its phone and email
+  // alone: by code, so no AI (ownSiteCategories).
+  const reads: PageReads | null | undefined = category && (pageReadsFor(category) ?? (contactFields(category, listing).length ? { kind: 'hours', keys: [], notes: [] } : null))
   if (!category || !reads) return { ok: false, error: 'The listing this page belongs to has no davening times or hours to keep current' }
 
   // Why it couldn't, when the site said (the user, Oct 23: Shivtei

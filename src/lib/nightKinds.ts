@@ -22,8 +22,8 @@ import type { Watch } from './watches'
 // everything it tracks, not only what was missed, with Newsletters (read
 // as each email comes in, so no nights) and Other pages (added by hand,
 // shown only when there are any). It replaced the tab's watch list.
-// Phone, email and hours (Oct 25): a food place's own website, read for
-// what Google doesn't have, each place saying why ("Not on Google").
+// Phone, email and hours (Oct 25): a place's own website, read for what
+// Google doesn't have, each place saying why ("Not on Google").
 // Pure: the runs route works it out, NightlyRuns.tsx draws it.
 
 export type NightKind = {
@@ -46,7 +46,7 @@ export const NIGHT_KINDS: readonly NightKind[] = [
   { id: 'times', name: 'Minyan times', job: 'watches', about: 'Reads each shul’s page of minyan times.', page: 'times' },
   { id: 'newsletters', name: 'Newsletters', job: null, about: 'Reads each shul’s newsletter as it comes in.', page: 'times' },
   { id: 'hours', name: 'Mikvah hours', job: 'watches', about: 'Reads each mikvah’s page of hours.', page: 'hours' },
-  { id: 'sites', name: 'Phone, email and hours', job: 'watches', about: 'Reads a place’s own website when Google doesn’t have them.', page: 'dishes' },
+  { id: 'sites', name: 'Phone, email and hours', job: 'watches', about: 'Reads a place’s own website when Google doesn’t have them.', page: '' },
   { id: 'menus', name: 'Menus', job: 'watches', about: 'Reads each food place’s menu when it changes, and a few never read each night.', page: 'dishes' },
   { id: 'other', name: 'Other pages', job: 'watches', about: 'Pages added by hand. What they find goes to the moderation queue.', page: '' },
 ]
@@ -57,9 +57,9 @@ type KindWatch = Pick<Watch, 'kind' | 'url' | 'createdBy' | 'label' | 'resourceI
  *  comes in, not at night. */
 /** `readsOf`, what each listing's page is read for (by its category, as
  *  the watch list sorts them): a mikvah's page whose label doesn't say
- *  "hours" is still Mikvah hours. `siteGap`: a food place's own website,
- *  read for the phone and hours Google doesn't have, is Phone, email and
- *  hours, not Mikvah hours (Oct 25: five were counted there). A page that
+ *  "hours" is still Mikvah hours. `siteGap`: a place's own website, read
+ *  for the phone, email and hours Google doesn't have, is Phone, email and
+ *  hours, not Mikvah hours (Oct 25: five food places were counted there). A page that
  *  is none of the kinds was added by hand: Other pages. */
 export function nightKindOf(w: KindWatch, readsOf?: ReadsOf, siteGap?: SiteGap): Exclude<NightKindId, 'google' | 'newsletters'> | null {
   if (isNewsletterWatch(w) || isIgnoredSender(w)) return null
@@ -180,6 +180,10 @@ function watchName(w: Pick<Watch, 'label' | 'url'>): string {
 
 type Live = { count: KindCount; misses: KindMiss[]; failed: number; never: number; notReached: number }
 
+/** Where a watch's place is acted on: a place's own website, its kind's
+ *  job page (Dishes) or none (the moderation queue); else its kind's. */
+const pageOf = (kind: NightKind, w: Pick<Watch, 'resourceId'>, siteGap?: SiteGap) => (kind.id === 'sites' ? ((w.resourceId && siteGap?.(w.resourceId)?.page) ?? '') : kind.page)
+
 /** A food place whose menu was never read (menuPlaceRead.ts). */
 export type UnreadMenu = { id: string; name: string }
 
@@ -207,7 +211,7 @@ function liveWatches(kind: NightKind, watches: readonly Watch[], start: number, 
     if (why === 'Didn’t load') live.failed++
     else if (why === 'Never read') live.never++
     else live.notReached++
-    live.misses.push({ name: watchName(w), why, page: kind.page })
+    live.misses.push({ name: watchName(w), why, page: pageOf(kind, w, siteGap) })
   }
   for (const u of unread) {
     if (watched.has(u.id)) continue
@@ -262,22 +266,22 @@ function watchStatus(w: Watch): Omit<TrackedSource, 'name' | 'page'> & { at: num
  *  why it's read first: "Not on Google · Read Oct 24". */
 function trackedWatches(kind: NightKind, watches: readonly Watch[], unread: readonly UnreadMenu[], readsOf?: ReadsOf, siteGap?: SiteGap): TrackedSource[] {
   const neverRead = new Map(unread.map((u) => [u.id, u]))
-  const places = new Map<string, { name: string; pages: number; best: ReturnType<typeof watchStatus> }>()
+  const places = new Map<string, { name: string; pages: number; best: ReturnType<typeof watchStatus>; page: string }>()
   for (const w of watches) {
     if (!w.active || nightKindOf(w, readsOf, siteGap) !== kind.id) continue
     const place = w.resourceId ? neverRead.get(w.resourceId) : undefined
     const status = place ? { status: 'Menu never read', bad: true, at: 0 } : watchStatus(w)
     const key = w.resourceId ?? w.id
     const line = places.get(key)
-    if (!line) places.set(key, { name: place?.name ?? watchName(w), pages: 1, best: status })
+    if (!line) places.set(key, { name: place?.name ?? watchName(w), pages: 1, best: status, page: pageOf(kind, w, siteGap) })
     else {
       line.pages++
       if ((status.bad && !line.best.bad) || (status.bad === line.best.bad && status.at > line.best.at)) line.best = status
     }
   }
-  const tracked = [...places.entries()].map(([key, { name, pages, best }]) => {
-    const why = kind.id === 'sites' ? siteGap?.(key) : null
-    return { name: pages > 1 ? `${name} · ${pages} pages` : name, status: why ? `${why} · ${best.status}` : best.status, bad: best.bad, page: kind.page }
+  const tracked = [...places.entries()].map(([key, { name, pages, best, page }]) => {
+    const why = kind.id === 'sites' ? siteGap?.(key)?.why : null
+    return { name: pages > 1 ? `${name} · ${pages} pages` : name, status: why ? `${why} · ${best.status}` : best.status, bad: best.bad, page }
   })
   for (const u of unread) if (!places.has(u.id)) tracked.push({ name: u.name, status: 'Menu never read', bad: true, page: kind.page })
   return tracked.sort(byNeed)
