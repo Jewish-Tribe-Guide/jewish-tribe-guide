@@ -150,7 +150,11 @@ function closureOf(details: Record<string, unknown>): GoogleClosure | null {
   if (status !== 'CLOSED_TEMPORARILY' && status !== 'CLOSED_PERMANENTLY') return null
   // Every read asks whether it's open; a status-only read asks nothing else.
   const reads = [isoOr(details.googleSyncedAt), isoOr(details.googleStatusCheckedAt)].filter((d): d is string => !!d).sort()
-  return { status, shownOpen: details.businessStatusOverride === 'OPERATIONAL', since: isoOr(details.businessStatusChangedAt), readAt: reads.at(-1) ?? null }
+  const since = isoOr(details.businessStatusChangedAt)
+  // Kept before Google last changed its answer is no longer an answer.
+  const keptAt = isoOr(details.businessStatusKeptAt)
+  const kept = keptAt && (!since || keptAt >= since) ? keptAt : null
+  return { status, shownOpen: details.businessStatusOverride === 'OPERATIONAL', since, readAt: reads.at(-1) ?? null, kept }
 }
 
 /** What a stored check left to decide, set against the listing as it is. */
@@ -422,15 +426,19 @@ async function markDecided(community: string, id: string, what: 'used' | 'kept',
   if (check) await writeDetails(community, id, { ...details, googleCheck: { ...check, decided: { what, at: new Date(now).toISOString() } } })
 }
 
-/** Show as open, over Google's closure; or Google's answer again. Only the
- *  override is written: Google's own `businessStatus` stays as the sync
- *  last had it, so the page still says what Google says, and clearing the
- *  override goes back to it. */
+/** Show as open, over Google's closure; or Google's answer again, which is
+ *  Keep closed (dated, so the closure stops waiting). Only the override is
+ *  written: Google's own `businessStatus` stays as the sync last had it, so
+ *  the page still says what Google says, and clearing the override goes
+ *  back to it. */
 export async function showAsOpen(community: string, id: string, open: boolean, now = Date.now()): Promise<GooglePlace> {
   const { row } = await loadOne(community, id)
   const details = { ...(row.details ?? {}) }
   if (open) details.businessStatusOverride = 'OPERATIONAL'
-  else delete details.businessStatusOverride
+  else {
+    delete details.businessStatusOverride
+    details.businessStatusKeptAt = new Date(now).toISOString()
+  }
   await writeDetails(community, id, details)
   return onePlace(community, id, now)
 }

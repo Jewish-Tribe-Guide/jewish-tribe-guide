@@ -32,6 +32,9 @@ export const SYNC_INTERNAL_FIELDS = [
   'businessStatusBefore',
   'businessStatusChangedAt',
   'businessStatusOverride',
+  // When an admin said Keep closed to Google's closure (the Watches tab,
+  // piece 4): an admin's, never a submitter's.
+  'businessStatusKeptAt',
   'googleDescription',
   'verifiedPlaceId',
   'legacyId',

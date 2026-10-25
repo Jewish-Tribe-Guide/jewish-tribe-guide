@@ -132,6 +132,45 @@ describe('watchKinds', () => {
     expect(place(input, 'giant')).toMatchObject({ pill: '1 change', href: '/philly/admin/watches/kosher' })
   })
 
+  it('waits on a closure Google reports until it’s kept closed or shown open', () => {
+    const closure = { status: 'CLOSED_TEMPORARILY' as const, shownOpen: false, since: '2026-10-12T14:00:00Z', readAt: ago(10), kept: null }
+    const input = jobs({
+      google: [
+        google('ritas', 'restaurant', { closure }),
+        google('kept', 'restaurant', { closure: { ...closure, kept: ago(5) } }),
+        google('open', 'restaurant', { closure: { ...closure, shownOpen: true } }),
+      ],
+    })
+    expect(place(input, 'ritas')).toMatchObject({ state: 'waiting', pill: 'Closed for now, says Google · Oct 12', rank: 'closed' })
+    expect(place(input, 'kept').state).toBe('up_to_date')
+    expect(place(input, 'open').state).toBe('up_to_date')
+  })
+
+  it('puts Waiting for you in the agreed order: off a list (red), closures, new places, changes', () => {
+    const closure = { status: 'CLOSED_TEMPORARILY' as const, shownOpen: false, since: '2026-10-12T14:00:00Z', readAt: ago(10), kept: null }
+    const input = jobs({
+      google: [
+        google('a-changes', 'restaurant', { compare: { at: ago(2), rows: [{ field: 'phone', label: 'Phone', google: '215', changed: true }] } }),
+        google('b-closed', 'restaurant', { closure }),
+        google('z-off', 'restaurant'),
+      ],
+      kosher: {
+        places: [],
+        newPlaces: [{ name: 'Aardvark Bakery', address: '', on: [{ list: 'mekor', name: 'Aardvark Bakery', url: '', says: '' }], archived: null, filed: 'queued', findings: [{ id: 'n1', at: '2026-10-24T09:00:00Z' }] }],
+        others: [{ id: 'f1', name: 'Z Off', targetId: 'z-off', operation: 'delete', from: 'Keystone-K’s list', at: '2026-10-24T09:00:00Z' }],
+      },
+    })
+    const waiting = kind(input, 'restaurant').places.filter((p) => p.state === 'waiting')
+    expect(waiting.map((p) => [p.name, p.pill])).toEqual([
+      ['z-off', 'Off Keystone-K’s list · Oct 24'],
+      ['b-closed', 'Closed for now, says Google · Oct 12'],
+      ['Aardvark Bakery', 'New on Mekor Habracha’s list · Oct 24'],
+      ['a-changes', '1 change'],
+    ])
+    expect(waiting[0].red).toBe(true)
+    expect(waiting.slice(1).some((p) => p.red)).toBe(false)
+  })
+
   it('lists a place only a kosher list has, under Food, with when', () => {
     const on = [{ list: 'mekor' as const, name: 'Magical Sweet Shop', url: '', says: '' }]
     const input = jobs({

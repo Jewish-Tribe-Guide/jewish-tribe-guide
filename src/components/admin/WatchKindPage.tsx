@@ -99,7 +99,9 @@ export default function WatchKindPage({ token, category }: { token: string; cate
                   <span className="text-[15px] font-bold text-slate-900">{p.name}</span>
                   {!p.pill && p.sources.length > 0 && <span className="text-[13px] text-muted">{placeSourcesText(p.sources)}</span>}
                 </span>
-                {p.pill && <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-xs font-semibold text-amber-800">{p.pill}</span>}
+                {p.pill && (
+                  <span className={`whitespace-nowrap rounded-full border px-2 py-px text-xs font-semibold ${p.red ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{p.pill}</span>
+                )}
                 <Chevron />
               </>
             )

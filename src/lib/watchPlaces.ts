@@ -1,5 +1,5 @@
 import type { CategoryConfig } from './categories'
-import type { GooglePlace } from './googleJob'
+import { closureText, closureWaits, type GooglePlace } from './googleJob'
 import { hoursDidntLoad, hoursSection } from './hoursJob'
 import { dishJobStatus, didntLoad, hospitalSection, type DishPlace } from './watchJobs'
 import { eruvStanding, findingFor, websiteWatchOf, type EruvJobLoaded } from './eruvJob'
@@ -16,15 +16,19 @@ import type { Watch } from './watches'
 //
 //   waiting      something read differs from the listing: a page's,
 //                Refuah's or a list's finding, a menu that would change
-//                its dishes, a check against Google with changes, or a
-//                place only a kosher list has
+//                its dishes, a check against Google with changes, a
+//                closure Google reports, or a place only a kosher list has
 //   not checked  a field nothing checks, Google stopped answering, or a
 //                page or menu that can't be read or didn't load
 //   up to date   the rest
 //
 // A place is in one of them, the first that fits. A job's first-night
 // grace (read, not compared yet) is neither: it's up to date until it's
-// compared. Google's closures wait with piece 4.
+// compared.
+//
+// Waiting for you is in the agreed order (Oct 24): a place off a kosher
+// list first, its pill red; then Google's closures; then new places; then
+// changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type WatchState = 'waiting' | 'not_checked' | 'up_to_date'
@@ -48,17 +52,25 @@ export type WatchedPlace = {
   /** Why it waits or isn't checked ("3 changes", "Website didn’t load");
    *  none when up to date. */
   pill: string | null
+  /** Off a kosher list: its pill is red. */
+  red?: boolean
+  /** Where it goes on Waiting for you: off a list, a closure, new, changes. */
+  rank?: Rank
   sources: WatchSource[]
   /** Where it's acted on: the job page holding what waits, or its listing. */
   href: string
 }
+
+/** Waiting for you's order. */
+export type Rank = 'off' | 'closed' | 'new' | 'changes'
+const RANKS: readonly Rank[] = ['off', 'closed', 'new', 'changes']
 
 export type WatchCounts = { waiting: number; notChecked: number; upToDate: number }
 
 export type WatchKind = { id: string; label: string; places: WatchedPlace[]; counts: WatchCounts; sources: WatchSource[] }
 
 type Page = { watch: Watch }
-type Found = { id: string; at?: string }
+type Found = { id: string; at?: string; operation?: string; from?: string }
 export type PagesPlace = { id: string; name: string; href: string; pages: Page[]; off: boolean; findings?: readonly Found[]; decided?: { at: string } | null; newsletters?: readonly Watch[] }
 export type DishesPlace = DishPlace & { id: string; name: string; href: string; pages?: readonly Watch[] }
 export type HospitalPlace = { id: string; name: string; href: string; watch: Watch | null; notOnRefuah: boolean; findings?: readonly Found[] }
@@ -86,7 +98,7 @@ const LIST_NAMES = { keystone: 'Keystone-K’s', mekor: 'Mekor Habracha’s' } a
 
 /** What one job says of a place: changes waiting, things not checked
  *  (each with its own pill), and where it reads it from. */
-type Say = { changes: number; unchecked: string[]; sources: WatchSource[]; href: string; pill?: string }
+type Say = { changes: number; unchecked: string[]; sources: WatchSource[]; href: string; pill?: string; rank?: Rank; red?: boolean }
 
 /** Its sources, as its row on Up to date says them: "Google · its website". */
 export function placeSourcesText(sources: readonly WatchSource[]): string {
@@ -106,9 +118,13 @@ export function kindSourcesText(sources: readonly WatchSource[]): string {
   return text ? text[0].toUpperCase() + text.slice(1) : ''
 }
 
+/** The one that comes first on Waiting for you. */
+const firstSay = (says: readonly Say[]) =>
+  [...says].filter((s) => s.pill).sort((a, b) => RANKS.indexOf(a.rank ?? 'changes') - RANKS.indexOf(b.rank ?? 'changes'))[0]
+
 function pillOf(state: WatchState, says: readonly Say[]): string | null {
   if (state === 'waiting') {
-    const own = says.find((s) => s.pill)
+    const own = firstSay(says)
     if (own) return own.pill!
     return plural(says.reduce((n, s) => n + s.changes, 0), 'change')
   }
@@ -124,12 +140,14 @@ function placeOf(id: string, name: string, category: string, listingHref: string
   const unchecked = says.find((s) => s.unchecked.length > 0)
   const state: WatchState = waiting ? 'waiting' : unchecked ? 'not_checked' : 'up_to_date'
   const have = new Set(says.flatMap((s) => s.sources))
+  const first = state === 'waiting' ? firstSay(says) : undefined
   return {
     id,
     name,
     category,
     state,
     pill: pillOf(state, says),
+    ...(state === 'waiting' ? { rank: first?.rank ?? 'changes', ...(first?.red ? { red: true } : {}) } : {}),
     sources: SOURCES.filter((s) => have.has(s)),
     href: (waiting ?? unchecked)?.href ?? listingHref,
   }
@@ -148,6 +166,12 @@ function googleSays(p: GooglePlace, base: string): Say {
   const sources: WatchSource[] = []
   if (p.matched) sources.push('google')
   if (p.fields.some((f) => f.by.kind === 'website')) sources.push('website')
+  // "Closed for now, says Google · Oct 12": on the site at once, waiting
+  // for Keep closed or Show as open.
+  if (closureWaits(p.closure)) {
+    const pill = `${closureText(p.closure)}, says Google${p.closure.since ? ` · ${dayText(p.closure.since)}` : ''}`
+    return { changes, unchecked, sources, href, pill, rank: 'closed' }
+  }
   return { changes, unchecked, sources, href }
 }
 
@@ -190,11 +214,19 @@ function hospitalSays(h: HospitalPlace, base: string, now: number): Say {
   return { changes: section === 'to_check' ? Math.max(1, h.findings?.length ?? 0) : 0, unchecked, sources, href }
 }
 
+/** "Off Keystone-K’s list · Oct 24", red: a list's removal. */
+function offSay(f: Found, href: string): Say | null {
+  if (f.operation !== 'delete' || !f.from) return null
+  return { changes: 1, unchecked: [], sources: [], href, pill: `Off ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}`, rank: 'off', red: true }
+}
+
 function kosherSays(p: KosherJob['places'][number], base: string): Say {
   const href = `${base}/watches/kosher`
   const waiting = p.findings?.length ?? 0
   const open = kosherSection({ ...p, waiting }) === 'to_check'
   const sources = [...new Set(p.on.map((o) => o.list))]
+  const off = (p.findings ?? []).map((f) => offSay(f, href)).find((x) => x)
+  if (off) return { ...off, changes: Math.max(1, waiting), sources }
   return { changes: open ? Math.max(1, waiting) : 0, unchecked: [], sources, href }
 }
 
@@ -220,10 +252,11 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
   const listed = new Set((jobs.google ?? []).map((g) => g.id))
   const loose: WatchedPlace[] = []
   for (const f of jobs.kosher?.others ?? []) {
-    if (f.targetId && listed.has(f.targetId)) add(f.targetId, { changes: 1, unchecked: [], sources: [], href: kosherHref })
+    if (f.targetId && listed.has(f.targetId)) add(f.targetId, offSay(f, kosherHref) ?? { changes: 1, unchecked: [], sources: [], href: kosherHref })
     else {
-      const pill = f.operation === 'create' && f.from ? `New on ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}` : '1 change'
-      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, sources: [], href: kosherHref })
+      const isNew = f.operation === 'create' && !!f.from
+      const pill = isNew ? `New on ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}` : '1 change'
+      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], href: kosherHref })
     }
   }
 
@@ -237,7 +270,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
     const lists = [...new Set(n.on.map((o) => o.list))]
     const at = n.findings?.map((f) => f.at).filter((x): x is string => !!x).sort()[0]
     const pill = `New on ${lists.map((l) => LIST_NAMES[l]).join(' and ')} list${lists.length > 1 ? 's' : ''}${at ? ` · ${dayText(at)}` : ''}`
-    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, sources: lists, href: kosherHref })
+    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: 'new', sources: lists, href: kosherHref })
   }
   loose.forEach(put)
 
@@ -252,7 +285,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
       if (e.statusUrl || watch?.active) sources.push('website')
       if (e.statusEmail) sources.push('email')
       const state: WatchState = s.tab === 'to_check' ? 'waiting' : s.tab === 'cant_read' ? 'not_checked' : 'up_to_date'
-      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, sources, href })
+      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, href })
     }
   }
 
@@ -265,7 +298,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
       {
         id: c.id,
         label: c.pluralLabel,
-        places: [...places].sort((a, b) => a.name.localeCompare(b.name)),
+        places: [...places].sort((a, b) => RANKS.indexOf(a.rank ?? 'changes') - RANKS.indexOf(b.rank ?? 'changes') || a.name.localeCompare(b.name)),
         counts: { waiting: n('waiting'), notChecked: n('not_checked'), upToDate: n('up_to_date') },
         sources: SOURCES.filter((s) => have.has(s)),
       },

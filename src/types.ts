@@ -212,6 +212,9 @@ export type DirectoryResource = {
   /** What `businessStatus` was before the sync last changed it, and when. */
   businessStatusBefore?: string
   businessStatusChangedAt?: string
+  /** When an admin said Keep closed to Google's closure: it stops waiting
+   *  on the Watches tab until Google changes its answer again. */
+  businessStatusKeptAt?: string
   /** Short editorial description from Google Places (fetched on first sync). */
   googleDescription?: string
   /** Which fields ('name'|'hours'|'phone'|'address') the sync is allowed to

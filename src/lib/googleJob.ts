@@ -42,7 +42,13 @@ export type GoogleClosure = {
   since: string | null
   /** Google is asked whether a place is open more often than for its fields. */
   readAt: string | null
+  /** When an admin said Keep closed, since Google last changed its answer. */
+  kept: string | null
 }
+
+/** A closure waits for the admin: shown on the site at once, Keep closed or
+ *  Show as open decides it. A later change of Google's asks again. */
+export const closureWaits = (c: GoogleClosure | null): c is GoogleClosure => !!c && !c.shownOpen && !c.kept
 
 export type GooglePlace = {
   id: string

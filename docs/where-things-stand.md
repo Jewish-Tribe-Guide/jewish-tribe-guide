@@ -275,7 +275,6 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      those in place is piece 4 (not checked ones open in place, piece 3).
    - The old job rows stay under "Job pages", and the watch list and Add
      a watch stay below them, until pieces 2 to 4 hold what they do.
-   - Google closures aren't counted yet (piece 4).
    - On the test site Food shows 25 waiting (mostly places only a kosher
      list has), 22 not checked and 49 up to date.
 2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
@@ -336,7 +335,14 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      Google": the check is a paid call and its answer needs Use / Keep.
    - The pills are piece 1's ("Google stopped answering Oct 17"), not a
      count of the fields in the groups.
-4. Waiting for you by source, in the agreed order.
+4. **Waiting for you by source, in the agreed order: building.**
+   - **4a, the order: BUILT Oct 25.** A place off a kosher list first, its
+     pill red ("Off Keystone-K’s list · Oct 24"); then Google's closures
+     ("Closed for now, says Google · Oct 12"); then new places; then
+     changes. A closure waits until Keep closed (dated, so it stops
+     waiting until Google changes its answer again) or Show as open.
+   - 4b, a waiting place opened in place, a group per source with
+     Accept / Edit / Keep as is: next.
 5. Nightly runs as one line per kind. Needs a new `job_run` column (a
    migration: dev only, ask before production).
 

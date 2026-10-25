@@ -59,8 +59,8 @@ describe('googlePill', () => {
   it('Checked: who checks, or a closure Google reports', () => {
     expect(googlePill(place({ fields: [f('name', G), f('hours', W)] }))).toBe('Google · its website')
     expect(googlePill(place({ fields: [f('name', G)] }))).toBe('Google')
-    expect(googlePill(place({ closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: null, readAt: null } }))).toBe('Closed for now')
-    expect(googlePill(place({ closure: { status: 'CLOSED_PERMANENTLY', shownOpen: true, since: null, readAt: null } }))).toBe('Shown as open')
+    expect(googlePill(place({ closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: null, readAt: null, kept: null } }))).toBe('Closed for now')
+    expect(googlePill(place({ closure: { status: 'CLOSED_PERMANENTLY', shownOpen: true, since: null, readAt: null, kept: null } }))).toBe('Shown as open')
   })
 })
 

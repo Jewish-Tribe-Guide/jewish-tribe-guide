@@ -58,7 +58,7 @@ const RITAS: GooglePlace = {
   street: 'Grant Ave',
   section: 'checked',
   fields: [row('name', GOOGLE, 'Rita’s')],
-  closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: '2026-10-12T14:00:00Z', readAt: '2026-10-21T14:00:00Z' },
+  closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: '2026-10-12T14:00:00Z', readAt: '2026-10-21T14:00:00Z', kept: null },
 }
 const SABABA: GooglePlace = { ...TBZ, id: 'sababa', name: 'Sababa Falafel', section: 'cant_read', readAt: '2026-09-10T14:00:00Z', failedAt: '2026-10-22T14:00:00Z', fields: [row('name', { kind: 'google', at: '2026-09-10T14:00:00Z' }, 'Sababa Falafel')] }
 

@@ -269,10 +269,19 @@ describe('Show as open', () => {
   it('overrides Google’s closure, and back; Google’s own answer stays', async () => {
     m.rows = [listing({ details: { businessStatus: 'CLOSED_TEMPORARILY', businessStatusChangedAt: '2026-10-12T10:00:00Z' } })]
     let p = await run.showAsOpen('philly', 'a1', true, NOW)
-    expect(p.closure).toEqual({ status: 'CLOSED_TEMPORARILY', shownOpen: true, since: '2026-10-12T10:00:00Z', readAt: '2026-10-18T10:00:00Z' })
+    expect(p.closure).toEqual({ status: 'CLOSED_TEMPORARILY', shownOpen: true, since: '2026-10-12T10:00:00Z', readAt: '2026-10-18T10:00:00Z', kept: null })
     p = await run.showAsOpen('philly', 'a1', false, NOW)
     expect(p.closure?.shownOpen).toBe(false)
     expect((m.rows[0].details as Record<string, unknown>).businessStatusOverride).toBeUndefined()
+  })
+  it('Keep closed dates it, until Google changes its answer again', async () => {
+    m.rows = [listing({ details: { businessStatus: 'CLOSED_TEMPORARILY', businessStatusChangedAt: '2026-10-12T10:00:00Z' } })]
+    expect((await run.loadGoogleJob('philly', NOW))[0].closure?.kept).toBeNull()
+    const p = await run.showAsOpen('philly', 'a1', false, NOW)
+    expect(p.closure?.kept).toBe(new Date(NOW).toISOString())
+    // Google reopened it and closed it again since: it asks again.
+    ;(m.rows[0].details as Record<string, unknown>).businessStatusChangedAt = new Date(NOW + 86_400_000).toISOString()
+    expect((await run.loadGoogleJob('philly', NOW + 2 * 86_400_000))[0].closure?.kept).toBeNull()
   })
   it('read when Google was last asked whether it’s open, which is more often than its fields', async () => {
     m.rows = [listing({ details: { placeId: 'P', businessStatus: 'CLOSED_TEMPORARILY', googleSyncedAt: '2026-08-28T10:00:00Z', googleStatusCheckedAt: '2026-10-21T10:00:00Z' } })]
