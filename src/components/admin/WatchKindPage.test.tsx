@@ -51,7 +51,41 @@ describe('WatchKindPage', () => {
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Waiting for you 0', 'Not checked 1', 'Up to date 1'])
     expect(tab(/Not checked/)).toHaveAttribute('aria-selected', 'true')
     expect(rows()).toEqual(['Lower Merion SynagogueWebsite not checked'])
-    expect(screen.getByTestId('kind-place')).toHaveAttribute('href', '/philly/admin/watches/google')
+    expect(screen.getByTestId('kind-place')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('opens a place not checked by what’s wrong, each with its own fix', async () => {
+    const added = new Date(Date.now() - 2 * 86_400_000).toISOString()
+    const page = { id: 'w2', url: 'https://lms.example/', active: true, lastRunAt: null, lastOkAt: null, lastError: null, failingSince: null, createdAt: added, lastCheck: null }
+    const shul = { id: 'b', name: 'Lower Merion Synagogue', href: '/philly/synagogues/b', website: 'https://lms.example', pages: [{ watch: page }], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: [], schedules: [] } }
+    const posts: unknown[] = []
+    const lms = place('b', 'Lower Merion Synagogue', { matched: false, section: 'to_check', fields: [field('Name', 'nothing'), field('Website', 'nothing')] })
+    await renderPage([lms], 'synagogue', (url, init) => {
+      if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
+      if (init?.method === 'POST') {
+        const body = JSON.parse(String(init.body))
+        posts.push([url.replace(/[?&]community=philly/, ''), body])
+        return body.action === 'check' && !body.id ? { read: ['w2'] } : { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Lower Merion Synagogue/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getAllByTestId('problem').map((p) => p.textContent)).toEqual([
+      'Nothing checks its nameNamexFind it on GoogleNot on Google',
+      `lms.example·never read · added ${day(added)}WebsitexRead it now`,
+    ])
+    expect(within(open).queryByText(/more checked/)).toBeNull()
+
+    // Read it now reads that page: its website searched, then the page.
+    await user.click(within(open).getByRole('button', { name: 'Read it now' }))
+    expect(posts).toEqual([
+      ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'b' }],
+      ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'b', id: 'w2' }],
+    ])
+    posts.length = 0
+    await user.click(within(open).getByRole('button', { name: 'Not on Google' }))
+    expect(posts).toEqual([['/api/admin/watches/google', { action: 'not_on_google', id: 'b' }]])
   })
 
   it('says where an up-to-date place is read from', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { openedPlace } from './openedPlaceBoxes'
+import { checkedLines, openedPlace } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
 import type { Watch, WatchCheck } from '@/lib/watches'
 import type { GooglePlace } from '@/lib/googleJob'
@@ -126,5 +126,71 @@ describe('openedPlace', () => {
     expect(o.boxes[0].foot).toEqual({ lead: 'Same as', links: [{ text: 'Refuah', url: 'https://refuah.com/hospitals/12' }], when: 'read Oct 23', change: { kind: 'refuah' } })
     expect(o.reads).toEqual([{ job: 'refuah', watchId: 'r' }])
     expect(o.pages).toBe(1)
+  })
+})
+
+describe('openedPlace, not checked', () => {
+  const nothing = (field: 'name' | 'hours' | 'phone' | 'website', label: string, value: string) => ({ field, label, value, by: { kind: 'nothing' as const } })
+  const kosher = (id: string) => ({
+    available: true,
+    lists: [{ list: 'keystone' as const, url: 'https://keystonek.example/list', watch: watch('k', 'https://keystonek.example/list', { lastOkAt: '2026-10-25T07:47:00Z' }), error: null, entries: 1, updated: null }],
+    counts: { checked: 1, toCheck: 0, cantRead: 0, didntLoad: 0, notListed: 0 },
+    places: [{ id, name: id, category: 'restaurant', certs: ['Keystone-K'], levels: [], on: [{ list: 'keystone' as const, name: id, url: '', says: '' }], differences: [], href: '/x' }],
+    newPlaces: [],
+  })
+
+  it('groups a place by what’s wrong: its name with Google, the rest with the page that would check them', () => {
+    // Rivka Cakes, as FinalFood3 draws it.
+    const page = watch('site', 'https://rivkacakes.com/', { lastRunAt: null, lastOkAt: null, lastCheck: null, pageHash: null })
+    const dishes = [{ id: 'p', name: 'Rivka Cakes', href: '/x', dishes: ['Cakes', 'Meringue Rolls', 'Macarons', 'Babka'], website: 'https://rivkacakes.com', menuUrl: 'https://rivkacakes.com/?page=menu', pages: [page], reading: { status: 'approved' as const, readAt: '2026-10-22T08:00:00Z', sourceUrl: 'https://rivkacakes.com/?page=menu' } }]
+    const g = google({ name: 'Rivka Cakes', matched: false, section: 'to_check', fields: [nothing('name', 'Name', 'Rivka Cakes'), nothing('hours', 'Hours', '—'), nothing('phone', 'Phone', '929-666-1482'), nothing('website', 'Website', 'https://rivkacakes.com')] })
+    const o = openedPlace('p', jobs({ dishes, kosher: kosher('p'), google: { counts: { checked: 0, toCheck: 1, cantRead: 0, didntLoad: 0 }, places: [g] } }), NOW)
+    expect(o.problems).toEqual([
+      { key: 'nothing', page: null, says: 'Nothing checks its name', fields: [{ label: 'Name', value: 'Rivka Cakes' }], fix: { kind: 'google' } },
+      {
+        key: 'site',
+        page: { text: 'rivkacakes.com', url: 'https://rivkacakes.com/' },
+        says: 'never read · added Oct 23',
+        fields: [
+          { label: 'Hours', value: 'None listed' },
+          { label: 'Phone', value: '929-666-1482' },
+          { label: 'Website', value: 'rivkacakes.com' },
+        ],
+        fix: { kind: 'read', step: { job: 'dishes', resourceId: 'p' } },
+      },
+    ])
+    expect(checkedLines(o.checked).map((l) => [l.label, l.value, l.foot.links.map((x) => x.text).join(' · '), l.foot.when, !!l.foot.change])).toEqual([
+      ['Dishes', 'Cakes, Meringue Rolls, Macarons and 1 more', 'rivkacakes.com/?page=menu', 'read Oct 22', true],
+      ['Hechsher', 'Keystone-K', 'Keystone-K’s list', 'read Oct 25', false],
+    ])
+  })
+
+  it('says Google stopped answering, with Find it on Google, and leaves its fields out of the checked', () => {
+    const g = google({ section: 'cant_read', failedAt: '2026-09-10T14:00:00Z', fields: [{ field: 'name', label: 'Name', value: 'Sababa Falafel', by: { kind: 'google', at: '2026-09-09T08:00:00Z' } }] })
+    const o = openedPlace('p', jobs({ google: { counts: { checked: 0, toCheck: 0, cantRead: 1, didntLoad: 0 }, places: [g] } }), NOW)
+    expect(o.problems).toEqual([{ key: 'google', page: { text: 'its Google listing', url: null }, says: 'failed every night since Sep 10', fields: [{ label: 'Name', value: 'Sababa Falafel' }], fix: { kind: 'google' } }])
+    expect(o.checked).toEqual([])
+  })
+
+  it('reads a shul’s pages that didn’t load again, together, in place of its times boxes', () => {
+    const failing = watch('w1', 'https://mekorhabracha.org/davening', { failingSince: '2026-10-20T08:00:00Z', lastError: '404', lastRunAt: '2026-10-25T08:00:00Z', lastCheck: check({ parts: [{ part: 'weekday', size: 2 }] }) })
+    // Not on Google too: Google's comes first, as drawn.
+    const g = google({ matched: false, section: 'to_check', fields: [nothing('name', 'Name', 'Mekor Habracha')] })
+    const down = watch('w2', 'https://mekorhabracha.org/', { failingSince: '2026-10-21T08:00:00Z', lastError: '404', lastRunAt: '2026-10-25T08:00:00Z' })
+    const o = openedPlace('p', jobs({ times: { name: 'Shul times', places: [shul({ pages: [{ watch: failing }, { watch: down }] }) as never] }, google: { counts: { checked: 0, toCheck: 1, cantRead: 0, didntLoad: 0 }, places: [g] } }), NOW)
+    expect(o.problems).toEqual([
+      { key: 'nothing', page: null, says: 'Nothing checks its name', fields: [{ label: 'Name', value: 'Mekor Habracha' }], fix: { kind: 'google' } },
+      // Its site down: one group, its pages read together.
+      { key: 'w1', page: { text: 'mekorhabracha.org/davening', url: 'https://mekorhabracha.org/davening' }, says: 'failed every night since Oct 20 · 2 pages', fields: [{ label: 'Minyanim', value: 'Shacharis' }], fix: { kind: 'read', step: { job: 'times', resourceId: 'p' }, pages: 2 } },
+    ])
+    // Its times box, as last read, isn't among the checked.
+    expect(o.boxes.map((b) => b.key)).toEqual(['weekday'])
+    expect(o.checked).toEqual([])
+  })
+
+  it('asks for a hospital’s page on Refuah when it isn’t found there', () => {
+    const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: null, notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }]
+    const o = openedPlace('p', jobs({ hospitals }), NOW)
+    expect(o.problems).toEqual([{ key: 'refuah', page: null, says: 'Not found on Refuah', fields: [{ label: 'Bikur Cholim', value: 'Bikur Cholim room' }], fix: { kind: 'change', change: { kind: 'refuah' }, label: 'Give its page on Refuah' } }])
   })
 })

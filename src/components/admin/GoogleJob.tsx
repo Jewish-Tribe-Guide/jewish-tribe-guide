@@ -51,12 +51,12 @@ function Who({ by }: { by: Checker }) {
   return <span className={by.kind === 'nothing' ? 'font-semibold text-amber-800' : undefined}>{checkerText(by)}</span>
 }
 
-type Post = (body: Record<string, unknown>) => Promise<{ place?: GooglePlace; found?: Found[] }>
+export type Post = (body: Record<string, unknown>) => Promise<{ place?: GooglePlace; found?: Found[] }>
 type Found = { placeId: string; name: string; address: string }
 
 /** Find it on Google: what Google finds, searched again on a different
  *  name, and This one beside each. */
-function FindSheet({ place: p, post, onPicked, onClose }: { place: GooglePlace; post: Post; onPicked: (p: GooglePlace) => void; onClose: () => void }) {
+export function FindSheet({ place: p, post, onPicked, onClose }: { place: GooglePlace; post: Post; onPicked: (p: GooglePlace) => void; onClose: () => void }) {
   const isMobile = useIsMobile()
   const [query, setQuery] = useState(p.name)
   const [found, setFound] = useState<Found[] | null>(null)

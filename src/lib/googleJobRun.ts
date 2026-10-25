@@ -32,7 +32,8 @@ import type { ResourceSubmission } from '@/types'
 //                its Website, one a listing-page job reads its hours from
 //                for its Hours (pageReadsFor), and any listing page for its
 //                Phone (contactRead.ts reads it off every one).
-//   You          Keep the listing, or Not on Google (details.googleKept).
+//   You          Keep the listing, or Not on Google (details.googleKept),
+//                for a year.
 //   Nothing      none of these.
 // What Check against Google found is kept on the listing
 // (details.googleCheck), so Use Google's and Keep the listing need no
@@ -53,6 +54,9 @@ type Row = {
 type CheckValues = Partial<Record<CheckedField, unknown>>
 type StoredCheck = { at: string; values: CheckValues; decided?: { what: 'used' | 'kept'; at: string } }
 
+/** A field you checked is yours this long, then nothing checks it again
+ *  (agreed Oct 24): a year on, the listing is worth a second look. */
+const KEPT_FOR_MS = 365 * 86_400_000
 /** A check's answer stays usable this long; after it, it's asked again. */
 const CHECK_KEEPS_MS = 7 * 86_400_000
 /** "Used Oct 22" shows this long after the decision. */
@@ -134,7 +138,7 @@ export function fieldRows(row: Row, category: CategoryConfig, watches: readonly 
         ? { kind: 'google', ...(failing ? { at: readAt } : {}) }
         : site.has(field)
           ? { kind: 'website' }
-          : typeof kept[field] === 'string'
+          : typeof kept[field] === 'string' && now - Date.parse(kept[field]) < KEPT_FOR_MS
             ? { kind: 'you', at: kept[field] }
             : { kind: 'nothing' }
     return { field, label: CHECKED_LABELS[field], value: shown(field, value), by }
@@ -323,8 +327,14 @@ export async function keepTheListing(community: string, id: string, now = Date.n
 /** Not on Google: said once, and its fields nothing checks become yours. */
 export async function notOnGoogle(community: string, id: string, now = Date.now()): Promise<GooglePlace> {
   const [{ row, category }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
-  if (matchOf(row.details ?? {})) throw new GoogleJobError('This listing has a Google match.', 400)
-  await writeDetails(community, id, { ...(row.details ?? {}), notOnGoogle: new Date(now).toISOString(), googleKept: keptNow(row, category, watches, now) })
+  const details = { ...(row.details ?? {}) }
+  if (matchOf(details)) {
+    // A match Google stopped answering for is dropped (agreed Oct 24); a
+    // live one stays.
+    if (!isoOr(details.lastSyncError)) throw new GoogleJobError('This listing has a Google match.', 400)
+    for (const k of ['placeId', 'lastSyncError', 'lastSyncFailedAt', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt']) delete details[k]
+  }
+  await writeDetails(community, id, { ...details, notOnGoogle: new Date(now).toISOString(), googleKept: keptNow({ ...row, details }, category, watches, now) })
   return onePlace(community, id, now)
 }
 

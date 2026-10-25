@@ -271,12 +271,11 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    so the counts can't disagree with the job pages. A list's finding
    on a grocery goes under Grocery; a place only a list has goes under
    Food. Not done yet, on purpose:
-   - A waiting or not checked place's row opens the job page that holds
-     it. Opening those in place is pieces 3 and 4.
+   - A waiting place's row opens the job page that holds it. Opening
+     those in place is piece 4 (not checked ones open in place, piece 3).
    - The old job rows stay under "Job pages", and the watch list and Add
      a watch stay below them, until pieces 2 to 4 hold what they do.
-   - Google closures aren't counted yet (piece 4). The year-old "You"
-     field rule isn't built (piece 3).
+   - Google closures aren't counted yet (piece 4).
    - On the test site Food shows 25 waiting (mostly places only a kosher
      list has), 22 not checked and 49 up to date.
 2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
@@ -308,7 +307,35 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    - On the test site, 13 food places have an approved menu reading but
      no dishes on the listing (Playa Bowls among them). They show no
      Dishes box rather than a "Same as its menu" that isn't so.
-3. Not checked.
+3. **Not checked, opened by what's wrong: BUILT Oct 25.** A not-checked
+   row opens in place too, as drawn (FinalFood3, FinalPhonePlace3,
+   FinalStopped2, EruvNotChecked): its pill, then a group per problem,
+   lit, each "<page> · <what's wrong>", the fields it leaves unchecked,
+   and its own button. Then "N more checked", a line each (what, the
+   listing's value, its source and when, Change), and Open its listing.
+   - Google: "Nothing checks its name" (Find it on Google / Not on
+     Google); "its Google listing · failed every night since Sep 10"
+     (the same two). A field a page of its website would check, once it
+     loads, goes with that page and its Read it now.
+   - Pages: "never read · added Oct 23", "failed every night since Oct
+     22", "not read since …" with Read it now; a site that's down is one
+     group ("· 5 pages", Read them now). Times or hours that can't be
+     read: Give the page with its times. No page: Add a source.
+   - Menus: never read (Read it now), can't be read (Give its menu
+     page), didn't load (Read it now). Hospitals: Refuah didn't load
+     (Read it now), not found (Give its page on Refuah).
+   - Eruvim: no status (a link to the Eruv page, "Give it a status
+     page"), an email it couldn't read ("Say what it says", same), a
+     status page or map that didn't load (Read it now).
+   - Built with it, as agreed Oct 24: a "You" field goes back to Not
+     checked after a year; Not on Google on a match Google stopped
+     answering for drops the match (it used to be refused).
+   Not done, on purpose:
+   - A matched place with a field nothing checks and no page to add
+     (a grocery's website) links to the Google page, "Check it against
+     Google": the check is a paid call and its answer needs Use / Keep.
+   - The pills are piece 1's ("Google stopped answering Oct 17"), not a
+     count of the fields in the groups.
 4. Waiting for you by source, in the agreed order.
 5. Nightly runs as one line per kind. Needs a new `job_run` column (a
    migration: dev only, ask before production).
@@ -339,11 +366,10 @@ Settled with the user so far:
 - **Not on Google** (`notOnGoogle()`, googleJobRun.ts) changes nothing on
   the listing: it saves the date, and every field nothing else checks
   becomes the admin's ("You · Oct 24"), so the place moves to Up to date.
-  Picking a Google match later clears it. Two things for the build:
-  a "You" field goes back to Not checked after a year (agreed Oct 24),
-  and Not on Google on a place whose match has died drops the dead match
-  (agreed Oct 24; the code refuses it for a place with a match today,
-  as on Sababa, failing since Sep 10).
+  Picking a Google match later clears it. A "You" field goes back to
+  Not checked after a year, and Not on Google on a place whose match has
+  died drops the dead match (both agreed Oct 24, built Oct 25 with
+  piece 3; a live match is still refused).
 - **Minyan times come in every kind the live site already keeps**: the
   usual weekday table and Shabbos, this week's times (including "No
   minyan this week" and a whole posted week), Yom Tov schedules (replace

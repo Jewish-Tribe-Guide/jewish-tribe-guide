@@ -12,9 +12,9 @@ import { kindsOf } from './WatchKinds'
 // One kind of place on the Watches tab (FinalChanges2, FinalPhoneShuls,
 // Oct 24): its places in three tabs, Waiting for you, Not checked and Up to
 // date. A place waiting or not checked says why; one up to date, where
-// it's read from. One up to date opens here, in boxes (OpenedPlace.tsx,
-// piece 2); one waiting or not checked still opens the job page that holds
-// it, until pieces 3 and 4.
+// it's read from. One up to date or not checked opens here (OpenedPlace.tsx:
+// in its boxes, piece 2; by what's wrong, piece 3); one waiting still opens
+// the job page that holds it, until piece 4.
 
 const TABS: { key: WatchState; label: string; none: string }[] = [
   { key: 'waiting', label: 'Waiting for you', none: 'Nothing waiting.' },
@@ -38,7 +38,7 @@ export default function WatchKindPage({ token, category }: { token: string; cate
   const [picked, setPicked] = useState<WatchState | null>(null)
   // The place opened, and what it was called, to say where it went when a
   // read finds it something to check.
-  const [open, setOpen] = useState<{ id: string; name: string } | null>(null)
+  const [open, setOpen] = useState<{ id: string; name: string; tab: WatchState } | null>(null)
   const all = kindsOf(jobs, base, now)
   const kind = all?.kinds.find((k) => k.id === category)
 
@@ -56,7 +56,8 @@ export default function WatchKindPage({ token, category }: { token: string; cate
   const active = picked ?? TABS.find((t) => count[t.key] > 0)?.key ?? 'waiting'
   const places = kind.places.filter((p) => p.state === active)
   const tab = TABS.find((t) => t.key === active)!
-  const moved = open && active === 'up_to_date' ? kind.places.find((p) => p.id === open.id && p.state !== 'up_to_date') : undefined
+  // Opened from this tab, and a read or a fix moved it to another.
+  const moved = open && open.tab === active ? kind.places.find((p) => p.id === open.id && p.state !== active) : undefined
 
   return (
     <div className="space-y-3.5">
@@ -103,7 +104,7 @@ export default function WatchKindPage({ token, category }: { token: string; cate
               </>
             )
             const row = 'flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 sm:px-4 sm:py-3'
-            if (p.state !== 'up_to_date') {
+            if (p.state === 'waiting') {
               return (
                 <li key={p.id}>
                   <Link href={p.href} className={row} data-testid="kind-place">
@@ -117,7 +118,7 @@ export default function WatchKindPage({ token, category }: { token: string; cate
             }
             return (
               <li key={p.id}>
-                <button type="button" aria-expanded="false" onClick={() => setOpen({ id: p.id, name: p.name })} className={row} data-testid="kind-place">
+                <button type="button" aria-expanded="false" onClick={() => setOpen({ id: p.id, name: p.name, tab: p.state })} className={row} data-testid="kind-place">
                   {inner}
                 </button>
               </li>

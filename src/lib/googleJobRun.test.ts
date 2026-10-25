@@ -199,7 +199,7 @@ describe('Use Google’s', () => {
 })
 
 describe('Keep the listing', () => {
-  it('changes nothing on it, and makes you the checker of what nothing checks, for good', async () => {
+  it('changes nothing on it, and makes you the checker of what nothing checks, for a year', async () => {
     await run.checkAgainstGoogle('philly', 'a1', NOW)
     const p = await run.keepTheListing('philly', 'a1', NOW)
     expect(m.filed).toEqual([])
@@ -208,9 +208,12 @@ describe('Keep the listing', () => {
     expect(by(p)).toEqual({ name: 'you', hours: 'you', phone: 'google', website: 'google' })
     expect(p.section).toBe('checked')
     expect(p.decided?.what).toBe('kept')
-    // Months later it is still yours.
+    // Months later it is still yours; a year on, nothing checks it again.
     const [later] = await run.loadGoogleJob('philly', NOW + 200 * 86_400_000)
     expect(later.section).toBe('checked')
+    const [year] = await run.loadGoogleJob('philly', NOW + 366 * 86_400_000)
+    expect(by(year)).toMatchObject({ name: 'nothing', hours: 'nothing' })
+    expect(year.section).toBe('to_check')
   })
 })
 
@@ -226,6 +229,17 @@ describe('Not on Google', () => {
 
   it('not for a listing with a match', async () => {
     await expect(run.notOnGoogle('philly', 'a1', NOW)).rejects.toThrow(/has a Google match/)
+  })
+
+  it('drops a match Google stopped answering for', async () => {
+    m.rows = [listing({ details: { lastSyncError: 'Google Places request failed', lastSyncFailedAt: '2026-09-10T14:00:00Z' } })]
+    const p = await run.notOnGoogle('philly', 'a1', NOW)
+    expect(p.matched).toBe(false)
+    expect(by(p)).toEqual({ name: 'you', hours: 'you', phone: 'you', website: 'you' })
+    expect(p.section).toBe('checked')
+    const details = m.rows[0].details as Record<string, unknown>
+    expect(details.placeId).toBeUndefined()
+    expect(details.lastSyncError).toBeUndefined()
   })
 })
 
