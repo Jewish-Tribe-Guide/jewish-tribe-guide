@@ -70,10 +70,10 @@ for that exact change, in the same conversation. Show the dry run first.
 1e. **Migration 086 (`job_run`)** is run on both databases (the user,
    Oct 24; checked). The live jobs start recording once this branch is
    deployed.
-1f. **Migration 087 (`job_run.kinds`) is not run anywhere yet** (Oct 25).
-   It needs the SQL editor: dev is the test project, and live needs your
-   yes. Without it the runs save as before, and Last night's earlier
-   nights say "Not counted". Last night itself works without it.
+1f. **Migration 087 (`job_run.kinds`)** is run on both databases (the
+   user, Oct 25; checked). Each run saves its counts per kind from the
+   next run on, so Last night's earlier nights fill in one night at a
+   time (live, once this branch is deployed).
 
 ## For the user or the community
 
