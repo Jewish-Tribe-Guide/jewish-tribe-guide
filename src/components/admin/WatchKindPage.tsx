@@ -12,9 +12,9 @@ import { kindsOf } from './WatchKinds'
 // One kind of place on the Watches tab (FinalChanges2, FinalPhoneShuls,
 // Oct 24): its places in three tabs, Waiting for you, Not checked and Up to
 // date. A place waiting or not checked says why; one up to date, where
-// it's read from. One up to date or not checked opens here (OpenedPlace.tsx:
-// in its boxes, piece 2; by what's wrong, piece 3); one waiting still opens
-// the job page that holds it, until piece 4.
+// it's read from. Each opens here (OpenedPlace.tsx): one up to date in its
+// boxes (piece 2), one not checked by what's wrong (piece 3), one waiting
+// by where its changes came from (piece 4).
 
 const TABS: { key: WatchState; label: string; none: string }[] = [
   { key: 'waiting', label: 'Waiting for you', none: 'Nothing waiting.' },
@@ -106,15 +106,6 @@ export default function WatchKindPage({ token, category }: { token: string; cate
               </>
             )
             const row = 'flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 sm:px-4 sm:py-3'
-            if (p.state === 'waiting') {
-              return (
-                <li key={p.id}>
-                  <Link href={p.href} className={row} data-testid="kind-place">
-                    {inner}
-                  </Link>
-                </li>
-              )
-            }
             if (open?.id === p.id) {
               return <OpenedPlace key={p.id} place={p} kindLabel={kind.label} jobs={jobs} token={token} community={community} now={now} onClose={() => setOpen(null)} onChanged={reload} />
             }

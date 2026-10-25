@@ -1,6 +1,10 @@
 import { selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { editorRows } from './editorRows'
 import { isCertificateLink } from './listingView'
+import { KEYSTONE_CERT } from './keystoneWatch'
+import type { Finding } from './watchFindings'
+
+type BoxFinding = Pick<Finding, 'operation' | 'values' | 'lines'>
 
 // ── A food place's Kosher box, as Kosher certification shows it (Oct 22) ────
 // Drawn on artifact 2PPYvecC87w2KLNeHgYfTN (agreed Oct 21): a place opened
@@ -121,4 +125,42 @@ export function googleLine(notes: readonly string[]): string | null {
     if (line) return line.trim().replace(/\.$/, '')
   }
   return null
+}
+
+/** What a list's finding would make the Kosher box: an edit's values; a
+ *  removal's, Keystone-K and its page taken off. */
+function nextBox(category: CategoryConfig, now: Record<string, unknown>, f: BoxFinding): Record<string, unknown> {
+  const keys = kosherBoxKeys(category)
+  if (f.operation !== 'delete') return Object.fromEntries(keys.map((k) => [k, f.values?.[k] ?? null]))
+  const out = { ...now }
+  for (const field of kosherBoxFields(category)) {
+    if (field.caveat) out[field.key] = selectValues(now[field.key]).filter((c) => c !== KEYSTONE_CERT)
+    else if (isCertificateLink(field) && /keystone-k\.org/.test(String(now[field.key] ?? ''))) out[field.key] = null
+  }
+  return out
+}
+
+/** A finding the Kosher box shows: an edit to it and nothing else, or a
+ *  removal. Anything wider is shown whole, to Compare. */
+export function kosherInTheBox(category: CategoryConfig | undefined, f: BoxFinding): boolean {
+  if (!category || !kosherBoxKeys(category).length) return false
+  if (f.operation === 'delete') return true
+  if (f.operation !== 'update' || !f.values) return false
+  const keys = new Set(kosherBoxKeys(category))
+  return f.lines.every((l) => keys.has(l.key))
+}
+
+/** What a list's finding would do to the Kosher box: its rows marked, the
+ *  keys Use takes, and whether it leaves no hechsher at all (Archive the
+ *  listing). The Kosher page and Waiting for you both decide by this. */
+export function kosherProposal(category: CategoryConfig, now: Record<string, unknown>, f: BoxFinding): { next: Record<string, unknown>; rows: KosherRow[]; use: string[]; noneLeft: boolean } {
+  const next = nextBox(category, now, f)
+  const rows = kosherRows(category, now, next)
+  const certKey = kosherBoxFields(category).find((x) => x.caveat)?.key
+  const noneLeft = !!certKey && selectValues(now[certKey]).length > 0 && selectValues(next[certKey]).length === 0
+  // Only ever the box's keys: the finding's other values are as the listing
+  // was when the list was read. A box that's the same already takes its own.
+  const changed = kosherKeysToUse(rows)
+  const use = changed.length ? changed : f.lines.length ? f.lines.map((l) => l.key) : kosherBoxKeys(category)
+  return { next, rows, use, noneLeft }
 }

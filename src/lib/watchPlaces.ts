@@ -59,6 +59,9 @@ export type WatchedPlace = {
   sources: WatchSource[]
   /** Where it's acted on: the job page holding what waits, or its listing. */
   href: string
+  /** Its listing on the site, for Open its listing; none for a place
+   *  only a list has, or an eruv. */
+  listing: string | null
 }
 
 /** Waiting for you's order. */
@@ -150,6 +153,7 @@ function placeOf(id: string, name: string, category: string, listingHref: string
     ...(state === 'waiting' ? { rank: first?.rank ?? 'changes', ...(first?.red ? { red: true } : {}) } : {}),
     sources: SOURCES.filter((s) => have.has(s)),
     href: (waiting ?? unchecked)?.href ?? listingHref,
+    listing: listingHref,
   }
 }
 
@@ -256,7 +260,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
     else {
       const isNew = f.operation === 'create' && !!f.from
       const pill = isNew ? `New on ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}` : '1 change'
-      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], href: kosherHref })
+      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], href: kosherHref, listing: null })
     }
   }
 
@@ -270,7 +274,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
     const lists = [...new Set(n.on.map((o) => o.list))]
     const at = n.findings?.map((f) => f.at).filter((x): x is string => !!x).sort()[0]
     const pill = `New on ${lists.map((l) => LIST_NAMES[l]).join(' and ')} list${lists.length > 1 ? 's' : ''}${at ? ` · ${dayText(at)}` : ''}`
-    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: 'new', sources: lists, href: kosherHref })
+    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: 'new', sources: lists, href: kosherHref, listing: null })
   }
   loose.forEach(put)
 
@@ -285,7 +289,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
       if (e.statusUrl || watch?.active) sources.push('website')
       if (e.statusEmail) sources.push('email')
       const state: WatchState = s.tab === 'to_check' ? 'waiting' : s.tab === 'cant_read' ? 'not_checked' : 'up_to_date'
-      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, href })
+      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, href, listing: null })
     }
   }
 

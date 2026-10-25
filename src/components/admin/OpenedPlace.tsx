@@ -16,6 +16,7 @@ import { groupedRows } from '@/lib/timesProposal'
 import { FindSheet } from './GoogleJob'
 import { checkedLines, openedPlace, type Change, type CheckedLine, type Foot, type OpenedBox, type Problem, type ReadStep } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
+import { waitingGroups, type WaitGroup } from './waitingGroups'
 
 // A place opened in place on its kind's page (openedPlaceBoxes.ts says what
 // goes in it). Under its row on a computer, its own screen on a phone
@@ -25,6 +26,12 @@ import type { Jobs } from './useWatchJobs'
 //                                  button (FinalFood3, FinalPhonePlace3,
 //                                  FinalStopped2, EruvNotChecked); then
 //                                  "2 more checked", a line each.
+//   Waiting for you (piece 4)      a group per source, what it would change
+//                                  lit with "Was …", its own buttons
+//                                  (FinalChanges2, FinalClosed,
+//                                  FinalDropped, FinalNewPlace); then "3
+//                                  more up to date". Edit opens the job
+//                                  page that holds it.
 
 const INPUT = 'w-full rounded-lg border border-slate-400 bg-white px-2.5 py-2 text-sm text-slate-900 min-h-11'
 
@@ -310,11 +317,124 @@ export default function OpenedPlace({
       ‹ {kindLabel}
     </button>
   )
-  const listing = (
-    <a href={place.href} target="_blank" rel="noopener noreferrer" className={`self-start py-1 text-[13.5px] ${LINK}`}>
+  const listing = place.listing && (
+    <a href={place.listing} target="_blank" rel="noopener noreferrer" className={`self-start py-1 text-[13.5px] ${LINK}`}>
       Open its listing
     </a>
   )
+
+  if (place.state === 'waiting') {
+    const w = waitingGroups(place.id, jobs, now)
+    const patch = (id: string, body: Record<string, unknown>) => fetchJson(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify(body) }, 'Could not do that.')
+    const each = (ids: readonly string[], body: (id: string) => Record<string, unknown>) => async () => {
+      for (const id of ids) await patch(id, body(id))
+    }
+    const google = (body: Record<string, unknown>) => () => post('/api/admin/watches/google', { ...body, id: place.id })
+    const menu = (action: 'use' | 'skip') => () => post('/api/admin/main-dishes', { action, resourceId: place.id })
+    // Each group's buttons, the first its main one, as drawn.
+    const buttons = (g: WaitGroup): { label: string; work: () => Promise<unknown> }[] => {
+      const d = g.decide
+      if (d.kind === 'later') return []
+      if (d.kind === 'closure') return [{ label: 'Keep closed', work: google({ action: 'open', open: false }) }, { label: 'Show as open', work: google({ action: 'open', open: true }) }]
+      if (d.kind === 'new') return [{ label: 'Add as new', work: each([d.id], () => ({ status: 'approved' })) }, { label: 'Don’t add', work: each([d.id], () => ({ status: 'rejected' })) }]
+      if (d.kind === 'off' || d.kind === 'archive')
+        return [
+          { label: 'Remove the listing', work: d.kind === 'off' ? each([d.id], () => ({ status: 'approved' })) : () => post('/api/admin/watches/kosher', { action: 'archive', id: d.id }) },
+          { label: 'Keep it', work: each([d.id], () => ({ status: 'rejected' })) },
+        ]
+      if (d.kind === 'google') return [{ label: 'Accept', work: google({ action: 'use' }) }, { label: 'Keep as is', work: google({ action: 'keep' }) }]
+      if (d.kind === 'menu') return [{ label: 'Accept', work: menu('use') }, { label: 'Keep as is', work: menu('skip') }]
+      return [
+        { label: 'Accept', work: each(d.ids, (id) => ({ status: 'approved', ...(d.only?.[id] ? { only: d.only[id] } : {}) })) },
+        { label: 'Keep as is', work: each(d.ids, () => ({ status: 'rejected' })) },
+      ]
+    }
+    // Edit, until it opens the box here: the job page that holds it.
+    const edit = (g: WaitGroup) =>
+      g.decide.kind === 'closure' || g.decide.kind === 'new' || g.decide.kind === 'later' ? null : (
+        <Link href={`${adminBase(community)}/watches/${g.job}`} className={BUTTON}>
+          Edit
+        </Link>
+      )
+    return (
+      <li role="region" aria-label={place.name} data-testid="kind-place-open" className={shell}>
+        {phoneBack}
+        <button type="button" aria-expanded="true" onClick={onClose} className="flex items-center gap-2.5 text-left max-sm:pointer-events-none">
+          <span className="max-sm:hidden">
+            <Down />
+          </span>
+          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:text-[19px]">{place.name}</span>
+          {place.pill && (
+            <span className={`whitespace-nowrap rounded-full border px-2 py-px text-xs font-semibold ${place.red ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{place.pill}</span>
+          )}
+        </button>
+        <div className="flex flex-col rounded-[10px] border border-slate-200 bg-white px-3.5 pb-3.5 pt-1">
+          {w.groups.map((g) => {
+            const [main, ...rest] = buttons(g)
+            const key = `wait:${g.key}`
+            const act = (b: { work: () => Promise<unknown> }) => () => void run(key, b.work)
+            return (
+              <div key={g.key} className="flex flex-col border-b border-slate-100 pb-3 pt-2.5" data-testid="waiting-group">
+                <span className="pb-1 text-[13px] font-semibold text-slate-600">
+                  From {g.page ? <PageLink {...g.page} /> : 'its source'}
+                  {g.when && ` · ${g.when}`}
+                </span>
+                {g.lines.length > 0 && (
+                  <div className="-mx-2 flex flex-col rounded-md bg-amber-50 px-2">
+                    {g.lines.map((l, i) => (
+                      <span key={i} className={FIELDS}>
+                        <span>{l.label}</span>
+                        <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
+                          <span className="font-semibold">{l.value}</span>
+                          {l.old !== null && <span className="text-[12.5px] text-slate-500">Was {l.old}</span>}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {g.facts.map((x) => (
+                  <span key={x.label} className={`${FIELDS} border-t border-slate-100`}>
+                    <span>{x.label}</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{x.url ? <PageLink text={x.value} url={x.url} /> : x.value}</span>
+                  </span>
+                ))}
+                {g.note && <span className="border-t border-slate-100 pb-0.5 pt-2.5 text-[12.5px] text-slate-500">{g.note}</span>}
+                {main && (
+                  <div className="flex flex-wrap items-center gap-2 pt-2.5">
+                    <button type="button" disabled={busy !== null} onClick={act(main)} className={GO}>
+                      {busy === key ? 'Saving…' : main.label}
+                    </button>
+                    {g.decide.kind !== 'off' && g.decide.kind !== 'archive' && edit(g)}
+                    {rest.map((b) => (
+                      <button key={b.label} type="button" disabled={busy !== null} onClick={act(b)} className={BUTTON}>
+                        {b.label}
+                      </button>
+                    ))}
+                    {(g.decide.kind === 'off' || g.decide.kind === 'archive') && edit(g)}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {/* What the Watches tab can't open yet: its job page has it. */}
+          {w.groups.length === 0 && (
+            <Link href={place.href} className={`py-2.5 text-[13.5px] ${LINK}`}>
+              Open it where it waits
+            </Link>
+          )}
+          {w.checked.length > 0 && (
+            <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 pb-1 pt-2.5 text-left text-[13.5px] text-slate-500">
+              {more ? <Down /> : <Right />}
+              {w.checked.length} more up to date
+            </button>
+          )}
+          {more && w.checked.map((l) => <CheckedRow key={l.key} line={l} />)}
+          {error && <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+          {listing && <span className="pt-1">{listing}</span>}
+        </div>
+      </li>
+    )
+  }
 
   if (notChecked) {
     const lines = checkedLines(opened.checked)
@@ -437,7 +557,7 @@ export default function OpenedPlace({
               )
             })}
           {error && <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
-          <span className="pt-1">{listing}</span>
+          {listing && <span className="pt-1">{listing}</span>}
         </div>
         {finding && googlePlace && (
           <FindSheet
@@ -521,9 +641,11 @@ export default function OpenedPlace({
             {reading ? 'Reading…' : opened.pages === 1 ? 'Read it now' : 'Read them now'}
           </button>
         )}
-        <a href={place.href} target="_blank" rel="noopener noreferrer" className={`py-1 ${LINK}`}>
-          Open its listing
-        </a>
+        {place.listing && (
+          <a href={place.listing} target="_blank" rel="noopener noreferrer" className={`py-1 ${LINK}`}>
+            Open its listing
+          </a>
+        )}
       </span>
     </li>
   )

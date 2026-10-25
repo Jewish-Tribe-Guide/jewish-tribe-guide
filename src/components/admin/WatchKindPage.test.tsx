@@ -76,6 +76,8 @@ describe('WatchKindPage', () => {
       `lms.example·never read · added ${day(added)}WebsitexRead it now`,
     ])
     expect(within(open).queryByText(/more checked/)).toBeNull()
+    // Its listing, not the job page it waits on.
+    expect(within(open).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/synagogues/b')
 
     // Read it now reads that page: its website searched, then the page.
     await user.click(within(open).getByRole('button', { name: 'Read it now' }))
@@ -86,6 +88,60 @@ describe('WatchKindPage', () => {
     posts.length = 0
     await user.click(within(open).getByRole('button', { name: 'Not on Google' }))
     expect(posts).toEqual([['/api/admin/watches/google', { action: 'not_on_google', id: 'b' }]])
+  })
+
+  it('opens a place waiting by where each change came from, each decided on its own', async () => {
+    const at = new Date().toISOString()
+    const weekday = (time: string) => [{ id: 'm', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time }]
+    const times = { id: 'f1', operation: 'update', targetId: 'b', name: 'Lower Merion Synagogue', from: 'its website', says: 'Its page says', named: null, at, notes: [], lines: [], page: 'https://lms.example/davening', part: 'weekday', times: { field: {}, current: weekday('6:45 AM'), proposed: weekday('6:30 AM'), currentSchedules: [], proposedSchedules: [] } }
+    const shul = { id: 'b', name: 'Lower Merion Synagogue', href: '/philly/synagogues/b', website: 'https://lms.example', pages: [], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: weekday('6:45 AM'), schedules: [] }, findings: [times] }
+    const lms = place('b', 'Lower Merion Synagogue', {
+      fields: [field('Name', 'google'), { field: 'phone', label: 'Phone', value: '610-555-0100', by: { kind: 'google' } }],
+      compare: { at, rows: [{ field: 'phone', label: 'Phone', google: '610-555-0199', changed: true }] },
+    })
+    const sent: unknown[] = []
+    await renderPage([lms], 'synagogue', (url, init) => {
+      if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
+      if (init?.method) {
+        sent.push([init.method, url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    expect(rows()).toEqual(['Lower Merion Synagogue2 changes'])
+    await user.click(screen.getByRole('button', { name: /Lower Merion Synagogue/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([
+      `From lms.example/davening · ${day(at)}Shacharis · Mon–Fri6:30 AMWas 6:45 AMAcceptEditKeep as is`,
+      `From its Google listing · ${day(at)}Phone610-555-0199Was 610-555-0100AcceptEditKeep as is`,
+    ])
+    expect(within(open).getAllByRole('link', { name: 'Edit' }).map((a) => a.getAttribute('href'))).toEqual(['/philly/admin/watches/times', '/philly/admin/watches/google'])
+    expect(within(open).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/synagogues/b')
+
+    const [shulTimes, google] = within(open).getAllByTestId('waiting-group')
+    await user.click(within(shulTimes).getByRole('button', { name: 'Accept' }))
+    expect(sent).toEqual([['PATCH', '/api/admin/submissions/f1', { status: 'approved' }]])
+    sent.length = 0
+    await user.click(within(google).getByRole('button', { name: 'Keep as is' }))
+    expect(sent).toEqual([['POST', '/api/admin/watches/google', { action: 'keep', id: 'b' }]])
+  })
+
+  it('a closure: Keep closed or Show as open', async () => {
+    const at = new Date().toISOString()
+    const ritas = place('r', 'Rita’s', { closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: at, readAt: at, kept: null } })
+    const sent: unknown[] = []
+    await renderPage([ritas], 'synagogue', (url, init) => {
+      if (init?.method) {
+        sent.push(JSON.parse(String(init.body)))
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Rita’s/ }))
+    const [g] = within(screen.getByTestId('kind-place-open')).getAllByTestId('waiting-group')
+    expect(g.textContent).toBe(`From its Google listing · ${day(at)}Open or closedClosed for nowWas OpenOn the siteShown closed since ${day(at)}Opens again by itself when Google says open.Keep closedShow as open`)
+    await user.click(within(g).getByRole('button', { name: 'Keep closed' }))
+    expect(sent).toEqual([{ action: 'open', open: false, id: 'r' }])
   })
 
   it('says where an up-to-date place is read from', async () => {

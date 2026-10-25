@@ -7,10 +7,8 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { KOSHER_LIST_NAMES, kosherSection, listWho, type KosherList, type KosherPlace, type NewOnList } from '@/lib/kosherJob'
-import { googleLine, kosherBoxFields, kosherBoxKeys, kosherKeysToUse, kosherPill, kosherRows, renamedTo, type KosherRow } from '@/lib/kosherBox'
-import { KEYSTONE_CERT } from '@/lib/keystoneWatch'
-import { companionKeys, selectValues, type CategoryConfig } from '@/lib/categories'
-import { isCertificateLink } from '@/lib/listingView'
+import { googleLine, kosherBoxKeys, kosherInTheBox, kosherPill, kosherProposal, kosherRows, renamedTo, type KosherRow } from '@/lib/kosherBox'
+import { companionKeys, type CategoryConfig } from '@/lib/categories'
 import { updatesPill } from '@/lib/dishProposal'
 import type { JobCounts } from '@/lib/watchJobs'
 import type { Watch } from '@/lib/watches'
@@ -138,28 +136,6 @@ function Rows({ rows }: { rows: readonly KosherRow[] }) {
 
 const listOf = (f: Finding): KosherList => (f.from.startsWith('Mekor') ? 'mekor' : 'keystone')
 
-/** What a list's finding would make the Kosher box: an edit's values; a
- *  removal's, Keystone-K and its page taken off. */
-function nextBox(category: CategoryConfig, now: Record<string, unknown>, f: KosherFinding): Record<string, unknown> {
-  const keys = kosherBoxKeys(category)
-  if (f.operation !== 'delete') return Object.fromEntries(keys.map((k) => [k, f.values?.[k] ?? null]))
-  const out = { ...now }
-  for (const field of kosherBoxFields(category)) {
-    if (field.caveat) out[field.key] = selectValues(now[field.key]).filter((c) => c !== KEYSTONE_CERT)
-    else if (isCertificateLink(field) && /keystone-k\.org/.test(String(now[field.key] ?? ''))) out[field.key] = null
-  }
-  return out
-}
-
-/** A finding the Kosher box shows: an edit to it and nothing else, or a
- *  removal. Anything wider is shown whole, to Compare. */
-function inTheBox(category: CategoryConfig | undefined, f: KosherFinding): boolean {
-  if (!category || !kosherBoxKeys(category).length) return false
-  if (f.operation === 'delete') return true
-  if (f.operation !== 'update' || !f.values) return false
-  const keys = new Set(kosherBoxKeys(category))
-  return f.lines.every((l) => keys.has(l.key))
-}
 
 function KosherBox({ place: p, category, finding: f, list, act, busy, onBusy }: { place: Place; category: CategoryConfig; finding: KosherFinding; list?: KosherListState; act: Act; busy: boolean; onBusy: (b: boolean) => void }) {
   const [error, setError] = useState<string | null>(null)
@@ -167,10 +143,7 @@ function KosherBox({ place: p, category, finding: f, list, act, busy, onBusy }: 
   const { token, community, settled, onDone } = act
   const headers = { Authorization: `Bearer ${token}` }
   const now = p.box ?? {}
-  const next = nextBox(category, now, f)
-  const rows = kosherRows(category, now, next)
-  const certKey = kosherBoxFields(category).find((x) => x.caveat)?.key
-  const noneLeft = !!certKey && selectValues(now[certKey]).length > 0 && selectValues(next[certKey]).length === 0
+  const { next, rows, use, noneLeft } = kosherProposal(category, now, f)
   const done = settled.get(f.id)
   const near = f.operation === 'delete' ? renamedTo(f.notes) : null
 
@@ -187,10 +160,6 @@ function KosherBox({ place: p, category, finding: f, list, act, busy, onBusy }: 
     }
   }
   const decide = (body: Record<string, unknown>, text: string) => send(`/api/admin/submissions/${f.id}`, { method: 'PATCH', body: JSON.stringify(body) }, text)
-  // Only ever the box's keys: the finding's other values are as the listing
-  // was when the list was read. A box that's the same already takes its own.
-  const changed = kosherKeysToUse(rows)
-  const use = changed.length ? changed : f.lines.length ? f.lines.map((l) => l.key) : kosherBoxKeys(category)
 
   /** Edit: the listing's own Kosher box, filled in with the list's
    *  version, saved straight to the listing. */
@@ -368,8 +337,8 @@ function PlaceReads({ place: p, lists, act, busy, onBusy, onReadNow, defaultOpen
 function KosherPlaceRow({ place: p, tab, category, lists, act, reading, onReadNow }: { place: Place; tab: Tab; category?: CategoryConfig; lists: readonly KosherListState[]; act: Act; reading: boolean; onReadNow: () => void }) {
   const [busy, setBusy] = useState(false)
   const findings = p.findings ?? []
-  const own = findings.filter((f) => inTheBox(category, f))
-  const others = findings.filter((f) => !inTheBox(category, f))
+  const own = findings.filter((f) => kosherInTheBox(category, f))
+  const others = findings.filter((f) => !kosherInTheBox(category, f))
   const waiting = findings.filter((f) => !act.settled.has(f.id))
   const listOfName = (l: KosherList) => lists.find((x) => x.list === l)
 

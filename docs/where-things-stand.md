@@ -271,8 +271,7 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    so the counts can't disagree with the job pages. A list's finding
    on a grocery goes under Grocery; a place only a list has goes under
    Food. Not done yet, on purpose:
-   - A waiting place's row opens the job page that holds it. Opening
-     those in place is piece 4 (not checked ones open in place, piece 3).
+   - Every row now opens in place (pieces 2 to 4).
    - The old job rows stay under "Job pages", and the watch list and Add
      a watch stay below them, until pieces 2 to 4 hold what they do.
    - On the test site Food shows 25 waiting (mostly places only a kosher
@@ -335,14 +334,37 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      Google": the check is a paid call and its answer needs Use / Keep.
    - The pills are piece 1's ("Google stopped answering Oct 17"), not a
      count of the fields in the groups.
-4. **Waiting for you by source, in the agreed order: building.**
+4. **Waiting for you by source, in the agreed order: BUILT Oct 25.**
    - **4a, the order: BUILT Oct 25.** A place off a kosher list first, its
      pill red ("Off Keystone-K’s list · Oct 24"); then Google's closures
      ("Closed for now, says Google · Oct 12"); then new places; then
      changes. A closure waits until Keep closed (dated, so it stops
      waiting until Google changes its answer again) or Show as open.
-   - 4b, a waiting place opened in place, a group per source with
-     Accept / Edit / Keep as is: next.
+   - **4b, a waiting place opened in place: BUILT Oct 25**
+     (`waitingGroups.ts`). A group per source, "From
+     mekorhabracha.org/davening · Oct 25", what it would change lit with
+     "Was …", its own buttons, then "3 more up to date" and Open its
+     listing. Each group decides what its job page would, by the same
+     calls:
+     - a change: Accept / Edit / Keep as is (Google's check: Use / Keep;
+       a menu read: Use / Skip; a kosher list's: only the Kosher box's
+       keys, through `kosherProposal`, now shared with the Kosher page);
+     - a closure: Keep closed / Show as open (FinalClosed);
+     - off a list with no hechsher left: Hechsher "None, was
+       Keystone-K", Remove the listing / Keep it / Edit (FinalDropped);
+     - a place only a list has: what it would add, Add as new / Don't
+       add (FinalNewPlace); one not filed yet says it's suggested after
+       tomorrow morning's read, with no buttons.
+     Fixed on the way: Open its listing on a place not checked went to
+     the job page it waits on, not its listing.
+     Not done, on purpose:
+     - Edit links to the job page that holds the change; it doesn't
+       open the box here yet.
+     - No Bring it back on a new place the guide has archived (unarchiving
+       isn't supported); its group says "Archived, as “…”".
+     - A waiting place with nothing a group can show shows "Open it
+       where it waits", a link to its job page. None seen on the test
+       site.
 5. Nightly runs as one line per kind. Needs a new `job_run` column (a
    migration: dev only, ask before production).
 
