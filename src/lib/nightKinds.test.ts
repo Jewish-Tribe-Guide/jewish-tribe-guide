@@ -134,6 +134,17 @@ describe('last night, a line per kind', () => {
     ])
   })
 
+  // As the watches are labelled (Oct 25, dev).
+  it('each missed by its place’s name', () => {
+    const watches = [
+      watch({ id: 'h', url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', label: 'Pennsylvania Hospital on Refuah', ...never }),
+      eruv('e', { label: 'Center City Eruv’s website', ...never }),
+      watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K\'s list', ...never }),
+    ]
+    const names = (k: string) => kind(nightKinds('philly', runs, watches, google, NOW), k).misses.map((m) => m.name)
+    expect([...names('Hospitals'), ...names('Eruvs'), ...names('Kosher certification')]).toEqual(['Pennsylvania Hospital', 'Center City Eruv', 'Keystone-K\'s list'])
+  })
+
   it('a mikvah’s page of hours links to the hours page', () => {
     const watches = [watch({ createdBy: 'listing pages', resourceId: 'm1', label: 'Mikvah Ohr · hours on their website', ...never }), watch({ id: 'x', label: 'A page', ...never })]
     expect(kind(nightKinds('philly', runs, watches, google, NOW), 'Websites').misses).toEqual([
@@ -162,8 +173,45 @@ describe('last night, a line per kind', () => {
     expect(kindBad(late)).toBe(true)
     expect(kind(nightKinds('philly', { watches: [run({ ok: false, error: 'boom' })] }, [], google, NOW), 'Menus')).toMatchObject({ count: 'Failed', trouble: 'boom' })
     const cutOff = kind(nightKinds('philly', { watches: [run({ finishedAt: null, ok: null })] }, [eruv('a'), eruv('b', never)], google, NOW), 'Eruvs')
-    expect(cutOff).toMatchObject({ count: '1 of 2 read', trouble: 'stopped before it finished' })
+    expect(cutOff).toMatchObject({ count: '1 of 2 read', trouble: 'stopped before it finished · 1 never read' })
     expect(kind(nightKinds('philly', {}, [], google, NOW), 'Google')).toMatchObject({ when: null, count: 'Not run yet', nights: [] })
+  })
+})
+
+// Oct 25: the read-menus job, which reads a few menus never read each
+// night, folded into Menus.
+describe('Menus, with the menus never read', () => {
+  const runs = { watches: [run({})], 'read-menus': [run({ job: 'read-menus', startedAt: after(WATCHES_AT, 30) })] }
+  const menu = (id: string, resourceId: string, over: Partial<Watch> = {}) => watch({ id, createdBy: 'menu links', resourceId, label: `Menu · ${id}`, ...over })
+
+  it('a place never read is Never read, by its name, whether its menu’s watch loaded or not', () => {
+    const watches = [menu('Zevi’s', 'f1'), menu('Zevi’s 2', 'f1'), menu('Judah', 'f2'), menu('Yum', 'f3', { lastRunAt: after(WATCHES_AT, 2), lastOkAt: night(WATCHES_AT, 1) })]
+    const unread = [{ id: 'f1', name: 'Zevi’s Pizza' }, { id: 'f9', name: 'Bar Bombon' }]
+    const view = kind(nightKinds('philly', runs, watches, [], NOW, unread), 'Menus')
+    expect(view.count).toBe('1 of 4 read')
+    expect(view.trouble).toBe('1 didn’t load · 2 never read')
+    expect(view.misses).toEqual([
+      { name: 'Zevi’s Pizza', why: 'Never read', page: 'dishes' },
+      { name: 'Yum', why: 'Didn’t load', page: 'dishes' },
+      { name: 'Bar Bombon', why: 'Never read', page: 'dishes' },
+    ])
+  })
+
+  it('says when reading new menus failed, didn’t run or isn’t set up', () => {
+    const menus = (r: Partial<JobRun>) => kind(nightKinds('philly', { ...runs, 'read-menus': [run({ job: 'read-menus', startedAt: after(WATCHES_AT, 30), ...r })] }, [], [], NOW), 'Menus').trouble
+    expect(menus({ ok: false, error: 'boom' })).toBe('reading new menus failed')
+    expect(menus({ startedAt: night(WATCHES_AT, 3) })).toBe('reading new menus didn’t run since Oct 22')
+    expect(menus({ warning: 'Not set up: no OPENAI_API_KEY' })).toBe('reading new menus isn’t set up')
+    expect(menus({})).toBeNull()
+  })
+
+  it('a night’s new menus read, after its count', () => {
+    const watches = [run({ kinds: { philly: { menus: { of: 51, read: 42 } } } }), run({ startedAt: night(WATCHES_AT, 1), kinds: { philly: { menus: { of: 51, read: 51 } } } })]
+    const firstReads = [run({ job: 'read-menus', startedAt: after(WATCHES_AT, 30), kinds: { philly: { menus: { of: 23, read: 3 } } } }), run({ job: 'read-menus', startedAt: night(after(WATCHES_AT, 30), 1), kinds: { philly: { menus: { of: 20, read: 0 } } } })]
+    expect(kind(nightKinds('philly', { watches, 'read-menus': firstReads }, [], [], NOW), 'Menus').nights).toEqual([
+      { date: 'Oct 25', result: '42 of 51 read · 3 new menus read', tone: 'bad' },
+      { date: 'Oct 24', result: '51 of 51 read', tone: 'good' },
+    ])
   })
 })
 

@@ -95,42 +95,53 @@ export const FIRST_READS_PER_RUN = 5
  *  few, maybe drawn in a browser, then the AI, inside the run's minute. */
 export const FIRST_READS_FOR_MS = 30_000
 
-/** Every community's food places never read (needsFirstRead), read and
- *  kept, a few a run, one after another. A place whose read throws is
- *  left for the next run. Returns what it did, for the run's log. */
+/** A community's food places never read (needsFirstRead), by name. */
+async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: DishKind }[]> {
+  const kinds = dishKinds(await listCategoriesUncached(slug))
+  if (!kinds.length) return []
+  const { readings, available } = await listMenuReadings(slug)
+  if (!available) return []
+  const { data: rows, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('community_id', slug)
+    .eq('status', 'approved')
+    .in(
+      'category',
+      kinds.map((k) => k.category.id),
+    )
+  if (error) throw new Error(`Couldn’t list the food places: ${error.message}`)
+  const read = new Set(readings.map((r) => r.resourceId))
+  return ((rows ?? []) as ResourceRow[])
+    .map(normalizeRow)
+    .flatMap((l) => {
+      const kind = kinds.find((k) => k.category.id === l.category)
+      return kind && needsFirstRead(l, kind, read.has(l.id)) ? [{ l, kind }] : []
+    })
+    .sort((a, b) => a.l.name.localeCompare(b.l.name))
+}
+
+/** The food places whose menu was never read, for the Watches tab's
+ *  Menus line (nightKinds.ts). */
+export async function listUnreadMenus(slug: string): Promise<{ id: string; name: string }[]> {
+  return (await unreadMenus(slug)).map(({ l }) => ({ id: l.id, name: l.name }))
+}
+
+/** Every community's food places never read, read and kept, a few a run,
+ *  one after another. A place whose read throws is left for the next run.
+ *  Returns what it did, for the run's log. */
 export async function readUnreadMenus(
   apiKey: string,
   { perRun = FIRST_READS_PER_RUN, forMs = FIRST_READS_FOR_MS, now = Date.now }: { perRun?: number; forMs?: number; now?: () => number } = {},
 ): Promise<{ community: string; read: number; left: number }[]> {
   const until = now() + forMs
-  const supabase = getAdminClient()
-  const { data: communities, error } = await supabase.from('community').select('slug')
+  const { data: communities, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   let budget = perRun
   for (const { slug } of (communities ?? []) as { slug: string }[]) {
-    const kinds = dishKinds(await listCategoriesUncached(slug))
-    if (!kinds.length) continue
-    const { readings, available } = await listMenuReadings(slug)
-    if (!available) continue
-    const { data: rows, error: listError } = await supabase
-      .from('resource')
-      .select('*')
-      .eq('community_id', slug)
-      .eq('status', 'approved')
-      .in(
-        'category',
-        kinds.map((k) => k.category.id),
-      )
-    if (listError) throw new Error(`Couldn’t list the food places: ${listError.message}`)
-    const read = new Set(readings.map((r) => r.resourceId))
-    const unread = ((rows ?? []) as ResourceRow[])
-      .map(normalizeRow)
-      .flatMap((l) => {
-        const kind = kinds.find((k) => k.category.id === l.category)
-        return kind && needsFirstRead(l, kind, read.has(l.id)) ? [{ l, kind }] : []
-      })
-      .sort((a, b) => a.l.name.localeCompare(b.l.name))
+    const unread = await unreadMenus(slug)
+    if (!unread.length) continue
     let done = 0
     for (const { l, kind } of unread) {
       if (budget <= 0 || now() > until) break

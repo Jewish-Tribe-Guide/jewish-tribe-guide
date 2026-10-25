@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn() }))
+const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn(), listUnreadMenus: vi.fn() }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/jobRunStore', () => ({ listJobRuns: m.listJobRuns }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
 vi.mock('@/lib/googleJobRun', () => ({ loadGoogleJob: m.loadGoogleJob }))
+vi.mock('@/lib/menuPlaceRead', () => ({ listUnreadMenus: m.listUnreadMenus }))
 
 const { GET } = await import('./route')
 const get = () => GET(new Request('http://x/api/admin/watches/runs'))
@@ -18,6 +19,7 @@ beforeEach(() => {
   m.listJobRuns.mockResolvedValue({ available: true, runs: { 'sync-hours': [], watches: [RUN], 'read-menus': [], 'walk-routes': [] } })
   m.listWatches.mockResolvedValue({ available: true, watches: [] })
   m.loadGoogleJob.mockResolvedValue([])
+  m.listUnreadMenus.mockResolvedValue([])
 })
 
 describe('/api/admin/watches/runs', () => {
@@ -33,6 +35,16 @@ describe('/api/admin/watches/runs', () => {
     expect(body.kinds.map((k: { name: string }) => k.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Websites', 'Menus'])
     expect(m.listWatches).toHaveBeenCalledWith('philly')
     expect(m.loadGoogleJob).toHaveBeenCalledWith('philly', expect.any(Number))
+  })
+
+  // Oct 25: the read-menus job folded into Menus.
+  it('Menus’ never read: this community’s food places whose menu was never read', async () => {
+    m.listUnreadMenus.mockResolvedValue([{ id: 'f1', name: 'Bar Bombon' }])
+    const startedAt = new Date(Date.now() - 3_600_000).toISOString()
+    m.listJobRuns.mockResolvedValue({ available: true, runs: { 'sync-hours': [], watches: [{ ...RUN, startedAt, finishedAt: startedAt, ok: true }], 'read-menus': [], 'walk-routes': [] } })
+    const body = await (await get()).json()
+    expect(m.listUnreadMenus).toHaveBeenCalledWith('philly')
+    expect(body.kinds.find((k: { id: string }) => k.id === 'menus')).toMatchObject({ count: '0 of 1 read', trouble: '1 never read', misses: [{ name: 'Bar Bombon', why: 'Never read', page: 'dishes' }] })
   })
 
   it('says when the table isn’t there yet', async () => {

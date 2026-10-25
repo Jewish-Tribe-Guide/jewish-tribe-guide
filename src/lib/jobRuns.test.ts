@@ -81,8 +81,12 @@ describe('each job’s run, in a line', () => {
   })
 
   it('menus: read and left, or not set up', () => {
-    expect(readMenusOutcome({ menus: [{ read: 3, left: 20 }] })).toEqual({ ok: true, summary: 'Read 3 menus · 20 left for the next nights' })
-    expect(readMenusOutcome({ menus: [{ read: 0, left: 0 }] })).toEqual({ ok: true, summary: 'No menus left to read' })
+    expect(readMenusOutcome({ menus: [{ community: 'philly', read: 3, left: 20 }] })).toEqual({
+      ok: true,
+      summary: 'Read 3 menus · 20 left for the next nights',
+      kinds: { philly: { menus: { of: 23, read: 3 } } },
+    })
+    expect(readMenusOutcome({ menus: [] })).toMatchObject({ ok: true, summary: 'No menus left to read' })
     expect(readMenusOutcome({ skipped: 'no OPENAI_API_KEY' })).toMatchObject({ warning: 'Not set up: no OPENAI_API_KEY' })
   })
 

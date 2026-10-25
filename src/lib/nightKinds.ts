@@ -13,7 +13,9 @@ import type { Watch } from './watches'
 // watch's last read, each listing's last Google answer), so a source read
 // again since stops showing as missed. The nights before need what each
 // run read, so each run saves its count per community and kind
-// (job_run.kinds, migration 087). Read-menus and walks have no line.
+// (job_run.kinds, migration 087). The menus never read are Menus' too:
+// the read-menus job reads a few each night (the user, Oct 25). Walks
+// have no line.
 // Pure: the runs route works it out, NightlyRuns.tsx draws it.
 
 export type NightKind = {
@@ -34,7 +36,7 @@ export const NIGHT_KINDS: readonly NightKind[] = [
   { id: 'eruvs', name: 'Eruvs', job: 'watches', about: 'Reads each eruv’s website for its hotline and email alerts.', page: 'eruv' },
   { id: 'times', name: 'Minyan times', job: 'watches', about: 'Reads each shul’s page of minyan times.', page: 'times' },
   { id: 'websites', name: 'Websites', job: 'watches', about: 'Reads every other page a place keeps, a mikvah’s hours among them.', page: '' },
-  { id: 'menus', name: 'Menus', job: 'watches', about: 'Reads each food place’s menu when it changes.', page: 'dishes' },
+  { id: 'menus', name: 'Menus', job: 'watches', about: 'Reads each food place’s menu when it changes, and a few never read each night.', page: 'dishes' },
 ]
 
 type KindWatch = Pick<Watch, 'kind' | 'url' | 'createdBy' | 'label' | 'resourceId'>
@@ -114,35 +116,63 @@ function nightResult(kind: NightKind, community: string, run: JobRun, latest: bo
   return { result: kind.id === 'google' && c.read === c.of ? `${c.read} read` : `${c.read} of ${c.of} read`, tone: c.read === c.of ? 'good' : 'bad' }
 }
 
+const byDay = (runs: readonly JobRun[]) => {
+  const days = new Map<string, JobRun>()
+  for (const r of runs) if (!days.has(dayKey(Date.parse(r.startedAt)))) days.set(dayKey(Date.parse(r.startedAt)), r)
+  return days
+}
+
 /** Its last 14 nights, newest first: from the first night recorded, and
- *  today only once it has run. */
-export function kindNights(kind: NightKind, community: string, runs: readonly JobRun[], now: number): KindNight[] {
+ *  today only once it has run. `newMenus`: for Menus, the read-menus
+ *  job's runs, a night's first reads said after its count. */
+export function kindNights(kind: NightKind, community: string, runs: readonly JobRun[], now: number, newMenus: readonly JobRun[] = []): KindNight[] {
   if (!runs.length) return []
-  const byDay = new Map<string, JobRun>()
-  for (const r of runs) if (!byDay.has(dayKey(Date.parse(r.startedAt)))) byDay.set(dayKey(Date.parse(r.startedAt)), r)
+  const days = byDay(runs)
+  const firstReads = byDay(newMenus)
   const first = dayKey(Date.parse(runs[runs.length - 1].startedAt))
   const nights: KindNight[] = []
   for (let i = 0; i < 14; i++) {
     const t = now - i * 86_400_000
     const key = dayKey(t)
     if (key < first) break
-    const run = byDay.get(key)
+    const run = days.get(key)
     if (!run && i === 0) continue
-    nights.push({ date: dayName(t), ...(run ? nightResult(kind, community, run, run === runs[0]) : { result: 'Didn’t run', tone: 'bad' as const }) })
+    const night = run ? nightResult(kind, community, run, run === runs[0]) : { result: 'Didn’t run', tone: 'bad' as const }
+    const read = firstReads.get(key)?.kinds?.[community]?.menus?.read
+    nights.push({ date: dayName(t), ...night, ...(read && /read$/.test(night.result) ? { result: `${night.result} · ${read} new ${read === 1 ? 'menu' : 'menus'} read` } : {}) })
   }
   return nights
 }
 
-/** A watch's name on the tab: a listing's page by its place's name
- *  ("Beth Am · davening times on their website"). */
-const watchName = (w: Pick<Watch, 'label' | 'url'>) => w.label?.split(' · ')[0] || w.url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '')
+/** A watch's name on the tab, its place's: "Menu · Say She Ate", "Beth
+ *  Am · davening times on their website", "Center City Eruv’s website",
+ *  "Pennsylvania Hospital on Refuah". */
+function watchName(w: Pick<Watch, 'label' | 'url'>): string {
+  const place = w.label?.replace(/^Menu · /, '').split(' · ')[0].replace(/(’s website| on Refuah)$/, '')
+  return place || w.url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '')
+}
 
 type Live = { count: KindCount; misses: KindMiss[]; failed: number; never: number; notReached: number }
 
-function liveWatches(kind: NightKind, watches: readonly Watch[], start: number): Live {
+/** A food place whose menu was never read (menuPlaceRead.ts). */
+export type UnreadMenu = { id: string; name: string }
+
+/** `unread`, for Menus: a place never read is missed as Never read, its
+ *  menu's watch or not (one that loaded only checked for a change). */
+function liveWatches(kind: NightKind, watches: readonly Watch[], start: number, unread: readonly UnreadMenu[] = []): Live {
   const own = watches.filter((w) => w.active && Date.parse(w.createdAt) < start && nightKindOf(w) === kind.id)
   const live: Live = { count: { of: own.length, read: 0 }, misses: [], failed: 0, never: 0, notReached: 0 }
+  const neverRead = new Map(unread.map((u) => [u.id, u]))
+  const watched = new Set<string>()
   for (const w of own) {
+    const place = w.resourceId ? neverRead.get(w.resourceId) : undefined
+    if (place) {
+      if (!watched.has(place.id)) live.misses.push({ name: place.name, why: 'Never read', page: kind.page })
+      if (watched.has(place.id)) live.count.of--
+      else live.never++
+      watched.add(place.id)
+      continue
+    }
     if (after(w.lastOkAt, start)) {
       live.count.read++
       continue
@@ -153,6 +183,12 @@ function liveWatches(kind: NightKind, watches: readonly Watch[], start: number):
     else live.notReached++
     const page = kind.id === 'websites' && / hours on their website$/.test(w.label ?? '') ? 'hours' : kind.page
     live.misses.push({ name: watchName(w), why, page })
+  }
+  for (const u of unread) {
+    if (watched.has(u.id)) continue
+    live.count.of++
+    live.never++
+    live.misses.push({ name: u.name, why: 'Never read', page: kind.page })
   }
   live.misses = onePerPlace(live.misses)
   return live
@@ -191,13 +227,31 @@ function troubleOf(live: Live, ranOut: boolean): string | null {
   return parts.filter(Boolean).join(' · ') || null
 }
 
-/** Each kind's line for one community. `runs`: each job's, newest first. */
-export function nightKinds(community: string, runs: Partial<Record<JobId, readonly JobRun[]>>, watches: readonly Watch[], google: readonly GoogleLive[], now: number): NightKindView[] {
+/** What's wrong with the read-menus job, said after Menus' count. */
+function newMenusTrouble(runs: readonly JobRun[], now: number): string | null {
+  const health = jobHealth(NIGHTLY_JOBS.find((j) => j.id === 'read-menus')!, runs, now)
+  if (health.state === 'failed') return 'reading new menus failed'
+  if (health.state === 'cut off') return 'reading new menus stopped before it finished'
+  if (health.state === 'late') return `reading new menus didn’t run since ${dayName(Date.parse(health.since))}`
+  if (health.state === 'warning' && /^Not set up/.test(health.warning)) return 'reading new menus isn’t set up'
+  return null
+}
+
+/** Each kind's line for one community. `runs`: each job's, newest first.
+ *  `unread`: the food places whose menu was never read. */
+export function nightKinds(
+  community: string,
+  runs: Partial<Record<JobId, readonly JobRun[]>>,
+  watches: readonly Watch[],
+  google: readonly GoogleLive[],
+  now: number,
+  unread: readonly UnreadMenu[] = [],
+): NightKindView[] {
   return NIGHT_KINDS.map((kind) => {
     const job = NIGHTLY_JOBS.find((j) => j.id === kind.job)!
     const own = runs[kind.job] ?? []
     const last = own[0]
-    const base = { id: kind.id, name: kind.name, about: kind.about, nights: kindNights(kind, community, own, now) }
+    const base = { id: kind.id, name: kind.name, about: kind.about, nights: kindNights(kind, community, own, now, kind.id === 'menus' ? (runs['read-menus'] ?? []) : []) }
     const health = jobHealth(job, own, now)
     if (!last || health.state === 'never') return { ...base, when: null, count: 'Not run yet', trouble: null, misses: [] }
     const when = timeOf(last.startedAt)
@@ -205,10 +259,11 @@ export function nightKinds(community: string, runs: Partial<Record<JobId, readon
     if (health.state === 'running') return { ...base, when, count: 'Running now', trouble: null, misses: [] }
     if (health.state === 'failed') return { ...base, when, count: 'Failed', trouble: health.error, misses: [] }
     const start = Date.parse(last.startedAt)
-    const live = kind.id === 'google' ? liveGoogle(kind, google, start) : liveWatches(kind, watches, start)
+    const live = kind.id === 'google' ? liveGoogle(kind, google, start) : liveWatches(kind, watches, start, kind.id === 'menus' ? unread : [])
     const count = live.count.of ? countLine(kind, live.count) : 'Nothing to read'
-    if (health.state === 'cut off') return { ...base, when, count, trouble: 'stopped before it finished', misses: live.misses }
-    return { ...base, when, count, trouble: troubleOf(live, !!last.warning), misses: live.misses }
+    const also = kind.id === 'menus' ? newMenusTrouble(runs['read-menus'] ?? [], now) : null
+    const trouble = [health.state === 'cut off' && 'stopped before it finished', troubleOf(live, !!last.warning), also].filter(Boolean).join(' · ') || null
+    return { ...base, when, count, trouble, misses: live.misses }
   })
 }
 

@@ -384,10 +384,15 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      saves per community and kind (migration 087, 1f).
    - Newsletters aren't counted: they're read as each email comes in.
      A mikvah's page of hours is under Websites.
-   - Gone from the tab: the old row per job. Walks and the read-menus
-     job have no line. Their emails when they break still go out.
-   Open, for you: should the read-menus job (menus never read yet) fold
-   into Menus, or stay off the tab?
+   - Gone from the tab: the old row per job. Walks have no line; their
+     email when they break still goes out.
+   - **The read-menus job is part of Menus** (the user, Oct 25). A food
+     place whose menu was never read is Never read on it, by name,
+     linking to Dishes, whether its menu's watch loaded or not. When that
+     job failed, didn't run or isn't set up, the line says so ("reading
+     new menus failed"). A night it read some says "· 3 new menus read".
+   - Each place missed goes by its name ("Menu · Say She Ate" is Say
+     She Ate; "Center City Eruv’s website" is Center City Eruv).
 
 Settled with the user so far:
 

@@ -36,7 +36,7 @@ vi.mock('@/lib/menuReadingStore', () => ({ listMenuReadings: async () => ({ read
 vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('@/lib/menuReader')>()), findMenus: m.findMenus, readMenus: m.readMenus }))
 vi.mock('@/lib/renderPage', () => ({ pageRenderer: () => ({ render: null, close: async () => {} }) }))
 
-const { readUnreadMenus } = await import('./menuPlaceRead')
+const { listUnreadMenus, readUnreadMenus } = await import('./menuPlaceRead')
 
 const row = (id: string, name: string, details: Record<string, unknown>) => ({ id, community_id: 'philly', category: 'restaurant', name, status: 'approved', details })
 const source = { url: 'https://x.example/menu', text: 'Falafel 9', pdf: null }
@@ -55,6 +55,18 @@ beforeEach(() => {
   m.findMenus.mockResolvedValue([source])
   m.readMenus.mockResolvedValue({ dishes: [{ name: 'Falafel' }], missing: [], sourceUrl: source.url, note: null, model: 'x' })
   m.saveMenuReading.mockImplementation(async (_c: string, id: string, r: object) => ({ resourceId: id, ...r }))
+})
+
+// Oct 25: the Watches tab's Menus line names them.
+describe('listUnreadMenus', () => {
+  it('the places never read, with something to read, by name', async () => {
+    expect(await listUnreadMenus('philly')).toEqual([
+      { id: 'a', name: 'Abe’s' },
+      { id: 'b', name: 'Bagel Place' },
+      { id: 'c', name: 'Charlie' },
+    ])
+    expect(m.findMenus).not.toHaveBeenCalled()
+  })
 })
 
 describe('readUnreadMenus', () => {

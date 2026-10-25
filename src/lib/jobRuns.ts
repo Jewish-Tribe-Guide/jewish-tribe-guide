@@ -127,14 +127,17 @@ export function watchesOutcome(run: WatchesRun): JobOutcome {
 }
 
 /** readUnreadMenus's, per community. */
-export type MenuReadRun = readonly { read: number; left: number }[]
+export type MenuReadRun = readonly { community: string; read: number; left: number }[]
 
+/** `kinds`: per community, of the menus never read, how many it read
+ *  (the Watches tab's Menus line). */
 export function readMenusOutcome(run: { skipped: string } | { menus: MenuReadRun }): JobOutcome {
   if ('skipped' in run) return { ok: true, summary: 'Nothing read', warning: `Not set up: ${run.skipped}` }
   const read = sum(run.menus, (m) => m.read)
   const left = sum(run.menus, (m) => m.left)
-  if (!read && !left) return { ok: true, summary: 'No menus left to read' }
-  return { ok: true, summary: [`Read ${plural(read, 'menu')}`, left && `${left} left for the next nights`].filter(Boolean).join(' · ') }
+  const kinds: RunKinds = Object.fromEntries(run.menus.map((m) => [m.community, { menus: { of: m.read + m.left, read: m.read } }]))
+  if (!read && !left) return { ok: true, summary: 'No menus left to read', kinds }
+  return { ok: true, summary: [`Read ${plural(read, 'menu')}`, left && `${left} left for the next nights`].filter(Boolean).join(' · '), kinds }
 }
 
 export function walkRoutesOutcome(run: WalkRouteRun): JobOutcome {
