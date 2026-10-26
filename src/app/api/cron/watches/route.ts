@@ -51,8 +51,11 @@ import { loadListings } from '@/lib/listingReads'
 export const maxDuration = 300
 
 /** No watch starts after this much of the run: one AI read can take half
- *  a minute (Oct 24: 31s), and the alerts still go out after the last. */
-const START_NO_WATCH_AFTER_MS = 200_000
+ *  a minute (Oct 24: 31s; 34s the slowest seen), and the alerts still go
+ *  out after the last, inside maxDuration. 200s until Oct 26, when the
+ *  night every shul's page is read for its new week (32 AI reads more)
+ *  would have left the menus, checked last, for the next night. */
+const START_NO_WATCH_AFTER_MS = 250_000
 
 async function eruvLines() {
   return runEruvLines().catch((err) => {

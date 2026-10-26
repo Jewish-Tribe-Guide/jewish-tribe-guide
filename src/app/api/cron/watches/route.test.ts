@@ -227,17 +227,18 @@ describe('/api/cron/watches', () => {
       expect(ran).toEqual(['k', 'site', 'menu'])
     })
 
-    it('starts no watch after 200 seconds, and says how many it left for the next night', async () => {
+    it('starts no watch after 250 seconds, and says how many it left for the next night', async () => {
       let clock = Date.parse('2026-10-24T07:47:00.000Z')
       vi.spyOn(Date, 'now').mockImplementation(() => clock)
       mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b' }), watch({ id: 'c' }), watch({ id: 'd' })] })
-      // Each page takes two minutes: a, b started; c would start at 240s.
-      mockWebsite.mockImplementation(async () => ((clock += 120_000), { ok: true, filed: 0, pageHash: 'h' }))
+      // One site, so a page at a time, each 125s: a, b, and c at 250s
+      // started (until Oct 26, c at 200s+ wasn't); d would start at 375s.
+      mockWebsite.mockImplementation(async () => ((clock += 125_000), { ok: true, filed: 0, pageHash: 'h' }))
       const body = await (await GET(request())).json()
-      expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b'])
-      expect(body.left).toBe(2)
+      expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b', 'c'])
+      expect(body.left).toBe(1)
       expect(recordedOutcomes).toEqual([
-        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night', kinds: { philly: { other: { of: 4, read: 2 } } } },
+        { job: 'watches', ok: true, summary: 'Checked 3 of 4 watches', warning: 'Ran out of time: 1 left for the next night', kinds: { philly: { other: { of: 4, read: 3 } } } },
       ])
     })
 

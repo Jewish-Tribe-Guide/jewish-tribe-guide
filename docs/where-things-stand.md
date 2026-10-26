@@ -1725,6 +1725,11 @@ said "Checked 108 of 108", and the tab counted it read. Now:
   - The menus job gets 5 minutes instead of 1, and up to 20 first reads a
     night instead of 5. 18 places were never read on Oct 26; the old job
     managed about 2–3 a night.
+  - The watches run starts watches until 250s instead of 200s. On Oct 26
+    it did 108 watches in 143s with about 30 AI reads. The night every
+    shul's page is read for its new week adds 32, which would have left the
+    menus (checked last) for the next night. The slowest read seen is 34s,
+    so one started at 250s still ends inside the 300s limit.
 - Not live until merged. PR 359 was merged before this, before Wrong place,
   and before the waiting-mikvahs fix.
 
