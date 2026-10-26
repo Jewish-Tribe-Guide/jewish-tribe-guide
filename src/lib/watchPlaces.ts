@@ -5,7 +5,7 @@ import { dishJobStatus, didntLoad, hospitalSection, type DishPlace } from './wat
 import { eruvStanding, findingFor, websiteWatchOf, type EruvJobLoaded } from './eruvJob'
 import { KOSHER_JOB_CATEGORIES, kosherSection, type KosherPlace, type NewOnList } from './kosherJob'
 import { dishProposal } from './dishProposal'
-import type { Watch } from './watches'
+import { watchHealth, type Watch } from './watches'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab by kind of place (drawings settled Oct 24): a row per
@@ -76,6 +76,9 @@ type Page = { watch: Watch }
 type Found = { id: string; at?: string; operation?: string; from?: string }
 export type PagesPlace = { id: string; name: string; href: string; pages: Page[]; off: boolean; findings?: readonly Found[]; decided?: { at: string } | null; newsletters?: readonly Watch[] }
 export type DishesPlace = DishPlace & { id: string; name: string; href: string; pages?: readonly Watch[] }
+/** A place whose own website is read with no job page of its own (a
+ *  grocery's, a childcare's): what it finds waits under its kind's row. */
+export type SitePlace = { id: string; name: string; category: string; href: string; pages: Page[]; findings?: readonly Found[] }
 export type HospitalPlace = { id: string; name: string; href: string; watch: Watch | null; notOnRefuah: boolean; findings?: readonly Found[] }
 export type KosherJob = {
   places: (KosherPlace & { href: string; findings?: readonly Found[] })[]
@@ -90,6 +93,7 @@ export type WatchJobsIn = {
   dishes: readonly DishesPlace[] | null
   hours: readonly PagesPlace[] | null
   times: readonly PagesPlace[] | null
+  sites?: readonly SitePlace[] | null
   hospitals: readonly HospitalPlace[] | null
   kosher: KosherJob | null
   eruvim: EruvJobLoaded | null
@@ -210,6 +214,14 @@ function pagesSays(p: PagesPlace, job: 'hours' | 'times', base: string, now: num
   return { changes: section === 'to_check' ? Math.max(1, p.findings?.length ?? 0) : 0, unchecked, sources, href }
 }
 
+function siteSays(p: SitePlace, base: string, now: number): Say {
+  const href = `${base}/watches/kind/${p.category}`
+  const live = p.pages.filter((x) => x.watch.active).map((x) => x.watch)
+  const changes = p.findings?.length ?? 0
+  const loads = live.some((w) => !['failing', 'stale'].includes(watchHealth(w, now).state))
+  return { changes, unchecked: changes || !live.length || loads ? [] : ['Website didn’t load'], sources: live.length ? ['website'] : [], href }
+}
+
 function hospitalSays(h: HospitalPlace, base: string, now: number): Say {
   const href = `${base}/watches/hospitals`
   const section = hospitalSection({ watch: h.watch, notOnRefuah: h.notOnRefuah, waiting: h.findings?.length }, now)
@@ -248,6 +260,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
   for (const p of jobs.dishes ?? []) add(p.id, dishesSays(p, base, now))
   for (const p of jobs.hours ?? []) add(p.id, pagesSays(p, 'hours', base, now))
   for (const p of jobs.times ?? []) add(p.id, pagesSays(p, 'times', base, now))
+  for (const p of jobs.sites ?? []) add(p.id, siteSays(p, base, now))
   for (const h of jobs.hospitals ?? []) add(h.id, hospitalSays(h, base, now))
   for (const p of jobs.kosher?.places ?? []) add(p.id, kosherSays(p, base))
   const kosherHref = `${base}/watches/kosher`
@@ -269,6 +282,9 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
   // Every listing the jobs read is one Google covers (googleJobRun.ts).
   // A name two listings share says its street ("The Kosher Grill · S Broad St").
   for (const g of jobs.google ?? []) put(placeOf(g.id, g.street ? `${g.name} · ${g.street}` : g.name, g.category, g.href, [googleSays(g, base), ...(says.get(g.id) ?? [])]))
+  // A place whose website is read and Google doesn't cover (its category
+  // has no address) is its kind's all the same.
+  for (const p of jobs.sites ?? []) if (!listed.has(p.id)) put(placeOf(p.id, p.name, p.category, p.href, says.get(p.id) ?? []))
   for (const n of jobs.kosher?.newPlaces ?? []) {
     if (n.filed === 'decided' && !n.findings?.length) continue
     const lists = [...new Set(n.on.map((o) => o.list))]

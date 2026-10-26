@@ -101,6 +101,17 @@ describe('waitingGroups', () => {
     expect(w.checked.map((l) => l.label)).toEqual(['Usual Shabbos times', 'Name', 'Website'])
   })
 
+  // Oct 25 (the user): "grocery should go to grocery". A grocery's own
+  // website, read for the phone Google doesn't have, waits here.
+  it('a grocery’s website finding: its page, what it would change, Accept or Keep as is', () => {
+    const phone = finding({ name: 'GIANT', page: 'https://giantfoodstores.com/stores/1', section: 'contact', lines: [{ key: 'phone', label: 'Phone', before: '(215) 555-0100', after: '(215) 555-0199' }] as never })
+    const store = { id: 'p', name: 'GIANT', category: 'grocery', href: '/philly/grocery/giant', pages: [{ watch: watch('w1', 'https://giantfoodstores.com/stores/1') }], findings: [phone] }
+    const w = waitingGroups('p', jobs({ sites: [store], google: { counts, places: [google({ name: 'GIANT', category: 'grocery' })] } }), NOW)
+    expect(w.groups.map((x) => [x.key, x.job, x.page?.text, x.when])).toEqual([['sites:https://giantfoodstores.com/stores/1', 'sites', 'giantfoodstores.com/stores/1', 'Oct 25']])
+    expect(w.groups[0].lines).toEqual([{ label: 'Phone', value: '(215) 555-0199', old: '(215) 555-0100' }])
+    expect(w.groups[0].decide).toEqual({ kind: 'findings', ids: ['f1'] })
+  })
+
   it('puts off a list first, then Google’s closure, then the changes', () => {
     const off = finding({ id: 'k1', operation: 'delete', from: 'Keystone-K’s list', name: 'Stephen’s Cafe' })
     const hours = finding({ id: 'h1', page: 'https://stephens.example/hours', lines: [{ key: 'hours', label: 'Hours', before: 'Sun–Thu 11 AM–9 PM', after: 'Sun–Thu 11 AM–10 PM', choosable: true }] })

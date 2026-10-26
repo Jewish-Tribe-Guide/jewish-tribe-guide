@@ -194,15 +194,23 @@ describe('onAJobPage', () => {
 })
 
 // Oct 22: a food place's website gives its hours and phone (Main dishes
-// board 3), so its findings wait on Main dishes, not in the queue.
-it('a food place’s website findings are Main dishes’, and its email says so', () => {
-  const restaurant = { id: 'restaurant', label: 'Food', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] as CategoryField[] }
-  const grocery = { id: 'grocery', label: 'Grocery', detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags', showCountInHeader: true }] as CategoryField[] }
-  const jobs = jobCategories([restaurant, grocery])
+// board 3), so its findings wait on Main dishes, not in the queue. Oct 25:
+// any other place's website (a grocery's) waits under its kind's row on
+// the Watches tab (the user: "grocery should go to grocery"); a place whose
+// website gives nothing (no phone, no hours) has no page, and a hand-added
+// watch on it still files to the queue.
+it('a website’s findings wait on Main dishes, or the place’s kind, and its email says so', () => {
+  const restaurant = { id: 'restaurant', label: 'Food', pluralLabel: 'Food', kind: 'listing', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] as CategoryField[] } as const
+  const grocery = { id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', kind: 'listing', detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags', showCountInHeader: true }] as CategoryField[] } as const
+  const cemetery = { id: 'cemetery', label: 'Cemetery', pluralLabel: 'Cemeteries', kind: 'listing', hasPhone: false, detailFields: [] as CategoryField[] } as const
+  const jobs = jobCategories([restaurant, grocery, cemetery])
   expect(onAJobPage(sub(), 'restaurant', jobs)).toBe(true)
-  expect(onAJobPage(sub(), 'grocery', jobs)).toBe(false)
+  expect(onAJobPage(sub(), 'grocery', jobs)).toBe(true)
+  expect(onAJobPage(sub(), 'cemetery', jobs)).toBe(false)
+  expect([...jobs.sites!]).toEqual(['grocery'])
   expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin/watches/dishes', name: 'Main dishes' })
-  expect(jobPageFor('philly', grocery)).toBeUndefined()
+  expect(jobPageFor('philly', grocery)).toEqual({ path: '/philly/admin/watches/kind/grocery', name: 'Grocery' })
+  expect(jobPageFor('philly', cemetery)).toBeUndefined()
 })
 
 it('findingPage: the job’s admin page and its name', () => {

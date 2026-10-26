@@ -349,9 +349,10 @@ export default function OpenedPlace({
         { label: 'Keep as is', work: each(d.ids, () => ({ status: 'rejected' })) },
       ]
     }
-    // Edit, until it opens the box here: the job page that holds it.
+    // Edit, until it opens the box here: the job page that holds it. A
+    // grocery's website has none.
     const edit = (g: WaitGroup) =>
-      g.decide.kind === 'closure' || g.decide.kind === 'new' || g.decide.kind === 'later' ? null : (
+      g.decide.kind === 'closure' || g.decide.kind === 'new' || g.decide.kind === 'later' || g.job === 'sites' ? null : (
         <Link href={`${adminBase(community)}/watches/${g.job}`} className={BUTTON}>
           Edit
         </Link>

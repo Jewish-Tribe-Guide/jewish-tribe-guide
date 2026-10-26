@@ -11,7 +11,8 @@ import { ownSiteCategories, siteGap } from './hoursJob'
  *  names a newsletter by its shul. `siteGap`: for a place whose own
  *  website is read for what Google doesn't have (ownSiteCategories), why
  *  ("Not on Google") and the job page holding what it finds (a food
- *  place's, Dishes; else '', the moderation queue); null for any other. */
+ *  place's, Dishes; any other's, its kind's page, kind/hotel); null for
+ *  any other. */
 export type SiteGap = (resourceId: string) => { why: string; page: string } | null
 export type ListingInfo = { readsOf: ReadsOf; nameOf: (resourceId: string) => string | null; siteGap: SiteGap }
 
@@ -31,7 +32,7 @@ export async function loadListings(communities: Iterable<string>): Promise<Listi
         const category = categoryOf.get(l.category)
         const kind = category && pageReadsFor(category)?.kind
         if (kind) reads.set(l.id, kind)
-        if (category && own.has(category.id)) gaps.set(l.id, { why: siteGap(category, l as unknown as Record<string, unknown>), page: food.has(category.id) ? 'dishes' : '' })
+        if (category && own.has(category.id)) gaps.set(l.id, { why: siteGap(category, l as unknown as Record<string, unknown>), page: food.has(category.id) ? 'dishes' : `kind/${category.id}` })
       }
     }),
   )

@@ -28,7 +28,9 @@ import type { Jobs } from './useWatchJobs'
 //   off       Remove the listing / Keep it / Edit, off a kosher list
 //   new       Add as new / Don't add, a place only a list has
 
-export type WaitJob = 'google' | 'times' | 'hours' | 'dishes' | 'hospitals' | 'kosher' | 'eruv'
+/** `sites`: a place whose own website is read with no job page of its own
+ *  (a grocery's), so it has no Edit there. */
+export type WaitJob = 'google' | 'times' | 'hours' | 'sites' | 'dishes' | 'hospitals' | 'kosher' | 'eruv'
 /** "Hours  Sun–Thu 11 AM–10 PM, was Sun–Thu 11 AM–9 PM"; `old` none for
  *  a value the listing doesn't have yet. */
 export type WaitLine = { label: string; value: string; old: string | null }
@@ -237,6 +239,8 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       if (f.section) covered.add(f.section)
     }
   }
+  const site = jobs.sites?.find((x) => x.id === id)
+  if (site?.findings?.length) changes.push(...findingGroups('sites', site.findings, pages))
   const dishes = jobs.dishes?.find((x) => x.id === id)
   if (dishes?.findings?.length) changes.push(...findingGroups('dishes', dishes.findings as Finding[], pages))
   const hospital = jobs.hospitals?.find((x) => x.id === id)

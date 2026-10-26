@@ -28,15 +28,16 @@ it('each listing’s name and reads by its category, across the communities aske
 })
 
 // Oct 25 (the user): a place's website is read for what Google doesn't
-// have, and says which; a food place's finds wait on Dishes, the rest in
-// the moderation queue. Since Oct 25 every kind of place, not only food.
+// have, and says which; a food place's finds wait on Dishes, the rest under
+// their kind's row on the Watches tab. Since Oct 25 every kind of place,
+// not only food.
 it('why each place’s own website is read', async () => {
   const { siteGap } = await loadListings(['philly'])
   expect(['f1', 'f2', 'f3', 'h1', 'c1', 'm1', 's1'].map(siteGap)).toEqual([
     { why: 'Not on Google', page: 'dishes' },
     { why: 'Google has no hours', page: 'dishes' },
     { why: '', page: 'dishes' },
-    { why: 'Google has no phone', page: '' },
+    { why: 'Google has no phone', page: 'kind/hotel' },
     null,
     null,
     null,

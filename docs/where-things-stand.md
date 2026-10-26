@@ -425,13 +425,22 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        jobs), with a phone, an email or hours to read. A place with no
        hours field (a hotel) is read for phone and email alone, by code,
        no AI. Hours are read by the AI only when the page changes. What a
-       food place's site finds waits on Dishes; anything else's goes to
-       the moderation queue (no job page of their own), so the kind
-       rows' "Waiting for you" doesn't count it yet. Dry run on the live
+       food place's site finds waits on Dishes. Dry run on the live
        site: the next morning adds GIANT (grocery, Google has no phone),
        CKids Philly (not on Google) and BZBI's Early Childhood (Google
        has no hours). Schools and hotels have no gaps today; cemeteries
        have no phone field.
+     - **Findings wait under their kind: BUILT Oct 25** (the user:
+       "every category that has a watch of some sort should be on the
+       watch list. So grocery should go to grocery"). What a grocery's,
+       childcare's, hotel's or school's own website finds now waits under
+       that kind's row (counted in its Waiting for you, opened there with
+       Accept / Keep as is, no Edit: there is no job page), not in the
+       moderation queue; its email links to that page. Every kind with a
+       watch has a row: a kind Google doesn't cover gets one from its
+       read websites. On the live site every watched place is a mikvah,
+       food place, hospital or shul today; Childcare already has a row
+       (from Google), and its websites join it once read.
      - Proposed, not decided: a free weekly check of the links a
        listing shows that Google doesn't give (kosher certificates,
        Refuah, WhatsApp, websites typed in), about 110.

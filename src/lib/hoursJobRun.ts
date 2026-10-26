@@ -8,6 +8,7 @@ import { readListingPage, type PageSource } from '@/lib/listingPageRun'
 import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
 import { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_JOBS, homePageWatchChanges, hoursJobCategories, ownSiteCategories, hoursSearchedUrl, hoursWatchChanges, isHoursOff, isHoursSearched, jobWords, looksLikeHours, searchReason, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
+import { siteCategories } from '@/lib/watchFindings'
 import type { Watch } from '@/lib/watches'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
@@ -96,6 +97,16 @@ async function ownSitePlaces(community: string): Promise<{ categories: CategoryC
     )
   if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
   return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow) }
+}
+
+/** The places whose website findings wait under their kind's row on the
+ *  Watches tab (siteCategories): ownSitePlaces less the food places, whose
+ *  wait on Main dishes. */
+export async function sitePlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const own = await ownSitePlaces(community)
+  const categories = siteCategories(own.categories)
+  const ids = new Set(categories.map((c) => c.id))
+  return { categories, places: own.places.filter((p) => ids.has(p.category)) }
 }
 
 export const websiteOf = (p: DirectoryResource): string | null => (typeof p.website === 'string' && p.website.trim() ? p.website.trim() : null)

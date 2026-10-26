@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kindSourcesText, notWatched, placeSourcesText, watchKinds, type PagesPlace, type WatchJobsIn } from './watchPlaces'
+import { kindSourcesText, notWatched, placeSourcesText, watchKinds, type PagesPlace, type SitePlace, type WatchJobsIn } from './watchPlaces'
 import type { Checker, GoogleFieldRow, GooglePlace } from './googleJob'
 import type { Watch, WatchCheck } from './watches'
 import type { AdminEruv } from './eruvStore'
@@ -216,6 +216,28 @@ describe('watchKinds', () => {
     expect(k.counts).toEqual({ waiting: 0, notChecked: 1, upToDate: 1 })
     expect(place(input, 'ne')).toMatchObject({ state: 'not_checked', pill: 'No status' })
     expect(kindSourcesText(k.sources)).toBe('Their websites')
+  })
+
+  // Oct 25 (the user): "every category that has a watch of some sort should
+  // be on the watch list. So grocery should go to grocery, and childcare
+  // should get a new row for childcare."
+  it('puts what a grocery’s own website found under Grocery, waiting there', () => {
+    const site = (id: string, over: Partial<SitePlace> = {}): SitePlace => ({ id, name: id, category: 'grocery', href: `/philly/grocery/${id}`, pages: [{ watch: watch() }], ...over })
+    const input = jobs({
+      google: [google('giant', 'grocery', { fields: [f('name', 'google'), f('phone', 'website')] }), google('acme', 'grocery'), google('shoprite', 'grocery')],
+      sites: [site('giant', { findings: [{ id: 'f1' }] }), site('shoprite', { pages: [{ watch: watch({ lastOkAt: ago(200), failingSince: ago(150), lastError: 'HTTP 500' }) }] })],
+    })
+    expect(kind(input, 'grocery').counts).toEqual({ waiting: 1, notChecked: 1, upToDate: 1 })
+    expect(place(input, 'giant')).toMatchObject({ state: 'waiting', pill: '1 change', href: `${BASE}/watches/kind/grocery`, sources: ['google', 'website'] })
+    expect(place(input, 'shoprite')).toMatchObject({ state: 'not_checked', pill: 'Website didn’t load' })
+    expect(kind(input, 'grocery').sources).toEqual(['google', 'website'])
+  })
+
+  it('gives a kind Google doesn’t cover its row when its places’ websites are read', () => {
+    const categories = [...CATEGORIES, { id: 'childcare', pluralLabel: 'Childcare', kind: 'listing', hasAddress: false }] as WatchJobsIn['categories']
+    const input = jobs({ categories, sites: [{ id: 'ckids', name: 'CKids Philly', category: 'childcare', href: '/philly/childcare/ckids', pages: [{ watch: watch() }] }] })
+    expect(kind(input, 'childcare')).toMatchObject({ label: 'Childcare', counts: { waiting: 0, notChecked: 0, upToDate: 1 }, sources: ['website'] })
+    expect(place(input, 'ckids')).toMatchObject({ name: 'CKids Philly', listing: '/philly/childcare/ckids' })
   })
 
   it('leaves out a kind with nothing in it, and keeps the site’s order', () => {

@@ -20,11 +20,15 @@ export function kindsOf(jobs: Jobs, base: string, now: number): { kinds: WatchKi
     dishes: jobs.dishes ?? null,
     hours: jobs.hours?.places ?? null,
     times: jobs.times?.places ?? null,
+    sites: jobs.sites ?? null,
     hospitals: jobs.hospitals ?? null,
     kosher: jobs.kosher ?? null,
     eruvim: jobs.eruvim ?? null,
   }
-  return { kinds: watchKinds(input, base, now), notWatched: notWatched(jobs.categories), settled: jobsSettled(jobs) }
+  const kinds = watchKinds(input, base, now)
+  // A kind with no address whose places' websites are read has its row.
+  const rows = new Set(kinds.map((k) => k.label))
+  return { kinds, notWatched: notWatched(jobs.categories).filter((l) => !rows.has(l)), settled: jobsSettled(jobs) }
 }
 
 function Stat({ n, label, flag }: { n: number; label: string; flag?: boolean }) {

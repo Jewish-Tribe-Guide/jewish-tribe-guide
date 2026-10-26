@@ -126,6 +126,32 @@ describe('WatchKindPage', () => {
     expect(sent).toEqual([['POST', '/api/admin/watches/google', { action: 'keep', id: 'b' }]])
   })
 
+  // Oct 25 (the user): "grocery should go to grocery". What a grocery's
+  // own website found waits here, with no job page to Edit it on.
+  it('a grocery’s website finding waits under Grocery: Accept or Keep as is', async () => {
+    const at = new Date().toISOString()
+    const phone = { id: 'f1', operation: 'update', targetId: 'g', name: 'GIANT', from: 'its website', says: 'Its page says', named: null, at, notes: [], page: 'https://giant.example/store', section: 'contact', lines: [{ key: 'phone', label: 'Phone', before: '215-555-0100', after: '215-555-0199' }] }
+    const store = { id: 'g', name: 'GIANT', category: 'grocery', href: '/philly/grocery/g', pages: [{ watch: { id: 'w1', url: 'https://giant.example/store', active: true, lastOkAt: at, lastRunAt: at, createdAt: at } }], findings: [phone] }
+    const giant = place('g', 'GIANT', { category: 'grocery', categoryLabel: 'Grocery', href: '/philly/grocery/g' })
+    const sent: unknown[] = []
+    await renderPage([giant], 'grocery', (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'grocery', pluralLabel: 'Grocery', kind: 'listing', hasAddress: true }] }
+      if (url.includes('/api/admin/watches/sites')) return { ok: true, places: [store] }
+      if (init?.method) {
+        sent.push([init.method, url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    expect(rows()).toEqual(['GIANT1 change'])
+    await user.click(screen.getByRole('button', { name: /GIANT/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([`From giant.example/store · ${day(at)}Phone215-555-0199Was 215-555-0100AcceptKeep as is`])
+    expect(within(open).queryByRole('link', { name: 'Edit' })).toBeNull()
+    await user.click(within(open).getByRole('button', { name: 'Accept' }))
+    expect(sent).toEqual([['PATCH', '/api/admin/submissions/f1', { status: 'approved' }]])
+  })
+
   it('a closure: Keep closed or Show as open', async () => {
     const at = new Date().toISOString()
     const ritas = place('r', 'Rita’s', { closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: at, readAt: at, kept: null } })

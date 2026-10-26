@@ -8,7 +8,9 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import type { CategoryConfig } from '@/lib/categories'
 import type { GooglePlace } from '@/lib/googleJob'
 import type { Watch } from '@/lib/watches'
+import type { Finding } from '@/lib/watchFindings'
 import type { DishPlace, JobCounts } from '@/lib/watchJobs'
+import type { SitePlace } from '@/lib/watchPlaces'
 import type { EruvJobLoaded } from '@/lib/eruvJob'
 import type { Hospital } from './HospitalsJob'
 import type { HoursPlace } from './HoursJob'
@@ -29,6 +31,8 @@ export type Jobs = {
   hospitals?: Hospital[] | null
   hours?: PagesJob
   times?: PagesJob
+  /** The places whose own website is read, with no job page of their own. */
+  sites?: (SitePlace & { findings?: Finding[] })[] | null
   eruvim?: EruvJobLoaded | null
   kosher?: KosherLoaded | null
   google?: { counts: JobCounts; places: GooglePlace[] } | null
@@ -43,7 +47,7 @@ export function forgetWatchJobs() {
 }
 
 /** All of them have come back, or failed. */
-export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['categories', 'dishes', 'hospitals', 'hours', 'times', 'eruvim', 'kosher', 'google']): boolean {
+export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['categories', 'dishes', 'hospitals', 'hours', 'times', 'sites', 'eruvim', 'kosher', 'google']): boolean {
   return keys.every((k) => jobs[k] !== undefined)
 }
 
@@ -65,6 +69,7 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
       get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals'))),
       get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours'))),
       get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times'))),
+      get<{ places: Jobs['sites'] }>('/api/admin/watches/sites').then((d) => (d ? fill('sites', d.places ?? null) : failed('sites'))),
       get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
       get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
       get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),

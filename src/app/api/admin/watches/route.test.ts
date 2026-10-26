@@ -64,7 +64,9 @@ describe('/api/admin/watches', () => {
   it('lists the watches and the listings a page can keep current', async () => {
     const body = await (await GET(req('GET'))).json()
     expect(body).toMatchObject({ ok: true, available: true, watches: [] })
-    expect(body.listings).toEqual([{ id: SHUL, name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: null, job: null }])
+    // Its category has no job page, but its website is read for its
+    // phone, so what it finds waits under its kind's row (Oct 25).
+    expect(body.listings).toEqual([{ id: SHUL, name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: null, job: 'Grocery Stores' }])
   })
 
   // Oct 19: "Add a watch" offers a place by what its own page can keep
