@@ -1736,12 +1736,12 @@ said "Checked 108 of 108", and the tab counted it read. Now:
 **Found Oct 26, waiting on the user:**
 - **Elkins Park Eruv's website page** (`yiep.org/eruv-map`) is gone (404
   since Oct 25). yiep.org now only links a Google map of the boundaries,
-  from /our-community/. Stop it on the eruv's page, once Stop on a page
-  that doesn't load is live (below).
+  from /our-community/. It has no status source, so its row says "Nothing
+  gives its status" and the website failure (with its Stop) doesn't show.
+  The user chose to change its website to `yiep.org/` in its listing: the
+  next nightly run drops the dead page's watch and watches the new one.
 - **Chabad of the Main Line's schedule page** answers every read with
-  Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
-  bot checks. Options: its email newsletter as the source, or Stop the
-  page so the shul shows Not checked.
+  Cloudflare's bot check (403 since Oct 20). Stopped by the user Oct 26.
 
 **Stop on a page that doesn't load (built Oct 26, own PR).** A page that
 failed showed only Read it now; Stop was only under a working page's box.
