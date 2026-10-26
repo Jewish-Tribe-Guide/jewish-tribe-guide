@@ -241,6 +241,23 @@ describe('/api/cron/watches', () => {
       ])
     })
 
+    // Oct 26: 9 shul pages the night's reads ran out for counted as read.
+    it('one the night’s reads ran out for isn’t checked or read, and isn’t saved as a run', async () => {
+      mockList.mockResolvedValue({
+        available: true,
+        watches: [
+          watch({ id: 'm1', url: 'https://a.example/menu', resourceId: 'r1', createdBy: 'menu links', pageHash: 'old' }),
+          watch({ id: 'm2', url: 'https://b.example/menu', resourceId: 'r2', createdBy: 'menu links', pageHash: 'old' }),
+        ],
+      })
+      mockMenu.mockResolvedValueOnce({ ok: true, filed: 0, pageHash: 'h' }).mockResolvedValueOnce({ ok: true, filed: 0, skipped: true })
+      await GET(request())
+      expect(recordedOutcomes).toEqual([
+        { job: 'watches', ok: true, summary: 'Checked 1 of 2 watches', warning: 'Ran out of reads: 1 not read, for the next night', kinds: { philly: { menus: { of: 2, read: 1 } } } },
+      ])
+      expect(mockUpdate).toHaveBeenCalledTimes(1)
+    })
+
     // Oct 25: one at a time, six slow AI reads left 33 of 107 unread.
     it('reads six sites at once, but one site a page at a time', async () => {
       let reading = 0

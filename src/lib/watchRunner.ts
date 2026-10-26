@@ -76,7 +76,7 @@ export async function runWatch(
 export async function runAndRecord(watch: Watch, now = new Date().toISOString(), budget?: MenuReadBudget, { full = false }: { full?: boolean } = {}) {
   const outcome = await runWatch(watch, budget, undefined, { full })
   const { update, alert } = afterRun(watch, outcome, now)
-  await updateWatch(watch.communityId, watch.id, update)
+  if (Object.keys(update).length) await updateWatch(watch.communityId, watch.id, update)
   const recorded = { ...watch, ...update } as Watch
   return { outcome, alert, watch: { ...recorded, lastCheck: withoutListRead(recorded.lastCheck) } }
 }

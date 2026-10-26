@@ -1708,7 +1708,30 @@ backfill script skips that listing.
   phone is still read every night. Decided Oct 26 (the user): Wrong place
   stays on the waiting card only, not on an up-to-date place's Google box.
 
+**Nothing skipped shows as read (built Oct 26, on `redesign/oct18-fixes`):**
+the user: "really misleading that some things are skipped but shown as
+read". A shul page or menu that loaded but needed the AI after the night's
+reads were spent was recorded like a read: its read date moved, the run
+said "Checked 108 of 108", and the tab counted it read. Now:
+- **A watch skipped this way stays as it was.** Neither run date moves.
+  The tab says Not reached, and the next night takes it ahead of those it
+  read.
+- **The run says so:** "Ran out of reads: N not read, for the next night".
+- **The menus job** says "N couldn't be read" for a menu it couldn't find,
+  and no longer counts that as read.
+- **Enough reads for all of it:**
+  - 40 shul-page reads a night instead of 20. All 32 pages are due the
+    night their week starts, which would have left 9 on Oct 26.
+  - The menus job gets 5 minutes instead of 1, and up to 20 first reads a
+    night instead of 5. 18 places were never read on Oct 26; the old job
+    managed about 2–3 a night.
+- Not live until merged. PR 359 was merged before this, before Wrong place,
+  and before the waiting-mikvahs fix.
+
 **Found Oct 26, not fixed:**
+- **Elkins Park Eruv's website page** (`yiep.org/eruv-map`) is gone (404
+  since Oct 25). yiep.org now only links a Google map of the boundaries,
+  from /our-community/. Stop it on the eruv's page.
 - **Chabad of the Main Line's schedule page** answers every read with
   Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
   bot checks. Options: its email newsletter as the source, or Stop the

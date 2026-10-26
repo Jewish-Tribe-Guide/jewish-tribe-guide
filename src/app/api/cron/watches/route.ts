@@ -119,13 +119,16 @@ async function runAll(started = Date.now()): Promise<Body> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  const read = new Set(results.filter((r) => r.ok).map((r) => r.id))
+  // One its reads ran out for wasn't read (the user, Oct 26): not counted
+  // as checked, and its kind's line says Not reached.
+  const skipped = results.filter((r) => r.ok && r.skipped).length
+  const read = new Set(results.filter((r) => r.ok && !r.skipped).map((r) => r.id))
   // Without them, a listing's page goes by its label (watchGroupOf).
   const listings = await loadListings(queue.map((w) => w.communityId)).catch((err) => {
     console.error('[cron/watches] listing reads failed:', err)
     return undefined
   })
-  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
+  const run = { active: queue.length, ran: results.length - skipped, notWorking: results.filter((r) => !r.ok).length, left, skipped, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 

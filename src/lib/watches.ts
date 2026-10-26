@@ -165,7 +165,16 @@ export function listCheck(run: { entries: number; matching: number; findings: nu
 
 /** What one run of a watch came to. */
 export type WatchOutcome =
-  | { ok: true; filed: number; pageHash?: string; check?: CheckFound }
+  | {
+      ok: true
+      filed: number
+      pageHash?: string
+      check?: CheckFound
+      /** It loaded, and needed the AI, but the run's reads were spent: not
+       *  read, so not recorded as read (the user, Oct 26). Its last read and
+       *  fingerprint stay, and it reads on a night with room. */
+      skipped?: true
+    }
   | { ok: false; error: string; check?: CheckFound }
 
 /** A page address as the guide keeps it: https, no fragment, no trailing
@@ -210,6 +219,12 @@ export function afterRun(
       update: { lastRunAt: now, lastError: outcome.error, failingSince: watch.failingSince ?? now, ...check },
       alert: watch.failingSince ? null : 'broke',
     }
+  }
+  // Skipped: it loaded, so it isn't failing, but it wasn't read. Neither
+  // run date moves, so the tab says Not reached, not Read (nightKinds.ts),
+  // and the next night's run takes it before those it read.
+  if (outcome.skipped) {
+    return { update: { ...(watch.failingSince ? { lastError: null, failingSince: null } : {}), ...check }, alert: watch.failingSince ? 'recovered' : null }
   }
   const update: ReturnType<typeof afterRun>['update'] = {
     lastRunAt: now,

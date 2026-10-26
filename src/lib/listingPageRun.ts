@@ -843,7 +843,7 @@ export async function runListingPageWatch(
     if (reads.kind === 'times' && (budget.timesReads ?? 0) > 0) budget.timesReads!--
     else {
       const left = compareOnly ? (budget.compares ?? 0) : budget.aiReads
-      if (left <= 0) return merge({ ok: true, filed: 0 })
+      if (left <= 0) return merge({ ok: true, filed: 0, skipped: true })
       if (compareOnly) budget.compares = left - 1
       else budget.aiReads--
     }

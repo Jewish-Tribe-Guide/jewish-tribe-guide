@@ -149,7 +149,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/kind/synagogue?place=s1', name: 'Grocery Stores' })
     // Its reads spent: left for a later morning, its fingerprint unset.
     m.readShulWeek.mockClear()
-    expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     // Once read, it's read again only when it changes.
     expect(await runListingPageWatch({ ...found, pageHash: await hashOfPage(), lastCheck: lastRead(shul, shulCategory, 'differs') }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
@@ -215,7 +215,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     // From its own reads, never a changed page's.
     const budget = { aiReads: 1, compares: 0 }
     m.readShulWeek.mockClear()
-    expect(await runListingPageWatch(same, budget, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0 })
+    expect(await runListingPageWatch(same, budget, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     expect(budget.aiReads).toBe(1)
   })
@@ -387,7 +387,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
 
   it('shares the run’s AI reads: with them spent, the change waits for tomorrow', async () => {
     const budget = { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }
-    expect(await runListingPageWatch(changed, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(await runListingPageWatch(changed, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     // Never the menus' own reads (MENU_READS_PER_RUN).
     expect(budget.menuReads).toBe(newMenuReadBudget().menuReads)
