@@ -457,10 +457,13 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        read. Not found or no such site counts at once; didn't answer
        counts only on a second check a week later. What's tracked has a
        Links line; a link that doesn't open puts its place on Not
-       checked ("Link doesn’t open") with Check it again. Dry run on the
-       live site: 92 links, 1 doesn't open — House of Kosher's
-       certificate (houseofkosher.com/Philadelphia, 404). Fixing that
-       link on the live site needs the user's OK. The cron first runs on
+       checked ("Link doesn’t open") with Check it again. A hospital's
+       Refuah link isn't checked: its Refuah watch reads that page
+       already (the link carries a `?q=` search the watch doesn't). Dry
+       run on the live site: 85 links, 1 doesn't open — House of
+       Kosher's certificate (houseofkosher.com/Philadelphia, 404); its
+       Keystone-K page is keystone-k.org/kosher/house-of-kosher/.
+       Changing it on the live site needs the user's OK. The cron first runs on
        production once this branch deploys.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add

@@ -40,6 +40,8 @@ const hostOf = (url: string) => {
   }
 }
 
+const pathOf = (url: string) => url.replace(/[?#].*$/, '')
+
 /** The links of a listing to check: each link field it has filled in
  *  with a web address, less what something else opens. */
 export function linksToCheck(
@@ -56,6 +58,9 @@ export function linksToCheck(
     const url = typeof raw === 'string' ? raw.trim() : ''
     if (!/^https?:\/\//i.test(url) || !hostOf(url)) return []
     if (read.some((w) => samePage(w.url, url))) return []
+    // Its own watch on the page, less a search left on the link (a
+    // hospital's Refuah link carries `?q=` its watch doesn't).
+    if (read.some((w) => w.resourceId === place.id && samePage(pathOf(w.url), pathOf(url)))) return []
     const website = f.label.trim().toLowerCase() === 'website'
     if (website && (google.includes('website') || ownHosts.has(hostOf(url)))) return []
     return [{ resourceId: place.id, key: f.key, field: f.label, url }]

@@ -45,6 +45,15 @@ describe('which links are checked', () => {
     expect(linksToCheck({ id: 'p1', details }, category, watches).map((l) => l.key)).toEqual(['kosher_url', 'whatsapp'])
   })
 
+  it('not a link its own watch reads with a search left on it, as a hospital’s Refuah page', () => {
+    const refuah = { ...category, detailFields: [{ key: 'r', label: 'Refuah Link', type: 'url' }] } as unknown as Parameters<typeof linksToCheck>[1]
+    const page = 'https://refuah.com/hospitals/jx75q42dv17pxq7zckc9sx31v589mzem'
+    const place = { id: 'p1', details: { r: `${page}?q=Pennsylvania+Hospital+800+spruce` } }
+    expect(linksToCheck(place, refuah, [watch({ url: page, resourceId: 'p1' })])).toEqual([])
+    // Another place's watch reads only that exact page.
+    expect(linksToCheck(place, refuah, [watch({ url: page, resourceId: 'p2' })]).map((l) => l.key)).toEqual(['r'])
+  })
+
   it('a watch that’s stopped, or another place’s on the same site, doesn’t count', () => {
     const watches = [watch({ url: 'https://kosherplace.com/menu', resourceId: 'p1', active: false }), watch({ url: 'https://kosherplace.com/about', resourceId: 'p2' })]
     expect(linksToCheck({ id: 'p1', details }, category, watches).map((l) => l.key)).toEqual(['website', 'kosher_url', 'menu_url', 'whatsapp'])
