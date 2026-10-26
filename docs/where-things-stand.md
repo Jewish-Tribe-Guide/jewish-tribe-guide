@@ -1750,36 +1750,40 @@ mikvah's page, an eruv's website, status page or map, a hospital's Refuah
 page, and a food place's menu. Not offered when several pages of a site are
 down together: that row stands for all of them, and Stop names one page.
 
-## Drawn Oct 26: a shul's week, weekdays then Shabbos (not built)
+## Built Oct 26: a shul's week, weekdays then Shabbos (on `redesign/oct18-fixes`)
 
 Drawing: https://claude.ai/artifact/6piwThENnhVRoacWqEHBD1 (boards 1–6, and
-1b, 3b, 4b, 5b beside them). Not built until the user approves it.
+1b, 3b, 4b, 5b beside them). Approved and built Oct 26: boards 1b, 2, 3,
+3b, 4b, 5b.
 
 Why: last week's week posts ran out after Shabbos Oct 24, and only shuls
-whose page changed got Oct 25–31. The weekly read of every shul page
-(PR 360) first runs the night of Oct 26.
+whose page changed got Oct 25–31.
 
-- **Agreed Oct 26: Shabbos goes first once the shul's last weekday minyan
-  of the week has started**, for the dated boxes and the usual boxes alike
-  (board 3b). Usually that's Friday's last Shacharis; a shul with nothing
-  on Friday switches after Thursday's last. This replaces today's Thursday
-  6 PM switch (`shabbosFirst` in `DaveningCard.tsx`).
-- **Asked for Oct 26:** when only the usual times are known, no dated
-  "This Shabbos" box. Usual Shabbos times stays as the site has it (boards
-  1b, 4b, 5b). A dated This Shabbos box only once that week's times are out
-  (boards 2, 3).
-- **Proposed, waiting on the drawing's approval:**
-  - The weekly read moves from Sunday 3 AM to Saturday 3 AM (Friday
-    night), so next week shows at havdalah. `calendarWeeks` already
-    includes next week from Thursday; `weekDue` would key on next Sunday
-    when today is Saturday.
-  - A read of every shul page on Thursday night (Friday 3 AM) for this
-    Shabbos's times; a Friday-midday read drawn as optional.
-  - After havdalah, the week first (today the site puts Shabbos first all
-    Saturday).
-  - The waiting card shortened to "Not on the guide yet" and "+ Add this
-    week's schedule", above the usual boxes.
-  - Candle lighting in the This Shabbos box, from the zmanim the site has.
+- **Shabbos goes first once the shul's last weekday minyan of the week has
+  started**, for the dated boxes and the usual boxes alike
+  (`shabbosComesFirst` in `schedules.ts`). Usually that's Friday's last
+  Shacharis; a shul with nothing on Friday switches after Thursday's last;
+  one with no weekday minyan at all, on Friday. After havdalah the week
+  comes first again. Replaced the Thursday 6 PM switch.
+- **A week post splits into two boxes:** "This week's schedule" (its
+  weekdays) and "This Shabbos" (Friday night and Shabbos, with candle
+  lighting from the shul's own times or the site's zmanim). Each box's
+  Edit opens the post its times came from. When only the usual times are
+  known there is no dated This Shabbos box; Usual Shabbos times stays.
+- **The waiting card** is "Not on the guide yet" and "+ Add this week's
+  schedule", with no footer.
+- **Every shul page is read Thursday night and Friday night** (the 3 AM
+  runs on Friday and Saturday), whether or not it changed, so this
+  Shabbos's times and then next week's are in by havdalah. It used to be
+  Sunday 3 AM (`weeklyReadDue` in `listingPageRun.ts`). The optional
+  Friday-midday read on board 6 was not built.
+- **A Shabbos post headed by a date alone** ("Fri Oct 30", from a shul's
+  page) now goes by its dates; it showed "Fri Oct 30, Oct 30".
+- **Differs from the boards:** dates use the site's format ("Oct 25–30",
+  not "Sun Oct 25 – Fri Oct 30"); times that have started today are
+  greyed; the dated boxes sit above the Yom Tov box and the usual boxes.
+- **Not seen yet:** the first Thursday-night and Friday-night reads happen
+  on the nightly runs after this deploys (Oct 30 and 31, 3 AM).
 
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 
