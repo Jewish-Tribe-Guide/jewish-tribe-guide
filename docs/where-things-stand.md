@@ -1750,6 +1750,37 @@ mikvah's page, an eruv's website, status page or map, a hospital's Refuah
 page, and a food place's menu. Not offered when several pages of a site are
 down together: that row stands for all of them, and Stop names one page.
 
+## Drawn Oct 26: a shul's week, weekdays then Shabbos (not built)
+
+Drawing: https://claude.ai/artifact/6piwThENnhVRoacWqEHBD1 (boards 1–6, and
+1b, 3b, 4b, 5b beside them). Not built until the user approves it.
+
+Why: last week's week posts ran out after Shabbos Oct 24, and only shuls
+whose page changed got Oct 25–31. The weekly read of every shul page
+(PR 360) first runs the night of Oct 26.
+
+- **Agreed Oct 26: Shabbos goes first once the shul's last weekday minyan
+  of the week has started**, for the dated boxes and the usual boxes alike
+  (board 3b). Usually that's Friday's last Shacharis; a shul with nothing
+  on Friday switches after Thursday's last. This replaces today's Thursday
+  6 PM switch (`shabbosFirst` in `DaveningCard.tsx`).
+- **Asked for Oct 26:** when only the usual times are known, no dated
+  "This Shabbos" box. Usual Shabbos times stays as the site has it (boards
+  1b, 4b, 5b). A dated This Shabbos box only once that week's times are out
+  (boards 2, 3).
+- **Proposed, waiting on the drawing's approval:**
+  - The weekly read moves from Sunday 3 AM to Saturday 3 AM (Friday
+    night), so next week shows at havdalah. `calendarWeeks` already
+    includes next week from Thursday; `weekDue` would key on next Sunday
+    when today is Saturday.
+  - A read of every shul page on Thursday night (Friday 3 AM) for this
+    Shabbos's times; a Friday-midday read drawn as optional.
+  - After havdalah, the week first (today the site puts Shabbos first all
+    Saturday).
+  - The waiting card shortened to "Not on the guide yet" and "+ Add this
+    week's schedule", above the usual boxes.
+  - Candle lighting in the This Shabbos box, from the zmanim the site has.
+
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 
 Found Oct 24: the live watches run checked 29 of 107 watches and stopped,
