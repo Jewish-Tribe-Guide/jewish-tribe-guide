@@ -91,6 +91,28 @@ describe('WatchKindPage', () => {
     expect(posts).toEqual([['/api/admin/watches/google', { action: 'not_on_google', id: 'b' }]])
   })
 
+  // Oct 25: the weekly link check found House of Kosher's kosher
+  // certificate link gone (404).
+  it('opens a place whose link doesn’t open, with Check it again', async () => {
+    const since = new Date(Date.now() - 3 * 86_400_000).toISOString()
+    const link = { resourceId: 'b', key: 'kosher_url', field: 'Kosher certificate', url: 'http://houseofkosher.com/Philadelphia', place: 'House of Kosher', category: 'synagogue', href: '/philly/synagogues/b', id: 'w9', checkedAt: since, error: 'Not found', failingSince: since }
+    const posts: unknown[] = []
+    await renderPage([place('a', 'Kesher Israel'), place('b', 'House of Kosher')], 'synagogue', (url, init) => {
+      if (url.includes('/api/admin/watches/links') && !init?.method) return { ok: true, links: [link] }
+      if (init?.method === 'POST') {
+        posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    expect(rows()).toEqual(['House of KosherLink doesn’t open'])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /House of Kosher/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getAllByTestId('problem').map((p) => p.textContent)).toEqual([`Kosher certificate·not found since ${day(since)}Linkhouseofkosher.com/PhiladelphiaCheck it again`])
+    await user.click(within(open).getByRole('button', { name: 'Check it again' }))
+    expect(posts).toEqual([['/api/admin/watches/links', { action: 'check', resourceId: 'b', key: 'kosher_url' }]])
+  })
+
   it('opens a place waiting by where each change came from, each decided on its own', async () => {
     const at = new Date().toISOString()
     const weekday = (time: string) => [{ id: 'm', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time }]

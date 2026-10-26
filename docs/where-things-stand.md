@@ -449,9 +449,19 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        read websites. On the live site every watched place is a mikvah,
        food place, hospital or shul today; Childcare already has a row
        (from Google), and its websites join it once read.
-     - Proposed, not decided: a free weekly check of the links a
-       listing shows that Google doesn't give (kosher certificates,
-       Refuah, WhatsApp, websites typed in), about 110.
+     - **Weekly link check: BUILT Oct 25** (the user: "let's also add a
+       check for links now"). Every Sunday (`/api/cron/check-links`,
+       added to `vercel.json`) each link a listing shows that nothing
+       else opens — kosher certificates, Refuah, WhatsApp groups,
+       websites Google doesn't keep — is opened once. No AI, nothing
+       read. Not found or no such site counts at once; didn't answer
+       counts only on a second check a week later. What's tracked has a
+       Links line; a link that doesn't open puts its place on Not
+       checked ("Link doesn’t open") with Check it again. Dry run on the
+       live site: 92 links, 1 doesn't open — House of Kosher's
+       certificate (houseofkosher.com/Philadelphia, 404). Fixing that
+       link on the live site needs the user's OK. The cron first runs on
+       production once this branch deploys.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add
        a source).

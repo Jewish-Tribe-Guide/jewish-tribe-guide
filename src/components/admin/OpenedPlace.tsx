@@ -542,6 +542,13 @@ export default function OpenedPlace({
             {busy === key ? 'Reading…' : (f.pages ?? 1) > 1 ? 'Read them now' : 'Read it now'}
           </button>
         )
+      if (f.kind === 'link')
+        return (
+          <button type="button" disabled={busy !== null} onClick={() => void run(key, () => post('/api/admin/watches/links', { action: 'check', resourceId: f.resourceId, key: f.key }))} className={`inline-flex items-center gap-1.5 ${GO}`}>
+            <Again />
+            {busy === key ? 'Checking…' : 'Check it again'}
+          </button>
+        )
       if (f.kind === 'job')
         return (
           <Link href={`${adminBase(community)}/watches/${f.job}`} className={`text-[13.5px] ${LINK}`}>

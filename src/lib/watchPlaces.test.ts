@@ -3,6 +3,7 @@ import { kindSourcesText, notWatched, placeSourcesText, watchKinds, type PagesPl
 import type { Checker, GoogleFieldRow, GooglePlace } from './googleJob'
 import type { Watch, WatchCheck } from './watches'
 import type { AdminEruv } from './eruvStore'
+import type { LinkStanding } from './linkCheck'
 
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const ago = (hours: number) => new Date(NOW - hours * 3_600_000).toISOString()
@@ -238,6 +239,36 @@ describe('watchKinds', () => {
     const input = jobs({ categories, sites: [{ id: 'ckids', name: 'CKids Philly', category: 'childcare', href: '/philly/childcare/ckids', pages: [{ watch: watch() }] }] })
     expect(kind(input, 'childcare')).toMatchObject({ label: 'Childcare', counts: { waiting: 0, notChecked: 0, upToDate: 1 }, sources: ['website'] })
     expect(place(input, 'ckids')).toMatchObject({ name: 'CKids Philly', listing: '/philly/childcare/ckids' })
+  })
+
+  // Oct 25: House of Kosher's kosher certificate link answered 404.
+  const link = (over: Partial<LinkStanding>): LinkStanding => ({
+    resourceId: 'r',
+    key: 'kosher_url',
+    field: 'Kosher Certification URL',
+    url: 'http://houseofkosher.com/Philadelphia',
+    place: 'House of Kosher',
+    category: 'restaurant',
+    href: '/philly/restaurant/r',
+    id: 'w1',
+    checkedAt: ago(30),
+    error: 'Not found',
+    failingSince: ago(30),
+    ...over,
+  })
+
+  it('a link a listing shows that doesn’t open is Not checked, on its kind’s page', () => {
+    const input = jobs({ google: [google('r', 'restaurant'), google('s', 'restaurant')], links: [link({}), link({ resourceId: 's', error: null, failingSince: null })] })
+    expect(place(input, 'r')).toMatchObject({ state: 'not_checked', pill: 'Link doesn’t open', href: `${BASE}/watches/kind/restaurant` })
+    expect(place(input, 's')).toMatchObject({ state: 'up_to_date' })
+    // Not answering once isn't, yet.
+    expect(place(jobs({ google: [google('r', 'restaurant')], links: [link({ error: 'Didn’t answer' })] }), 'r')).toMatchObject({ state: 'up_to_date' })
+  })
+
+  it('a place nothing else reads gets its row for a link that doesn’t open', () => {
+    const input = jobs({ links: [link({ resourceId: 'g', place: 'Kosher Delivery', category: 'whatsapp', field: 'Join group', href: '/philly/whatsapp/g' })] })
+    expect(kind(input, 'whatsapp')).toMatchObject({ label: 'WhatsApp Groups', counts: { waiting: 0, notChecked: 1, upToDate: 0 } })
+    expect(place(input, 'g')).toMatchObject({ name: 'Kosher Delivery', state: 'not_checked', listing: '/philly/whatsapp/g' })
   })
 
   it('leaves out a kind with nothing in it, and keeps the site’s order', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { countGoogleKinds, countWatchKinds, kindBad, lastNightLine, nightKindOf, nightKinds, type GoogleLive, type NightKindView } from './nightKinds'
 import type { JobRun } from './jobRuns'
 import type { Watch } from './watches'
+import type { LinkStanding } from './linkCheck'
 
 // Oct 25, 10 AM in Philadelphia: Google ran at 2, the watches at 3.
 const NOW = Date.parse('2026-10-25T14:00:00Z')
@@ -416,5 +417,55 @@ describe('Newsletters', () => {
   it('none yet, and all well', () => {
     expect(view([])).toMatchObject({ count: 'None yet', trouble: null, tracked: [] })
     expect(view([news('a', { pageChangedAt: null })])).toMatchObject({ count: '1 newsletter', trouble: null, tracked: [{ status: 'No email yet' }] })
+  })
+})
+
+describe('Links', () => {
+  // The link check ran last Sunday, Oct 18, 5 AM.
+  const RUN_AT = '2026-10-18T09:00:00.000Z'
+  const link = (over: Partial<LinkStanding>): LinkStanding => ({
+    resourceId: 'p1',
+    key: 'kosher_url',
+    field: 'Kosher Certification URL',
+    url: 'https://k.org/cert',
+    place: 'Sababa',
+    category: 'restaurant',
+    href: '/philly/restaurant/sababa',
+    id: 'w1',
+    checkedAt: after(RUN_AT, 1),
+    error: null,
+    failingSince: null,
+    ...over,
+  })
+  const runs = { 'check-links': [run({ job: 'check-links', startedAt: RUN_AT })] }
+  const view = (links: LinkStanding[], r: Parameters<typeof nightKinds>[1] = runs) => kind(nightKinds('philly', r, [], [], NOW, [], undefined, links), 'Links')
+
+  it('every link, what doesn’t open first, each on its place’s kind page; no nights, it runs once a week', () => {
+    const v = view([
+      link({}),
+      link({ resourceId: 'p2', place: 'House of Kosher', url: 'http://houseofkosher.com/Philadelphia', error: 'Not found', failingSince: after(RUN_AT, 1) }),
+      link({ resourceId: 'p3', place: 'Kosher Corner', key: 'whatsapp', field: 'Join group', error: 'Didn’t answer', failingSince: after(RUN_AT, 1) }),
+    ])
+    expect(v).toMatchObject({ when: 'Oct 18, 5:00 AM', count: '3 links', trouble: '1 doesn’t open', nights: [] })
+    expect(v.misses).toEqual([{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 18', page: 'kind/restaurant' }])
+    expect(v.tracked).toEqual([
+      { name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 18', bad: true, page: 'kind/restaurant' },
+      // Not answering once isn't a problem yet: the next week's check says.
+      { name: 'Kosher Corner · Join group', status: 'Didn’t answer since Oct 18', bad: false, page: 'kind/restaurant' },
+      { name: 'Sababa · Kosher Certification URL', status: 'Opens · checked Oct 18', bad: false, page: 'kind/restaurant' },
+    ])
+    expect(kindBad(v)).toBe(true)
+  })
+
+  it('not run yet, or not for over a week', () => {
+    expect(view([link({ checkedAt: null })], {})).toMatchObject({ when: null, count: '1 link · not checked yet', trouble: null })
+    // No run kept, but checked: the links say.
+    expect(view([link({ error: 'Not found', failingSince: after(RUN_AT, 1) })], {})).toMatchObject({ when: 'Oct 18, 5:01 AM', count: '1 link', trouble: '1 doesn’t open' })
+    const old = { 'check-links': [run({ job: 'check-links', startedAt: night(RUN_AT, 2) })] }
+    expect(view([link({})], old)).toMatchObject({ count: 'Didn’t run since Oct 16' })
+  })
+
+  it('only when a listing shows a link', () => {
+    expect(nightKinds('philly', runs, [], [], NOW).map((v) => v.name)).not.toContain('Links')
   })
 })

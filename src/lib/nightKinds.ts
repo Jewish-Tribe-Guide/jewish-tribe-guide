@@ -1,10 +1,11 @@
-import { jobHealth, NIGHTLY_JOBS, type JobId, type JobRun, type KindCount, type NightKindId, type RunKinds } from './jobRuns'
+import { jobHealth, NIGHTLY_JOBS, type JobId, type NightlyJob, type JobRun, type KindCount, type NightKindId, type RunKinds } from './jobRuns'
 import { watchGroupOf, type ReadsOf } from './watchGroups'
 import { isIgnoredSender, isNewsletterWatch } from './newsletter'
 import type { ListingInfo, SiteGap } from './listingReads'
 import { isListingPageWatch } from './listingPageWatch'
 import { isEruvWebsiteWatch } from './eruvWebsite'
 import type { Watch } from './watches'
+import { linkBroken, linkStatus, type LinkStanding } from './linkCheck'
 
 // ── Nightly runs, a line per kind of source (Oct 25) ────────────────────────
 // The Watches tab's "Last night" (FinalNightly): Google, Kosher
@@ -24,6 +25,8 @@ import type { Watch } from './watches'
 // shown only when there are any). It replaced the tab's watch list.
 // Phone, email and hours (Oct 25): a place's own website, read for what
 // Google doesn't have, each place saying why ("Not on Google").
+// Links (Oct 25): the weekly link check's, every link a listing shows
+// that nothing else reads, each saying whether it opened.
 // Pure: the runs route works it out, NightlyRuns.tsx draws it.
 
 export type NightKind = {
@@ -49,6 +52,7 @@ export const NIGHT_KINDS: readonly NightKind[] = [
   { id: 'sites', name: 'Phone, email and hours', job: 'watches', about: 'Reads a place’s own website when Google doesn’t have them.', page: '' },
   { id: 'menus', name: 'Menus', job: 'watches', about: 'Reads each food place’s menu when it changes, and a few never read each night.', page: 'dishes' },
   { id: 'other', name: 'Other pages', job: 'watches', about: 'Pages added by hand. What they find goes to the moderation queue.', page: '' },
+  { id: 'links', name: 'Links', job: 'check-links', about: 'Opens every link a listing shows that nothing else reads, once a week.', page: '' },
 ]
 
 type KindWatch = Pick<Watch, 'kind' | 'url' | 'createdBy' | 'label' | 'resourceId'>
@@ -329,6 +333,32 @@ function newsletterView(kind: NightKind, watches: readonly Watch[], listings?: L
   }
 }
 
+/** Links: checked once a week, so no nights. "112 links · checked Oct
+ *  19", and what didn't open, by its place, on its kind's page. */
+function linksView(kind: NightKind, job: NightlyJob, runs: readonly JobRun[], links: readonly LinkStanding[], now: number): NightKindView {
+  const tracked = links
+    .map((l) => {
+      const s = linkStatus(l)
+      return { name: `${l.place} · ${l.field}`, status: s.text, bad: s.bad, page: `kind/${l.category}` }
+    })
+    .sort(byNeed)
+  const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: [] }
+  const n = `${links.length} link${links.length === 1 ? '' : 's'}`
+  const last = runs[0]
+  const health = jobHealth(job, runs, now)
+  // With no run kept (before migration 086), its links' own checks.
+  const checkedAt = links.map((l) => l.checkedAt).filter((x): x is string => !!x).sort().at(-1)
+  if (!last && !checkedAt) return { ...base, when: null, count: links.length ? `${n} · not checked yet` : 'Not run yet', trouble: null, misses: [] }
+  const at = last?.startedAt ?? checkedAt!
+  const when = `${dayName(Date.parse(at))}, ${timeOf(at)}`
+  if (health.state === 'late') return { ...base, when, count: `Didn’t run since ${dayName(Date.parse(health.since))}`, trouble: null, misses: [] }
+  if (health.state === 'running') return { ...base, when, count: 'Running now', trouble: null, misses: [] }
+  if (health.state === 'failed') return { ...base, when, count: 'Failed', trouble: health.error, misses: [] }
+  const bad = links.filter((l) => linkBroken(l)).length
+  const trouble = [health.state === 'cut off' && 'stopped before it finished', health.state === 'warning' && 'ran out of time', bad && `${bad} ${bad === 1 ? 'doesn’t' : 'don’t'} open`].filter(Boolean).join(' · ') || null
+  return { ...base, when, count: links.length ? n : 'No links to check', trouble, misses: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page })) }
+}
+
 function troubleOf(live: Live, ranOut: boolean): string | null {
   const parts = [live.failed && `${live.failed} didn’t load`, live.never && `${live.never} never read`, live.notReached && (ranOut ? 'ran out of time' : `${live.notReached} not reached`)]
   return parts.filter(Boolean).join(' · ') || null
@@ -354,6 +384,7 @@ export function nightKinds(
   now: number,
   unread: readonly UnreadMenu[] = [],
   listings?: ListingInfo,
+  links: readonly LinkStanding[] = [],
 ): NightKindView[] {
   const readsOf = listings?.readsOf
   const siteGap = listings?.siteGap
@@ -361,6 +392,7 @@ export function nightKinds(
     if (!kind.job) return newsletterView(kind, watches, listings)
     const job = NIGHTLY_JOBS.find((j) => j.id === kind.job)!
     const own = runs[kind.job] ?? []
+    if (kind.id === 'links') return linksView(kind, job, own, links, now)
     const last = own[0]
     const tracked = kind.id === 'google' ? trackedGoogle(kind, google) : trackedWatches(kind, watches, kind.id === 'menus' ? unread : [], readsOf, siteGap)
     const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: kindNights(kind, community, own, now, kind.id === 'menus' ? (runs['read-menus'] ?? []) : []) }
@@ -377,7 +409,7 @@ export function nightKinds(
     const trouble = [health.state === 'cut off' && 'stopped before it finished', troubleOf(live, !!last.warning), also].filter(Boolean).join(' · ') || null
     return { ...base, when, count, trouble, misses: live.misses }
   })
-  return views.filter((v) => (v.id !== 'other' && v.id !== 'sites') || v.tracked.length)
+  return views.filter((v) => (v.id !== 'other' && v.id !== 'sites' && v.id !== 'links') || v.tracked.length)
 }
 
 /** Not all read: something missed, or its run didn't run or failed. */

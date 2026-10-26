@@ -115,4 +115,20 @@ describe('What’s tracked on the Watches tab', () => {
     expect(needs).toHaveTextContent('info@lms.orgNot linked to a shulLink box for w1')
     expect(screen.queryByText('Not read last night')).toBeNull()
   })
+  // Links are checked once a week: what doesn't open needs a look, on its
+  // place's kind page.
+  it('Links: what doesn’t open needs a look, not last night', async () => {
+    const links = kind({
+      id: 'links', name: 'Links', when: 'Oct 25, 5:00 AM', count: '82 links', trouble: '1 doesn’t open', nights: [],
+      misses: [{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 25', page: 'kind/restaurant' }],
+      tracked: [{ name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 25', bad: true, page: 'kind/restaurant' }],
+    })
+    show([links])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    await u.click(screen.getByRole('button', { name: /^Links/ }))
+    const needs = screen.getByRole('list', { name: 'Links: needs a look' })
+    expect(within(needs).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/kind/restaurant')
+    expect(screen.queryByText('Not read last night')).toBeNull()
+  })
 })

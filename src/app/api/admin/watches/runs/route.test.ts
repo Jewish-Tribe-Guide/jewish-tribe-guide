@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn(), listUnreadMenus: vi.fn(), loadListings: vi.fn() }))
+const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), listJobRuns: vi.fn(), listWatches: vi.fn(), loadGoogleJob: vi.fn(), listUnreadMenus: vi.fn(), loadListings: vi.fn(), linkStandings: vi.fn() }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/jobRunStore', () => ({ listJobRuns: m.listJobRuns }))
@@ -8,6 +8,7 @@ vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
 vi.mock('@/lib/googleJobRun', () => ({ loadGoogleJob: m.loadGoogleJob }))
 vi.mock('@/lib/menuPlaceRead', () => ({ listUnreadMenus: m.listUnreadMenus }))
 vi.mock('@/lib/listingReads', () => ({ loadListings: m.loadListings }))
+vi.mock('@/lib/linkCheckRun', () => ({ linkStandings: m.linkStandings }))
 
 const { GET } = await import('./route')
 const get = () => GET(new Request('http://x/api/admin/watches/runs'))
@@ -22,9 +23,17 @@ beforeEach(() => {
   m.loadGoogleJob.mockResolvedValue([])
   m.listUnreadMenus.mockResolvedValue([])
   m.loadListings.mockResolvedValue({ readsOf: () => null, nameOf: () => null })
+  m.linkStandings.mockResolvedValue([])
 })
 
 describe('/api/admin/watches/runs', () => {
+  it('Links: this community’s, from the link check', async () => {
+    m.linkStandings.mockResolvedValue([{ resourceId: 'p', key: 'kosher_url', field: 'Kosher certificate', url: 'https://k.org/c', place: 'Sababa', category: 'restaurant', href: '/x', id: 'w', checkedAt: null, error: null, failingSince: null }])
+    const body = await (await get()).json()
+    expect(m.linkStandings).toHaveBeenCalledWith('philly')
+    expect(body.kinds.find((k: { name: string }) => k.name === 'Links')).toMatchObject({ count: '1 link · not checked yet', tracked: [{ name: 'Sababa · Kosher certificate', status: 'Not checked yet' }] })
+  })
+
   it('admins only', async () => {
     m.getAdminUserForCommunity.mockResolvedValue(null)
     expect((await get()).status).toBe(401)

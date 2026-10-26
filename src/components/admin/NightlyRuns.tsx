@@ -43,7 +43,9 @@ function KindRow({ kind, base, linkSender }: { kind: NightKindView; base: string
   const [open, setOpen] = useState(false)
   const [all, setAll] = useState(false)
   const page = (p: string) => `${base}/watches/${p}`
-  const nightly = kind.id !== 'newsletters'
+  // Newsletters come as they're sent, links are checked weekly: what needs
+  // a look, not last night.
+  const nightly = kind.id !== 'newsletters' && kind.id !== 'links'
   return (
     <li className="border-t border-slate-100" data-testid="night-kind">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex min-h-11 w-full cursor-pointer items-start gap-2.5 px-3.5 py-3 text-left">

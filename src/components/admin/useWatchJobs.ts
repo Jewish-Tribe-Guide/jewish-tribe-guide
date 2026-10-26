@@ -12,6 +12,7 @@ import type { Finding } from '@/lib/watchFindings'
 import type { DishPlace, JobCounts } from '@/lib/watchJobs'
 import type { SitePlace } from '@/lib/watchPlaces'
 import type { EruvJobLoaded } from '@/lib/eruvJob'
+import type { LinkStanding } from '@/lib/linkCheck'
 import type { Hospital } from './HospitalsJob'
 import type { HoursPlace } from './HoursJob'
 import type { KosherLoaded } from './KosherJob'
@@ -36,6 +37,8 @@ export type Jobs = {
   eruvim?: EruvJobLoaded | null
   kosher?: KosherLoaded | null
   google?: { counts: JobCounts; places: GooglePlace[] } | null
+  /** The weekly link check's: every link a listing shows that it opens. */
+  links?: LinkStanding[] | null
   runs?: NightlyRunsLoaded | null
 }
 
@@ -47,7 +50,7 @@ export function forgetWatchJobs() {
 }
 
 /** All of them have come back, or failed. */
-export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['categories', 'dishes', 'hospitals', 'hours', 'times', 'sites', 'eruvim', 'kosher', 'google']): boolean {
+export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['categories', 'dishes', 'hospitals', 'hours', 'times', 'sites', 'eruvim', 'kosher', 'google', 'links']): boolean {
   return keys.every((k) => jobs[k] !== undefined)
 }
 
@@ -73,6 +76,7 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
       get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
       get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
       get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
+      get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
       get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
     ])
   }, [token, community])

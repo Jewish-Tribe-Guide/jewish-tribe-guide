@@ -12,6 +12,7 @@ import { sectionPages, type ListedSection, type MikvahPlace } from './MikvahHour
 import type { ListedBox } from './HospitalsJob'
 import type { Jobs } from './useWatchJobs'
 import type { GoogleFieldRow } from '@/lib/googleJob'
+import { linkBroken, linkStatus } from '@/lib/linkCheck'
 
 // ── A place up to date, opened on its kind's page (piece 2, Oct 25) ─────────
 // Drawn on FinalShuls3, FinalPhoneShul3, FinalAddSource3 and
@@ -66,6 +67,7 @@ export type Fix =
   | { kind: 'change'; change: Change; label: string }
   | { kind: 'add' }
   | { kind: 'job'; job: 'google' | 'eruv'; text: string }
+  | { kind: 'link'; resourceId: string; key: string }
 export type Field = { label: string; value: string }
 /** A place not checked, by what's wrong (FinalFood3): "rivkacakes.com ·
  *  never read · added Oct 23", the fields it leaves unchecked, its fix. */
@@ -348,6 +350,15 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     const you = by('you')
     const youAt = you.map((f) => f.by.at).filter((x): x is string => !!x).sort().at(-1)
     if (you.length) boxes.push({ key: 'you', kind: 'rows', title: g.length || web.length ? 'Checked by a person' : fieldsTitle(you), groups: [{ head: '', rows: fieldRows(you) }], foot: { lead: 'Checked by a person', links: [], when: youAt ? day(youAt) : null } })
+  }
+
+  // A link it shows that doesn't open (linkCheck.ts): "Kosher
+  // certificate · not found since Oct 12", with Check it again, once it's
+  // fixed.
+  for (const l of jobs.links ?? []) {
+    if (l.resourceId !== id || !linkBroken(l)) continue
+    const says = linkStatus(l).text
+    problem({ key: `link:${l.key}`, page: { text: l.field, url: l.url }, says: says[0].toLowerCase() + says.slice(1), fields: [{ label: 'Link', value: shortUrl(l.url) }], fix: { kind: 'link', resourceId: l.resourceId, key: l.key } })
   }
 
   const checked = boxes.filter((b) => !drop.has(b.key) && !(b.foot.change?.kind === 'page' && badPages.has(b.foot.change.replaces)))

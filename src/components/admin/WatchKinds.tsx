@@ -24,6 +24,7 @@ export function kindsOf(jobs: Jobs, base: string, now: number): { kinds: WatchKi
     hospitals: jobs.hospitals ?? null,
     kosher: jobs.kosher ?? null,
     eruvim: jobs.eruvim ?? null,
+    links: jobs.links ?? null,
   }
   const kinds = watchKinds(input, base, now)
   // A kind with no address whose places' websites are read has its row.

@@ -1,14 +1,15 @@
 import type { WalkRouteRun } from './walkRouteJob'
 
 // ── The nightly jobs and how each run went (Oct 24) ─────────────────────────
-// Four jobs run on their own every night (vercel.json). Each run is saved
+// Four jobs run on their own every night, and the link check once a week
+// (vercel.json). Each run is saved
 // in job_run (migration 086, jobRunStore.ts) when it starts and filled in
 // when it ends, so the Watches tab can say what each one did, and when one
 // failed, was cut off, or didn't run at all. Before this, only the watches
 // kept anything, on each watch: the run that stopped after 29 of 107 of
 // them on Oct 24 looked like a quiet morning. Pure: the tab reads it too.
 
-export type JobId = 'sync-hours' | 'watches' | 'read-menus' | 'walk-routes'
+export type JobId = 'sync-hours' | 'watches' | 'read-menus' | 'walk-routes' | 'check-links'
 
 export type NightlyJob = {
   id: JobId
@@ -18,6 +19,8 @@ export type NightlyJob = {
   /** The route's own time limit (maxDuration). A run not finished well
    *  past it was cut off. */
   limitSeconds: number
+  /** How many days apart it runs: 1, every night, unless said. */
+  everyDays?: number
 }
 
 /** In the order they run (vercel.json's hours). */
@@ -46,10 +49,17 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
     about: 'Works out walking times along the streets. Most are done when a listing is approved; this catches up on the rest.',
     limitSeconds: 60,
   },
+  {
+    id: 'check-links',
+    name: 'Links',
+    about: 'Opens every link a listing shows that nothing else reads, once a week, to see it’s still there.',
+    limitSeconds: 300,
+    everyDays: 7,
+  },
 ]
 
 /** The kinds of source the tab gives a line each (nightKinds.ts). */
-export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'newsletters' | 'hours' | 'sites' | 'menus' | 'other'
+export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'newsletters' | 'hours' | 'sites' | 'menus' | 'other' | 'links'
 
 /** How many of a kind's sources a run had, and how many it read. */
 export type KindCount = { of: number; read: number }
@@ -78,6 +88,9 @@ export type JobRun = {
  *  starts a cron any time within its hour. */
 export const LATE_AFTER_MS = 30 * 3_600_000
 
+/** Late after its days apart, and the same few hours. */
+export const lateAfterMs = (job: Pick<NightlyJob, 'everyDays'>) => LATE_AFTER_MS + ((job.everyDays ?? 1) - 1) * 86_400_000
+
 export type JobHealth =
   | { state: 'never' }
   | { state: 'running' }
@@ -89,11 +102,11 @@ export type JobHealth =
 
 /** The latest run first. A missed night outranks how the run before it
  *  went: the job itself has stopped. */
-export function jobHealth(job: Pick<NightlyJob, 'limitSeconds'>, runs: readonly JobRun[], now: number): JobHealth {
+export function jobHealth(job: Pick<NightlyJob, 'limitSeconds' | 'everyDays'>, runs: readonly JobRun[], now: number): JobHealth {
   const last = runs[0]
   if (!last) return { state: 'never' }
   const started = Date.parse(last.startedAt)
-  if (now - started > LATE_AFTER_MS) return { state: 'late', since: last.startedAt }
+  if (now - started > lateAfterMs(job)) return { state: 'late', since: last.startedAt }
   if (!last.finishedAt) return now - started > (job.limitSeconds + 60) * 1000 ? { state: 'cut off' } : { state: 'running' }
   if (last.ok === false) return { state: 'failed', error: last.error || 'It stopped with an error.' }
   if (last.warning) return { state: 'warning', warning: last.warning }
@@ -149,6 +162,19 @@ export function walkRoutesOutcome(run: WalkRouteRun): JobOutcome {
   const parts = [walks ? `Worked out ${plural(walks, 'walk')}` : 'Nothing new to work out']
   if (left) parts.push(`${left} left for the next night`)
   return { ok: true, summary: parts.join(' · '), warning: failed ? `${plural(failed, 'walk')} couldn’t be worked out` : null }
+}
+
+/** checkAllLinks's, per community (linkCheckRun.ts). */
+export type CheckLinksRun = readonly { community: string; links: number; checked: number; dontOpen: number; left: number }[]
+
+export function checkLinksOutcome(run: CheckLinksRun): JobOutcome {
+  const checked = sum(run, (r) => r.checked)
+  const dontOpen = sum(run, (r) => r.dontOpen)
+  const left = sum(run, (r) => r.left)
+  const kinds: RunKinds = Object.fromEntries(run.map((r) => [r.community, { links: { of: r.links, read: r.checked - r.dontOpen } }]))
+  const parts = [checked ? `Checked ${plural(checked, 'link')}` : 'No links to check']
+  if (dontOpen) parts.push(`${dontOpen} didn’t open`)
+  return { ok: true, summary: parts.join(' · '), warning: left ? `Ran out of time: ${left} left for next week` : null, kinds }
 }
 
 // ── Telling the admins (Oct 24) ─────────────────────────────────────────────

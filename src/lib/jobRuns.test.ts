@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { jobAlert, jobHealth, LATE_AFTER_MS, needsLook, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
+import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, needsLook, NIGHTLY_JOBS, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
 
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const ago = (ms: number) => new Date(NOW - ms).toISOString()
@@ -53,6 +53,17 @@ describe('jobHealth: how a nightly job’s last run went', () => {
     expect(jobHealth(job, [run({ startedAt: ago(25 * 3_600_000) })], NOW)).toEqual({ state: 'ok' })
   })
 
+  // The link check runs once a week: six days without a run is a quiet
+  // week, not a broken job.
+  it('a weekly job is late only after a week and a few hours', () => {
+    const weekly = NIGHTLY_JOBS.find((j) => j.id === 'check-links')!
+    const DAY = 86_400_000
+    expect(jobHealth(weekly, [run({ startedAt: ago(6 * DAY) })], NOW)).toEqual({ state: 'ok' })
+    expect(jobHealth(weekly, [run({ startedAt: ago(7 * DAY + 3_600_000) })], NOW)).toEqual({ state: 'ok' })
+    expect(jobHealth(weekly, [run({ startedAt: ago(8 * DAY) })], NOW)).toMatchObject({ state: 'late' })
+    expect(jobHealth(job, [run({ startedAt: ago(2 * DAY) })], NOW)).toMatchObject({ state: 'late' })
+  })
+
   it('only the latest run counts', () => {
     expect(jobHealth(job, [run({}), run({ ok: false, error: 'x' })], NOW)).toEqual({ state: 'ok' })
   })
@@ -99,6 +110,22 @@ describe('each job’s run, in a line', () => {
       warning: '3 walks couldn’t be worked out',
     })
     expect(walkRoutesOutcome({ ok: true, skipped: 'OPENROUTESERVICE_API_KEY is not set' })).toMatchObject({ warning: 'Not set up: OPENROUTESERVICE_API_KEY is not set' })
+  })
+})
+
+describe('the link check’s run, in a line', () => {
+  it('how many it checked, how many didn’t open, and what each community’s were', () => {
+    expect(checkLinksOutcome([{ community: 'philly', links: 92, checked: 92, dontOpen: 1, left: 0 }])).toEqual({
+      ok: true,
+      summary: 'Checked 92 links · 1 didn’t open',
+      warning: null,
+      kinds: { philly: { links: { of: 92, read: 91 } } },
+    })
+  })
+
+  it('out of time, what was left', () => {
+    expect(checkLinksOutcome([{ community: 'philly', links: 92, checked: 80, dontOpen: 0, left: 12 }])).toMatchObject({ summary: 'Checked 80 links', warning: 'Ran out of time: 12 left for next week' })
+    expect(checkLinksOutcome([])).toMatchObject({ summary: 'No links to check', warning: null })
   })
 })
 

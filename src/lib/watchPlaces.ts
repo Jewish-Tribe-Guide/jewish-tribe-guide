@@ -6,6 +6,7 @@ import { eruvStanding, findingFor, websiteWatchOf, type EruvJobLoaded } from './
 import { KOSHER_JOB_CATEGORIES, kosherSection, type KosherPlace, type NewOnList } from './kosherJob'
 import { dishProposal } from './dishProposal'
 import { watchHealth, type Watch } from './watches'
+import { linkBroken, type LinkStanding } from './linkCheck'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab by kind of place (drawings settled Oct 24): a row per
@@ -18,8 +19,9 @@ import { watchHealth, type Watch } from './watches'
 //                Refuah's or a list's finding, a menu that would change
 //                its dishes, a check against Google with changes, a
 //                closure Google reports, or a place only a kosher list has
-//   not checked  a field nothing checks, Google stopped answering, or a
-//                page or menu that can't be read or didn't load
+//   not checked  a field nothing checks, Google stopped answering, a
+//                page or menu that can't be read or didn't load, or a
+//                link the listing shows that doesn't open (linkCheck.ts)
 //   up to date   the rest
 //
 // A place is in one of them, the first that fits. A job's first-night
@@ -97,6 +99,8 @@ export type WatchJobsIn = {
   hospitals: readonly HospitalPlace[] | null
   kosher: KosherJob | null
   eruvim: EruvJobLoaded | null
+  /** The weekly link check's links. */
+  links?: readonly LinkStanding[] | null
 }
 
 const dayText = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
@@ -263,6 +267,13 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
   for (const p of jobs.sites ?? []) add(p.id, siteSays(p, base, now))
   for (const h of jobs.hospitals ?? []) add(h.id, hospitalSays(h, base, now))
   for (const p of jobs.kosher?.places ?? []) add(p.id, kosherSays(p, base))
+  // A link it shows that doesn't open, whatever reads the rest of it.
+  const broken = new Map<string, LinkStanding>()
+  for (const l of jobs.links ?? []) {
+    if (!linkBroken(l)) continue
+    add(l.resourceId, { changes: 0, unchecked: ['Link doesn’t open'], sources: [], href: `${base}/watches/kind/${l.category}` })
+    broken.set(l.resourceId, l)
+  }
   const kosherHref = `${base}/watches/kosher`
   // A list's finding that matches no place on its page now waits on the
   // listing it names, whatever its kind (a grocery), or on its own.
@@ -285,6 +296,9 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
   // A place whose website is read and Google doesn't cover (its category
   // has no address) is its kind's all the same.
   for (const p of jobs.sites ?? []) if (!listed.has(p.id)) put(placeOf(p.id, p.name, p.category, p.href, says.get(p.id) ?? []))
+  // A place nothing else reads, its row for a link that doesn't open.
+  const sites = new Set((jobs.sites ?? []).map((p) => p.id))
+  for (const [id, l] of broken) if (!listed.has(id) && !sites.has(id)) put(placeOf(id, l.place, l.category, l.href, says.get(id) ?? []))
   for (const n of jobs.kosher?.newPlaces ?? []) {
     if (n.filed === 'decided' && !n.findings?.length) continue
     const lists = [...new Set(n.on.map((o) => o.list))]
