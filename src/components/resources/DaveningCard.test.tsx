@@ -7,6 +7,8 @@ import DaveningCard from './DaveningCard'
 import { TellAboutContext } from './tellAbout'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+// This week's candle lighting, as a test sets it (none unless it does).
+const zmanimShabbos = vi.hoisted(() => ({ candleLighting: null as null | { label: string; time: string; iso: string } }))
 // This week, as the calendar has it: Chol HaMoed Thursday, Hoshana Rabbah
 // Friday, Shemini Atzeres on Shabbos, Simchas Torah Sunday.
 vi.mock('@/lib/useZmanim', () => ({
@@ -22,7 +24,7 @@ vi.mock('@/lib/useZmanim', () => ({
         { date: '2026-10-04', yomTov: true, cholHamoed: false, name: 'Simchas Torah', festival: 'Sukkos' },
       ],
       // Shabbos Bereishis's: when this week becomes the week ahead.
-      shabbos: { candleLighting: null, havdalah: { label: 'Havdalah', time: '7:05 PM', iso: '2026-10-10T19:05:00-04:00' } },
+      shabbos: { candleLighting: zmanimShabbos.candleLighting, havdalah: { label: 'Havdalah', time: '7:05 PM', iso: '2026-10-10T19:05:00-04:00' } },
     },
   }),
 }))
@@ -164,8 +166,8 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
     expect(screen.getByTestId('update-times')).toBeInTheDocument()
   })
 
-  it('Shabbos in the order it happens, written as the shul gives it, this season’s; first from Thursday evening', () => {
-    at('2026-10-08T19:00:00-04:00') // Thu, 7 PM
+  it('Shabbos in the order it happens, written as the shul gives it, this season’s; first once the week’s last weekday minyan has started', () => {
+    at('2026-10-08T19:00:00-04:00') // Thu, 7 PM: Thursday’s 6:45 AM was the week’s last
     show(mekor)
     expect(boxes()).toEqual(['davening-shabbos', 'davening-weekday'])
     expect([...screen.getByTestId('davening-shabbos-lines').children].map((l) => l.textContent)).toEqual([
@@ -176,6 +178,34 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('In winter, also Mincha 12:20 PM, following Kiddush.')
     cleanup()
     at('2026-10-06T17:30:00-04:00') // Tue: the week first
+    show(mekor)
+    expect(boxes()).toEqual(['davening-weekday', 'davening-shabbos'])
+  })
+
+  // Oct 26: Shabbos first only once the week's last weekday minyan has
+  // started: on Friday morning the Shacharis still to come stays on top.
+  it('the week stays first until its last weekday minyan starts, then Shabbos, until havdalah', () => {
+    const order = (iso: string) => {
+      cleanup()
+      at(iso)
+      show([...lowerMerion, ...mekor.filter((m) => m.days.includes('sat') && !m.season)])
+      return boxes()
+    }
+    const weekFirst = ['davening-weekday', 'davening-shabbos']
+    const shabbosFirst = ['davening-shabbos', 'davening-weekday']
+    expect(order('2026-10-08T19:00:00-04:00')).toEqual(weekFirst) // Thu 7 PM: Friday's still to come
+    expect(order('2026-10-09T07:30:00-04:00')).toEqual(weekFirst) // Fri 7:30 AM: 8 AM still to come
+    expect(order('2026-10-09T08:00:00-04:00')).toEqual(shabbosFirst) // Fri 8 AM: the last has started
+    expect(order('2026-10-10T15:00:00-04:00')).toEqual(shabbosFirst) // Shabbos afternoon
+    expect(order('2026-10-10T19:30:00-04:00')).toEqual(weekFirst) // after havdalah: the week ahead
+  })
+
+  it('a shul with nothing on Friday: Shabbos first once Thursday’s last has started', () => {
+    at('2026-10-08T07:00:00-04:00') // Thu 7 AM: Mekor's Thursday 6:45 AM was its last
+    show(mekor)
+    expect(boxes()).toEqual(['davening-shabbos', 'davening-weekday'])
+    cleanup()
+    at('2026-10-08T06:00:00-04:00') // Thu 6 AM: still to come
     show(mekor)
     expect(boxes()).toEqual(['davening-weekday', 'davening-shabbos'])
   })
@@ -271,19 +301,22 @@ describe('this week’s schedule (Oct 6)', () => {
   it('waits for this week’s from a shul that sends one out, with Add opening in the box', () => {
     show(before)
     const box = screen.getByTestId('davening-this-week-waiting')
-    expect(box).toHaveTextContent('This week’s scheduleThey send out a schedule each week; this week’s isn’t on the guide yet. Until it is, their usual times are below.')
-    expect(box).toHaveTextContent('Paste their email or add a photo; an admin checks it.')
+    // Drawn Oct 26: a line, not a paragraph.
+    expect(box).toHaveTextContent(/^This week’s scheduleNot on the guide yetAdd this week’s schedule$/)
     fireEvent.click(within(box).getByRole('button', { name: 'Add this week’s schedule' }))
     expect(within(box).getByTestId('update-times')).toBeInTheDocument()
     // The usual times stay open below it.
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 9:15 AM')
   })
 
-  it('once it’s in: its name and dates, its times day by day, and the usual Shabbos times folded', () => {
+  it('once it’s in: This Shabbos, its name and dates, its times day by day, and the usual Shabbos times folded', () => {
     show([...before, weekPost('Shabbos Bereishis', '2026-10-09', '2026-10-10', { postedAt: '2026-10-07T15:00:00.000Z' })])
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
-    const box = screen.getByTestId('davening-this-week')
-    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent('Shabbos Bereishis, Oct 9–10')
+    // Only Shabbos's times: no week box (drawn Oct 26).
+    expect(screen.queryByTestId('davening-this-week')).not.toBeInTheDocument()
+    const box = screen.getByTestId('davening-this-shabbos')
+    expect(within(box).getByRole('heading', { name: 'This Shabbos' })).toBeInTheDocument()
+    expect(within(box).getByTestId('davening-this-shabbos-dates')).toHaveTextContent('Shabbos Bereishis, Oct 9–10')
     expect(within(box).getByTestId('davening-this-week-days')).toHaveTextContent('Fri Oct 9Mincha & Maariv6:10 PMSat Oct 10Shacharis9 AM · Kiddush after davening')
     // It's this week's schedule, not something set against "usual times"
     // (the user, Oct 20).
@@ -301,7 +334,7 @@ describe('this week’s schedule (Oct 6)', () => {
     // The shul's website gave the week's times, and they agree (Oct 23:
     // that dates this box, sourceConfirm.ts).
     show([...before, bereishis], { onEditBox, sectionConfirmed: { week: '2026-10-07T18:00:00.000Z' }, sectionFrom: { week: { from: 'Mekor Habracha', at: '2026-10-07T18:00:00.000Z' } } })
-    const box = screen.getByTestId('davening-this-week')
+    const box = screen.getByTestId('davening-this-shabbos')
     expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed by Mekor Habracha, Oct 7/)
     expect(box).not.toHaveTextContent('Posted')
     expect(within(box).queryByRole('button', { name: 'Update their times' })).not.toBeInTheDocument()
@@ -365,7 +398,7 @@ describe('this week’s schedule (Oct 6)', () => {
   // Oct 19: Mekor's newsletter week ran Sunday to Friday night, headed
   // "Shabbat Schedule". It was titled for the Shabbos it didn't cover, and
   // folded away (greyed) Shabbos morning's usual time, which still held.
-  it('a week of weekdays to Friday night: named by its dates, and Shabbos’s usual times left open', () => {
+  it('a week of weekdays to Friday night: This Shabbos by its dates, and Shabbos’s usual times left open', () => {
     const weekdays = {
       ...weekPost('Shabbat Schedule', '2026-10-04', '2026-10-09'),
       minyanim: [
@@ -374,7 +407,9 @@ describe('this week’s schedule (Oct 6)', () => {
       ],
     }
     show([...before, weekdays])
-    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
+    // Thursday: Monday's Shacharis is gone by; Friday night is Shabbos's.
+    expect(screen.queryByTestId('davening-this-week')).not.toBeInTheDocument()
+    expect(screen.getByTestId('davening-this-shabbos-dates')).toHaveTextContent(/^Oct 9$/)
     const shabbos = screen.getByTestId('davening-shabbos')
     expect(shabbos).toHaveTextContent('Shacharis 9:15 AM')
     expect(shabbos).not.toHaveAttribute('data-muted')
@@ -398,6 +433,67 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.getAllByTestId('davening-folded').map((f) => f.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Not this week: no minyan this week')]))
     fireEvent.click(within(box).getByTestId('box-edit-button'))
     expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'Times for Oct 4 – Oct 10')
+  })
+
+  // Drawn Oct 26 (boards 2, 3 and 3b): the week's weekdays and This
+  // Shabbos, ordered as the usual boxes are; a time already started today
+  // greyed; This Shabbos headed by Friday's candle lighting.
+  describe('the week and This Shabbos (Oct 26)', () => {
+    afterEach(() => {
+      zmanimShabbos.candleLighting = null
+    })
+    const fullWeek = {
+      ...weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website' }),
+      minyanim: [
+        { id: 'f1', tefillah: 'shacharis', on: ['2026-10-08', '2026-10-09'], time: '7:00am' },
+        { id: 'f2', tefillah: 'shacharis', on: ['2026-10-08', '2026-10-09'], time: '8:00am' },
+        { id: 'f3', tefillah: 'kabbalas_shabbos', on: ['2026-10-09'], time: '6:20pm' },
+        { id: 'f4', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:00am' },
+      ],
+    }
+    const showAt = (iso: string, schedules: unknown[]) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(iso))
+      const shul = makeListing({ id: 'k', name: 'Lower Merion Synagogue', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules })
+      renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} />, { content: { categories: [shuls] } })
+    }
+    const dated = () => [...screen.getByTestId('listing-davening').querySelectorAll('[data-testid="davening-this-week"], [data-testid="davening-this-shabbos"]')].map((e) => e.getAttribute('data-testid'))
+
+    it('Friday morning: the week first, the Shacharis gone by greyed; once the last has started, This Shabbos first', () => {
+      showAt('2026-10-09T07:30:00-04:00', [fullWeek])
+      expect(dated()).toEqual(['davening-this-week', 'davening-this-shabbos'])
+      const week = screen.getByTestId('davening-this-week')
+      expect(week).toHaveTextContent(/Fri Oct 9TodayShacharis7 AMShacharis8 AM/)
+      expect(within(week).getByText('7 AM').closest('[data-past]')).not.toBeNull()
+      expect(within(week).getByText('8 AM').closest('[data-past]')).toBeNull()
+      cleanup()
+      showAt('2026-10-09T11:00:00-04:00', [fullWeek])
+      expect(dated()).toEqual(['davening-this-shabbos', 'davening-this-week'])
+    })
+
+    it('This Shabbos starts with Friday’s candle lighting, a day of its own when the week gives Friday nothing', () => {
+      zmanimShabbos.candleLighting = { label: 'Candle lighting', time: '6:05 PM', iso: '2026-10-09T18:05:00-04:00' }
+      showAt('2026-10-08T16:00:00-04:00', [fullWeek])
+      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent('Fri Oct 9Candle lighting6:05 PMKabbalas Shabbos6:20 PMSat Oct 10Shacharis9 AM')
+      // Not in the week's box.
+      expect(screen.getByTestId('davening-this-week')).not.toHaveTextContent('Candle lighting')
+      cleanup()
+      showAt('2026-10-08T16:00:00-04:00', [{ ...fullWeek, minyanim: fullWeek.minyanim.filter((m) => m.id !== 'f3') }])
+      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent(/Fri Oct 9Candle lighting6:05 PMSat Oct 10Shacharis9 AM/)
+    })
+
+    it('no candle lighting from another week’s zmanim', () => {
+      zmanimShabbos.candleLighting = { label: 'Candle lighting', time: '6:15 PM', iso: '2026-10-02T18:15:00-04:00' }
+      showAt('2026-10-08T16:00:00-04:00', [fullWeek])
+      expect(screen.queryByTestId('davening-candle-lighting')).not.toBeInTheDocument()
+    })
+
+    it('no dated This Shabbos while only the usual times are known', () => {
+      showAt('2026-10-06T10:00:00-04:00', [{ ...fullWeek, minyanim: fullWeek.minyanim.filter((m) => m.id === 'f1') }])
+      expect(screen.getByTestId('davening-this-week')).toBeInTheDocument()
+      expect(screen.queryByTestId('davening-this-shabbos')).not.toBeInTheDocument()
+      expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Usual Shabbos times')
+    })
   })
 
   it('a shul that has never sent one out just shows its usual times', () => {
@@ -487,13 +583,15 @@ describe('this week’s one-day additions (Oct 20)', () => {
     expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thanksgiving, Thu Oct 8Shacharis8:10 AM')
   })
 
-  it('with a week the shul sent out: one list, in date order', () => {
+  it('with a week the shul sent out: the weekdays in the week’s box, Shabbos in This Shabbos', () => {
     const week = { id: 'w', name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10', mode: 'replace', kind: 'week', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:00am' }] }
     show('2026-10-06T10:00:00-04:00', [week, ...thursdays])
     const box = screen.getByTestId('davening-this-week')
-    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 8–10$/)
-    expect(within(box).getByTestId('davening-this-week-days')).toHaveTextContent(/^Thu Oct 8Shacharis8:10 AMSat Oct 10Shacharis9 AM$/)
-    expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
+    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 8$/)
+    expect(within(box).getByTestId('davening-this-week-days')).toHaveTextContent(/^Thu Oct 8Shacharis8:10 AM$/)
+    const shabbos = screen.getByTestId('davening-this-shabbos')
+    expect(within(shabbos).getByTestId('davening-this-shabbos-dates')).toHaveTextContent(/^Shabbos Bereishis, Oct 9–10$/)
+    expect(within(shabbos).getByTestId('davening-this-week-days')).toHaveTextContent(/^Sat Oct 10Shacharis9 AM$/)
   })
 
   it('a time the week already gives is there once', () => {
@@ -534,21 +632,24 @@ describe('one week, from the newsletter and the website (Oct 20)', () => {
     renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} onEditBox={onEditBox} />, { content: { categories: [shuls] } })
   }
 
-  it('is one box, day by day, the newsletter’s times on the day both give', () => {
+  it('is one week, day by day, the newsletter’s times on the day both give: weekdays, then This Shabbos', () => {
     show([website, newsletter])
     expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
-    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–10$/)
-    expect(screen.getByTestId('davening-this-week-days')).toHaveTextContent(
-      /^Tue Oct 6TodayShacharis7 AMWed Oct 7Shacharis7 AMFri Oct 9Kabbalas Shabbos6:10 PMSat Oct 10Shacharis9 AM$/,
-    )
+    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–7$/)
+    const [week, shabbos] = screen.getAllByTestId('davening-this-week-days')
+    expect(week).toHaveTextContent(/^Tue Oct 6TodayShacharis7 AMWed Oct 7Shacharis7 AM$/)
+    expect(shabbos).toHaveTextContent(/^Fri Oct 9Kabbalas Shabbos6:10 PMSat Oct 10Shacharis9 AM$/)
+    expect(screen.getByTestId('davening-this-shabbos-dates')).toHaveTextContent(/^Shabbos Bereishis, Oct 9–10$/)
     expect(screen.getByTestId('davening-this-week')).not.toHaveTextContent(/usual/i)
   })
 
-  it('Edit opens the newsletter’s week', () => {
+  it('each box’s Edit opens the week its times are from', () => {
     const onEditBox = vi.fn()
     show([website, newsletter], onEditBox)
+    fireEvent.click(within(screen.getByTestId('davening-this-shabbos')).getByTestId('box-edit-button'))
+    expect(onEditBox).toHaveBeenLastCalledWith('this_week', 'This week’s schedule', 'news')
     fireEvent.click(within(screen.getByTestId('davening-this-week')).getByTestId('box-edit-button'))
-    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'news')
+    expect(onEditBox).toHaveBeenLastCalledWith('this_week', 'This week’s schedule', 'site')
   })
 })
 

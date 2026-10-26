@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, usualJoinLink, resolveDay, sendsWeekly, shabbosIsOver, signUpGroup, thisWeeksDays, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, usualJoinLink, resolveDay, sendsWeekly, shabbosIsOver, signUpGroup, thisWeeksDays, weekByDates, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -511,5 +511,19 @@ describe('the group a sign-up minyan signs up in', () => {
   it('none that day: sign-up, with no group yet', () => {
     expect(signUpGroup(usual, 'shacharis', ['mon'])).toEqual({})
     expect(signUpGroup(usual, 'maariv', ['thu'])).toEqual({})
+  })
+})
+
+describe('weekByDates', () => {
+  it('goes by the dates when a Shabbos post is headed by a date alone', () => {
+    expect(weekByDates({ name: 'Fri Oct 30', from: '2026-10-30', to: '2026-10-30' })).toBe(true)
+    expect(weekByDates({ name: 'Friday, October 30', from: '2026-10-30', to: '2026-10-30' })).toBe(true)
+    expect(weekByDates({ name: 'Oct 30–31', from: '2026-10-30', to: '2026-10-31' })).toBe(true)
+  })
+
+  it('keeps a Shabbos post’s own name', () => {
+    expect(weekByDates({ name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10' })).toBe(false)
+    expect(weekByDates({ name: 'Shabbat Noach 5787', from: '2026-10-16', to: '2026-10-17' })).toBe(false)
+    expect(weekByDates({ name: 'Friday night', from: '2026-10-30', to: '2026-10-30' })).toBe(false)
   })
 })

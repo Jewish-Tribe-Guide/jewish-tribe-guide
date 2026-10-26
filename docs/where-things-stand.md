@@ -1736,12 +1736,12 @@ said "Checked 108 of 108", and the tab counted it read. Now:
 **Found Oct 26, waiting on the user:**
 - **Elkins Park Eruv's website page** (`yiep.org/eruv-map`) is gone (404
   since Oct 25). yiep.org now only links a Google map of the boundaries,
-  from /our-community/. Stop it on the eruv's page, once Stop on a page
-  that doesn't load is live (below).
+  from /our-community/. It has no status source, so its row says "Nothing
+  gives its status" and the website failure (with its Stop) doesn't show.
+  The user chose to change its website to `yiep.org/` in its listing: the
+  next nightly run drops the dead page's watch and watches the new one.
 - **Chabad of the Main Line's schedule page** answers every read with
-  Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
-  bot checks. Options: its email newsletter as the source, or Stop the
-  page so the shul shows Not checked.
+  Cloudflare's bot check (403 since Oct 20). Stopped by the user Oct 26.
 
 **Stop on a page that doesn't load (built Oct 26, own PR).** A page that
 failed showed only Read it now; Stop was only under a working page's box.
@@ -1749,6 +1749,41 @@ Now its problem has Stop beside Read it now, asked first, for a shul's or
 mikvah's page, an eruv's website, status page or map, a hospital's Refuah
 page, and a food place's menu. Not offered when several pages of a site are
 down together: that row stands for all of them, and Stop names one page.
+
+## Built Oct 26: a shul's week, weekdays then Shabbos (on `redesign/oct18-fixes`)
+
+Drawing: https://claude.ai/artifact/6piwThENnhVRoacWqEHBD1 (boards 1–6, and
+1b, 3b, 4b, 5b beside them). Approved and built Oct 26: boards 1b, 2, 3,
+3b, 4b, 5b.
+
+Why: last week's week posts ran out after Shabbos Oct 24, and only shuls
+whose page changed got Oct 25–31.
+
+- **Shabbos goes first once the shul's last weekday minyan of the week has
+  started**, for the dated boxes and the usual boxes alike
+  (`shabbosComesFirst` in `schedules.ts`). Usually that's Friday's last
+  Shacharis; a shul with nothing on Friday switches after Thursday's last;
+  one with no weekday minyan at all, on Friday. After havdalah the week
+  comes first again. Replaced the Thursday 6 PM switch.
+- **A week post splits into two boxes:** "This week's schedule" (its
+  weekdays) and "This Shabbos" (Friday night and Shabbos, with candle
+  lighting from the shul's own times or the site's zmanim). Each box's
+  Edit opens the post its times came from. When only the usual times are
+  known there is no dated This Shabbos box; Usual Shabbos times stays.
+- **The waiting card** is "Not on the guide yet" and "+ Add this week's
+  schedule", with no footer.
+- **Every shul page is read Thursday night and Friday night** (the 3 AM
+  runs on Friday and Saturday), whether or not it changed, so this
+  Shabbos's times and then next week's are in by havdalah. It used to be
+  Sunday 3 AM (`weeklyReadDue` in `listingPageRun.ts`). The optional
+  Friday-midday read on board 6 was not built.
+- **A Shabbos post headed by a date alone** ("Fri Oct 30", from a shul's
+  page) now goes by its dates; it showed "Fri Oct 30, Oct 30".
+- **Differs from the boards:** dates use the site's format ("Oct 25–30",
+  not "Sun Oct 25 – Fri Oct 30"); times that have started today are
+  greyed; the dated boxes sit above the Yom Tov box and the usual boxes.
+- **Not seen yet:** the first Thursday-night and Friday-night reads happen
+  on the nightly runs after this deploys (Oct 30 and 31, 3 AM).
 
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 

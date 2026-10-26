@@ -375,6 +375,17 @@ const DATED_HELD = 'Some usual times differ from what their calendar gives on a 
 /** "2026-10-22", the community's day. */
 const dayIn = (now: number) => new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(now)
 
+/** The last morning a shul's page was due its read, changed or not (the
+ *  user, Oct 26): Friday's (Thursday night's run), for this Shabbos's
+ *  times, and Saturday's (Friday night's), for the week after it, so it's
+ *  up at havdalah; nothing posts on Shabbos. A read since then is enough.
+ *  On a Saturday the weeks read include the next one (calendarWeeks). */
+export function weeklyReadDue(today: string): string {
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
+  if (weekday >= 5) return today
+  return new Date(Date.parse(`${today}T12:00:00Z`) - (weekday + 1) * 86_400_000).toISOString().slice(0, 10)
+}
+
 /** "Oct 25–31". */
 function weekText(w: Pick<CalendarWeek, 'from' | 'to'>): string {
   const [fromMonth, fromDay] = dateText(w.from).split(' ')
@@ -782,11 +793,11 @@ export async function runListingPageWatch(
   // agrees, and dates the listing without the AI.
   const listed = listedAs(listing, reads)
   const listingMoved = !!watch.pageHash && watch.lastCheck?.listedAs !== listed
-  // A shul's page is read once a week, changed or not (the user, Oct 26):
+  // A shul's page is read twice a week, changed or not (the user, Oct 26):
   // a page whose words stay put still gives the new week's times, and one
-  // read on a Thursday filed only up to Saturday week.
-  const thisWeek = calendarWeeks(dayIn(opts.now ?? Date.now()))[0].sunday
-  const weekDue = reads.kind === 'times' && !!watch.pageHash && (watch.lastCheck?.readWeek ?? '') < thisWeek
+  // read on a Thursday filed only up to Saturday week (weeklyReadDue).
+  const today = dayIn(opts.now ?? Date.now())
+  const weekDue = reads.kind === 'times' && !!watch.pageHash && (watch.lastCheck?.readWeek ?? '') < weeklyReadDue(today)
   // A difference that waited behind a suggestion already in the queue is
   // read again in full once nothing waits for the listing: what still
   // differs is filed, what doesn't clears. It used to settle only on a
@@ -850,7 +861,7 @@ export async function runListingPageWatch(
   }
   const o = merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash, compareOnly }))
   // A compare files nothing, so it isn't the week's read.
-  const read = o.check ? { listedAs: listed, ...(reads.kind === 'times' && !compareOnly ? { readWeek: thisWeek } : {}) } : {}
+  const read = o.check ? { listedAs: listed, ...(reads.kind === 'times' && !compareOnly ? { readWeek: today } : {}) } : {}
   return dated(o.check ? { ...o, check: { ...o.check, ...read } } : o, o.check?.result === 'agrees')
 }
 

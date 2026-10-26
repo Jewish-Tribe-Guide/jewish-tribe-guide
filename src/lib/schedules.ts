@@ -378,8 +378,12 @@ export function weekKeepsHeading(post: Pick<SpecialSchedule, 'from' | 'to'>): bo
  *  Schedule" before weeks were named by their dates, and the Minyanim list
  *  called its Monday Maariv "Shabbat Schedule times" (the user, Oct 19). */
 export function weekByDates(post: Pick<SpecialSchedule, 'name' | 'from' | 'to'>): boolean {
-  return /^times for /i.test(post.name) || !weekKeepsHeading(post)
+  return /^times for /i.test(post.name) || ONLY_DATES.test(post.name) || !weekKeepsHeading(post)
 }
+
+/** A heading that is nothing but a date ("Fri Oct 30"), which a shul's page
+ *  can head its Friday with: as a name it showed "Fri Oct 30, Oct 30". */
+const ONLY_DATES = /^(?=.*\d)(?:[\s\d,.\/–-]|(?:sun|mon|tue|wed|thu|fri|sat)[a-z]*|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)+$/i
 
 /** The sign-up a week's minyan runs under: its own, else that of the usual
  *  minyan it stands in for, the same tefillah on one of its weekdays, in
@@ -542,4 +546,21 @@ export function thisWeeksDays(
   // week, which isn't the same as no week posted (SpecialSchedule.whole).
   const none = !days.length && whole.length === datesOf({ from: today, to: saturday }).length ? whole[0] : null
   return { days, posts, none }
+}
+
+/** Whether a shul's Shabbos boxes go above its week's (the user, Oct 26):
+ *  once the last weekday minyan of the week has started, so on a Friday
+ *  morning the Shacharis still ahead stays on top; through Shabbos; and
+ *  never once Shabbos is over, when the week shown is the one ahead.
+ *  `startsOn` gives a weekday's minyanim's start times, in minutes from
+ *  midnight. A shul with no weekday minyan goes by Friday. */
+export function shabbosComesFirst(today: string, nowMinutes: number, shabbosOver: boolean, startsOn: (date: string) => number[]): boolean {
+  if (shabbosOver) return false
+  const weekday = weekdayOfDate(today)
+  if (weekday === 'sat') return true
+  const saturday = saturdayOf(today)
+  const week = datesOf({ from: new Date(Date.parse(`${saturday}T12:00:00Z`) - 6 * DAY_MS).toISOString().slice(0, 10), to: saturday }).slice(0, 6)
+  const last = week.filter((date) => startsOn(date).length > 0).at(-1)
+  if (!last) return weekday === 'fri'
+  return last < today || (last === today && nowMinutes >= Math.max(...startsOn(last)))
 }

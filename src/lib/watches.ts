@@ -94,9 +94,10 @@ export type WatchCheck = {
    *  listing both stay as they were, a page that agreed still agrees, and
    *  the daily run dates the listing again without the AI (Oct 23). */
   listedAs?: string
-  /** A shul's page: the Sunday (YYYY-MM-DD) of the week the AI last read
-   *  it, so it's read again once a week even when it hasn't changed
-   *  (listingPageRun.ts, Oct 26). */
+  /** A shul's page: the day (YYYY-MM-DD) the AI last read it, so it's
+   *  read again each Friday and Saturday morning even when it hasn't
+   *  changed (weeklyReadDue in listingPageRun.ts, Oct 26). Older checks
+   *  hold the Sunday of the week read, which compares the same way. */
   readWeek?: string
 }
 

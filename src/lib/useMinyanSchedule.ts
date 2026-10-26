@@ -47,6 +47,9 @@ export type MinyanSchedule = {
   /** Saturday night after havdalah: "this week" is the week ahead
    *  (shabbosIsOver). */
   shabbosOver: boolean
+  /** This week's candle lighting where the community is ("5:38 PM", with
+   *  its ISO time): the This Shabbos box's first line. */
+  candleLighting: { time: string; iso: string } | null
 }
 
 /**
@@ -124,7 +127,10 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
 
   const shabbosOver = shabbosIsOver(today.date, now, zmanimData?.shabbos?.havdalah?.iso)
 
-  return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, tomorrowDayKeys, today, tomorrow, week: dates, posting, nowMinutes, season, shabbosOver }
+  const lit = zmanimData?.shabbos?.candleLighting
+  const candleLighting = lit?.iso ? { time: lit.time, iso: lit.iso } : null
+
+  return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, tomorrowDayKeys, today, tomorrow, week: dates, posting, nowMinutes, season, shabbosOver, candleLighting }
 }
 
 /** The day keys a date's minyanim match: its weekday, its own date (a
