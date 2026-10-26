@@ -9,7 +9,6 @@ import { adminBase } from '@/lib/adminNav'
 import { milesText } from '@/lib/geo'
 import { boxPill, contactRows } from '@/lib/hospitalBoxes'
 import { readContacts } from '@/lib/contacts'
-import { editorRows } from '@/lib/editorRows'
 import { hospitalSection } from '@/lib/watchJobs'
 import { watchHealth, type Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
@@ -18,6 +17,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import { updatesPill } from '@/lib/dishProposal'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { hospitalBoxEdit, withSave } from './findingEdits'
 import FindingCompare, { type Decision } from './FindingCompare'
 import { JobPage, day, jobTabs, needsYou, tabCounts, tabOf, type JobStatus, type JobTab } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
@@ -242,36 +242,11 @@ function HospitalRow({
    *  listing. */
   async function edit(f: BoxFinding) {
     setError(null)
-    const b = boxOf(f)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/hospitals?item=${h.id}`, community), { headers }, 'Could not open its box.')
-      const row = editorRows(category, (item.details ?? {}) as Record<string, unknown>).find((r) => r.id.startsWith('box:') && r.title === b.title)
-      if (!row) return
-      setEditing({
-        item,
-        category,
-        edit: {
-          title: b.title,
-          fields: [],
-          rows: [row.id],
-          preset: f.values,
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
-                method: 'PATCH',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'approved', payload: { details: Object.fromEntries(b.keys.map((k) => [k, d[k] ?? null])) } }),
-              })
-            },
-            onSaved: () => {
-              setEditing(null)
-              onDecided(f, 'approved')
-            },
-          },
-        },
-      })
+      const fe = hospitalBoxEdit(f, item, category, boxOf(f))
+      if (!fe) return
+      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => (setEditing(null), onDecided(f, 'approved')) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its box.')
     }

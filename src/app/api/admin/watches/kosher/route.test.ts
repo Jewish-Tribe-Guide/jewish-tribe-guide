@@ -19,10 +19,14 @@ const m = vi.hoisted(() => ({
   approveSubmission: vi.fn(),
   rejectSubmission: vi.fn(),
   revalidatePublicContent: vi.fn(),
+  restoreResource: vi.fn(),
+  runWalkRoutesAfterChange: vi.fn(),
 }))
 vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
-vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
+vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources, restoreResource: m.restoreResource }))
+vi.mock('@/lib/walkRouteJob', () => ({ runWalkRoutesAfterChange: m.runWalkRoutesAfterChange }))
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
 vi.mock('@/lib/submissionStore', () => ({
   submitListingUpdate: m.submitListingUpdate,
   submitListingDelete: m.submitListingDelete,
@@ -316,6 +320,51 @@ describe('POST /api/admin/watches/kosher', () => {
     expect(m.rejectSubmission).toHaveBeenCalledWith(FINDING, 'philly', 'me@x.co')
     m.single.submission = finding({ operation: 'update' })
     expect((await post({ action: 'edit', id: FINDING, details: {} })).status).toBe(400)
+  })
+
+  // Oct 25 (the user): "A new place the guide archived has no way to bring
+  // it back."
+  describe('restore: Bring it back', () => {
+    const OLD = 'c0ffee00-0000-4000-8000-000000000002'
+    const restored = { ...judah, id: OLD, name: 'Rita’s Water Ice', details: { kosherCert: ['IKC'], s: 'Its own' } }
+    const fresh = async () => finding({ operation: 'create', target_id: null, payload: { details: { kosherCert: ['Keystone-K'], s: 'The list’s' } }, submitted_by: { name: (await import('@/lib/mekorWatch')).MEKOR_WATCH_NAME } })
+    beforeEach(async () => {
+      m.single = { resource: { id: OLD, category: 'restaurant' }, submission: await fresh() }
+      m.restoreResource.mockResolvedValue(restored)
+    })
+
+    it('restores the archived listing, makes its Kosher box the list’s, and closes the new place', async () => {
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(200)
+      expect(m.restoreResource).toHaveBeenCalledWith(OLD, 'philly')
+      const [, id, payload] = savedAs()
+      expect(id).toBe(OLD)
+      // Its hechsher the list's; the rest of it as it was.
+      expect(payload).toMatchObject({ name: 'Rita’s Water Ice', details: { kosherCert: ['Keystone-K'], s: 'Its own' } })
+      expect(m.approveSubmission).toHaveBeenCalledWith('filed', 'philly', 'me@x.co')
+      expect(m.rejectSubmission).toHaveBeenCalledWith(FINDING, 'philly', 'me@x.co')
+      expect(m.revalidatePublicContent).toHaveBeenCalled()
+      expect(m.runWalkRoutesAfterChange).toHaveBeenCalledWith('philly')
+    })
+
+    it('with nothing filed yet, only restores it', async () => {
+      expect((await post({ action: 'restore', resourceId: OLD })).status).toBe(200)
+      expect(m.restoreResource).toHaveBeenCalledWith(OLD, 'philly')
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+      expect(m.rejectSubmission).not.toHaveBeenCalled()
+    })
+
+    it('refuses a place not archived, one outside food, and a new place not waiting', async () => {
+      m.single.resource = null
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(404)
+      m.single.resource = { id: OLD, category: 'synagogue' }
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(404)
+      m.single = { resource: { id: OLD, category: 'restaurant' }, submission: { ...(await fresh()), status: 'rejected' } }
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(409)
+      m.single.submission = finding()
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(409)
+      expect((await post({ action: 'restore', resourceId: 'nope' })).status).toBe(400)
+      expect(m.restoreResource).not.toHaveBeenCalled()
+    })
   })
 
   it('page: its page on Keystone-K’s list, as its certificate link', async () => {

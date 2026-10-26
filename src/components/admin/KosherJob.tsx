@@ -8,7 +8,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { KOSHER_LIST_NAMES, kosherSection, listWho, type KosherList, type KosherPlace, type NewOnList } from '@/lib/kosherJob'
 import { googleLine, kosherBoxKeys, kosherInTheBox, kosherPill, kosherProposal, kosherRows, renamedTo, type KosherRow } from '@/lib/kosherBox'
-import { companionKeys, type CategoryConfig } from '@/lib/categories'
+import type { CategoryConfig } from '@/lib/categories'
 import { updatesPill } from '@/lib/dishProposal'
 import type { JobCounts } from '@/lib/watchJobs'
 import type { Watch } from '@/lib/watches'
@@ -16,6 +16,7 @@ import type { Finding } from '@/lib/watchFindings'
 import type { Decided } from '@/lib/watchFindingStore'
 import type { DirectoryResource } from '@/types'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { kosherEdit, withSave } from './findingEdits'
 import FindingCompare from './FindingCompare'
 import ListingEditorScreen from './ListingEditorScreen'
 import { JobPage, day, shortUrl } from './JobPage'
@@ -167,40 +168,7 @@ function KosherBox({ place: p, category, finding: f, list, act, busy, onBusy }: 
     setError(null)
     try {
       const { item } = await fetchJson<{ item: DirectoryResource }>(withCommunity(`${API}?item=${p.id}`, community), { headers }, 'Could not open its box.')
-      const keys = new Set(kosherBoxKeys(category))
-      // Every field the listing has now, the box's as edited: a finding
-      // carries the listing as it was when read (withReviewEdits).
-      const editable = category.detailFields.flatMap((x) => [x.key, ...companionKeys(x)])
-      setEditing({
-        item,
-        edit: {
-          title: 'Kosher',
-          fields: [],
-          rows: ['facts'],
-          preset: Object.fromEntries([...keys].map((k) => [k, next[k] ?? null])),
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              const details = Object.fromEntries(editable.map((k) => [k, keys.has(k) ? (d[k] ?? null) : (item[k] ?? null)]))
-              if (f.operation === 'delete') {
-                // A removal can't be edited: the listing is saved as the
-                // admin left it, and the removal closes.
-                return fetch(withCommunity(API, community), { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'edit', id: f.id, details: Object.fromEntries([...keys].map((k) => [k, d[k] ?? null])) }) })
-              }
-              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
-                method: 'PATCH',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'approved', payload: { name: item.name, address: item.address ?? '', phone: item.phone ?? '', details } }),
-              })
-            },
-            onSaved: () => {
-              setEditing(null)
-              onDone(f, `Used ${today()}`)
-            },
-          },
-        },
-      })
+      setEditing({ item, edit: withSave(kosherEdit(f, item, category, next), { community, token, onSaved: () => (setEditing(null), onDone(f, `Used ${today()}`)) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its box.')
     }
@@ -396,10 +364,12 @@ function KosherPlaceRow({ place: p, tab, category, lists, act, reading, onReadNo
 }
 
 /** A place a list has and the guide doesn't, drawn as the listing it would
- *  add: Add it, Edit, Leave it out. */
+ *  add: Add it, Edit, Leave it out. One the guide has archived: Bring it
+ *  back too. */
 function NewPlaceRow({ place: n, categories, lists, act, onEdit }: { place: NewPlace; categories: readonly CategoryConfig[]; lists: readonly KosherListState[]; act: Act; onEdit: (f: KosherFinding, category: CategoryConfig) => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
   const f = n.findings?.[0]
   const done = f ? act.settled.get(f.id) : undefined
   const category = categories.find((c) => c.id === (f?.category ?? 'restaurant'))
@@ -421,6 +391,21 @@ function NewPlaceRow({ place: n, categories, lists, act, onEdit }: { place: NewP
     }
   }
 
+  async function restore() {
+    if (!n.archivedId) return
+    setRestoreError(null)
+    setBusy(true)
+    try {
+      await fetchJson(withCommunity(API, act.community), { method: 'POST', headers: { Authorization: `Bearer ${act.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'restore', resourceId: n.archivedId, ...(f ? { id: f.id } : {}) }) }, 'Could not bring it back.')
+      if (f) act.onDone(f, `Brought back ${today()}`)
+      act.onReload()
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'Could not bring it back.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const pill: { text: string; tone: Tone } = done ? { text: done, tone: 'grey' } : f ? { text: 'New', tone: 'amber' } : { text: n.filed === 'next' ? 'Not read yet' : 'New', tone: 'grey' }
   return (
     <PlaceRow name={n.name} pill={pill} back="Kosher certification">
@@ -430,6 +415,14 @@ function NewPlaceRow({ place: n, categories, lists, act, onEdit }: { place: NewP
         </BoxRows>
         {google && <p className="text-[12.5px] text-slate-500">{google}</p>}
         {n.archived && <p className="text-[12.5px] text-slate-500">The guide has it archived, as “{n.archived}”.</p>}
+        {n.archivedId && !done && (
+          <span>
+            <button type="button" disabled={busy} onClick={() => void restore()} className={BUTTON}>
+              Bring it back
+            </button>
+          </span>
+        )}
+        {restoreError && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{restoreError}</p>}
       </Box>
       {rows.length > 0 && (
         <Box key={done ? 'kosher-done' : 'kosher'} name="Kosher" pill={done ? { text: done, tone: 'grey' } : { text: 'New', tone: 'amber' }} defaultOpen={!done}>

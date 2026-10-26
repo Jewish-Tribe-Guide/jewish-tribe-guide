@@ -52,8 +52,9 @@ export type KosherPlace = {
   differences: Difference[]
 }
 
-/** A place on a list that the guide doesn't have (or has only archived). */
-export type NewOnList = { name: string; address: string; on: OnList[]; archived: string | null; filed: FiledState }
+/** A place on a list that the guide doesn't have (or has only archived:
+ *  that listing's name, and its id for Bring it back). */
+export type NewOnList = { name: string; address: string; on: OnList[]; archived: string | null; archivedId: string | null; filed: FiledState }
 
 /** Where a place is on the page.
  *   to_check    a list differs from it, and that waits here or will
@@ -133,7 +134,7 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
   const live = listings.filter((l) => l.status === 'approved')
   const on = new Map<string, OnList[]>(live.map((l) => [l.id, []]))
   const differences = new Map<string, Difference[]>(live.map((l) => [l.id, []]))
-  const fresh: { on: OnList; address: string; archived: string | null; filed: FiledState }[] = []
+  const fresh: { on: OnList; address: string; archived: string | null; archivedId: string | null; filed: FiledState }[] = []
 
   if (keystone) {
     const k = filed.keystone ?? NOTHING_FILED
@@ -143,7 +144,7 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
     }
     for (const f of compareKeystone(keystone, live)) {
       const state = filedState(keystoneKey(f), k)
-      if (f.kind === 'new') fresh.push({ on: keystoneOn(f.entry), address: f.entry.address, archived: null, filed: state })
+      if (f.kind === 'new') fresh.push({ on: keystoneOn(f.entry), address: f.entry.address, archived: null, archivedId: null, filed: state })
       else for (const line of keystoneLines(f)) differences.get(f.listing.id)!.push({ list: 'keystone', line, filed: state })
     }
   }
@@ -158,7 +159,7 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
     // place either way, and says where its suggestion is.
     for (const f of compareMekor(mekor, listings, [])) {
       const state = filedState(mekorKey(f), m)
-      if (f.kind === 'new') fresh.push({ on: mekorOn(f.entry), address: f.entry.address, archived: f.archived?.name ?? null, filed: state })
+      if (f.kind === 'new') fresh.push({ on: mekorOn(f.entry), address: f.entry.address, archived: f.archived?.name ?? null, archivedId: f.archived?.id ?? null, filed: state })
       else differences.get(f.listing.id)?.push({ list: 'mekor', line: mekorLine(f), filed: state })
     }
   }
@@ -168,11 +169,12 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
   for (const f of fresh) {
     const same = newPlaces.find((n) => baseName(n.name) === baseName(f.on.name))
     if (!same) {
-      newPlaces.push({ name: f.on.name, address: f.address, on: [f.on], archived: f.archived, filed: f.filed })
+      newPlaces.push({ name: f.on.name, address: f.address, on: [f.on], archived: f.archived, archivedId: f.archivedId, filed: f.filed })
       continue
     }
     same.on.push(f.on)
     same.archived ??= f.archived
+    same.archivedId ??= f.archivedId
     const states = [same.filed, f.filed]
     same.filed = states.includes('queued') ? 'queued' : states.includes('next') ? 'next' : 'decided'
   }

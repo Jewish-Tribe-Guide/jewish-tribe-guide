@@ -16,7 +16,17 @@ import { groupedRows } from '@/lib/timesProposal'
 import { FindSheet } from './GoogleJob'
 import { checkedLines, openedPlace, type Change, type CheckedLine, type Foot, type OpenedBox, type Problem, type ReadStep } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
-import { waitingGroups, type WaitGroup } from './waitingGroups'
+import { groupEdit, waitingGroups, type WaitGroup } from './waitingGroups'
+import { withSave } from './findingEdits'
+import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import EruvEditor, { type EruvValues } from '@/components/resources/EruvEditor'
+import MobileSheet from '@/components/resources/MobileSheet'
+import ActionDialog from '@/components/resources/ActionDialog'
+import { useIsMobile } from '@/lib/useIsMobile'
+import type { AdminEruv } from '@/lib/eruvStore'
+import type { EruvFinding } from '@/lib/eruvJob'
+import type { CategoryConfig } from '@/lib/categories'
+import type { DirectoryResource } from '@/types'
 
 // A place opened in place on its kind's page (openedPlaceBoxes.ts says what
 // goes in it). Under its row on a computer, its own screen on a phone
@@ -30,8 +40,8 @@ import { waitingGroups, type WaitGroup } from './waitingGroups'
 //                                  lit with "Was …", its own buttons
 //                                  (FinalChanges2, FinalClosed,
 //                                  FinalDropped, FinalNewPlace); then "3
-//                                  more up to date". Edit opens the job
-//                                  page that holds it.
+//                                  more up to date". Edit opens the box
+//                                  its job page's would, right here.
 
 const INPUT = 'w-full rounded-lg border border-slate-400 bg-white px-2.5 py-2 text-sm text-slate-900 min-h-11'
 
@@ -258,6 +268,11 @@ export default function OpenedPlace({
   const [changing, setChanging] = useState<string | null>(null)
   const [more, setMore] = useState(false)
   const [finding, setFinding] = useState(false)
+  // Edit's box, open here: `n` the group's finding it's on, `saved` how
+  // many of them Save put in.
+  const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit; n: number; saved: number } | null>(null)
+  const [eruvEditing, setEruvEditing] = useState<{ eruv: AdminEruv; finding: EruvFinding } | null>(null)
+  const isMobile = useIsMobile()
   const opened = openedPlace(place.id, jobs, now)
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
@@ -308,6 +323,62 @@ export default function OpenedPlace({
     else await post(hoursApi(a.job), { action: 'give', resourceId: place.id, url })
   }
 
+  /** Edit: the box each of the group's findings changes, one after
+   *  another, saved straight to the listing. */
+  async function openEdit(g: WaitGroup) {
+    const e = groupEdit(g, place.id, jobs)
+    if (!e) return
+    setError(null)
+    if (e.kind === 'eruv') return setEruvEditing({ eruv: e.eruv, finding: e.finding })
+    try {
+      const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+      const edits = e.makers.map((m) => m(item, category)).filter((x) => x !== null)
+      if (!edits.length) throw new Error('Could not open its box.')
+      const open = (n: number) => {
+        const fe = edits[n]
+        if (!fe) {
+          setEditing(null)
+          return void onChanged()
+        }
+        setEditing({ item, category, n, saved: n, edit: withSave(fe, { community, token, onSaved: () => open(n + 1) }) })
+      }
+      open(0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open its listing.')
+    }
+  }
+  function closeEdit() {
+    if (editing?.saved) void onChanged()
+    setEditing(null)
+  }
+  const Sheet = isMobile ? MobileSheet : ActionDialog
+  const editSheets = (
+    <>
+      {editing && <BoxEditSheet key={editing.n} item={editing.item} category={editing.category} edit={editing.edit} onClose={closeEdit} />}
+      <Sheet isOpen={!!eruvEditing} onClose={() => setEruvEditing(null)} title="Details">
+        {eruvEditing && (
+          <EruvEditor
+            eruv={eruvEditing.eruv}
+            onClose={() => setEruvEditing(null)}
+            adminSave={{
+              label: 'Save to the listing',
+              values: { hotline: eruvEditing.finding.hotline ?? '', alertsUrl: eruvEditing.finding.alertsUrl ?? '' },
+              onSave: async (values: EruvValues) => {
+                try {
+                  await fetchJson(withCommunity(`/api/admin/submissions/${eruvEditing.finding.id}`, community), { method: 'PATCH', headers, body: JSON.stringify({ status: 'approved', payload: values }) }, 'Could not save that.')
+                } catch (err) {
+                  return [err instanceof Error ? err.message : 'Could not save that.']
+                }
+                void onChanged()
+                return null
+              },
+            }}
+          />
+        )}
+      </Sheet>
+    </>
+  )
+
   const reading = busy === 'read'
   const notChecked = place.state === 'not_checked' && opened.problems.length > 0
   const shell =
@@ -331,12 +402,20 @@ export default function OpenedPlace({
     }
     const google = (body: Record<string, unknown>) => () => post('/api/admin/watches/google', { ...body, id: place.id })
     const menu = (action: 'use' | 'skip') => () => post('/api/admin/main-dishes', { action, resourceId: place.id })
+    // Bring it back: the guide's archived listing restored, with the list's
+    // hechsher once its new place is filed.
+    const restore = (archivedId: string, id?: string) => () => post('/api/admin/watches/kosher', { action: 'restore', resourceId: archivedId, ...(id ? { id } : {}) })
     // Each group's buttons, the first its main one, as drawn.
     const buttons = (g: WaitGroup): { label: string; work: () => Promise<unknown> }[] => {
       const d = g.decide
-      if (d.kind === 'later') return []
+      if (d.kind === 'later') return d.archivedId ? [{ label: 'Bring it back', work: restore(d.archivedId) }] : []
       if (d.kind === 'closure') return [{ label: 'Keep closed', work: google({ action: 'open', open: false }) }, { label: 'Show as open', work: google({ action: 'open', open: true }) }]
-      if (d.kind === 'new') return [{ label: 'Add as new', work: each([d.id], () => ({ status: 'approved' })) }, { label: 'Don’t add', work: each([d.id], () => ({ status: 'rejected' })) }]
+      if (d.kind === 'new')
+        return [
+          ...(d.archivedId ? [{ label: 'Bring it back', work: restore(d.archivedId, d.id) }] : []),
+          { label: 'Add as new', work: each([d.id], () => ({ status: 'approved' })) },
+          { label: 'Don’t add', work: each([d.id], () => ({ status: 'rejected' })) },
+        ]
       if (d.kind === 'off' || d.kind === 'archive')
         return [
           { label: 'Remove the listing', work: d.kind === 'off' ? each([d.id], () => ({ status: 'approved' })) : () => post('/api/admin/watches/kosher', { action: 'archive', id: d.id }) },
@@ -349,13 +428,12 @@ export default function OpenedPlace({
         { label: 'Keep as is', work: each(d.ids, () => ({ status: 'rejected' })) },
       ]
     }
-    // Edit, until it opens the box here: the job page that holds it. A
-    // grocery's website has none.
+    // Edit: the box its job page's Edit opens, here.
     const edit = (g: WaitGroup) =>
-      g.decide.kind === 'closure' || g.decide.kind === 'new' || g.decide.kind === 'later' || g.job === 'sites' ? null : (
-        <Link href={`${adminBase(community)}/watches/${g.job}`} className={BUTTON}>
+      groupEdit(g, place.id, jobs) && (
+        <button type="button" disabled={busy !== null} onClick={() => void openEdit(g)} className={BUTTON}>
           Edit
-        </Link>
+        </button>
       )
     return (
       <li role="region" aria-label={place.name} data-testid="kind-place-open" className={shell}>
@@ -433,6 +511,7 @@ export default function OpenedPlace({
           {error && <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
           {listing && <span className="pt-1">{listing}</span>}
         </div>
+        {editSheets}
       </li>
     )
   }

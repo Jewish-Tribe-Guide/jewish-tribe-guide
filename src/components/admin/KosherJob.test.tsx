@@ -126,7 +126,7 @@ const RIVKA = {
   name: 'Rivka Cakes',
   address: '198 Tomlinson Rd, Philadelphia PA 19116',
   on: [{ list: 'keystone' as const, name: 'Rivka Cakes', url: 'https://keystone-k.org/kosher/rivka-cakes/', says: 'Parve' }],
-  archived: null,
+  archived: null, archivedId: null,
   filed: 'queued' as const,
   findings: [
     finding({
@@ -348,6 +348,20 @@ describe('Kosher certification', () => {
     // Decided: off the page.
     expect(shown('Rivka Cakes')).toBe(false)
     expect(screen.getByRole('tab', { name: 'New on a list 0' })).toBeInTheDocument()
+  })
+
+  // Oct 25 (the user): "A new place the guide archived has no way to bring
+  // it back."
+  it('a new place the guide has archived: Bring it back restores it and closes the new place', async () => {
+    const { loads } = await renderPage({ newPlaces: [{ ...RIVKA, archived: 'Rivka’s Cakes', archivedId: 'rivka-old' }] })
+    await tab('New on a list')
+    await open('Rivka Cakes')
+    const p = box('Rivka Cakes', 'Place')
+    expect(within(p).getByText('The guide has it archived, as “Rivka’s Cakes”.')).toBeInTheDocument()
+    const before = loads()
+    await userEvent.setup().click(within(p).getByRole('button', { name: 'Bring it back' }))
+    expect(posts.at(-1)).toEqual({ url: '/api/admin/watches/kosher?community=philly', body: { action: 'restore', resourceId: 'rivka-old', id: 's-rivka' } })
+    await waitFor(() => expect(loads()).toBeGreaterThan(before))
   })
 
   it('a new place left out before isn’t shown again', async () => {

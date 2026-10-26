@@ -156,7 +156,7 @@ describe('kosherPlaces', () => {
     const e = mekor({ slug: 'old-deli', name: 'Old Deli' })
     const { places, newPlaces } = kosherPlaces({ listings: [gone], keystone: null, mekor: [e] })
     expect(places).toEqual([])
-    expect(newPlaces).toEqual([{ name: 'Old Deli', address: '', on: [expect.objectContaining({ list: 'mekor' })], archived: 'Old Deli', filed: 'next' }])
+    expect(newPlaces).toEqual([{ name: 'Old Deli', address: '', on: [expect.objectContaining({ list: 'mekor' })], archived: 'Old Deli', archivedId: 'old', filed: 'next' }])
   })
 
   // The user, Oct 22: "We only need to check Food, not grocery stores".

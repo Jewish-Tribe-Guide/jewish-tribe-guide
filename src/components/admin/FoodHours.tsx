@@ -10,6 +10,7 @@ import type { Finding } from '@/lib/watchFindings'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { FOOD_HOURS_KEY, foodHoursEdit, withSave } from './findingEdits'
 import type { Decision } from './FindingCompare'
 import { day, shortUrl } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, SourceLine } from './JobBoxes'
@@ -23,7 +24,7 @@ import { Box, BoxActions, BoxRow, BoxRows, SourceLine } from './JobBoxes'
 // the page it's from. A page that agrees is a closed "Same" box.
 
 /** The listing's plain hours field. */
-export const FOOD_HOURS_KEY = 'hours'
+export { FOOD_HOURS_KEY }
 type HoursFinding = Finding & { values: Record<string, unknown> }
 
 export const isFoodHoursFinding = (f: Finding): f is HoursFinding => f.operation === 'update' && f.section === FOOD_HOURS_KEY && !!f.values && FOOD_HOURS_KEY in f.values
@@ -97,36 +98,15 @@ export default function FoodHours({
 
   /** Edit: the listing's own Edit for its hours, filled in with the
    *  website's, saved straight to the listing. */
+  /** Edit: the listing's own Edit for its hours, filled in with the
+   *  website's, saved straight to the listing. */
   async function edit(f: HoursFinding) {
     setError(null)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/main-dishes?item=${placeId}`, community), { headers }, 'Could not open its hours.')
-      const fields = category.detailFields.filter((x) => x.key === FOOD_HOURS_KEY)
-      if (!fields.length) return
-      setEditing({
-        item,
-        category,
-        edit: {
-          title: fields[0].label,
-          fields,
-          preset: f.values,
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
-                method: 'PATCH',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'approved', payload: { details: { [FOOD_HOURS_KEY]: d[FOOD_HOURS_KEY] ?? null } } }),
-              })
-            },
-            onSaved: () => {
-              setEditing(null)
-              onDecided(f, 'approved')
-            },
-          },
-        },
-      })
+      const fe = foodHoursEdit(f, category)
+      if (!fe) return
+      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => (setEditing(null), onDecided(f, 'approved')) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its hours.')
     }

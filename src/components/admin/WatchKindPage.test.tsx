@@ -8,6 +8,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import WatchKindPage from './WatchKindPage'
 import { forgetWatchJobs } from './useWatchJobs'
 import { day } from './JobPage'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -115,7 +116,9 @@ describe('WatchKindPage', () => {
       `From lms.example/davening · ${day(at)}Shacharis · Mon–Fri6:30 AMWas 6:45 AMAcceptEditKeep as is`,
       `From its Google listing · ${day(at)}Phone610-555-0199Was 610-555-0100AcceptEditKeep as is`,
     ])
-    expect(within(open).getAllByRole('link', { name: 'Edit' }).map((a) => a.getAttribute('href'))).toEqual(['/philly/admin/watches/times', '/philly/admin/watches/google'])
+    // Edit opens the change here, not its job page.
+    expect(within(open).queryByRole('link', { name: 'Edit' })).toBeNull()
+    expect(within(open).getAllByRole('button', { name: 'Edit' })).toHaveLength(2)
     expect(within(open).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/synagogues/b')
 
     const [shulTimes, google] = within(open).getAllByTestId('waiting-group')
@@ -127,10 +130,10 @@ describe('WatchKindPage', () => {
   })
 
   // Oct 25 (the user): "grocery should go to grocery". What a grocery's
-  // own website found waits here, with no job page to Edit it on.
+  // own website found waits here, with no job page of its own.
   it('a grocery’s website finding waits under Grocery: Accept or Keep as is', async () => {
     const at = new Date().toISOString()
-    const phone = { id: 'f1', operation: 'update', targetId: 'g', name: 'GIANT', from: 'its website', says: 'Its page says', named: null, at, notes: [], page: 'https://giant.example/store', section: 'contact', lines: [{ key: 'phone', label: 'Phone', before: '215-555-0100', after: '215-555-0199' }] }
+    const phone = { id: 'f1', operation: 'update', targetId: 'g', name: 'GIANT', from: 'its website', says: 'Its page says', named: null, at, notes: [], page: 'https://giant.example/store', section: 'contact', values: { phone: '215-555-0199' }, lines: [{ key: 'phone', label: 'Phone', before: '215-555-0100', after: '215-555-0199' }] }
     const store = { id: 'g', name: 'GIANT', category: 'grocery', href: '/philly/grocery/g', pages: [{ watch: { id: 'w1', url: 'https://giant.example/store', active: true, lastOkAt: at, lastRunAt: at, createdAt: at } }], findings: [phone] }
     const giant = place('g', 'GIANT', { category: 'grocery', categoryLabel: 'Grocery', href: '/philly/grocery/g' })
     const sent: unknown[] = []
@@ -146,10 +149,96 @@ describe('WatchKindPage', () => {
     expect(rows()).toEqual(['GIANT1 change'])
     await user.click(screen.getByRole('button', { name: /GIANT/ }))
     const open = screen.getByTestId('kind-place-open')
-    expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([`From giant.example/store · ${day(at)}Phone215-555-0199Was 215-555-0100AcceptKeep as is`])
-    expect(within(open).queryByRole('link', { name: 'Edit' })).toBeNull()
+    expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([`From giant.example/store · ${day(at)}Phone215-555-0199Was 215-555-0100AcceptEditKeep as is`])
     await user.click(within(open).getByRole('button', { name: 'Accept' }))
     expect(sent).toEqual([['PATCH', '/api/admin/submissions/f1', { status: 'approved' }]])
+  })
+
+  // Oct 25 (the user): "Edit still sends you to the job page instead of
+  // opening the change right there."
+  it('Edit opens the change right here: its box, filled in with what was read, saved to the listing', async () => {
+    const at = new Date().toISOString()
+    const phone = { id: 'f1', operation: 'update', targetId: 'g', name: 'GIANT', from: 'its website', says: 'Its page says', named: null, at, notes: [], page: 'https://giant.example/store', section: 'contact', values: { phone: '215-555-0199' }, lines: [{ key: 'phone', label: 'Phone', before: '215-555-0100', after: '215-555-0199' }] }
+    const store = { id: 'g', name: 'GIANT', category: 'grocery', href: '/philly/grocery/g', pages: [], findings: [phone] }
+    const giant = place('g', 'GIANT', { category: 'grocery', categoryLabel: 'Grocery', href: '/philly/grocery/g' })
+    const category = makeCategory({ id: 'grocery', hasPhone: true, detailFields: [] })
+    const item = makeListing({ id: 'g', category: 'grocery', name: 'GIANT', address: '1 Main St', phone: '215-555-0100' })
+    await renderPage([giant], 'grocery', (url) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'grocery', pluralLabel: 'Grocery', kind: 'listing', hasAddress: true }] }
+      if (url.includes('item=g')) return { ok: true, item, category }
+      if (url.includes('/api/admin/watches/sites')) return { ok: true, places: [store] }
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /GIANT/ }))
+    await user.click(within(screen.getByTestId('kind-place-open')).getByRole('button', { name: 'Edit' }))
+    expect(vi.mocked(fetchJson).mock.calls.map(([u]) => u)).toContain('/api/admin/watches/google?item=g&community=philly')
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByDisplayValue('(215) 555-0199')).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+    const [url, init] = fetchMock.mock.calls.find(([u]) => String(u).includes('/api/admin/submissions/'))!
+    expect(String(url)).toBe('/api/admin/submissions/f1?community=philly')
+    const body = JSON.parse(String(init!.body))
+    expect(body).toMatchObject({ status: 'approved', payload: { phone: '(215) 555-0199', address: '1 Main St' } })
+    fetchMock.mockRestore()
+  })
+
+  it('Edit on a group of several changes opens each one’s box in turn', async () => {
+    const at = new Date().toISOString()
+    const page = 'https://lmc.example/hours'
+    const note = (id: string, key: string, label: string, after: string) => ({ id, operation: 'update', targetId: 'lmc', name: 'LMC', from: 'its website', says: 'Its page says', named: null, at, notes: [], page, section: key, values: { [`${key}_notes`]: after }, lines: [{ key: `${key}_notes`, label, before: '—', after }] })
+    const mikvah = {
+      id: 'lmc', name: 'LMC', href: '/philly/mikvahs/lmc', website: 'https://lmc.example', pages: [], off: false, reason: null, fields: [],
+      sections: [{ section: 'women', label: 'Women’s', hours: null, notes: 'women_notes', now: {} }, { section: 'men', label: 'Men’s', hours: null, notes: 'men_notes', now: {} }],
+      findings: [note('s1', 'women', 'Women’s Notes', 'Call ahead.'), note('s2', 'men', 'Men’s Notes', 'Fridays only.')],
+    }
+    const category = makeCategory({ id: 'mikvah', detailFields: [{ key: 'women_notes', label: 'Women’s Notes', type: 'textarea' }, { key: 'men_notes', label: 'Men’s Notes', type: 'textarea' }] })
+    const item = makeListing({ id: 'lmc', category: 'mikvah', name: 'LMC' })
+    await renderPage([place('lmc', 'LMC', { category: 'mikvah', categoryLabel: 'Mikvahs', href: '/philly/mikvahs/lmc' })], 'mikvah', (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'mikvah', pluralLabel: 'Mikvahs', kind: 'listing', hasAddress: true }] }
+      if (url.includes('item=lmc')) return { ok: true, item, category }
+      if (url.includes('/api/admin/watches/hours') && !url.includes('job=times') && !init?.method) return { name: 'Mikvah hours', places: [mikvah] }
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /LMC/ }))
+    expect(screen.getAllByTestId('waiting-group')).toHaveLength(1)
+    await user.click(within(screen.getByTestId('kind-place-open')).getByRole('button', { name: 'Edit' }))
+    let sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByDisplayValue('Call ahead.')).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+    sheet = await screen.findByRole('dialog')
+    expect(await within(sheet).findByDisplayValue('Fridays only.')).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
+    const sentTo = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('/api/admin/submissions/'))
+    expect(sentTo).toEqual(['/api/admin/submissions/s1?community=philly', '/api/admin/submissions/s2?community=philly'])
+    fetchMock.mockRestore()
+  })
+
+  it('a new place the guide has archived: Bring it back first, then Add as new or Don’t add', async () => {
+    const at = new Date().toISOString()
+    const lines = [{ key: 'kosherCert', label: 'Kosher Certification', before: '—', after: 'Keystone-K' }]
+    const f = { id: 'n1', operation: 'create', targetId: null, name: 'Rita’s', from: 'Mekor Habracha’s list', says: 'The list says', named: null, at, notes: [], lines, values: { kosherCert: ['Keystone-K'] }, address: '1 Main St', category: 'restaurant' }
+    const kosher = {
+      available: true, categories: [], counts: {}, places: [],
+      lists: [{ list: 'mekor', url: 'https://mekor.example/list', watch: null, error: null, entries: 1, updated: null }],
+      newPlaces: [{ name: 'Rita’s', address: '1 Main St', on: [{ list: 'mekor', name: 'Rita’s', url: '', says: '' }], archived: 'Rita’s Water Ice', archivedId: 'r-old', filed: 'queued', findings: [f] }],
+    }
+    const sent: unknown[] = []
+    await renderPage([], 'restaurant', (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'restaurant', pluralLabel: 'Food', kind: 'listing', hasAddress: true }] }
+      if (url.includes('/api/admin/watches/kosher') && !init?.method) return { ok: true, ...kosher }
+      if (init?.method) {
+        sent.push([init.method, url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Rita’s/ }))
+    const [g] = within(screen.getByTestId('kind-place-open')).getAllByTestId('waiting-group')
+    expect(within(g).getAllByRole('button').map((b) => b.textContent)).toEqual(['Bring it back', 'Add as new', 'Don’t add'])
+    await user.click(within(g).getByRole('button', { name: 'Bring it back' }))
+    expect(sent).toEqual([['POST', '/api/admin/watches/kosher', { action: 'restore', resourceId: 'r-old', id: 'n1' }]])
   })
 
   it('a closure: Keep closed or Show as open', async () => {

@@ -3,10 +3,9 @@
 import { useState, type ReactNode } from 'react'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
-import { schedulesKey, type SpecialSchedule } from '@/lib/schedules'
+import type { SpecialSchedule } from '@/lib/schedules'
 import { boxPill, groupedRows, scheduleProposal, usualProposal, type ProposalRow, type RowGroup } from '@/lib/timesProposal'
 import { TIMES_PARTS, TIMES_PART_LABELS, isDatedLine, partsFromRead, type PartGiven, type TimesPart } from '@/lib/timesParts'
-import { minyanWriting } from '@/lib/minyanText'
 import { watchHealth, type Watch } from '@/lib/watches'
 import { newsletterReads, samePage } from '@/lib/hoursJob'
 import { updatesPill } from '@/lib/dishProposal'
@@ -15,6 +14,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import type { Minyan } from '@/lib/davening'
 import type { DirectoryResource } from '@/types'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { timesEdit, withSave } from './findingEdits'
 import FindingCompare, { type Decision } from './FindingCompare'
 import { GivePage, day, shortUrl, type JobStatus } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
@@ -257,41 +257,13 @@ export function ShulRow({
 
   /** Edit: the listing's own box editor for the part, filled in with the
    *  website's version, saved straight to the listing. */
-  async function edit(f: PartFinding, weeks: readonly string[]) {
+  async function edit(f: PartFinding) {
     setError(null)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/hours?job=times&item=${p.id}`, community), { headers }, 'Could not open its times.')
-      const field = category.detailFields.find((x) => x.key === f.times.field.key)
-      if (!field) return
-      const key = field.key
-      const sk = schedulesKey(key)
-      setEditing({
-        item,
-        category,
-        edit: {
-          title: TIMES_PART_LABELS[f.part],
-          fields: [field],
-          minyanimBox: f.part === 'week' ? 'this_week' : f.part,
-          writing: minyanWriting,
-          weeks,
-          preset: f.part === 'week' ? { [sk]: f.times.proposedSchedules } : { [key]: f.times.proposed },
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
-                method: 'PATCH',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'approved', payload: { details: { [key]: d[key], [sk]: d[sk] } } }),
-              })
-            },
-            onSaved: () => {
-              setEditing(null)
-              onDecided(f, 'approved')
-            },
-          },
-        },
-      })
+      const fe = timesEdit(f, category)
+      if (!fe) return
+      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => (setEditing(null), onDecided(f, 'approved')) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its times.')
     }
@@ -362,7 +334,7 @@ export function ShulRow({
             busy={busy || saving === f.id}
             at={readAt(f.page) ?? f.at}
             onUse={() => void decide(f, { status: 'approved' }, 'approved')}
-            onEdit={f.part !== 'week' || posted.length > 0 ? () => void edit(f, posted.map((s) => s.id)) : undefined}
+            onEdit={f.part !== 'week' || posted.length > 0 ? () => void edit(f) : undefined}
             onKeep={() => void decide(f, { status: 'rejected' }, 'rejected')}
           />
         )

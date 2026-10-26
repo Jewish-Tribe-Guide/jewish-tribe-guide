@@ -14,7 +14,9 @@ import { KOSHER_JOB_CATEGORIES, kosherCounts, kosherPlaces, type Filed, type Kos
 import { listingSlug } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
 import { UUID } from '@/lib/itemMarkRoutes'
-import { listApprovedResources } from '@/lib/resourceStore'
+import { listApprovedResources, restoreResource } from '@/lib/resourceStore'
+import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
+import { after } from 'next/server'
 import { approveSubmission, rejectSubmission, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { kosherBoxKeys, renamedTo } from '@/lib/kosherBox'
@@ -49,6 +51,11 @@ import type { ResourceSubmission } from '@/types'
 //         as the admin left it (only its fields), and the removal closes.
 //     { action: 'page', resourceId, url }  Add a page: its page on
 //         Keystone-K's list, as its certificate link.
+//     { action: 'restore', resourceId, id? }  Bring it back: a new place
+//         on a list that the guide has archived. The archived listing is
+//         restored (hours and photos with it, as the Archived tab's
+//         restore), its Kosher box made the list's (`id`, the new place's
+//         finding, when it's filed), and that finding closes.
 //     Admin only.
 
 export const maxDuration = 60
@@ -210,6 +217,45 @@ export async function GET(request: Request) {
 
 const LIST_NAMES = new Set([KEYSTONE_WATCH_NAME, MEKOR_WATCH_NAME])
 
+/** Bring it back: the archived listing restored, with the list's Kosher
+ *  box when its new place was filed. */
+async function restore(slug: string, body: Record<string, unknown> | null, admin: string): Promise<Response> {
+  const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
+  const findingId = typeof body?.id === 'string' ? body.id : null
+  if (!UUID.test(resourceId) || (findingId !== null && !UUID.test(findingId))) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
+  try {
+    const supabase = getAdminClient()
+    const { data: archived, error } = await supabase.from('resource').select('id,category').eq('community_id', slug).eq('id', resourceId).eq('status', 'archived').maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!archived || !CATEGORIES.includes(archived.category)) return Response.json({ ok: false, errors: ['That place isn’t archived any more.'] }, { status: 404 })
+    // The list's new place, still waiting: a suggestion to add it.
+    let found: { id: string; payload: ResourceSubmission; by: string } | null = null
+    if (findingId) {
+      const { data, error: e } = await supabase.from('submission').select('id,operation,payload,status,submitted_by').eq('community_id', slug).eq('id', findingId).maybeSingle()
+      if (e) throw new Error(e.message)
+      const by = (data?.submitted_by as { name?: string } | null)?.name ?? ''
+      if (!data || data.status !== 'pending' || data.operation !== 'create' || !LIST_NAMES.has(by)) return Response.json({ ok: false, errors: ['That suggestion isn’t waiting any more.'] }, { status: 409 })
+      found = { id: data.id, payload: data.payload as ResourceSubmission, by }
+    }
+    const row = (await restoreResource(resourceId, slug)) as Row | null
+    if (!row) return Response.json({ ok: false, errors: ['That place isn’t archived any more.'] }, { status: 404 })
+    if (found) {
+      const category = (await listCategories(slug)).find((c) => c.id === row.category)
+      const keys = category ? kosherBoxKeys(category) : []
+      const listed = (found.payload.details ?? {}) as Record<string, unknown>
+      if (keys.length) await saveAsTheList(slug, row, found.by, { details: { ...row.details, ...pick(listed, keys) } }, 'Brought back from the archive, its hechsher as the list has it.', admin)
+      await rejectSubmission(found.id, slug, admin)
+    }
+    await revalidatePublicContent()
+    // Its walks along the streets now, not tonight (walkRouteJob.ts).
+    after(() => runWalkRoutesAfterChange(slug))
+    return Response.json({ ok: true })
+  } catch (err) {
+    console.error('[admin/watches/kosher] restore failed:', err)
+    return Response.json({ ok: false, errors: ['Could not bring it back.'] }, { status: 502 })
+  }
+}
+
 type Row = { id: string; category: string; name: string; address: string | null; phone: string | null; anchor_id: string; distance: number | null; details: Record<string, unknown> | null; status: string }
 
 /** The listing, as one of the lists suggests it now: filed under the
@@ -236,6 +282,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = String(body?.action ?? '')
   const id = typeof body?.id === 'string' ? body.id : typeof body?.resourceId === 'string' ? body.resourceId : ''
+  if (action === 'restore') return restore(community.slug, body, admin.email)
   if (!['renamed', 'archive', 'edit', 'page'].includes(action) || !UUID.test(id)) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
 
   try {

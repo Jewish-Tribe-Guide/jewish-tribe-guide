@@ -362,11 +362,19 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        tomorrow morning's read, with no buttons.
      Fixed on the way: Open its listing on a place not checked went to
      the job page it waits on, not its listing.
+     - **Edit opens the box here: BUILT Oct 25** (`findingEdits.ts`):
+       the same box its job page opens, filled in with what was read,
+       saved straight to the listing. A group with several changes opens
+       them one after another (a mikvah's two sections). An eruv's opens
+       the eruv editor. Each job page now builds its box from the same
+       code.
+     - **Bring it back: BUILT Oct 25.** A new place a kosher list has
+       that the guide archived ("Archived, as “…”") has Bring it back,
+       on its kind's row and on the Kosher page: the archived listing
+       comes back with the list's hechsher, and the suggestion closes.
+       It uses the Archived tab's restore, which already existed. Off a
+       list and archived: Bring it back alone.
      Not done, on purpose:
-     - Edit links to the job page that holds the change; it doesn't
-       open the box here yet.
-     - No Bring it back on a new place the guide has archived (unarchiving
-       isn't supported); its group says "Archived, as “…”".
      - A waiting place with nothing a group can show shows "Open it
        where it waits", a link to its job page. None seen on the test
        site.
@@ -435,7 +443,7 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        watch list. So grocery should go to grocery"). What a grocery's,
        childcare's, hotel's or school's own website finds now waits under
        that kind's row (counted in its Waiting for you, opened there with
-       Accept / Keep as is, no Edit: there is no job page), not in the
+       Accept / Edit / Keep as is), not in the
        moderation queue; its email links to that page. Every kind with a
        watch has a row: a kind Google doesn't cover gets one from its
        read websites. On the live site every watched place is a mikvah,

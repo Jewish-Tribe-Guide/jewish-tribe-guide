@@ -13,6 +13,7 @@ import type { JobCounts } from '@/lib/watchJobs'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { googleEdit, withSave } from './findingEdits'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import { JobPage, day, shortUrl } from './JobPage'
@@ -273,24 +274,6 @@ function GooglePlaceRow({ place: p, post, onPlace, onEdit }: { place: GooglePlac
   )
 }
 
-/** Edit: the listing's own rows for these fields, filled in with Google's
- *  version where it differs. */
-function editOf(p: GooglePlace, item: DirectoryResource, category: CategoryConfig): { rows: string[]; preset: Record<string, unknown> } {
-  const websiteKey = websiteKeyOf(category)
-  const keys = new Set(['hours', ...(websiteKey ? [websiteKey] : [])])
-  const rows = editorRows(category, item as unknown as Record<string, unknown>)
-    .filter((r) => r.id === 'name' || r.kind === 'contact' || r.fields.some((f) => keys.has(f.key)))
-    .map((r) => r.id)
-  const preset: Record<string, unknown> = {}
-  for (const r of p.compare?.rows ?? []) {
-    if (!r.changed) continue
-    const key = r.field === 'website' ? websiteKey : r.field
-    if (!key) continue
-    preset[key] = r.raw
-  }
-  return { rows, preset }
-}
-
 export default function GoogleJob({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<GoogleLoaded | null>(null)
@@ -328,35 +311,11 @@ export default function GoogleJob({ token }: { token: string }) {
     setEditError(null)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`${API}?item=${p.id}`, community), { headers }, 'Could not open its listing.')
-      const { rows, preset } = editOf(p, item, category)
-      const websiteKey = websiteKeyOf(category)
-      setEditing({
-        place: p,
-        item,
-        category,
-        edit: {
-          title: 'Fields',
-          fields: [],
-          rows,
-          preset,
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              const values = Object.fromEntries(
-                p.fields.map((f) => [f.field, f.field === 'name' ? payload.name : f.field === 'phone' ? (payload.phone ?? '') : f.field === 'hours' ? (d.hours ?? null) : websiteKey ? (d[websiteKey] ?? null) : null]),
-              )
-              const res = await fetch(withCommunity(API, community), { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'edit', id: p.id, values }) })
-              if (res.ok) {
-                const got = (await res.clone().json()) as { place?: GooglePlace }
-                if (got.place) setPlace(got.place)
-              }
-              return res
-            },
-            onSaved: () => setEditing(null),
-          },
-        },
-      })
+      const after = async (res: Response) => {
+        const got = (await res.json()) as { place?: GooglePlace }
+        if (got.place) setPlace(got.place)
+      }
+      setEditing({ place: p, item, category, edit: withSave(googleEdit(p, item, category), { community, token, onSaved: () => setEditing(null), after }) })
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Could not open its listing.')
     }

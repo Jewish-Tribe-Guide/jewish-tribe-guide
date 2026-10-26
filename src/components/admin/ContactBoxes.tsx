@@ -8,9 +8,9 @@ import type { Watch } from '@/lib/watches'
 import { samePage } from '@/lib/hoursJob'
 import type { Finding } from '@/lib/watchFindings'
 import type { CategoryConfig } from '@/lib/categories'
-import { editorRows } from '@/lib/editorRows'
 import type { DirectoryResource } from '@/types'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { contactEdit, withSave } from './findingEdits'
 import type { Decision } from './FindingCompare'
 import { day, shortUrl } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, SourceLine, type Tone } from './JobBoxes'
@@ -130,35 +130,7 @@ export default function ContactBoxes({
     setError(null)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`${itemUrl}${itemUrl.includes('?') ? '&' : '?'}item=${placeId}`, community), { headers }, 'Could not open its contact details.')
-      // Everything the box shows goes back, so an edit to its website or
-      // email sticks too; the approval takes what the admin changed.
-      const shown = editorRows(category, item as Record<string, unknown>).find((r) => r.id === 'contact')?.fields.map((x) => x.key) ?? []
-      const keys = [...new Set([...shown, ...(contact?.fields ?? []).map((x) => x.key)])].filter((k) => k !== 'phone')
-      const sectioned = Object.keys(f.values).some((k) => category.detailFields.some((x) => x.key === k && x.audienceKey))
-      const save: BoxEdit['save'] = {
-        label: 'Save to the listing',
-        via: async ({ payload }) => {
-          const d = (payload.details ?? {}) as Record<string, unknown>
-          return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
-            method: 'PATCH',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: 'approved',
-              // The contact box holds its address too: an edit to it goes
-              // with the phone, as the admin left it.
-              payload: { address: payload.address ?? '', phone: payload.phone ?? '', ...(payload.geo ? { geo: payload.geo } : {}), details: Object.fromEntries(keys.map((k) => [k, d[k] ?? null])) },
-            }),
-          })
-        },
-        onSaved: () => {
-          setEditing(null)
-          onDecided(f, 'approved')
-        },
-      }
-      const edit: BoxEdit = sectioned
-        ? { title: name(f), fields: category.detailFields.filter((x) => x.key in f.values), preset: f.values, save }
-        : { title: name(f), fields: [], rows: ['contact'], preset: f.values, save }
-      setEditing({ item, category, edit })
+      setEditing({ item, category, edit: withSave(contactEdit(f, item, category, contact), { community, token, onSaved: () => (setEditing(null), onDecided(f, 'approved')) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its contact details.')
     }

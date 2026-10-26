@@ -11,6 +11,13 @@ import { day, shortUrl } from './JobPage'
 import { usualRows } from './TimesProposal'
 import { checkedLines, openedPlace, type CheckedLine, type FootLink } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
+import type { HoursPlace } from './HoursJob'
+import type { ListedSection } from './MikvahHours'
+import { FOOD_HOURS_KEY, contactEdit, dishesEdit, foodHoursEdit, googleEdit, hospitalBoxEdit, kosherEdit, sectionEdit, timesEdit, type FindingEdit } from './findingEdits'
+import { CONTACT_SECTION } from '@/lib/contactRead'
+import type { AdminEruv } from '@/lib/eruvStore'
+import type { EruvFinding } from '@/lib/eruvJob'
+import type { DirectoryResource } from '@/types'
 
 // ── A place waiting for you, opened on its kind's page (piece 4, Oct 25) ────
 // Drawn on FinalChanges2, FinalNewsletter, FinalClosed, FinalDropped and
@@ -26,7 +33,8 @@ import type { Jobs } from './useWatchJobs'
 //             reading: Use this or Skip)
 //   closed    Keep closed / Show as open
 //   off       Remove the listing / Keep it / Edit, off a kosher list
-//   new       Add as new / Don't add, a place only a list has
+//   new       Add as new / Don't add, a place only a list has; first
+//             Bring it back, when the guide has it archived
 
 /** `sites`: a place whose own website is read with no job page of its own
  *  (a grocery's), so it has no Edit there. */
@@ -45,9 +53,12 @@ export type Decide =
   | { kind: 'off'; id: string }
   /** A change that leaves it no hechsher: the Kosher page's archive. */
   | { kind: 'archive'; id: string }
-  | { kind: 'new'; id: string }
-  /** Nothing to decide yet: a list's new place, filed after its next read. */
-  | { kind: 'later' }
+  /** `archivedId`: the guide's archived listing it may be, for Bring it
+   *  back. */
+  | { kind: 'new'; id: string; archivedId?: string }
+  /** Nothing to decide yet: a list's new place, filed after its next read;
+   *  Bring it back all the same, when the guide has it archived. */
+  | { kind: 'later'; archivedId?: string }
 export type WaitGroup = { key: string; job: WaitJob; page: FootLink | null; when: string | null; lines: WaitLine[]; facts: WaitFact[]; note: string | null; decide: Decide }
 
 export type Waiting = { groups: WaitGroup[]; checked: CheckedLine[] }
@@ -161,7 +172,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       lines: newLines(f, kosher?.categories?.find((c) => c.id === (f.category ?? 'restaurant'))),
       facts: fresh?.archived ? [{ label: 'In the guide', value: `Archived, as “${fresh.archived}”` }] : [],
       note: null,
-      decide: { kind: 'new', id: f.id },
+      decide: { kind: 'new', id: f.id, ...(fresh?.archivedId ? { archivedId: fresh.archivedId } : {}) },
     })
   } else if (fresh) {
     // Not filed yet: the Kosher page's "Suggested after tomorrow
@@ -174,7 +185,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       lines: fresh.address ? [{ label: 'Address', value: fresh.address, old: null }] : [],
       facts: fresh.archived ? [{ label: 'In the guide', value: `Archived, as “${fresh.archived}”` }] : [],
       note: fresh.filed === 'next' ? 'Suggested after tomorrow morning’s read, if Google says it’s open.' : null,
-      decide: { kind: 'later' },
+      decide: { kind: 'later', ...(fresh.archivedId ? { archivedId: fresh.archivedId } : {}) },
     })
   }
 
@@ -320,3 +331,80 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
   return { groups, checked }
 }
 
+
+// ── Edit, on a group: its box opened right there (Oct 25) ──────────────────
+// The box its job page's Edit opens (findingEdits.ts), one per finding the
+// group holds, in turn. An eruv's details open its own editor.
+
+/** A finding's box, once its listing has been fetched. */
+export type EditMaker = (item: DirectoryResource, category: CategoryConfig) => FindingEdit | null
+export type GroupEdit = { kind: 'boxes'; makers: EditMaker[] } | { kind: 'eruv'; eruv: AdminEruv; finding: EruvFinding }
+
+type Valued = Finding & { values: Record<string, unknown> }
+type Contact = { name: string; fields: readonly { key: string }[] } | null
+
+/** A website's, Refuah's or a newsletter's finding: the box it changes. */
+function makerOf(f: Finding, own: { sections?: readonly ListedSection[]; boxes?: readonly { title: string; keys: string[] }[]; contact?: Contact }): EditMaker | null {
+  if (f.operation !== 'update') return null
+  const { part, times } = f
+  if (part && times) return (_, c) => timesEdit({ ...f, part, times }, c)
+  if (!f.values) return null
+  const v = f as Valued
+  if (f.section === CONTACT_SECTION) return (item, c) => contactEdit(v, item, c, own.contact ?? null)
+  const s = own.sections?.find((x) => x.section === f.section)
+  if (s) return (_, c) => sectionEdit(v, c, s)
+  const b = own.boxes?.find((x) => x.title === f.section)
+  if (b) return (item, c) => hospitalBoxEdit(v, item, c, b)
+  if (f.section === FOOD_HOURS_KEY && FOOD_HOURS_KEY in f.values) return (_, c) => foodHoursEdit(v, c)
+  return null
+}
+
+/** What Edit opens on this group; none where its job page has no Edit
+ *  either (a closure, a new place, a finding read line by line). */
+export function groupEdit(g: WaitGroup, id: string, jobs: Jobs): GroupEdit | null {
+  const d = g.decide
+  const boxes = (makers: (EditMaker | null)[]): GroupEdit | null => {
+    const ms = makers.filter((m): m is EditMaker => !!m)
+    return ms.length ? { kind: 'boxes', makers: ms } : null
+  }
+  if (d.kind === 'google') {
+    const p = jobs.google?.places.find((x) => x.id === id)
+    return p ? boxes([(item, c) => googleEdit(p, item, c)]) : null
+  }
+  if (d.kind === 'menu') {
+    const p = jobs.dishes?.find((x) => x.id === id)
+    const r = p?.reading
+    return p && r ? boxes([(_, c) => dishesEdit(id, c, dishProposal(p, { dishes: r.dishes ?? [], missing: r.missing }))]) : null
+  }
+  if (g.job === 'kosher' && (d.kind === 'findings' || d.kind === 'off' || d.kind === 'archive')) {
+    const p = jobs.kosher?.places.find((x) => x.id === id)
+    const ids = d.kind === 'findings' ? d.ids : [d.id]
+    return boxes(
+      ids.map((fid) => {
+        const f = p?.findings?.find((x) => x.id === fid)
+        return f && p ? (item, c) => (kosherInTheBox(c, f) ? kosherEdit(f, item, c, kosherProposal(c, p.box ?? {}, f).next) : null) : null
+      }),
+    )
+  }
+  if (d.kind !== 'findings') return null
+  if (g.job === 'eruv') {
+    const eruv = jobs.eruvim?.eruvim.find((e) => e.id === id)
+    const finding = jobs.eruvim?.findings.find((f) => f.id === d.ids[0])
+    return eruv && finding ? { kind: 'eruv', eruv, finding } : null
+  }
+  const found = (fs: readonly Finding[] | undefined) => d.ids.map((fid) => fs?.find((f) => f.id === fid)).filter((f): f is Finding => !!f)
+  if (g.job === 'times' || g.job === 'hours') {
+    const p = jobs[g.job]?.places.find((x) => x.id === id) as (HoursPlace & { sections?: ListedSection[] }) | undefined
+    return boxes(found(p?.findings).map((f) => makerOf(f, { sections: p?.sections, contact: p?.contact })))
+  }
+  if (g.job === 'hospitals') {
+    const h = jobs.hospitals?.find((x) => x.id === id)
+    return boxes(found(h?.findings).map((f) => makerOf(f, { boxes: h?.boxes })))
+  }
+  if (g.job === 'dishes') {
+    const p = jobs.dishes?.find((x) => x.id === id)
+    return boxes(found(p?.findings as Finding[] | undefined).map((f) => makerOf(f, { contact: (p as { contact?: Contact } | undefined)?.contact })))
+  }
+  if (g.job === 'sites') return boxes(found(jobs.sites?.find((x) => x.id === id)?.findings).map((f) => makerOf(f, {})))
+  return null
+}

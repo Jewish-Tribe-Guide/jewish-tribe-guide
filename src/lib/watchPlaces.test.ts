@@ -156,7 +156,7 @@ describe('watchKinds', () => {
       ],
       kosher: {
         places: [],
-        newPlaces: [{ name: 'Aardvark Bakery', address: '', on: [{ list: 'mekor', name: 'Aardvark Bakery', url: '', says: '' }], archived: null, filed: 'queued', findings: [{ id: 'n1', at: '2026-10-24T09:00:00Z' }] }],
+        newPlaces: [{ name: 'Aardvark Bakery', address: '', on: [{ list: 'mekor', name: 'Aardvark Bakery', url: '', says: '' }], archived: null, archivedId: null, filed: 'queued', findings: [{ id: 'n1', at: '2026-10-24T09:00:00Z' }] }],
         others: [{ id: 'f1', name: 'Z Off', targetId: 'z-off', operation: 'delete', from: 'Keystone-K’s list', at: '2026-10-24T09:00:00Z' }],
       },
     })
@@ -177,8 +177,8 @@ describe('watchKinds', () => {
       kosher: {
         places: [],
         newPlaces: [
-          { name: 'Magical Sweet Shop', address: '', on, archived: null, filed: 'queued', findings: [{ id: 'n1', at: '2026-10-24T09:00:00Z' }] },
-          { name: 'Decided Already', address: '', on, archived: null, filed: 'decided' },
+          { name: 'Magical Sweet Shop', address: '', on, archived: null, archivedId: null, filed: 'queued', findings: [{ id: 'n1', at: '2026-10-24T09:00:00Z' }] },
+          { name: 'Decided Already', address: '', on, archived: null, archivedId: null, filed: 'decided' },
         ],
         others: [{ id: 'n2', name: 'GIANT Huntingdon Valley', targetId: null, operation: 'create', from: 'Keystone-K’s list', at: '2026-10-18T09:00:00Z' }],
       },

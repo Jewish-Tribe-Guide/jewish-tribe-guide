@@ -10,6 +10,7 @@ import type { Finding } from '@/lib/watchFindings'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { sectionEdit, withSave } from './findingEdits'
 import FindingCompare, { type Decision } from './FindingCompare'
 import { GivePage, day, shortUrl, type JobStatus } from './JobPage'
 import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage } from './JobBoxes'
@@ -157,36 +158,11 @@ export function MikvahRow({
    *  website's version, saved straight to the listing. */
   async function edit(f: SectionFinding) {
     setError(null)
-    const s = sectionOf(f)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/hours?item=${p.id}`, community), { headers }, 'Could not open its hours.')
-      const keys = [s.hours, s.notes].filter((k): k is string => !!k)
-      const fields = keys.flatMap((k) => category.detailFields.filter((x) => x.key === k))
-      if (!fields.length) return
-      setEditing({
-        item,
-        category,
-        edit: {
-          title: s.hours ? `${s.label} hours` : s.label,
-          fields,
-          preset: f.values,
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
-                method: 'PATCH',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'approved', payload: { details: Object.fromEntries(keys.map((k) => [k, d[k] ?? null])) } }),
-              })
-            },
-            onSaved: () => {
-              setEditing(null)
-              onDecided(f, 'approved')
-            },
-          },
-        },
-      })
+      const fe = sectionEdit(f, category, sectionOf(f))
+      if (!fe) return
+      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => (setEditing(null), onDecided(f, 'approved')) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its hours.')
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { waitingGroups } from './waitingGroups'
+import { groupEdit, waitingGroups } from './waitingGroups'
 import type { Jobs } from './useWatchJobs'
 import type { Watch, WatchCheck } from '@/lib/watches'
 import type { GooglePlace } from '@/lib/googleJob'
@@ -129,8 +129,12 @@ describe('waitingGroups', () => {
       closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: '2026-10-12T08:00:00Z', readAt: '2026-10-25T06:00:00Z', kept: null },
     })
     const mikvah = { id: 'p', name: 'Stephen’s Cafe', href: '/x', website: null, pages: [], off: false, offSince: null, reason: null, fields: [], findings: [hours] }
-    const w = waitingGroups('p', jobs({ kosher: kosher as never, google: { counts, places: [g] }, hours: { name: 'Mikvah hours', places: [mikvah as never] } }), NOW)
+    const js = jobs({ kosher: kosher as never, google: { counts, places: [g] }, hours: { name: 'Mikvah hours', places: [mikvah as never] } })
+    const w = waitingGroups('p', js, NOW)
     expect(w.groups.map((x) => x.key)).toEqual(['off:k1', 'closure', 'hours:https://stephens.example/hours'])
+    // Edit, right there: the Kosher box for the list's removal; none for a
+    // closure, nor for hours read line by line (no box of their own).
+    expect(w.groups.map((x) => groupEdit(x, 'p', js)?.kind ?? null)).toEqual(['boxes', null, null])
     const [o, c, h] = w.groups
     expect(o.lines).toEqual([{ label: 'Hechsher', value: 'None', old: 'Keystone-K' }])
     expect(o.page).toEqual({ text: 'Keystone-K’s list', url: 'https://keystonek.example/list' })
@@ -174,7 +178,7 @@ describe('waitingGroups', () => {
       lists: [{ list: 'mekor' as const, url: 'https://mekor.example/list', watch: null, error: null, entries: 1, updated: null }],
       counts: { ...counts, notListed: 0 },
       places: [],
-      newPlaces: [{ name: 'Rita’s', address: '1 Main St', on: [], archived: 'Rita’s Water Ice', filed: 'queued', findings: [f] }],
+      newPlaces: [{ name: 'Rita’s', address: '1 Main St', on: [], archived: 'Rita’s Water Ice', archivedId: 'r-old', filed: 'queued', findings: [f] }],
     }
     const w = waitingGroups('new:Rita’s', jobs({ kosher: kosher as never }), NOW)
     expect(w.groups).toHaveLength(1)
@@ -188,7 +192,8 @@ describe('waitingGroups', () => {
         { label: 'Hechsher', value: 'Keystone-K', old: null },
       ],
       facts: [{ label: 'In the guide', value: 'Archived, as “Rita’s Water Ice”' }],
-      decide: { kind: 'new', id: 'n1' },
+      // That listing, for Bring it back.
+      decide: { kind: 'new', id: 'n1', archivedId: 'r-old' },
     })
     expect(w.checked).toEqual([])
   })
@@ -199,7 +204,7 @@ describe('waitingGroups', () => {
       lists: [{ list: 'mekor' as const, url: 'https://mekor.example/list', watch: null, error: null, entries: 1, updated: null }],
       counts: { ...counts, notListed: 0 },
       places: [],
-      newPlaces: [{ name: 'Z Candy Bar', address: '2 Main St', on: [{ list: 'mekor' as const, name: 'Z Candy Bar', url: '', says: '' }], archived: null, filed: 'next' }],
+      newPlaces: [{ name: 'Z Candy Bar', address: '2 Main St', on: [{ list: 'mekor' as const, name: 'Z Candy Bar', url: '', says: '' }], archived: null, archivedId: null, filed: 'next' }],
     }
     const [g] = waitingGroups('new:Z Candy Bar', jobs({ kosher: kosher as never }), NOW).groups
     expect(g).toMatchObject({

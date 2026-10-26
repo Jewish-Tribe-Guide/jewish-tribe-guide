@@ -9,13 +9,13 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { readElsewhere } from '@/lib/menuLink'
-import { itemsField } from '@/lib/listingView'
 import { samePage } from '@/lib/hoursJob'
 import { dishProposal, updatesPill, type DishProposal, type ReadDish } from '@/lib/dishProposal'
 import { dishJobStatus, dishStatus, sentThroughSite, type DishJobStatus, type DishPlace, type DishPlaceStatus } from '@/lib/watchJobs'
 import { watchHealth, type Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { dishesEdit, withSave } from './findingEdits'
 import ContactBoxes, { givesContact, isContactFinding, type ListedContact } from './ContactBoxes'
 import FoodHours, { isFoodHoursFinding } from './FoodHours'
 import FindingCompare, { type Decision } from './FindingCompare'
@@ -463,32 +463,9 @@ export default function MainDishes({ token }: { token: string }) {
     setSaveError(null)
     try {
       const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/main-dishes?item=${p.id}`, community), { headers }, 'Could not open its dishes.')
-      const field = itemsField(category)
-      if (!field) return
-      setEditing({
-        item,
-        category,
-        edit: {
-          title: field.label,
-          fields: [],
-          rows: ['items'],
-          preset: { [field.key]: proposal.always, [`${field.key}_sometimes`]: proposal.sometimes },
-          save: {
-            label: 'Save to the listing',
-            via: async ({ payload }) => {
-              const d = (payload.details ?? {}) as Record<string, unknown>
-              const res = await fetch(api, {
-                method: 'POST',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'save', resourceId: p.id, always: d[field.key] ?? [], sometimes: d[`${field.key}_sometimes`] ?? [] }),
-              })
-              if (res.ok) used(p, await res.clone().json())
-              return res
-            },
-            onSaved: () => setEditing(null),
-          },
-        },
-      })
+      const fe = dishesEdit(p.id, category, proposal)
+      if (!fe) return
+      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => setEditing(null), after: async (res) => used(p, await res.json()) }) })
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not open its dishes.')
     }
