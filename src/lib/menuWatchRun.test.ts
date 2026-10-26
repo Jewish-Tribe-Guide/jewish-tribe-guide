@@ -38,7 +38,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 
-const { runMenuWatch, syncMenuWatches, newMenuReadBudget } = await import('./menuWatchRun')
+const { runMenuWatch, syncMenuWatches, newMenuReadBudget, MENU_READS_PER_RUN } = await import('./menuWatchRun')
 
 const food = makeCategory({
   id: 'restaurant',
@@ -158,6 +158,35 @@ describe('runMenuWatch', () => {
     expect(newMenuReadBudget().aiReads).toBeGreaterThan(0)
   })
 
+  // Oct 26: the menus are checked last, so the shul and mikvah pages had
+  // spent the run's reads before any changed menu got one (Goldie's waited
+  // from Oct 22). A menu has its own reads, taken first.
+  it('a changed menu reads from the menus’ own reads first, then the run’s', async () => {
+    const budget = { ...newMenuReadBudget(), aiReads: 0 }
+    expect(budget.menuReads).toBe(MENU_READS_PER_RUN)
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k' })).toMatchObject({ ok: true, filed: 1 })
+    expect(m.readMenu).toHaveBeenCalledTimes(1)
+    expect(budget).toMatchObject({ menuReads: MENU_READS_PER_RUN - 1, aiReads: 0 })
+    const last = { aiReads: 1, menuReads: 0 }
+    expect((await runMenuWatch({ ...watch, pageHash: 'old' }, last, { apiKey: 'k' })).ok).toBe(true)
+    expect(last).toEqual({ aiReads: 0, menuReads: 0 })
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, last, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(m.readMenu).toHaveBeenCalledTimes(2)
+  })
+
+  it('the other menu pages on its website take from the menus’ reads, then the run’s', async () => {
+    m.listCategoriesUncached.mockResolvedValue([site])
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, website: 'https://judah.example' } })
+    const treats = { url: 'https://judah.example/treats', text: 'Blendini.', pdf: null }
+    const drinks = { url: 'https://judah.example/drinks', text: 'Lemonade.', pdf: null }
+    m.findMenus.mockResolvedValue([page, treats, drinks])
+    m.readMenus.mockResolvedValue(twoDishes)
+    const budget = { aiReads: 1, menuReads: 2 }
+    await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k' })
+    expect(m.readMenus).toHaveBeenCalledWith([page, treats, drinks], 'Judah', expect.anything())
+    expect(budget).toEqual({ aiReads: 0, menuReads: 0 })
+  })
+
   it('a menu that can’t be read, a listing gone, or the AI failing is a watch not working, with the reason', async () => {
     m.readMenuPage.mockResolvedValueOnce(null)
     expect(await runMenuWatch(watch, undefined, { apiKey: 'k' })).toMatchObject({ ok: false, error: expect.stringContaining('Couldn’t read the menu') })
@@ -267,7 +296,7 @@ describe('runMenuWatch: dishes added since its last read', () => {
   })
 
   it('from the run’s AI reads: past them, it waits for a run with room', async () => {
-    const out = await runMenuWatch(unchanged, { ...newMenuReadBudget(), aiReads: 0 }, { apiKey: 'k' })
+    const out = await runMenuWatch(unchanged, { ...newMenuReadBudget(), aiReads: 0, menuReads: 0 }, { apiKey: 'k' })
     expect(out).toEqual({ ok: true, filed: 0 })
     expect(m.readMenu).not.toHaveBeenCalled()
   })
@@ -448,7 +477,7 @@ describe('runMenuWatch: a menu page that stops opening', () => {
     const budget = newMenuReadBudget()
     expect(budget.searches).toBe(1)
     await run(budget)
-    expect(budget).toMatchObject({ searches: 0, aiReads: 2 })
+    expect(budget).toMatchObject({ searches: 0, menuReads: MENU_READS_PER_RUN - 1 })
     expect(await run(budget)).toEqual({ ok: false, error: 'Couldn’t read the menu (blocked, moved, or built in the browser)' })
     expect(await runWithoutAi()).toEqual({ ok: false, error: 'Couldn’t read the menu (blocked, moved, or built in the browser)' })
     expect(m.findMenus).toHaveBeenCalledTimes(1)

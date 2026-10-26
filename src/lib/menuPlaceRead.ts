@@ -5,7 +5,8 @@ import { itemsField } from '@/lib/listingView'
 import { itemMarks, itemWording } from '@/lib/itemMarks'
 import { findMenus, readMenuPage, readMenus, unreadMenuNote, menuPages, type Trouble } from '@/lib/menuReader'
 import { MENU_LINK_KEY, menuWebsite, readMenuLink } from '@/lib/menuLink'
-import { listMenuReadings, saveMenuReading, type StoredMenuReading } from '@/lib/menuReadingStore'
+import { dateMenuDishes, listMenuReadings, saveMenuReading, type StoredMenuReading } from '@/lib/menuReadingStore'
+import { listedDishes, newDishes } from '@/lib/menuWatch'
 import { pageRenderer } from '@/lib/renderPage'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
@@ -41,10 +42,13 @@ export function newestMenuDate(item: DirectoryResource, field: CategoryField): s
   return itemMarks(item, field).reduce<string | null>((newest, m) => (m.menuAt && (!newest || m.menuAt > newest) ? m.menuAt : newest), null)
 }
 
-/** Never read, with something to read it from, and no dishes from a menu
- *  someone sent through the site (watchJobs.ts's 'not_read'). */
+/** Never read, with something to read it from. Its dishes dated "on its
+ *  menu" too: until Oct 26 those were left out, as from a menu sent through
+ *  the site, but most were dated by the reads of Oct 17 and 18, before a
+ *  reading was kept, so with no reading and no menu link they had no watch
+ *  either, and HipCityVeg's dishes said Oct 17 for good. */
 export function needsFirstRead(item: DirectoryResource, kind: DishKind, read: boolean): boolean {
-  return !read && !!(menuLinkOf(item) || menuWebsite(item, kind.category)) && !newestMenuDate(item, kind.field)
+  return !read && !!(menuLinkOf(item) || menuWebsite(item, kind.category))
 }
 
 /** Reads a place's menu now and keeps what the AI proposed: its menu link
@@ -86,6 +90,16 @@ export async function readPlaceMenu(slug: string, listing: DirectoryResource, ki
     note: read.note,
     model: read.model,
   })
+}
+
+/** A first read that agrees with the listing (no dish new to it, none it
+ *  lists missing) dates every dish it named, as a menu watch's agreeing
+ *  read does (menuWatchRun.ts); one that doesn't waits on the Main dishes
+ *  tab, its dates as they were. */
+async function dateIfAgreeing(slug: string, listing: DirectoryResource, kind: DishKind, kept: StoredMenuReading): Promise<void> {
+  if (kept.status !== 'proposed' || kept.missing?.length) return
+  if (newDishes(kept.dishes, listedDishes(listing, kind.category)).length) return
+  await dateMenuDishes(slug, listing.id, kind.field.key, kept.dishes.map((d) => d.name))
 }
 
 /** Food places a morning run reads, at most. */
@@ -151,6 +165,7 @@ export async function readUnreadMenus(
         return null
       })
       if (kept) done++
+      if (kept) await dateIfAgreeing(slug, l, kind, kept)
     }
     out.push({ community: slug, read: done, left: unread.length - done })
   }

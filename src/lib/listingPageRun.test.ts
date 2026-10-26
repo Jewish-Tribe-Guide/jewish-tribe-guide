@@ -389,6 +389,8 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     const budget = { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }
     expect(await runListingPageWatch(changed, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
     expect(m.readShulWeek).not.toHaveBeenCalled()
+    // Never the menus' own reads (MENU_READS_PER_RUN).
+    expect(budget.menuReads).toBe(newMenuReadBudget().menuReads)
   })
 
   // Oct 26: a Sunday's new weeks waited days behind the menus for the

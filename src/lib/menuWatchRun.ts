@@ -34,7 +34,25 @@ import type { DirectoryResource, ResourceRow } from '@/types'
  *  each several seconds of a run that has a minute for every watch.
  *  `searches`: how many websites it may search again for a menu whose page
  *  stopped opening (a few pages each, and one of the run's AI reads). */
-export type MenuReadBudget = { aiReads: number; renders?: number; searches?: number; compares?: number; timesReads?: number }
+export type MenuReadBudget = { aiReads: number; menuReads?: number; renders?: number; searches?: number; compares?: number; timesReads?: number }
+
+/** A menu's own AI reads per cron run, apart from the run's: taken first,
+ *  and past them a menu takes from the run's as before. The menus are
+ *  checked last, so on Oct 26 the shul and mikvah pages had spent the
+ *  run's reads before any menu that changed got one: 1 of 22 reads was a
+ *  menu, and a changed menu waited night after night (Goldie's, since
+ *  Oct 22). */
+export const MENU_READS_PER_RUN = 8
+
+/** Takes up to `n` AI reads for a menu, its own first (MENU_READS_PER_RUN),
+ *  then the run's: how many it got. */
+function takeMenuReads(budget: MenuReadBudget, n: number): number {
+  const own = Math.max(0, Math.min(n, budget.menuReads ?? 0))
+  if (own) budget.menuReads! -= own
+  const shared = Math.max(0, Math.min(n - own, budget.aiReads))
+  budget.aiReads -= shared
+  return own + shared
+}
 
 /** Listing pages a cron run may read again only because their listing
  *  changed (listingPageRun.ts), apart from the reads a page that changed
@@ -58,7 +76,7 @@ export const MENU_RENDERS_PER_RUN = 1
 export const MENU_SEARCHES_PER_RUN = 1
 
 export function newMenuReadBudget(): MenuReadBudget {
-  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN, searches: MENU_SEARCHES_PER_RUN, compares: LISTING_COMPARES_PER_RUN, timesReads: TIMES_READS_PER_RUN }
+  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN, searches: MENU_SEARCHES_PER_RUN, compares: LISTING_COMPARES_PER_RUN, timesReads: TIMES_READS_PER_RUN, menuReads: MENU_READS_PER_RUN }
 }
 
 /** Gives every food place its menu watch, on its menu link or else the page
@@ -184,10 +202,7 @@ export async function runMenuWatch(
     if (!opts.full) return { ok: true, filed: 0 }
     return { ok: true, filed: 0, check: { what: 'dishes', from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the menu wasn’t read.' } }
   }
-  if (budget && !opts.full) {
-    if (budget.aiReads <= 0) return { ok: true, filed: 0 }
-    budget.aiReads--
-  }
+  if (budget && !opts.full && !takeMenuReads(budget, 1)) return { ok: true, filed: 0 }
   const listed = listedDishes(listing, category)
   let read
   try {
@@ -195,8 +210,7 @@ export async function runMenuWatch(
     // from another page isn't "not on the menu"; each page an AI read.
     const website = menuWebsite(listing, category)
     const pages = menuPages(source, website ? await findMenus(website, { fetchImpl: opts.fetchImpl }).catch(() => []) : [])
-    const reading = budget && !opts.full ? pages.slice(0, 1 + Math.max(0, budget.aiReads)) : pages
-    if (budget && !opts.full) budget.aiReads -= reading.length - 1
+    const reading = budget && !opts.full ? pages.slice(0, 1 + takeMenuReads(budget, pages.length - 1)) : pages
     read = reading.length > 1 ? (await readMenus(reading, listing.name, { apiKey, fetchImpl: opts.fetchImpl, listed }))! : await readMenu(source, listing.name, { apiKey, fetchImpl: opts.fetchImpl, listed })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The menu changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
@@ -264,9 +278,8 @@ async function lookElsewhere(
   const other = kept && kept.status !== 'failed' && kept.sourceUrl && kept.sourceUrl !== watch.url && /^https?:\/\//i.test(kept.sourceUrl) ? kept.sourceUrl : null
   if (other) return `. Its menu was last read from ${other}: see the Main dishes tab.`
   if (budget && !opts.full) {
-    if ((budget.searches ?? 0) <= 0 || budget.aiReads <= 0) return ''
+    if ((budget.searches ?? 0) <= 0 || !takeMenuReads(budget, 1)) return ''
     budget.searches!--
-    budget.aiReads--
   }
   const notFound = '. Its website was searched again, and no other page on it has the menu.'
   const pages = (await findMenus(website, { fetchImpl: opts.fetchImpl, render: opts.render })).filter((p) => p.url !== watch.url)

@@ -115,6 +115,28 @@ for that exact change, in the same conversation. Show the dry run first.
    - Still open: two of the Dottie's branches share dotties.com with the
      first branch's watch (one watch per page), so the daily run never
      looks for theirs. Read it now on each does.
+   **Oct 26, "why does HipCityVeg say Oct 17, and Goldie?"** Two causes,
+   both fixed on `redesign/oct18-fixes` (not live until it deploys):
+   - Menus are checked last each night, and the shul and mikvah pages
+     spent the run's AI reads first: on Oct 26, 1 of 22 reads was a
+     menu. A changed menu (Goldie, Sweet Box, Roling's, Nanas, Sweet
+     Trading, Gelbstein's) kept its old date night after night. Menus now
+     have 8 reads a night of their own (`MENU_READS_PER_RUN`), taken
+     first, then the shared ones. Not ordered by who waited longest: with
+     8, every changed menu found on Oct 26 is read in one night.
+   - 7 places never read (HipCityVeg, Lipkin's, PKS, Center City Pretzel,
+     Star of David, The Brazilian BBQ, The Kosher Grill) had dishes dated
+     by the Oct 17–18 reads, before readings were kept. Dated dishes kept
+     them out of the morning first read (they looked "sent through the
+     site"), and with no reading and no menu link they had no watch. The
+     morning read (`/api/cron/read-menus`, 5 a morning) now reads them
+     too; one that agrees with the listing dates its dishes, one that
+     doesn't waits on the kind page, and from then on the place has a
+     watch. A place whose website menu can't be read now says so ("Menu
+     can't be read") instead of nothing.
+   - Mike's, Bar Bombón and Mama's need a browser to draw their menu,
+     1 a night; Tasty Twisters' page is unchanged but its date is stuck at
+     Oct 22, cause not found yet.
 
 ## Getting the branch live
 
