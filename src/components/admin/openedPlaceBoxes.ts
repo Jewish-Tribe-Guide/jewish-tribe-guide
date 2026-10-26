@@ -89,8 +89,10 @@ export type Fix =
   | { kind: 'eruv-find'; id: string }
 export type Field = { label: string; value: string }
 /** A place not checked, by what's wrong (FinalFood3): "rivkacakes.com ·
- *  never read · added Oct 23", the fields it leaves unchecked, its fix. */
-export type Problem = { key: string; page: FootLink | null; says: string; fields: Field[]; fix: Fix | null }
+ *  never read · added Oct 23", the fields it leaves unchecked, its fix.
+ *  `stop`: a page that doesn't load, no longer read (Oct 26: Chabad of the
+ *  Main Line's, turned away every night, and Elkins Park's, gone). */
+export type Problem = { key: string; page: FootLink | null; says: string; fields: Field[]; fix: Fix | null; stop?: Stop }
 
 /** `checked`: the boxes no problem stands for, a not-checked place's
  *  "2 more checked". */
@@ -150,8 +152,10 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   const sitePages: { watch: Watch; step: ReadStep }[] = []
   const problem = (p: Problem) => {
     const same = problems.find((x) => x.key === p.key)
-    if (same) same.fields.push(...p.fields.filter((f) => !same.fields.some((g) => g.label === f.label)))
-    else problems.push(p)
+    if (same) {
+      same.fields.push(...p.fields.filter((f) => !same.fields.some((g) => g.label === f.label)))
+      same.stop ??= p.stop
+    } else problems.push(p)
   }
 
   // A shul's times: this week's, then its usual weekday and Shabbos ones,
@@ -233,7 +237,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       const down = live.filter((x) => didntLoad(x, now))
       down.forEach((w) => badPages.add(w.id))
       const w = down[0]
-      if (w) problem({ key: w.id, page: pageLink(w.url), says: `${pageSays(w, now) ?? 'didn’t load'}${down.length > 1 ? ` · ${down.length} pages` : ''}`, fields: [...fields], fix: { kind: 'read', step, pages: down.length } })
+      if (w) problem({ key: w.id, page: pageLink(w.url), says: `${pageSays(w, now) ?? 'didn’t load'}${down.length > 1 ? ` · ${down.length} pages` : ''}`, fields: [...fields], fix: { kind: 'read', step, pages: down.length }, ...(down.length === 1 ? { stop: stopPage(job, w) } : {}) })
     } else if (hoursSection(state, now) === 'cant_read') {
       const w = live[0]
       if (w) badPages.add(w.id)
@@ -251,6 +255,8 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   if (food) {
     const r = food.reading
     const menu = r?.sourceUrl ?? food.menuUrl
+    // Its menu link unlinked; a page found on its website, No menu online.
+    const stopMenu: Stop = { kind: 'menu', action: food.menuUrl && (!r?.sourceUrl || samePage(r.sourceUrl, food.menuUrl)) ? 'unlink' : 'no_menu', what: 'its menu' }
     if (food.dishes.length && r?.status !== 'no_menu') {
       const sometimes = new Set(food.sometimes ?? [])
       const sent = sentThroughSite(food)
@@ -273,8 +279,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
         ],
         foot: sent
           ? { lead: 'Sent through the site', links: [], when: food.menuAt ? day(food.menuAt) : null, change: { kind: 'menu' } }
-          : // Its menu link unlinked; a page found on its website, No menu online.
-            { lead: 'Same as', links: [{ text: 'its menu', url: menu ?? null }], when: read(r?.readAt), change: { kind: 'menu' }, stop: { kind: 'menu', action: food.menuUrl && (!r?.sourceUrl || samePage(r.sourceUrl, food.menuUrl)) ? 'unlink' : 'no_menu', what: 'its menu' } },
+          : { lead: 'Same as', links: [{ text: 'its menu', url: menu ?? null }], when: read(r?.readAt), change: { kind: 'menu' }, stop: stopMenu },
       })
     }
     const live = (food.pages ?? []).filter((w) => w.active)
@@ -297,7 +302,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     if (status === 'cant_read') problem({ key: 'menu', page, says: 'can’t be read', fields, fix: { kind: 'change', change: { kind: 'menu' }, label: 'Give its menu page' } })
     if (status === 'didnt_load') {
       const w = food.menuWatch
-      problem({ key: 'menu', page: w ? pageLink(w.url) : page, says: (w && pageSays(w, now)) ?? 'didn’t load', fields, fix: { kind: 'read', step } })
+      problem({ key: 'menu', page: w ? pageLink(w.url) : page, says: (w && pageSays(w, now)) ?? 'didn’t load', fields, fix: { kind: 'read', step }, stop: stopMenu })
     }
   }
 
@@ -345,7 +350,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     hospital.boxes?.forEach((b) => drop.add(`refuah-${b.title}`))
     problem(
       w && didntLoad(w, now)
-        ? { key: 'refuah', page: { text: 'Refuah', url: w.url }, says: pageSays(w, now) ?? 'didn’t load', fields, fix: { kind: 'read', step: { job: 'refuah', watchId: w.id } } }
+        ? { key: 'refuah', page: { text: 'Refuah', url: w.url }, says: pageSays(w, now) ?? 'didn’t load', fields, fix: { kind: 'read', step: { job: 'refuah', watchId: w.id } }, stop: { kind: 'refuah', what: 'its Refuah page' } }
         : { key: 'refuah', page: null, says: 'Not found on Refuah', fields, fix: { kind: 'change', change: { kind: 'refuah' }, label: 'Give its page on Refuah' } },
     )
   }
@@ -400,10 +405,10 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       if (section !== 'read') drop.add('eruv')
       if (section === 'no_source') problem({ key: 'eruv', page: null, says: 'Nothing gives its status', fields: status, fix: eruv.website ? { kind: 'eruv-find', id } : { kind: 'add' } })
       else if (section === 'email') problem({ key: 'eruv', page: { text: `its emails, from ${eruv.statusEmail ?? ''}`, url: null }, says: 'its last email couldn’t be read', fields: status, fix: { kind: 'eruv-email', id } })
-      else if (section === 'didnt_load') problem({ key: 'eruv', page: { text: 'its status page', url: eruv.statusUrl }, says: eruv.statusErrorAt ? `didn’t load ${day(eruv.statusErrorAt)}` : 'didn’t load', fields: status, fix: readIt })
+      else if (section === 'didnt_load') problem({ key: 'eruv', page: { text: 'its status page', url: eruv.statusUrl }, says: eruv.statusErrorAt ? `didn’t load ${day(eruv.statusErrorAt)}` : 'didn’t load', fields: status, fix: readIt, stop: stopStatus })
       else if (eruv.lineUrl && eruv.lineError) {
         drop.add('eruv-map')
-        problem({ key: 'map', page: { text: 'its map', url: eruv.lineUrl }, says: 'didn’t load', fields: [{ label: 'Map', value: 'As last read' }], fix: readIt })
+        problem({ key: 'map', page: { text: 'its map', url: eruv.lineUrl }, says: 'didn’t load', fields: [{ label: 'Map', value: 'As last read' }], fix: readIt, stop: { kind: 'eruv-map', id, what: 'its map' } })
       } else if (watch) {
         drop.add('eruv-details')
         problem({
@@ -415,6 +420,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
             { label: 'Email alerts', value: eruv.alertsUrl ? shortUrl(eruv.alertsUrl) : 'None listed' },
           ],
           fix: { kind: 'read', step: { job: 'watch', watchId: watch.id } },
+          stop: { kind: 'watch', watchId: watch.id, what: 'its website' },
         })
       }
     }

@@ -818,7 +818,18 @@ export default function OpenedPlace({
                   ))}
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-2 pt-2.5">{fix(p)}</div>
+              <div className="flex flex-wrap items-center gap-2 pt-2.5">
+                {fix(p)}
+                {/* A page that doesn't load: no longer read, asked first. */}
+                {p.stop && stopping !== p.key && (
+                  <button type="button" disabled={busy !== null} onClick={() => setStopping(p.key)} className={BUTTON}>
+                    Stop
+                  </button>
+                )}
+              </div>
+              {p.stop && stopping === p.key && (
+                <StopAsk what={p.stop.what} busy={busy !== null} onKeep={() => setStopping(null)} onStop={() => void run('stop', () => stopSource(p.stop!)).then((ok) => ok && setStopping(null))} />
+              )}
               {form(p)}
             </div>
           ))}

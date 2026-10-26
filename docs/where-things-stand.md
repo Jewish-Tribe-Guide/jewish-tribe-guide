@@ -1730,17 +1730,25 @@ said "Checked 108 of 108", and the tab counted it read. Now:
     shul's page is read for its new week adds 32, which would have left the
     menus (checked last) for the next night. The slowest read seen is 34s,
     so one started at 250s still ends inside the 300s limit.
-- Not live until merged. PR 359 was merged before this, before Wrong place,
-  and before the waiting-mikvahs fix.
+- Live: PR 360 merged Oct 26 (deployed 19:33Z), with Wrong place and the
+  waiting-mikvahs fix. The mikvahs clear on the first nightly run after it.
 
-**Found Oct 26, not fixed:**
+**Found Oct 26, waiting on the user:**
 - **Elkins Park Eruv's website page** (`yiep.org/eruv-map`) is gone (404
   since Oct 25). yiep.org now only links a Google map of the boundaries,
-  from /our-community/. Stop it on the eruv's page.
+  from /our-community/. Stop it on the eruv's page, once Stop on a page
+  that doesn't load is live (below).
 - **Chabad of the Main Line's schedule page** answers every read with
   Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
   bot checks. Options: its email newsletter as the source, or Stop the
   page so the shul shows Not checked.
+
+**Stop on a page that doesn't load (built Oct 26, own PR).** A page that
+failed showed only Read it now; Stop was only under a working page's box.
+Now its problem has Stop beside Read it now, asked first, for a shul's or
+mikvah's page, an eruv's website, status page or map, a hospital's Refuah
+page, and a food place's menu. Not offered when several pages of a site are
+down together: that row stands for all of them, and Stop names one page.
 
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 

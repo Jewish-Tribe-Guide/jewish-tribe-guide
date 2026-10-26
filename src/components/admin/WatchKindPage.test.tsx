@@ -91,6 +91,35 @@ describe('WatchKindPage', () => {
     expect(posts).toEqual([['/api/admin/watches/google', { action: 'not_on_google', id: 'b' }]])
   })
 
+  // Oct 26: Chabad of the Main Line's schedule page turned the reader away
+  // every night, with only Read it now beside it.
+  it('a page that doesn’t load: Stop, asked first, beside Read it now', async () => {
+    const since = new Date(Date.now() - 6 * 86_400_000).toISOString()
+    const ran = new Date(Date.now() - 3_600_000).toISOString()
+    const page = { id: 'w3', url: 'https://chabad.example/Schedule.htm', active: true, lastRunAt: ran, lastOkAt: since, lastError: 'Couldn’t read the page: it turned the reader away (403)', failingSince: since, createdAt: since, lastCheck: null }
+    const shul = { id: 'c', name: 'Chabad of the Main Line', href: '/philly/synagogues/c', website: 'https://chabad.example', pages: [{ watch: page }], off: false, reason: null, fields: ['Minyanim'], times: { key: 'minyanim', minyanim: [], schedules: [] } }
+    const posts: unknown[] = []
+    await renderPage([place('c', 'Chabad of the Main Line')], 'synagogue', (url, init) => {
+      if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
+      if (init?.method === 'POST') {
+        posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Chabad of the Main Line/ }))
+    const open = screen.getByTestId('kind-place-open')
+    const problem = within(open).getByTestId('problem')
+    expect(within(problem).getByRole('button', { name: 'Read it now' })).toBeTruthy()
+    await user.click(within(problem).getByRole('button', { name: 'Stop' }))
+    expect(within(problem).getByText('Stop reading chabad.example/Schedule.htm?')).toBeTruthy()
+    await user.click(within(problem).getByRole('button', { name: 'Keep reading' }))
+    expect(posts).toEqual([])
+    await user.click(within(problem).getByRole('button', { name: 'Stop' }))
+    await user.click(within(problem).getByRole('button', { name: 'Stop reading' }))
+    expect(posts).toContainEqual(['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'c', id: 'w3' }])
+  })
+
   // Oct 25: the weekly link check found House of Kosher's kosher
   // certificate link gone (404).
   it('opens a place whose link doesn’t open, with Check it again', async () => {
@@ -440,6 +469,29 @@ describe('an eruv, on its kind’s page', () => {
     expect(within(status).getByText('An email: read for its status. Subscribe the guide’s inbox to it too.')).toBeTruthy()
     await user.click(within(status).getByRole('button', { name: 'Use this' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusEmail: 'eruv@lowermerioneruv.org', statusUrl: '' } }]])
+  })
+
+  // Oct 26: Elkins Park's eruv map page, gone (404) every night since Oct 25.
+  it('a website that doesn’t load: Stop pauses it, beside Read it now', async () => {
+    const since = new Date(Date.now() - 2 * 86_400_000).toISOString()
+    const gone = { ...LM, id: 'ep', name: 'Elkins Park Eruv', website: 'https://yiep.example/eruv-map', lineUrl: null, lineReadAt: null }
+    const down = { ...site, id: 'w-ep', url: 'https://yiep.example/eruv-map', lastOkAt: since, lastError: 'The page answered 404', failingSince: since }
+    await renderPage([], 'eruv-information', (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'eruv-information', pluralLabel: 'Eruv Information', kind: 'eruv' }] }
+      if (url.includes('/api/admin/watches/eruv') && !init?.method) return { available: true, timezone: 'America/New_York', eruvim: [gone], findings: [], watches: [down] }
+      if (init?.method === 'POST') {
+        posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Elkins Park Eruv/ }))
+    const problem = within(screen.getByTestId('kind-place-open')).getByTestId('problem')
+    expect(within(problem).getByRole('button', { name: 'Read it now' })).toBeTruthy()
+    await user.click(within(problem).getByRole('button', { name: 'Stop' }))
+    expect(within(problem).getByText('Stop reading its website?')).toBeTruthy()
+    await user.click(within(problem).getByRole('button', { name: 'Stop reading' }))
+    expect(posts).toContainEqual(['/api/admin/watches', { action: 'pause', id: 'w-ep' }])
   })
 
   it('an email it couldn’t read: say what it says, here', async () => {

@@ -221,6 +221,24 @@ describe('openedPlace, not checked', () => {
     expect(o.checked).toEqual([])
   })
 
+  it('offers to stop a page that doesn’t load, alone; not a site of several pages down', () => {
+    const failing = watch('w1', 'https://mekorhabracha.org/davening', { failingSince: '2026-10-20T08:00:00Z', lastError: '403', lastRunAt: '2026-10-25T08:00:00Z', lastCheck: check({ parts: [{ part: 'weekday', size: 2 }] }) })
+    const o = openedPlace('p', jobs({ times: { name: 'Shul times', places: [shul({ pages: [{ watch: failing }] }) as never] } }), NOW)
+    expect(o.problems.map((p) => p.stop)).toEqual([{ kind: 'page', job: 'times', watchId: 'w1', what: 'mekorhabracha.org/davening' }])
+    const down = watch('w2', 'https://mekorhabracha.org/', { failingSince: '2026-10-21T08:00:00Z', lastError: '403', lastRunAt: '2026-10-25T08:00:00Z' })
+    const two = openedPlace('p', jobs({ times: { name: 'Shul times', places: [shul({ pages: [{ watch: failing }, { watch: down }] }) as never] } }), NOW)
+    expect(two.problems.map((p) => p.stop)).toEqual([undefined])
+  })
+
+  it('offers to stop a hospital’s Refuah page and a food place’s menu that don’t load', () => {
+    const failing = (id: string, url: string) => watch(id, url, { failingSince: '2026-10-20T08:00:00Z', lastError: '404', lastRunAt: '2026-10-25T08:00:00Z' })
+    const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: failing('r', 'https://refuah.example/chop'), notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }]
+    expect(openedPlace('p', jobs({ hospitals }), NOW).problems.map((p) => p.stop)).toEqual([{ kind: 'refuah', what: 'its Refuah page' }])
+    const menu = failing('m', 'https://grill.example/menu')
+    const dishes = [{ id: 'p', name: 'Grill', href: '/x', dishes: ['Schnitzel'], website: 'https://grill.example', menuUrl: 'https://grill.example/menu', menuWatch: menu, pages: [menu], reading: { status: 'approved' as const, readAt: '2026-10-19T08:00:00Z', sourceUrl: 'https://grill.example/menu' } }]
+    expect(openedPlace('p', jobs({ dishes }), NOW).problems.find((p) => p.key === 'menu')?.stop).toEqual({ kind: 'menu', action: 'unlink', what: 'its menu' })
+  })
+
   it('asks for a hospital’s page on Refuah when it isn’t found there', () => {
     const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: null, notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }]
     const o = openedPlace('p', jobs({ hospitals }), NOW)
