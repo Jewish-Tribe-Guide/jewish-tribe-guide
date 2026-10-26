@@ -1705,7 +1705,8 @@ backfill script skips that listing.
 - **Still open: BZBI Early Childhood** (matched to the temple's place id).
   It was decided with Keep as is before the button existed, so nothing is
   waiting, and only a waiting Google change shows Wrong place. Its Google
-  phone is still read every night.
+  phone is still read every night. Decided Oct 26 (the user): Wrong place
+  stays on the waiting card only, not on an up-to-date place's Google box.
 
 **Found Oct 26, not fixed:**
 - **Chabad of the Main Line's schedule page** answers every read with
