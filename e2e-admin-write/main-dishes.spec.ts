@@ -139,6 +139,13 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   await expect(open.getByTestId('waiting-group')).toHaveCount(0)
   await page.getByRole('tab', { name: /^Not checked/ }).click()
   await expect(placeRow(page)).toBeVisible()
+  // Its Dishes, with what the menu read made of the one added by hand (the
+  // user, Oct 26: "see or know if the AI reader is picking things up").
+  await expect(async () => {
+    await page.goto(`/philly/admin/watches/kind/${c.id}?place=${id}`)
+    await open.getByRole('button', { name: /more checked$/ }).click({ timeout: 3_000 })
+    await expect(open.getByTestId('checked-mark')).toHaveText(['Laffa · Not found on its menu'], { timeout: 3_000 })
+  }).toPass({ timeout: 20_000 })
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
   await expect.poll(async () => (await stored())[f.key]).toEqual(['Shawarma', 'Laffa', 'Falafel'])

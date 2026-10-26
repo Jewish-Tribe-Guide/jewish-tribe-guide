@@ -5,6 +5,7 @@ import { detailsRows } from '@/lib/eruvWebsite'
 import { dishJobStatus, didntLoad, eruvSection, hospitalSection, sentThroughSite } from '@/lib/watchJobs'
 import { hoursDidntLoad, hoursSection, samePage } from '@/lib/hoursJob'
 import { formatHoursSummary } from '@/lib/hours'
+import { READER_MARK_TEXT, readerMarks, type ReaderMark } from '@/lib/dishProposal'
 import { TEFILLAH_LABELS } from '@/lib/davening'
 import { watchHealth, type Watch } from '@/lib/watches'
 import { day, shortUrl } from './watchText'
@@ -253,11 +254,23 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     if (food.dishes.length && r?.status !== 'no_menu') {
       const sometimes = new Set(food.sometimes ?? [])
       const sent = sentThroughSite(food)
+      // Each dish no read has found yet, by what its last read made of it
+      // (dishProposal's readerMarks); not for a menu sent through the site.
+      const marks = sent ? new Map<string, ReaderMark>() : readerMarks(food, r ? { dishes: r.dishes ?? [], missing: r.missing } : null)
       boxes.push({
         key: 'dishes',
         kind: 'rows',
         title: 'Dishes',
-        groups: [{ head: '', rows: food.dishes.map((name) => ({ name, sub: sometimes.has(name) ? 'Not always' : undefined })) }],
+        groups: [
+          {
+            head: '',
+            rows: food.dishes.map((name) => ({
+              name,
+              ...(sometimes.has(name) ? { sub: 'Not always' } : {}),
+              ...(marks.has(name) ? { right: READER_MARK_TEXT[marks.get(name)!] } : {}),
+            })),
+          },
+        ],
         foot: sent
           ? { lead: 'Sent through the site', links: [], when: food.menuAt ? day(food.menuAt) : null, change: { kind: 'menu' } }
           : // Its menu link unlinked; a page found on its website, No menu online.
@@ -458,8 +471,10 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
 }
 
 /** "2 more checked", a line each: what it is, the listing's value, where
- *  it's read from (FinalPhonePlace3). */
-export type CheckedLine = { key: string; box: string; label: string; value: string; foot: Foot }
+ *  it's read from (FinalPhonePlace3). `marks`: its dishes no read has found
+ *  yet, each with what its last read made of it ("Bagels", "Not looked for
+ *  yet"), as its Dishes box has them. */
+export type CheckedLine = { key: string; box: string; label: string; value: string; foot: Foot; marks?: { name: string; mark: string }[] }
 export function checkedLines(boxes: readonly OpenedBox[]): CheckedLine[] {
   return boxes.flatMap((b): CheckedLine[] => {
     const line = (label: string, value: string, n = 0) => ({ key: `${b.key}-${n}`, box: b.key, label, value, foot: b.foot })
@@ -468,7 +483,11 @@ export function checkedLines(boxes: readonly OpenedBox[]): CheckedLine[] {
     if (b.kind === 'section') return [line(b.title, b.section.hours ? formatHoursSummary(b.section.now[b.section.hours]) || '—' : '—')]
     if (b.kind === 'people') return [line(b.title, listText(b.box.labels))]
     // Its menu by its address, as drawn ("rivkacakes.com/?page=menu").
-    if (b.key === 'dishes') return [{ ...line('Dishes', listText(b.groups.flatMap((g) => g.rows.map((r) => r.name)))), foot: { ...b.foot, links: b.foot.links.map((l) => (l.url ? pageLink(l.url) : l)) } }]
+    if (b.key === 'dishes') {
+      const rows = b.groups.flatMap((g) => g.rows)
+      const marks = rows.flatMap((r) => (r.right ? [{ name: r.name, mark: r.right }] : []))
+      return [{ ...line('Dishes', listText(rows.map((r) => r.name))), foot: { ...b.foot, links: b.foot.links.map((l) => (l.url ? pageLink(l.url) : l)) }, ...(marks.length ? { marks } : {}) }]
+    }
     return b.groups.flatMap((g) => g.rows).map((r, i) => line(r.name, r.right ?? r.sub ?? '', i))
   })
 }

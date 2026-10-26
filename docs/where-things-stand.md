@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 25, 2026.
+Last updated: Oct 26, 2026.
 
 ## The branch
 
@@ -98,6 +98,23 @@ for that exact change, in the same conversation. Show the dry run first.
    Dishes added by hand are now looked for on each read after (see
    "dishes added by hand are checked"), so "Read again" after adding
    them shows which the reader finds.
+   **Oct 26, "is the reader picking up what I added?"** On the live site
+   5 places had 33 dishes added by hand (Espresso Cafe's Bagels, the 8
+   flavours on each of the 4 Dottie's Donuts). None had been looked for:
+   all were added after the Oct 22 reads, and a menu whose words don't
+   change was never read by the AI again. Asked locally (nothing saved),
+   the reader found all 33 ("Cream Cheese Bagel", "chocolate, vanilla,
+   …"): not a missed dish, a name mismatch or the wrong page. Now:
+   - Each dish no read has found yet says, on its place's Dishes box on
+     the kind page (and on its Dishes line under "more checked"): On its
+     menu, Not found on its menu, or Not looked for yet.
+   - The daily run reads an unchanged menu again when its listing has
+     dishes the last read never looked for, from the run's 3 AI reads
+     (`dishesToLookFor`). One it names gets its menu date; one it doesn't
+     waits on the kind page.
+   - Still open: two of the Dottie's branches share dotties.com with the
+     first branch's watch (one watch per page), so the daily run never
+     looks for theirs. Read it now on each does.
 
 ## Getting the branch live
 

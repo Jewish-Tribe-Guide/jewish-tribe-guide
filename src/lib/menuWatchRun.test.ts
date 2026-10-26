@@ -238,6 +238,49 @@ describe('runMenuWatch: the listing’s own dishes', () => {
   })
 })
 
+// The user, Oct 26: "for the menu items that I manually added that you could
+// see on the menu it looks like they're not getting picked up by the reader."
+// On production none of them had been looked for: Espresso Cafe's Bagels and
+// Dottie's flavors were added after the Oct 22 reads, and a menu that hasn't
+// changed is never read by the AI. Asked, it found all 33.
+describe('runMenuWatch: dishes added since its last read', () => {
+  const dated = { ...row, details: { ...row.details, dishes: ['Falafel', 'Bagels'], itemMenu: { dishes: { Falafel: '2026-10-22T00:00:00Z' } } } }
+  const kept = { status: 'approved', sourceUrl: URL_, dishes: [{ name: 'Falafel', quote: 'Falafel plate', checked: true }], missing: [] }
+  const unchanged = { ...watch, pageHash: menuHash(page) }
+
+  beforeEach(() => {
+    m.getResourceRowById.mockResolvedValue(dated)
+    m.getMenuReading.mockResolvedValue(kept)
+  })
+
+  it('an unchanged menu is read again for them, and one it names is dated from it', async () => {
+    m.readMenu.mockResolvedValue({ ...twoDishes, dishes: [twoDishes.dishes[0], { name: 'Bagels', quote: 'Cream Cheese Bagel', checked: true, onListing: true }], missing: [] })
+    expect(await runMenuWatch(unchanged, newMenuReadBudget(), { apiKey: 'k' })).toMatchObject({ ok: true, filed: 0, pageHash: menuHash(page), check: { result: 'agrees' } })
+    expect(m.readMenu).toHaveBeenCalledWith(page, 'Judah', expect.objectContaining({ listed: ['Falafel', 'Bagels'] }))
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r1', 'dishes', ['Falafel', 'Bagels'])
+  })
+
+  it('one it doesn’t name waits on the kind page, without saying the menu changed', async () => {
+    m.readMenu.mockResolvedValue({ ...twoDishes, dishes: [twoDishes.dishes[0]], missing: ['Bagels'] })
+    expect(await runMenuWatch(unchanged, newMenuReadBudget(), { apiKey: 'k' })).toMatchObject({ filed: 1 })
+    expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'r1', expect.objectContaining({ status: 'proposed', missing: ['Bagels'], note: 'One listed dish isn’t on it any more: Bagels.' }))
+  })
+
+  it('from the run’s AI reads: past them, it waits for a run with room', async () => {
+    const out = await runMenuWatch(unchanged, { ...newMenuReadBudget(), aiReads: 0 }, { apiKey: 'k' })
+    expect(out).toEqual({ ok: true, filed: 0 })
+    expect(m.readMenu).not.toHaveBeenCalled()
+  })
+
+  it('not once its reading has looked for them, nor after a reading only from pictures', async () => {
+    m.getMenuReading.mockResolvedValue({ ...kept, missing: ['Bagels'] })
+    await runMenuWatch(unchanged, newMenuReadBudget(), { apiKey: 'k' })
+    m.getMenuReading.mockResolvedValue({ ...kept, dishes: [{ ...kept.dishes[0], picture: true }] })
+    await runMenuWatch(unchanged, newMenuReadBudget(), { apiKey: 'k' })
+    expect(m.readMenu).not.toHaveBeenCalled()
+  })
+})
+
 describe('syncMenuWatches', () => {
   it('gives each food place with a menu link its watch, marked as the run’s own', async () => {
     expect(await syncMenuWatches()).toEqual([{ community: 'philly', added: 1, removed: 0 }])

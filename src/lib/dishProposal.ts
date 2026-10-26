@@ -88,3 +88,38 @@ export function dishProposal(listed: ListedDishes, reading: { dishes: readonly R
   const pill = gone.length && fresh.length ? `${updates} updates` : gone.length ? `${gone.length} not on the menu` : fresh.length ? `${fresh.length} new` : null
   return { rows: [...gone, ...found, ...notFound, ...unchecked], always, sometimes: notAlways, updates, pill }
 }
+
+// ── What its last read made of each dish (the user, Oct 26) ─────────────────
+// "What I really want is to see or know if the AI reader is picking things
+// up that was added." A dish with no menu date is one no read has found on
+// its menu yet: added by hand, or by a visitor. Its row on the place's
+// Dishes box says what the last read made of it:
+//   on_menu     the reading names it
+//   not_found   the reading looked for it, and its menu doesn't name it
+//   not_looked  the reading didn't look for it: read before it was added,
+//               or from pictures, which may be only part of a menu
+// A dish with a menu date was found by a read already, and is marked only
+// when the last read looked and didn't find it.
+
+export type ReaderMark = 'on_menu' | 'not_found' | 'not_looked'
+
+export const READER_MARK_TEXT: Record<ReaderMark, string> = {
+  on_menu: 'On its menu',
+  not_found: 'Not found on its menu',
+  not_looked: 'Not looked for yet',
+}
+
+/** The marked dishes, by the listing's name for each; one not in it has none. */
+export function readerMarks(listed: ListedDishes, reading: { dishes: readonly Pick<ReadDish, 'name'>[]; missing?: readonly string[] } | null): Map<string, ReaderMark> {
+  const dated = new Set((listed.menuDated ?? []).map(lower))
+  const named = new Set((reading?.dishes ?? []).map((d) => lower(d.name)))
+  const missing = new Set((reading?.missing ?? []).map(lower))
+  const out = new Map<string, ReaderMark>()
+  for (const name of listed.dishes) {
+    const k = lower(name)
+    if (missing.has(k)) out.set(name, 'not_found')
+    else if (dated.has(k)) continue
+    else out.set(name, named.has(k) ? 'on_menu' : 'not_looked')
+  }
+  return out
+}

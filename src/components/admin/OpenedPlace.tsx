@@ -235,6 +235,11 @@ function CheckedRow({ line, onChange }: { line: CheckedLine; onChange?: () => vo
       <span>{line.label}</span>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="[overflow-wrap:anywhere]">{line.value}</span>
+        {line.marks?.map((m) => (
+          <span key={m.name} className="text-[12.5px] text-slate-700 [overflow-wrap:anywhere]" data-testid="checked-mark">
+            {m.name} · {m.mark}
+          </span>
+        ))}
         <span className="text-[12.5px] text-slate-500 [overflow-wrap:anywhere]">
           {f.mail && <Mail />}
           {f.links.length ? (

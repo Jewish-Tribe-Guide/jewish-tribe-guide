@@ -501,7 +501,7 @@ describe('stopping a hospital’s or food place’s source, on its kind’s page
   })
 
   it('a food place’s menu: Stop unlinks its menu link', async () => {
-    const grill = { id: 'r', name: 'Cherry Grill', href: '/philly/restaurants/cherry', category: 'restaurant', dishes: ['Schnitzel'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved', readAt: at, sourceUrl: 'https://cherrygrill88.com/menu', dishes: ['Schnitzel'] } }
+    const grill = { id: 'r', name: 'Cherry Grill', href: '/philly/restaurants/cherry', category: 'restaurant', dishes: ['Schnitzel'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved', readAt: at, sourceUrl: 'https://cherrygrill88.com/menu', dishes: [{ name: 'Schnitzel', quote: 'Schnitzel', checked: true }] } }
     await kind('restaurant', 'Restaurants', (url) => (url.includes('/api/admin/main-dishes') ? { places: [grill] } : undefined))
     const user = userEvent.setup()
     await user.click(tab(/Up to date/))

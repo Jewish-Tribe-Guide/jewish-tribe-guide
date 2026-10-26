@@ -93,7 +93,7 @@ describe('openedPlace', () => {
   })
 
   it('opens a food place: its dishes from its menu, its hechsher from the lists, its hours from Google', () => {
-    const dishes = [{ id: 'p', name: 'Cherry Grill', href: '/x', dishes: ['Schnitzel', 'Steak'], sometimes: ['Steak'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved' as const, readAt: '2026-10-20T08:00:00Z', sourceUrl: 'https://cherrygrill88.com/menu' } }]
+    const dishes = [{ id: 'p', name: 'Cherry Grill', href: '/x', dishes: ['Schnitzel', 'Steak'], sometimes: ['Steak'], menuDated: ['Schnitzel', 'Steak'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved' as const, readAt: '2026-10-20T08:00:00Z', sourceUrl: 'https://cherrygrill88.com/menu' } }]
     const kosher = {
       available: true,
       lists: [{ list: 'keystone' as const, url: 'https://keystonek.example/list', watch: watch('k', 'https://keystonek.example/list', { lastOkAt: '2026-10-24T07:47:00Z' }), error: null, entries: 1, updated: null }],
@@ -114,6 +114,36 @@ describe('openedPlace', () => {
     expect(o.reads).toEqual([{ job: 'dishes', resourceId: 'p' }, { job: 'watch', watchId: 'k' }])
     // It has a menu link, changed on its Dishes box: nothing to add.
     expect(o.add).toBeNull()
+  })
+
+  // The user, Oct 26: "what I really want is to see or know if the AI reader
+  // is picking things up that was added." Each dish no read has found yet
+  // says what its last read made of it.
+  it('marks each dish added by hand by what its last read made of it', () => {
+    const reading = { status: 'proposed' as const, readAt: '2026-10-22T08:00:00Z', sourceUrl: 'https://espresso.example/menu', dishes: [{ name: 'Salads', quote: 'Salads', checked: true }, { name: 'Bagels', quote: 'Cream Cheese Bagel', checked: true }], missing: ['Babka'] }
+    const dishes = [{ id: 'p', name: 'Espresso Cafe', href: '/x', dishes: ['Salads', 'Bagels', 'Babka', 'Kugel'], menuDated: ['Salads'], website: null, menuUrl: 'https://espresso.example/menu', reading }]
+    const d = openedPlace('p', jobs({ dishes }), NOW).boxes[0]
+    expect(d.kind === 'rows' && d.groups[0].rows).toEqual([
+      { name: 'Salads' },
+      { name: 'Bagels', right: 'On its menu' },
+      { name: 'Babka', right: 'Not found on its menu' },
+      { name: 'Kugel', right: 'Not looked for yet' },
+    ])
+    // A place not checked has it as one line: the marks go with it.
+    expect(checkedLines([d])[0]).toMatchObject({
+      value: 'Salads, Bagels, Babka and 1 more',
+      marks: [
+        { name: 'Bagels', mark: 'On its menu' },
+        { name: 'Babka', mark: 'Not found on its menu' },
+        { name: 'Kugel', mark: 'Not looked for yet' },
+      ],
+    })
+  })
+
+  it('marks none on dishes from a menu sent through the site', () => {
+    const dishes = [{ id: 'p', name: 'Joy Cafe', href: '/x', dishes: ['Bagels'], website: null, menuUrl: null, menuAt: '2026-10-24T08:00:00Z', reading: { status: 'failed' as const, readAt: '2026-10-20T08:00:00Z' } }]
+    const d = openedPlace('p', jobs({ dishes }), NOW).boxes[0]
+    expect(d.kind === 'rows' && d.groups[0].rows).toEqual([{ name: 'Bagels' }])
   })
 
   it('offers a menu page to a food place with none', () => {

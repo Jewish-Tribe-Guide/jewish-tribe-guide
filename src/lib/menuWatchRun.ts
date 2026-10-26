@@ -7,6 +7,7 @@ import { dateMenuDishes, getMenuReading, listMenuReadings, saveMenuReading } fro
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import {
   changedMenuNote,
+  dishesToLookFor,
   listedDishes,
   menuHash,
   menuMovedNote,
@@ -152,16 +153,24 @@ export async function runMenuWatch(
   // still names the dishes it named, so their dates move (withMenuChecked):
   // not one the last read found missing from it, still waiting or skipped.
   const field = itemsField(category)
+  // Unchanged, but with dishes its last read never looked for (added since,
+  // by hand): read again for them, from the run's AI reads (the user, Oct 26).
+  let lookingFor: string[] = []
   if (!opts.full && !changed) {
-    if (watch.pageHash && field) {
-      const missing = new Set(((await getMenuReading(watch.communityId, listing.id))?.missing ?? []).map((n) => n.trim().toLowerCase()))
-      await dateMenuDishes(watch.communityId, listing.id, field.key, menuDated(listing).filter((n) => !missing.has(n.trim().toLowerCase())))
+    const kept = watch.pageHash && field ? await getMenuReading(watch.communityId, listing.id) : null
+    lookingFor = dishesToLookFor({ dishes: listedDishes(listing, category), menuDated: menuDated(listing) }, kept)
+    if (!lookingFor.length) {
+      if (watch.pageHash && field) {
+        const missing = new Set((kept?.missing ?? []).map((n) => n.trim().toLowerCase()))
+        await dateMenuDishes(watch.communityId, listing.id, field.key, menuDated(listing).filter((n) => !missing.has(n.trim().toLowerCase())))
+      }
+      return { ok: true, filed: 0, pageHash }
     }
-    return { ok: true, filed: 0, pageHash }
   }
 
-  // Changed. Without the AI, or with this run's reads spent, the old
-  // fingerprint stays, so the change is still news next time.
+  // Changed (or looking for dishes). Without the AI, or with this run's
+  // reads spent, the old fingerprint stays, so the change is still news
+  // next time; dishes looked for are looked for on a run with room.
   if (!apiKey) {
     if (!opts.full) return { ok: true, filed: 0 }
     return { ok: true, filed: 0, check: { what: 'dishes', from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the menu wasn’t read.' } }
@@ -217,7 +226,7 @@ export async function runMenuWatch(
     sourceUrl: read.sourceUrl ?? watch.url,
     dishes: read.dishes,
     missing,
-    note: changedMenuNote(found, missing),
+    note: changedMenuNote(found, missing, changed || !lookingFor.length),
     model: read.model,
   })
   return { ok: true, filed: 1, pageHash, check: check('filed') }
