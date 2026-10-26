@@ -657,6 +657,29 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     expect(m.readMessage).not.toHaveBeenCalled()
   })
 
+  // Oct 26: Lower Merion's men's page and Ohel Leah's what-to-expect waited
+  // behind suggestions approved Oct 23, and said "Waiting for you" with
+  // nothing to open.
+  describe('a difference that waited behind a suggestion', () => {
+    const behind = async () => ({ ...watch, resourceId: 'mk1', pageHash: await hashOfPage(), lastCheck: { ...lastRead(mikvah, mikvahCategory as typeof shulCategory, 'differs'), queue: 'waiting' as const } })
+
+    it('is read again in full once nothing waits for the listing, and files what still differs', async () => {
+      m.readMessage.mockResolvedValue(reading('19:30'))
+      expect(await runListingPageWatch(await behind(), newMenuReadBudget(), { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', queue: 'filed' } })
+    })
+
+    it('clears when the page now agrees', async () => {
+      m.readMessage.mockResolvedValue(reading('19:00'))
+      expect(await runListingPageWatch(await behind(), newMenuReadBudget(), { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees' } })
+    })
+
+    it('is left alone while a suggestion still waits', async () => {
+      m.pending = [{ id: 'p', payload: { details: {} } }]
+      expect(await runListingPageWatch(await behind(), newMenuReadBudget(), { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+      expect(m.readMessage).not.toHaveBeenCalled()
+    })
+  })
+
   it('reads its hours with the any-field reader, and files only the hours that differ', async () => {
     m.readMessage.mockResolvedValue(reading('19:30'))
     const out = await runListingPageWatch({ ...changed, resourceId: 'mk1' }, undefined, { apiKey: 'k', now: NOW })

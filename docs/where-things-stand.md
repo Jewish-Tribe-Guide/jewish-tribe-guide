@@ -1681,7 +1681,29 @@ read again, so a new week's times never arrived.
   used to re-date the old finding to that morning. So an approval made
   after the real read looked older than the finding, and Mikvah Ohel Leah
   and LMC men's kept saying "differs". They now settle once approved.
+- **…and the two already stuck are read again (Oct 26, later).** Their
+  stored checks were re-dated to Oct 26 07:49 before that fix, after the
+  Oct 23 approvals they waited behind, so they'd never settle; the user saw
+  them as two mikvahs "Waiting for you" with no change. Now a check that
+  waited behind a suggestion is read again in full on the first night
+  nothing waits for the listing (`stoodBehind`, `listingPageRun.ts`): what
+  still differs is filed as a new suggestion, what doesn't clears. No
+  database write. Also covers the Little Shul's home page (waiting since
+  Oct 23). LMC men's "difference" was only spaces; notes ignore spacing
+  since Oct 22, so its re-read should clear it.
 - Reaches the live site with the next merge and deploy.
+
+**Found Oct 26, not fixed:**
+- **BZBI Early Childhood is matched to the temple's Google entry** (same
+  place id as Temple Beth Zion-Beth Israel). Keep as is (Oct 26) made its
+  name, hours and website the admin's, but the match stays: Google is
+  still asked about the temple every night and gives its phone. There's
+  no button for "Google's place is the wrong one" on a matched place; Find
+  it on Google and Not on Google only show when there's no match.
+- **Chabad of the Main Line's schedule page** answers every read with
+  Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
+  bot checks. Options: its email newsletter as the source, or Stop the
+  page so the shul shows Not checked.
 
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 

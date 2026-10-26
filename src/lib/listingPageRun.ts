@@ -787,6 +787,14 @@ export async function runListingPageWatch(
   // read on a Thursday filed only up to Saturday week.
   const thisWeek = calendarWeeks(dayIn(opts.now ?? Date.now()))[0].sunday
   const weekDue = reads.kind === 'times' && !!watch.pageHash && (watch.lastCheck?.readWeek ?? '') < thisWeek
+  // A difference that waited behind a suggestion already in the queue is
+  // read again in full once nothing waits for the listing: what still
+  // differs is filed, what doesn't clears. It used to settle only on a
+  // decision dated after it, and a run that carried it re-dated it each
+  // morning, so Lower Merion's men's page and Ohel Leah's what-to-expect
+  // said "Waiting for you" with nothing to open (Oct 26).
+  const stoodBehind =
+    !opts.full && !!watch.pageHash && watch.lastCheck?.queue === 'waiting' && watch.lastCheck.result === 'differs' && !(await pendingSuggestions(watch.communityId, listing.id)).length
   const stillAgrees = watch.lastCheck?.result === 'agrees' && !listingMoved
   const dated = async (o: WatchOutcome, agrees: boolean): Promise<WatchOutcome> => {
     // What it read, and only that (pageReadBoxes): its phone and email too
@@ -797,7 +805,7 @@ export async function runListingPageWatch(
     return o
   }
   // Else the first read sets the baseline; an unchanged page is left alone.
-  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread && !listingMoved && !weekDue) return dated({ ok: true, filed: 0, pageHash }, stillAgrees)
+  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread && !listingMoved && !weekDue && !stoodBehind) return dated({ ok: true, filed: 0, pageHash }, stillAgrees)
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A
@@ -812,7 +820,7 @@ export async function runListingPageWatch(
   const contact = contactReading ? await fileContact(watch, category, listing, contacts, contactReading, waitingNow, blocked, source.text, { now: opts.now, seen }) : null
   const merge = (o: WatchOutcome): WatchOutcome => withContact(o, contact, watch.lastCheck ?? null, reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }))
   // Read for its phone and email alone: the rest waits for the page to change.
-  if (!opts.full && !changed && !firstFound && !notesUnread && !listingMoved && !weekDue) {
+  if (!opts.full && !changed && !firstFound && !notesUnread && !listingMoved && !weekDue && !stoodBehind) {
     const o = merge({ ok: true, filed: 0, pageHash })
     return dated(o, stillAgrees && o.check?.result === 'agrees')
   }
@@ -829,7 +837,7 @@ export async function runListingPageWatch(
   // so a standing difference is the listing being newer (a newsletter, an
   // approval), never filed; it says whether the two still agree. Its own
   // few reads a run, so it never takes a changed page's.
-  const compareOnly = !opts.full && !changed && !firstFound && !notesUnread && !weekDue
+  const compareOnly = !opts.full && !changed && !firstFound && !notesUnread && !weekDue && !stoodBehind
   if (budget && !opts.full) {
     // A shul's page takes from the run's times reads first (TIMES_READS_PER_RUN).
     if (reads.kind === 'times' && (budget.timesReads ?? 0) > 0) budget.timesReads!--
