@@ -461,9 +461,10 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        Refuah link isn't checked: its Refuah watch reads that page
        already (the link carries a `?q=` search the watch doesn't). Dry
        run on the live site: 85 links, 1 doesn't open — House of
-       Kosher's certificate (houseofkosher.com/Philadelphia, 404); its
-       Keystone-K page is keystone-k.org/kosher/house-of-kosher/.
-       Changing it on the live site needs the user's OK. The cron first runs on
+       Kosher's certificate (houseofkosher.com/Philadelphia, 404). With
+       the user's yes, the live listing now links its Keystone-K page,
+       keystone-k.org/kosher/house-of-kosher/ (Oct 25), so the first
+       run should find none. The cron first runs on
        production once this branch deploys.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add
