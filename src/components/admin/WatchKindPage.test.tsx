@@ -306,7 +306,7 @@ describe('WatchKindPage', () => {
     await user.click(screen.getByRole('button', { name: /Kesher Israel/ }))
     const open = screen.getByTestId('kind-place-open')
     expect(within(open).getAllByTestId('job-box').map((b) => b.getAttribute('aria-label'))).toEqual(['Usual weekday times', 'Name and contact'])
-    expect(within(open).getAllByTestId('box-source').map((f) => f.textContent)).toEqual([`Same as kesher.example/davening · read ${day(at)} · Change`, `Same as its Google listing · read ${day(new Date().toISOString())}`])
+    expect(within(open).getAllByTestId('box-source').map((f) => f.textContent)).toEqual([`Same as kesher.example/davening · read ${day(at)} · Change · Stop`, `Same as its Google listing · read ${day(new Date().toISOString())}`])
 
     // Read it now: its website searched, then its page read.
     await user.click(within(open).getByRole('button', { name: 'Read it now' }))
@@ -329,6 +329,13 @@ describe('WatchKindPage', () => {
     await user.type(within(open).getByLabelText('The page to read instead'), 'https://kesher.example/times')
     await user.click(within(open).getByRole('button', { name: 'Use this' }))
     expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]])
+
+    // Stop: the page no longer read, as its job page's Reads × did.
+    posts.length = 0
+    await user.click(within(open).getByRole('button', { name: 'Stop' }))
+    expect(within(open).getByText('Stop reading kesher.example/davening?')).toBeTruthy()
+    await user.click(within(open).getByRole('button', { name: 'Stop reading' }))
+    expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
   })
 
   it('has no Read it now for a place read only from Google', async () => {
@@ -461,5 +468,47 @@ describe('an eruv, on its kind’s page', () => {
     await user.type(within(open).getByLabelText('Its status page, or the address its emails come from'), 'eruv@neeruv.org')
     await user.click(within(open).getByRole('button', { name: 'Add' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'ne', action: 'save', edit: { statusEmail: 'eruv@neeruv.org', statusUrl: '' } }]])
+  })
+})
+
+// What the Hospitals and Dishes pages' Reads did with a source, here (Oct 25).
+describe('stopping a hospital’s or food place’s source, on its kind’s page', () => {
+  const at = new Date(Date.now() - 3_600_000).toISOString()
+  const posts: unknown[] = []
+  const kind = (category: string, label: string, job: (url: string) => unknown) =>
+    renderPage([place(category[0], category === 'hospital' ? 'CHOP' : 'Cherry Grill', { category })], category, (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: category, pluralLabel: label, kind: 'listing', hasAddress: true }] }
+      if (init?.method === 'POST') {
+        posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+      if (url.includes('/api/admin/watches/google')) return undefined
+      return job(url)
+    })
+  afterEach(() => {
+    posts.length = 0
+  })
+
+  it('a hospital Refuah doesn’t have: Not on Refuah, beside Give its page', async () => {
+    const chop = { id: 'h', name: 'CHOP', href: '/philly/hospitals/chop', category: 'hospital', watch: null, notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }
+    await kind('hospital', 'Hospitals', (url) => (url.includes('/api/admin/watches/hospitals') ? { hospitals: [chop] } : undefined))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /CHOP/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getByRole('button', { name: 'Give its page on Refuah' })).toBeTruthy()
+    await user.click(within(open).getByRole('button', { name: 'Not on Refuah' }))
+    expect(posts).toEqual([['/api/admin/watches/hospitals', { action: 'none', resourceId: 'h' }]])
+  })
+
+  it('a food place’s menu: Stop unlinks its menu link', async () => {
+    const grill = { id: 'r', name: 'Cherry Grill', href: '/philly/restaurants/cherry', category: 'restaurant', dishes: ['Schnitzel'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved', readAt: at, sourceUrl: 'https://cherrygrill88.com/menu', dishes: ['Schnitzel'] } }
+    await kind('restaurant', 'Restaurants', (url) => (url.includes('/api/admin/main-dishes') ? { places: [grill] } : undefined))
+    const user = userEvent.setup()
+    await user.click(tab(/Up to date/))
+    await user.click(screen.getByRole('button', { name: /Cherry Grill/ }))
+    const open = screen.getByTestId('kind-place-open')
+    await user.click(within(open).getByRole('button', { name: 'Stop' }))
+    await user.click(within(open).getByRole('button', { name: 'Stop reading' }))
+    expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])
   })
 })

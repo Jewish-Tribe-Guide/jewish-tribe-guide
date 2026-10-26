@@ -308,9 +308,17 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    - No Add a source for hospitals: one source. A hospital's Change
      gives a new Refuah page. An eruv's Status and Map have Change (a
      status page or its emails; a map), and Add a source when nothing
-     gives its status. Since Oct 25 an eruv's boxes also have Stop
-     ("Stop reading its map?"), and its Status box "Its page dates each
-     week's post".
+     gives its status. Its Status box has "Its page dates each week's
+     post".
+   - **Stop** (Oct 25), what each job page's Reads × did, asked first
+     ("Stop reading mekorhabracha.org/davening?"): a shul's or mikvah's
+     page stopped, a menu link unlinked (a menu found on its website:
+     No menu online), a Refuah page stopped, an eruv's status or map
+     emptied, its website's read paused. A hospital Refuah doesn't have
+     has Not on Refuah beside Give its page on Refuah. Newsletters have
+     no Stop, as on the Shul times page. A place's whole Off switch
+     isn't here: stopping each source does it, and giving a page turns
+     it back on.
    - On the test site, 13 food places have an approved menu reading but
      no dishes on the listing (Playa Bowls among them). They show no
      Dishes box rather than a "Same as its menu" that isn't so.

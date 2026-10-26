@@ -369,6 +369,9 @@ export default function OpenedPlace({
 
   async function stopSource(s: Stop) {
     if (s.kind === 'watch') await post('/api/admin/watches', { action: 'pause', id: s.watchId })
+    else if (s.kind === 'page') await post(hoursApi(s.job), { action: 'stop', resourceId: place.id, id: s.watchId })
+    else if (s.kind === 'menu') await post('/api/admin/main-dishes', { action: s.action, resourceId: place.id })
+    else if (s.kind === 'refuah') await post('/api/admin/watches/hospitals', { action: 'stop', resourceId: place.id })
     else await post('/api/admin/eruvim', { id: s.id, action: 'save', edit: s.kind === 'eruv-status' ? { statusUrl: '', statusEmail: '' } : { lineUrl: '' } })
   }
 
@@ -643,9 +646,17 @@ export default function OpenedPlace({
       if (changing === key) return null
       const label = f.kind === 'add' ? 'Add a source' : f.label
       return (
-        <button type="button" disabled={busy !== null || (f.kind === 'add' && !opened.add)} onClick={() => setChanging(key)} className={GO}>
-          {label}
-        </button>
+        <>
+          <button type="button" disabled={busy !== null || (f.kind === 'add' && !opened.add)} onClick={() => setChanging(key)} className={GO}>
+            {label}
+          </button>
+          {/* A hospital Refuah doesn't have: said so, as its job page's Reads did. */}
+          {f.kind === 'change' && f.change.kind === 'refuah' && (
+            <button type="button" disabled={busy !== null} onClick={() => void run(key, () => post('/api/admin/watches/hospitals', { action: 'none', resourceId: place.id }))} className={BUTTON}>
+              Not on Refuah
+            </button>
+          )}
+        </>
       )
     }
     const form = (p: Problem) => {

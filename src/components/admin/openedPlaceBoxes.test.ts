@@ -72,7 +72,7 @@ describe('openedPlace', () => {
   it('opens a shul in boxes: its times from the page that gives them, its contact from Google', () => {
     const o = openedPlace('p', jobs({ times: { name: 'Shul times', places: [shul() as never] }, google: { counts: { checked: 1, toCheck: 0, cantRead: 0, didntLoad: 0 }, places: [google()] } }), NOW)
     expect(o.boxes.map((b) => b.title)).toEqual(['Usual weekday times', 'Usual Shabbos times', 'Name and contact'])
-    expect(foot(o, 'weekday')).toEqual({ lead: 'Same as', links: [{ text: 'mekorhabracha.org/davening', url: 'https://mekorhabracha.org/davening' }], when: 'read Oct 23', change: { kind: 'page', job: 'times', replaces: 'w1' } })
+    expect(foot(o, 'weekday')).toEqual({ lead: 'Same as', links: [{ text: 'mekorhabracha.org/davening', url: 'https://mekorhabracha.org/davening' }], when: 'read Oct 23', change: { kind: 'page', job: 'times', replaces: 'w1' }, stop: { kind: 'page', job: 'times', watchId: 'w1', what: 'mekorhabracha.org/davening' } })
     // Google's has no Change: Google is matched, not given.
     expect(foot(o, 'google')).toEqual({ lead: 'Same as', links: [{ text: 'its Google listing', url: null }], when: 'read Oct 19' })
     const rows = o.boxes.find((b) => b.key === 'google')!
@@ -106,7 +106,8 @@ describe('openedPlace', () => {
     expect(o.boxes.map((b) => b.title)).toEqual(['Dishes', 'Kosher', 'Hours and contact'])
     const d = o.boxes[0]
     expect(d.kind === 'rows' && d.groups[0].rows).toEqual([{ name: 'Schnitzel' }, { name: 'Steak', sub: 'Not always' }])
-    expect(d.foot).toEqual({ lead: 'Same as', links: [{ text: 'its menu', url: 'https://cherrygrill88.com/menu' }], when: 'read Oct 20', change: { kind: 'menu' } })
+    // Its menu link, read: Stop unlinks it.
+    expect(d.foot).toEqual({ lead: 'Same as', links: [{ text: 'its menu', url: 'https://cherrygrill88.com/menu' }], when: 'read Oct 20', change: { kind: 'menu' }, stop: { kind: 'menu', action: 'unlink', what: 'its menu' } })
     expect(foot(o, 'kosher')).toEqual({ lead: 'Same as', links: [{ text: 'Keystone-K’s list', url: 'https://keystonek.example/list' }], when: 'read Oct 24' })
     expect(o.reads).toEqual([{ job: 'dishes', resourceId: 'p' }])
     // It has a menu link, changed on its Dishes box: nothing to add.
@@ -123,7 +124,7 @@ describe('openedPlace', () => {
     const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: w, notOnRefuah: false, source: 'match' as const, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim'], now: { bikur: [] } }] }]
     const o = openedPlace('p', jobs({ hospitals }), NOW)
     expect(o.boxes.map((b) => [b.title, b.kind])).toEqual([['Bikur Cholim', 'people']])
-    expect(o.boxes[0].foot).toEqual({ lead: 'Same as', links: [{ text: 'Refuah', url: 'https://refuah.com/hospitals/12' }], when: 'read Oct 23', change: { kind: 'refuah' } })
+    expect(o.boxes[0].foot).toEqual({ lead: 'Same as', links: [{ text: 'Refuah', url: 'https://refuah.com/hospitals/12' }], when: 'read Oct 23', change: { kind: 'refuah' }, stop: { kind: 'refuah', what: 'its Refuah page' } })
     expect(o.reads).toEqual([{ job: 'refuah', watchId: 'r' }])
     expect(o.pages).toBe(1)
   })

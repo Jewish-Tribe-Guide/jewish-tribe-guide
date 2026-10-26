@@ -3,7 +3,7 @@ import { TIMES_PART_LABELS } from '@/lib/timesParts'
 import { eruvStanding, findingFor, statusPill, websiteWatchOf } from '@/lib/eruvJob'
 import { detailsRows } from '@/lib/eruvWebsite'
 import { dishJobStatus, didntLoad, eruvSection, hospitalSection, sentThroughSite } from '@/lib/watchJobs'
-import { hoursDidntLoad, hoursSection } from '@/lib/hoursJob'
+import { hoursDidntLoad, hoursSection, samePage } from '@/lib/hoursJob'
 import { formatHoursSummary } from '@/lib/hours'
 import { TEFILLAH_LABELS } from '@/lib/davening'
 import { watchHealth, type Watch } from '@/lib/watches'
@@ -38,7 +38,13 @@ export type Change =
 
 /** A source no longer read: an eruv's status or map emptied, or a watch
  *  paused. `what`: "its status", for "Stop reading its status?". */
-export type Stop = ({ kind: 'eruv-status' | 'eruv-map'; id: string } | { kind: 'watch'; watchId: string }) & { what: string }
+export type Stop = (
+  | { kind: 'eruv-status' | 'eruv-map'; id: string }
+  | { kind: 'watch'; watchId: string }
+  | { kind: 'page'; job: 'hours' | 'times'; watchId: string }
+  | { kind: 'menu'; action: 'unlink' | 'no_menu' }
+  | { kind: 'refuah' }
+) & { what: string }
 
 export type FootLink = { text: string; url: string | null }
 /** "Same as its Google listing · read Oct 19". */
@@ -91,6 +97,8 @@ export type Opened = { boxes: OpenedBox[]; reads: ReadStep[]; pages: number; add
 const read = (at: string | null | undefined) => (at ? `read ${day(at)}` : null)
 const sameSite = (a: string | null, b: string | null) => !!a && !!b && shortUrl(a).toLowerCase() === shortUrl(b).toLowerCase()
 const pageLink = (url: string): FootLink => ({ text: shortUrl(url), url })
+/** A shul's or mikvah's page, stopped as its job page's Reads ×. */
+const stopPage = (job: 'hours' | 'times', w: Pick<Watch, 'id' | 'url'>): Stop => ({ kind: 'page', job, watchId: w.id, what: shortUrl(w.url) })
 /** "Cakes, Meringue Rolls, Macarons and 7 more". */
 export const listText = (items: readonly string[], none = 'None listed') =>
   items.length ? (items.length > 3 ? `${items.slice(0, 3).join(', ')} and ${items.length - 3} more` : items.join(', ')) : none
@@ -149,7 +157,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       const foot: Foot = fromNews
         ? { lead: 'Same as', links: [{ text: `its newsletter, ${news!.url.replace(/^mailto:/, '')}`, url: null }], when: read(news!.pageChangedAt), mail: true, change: { kind: 'newsletter', replaces: news!.id } }
         : page
-          ? { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'times', replaces: page.id } }
+          ? { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'times', replaces: page.id }, stop: stopPage('times', page) }
           : { lead: 'Added by hand', links: [], when: thisWeek[0].postedAt ? day(thisWeek[0].postedAt) : null }
       for (const week of scheduleProposal([], thisWeek, times.minyanim).weeks) {
         boxes.push({ key: `week-${week.range}`, kind: 'week', title: `${TIMES_PART_LABELS.week}, ${week.range}`, week, foot })
@@ -158,7 +166,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     for (const part of ['weekday', 'shabbos'] as const) {
       const page = named.get(part)
       const rows = times && page ? usualRows(part, times.minyanim, times.minyanim) : []
-      if (page && rows.length) boxes.push({ key: part, kind: 'usual', title: TIMES_PART_LABELS[part], rows, foot: { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'times', replaces: page.id } } })
+      if (page && rows.length) boxes.push({ key: part, kind: 'usual', title: TIMES_PART_LABELS[part], rows, foot: { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'times', replaces: page.id }, stop: stopPage('times', page) } })
     }
     if (!shul.off) {
       pages += live.length
@@ -178,7 +186,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     site ??= live[0]?.url ?? null
     for (const s of sections) {
       const page = named.get(s.section)
-      if (page) boxes.push({ key: s.section, kind: 'section', title: s.label, section: s, foot: { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'hours', replaces: page.id } } })
+      if (page) boxes.push({ key: s.section, kind: 'section', title: s.label, section: s, foot: { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'hours', replaces: page.id }, stop: stopPage('hours', page) } })
     }
     if (!mikvah.off) {
       pages += live.length
@@ -228,7 +236,8 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
         groups: [{ head: '', rows: food.dishes.map((name) => ({ name, sub: sometimes.has(name) ? 'Not always' : undefined })) }],
         foot: sent
           ? { lead: 'Sent through the site', links: [], when: food.menuAt ? day(food.menuAt) : null, change: { kind: 'menu' } }
-          : { lead: 'Same as', links: [{ text: 'its menu', url: menu ?? null }], when: read(r?.readAt), change: { kind: 'menu' } },
+          : // Its menu link unlinked; a page found on its website, No menu online.
+            { lead: 'Same as', links: [{ text: 'its menu', url: menu ?? null }], when: read(r?.readAt), change: { kind: 'menu' }, stop: { kind: 'menu', action: food.menuUrl && (!r?.sourceUrl || samePage(r.sourceUrl, food.menuUrl)) ? 'unlink' : 'no_menu', what: 'its menu' } },
       })
     }
     const live = (food.pages ?? []).filter((w) => w.active)
@@ -274,7 +283,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   if (hospital?.watch) {
     const w = hospital.watch
     for (const b of hospital.boxes ?? []) {
-      boxes.push({ key: `refuah-${b.title}`, kind: 'people', title: b.title, box: b, foot: { lead: 'Same as', links: [{ text: 'Refuah', url: w.url }], when: read(w.lastCheck?.at ?? w.lastOkAt), change: { kind: 'refuah' } } })
+      boxes.push({ key: `refuah-${b.title}`, kind: 'people', title: b.title, box: b, foot: { lead: 'Same as', links: [{ text: 'Refuah', url: w.url }], when: read(w.lastCheck?.at ?? w.lastOkAt), change: { kind: 'refuah' }, ...(w.active ? { stop: { kind: 'refuah' as const, what: 'its Refuah page' } } : {}) } })
     }
     if (w.active) {
       pages += 1
