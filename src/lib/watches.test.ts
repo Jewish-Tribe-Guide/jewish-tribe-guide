@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afterRun, listCheck, listDifference, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, withoutListRead, type CheckFound, type WatchCheck, type Watch } from './watches'
+import { afterRun, settles, listCheck, listDifference, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, withoutListRead, type CheckFound, type WatchCheck, type Watch } from './watches'
 
 const NOW = '2026-10-06T07:00:00.000Z'
 const DAY = 86_400_000
@@ -97,6 +97,17 @@ describe('afterRun', () => {
     expect(afterRun(watch(), { ok: true, filed: 0, pageHash: 'a', check }, NOW).update.lastCheck).toEqual({ ...check, at: NOW })
     expect(afterRun(watch(), { ok: false, error: 'down', check: { ...check, result: 'unreadable', read: [] } }, NOW).update.lastCheck).toMatchObject({ result: 'unreadable', at: NOW })
     expect('lastCheck' in afterRun(watch(), { ok: true, filed: 0, pageHash: 'a' }, NOW).update).toBe(false)
+  })
+
+  // Oct 26: a check carried over (a run that read only the phone) was
+  // re-dated to that morning, so an approval made between the read and
+  // it looked older than the finding, and the finding never settled.
+  it('keeps a carried check’s own date, so an approval after the read settles it', () => {
+    const read = '2026-10-19T07:00:00.000Z'
+    const check: CheckFound = { what: 'times', from: 'page', result: 'differs', read: ['Mincha Sun 6:05 PM'], differences: ['x'], queue: 'waiting', at: read }
+    const kept = afterRun(watch(), { ok: true, filed: 0, pageHash: 'a', check }, NOW).update.lastCheck!
+    expect(kept.at).toBe(read)
+    expect(settles(kept, 0, '2026-10-19T15:00:00.000Z')).toBe(true)
   })
 })
 

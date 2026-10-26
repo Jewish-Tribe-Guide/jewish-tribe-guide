@@ -1637,6 +1637,30 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 26: shuls' times read each week; an approval settles its finding (on `redesign/oct18-fixes`)
+
+Found Oct 26 (read only, live): nothing from a shul's page had been filed
+since Oct 23. Every finding from Oct 19–23 had been decided, and the
+approved times are live. But a page whose text hadn't changed was never
+read again, so a new week's times never arrived.
+
+- **A shul's times page is read once each week, even if unchanged.** The
+  week starts Sunday. A full read files what differs, like a changed page.
+  The check keeps the week it read (`readWeek`). A compare after the
+  listing moved doesn't count as the week's read. Mikvah and other hours
+  pages are still read only when they change.
+- **Shuls' pages get 20 reads a night of their own.** Past that, they share
+  the run's 3, as before. Menus no longer hold them up. The cost is about
+  45 shul pages × 1 extra read a week.
+- **Compares go from 3 a night to 12.** About 45 pages are waiting to be
+  compared after the Oct 23 approvals. At 3 a night, a listing like Mei
+  Shalva's stayed dated Oct 18 for days.
+- **A carried check keeps its own date.** A run that read only the phone
+  used to re-date the old finding to that morning. So an approval made
+  after the real read looked older than the finding, and Mikvah Ohel Leah
+  and LMC men's kept saying "differs". They now settle once approved.
+- Reaches the live site with the next merge and deploy.
+
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 
 Found Oct 24: the live watches run checked 29 of 107 watches and stopped,

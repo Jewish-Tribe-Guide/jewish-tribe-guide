@@ -94,6 +94,10 @@ export type WatchCheck = {
    *  listing both stay as they were, a page that agreed still agrees, and
    *  the daily run dates the listing again without the AI (Oct 23). */
   listedAs?: string
+  /** A shul's page: the Sunday (YYYY-MM-DD) of the week the AI last read
+   *  it, so it's read again once a week even when it hasn't changed
+   *  (listingPageRun.ts, Oct 26). */
+  readWeek?: string
 }
 
 export type ListRead = { updated: string | null; entries: unknown[] }
@@ -118,8 +122,11 @@ export function withoutListRead(c: WatchCheck | null): WatchCheck | null {
 export const settles = (c: WatchCheck, waiting: number | undefined, decidedAt?: string | null) =>
   waiting === 0 && c.result === 'differs' && (c.queue === 'filed' || c.queue === 'before' || (c.queue === 'waiting' && !!decidedAt && decidedAt >= c.at))
 
-/** A check as a runner makes it; the run dates it. */
-export type CheckFound = Omit<WatchCheck, 'at'>
+/** A check as a runner makes it; the run dates it. One carried over from
+ *  an earlier read keeps that read's date: else it reads as this
+ *  morning's, and one that waited behind a suggestion never settles
+ *  (Mikvah Ohel Leah's, Oct 26). */
+export type CheckFound = Omit<WatchCheck, 'at'> & { at?: string }
 
 /** The `created_by` of the watches the daily run makes for each food
  *  place's menu (menuWatch.ts), so it only ever adds and removes its own,
@@ -197,7 +204,7 @@ export function afterRun(
   alert: 'broke' | 'recovered' | null
 } {
   // A run that only fingerprinted the page keeps the last check's result.
-  const check = outcome.check ? { lastCheck: { ...outcome.check, at: now } } : {}
+  const check = outcome.check ? { lastCheck: { ...outcome.check, at: outcome.check.at ?? now } } : {}
   if (!outcome.ok) {
     return {
       update: { lastRunAt: now, lastError: outcome.error, failingSince: watch.failingSince ?? now, ...check },

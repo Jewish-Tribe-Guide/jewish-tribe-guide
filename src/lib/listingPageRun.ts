@@ -782,6 +782,11 @@ export async function runListingPageWatch(
   // agrees, and dates the listing without the AI.
   const listed = listedAs(listing, reads)
   const listingMoved = !!watch.pageHash && watch.lastCheck?.listedAs !== listed
+  // A shul's page is read once a week, changed or not (the user, Oct 26):
+  // a page whose words stay put still gives the new week's times, and one
+  // read on a Thursday filed only up to Saturday week.
+  const thisWeek = calendarWeeks(dayIn(opts.now ?? Date.now()))[0].sunday
+  const weekDue = reads.kind === 'times' && !!watch.pageHash && (watch.lastCheck?.readWeek ?? '') < thisWeek
   const stillAgrees = watch.lastCheck?.result === 'agrees' && !listingMoved
   const dated = async (o: WatchOutcome, agrees: boolean): Promise<WatchOutcome> => {
     // What it read, and only that (pageReadBoxes): its phone and email too
@@ -792,7 +797,7 @@ export async function runListingPageWatch(
     return o
   }
   // Else the first read sets the baseline; an unchanged page is left alone.
-  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread && !listingMoved) return dated({ ok: true, filed: 0, pageHash }, stillAgrees)
+  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread && !listingMoved && !weekDue) return dated({ ok: true, filed: 0, pageHash }, stillAgrees)
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A
@@ -807,7 +812,7 @@ export async function runListingPageWatch(
   const contact = contactReading ? await fileContact(watch, category, listing, contacts, contactReading, waitingNow, blocked, source.text, { now: opts.now, seen }) : null
   const merge = (o: WatchOutcome): WatchOutcome => withContact(o, contact, watch.lastCheck ?? null, reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }))
   // Read for its phone and email alone: the rest waits for the page to change.
-  if (!opts.full && !changed && !firstFound && !notesUnread && !listingMoved) {
+  if (!opts.full && !changed && !firstFound && !notesUnread && !listingMoved && !weekDue) {
     const o = merge({ ok: true, filed: 0, pageHash })
     return dated(o, stillAgrees && o.check?.result === 'agrees')
   }
@@ -824,15 +829,21 @@ export async function runListingPageWatch(
   // so a standing difference is the listing being newer (a newsletter, an
   // approval), never filed; it says whether the two still agree. Its own
   // few reads a run, so it never takes a changed page's.
-  const compareOnly = !opts.full && !changed && !firstFound && !notesUnread
+  const compareOnly = !opts.full && !changed && !firstFound && !notesUnread && !weekDue
   if (budget && !opts.full) {
-    const left = compareOnly ? (budget.compares ?? 0) : budget.aiReads
-    if (left <= 0) return merge({ ok: true, filed: 0 })
-    if (compareOnly) budget.compares = left - 1
-    else budget.aiReads--
+    // A shul's page takes from the run's times reads first (TIMES_READS_PER_RUN).
+    if (reads.kind === 'times' && (budget.timesReads ?? 0) > 0) budget.timesReads!--
+    else {
+      const left = compareOnly ? (budget.compares ?? 0) : budget.aiReads
+      if (left <= 0) return merge({ ok: true, filed: 0 })
+      if (compareOnly) budget.compares = left - 1
+      else budget.aiReads--
+    }
   }
   const o = merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash, compareOnly }))
-  return dated(o.check ? { ...o, check: { ...o.check, listedAs: listed } } : o, o.check?.result === 'agrees')
+  // A compare files nothing, so it isn't the week's read.
+  const read = o.check ? { listedAs: listed, ...(reads.kind === 'times' && !compareOnly ? { readWeek: thisWeek } : {}) } : {}
+  return dated(o.check ? { ...o, check: { ...o.check, ...read } } : o, o.check?.result === 'agrees')
 }
 
 /** The AI's read of a page that changed (or a check's), and what it files:
@@ -1066,8 +1077,8 @@ async function fileContact(
  *  differences among the check's, what it filed counted. */
 export function withContact(o: WatchOutcome, contact: ContactFiled | null, last: WatchCheck | null, what: PageReads['kind'], from: WatchCheck['from']): WatchOutcome {
   if (!contact || !o.ok) return o
-  const { at: _at, ...was } = last ?? { at: '' }
-  void _at
+  const { at, ...was } = last ?? { at: '' }
+  const carried = !o.check && !!last
   const base: Omit<WatchCheck, 'at'> = o.check ?? (last ? (was as Omit<WatchCheck, 'at'>) : { what, from, result: 'nothing', read: [], differences: [], queue: null })
   const { same, changes } = contact.reading
   const differences = [...base.differences.filter((d) => !contact.lines.includes(d)), ...contact.lines]
@@ -1077,6 +1088,15 @@ export function withContact(o: WatchOutcome, contact: ContactFiled | null, last:
   return {
     ...o,
     filed: o.filed + contact.filed.length,
-    check: { ...base, result, differences, queue: base.queue ?? contact.queue, contact: { same, changes: Object.keys(changes) } },
+    check: {
+      ...base,
+      result,
+      differences,
+      queue: base.queue ?? contact.queue,
+      contact: { same, changes: Object.keys(changes) },
+      // The last read's, carried with nothing new: dated by that read, not
+      // this morning's run (CheckFound).
+      ...(carried && !contact.lines.length ? { at } : {}),
+    },
   }
 }

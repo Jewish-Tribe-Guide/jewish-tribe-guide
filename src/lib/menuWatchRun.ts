@@ -34,12 +34,21 @@ import type { DirectoryResource, ResourceRow } from '@/types'
  *  each several seconds of a run that has a minute for every watch.
  *  `searches`: how many websites it may search again for a menu whose page
  *  stopped opening (a few pages each, and one of the run's AI reads). */
-export type MenuReadBudget = { aiReads: number; renders?: number; searches?: number; compares?: number }
+export type MenuReadBudget = { aiReads: number; renders?: number; searches?: number; compares?: number; timesReads?: number }
 
 /** Listing pages a cron run may read again only because their listing
  *  changed (listingPageRun.ts), apart from the reads a page that changed
- *  gets, so they never crowd one out. */
-export const LISTING_COMPARES_PER_RUN = 3
+ *  gets, so they never crowd one out. 3 left 40-odd pages, compared with
+ *  nothing since a morning of approvals (Oct 23), unread for days: a
+ *  mikvah's checked date stayed where it was (Oct 26). */
+export const LISTING_COMPARES_PER_RUN = 12
+
+/** A shul's times pages a cron run may read, apart from the menus' reads:
+ *  each once a week (listingPageRun.ts) and whenever it changes, and its
+ *  calendar changes on the Sunday and the Thursday. Taken first; past it,
+ *  a page takes from the run's reads as before. Two nights for every
+ *  shul's page, read on a Sunday with its new week (Oct 26). */
+export const TIMES_READS_PER_RUN = 20
 
 /** Menu pages a cron run may draw in a browser. */
 export const MENU_RENDERS_PER_RUN = 1
@@ -49,7 +58,7 @@ export const MENU_RENDERS_PER_RUN = 1
 export const MENU_SEARCHES_PER_RUN = 1
 
 export function newMenuReadBudget(): MenuReadBudget {
-  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN, searches: MENU_SEARCHES_PER_RUN, compares: LISTING_COMPARES_PER_RUN }
+  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN, searches: MENU_SEARCHES_PER_RUN, compares: LISTING_COMPARES_PER_RUN, timesReads: TIMES_READS_PER_RUN }
 }
 
 /** Gives every food place its menu watch, on its menu link or else the page
