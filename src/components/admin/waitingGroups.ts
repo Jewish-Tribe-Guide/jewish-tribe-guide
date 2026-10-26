@@ -2,16 +2,16 @@ import { closureText, closureWaits } from '@/lib/googleJob'
 import { dishProposal } from '@/lib/dishProposal'
 import { findingFor } from '@/lib/eruvJob'
 import { detailsKeysToUse, detailsRows } from '@/lib/eruvWebsite'
-import { kosherBoxKeys, kosherInTheBox, kosherProposal, kosherRows } from '@/lib/kosherBox'
+import { kosherBoxKeys, kosherInTheBox, kosherProposal, kosherRows, renamedTo } from '@/lib/kosherBox'
 import type { CategoryConfig } from '@/lib/categories'
 import { KOSHER_LIST_NAMES, type KosherList } from '@/lib/kosherJob'
 import { scheduleProposal } from '@/lib/timesProposal'
 import type { Finding } from '@/lib/watchFindings'
-import { day, shortUrl } from './JobPage'
+import { day, shortUrl } from './watchText'
 import { usualRows } from './TimesProposal'
 import { checkedLines, openedPlace, type CheckedLine, type FootLink } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
-import type { HoursPlace } from './HoursJob'
+import type { HoursPlace } from './watchJobTypes'
 import type { ListedSection } from './MikvahHours'
 import { FOOD_HOURS_KEY, contactEdit, dishesEdit, foodHoursEdit, googleEdit, hospitalBoxEdit, kosherEdit, sectionEdit, timesEdit, type FindingEdit } from './findingEdits'
 import { CONTACT_SECTION } from '@/lib/contactRead'
@@ -50,7 +50,8 @@ export type Decide =
   | { kind: 'google' }
   | { kind: 'closure' }
   | { kind: 'menu' }
-  | { kind: 'off'; id: string }
+  /** `renamed`: the near name the list has it by, for It's … now. */
+  | { kind: 'off'; id: string; renamed?: string }
   /** A change that leaves it no hechsher: the Kosher page's archive. */
   | { kind: 'archive'; id: string }
   /** `archivedId`: the guide's archived listing it may be, for Bring it
@@ -207,7 +208,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         lines: [{ label: 'Hechsher', value: 'None', old: list.text.replace(/’s list$/, '') }],
         facts: [...siteFact(), ...(google?.matched ? [{ label: 'Google', value: google.closure ? closureText(google.closure) : 'Open' }] : [])],
         note: 'Its only hechsher. Removing archives it.',
-        decide: f.operation === 'delete' ? { kind: 'off', id: f.id } : { kind: 'archive', id: f.id },
+        decide: f.operation === 'delete' ? { kind: 'off', id: f.id, ...(renamedTo(f.notes) ? { renamed: renamedTo(f.notes)!.name } : {}) } : { kind: 'archive', id: f.id },
       })
     } else if (box) {
       listChanges.push({

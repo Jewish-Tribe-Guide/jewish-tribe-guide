@@ -108,8 +108,10 @@ describe('openedPlace', () => {
     expect(d.kind === 'rows' && d.groups[0].rows).toEqual([{ name: 'Schnitzel' }, { name: 'Steak', sub: 'Not always' }])
     // Its menu link, read: Stop unlinks it.
     expect(d.foot).toEqual({ lead: 'Same as', links: [{ text: 'its menu', url: 'https://cherrygrill88.com/menu' }], when: 'read Oct 20', change: { kind: 'menu' }, stop: { kind: 'menu', action: 'unlink', what: 'its menu' } })
-    expect(foot(o, 'kosher')).toEqual({ lead: 'Same as', links: [{ text: 'Keystone-K’s list', url: 'https://keystonek.example/list' }], when: 'read Oct 24' })
-    expect(o.reads).toEqual([{ job: 'dishes', resourceId: 'p' }])
+    // On Keystone-K's list: Change gives its page there (Oct 26).
+    expect(foot(o, 'kosher')).toEqual({ lead: 'Same as', links: [{ text: 'Keystone-K’s list', url: 'https://keystonek.example/list' }], when: 'read Oct 24', change: { kind: 'keystone' } })
+    // Its menu, and Keystone-K's list: each can be stopped here (Oct 26).
+    expect(o.reads).toEqual([{ job: 'dishes', resourceId: 'p' }, { job: 'watch', watchId: 'k' }])
     // It has a menu link, changed on its Dishes box: nothing to add.
     expect(o.add).toBeNull()
   })
@@ -162,7 +164,7 @@ describe('openedPlace, not checked', () => {
     ])
     expect(checkedLines(o.checked).map((l) => [l.label, l.value, l.foot.links.map((x) => x.text).join(' · '), l.foot.when, !!l.foot.change])).toEqual([
       ['Dishes', 'Cakes, Meringue Rolls, Macarons and 1 more', 'rivkacakes.com/?page=menu', 'read Oct 22', true],
-      ['Hechsher', 'Keystone-K', 'Keystone-K’s list', 'read Oct 25', false],
+      ['Hechsher', 'Keystone-K', 'Keystone-K’s list', 'read Oct 25', true],
     ])
   })
 
@@ -193,5 +195,48 @@ describe('openedPlace, not checked', () => {
     const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: null, notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }]
     const o = openedPlace('p', jobs({ hospitals }), NOW)
     expect(o.problems).toEqual([{ key: 'refuah', page: null, says: 'Not found on Refuah', fields: [{ label: 'Bikur Cholim', value: 'Bikur Cholim room' }], fix: { kind: 'change', change: { kind: 'refuah' }, label: 'Give its page on Refuah' } }])
+  })
+})
+
+// Oct 26: what the job pages had, on the kinds' pages. A source turned off
+// or stopped is listed as not read, each with Read it again (their Turn
+// back on); a place on neither kosher list gets a Kosher box all the same.
+describe('openedPlace, what isn’t read', () => {
+  it('a shul turned off, and a page of it stopped', () => {
+    const stopped = watch('x', 'https://mekorhabracha.org/events', { active: false })
+    const o = openedPlace('p', jobs({ times: { name: 'Shul times', places: [shul({ off: true, pages: [], stopped: [{ watch: stopped }] }) as never] } }), NOW)
+    expect(o.again).toEqual([
+      { key: 'times-off', kind: 'place', job: 'times', what: 'mekorhabracha.org' },
+      { key: 'x', kind: 'page', job: 'times', watchId: 'x', what: 'mekorhabracha.org/events' },
+    ])
+  })
+
+  it('a hospital off Refuah, a menu marked none online, a food place’s page stopped', () => {
+    const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: null, notOnRefuah: true, source: null, line: '', refuah: null, nearby: [], boxes: [] }]
+    expect(openedPlace('p', jobs({ hospitals }), NOW).again).toEqual([{ key: 'refuah', kind: 'refuah', what: 'its Refuah page' }])
+    const page = watch('m', 'https://joy.example/menu', { active: false })
+    const dishes = [{ id: 'p', name: 'Joy Cafe', href: '/x', dishes: [], website: 'https://joy.example', menuUrl: null, pages: [page], reading: { status: 'no_menu' as const, readAt: AT } }]
+    expect(openedPlace('p', jobs({ dishes: dishes as never }), NOW).again).toEqual([
+      { key: 'menu', kind: 'menu', what: 'its menu' },
+      { key: 'm', kind: 'watch', watchId: 'm', what: 'joy.example/menu' },
+    ])
+  })
+
+  it('nothing, when everything it has is read', () => {
+    expect(openedPlace('p', jobs({ times: { name: 'Shul times', places: [shul() as never] } }), NOW).again).toEqual([])
+  })
+
+  it('a food place on neither kosher list: its hechsher, and Change to give its page on Keystone-K’s', () => {
+    const kosher = {
+      available: true,
+      lists: [],
+      counts: { checked: 0, toCheck: 0, cantRead: 0, didntLoad: 0, notListed: 1 },
+      places: [{ id: 'p', name: 'Joy Cafe', category: 'restaurant', certs: ['OU'], levels: [], on: [], differences: [], href: '/x' }],
+      newPlaces: [],
+    }
+    const o = openedPlace('p', jobs({ kosher }), NOW)
+    const box = o.boxes.find((b) => b.key === 'kosher')!
+    expect(box.kind === 'rows' && box.groups[0].rows).toEqual([{ name: 'Hechsher', right: 'OU' }])
+    expect(box.foot).toEqual({ lead: 'On neither list', links: [], when: null, change: { kind: 'keystone' } })
   })
 })

@@ -29,7 +29,9 @@ const Chevron = () => (
   </svg>
 )
 
-export default function WatchKindPage({ token, category }: { token: string; category: string }) {
+/** `place`: the place a link opened it on (What's tracked's lines,
+ *  ?place=), opened on its tab until another is picked. */
+export default function WatchKindPage({ token, category, place }: { token: string; category: string; place?: string | null }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
   const { jobs, reload } = useWatchJobsAndReload(token)
@@ -39,6 +41,7 @@ export default function WatchKindPage({ token, category }: { token: string; cate
   // The place opened, and what it was called, to say where it went when a
   // read finds it something to check.
   const [open, setOpen] = useState<{ id: string; name: string; tab: WatchState } | null>(null)
+  const [linked, setLinked] = useState(place ?? null)
   const all = kindsOf(jobs, base, now)
   const kind = all?.kinds.find((k) => k.id === category)
 
@@ -52,12 +55,14 @@ export default function WatchKindPage({ token, category }: { token: string; cate
   if (!kind) return <div className="space-y-4">{back}<p className="text-sm text-slate-600">Nothing of this kind is watched.</p></div>
 
   const count = { waiting: kind.counts.waiting, not_checked: kind.counts.notChecked, up_to_date: kind.counts.upToDate }
-  // Opens on the first tab with anything in it.
-  const active = picked ?? TABS.find((t) => count[t.key] > 0)?.key ?? 'waiting'
+  const fromLink = linked ? kind.places.find((p) => p.id === linked) : undefined
+  const shown = open ?? (fromLink ? { id: fromLink.id, name: fromLink.name, tab: fromLink.state } : null)
+  // Opens on the linked place's tab, else the first with anything in it.
+  const active = picked ?? fromLink?.state ?? TABS.find((t) => count[t.key] > 0)?.key ?? 'waiting'
   const places = kind.places.filter((p) => p.state === active)
   const tab = TABS.find((t) => t.key === active)!
   // Opened from this tab, and a read or a fix moved it to another.
-  const moved = open && open.tab === active ? kind.places.find((p) => p.id === open.id && p.state !== active) : undefined
+  const moved = shown && shown.tab === active ? kind.places.find((p) => p.id === shown.id && p.state !== active) : undefined
 
   return (
     <div className="space-y-3.5">
@@ -73,7 +78,7 @@ export default function WatchKindPage({ token, category }: { token: string; cate
               type="button"
               role="tab"
               aria-selected={on}
-              onClick={() => setPicked(t.key)}
+              onClick={() => (setPicked(t.key), setLinked(null))}
               className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-2 py-2 text-[13.5px] font-semibold sm:px-3 sm:text-sm ${on ? 'border-primary text-primary' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
             >
               {t.label} <span className={on ? '' : flag ? 'text-amber-800' : 'text-slate-500'}>{count[t.key]}</span>
@@ -106,12 +111,12 @@ export default function WatchKindPage({ token, category }: { token: string; cate
               </>
             )
             const row = 'flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 sm:px-4 sm:py-3'
-            if (open?.id === p.id) {
-              return <OpenedPlace key={p.id} place={p} kindLabel={kind.label} jobs={jobs} token={token} community={community} now={now} onClose={() => setOpen(null)} onChanged={reload} />
+            if (shown?.id === p.id) {
+              return <OpenedPlace key={p.id} place={p} kindLabel={kind.label} jobs={jobs} token={token} community={community} now={now} onClose={() => (setOpen(null), setLinked(null))} onChanged={reload} />
             }
             return (
               <li key={p.id}>
-                <button type="button" aria-expanded="false" onClick={() => setOpen({ id: p.id, name: p.name, tab: p.state })} className={row} data-testid="kind-place">
+                <button type="button" aria-expanded="false" onClick={() => (setOpen({ id: p.id, name: p.name, tab: p.state }), setLinked(null))} className={row} data-testid="kind-place">
                   {inner}
                 </button>
               </li>

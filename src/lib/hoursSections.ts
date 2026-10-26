@@ -153,11 +153,6 @@ export function hoursRows(now: unknown, next: unknown = now): HoursRow[] {
   return groups.map((g) => ({ days: hoursDays(g.days), text: g.text, ...(g.was ? { was: g.was, mark: g.was === 'Not listed' ? 'new' : 'changed' } : { mark: 'same' }) }))
 }
 
-/** How many rows a section's update changes, its note counted as one. */
-export function sectionChanges(rows: readonly HoursRow[], noteChanged: boolean): number {
-  return rows.filter((r) => r.mark !== 'same').length + (noteChanged ? 1 : 0)
-}
-
 /** Whether a note reads differently, not just spaced differently. */
 export function noteChanged(now: unknown, next: unknown): boolean {
   const a = typeof now === 'string' ? now : ''

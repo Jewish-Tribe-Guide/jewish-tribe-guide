@@ -218,7 +218,7 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
   }
   const queue = outcomes.includes('filed') ? 'filed' : outcomes.includes('waiting') ? 'waiting' : 'before'
   if (filed.length) {
-    await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: filed.join('; ') }], findingPage(community, 'hospitals')).catch((err) =>
+    await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: filed.join('; ') }], findingPage(community, category, row.id)).catch((err) =>
       console.error('[watch-refuah] digest failed:', err),
     )
   }

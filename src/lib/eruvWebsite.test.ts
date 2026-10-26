@@ -4,7 +4,6 @@ import {
   alertsLinks,
   detailsKey,
   detailsKeysToUse,
-  detailsPill,
   detailsRows,
   eruvDetailsSuggestion,
   eruvWebsiteWatchChanges,
@@ -91,15 +90,12 @@ describe('the Details box', () => {
       ['Hotline', '(610) 555-0199', '(610) 664-5626, option 3', 'changed'],
       ['Email alerts', 'eepurl.com/abc', undefined, 'new'],
     ])
-    expect(detailsPill(rows)).toBe('2 updates')
     expect(detailsKeysToUse(rows)).toEqual(['hotline', 'alertsUrl'])
   })
 
-  it('with nothing from the website: Same', () => {
+  it('with nothing from the website, the rows the eruv has', () => {
     const rows = detailsRows(now)
     expect(rows.map((r) => r.name)).toEqual(['Where it goes', 'Website', 'Hotline'])
-    expect(detailsPill(rows)).toBe('Same')
-    expect(detailsPill(detailsRows(now, { hotline: '(610) 555-0199' }))).toBe('1 change')
   })
 })
 

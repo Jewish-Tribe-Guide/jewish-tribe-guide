@@ -777,10 +777,10 @@ describe('sendWatchDigest — where the suggestions wait', () => {
   })
 
   it('names and links the job page they wait on', async () => {
-    await sendWatchDigest('philly', 'Refuah', [{ name: 'HUP', what: 'Kosher food: a new contact' }], { path: '/philly/admin/watches/hospitals', name: 'Hospitals' })
+    await sendWatchDigest('philly', 'Refuah', [{ name: 'HUP', what: 'Kosher food: a new contact' }], { path: '/philly/admin/watches/kind/hospital', name: 'Hospitals' })
     const { html } = h.last()
     expect(html).toContain('waiting on the Watches tab’s Hospitals page')
-    expect(html).toContain('href="https://guide.example/philly/admin/watches/hospitals"')
+    expect(html).toContain('href="https://guide.example/philly/admin/watches/kind/hospital"')
     expect(html).toContain('Open Hospitals')
     expect(html).not.toContain('moderation queue')
   })

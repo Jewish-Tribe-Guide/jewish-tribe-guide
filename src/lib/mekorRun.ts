@@ -224,7 +224,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community, 'kosher')).catch((err) => console.error('[watch-mekor] digest failed:', err))
+  await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community)).catch((err) => console.error('[watch-mekor] digest failed:', err))
   // What a kosher list says is the certification: that's what it dates.
   const confirmed = await confirmFromSource(community, agree, MEKOR_NAME, [KOSHER_SECTION])
 

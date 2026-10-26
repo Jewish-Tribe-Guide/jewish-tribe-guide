@@ -88,8 +88,3 @@ export function dishProposal(listed: ListedDishes, reading: { dishes: readonly R
   const pill = gone.length && fresh.length ? `${updates} updates` : gone.length ? `${gone.length} not on the menu` : fresh.length ? `${fresh.length} new` : null
   return { rows: [...gone, ...found, ...notFound, ...unchecked], always, sometimes: notAlways, updates, pill }
 }
-
-/** "1 update", "2 updates": a place's row, whatever kinds its boxes hold. */
-export function updatesPill(n: number): string {
-  return `${n} update${n === 1 ? '' : 's'}`
-}

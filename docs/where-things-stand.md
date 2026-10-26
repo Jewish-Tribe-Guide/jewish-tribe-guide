@@ -276,9 +276,9 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    on a grocery goes under Grocery; a place only a list has goes under
    Food. Not done yet, on purpose:
    - Every row now opens in place (pieces 2 to 4).
-   - The old job rows stay under "Job pages" until pieces 2 to 4 hold
-     what they do. The watch list and Add a watch are gone (piece 5,
-     What's tracked).
+   - The old job rows stayed under "Job pages" until pieces 2 to 4 held
+     what they did; the job pages went Oct 26 (piece 6). The watch list
+     and Add a watch are gone (piece 5, What's tracked).
    - On the test site Food shows 25 waiting (mostly places only a kosher
      list has), 22 not checked and 49 up to date.
 2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
@@ -349,8 +349,9 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      answering for drops the match (it used to be refused).
    Not done, on purpose:
    - A matched place with a field nothing checks and no page to add
-     (a grocery's website) links to the Google page, "Check it against
-     Google": the check is a paid call and its answer needs Use / Keep.
+     (a grocery's website) has "Check it against Google" (a paid call;
+     its answer waits with Use / Keep). It linked to the Google page
+     until Oct 26.
    - The pills are piece 1's ("Google stopped answering Oct 17"), not a
      count of the fields in the groups.
 4. **Waiting for you by source, in the agreed order: BUILT Oct 25.**
@@ -389,9 +390,10 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        It uses the Archived tab's restore, which already existed. Off a
        list and archived: Bring it back alone.
      Not done, on purpose:
-     - A waiting place with nothing a group can show shows "Open it
-       where it waits", a link to its job page. None seen on the test
-       site.
+     - A waiting place with nothing a group can show (a page that
+       differs, nothing filed from it yet) has Read it again, to file
+       what it says. It linked to its job page until Oct 26. None seen on
+       the test site.
 5. **Last night, a line per kind: BUILT Oct 25** (`nightKinds.ts`,
    `NightlyRuns.tsx`, FinalNightly). Closed: "Everything read", or which
    kinds weren't ("Kosher certification, minyan times and menus not all
@@ -483,6 +485,32 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add
        a source).
+6. **The job pages gone: BUILT Oct 26** (the user: "my goal would be to
+   have everything accounted for so then we can remove job pages"). The
+   seven pages under `/admin/watches/` (Google, Dishes, Hospitals, Mikvah
+   hours, Shul times, Eruv status, Kosher certification) and their
+   components are deleted; what only they did is on the kinds' pages:
+   - **Not read** under an opened place: a shul or mikvah turned off, a
+     page of it stopped, a hospital off Refuah, a menu marked No menu
+     online, a food place's or eruv's website stopped. Each has Read it
+     again (the job pages' Turn back on).
+   - **Kosher:** a food place on neither list gets a Kosher box ("On
+     neither list") whose Change gives its page on Keystone-K's list; on
+     Keystone-K's, the same Change. Off a list that has it by a near
+     name: It's <name> now, beside Remove the listing / Keep it. Read it
+     now also reads the lists it's on.
+   - **Menus:** a menu that can't be read has Photos of the menu and No
+     menu online beside Give its menu page.
+   - **Check it against Google** on its own place, not a link away.
+   - **A kosher list** is stopped, or read again, from its line in
+     What's tracked (Kosher lists, All N tracked).
+   - Every link that went to a job page — What's tracked's lines, the
+     findings' emails — opens the place on its kind's page instead
+     (`?place=<id>`, on its tab). A kosher list's findings email links
+     to the Watches tab.
+   Dropped on purpose: a whole Off switch per place (stopping each source
+   does it; giving a page turns it back on), and Stop on a newsletter (it
+   had none on the Shul times page either).
 
 Settled with the user so far:
 
@@ -609,6 +637,9 @@ Settled with the user so far:
   ("Same as its menu: Bowls · Smoothies · Surf Quenchers · read Oct 22").
 
 ## Building next: the job pages, as drawn (agreed Oct 21)
+
+**Gone Oct 26**: these pages were removed once the kinds' pages held what
+they did (piece 6 above). Kept for the history of what was decided.
 
 The user, Oct 21: "great, let's do it". There is one drawing per page, all
 agreed:

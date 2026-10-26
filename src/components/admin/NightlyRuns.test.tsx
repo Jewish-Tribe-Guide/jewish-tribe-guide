@@ -13,7 +13,7 @@ const GOOGLE = kind({ id: 'google', name: 'Google', about: 'Reads every place ma
 const ERUVS = kind({
   count: '1 of 5 read',
   trouble: '4 never read',
-  misses: [{ name: 'Lower Merion Eruv', why: 'Never read', page: 'eruv' }, { name: 'A page', why: 'Didn’t load', page: '' }],
+  misses: [{ name: 'Lower Merion Eruv', why: 'Never read', page: 'kind/eruvin?place=lm' }, { name: 'A page', why: 'Didn’t load', page: '' }],
   nights: [{ date: 'Oct 25', result: '1 of 5 read', tone: 'bad' }],
 })
 
@@ -51,7 +51,7 @@ describe('What’s tracked on the Watches tab', () => {
     const row = screen.getAllByTestId('night-kind')[1]
     expect(within(row).getByText('Reads each eruv’s website for its hotline and email alerts.')).toBeTruthy()
     const misses = within(row).getByRole('list', { name: 'Eruvs: not read last night' })
-    expect(within(misses).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Lower Merion EruvNever read', '/philly/admin/watches/eruv']])
+    expect(within(misses).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Lower Merion EruvNever read', '/philly/admin/watches/kind/eruvin?place=lm']])
     // A page with no job page of its own (added by hand) isn't a link.
     expect(within(misses).getAllByRole('listitem')[1]).toHaveTextContent('A pageDidn’t load')
     expect(within(row).getByRole('list', { name: 'Eruvs: last 14 nights' })).toHaveTextContent('Oct 251 of 5 read')
@@ -81,8 +81,8 @@ describe('What’s tracked on the Watches tab', () => {
     show([
       kind({
         tracked: [
-          { name: 'Northeast Eruv', status: 'Not loading since Oct 22', bad: true, page: 'eruv' },
-          { name: 'Center City Eruv', status: 'Read Oct 25', bad: false, page: 'eruv' },
+          { name: 'Northeast Eruv', status: 'Not loading since Oct 22', bad: true, page: 'kind/eruvin?place=ne' },
+          { name: 'Center City Eruv', status: 'Read Oct 25', bad: false, page: 'kind/eruvin?place=cc' },
           { name: 'A page', status: 'Read Oct 25', bad: false, page: '' },
         ],
       }),
@@ -94,7 +94,7 @@ describe('What’s tracked on the Watches tab', () => {
     await u.click(screen.getByRole('button', { name: 'All 3 tracked' }))
     const all = screen.getByRole('list', { name: 'Eruvs: all tracked' })
     expect(within(all).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Northeast EruvNot loading since Oct 22', 'Center City EruvRead Oct 25', 'A pageRead Oct 25'])
-    expect(within(all).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/philly/admin/watches/eruv', '/philly/admin/watches/eruv'])
+    expect(within(all).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/philly/admin/watches/kind/eruvin?place=ne', '/philly/admin/watches/kind/eruvin?place=cc'])
     expect(within(all).getByText('Not loading since Oct 22')).toHaveClass('text-amber-800')
   })
 
@@ -104,7 +104,7 @@ describe('What’s tracked on the Watches tab', () => {
     const news = kind({
       id: 'newsletters', name: 'Newsletters', when: null, count: '2 newsletters · last email Oct 25', trouble: '1 to link',
       misses: [{ name: 'info@lms.org', why: 'Not linked to a shul', page: '', link: 'w1' }],
-      tracked: [{ name: 'info@lms.org', status: 'Not linked to a shul', bad: true, page: '' }, { name: 'BZBI', status: 'Email Oct 25', bad: false, page: 'times' }],
+      tracked: [{ name: 'info@lms.org', status: 'Not linked to a shul', bad: true, page: '' }, { name: 'BZBI', status: 'Email Oct 25', bad: false, page: 'kind/synagogue?place=bzbi' }],
     })
     show([news], (id) => <span>Link box for {id}</span>)
     const u = user()

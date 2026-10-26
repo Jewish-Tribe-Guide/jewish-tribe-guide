@@ -29,7 +29,6 @@ import type { JobCounts } from './watchJobs'
 export type KosherList = 'keystone' | 'mekor'
 
 export const KOSHER_LIST_NAMES: Record<KosherList, string> = { keystone: 'Keystone-K’s list', mekor: 'Mekor Habracha’s list' }
-const WHO: Record<KosherList, string> = { keystone: 'Keystone-K', mekor: 'Mekor Habracha' }
 
 /** What became of a difference: a finding waiting to compare; one filed
  *  before and decided (not filed again until the list or the listing
@@ -195,9 +194,6 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
     newPlaces: newPlaces.sort((a, b) => a.name.localeCompare(b.name)),
   }
 }
-
-/** Who says it, for a line: "Keystone-K", "Mekor Habracha". */
-export const listWho = (list: KosherList) => WHO[list]
 
 /** The page's counts, for its row on the Watches tab. To check counts the
  *  places a list differs from and the places only a list has, unless

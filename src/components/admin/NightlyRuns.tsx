@@ -8,7 +8,8 @@ import { kindBad, lastNightLine, type KindNight, type NightKindView } from '@/li
 // A row that says whether everything was read last night, or which kinds
 // need a look. Opened, a line per kind of source (nightKinds.ts): its run's
 // time and what it read. A kind opens to what it reads, what wasn't read
-// last night and why, each a link to its job page, everything it tracks
+// last night and why, each a link to its place on its kind's page (or to
+// nothing, for a list or a page added by hand), everything it tracks
 // ("All 52 tracked", the user, Oct 25: it replaced the tab's watch list)
 // and its last 14 nights. Newsletters come as they're sent: what needs a
 // look, a sender not linked to a shul linked in place (`linkSender`).
@@ -38,8 +39,10 @@ function CountLine({ kind }: { kind: NightKindView }) {
 }
 
 type LinkSender = (watchId: string) => ReactNode
+/** A kosher list's Stop or Read again. */
+type OnList = (watchId: string, action: 'pause' | 'resume') => void
 
-function KindRow({ kind, base, linkSender }: { kind: NightKindView; base: string; linkSender?: LinkSender }) {
+function KindRow({ kind, base, linkSender, onList }: { kind: NightKindView; base: string; linkSender?: LinkSender; onList?: OnList }) {
   const [open, setOpen] = useState(false)
   const [all, setAll] = useState(false)
   const page = (p: string) => `${base}/watches/${p}`
@@ -104,6 +107,11 @@ function KindRow({ kind, base, linkSender }: { kind: NightKindView; base: string
                       <>
                         <span className="min-w-0 flex-1 text-sm text-slate-900">{t.name}</span>
                         <span className={`whitespace-nowrap text-[12.5px] ${t.bad ? 'font-semibold text-amber-800' : 'text-slate-500'}`}>{t.status}</span>
+                        {t.watch && onList && (
+                          <button type="button" onClick={() => onList(t.watch!.id, t.watch!.active ? 'pause' : 'resume')} className="whitespace-nowrap text-[12.5px] font-semibold text-primary hover:underline">
+                            {t.watch.active ? 'Stop' : 'Read again'}
+                          </button>
+                        )}
                       </>
                     )
                     return (
@@ -143,7 +151,7 @@ function KindRow({ kind, base, linkSender }: { kind: NightKindView; base: string
 }
 
 /** `runs`: undefined while loading, null when it couldn't be loaded. */
-export default function NightlyRuns({ runs, base, linkSender }: { runs: NightlyRunsLoaded | null | undefined; base: string; linkSender?: LinkSender }) {
+export default function NightlyRuns({ runs, base, linkSender, onList }: { runs: NightlyRunsLoaded | null | undefined; base: string; linkSender?: LinkSender; onList?: OnList }) {
   const [open, setOpen] = useState(false)
   const kinds = runs?.available ? runs.kinds : null
   const line = kinds && lastNightLine(kinds)
@@ -182,7 +190,7 @@ export default function NightlyRuns({ runs, base, linkSender }: { runs: NightlyR
       {open && kinds && (
         <ul>
           {kinds.map((k) => (
-            <KindRow key={k.id} kind={k} base={base} linkSender={linkSender} />
+            <KindRow key={k.id} kind={k} base={base} linkSender={linkSender} onList={onList} />
           ))}
         </ul>
       )}

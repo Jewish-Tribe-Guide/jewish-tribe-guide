@@ -91,9 +91,9 @@ describe('watchKinds', () => {
     })
     const k = kind(input, 'synagogue')
     expect(k.counts).toEqual({ waiting: 1, notChecked: 1, upToDate: 1 })
-    expect(place(input, 'bzbi')).toMatchObject({ state: 'waiting', pill: '2 changes', href: '/philly/admin/watches/times' })
-    expect(place(input, 'lms')).toMatchObject({ state: 'not_checked', pill: 'Website not checked', href: '/philly/admin/watches/google' })
-    expect(place(input, 'ksi')).toMatchObject({ state: 'up_to_date', pill: null, href: '/philly/synagogue/ksi' })
+    expect(place(input, 'bzbi')).toMatchObject({ state: 'waiting', pill: '2 changes' })
+    expect(place(input, 'lms')).toMatchObject({ state: 'not_checked', pill: 'Website not checked' })
+    expect(place(input, 'ksi')).toMatchObject({ state: 'up_to_date', pill: null })
     expect(placeSourcesText(place(input, 'ksi').sources)).toBe('Google · its website · its newsletter')
     expect(kindSourcesText(k.sources)).toBe('Google · their websites · newsletters')
   })
@@ -130,7 +130,7 @@ describe('watchKinds', () => {
     })
     expect(kind(input, 'grocery').counts).toEqual({ waiting: 1, notChecked: 0, upToDate: 0 })
     expect(kind(input, 'restaurant').counts).toEqual({ waiting: 0, notChecked: 0, upToDate: 1 })
-    expect(place(input, 'giant')).toMatchObject({ pill: '1 change', href: '/philly/admin/watches/kosher' })
+    expect(place(input, 'giant')).toMatchObject({ pill: '1 change' })
   })
 
   it('waits on a closure Google reports until it’s kept closed or shown open', () => {
@@ -229,7 +229,7 @@ describe('watchKinds', () => {
       sites: [site('giant', { findings: [{ id: 'f1' }] }), site('shoprite', { pages: [{ watch: watch({ lastOkAt: ago(200), failingSince: ago(150), lastError: 'HTTP 500' }) }] })],
     })
     expect(kind(input, 'grocery').counts).toEqual({ waiting: 1, notChecked: 1, upToDate: 1 })
-    expect(place(input, 'giant')).toMatchObject({ state: 'waiting', pill: '1 change', href: `${BASE}/watches/kind/grocery`, sources: ['google', 'website'] })
+    expect(place(input, 'giant')).toMatchObject({ state: 'waiting', pill: '1 change', sources: ['google', 'website'] })
     expect(place(input, 'shoprite')).toMatchObject({ state: 'not_checked', pill: 'Website didn’t load' })
     expect(kind(input, 'grocery').sources).toEqual(['google', 'website'])
   })
@@ -259,7 +259,7 @@ describe('watchKinds', () => {
 
   it('a link a listing shows that doesn’t open is Not checked, on its kind’s page', () => {
     const input = jobs({ google: [google('r', 'restaurant'), google('s', 'restaurant')], links: [link({}), link({ resourceId: 's', error: null, failingSince: null })] })
-    expect(place(input, 'r')).toMatchObject({ state: 'not_checked', pill: 'Link doesn’t open', href: `${BASE}/watches/kind/restaurant` })
+    expect(place(input, 'r')).toMatchObject({ state: 'not_checked', pill: 'Link doesn’t open' })
     expect(place(input, 's')).toMatchObject({ state: 'up_to_date' })
     // Not answering once isn't, yet.
     expect(place(jobs({ google: [google('r', 'restaurant')], links: [link({ error: 'Didn’t answer' })] }), 'r')).toMatchObject({ state: 'up_to_date' })

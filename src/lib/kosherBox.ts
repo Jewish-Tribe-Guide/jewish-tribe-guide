@@ -92,18 +92,6 @@ export function kosherRows(category: CategoryConfig, now: Record<string, unknown
   return rows
 }
 
-/** The box's pill: "1 new", "2 changes", "1 off the list", else "3 updates". */
-export function kosherPill(rows: readonly KosherRow[]): string {
-  const lit = rows.filter((r) => r.mark !== 'same')
-  const n = lit.length
-  const kinds = new Set(lit.map((r) => r.mark))
-  if (!n) return 'Same'
-  if (kinds.size > 1) return `${n} updates`
-  if (kinds.has('new')) return `${n} new`
-  if (kinds.has('gone')) return `${n} off the list`
-  return `${n} change${n === 1 ? '' : 's'}`
-}
-
 /** What Use this takes from a list: the rows it would change. */
 export const kosherKeysToUse = (rows: readonly KosherRow[]): string[] => rows.filter((r) => r.mark !== 'same').flatMap((r) => r.keys)
 
@@ -114,15 +102,6 @@ export function renamedTo(notes: readonly string[]): { name: string; url: string
   for (const n of notes) {
     const m = n.match(/The list does have "(.+?)" \((https?:\/\/[^\s)]+)\)/)
     if (m) return { name: m[1], url: m[2] }
-  }
-  return null
-}
-
-/** Google's line in a new place's note: "Google: open, as Rivka Cakes". */
-export function googleLine(notes: readonly string[]): string | null {
-  for (const n of notes) {
-    const line = n.split('\n').find((l) => /^Google/.test(l.trim()))
-    if (line) return line.trim().replace(/\.$/, '')
   }
   return null
 }

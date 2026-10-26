@@ -880,7 +880,7 @@ async function readAndFile(
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
     if (filed.length) {
-      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
+      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
         console.error('[watch-listing-page] digest failed:', err),
       )
     }
@@ -892,7 +892,7 @@ async function readAndFile(
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileSections(watch, category, listing, sections, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
     if (filed.length) {
-      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
+      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
         console.error('[watch-listing-page] digest failed:', err),
       )
     }
@@ -913,7 +913,7 @@ async function readAndFile(
     note,
     { name: LISTING_PAGE_WATCH_NAME },
   )
-  await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }], jobPageFor(watch.communityId, category)).catch((err) =>
+  await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }], jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
     console.error('[watch-listing-page] digest failed:', err),
   )
   return { ok: true, filed: 1, pageHash, check: check('filed') }
@@ -1054,7 +1054,7 @@ async function fileContact(
   const section: HoursSection = { section: CONTACT_SECTION, label: contactBoxName(fields), hours: null, notes: null }
   const { queue, filed } = await fileSections(watch, category, listing, [{ section, details: reading.changes, source: { section: CONTACT_SECTION, keys } }], waiting, text, at)
   if (filed.length) {
-    await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
+    await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
       console.error('[watch-listing-page] digest failed:', err),
     )
   }

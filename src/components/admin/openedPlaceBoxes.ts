@@ -7,10 +7,10 @@ import { hoursDidntLoad, hoursSection, samePage } from '@/lib/hoursJob'
 import { formatHoursSummary } from '@/lib/hours'
 import { TEFILLAH_LABELS } from '@/lib/davening'
 import { watchHealth, type Watch } from '@/lib/watches'
-import { day, shortUrl } from './JobPage'
+import { day, shortUrl } from './watchText'
 import { partPages, usualRows, type ShulPlace } from './TimesProposal'
 import { sectionPages, type ListedSection, type MikvahPlace } from './MikvahHours'
-import type { ListedBox } from './HospitalsJob'
+import type { ListedBox } from './watchJobTypes'
 import type { Jobs } from './useWatchJobs'
 import type { GoogleFieldRow } from '@/lib/googleJob'
 import { linkBroken, linkStatus } from '@/lib/linkCheck'
@@ -35,6 +35,7 @@ export type Change =
   | { kind: 'refuah' }
   | { kind: 'eruv-status'; id: string }
   | { kind: 'eruv-map'; id: string }
+  | { kind: 'keystone' }
 
 /** A source no longer read: an eruv's status or map emptied, or a watch
  *  paused. `what`: "its status", for "Stop reading its status?". */
@@ -81,7 +82,7 @@ export type Fix =
   | { kind: 'read'; step: ReadStep; pages?: number }
   | { kind: 'change'; change: Change; label: string }
   | { kind: 'add' }
-  | { kind: 'job'; job: 'google' | 'eruv'; text: string }
+  | { kind: 'google-check' }
   | { kind: 'link'; resourceId: string; key: string }
   | { kind: 'eruv-email'; id: string }
   | { kind: 'eruv-find'; id: string }
@@ -92,7 +93,18 @@ export type Problem = { key: string; page: FootLink | null; says: string; fields
 
 /** `checked`: the boxes no problem stands for, a not-checked place's
  *  "2 more checked". */
-export type Opened = { boxes: OpenedBox[]; reads: ReadStep[]; pages: number; add: AddSource | null; problems: Problem[]; checked: OpenedBox[] }
+/** A source turned off or stopped, not read until Read it again: a
+ *  shul's or mikvah's place turned off, a page of it stopped, a hospital
+ *  off Refuah, No menu online, a website stopped. */
+export type Again = { key: string; what: string } & (
+  | { kind: 'place'; job: 'hours' | 'times' }
+  | { kind: 'page'; job: 'hours' | 'times'; watchId: string }
+  | { kind: 'refuah' }
+  | { kind: 'menu' }
+  | { kind: 'watch'; watchId: string }
+)
+
+export type Opened = { boxes: OpenedBox[]; reads: ReadStep[]; pages: number; add: AddSource | null; problems: Problem[]; checked: OpenedBox[]; again: Again[] }
 
 const read = (at: string | null | undefined) => (at ? `read ${day(at)}` : null)
 const sameSite = (a: string | null, b: string | null) => !!a && !!b && shortUrl(a).toLowerCase() === shortUrl(b).toLowerCase()
@@ -126,6 +138,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   const reads: ReadStep[] = []
   let pages = 0
   let add: AddSource | null = null
+  const again: Again[] = []
   // Its own website's first page, for a field the website keeps.
   let site: string | null = null
   const problems: Problem[] = []
@@ -172,6 +185,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       pages += live.length
       if (live.length || shul.website) reads.push({ job: 'times', resourceId: id })
     }
+    offAgain('times', shul, live)
     add = { job: 'times', email: true, label: 'A web page, or the email its newsletter comes from' }
     const fields = [{ label: 'Minyanim', value: listText([...new Set((times?.minyanim ?? []).map((m) => TEFILLAH_LABELS[m.tefillah]))]) }]
     pagesProblems('times', shul, live, fields)
@@ -192,9 +206,19 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       pages += live.length
       if (live.length || mikvah.website) reads.push({ job: 'hours', resourceId: id })
     }
+    offAgain('hours', mikvah, live)
     add ??= { job: 'hours', email: false, label: 'A web page' }
     const fields = sections.length ? sections.map((s) => ({ label: s.label, value: (s.hours && formatHoursSummary(s.now[s.hours])) || 'None listed' })) : [{ label: 'Hours', value: 'None listed' }]
     pagesProblems('hours', mikvah, live, fields)
+  }
+
+  // A shul or mikvah turned off, and the pages of it stopped.
+  function offAgain(job: 'hours' | 'times', p: ShulPlace | MikvahPlace, live: Watch[]) {
+    if (p.off) {
+      const url = live[0]?.url ?? p.website
+      again.push({ key: `${job}-off`, kind: 'place', job, what: url ? shortUrl(url) : 'its website' })
+    }
+    for (const x of p.stopped ?? []) again.push({ key: x.watch.id, kind: 'page', job, watchId: x.watch.id, what: shortUrl(x.watch.url) })
   }
 
   // A shul's or mikvah's pages that didn't load, or that its times can't be
@@ -247,6 +271,8 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       reads.push({ job: 'dishes', resourceId: id })
     }
     if (!food.menuUrl) add ??= { job: 'dishes', email: false, label: 'Its menu page' }
+    if (r?.status === 'no_menu') again.push({ key: 'menu', kind: 'menu', what: 'its menu' })
+    for (const w of food.pages ?? []) if (!w.active) again.push({ key: w.id, kind: 'watch', watchId: w.id, what: shortUrl(w.url) })
     const step: ReadStep = { job: 'dishes', resourceId: id }
     for (const w of live) sitePages.push({ watch: w, step })
     const status = dishJobStatus(food, now)
@@ -264,17 +290,26 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
 
   // Its hechsher, as the lists it's on have it.
   const kosher = jobs.kosher?.places.find((x) => x.id === id)
+  // On neither list: its own hechsher, and a way to give its page on
+  // Keystone-K's (the Kosher job page's Add a page).
+  if (kosher && !kosher.on.length) boxes.push({ key: 'kosher', kind: 'rows', title: 'Kosher', groups: [{ head: '', rows: [{ name: 'Hechsher', right: kosher.certs.join(', ') || 'None listed' }] }], foot: { lead: 'On neither list', links: [], when: null, change: { kind: 'keystone' } } })
   if (kosher?.on.length) {
     const lists = jobs.kosher!.lists
     const on = [...new Set(kosher.on.map((o) => o.list))]
     const states = on.map((l) => lists.find((s) => s.list === l))
     const at = states.map((s) => s?.watch?.lastOkAt).filter((x): x is string => !!x).sort()[0]
+    // Read them now reads the lists it's on, as its Kosher page's Reads did.
+    for (const st of states)
+      if (st?.watch?.active) {
+        pages += 1
+        reads.push({ job: 'watch', watchId: st.watch.id })
+      }
     boxes.push({
       key: 'kosher',
       kind: 'rows',
       title: 'Kosher',
       groups: [{ head: '', rows: [{ name: 'Hechsher', right: kosher.certs.join(', ') || kosher.on[0].says }] }],
-      foot: { lead: 'Same as', links: on.map((l, i) => ({ text: l === 'keystone' ? 'Keystone-K’s list' : 'Mekor Habracha’s list', url: states[i]?.url ?? null })), when: read(at) },
+      foot: { lead: 'Same as', links: on.map((l, i) => ({ text: l === 'keystone' ? 'Keystone-K’s list' : 'Mekor Habracha’s list', url: states[i]?.url ?? null })), when: read(at), ...(on.includes('keystone') ? { change: { kind: 'keystone' as const } } : {}) },
     })
   }
 
@@ -290,6 +325,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       reads.push({ job: 'refuah', watchId: w.id })
     }
   }
+  if (hospital && (hospital.notOnRefuah || (hospital.watch && !hospital.watch.active))) again.push({ key: 'refuah', kind: 'refuah', what: 'its Refuah page' })
   if (hospital && hospitalSection({ watch: hospital.watch, notOnRefuah: hospital.notOnRefuah, waiting: hospital.findings?.length }, now) === 'cant_read') {
     const w = hospital.watch
     const fields = (hospital.boxes ?? []).map((b) => ({ label: b.title, value: listText(b.labels) }))
@@ -340,6 +376,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     const own = (eruv.statusUrl ? 1 : 0) + (eruv.lineUrl ? 1 : 0)
     if (own || eruv.statusEmailKept) reads.push({ job: 'eruv', id })
     if (eruv.website && (!watch || watch.active)) reads.push({ job: 'eruv-site', id })
+    if (eruv.website && watch && !watch.active) again.push({ key: watch.id, kind: 'watch', watchId: watch.id, what: shortUrl(eruv.website) })
     pages += own + (eruv.website && (!watch || watch.active) && !sameSite(eruv.statusUrl, eruv.website) ? 1 : 0)
     if (section === 'no_source') add = { job: 'eruv', email: true, label: 'Its status page, or the address its emails come from' }
 
@@ -388,7 +425,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     const rest = nothing.filter((f) => !byPage.includes(f))
     if (rest.length) {
       const says = rest.length === 1 ? `Nothing checks its ${rest[0].label.toLowerCase()}` : 'Nothing checks these'
-      const fix: Fix = !google.matched ? { kind: 'google' } : add ? { kind: 'add' } : { kind: 'job', job: 'google', text: 'Check it against Google' }
+      const fix: Fix = !google.matched ? { kind: 'google' } : add ? { kind: 'add' } : { kind: 'google-check' }
       problem({ key: 'nothing', page: null, says, fields: rest.map(asField), fix })
     }
     if (bad && byPage.length) {
@@ -417,7 +454,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   // Google's first, as drawn: only it checks a name.
   const first = (p: Problem) => (p.key === 'google' || p.key === 'nothing' ? 0 : 1)
   problems.sort((a, b) => first(a) - first(b))
-  return { boxes, reads, pages, add, problems, checked }
+  return { boxes, reads, pages, add, problems, checked, again }
 }
 
 /** "2 more checked", a line each: what it is, the listing's value, where

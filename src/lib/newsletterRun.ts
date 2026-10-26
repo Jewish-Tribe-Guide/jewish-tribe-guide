@@ -295,8 +295,8 @@ async function readAndFile(
       from,
       filings.map((f) => ({ name: f.name, what: `${f.part ? `${TIMES_PART_LABELS[f.part.part]}: ` : ''}${f.lines.join('; ')}` })),
       // A newsletter is one of its shul's sources: its findings wait on
-      // Shul times, with the website's.
-      findingPage(community, 'times'),
+      // its shul, with the website's.
+      findingPage(community, shulCategory, shul.id),
     ).catch((err) => console.error('[newsletter] digest failed:', err))
   }
   return filings.length

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dishProposal, updatesPill } from './dishProposal'
+import { dishProposal } from './dishProposal'
 
 const dish = (name: string, quote = name.toUpperCase()) => ({ name, quote, checked: true, named: true })
 
@@ -58,12 +58,5 @@ describe('dishProposal', () => {
     const p = dishProposal({ dishes: ['Bao Buns'], menuDated: ['Bao Buns'] }, { dishes: [dish('bao buns')], missing: [] })
     expect(p.rows).toEqual([expect.objectContaining({ name: 'Bao Buns', status: 'same' })])
     expect(p.always).toEqual(['Bao Buns'])
-  })
-})
-
-describe('updatesPill', () => {
-  it('counts boxes', () => {
-    expect(updatesPill(1)).toBe('1 update')
-    expect(updatesPill(2)).toBe('2 updates')
   })
 })

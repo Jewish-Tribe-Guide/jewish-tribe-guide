@@ -55,7 +55,7 @@ describe('/api/admin/watches/runs', () => {
     m.listJobRuns.mockResolvedValue({ available: true, runs: { 'sync-hours': [], watches: [{ ...RUN, startedAt, finishedAt: startedAt, ok: true }], 'read-menus': [], 'walk-routes': [] } })
     const body = await (await get()).json()
     expect(m.listUnreadMenus).toHaveBeenCalledWith('philly')
-    expect(body.kinds.find((k: { id: string }) => k.id === 'menus')).toMatchObject({ count: '0 of 1 read', trouble: '1 never read', misses: [{ name: 'Bar Bombon', why: 'Never read', page: 'dishes' }] })
+    expect(body.kinds.find((k: { id: string }) => k.id === 'menus')).toMatchObject({ count: '0 of 1 read', trouble: '1 never read', misses: [{ name: 'Bar Bombon', why: 'Never read', page: '' }] })
   })
 
   // Oct 25: a mikvah's page found as "its website" was under Minyan times.
@@ -66,10 +66,10 @@ describe('/api/admin/watches/runs', () => {
       available: true,
       watches: [{ id: 'z', communityId: 'philly', kind: 'website', url: 'https://www.mikvahwestphilly.com/', resourceId: 'm1', label: 'Mikvah Moishe Zvi · its website', active: true, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'listing pages (found)', lastRunAt: null, lastOkAt: null }],
     })
-    m.loadListings.mockResolvedValue({ readsOf: (id: string) => (id === 'm1' ? 'hours' : null), nameOf: () => null })
+    m.loadListings.mockResolvedValue({ readsOf: (id: string) => (id === 'm1' ? 'hours' : null), nameOf: () => null, placePage: (id: string) => `kind/mikvah?place=${id}` })
     const body = await (await get()).json()
     expect(m.loadListings).toHaveBeenCalledWith(['philly'])
-    expect(body.kinds.find((k: { id: string }) => k.id === 'hours')).toMatchObject({ count: '0 of 1 read', misses: [{ name: 'Mikvah Moishe Zvi', why: 'Never read', page: 'hours' }] })
+    expect(body.kinds.find((k: { id: string }) => k.id === 'hours')).toMatchObject({ count: '0 of 1 read', misses: [{ name: 'Mikvah Moishe Zvi', why: 'Never read', page: 'kind/mikvah?place=m1' }] })
     expect(body.kinds.find((k: { id: string }) => k.id === 'times')).toMatchObject({ count: 'Nothing to read' })
   })
 

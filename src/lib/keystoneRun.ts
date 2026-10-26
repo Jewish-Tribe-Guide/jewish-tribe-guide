@@ -218,7 +218,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, "Keystone-K's list", items, findingPage(community, 'kosher')).catch((err) =>
+  await sendWatchDigest(community, "Keystone-K's list", items, findingPage(community)).catch((err) =>
     console.error('[watch-keystone] digest failed:', err),
   )
   // What a kosher list says is the certification: that's what it dates.

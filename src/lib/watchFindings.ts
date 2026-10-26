@@ -1,6 +1,6 @@
 import type { ResourceRow, ResourceSubmission, SubmissionRow } from '@/types'
 import { companionKeys, type CategoryConfig, type CategoryField } from './categories'
-import { hoursJobCategories, hoursJobName, ownSiteCategories } from './hoursJob'
+import { hoursJobCategories, ownSiteCategories } from './hoursJob'
 import { diffListing } from './submissionDiff'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { NEWSLETTER_WATCH_NAME } from './newsletter'
@@ -263,28 +263,18 @@ export function onAJobPage(s: Pick<SubmissionRow, 'submitted_by' | 'target_type'
   return (['hours', 'times', 'dishes', 'sites'] as const).some((job) => FINDING_SOURCES[job].includes(name) && !!jobs[job]?.has(category))
 }
 
-const PAGE_NAME: Record<Exclude<FindingJob, 'hours' | 'sites'>, string> = {
-  times: 'Shul times',
-  dishes: 'Main dishes',
-  hospitals: 'Hospitals',
-  kosher: 'Kosher certification',
+/** Where a watch's findings wait, for its email: a place's kind's page on
+ *  the Watches tab, opened on it when `placeId` is given; the tab itself
+ *  (no name) for a list's, which span kinds. */
+export function findingPage(community: string, category?: Pick<CategoryConfig, 'id' | 'pluralLabel'> | null, placeId?: string): { path: string; name: string } {
+  if (!category) return { path: `/${community}/admin/watches`, name: '' }
+  return { path: `/${community}/admin/watches/kind/${category.id}${placeId ? `?place=${placeId}` : ''}`, name: category.pluralLabel }
 }
 
-/** The job page a watch's findings wait on, for its email: its admin path
- *  and its name. Mikvah hours is named from its category ("Mikvah hours",
- *  hoursJobName), so it's given. */
-export function findingPage(community: string, job: Exclude<FindingJob, 'sites'>, hoursName?: string): { path: string; name: string } {
-  return { path: `/${community}/admin/watches/${job}`, name: job === 'hours' ? hoursName ?? 'Hours' : PAGE_NAME[job] }
-}
-
-/** The job page a place's findings wait on: Shul times, the hours job or
- *  Main dishes, for a category one of them reads; its kind's page on the
- *  Watches tab for one whose own website is read ("Grocery"); none
+/** Where a place's findings wait: its kind's page, for a category Shul
+ *  times, the hours job, Main dishes or its own website reads; none
  *  otherwise, and they wait in the moderation queue. */
-export function jobPageFor(community: string, category: Pick<CategoryConfig, 'id' | 'label' | 'pluralLabel' | 'kind' | 'hasPhone' | 'detailFields'>): { path: string; name: string } | undefined {
-  if (hoursJobCategories([category], 'times').length) return findingPage(community, 'times')
-  if (hoursJobCategories([category], 'hours').length) return findingPage(community, 'hours', hoursJobName([category]))
-  if (dishCategories([category]).length) return findingPage(community, 'dishes')
-  if (siteCategories([category]).length) return { path: `/${community}/admin/watches/kind/${category.id}`, name: category.pluralLabel }
-  return undefined
+export function jobPageFor(community: string, category: Pick<CategoryConfig, 'id' | 'label' | 'pluralLabel' | 'kind' | 'hasPhone' | 'detailFields'>, placeId?: string): { path: string; name: string } | undefined {
+  const read = hoursJobCategories([category], 'times').length || hoursJobCategories([category], 'hours').length || dishCategories([category]).length || siteCategories([category]).length
+  return read ? findingPage(community, category, placeId) : undefined
 }

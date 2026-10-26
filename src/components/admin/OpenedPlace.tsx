@@ -1,8 +1,6 @@
 'use client'
 
 import { Fragment, useState } from 'react'
-import Link from 'next/link'
-import { adminBase } from '@/lib/adminNav'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { sourceKind, sourceProblem } from '@/lib/watchPurposes'
@@ -10,13 +8,13 @@ import { placeSourcesText, type WatchedPlace } from '@/lib/watchPlaces'
 import { Box, BoxRow, BoxRows, BUTTON, GO, LINK } from './JobBoxes'
 import { Groups, UsualRow } from './TimesProposal'
 import { Notes, Rows } from './MikvahHours'
-import { People } from './HospitalsJob'
+import { People } from './People'
 import { hoursRows } from '@/lib/hoursSections'
 import { groupedRows } from '@/lib/timesProposal'
-import { FindSheet } from './GoogleJob'
-import { checkedLines, openedPlace, type Change, type CheckedLine, type Foot, type OpenedBox, type Problem, type ReadStep, type Stop } from './openedPlaceBoxes'
+import { FindSheet } from './FindSheet'
+import { checkedLines, openedPlace, type Again, type Change, type CheckedLine, type Foot, type OpenedBox, type Problem, type ReadStep, type Stop } from './openedPlaceBoxes'
 import EruvKeptEmail from './EruvKeptEmail'
-import { shortUrl } from './JobPage'
+import { shortUrl } from './watchText'
 import type { FoundStatusPage } from '@/lib/eruvFind'
 import type { Jobs } from './useWatchJobs'
 import { groupEdit, waitingGroups, type WaitGroup } from './waitingGroups'
@@ -270,6 +268,7 @@ const CHANGE_LABEL: Record<Change['kind'], string> = {
   refuah: 'Its page on Refuah',
   'eruv-status': 'Its status page, or the address its emails come from',
   'eruv-map': 'Its map',
+  keystone: 'Its page on Keystone-K’s list',
 }
 const changeEmail = (c: Change) => c.kind === 'newsletter' || c.kind === 'eruv-status'
 const readFor = (c: Change | null) => (c?.kind === 'eruv-status' ? 'status' : 'times')
@@ -312,6 +311,15 @@ export default function OpenedPlace({
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
   const hoursApi = (job: 'hours' | 'times') => `/api/admin/watches/hours${job === 'times' ? '?job=times' : ''}`
 
+  /** Photos of a menu, read for its dishes (the Dishes page's). */
+  function menuPhotos(files: File[]) {
+    const body = new FormData()
+    body.append('action', 'photos')
+    body.append('resourceId', place.id)
+    for (const f of files) body.append('file', f)
+    return fetchJson(withCommunity('/api/admin/main-dishes', community), { method: 'POST', headers: { Authorization: headers.Authorization }, body }, 'Could not read those photos.')
+  }
+
   async function run(what: string, work: () => Promise<unknown>) {
     setError(null)
     setBusy(what)
@@ -353,7 +361,8 @@ export default function OpenedPlace({
       if (problem) throw new Error(problem)
       await post('/api/admin/eruvim', { id: place.id, action: 'save', edit: { lineUrl: url } })
       await post('/api/admin/eruvim', { id: place.id, action: 'check' })
-    } else await post('/api/admin/watches/hospitals', { action: 'choose', resourceId: place.id, url })
+    } else if (c.kind === 'keystone') await post('/api/admin/watches/kosher', { action: 'page', resourceId: place.id, url })
+    else await post('/api/admin/watches/hospitals', { action: 'choose', resourceId: place.id, url })
   }
 
   /** An eruv's one source for its status (eruvEdit.ts): a page or the
@@ -374,6 +383,29 @@ export default function OpenedPlace({
     else if (s.kind === 'refuah') await post('/api/admin/watches/hospitals', { action: 'stop', resourceId: place.id })
     else await post('/api/admin/eruvim', { id: s.id, action: 'save', edit: s.kind === 'eruv-status' ? { statusUrl: '', statusEmail: '' } : { lineUrl: '' } })
   }
+
+  /** Read it again: a source turned off or stopped, read from now on. */
+  async function readAgain(a: Again) {
+    if (a.kind === 'place') await post(hoursApi(a.job), { action: 'on', resourceId: place.id })
+    else if (a.kind === 'page') await post(hoursApi(a.job), { action: 'again', resourceId: place.id, id: a.watchId })
+    else if (a.kind === 'refuah') await post('/api/admin/watches/hospitals', { action: 'on', resourceId: place.id })
+    else if (a.kind === 'menu') await post('/api/admin/main-dishes', { action: 'undo_no_menu', resourceId: place.id })
+    else await post('/api/admin/watches', { action: 'resume', id: a.watchId })
+  }
+
+  // What isn't read, each with Read it again (the job pages' Turn back on).
+  const notRead = opened.again.length > 0 && (
+    <section aria-label="Not read" className="flex flex-col">
+      {opened.again.map((a) => (
+        <span key={a.key} className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-slate-100 py-2 text-[13.5px]">
+          <span className="min-w-0 text-slate-600 [overflow-wrap:anywhere]">Not read · {a.what}</span>
+          <button type="button" disabled={busy !== null} onClick={() => void run(`again-${a.key}`, () => readAgain(a))} className={LINK}>
+            {busy === `again-${a.key}` ? 'Reading…' : 'Read it again'}
+          </button>
+        </span>
+      ))}
+    </section>
+  )
 
   async function addSource(url: string) {
     const a = opened.add!
@@ -482,6 +514,7 @@ export default function OpenedPlace({
         return [
           { label: 'Remove the listing', work: d.kind === 'off' ? each([d.id], () => ({ status: 'approved' })) : () => post('/api/admin/watches/kosher', { action: 'archive', id: d.id }) },
           { label: 'Keep it', work: each([d.id], () => ({ status: 'rejected' })) },
+          ...(d.kind === 'off' && d.renamed ? [{ label: `It’s ${d.renamed} now`, work: () => post('/api/admin/watches/kosher', { action: 'renamed', id: d.id }) }] : []),
         ]
       if (d.kind === 'google') return [{ label: 'Accept', work: google({ action: 'use' }) }, { label: 'Keep as is', work: google({ action: 'keep' }) }]
       if (d.kind === 'menu') return [{ label: 'Accept', work: menu('use') }, { label: 'Keep as is', work: menu('skip') }]
@@ -557,11 +590,21 @@ export default function OpenedPlace({
               </div>
             )
           })}
-          {/* What the Watches tab can't open yet: its job page has it. */}
-          {w.groups.length === 0 && (
-            <Link href={place.href} className={`py-2.5 text-[13.5px] ${LINK}`}>
-              Open it where it waits
-            </Link>
+          {/* A page that differs with nothing filed from it yet: read it
+              again, to file what it says. */}
+          {w.groups.length === 0 && opened.reads.length > 0 && (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() =>
+                void run('read', async () => {
+                  for (const s of opened.reads) await readStep(s)
+                })
+              }
+              className={`self-start py-2.5 text-[13.5px] ${LINK}`}
+            >
+              {busy === 'read' ? 'Reading…' : opened.pages === 1 ? 'Read it again' : 'Read them again'}
+            </button>
           )}
           {w.checked.length > 0 && (
             <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 pb-1 pt-2.5 text-left text-[13.5px] text-slate-500">
@@ -570,6 +613,7 @@ export default function OpenedPlace({
             </button>
           )}
           {more && w.checked.map((l) => <CheckedRow key={l.key} line={l} />)}
+          {notRead}
           {error && <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
           {listing && <span className="pt-1">{listing}</span>}
         </div>
@@ -611,11 +655,11 @@ export default function OpenedPlace({
             {busy === key ? 'Checking…' : 'Check it again'}
           </button>
         )
-      if (f.kind === 'job')
+      if (f.kind === 'google-check')
         return (
-          <Link href={`${adminBase(community)}/watches/${f.job}`} className={`text-[13.5px] ${LINK}`}>
-            {f.text}
-          </Link>
+          <button type="button" disabled={busy !== null} onClick={() => void run(key, () => googlePost({ action: 'check', id: place.id }))} className={GO}>
+            {busy === key ? 'Checking…' : 'Check it against Google'}
+          </button>
         )
       if (f.kind === 'eruv-email') {
         const e = jobs.eruvim?.eruvim.find((x) => x.id === f.id)
@@ -655,6 +699,30 @@ export default function OpenedPlace({
             <button type="button" disabled={busy !== null} onClick={() => void run(key, () => post('/api/admin/watches/hospitals', { action: 'none', resourceId: place.id }))} className={BUTTON}>
               Not on Refuah
             </button>
+          )}
+          {/* A menu that can't be read: photos of it, or none online, as
+              its job page's Reads had them. */}
+          {f.kind === 'change' && f.change.kind === 'menu' && (
+            <>
+              <label className={`cursor-pointer ${BUTTON} ${busy !== null ? 'pointer-events-none opacity-50' : ''}`}>
+                Photos of the menu
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  disabled={busy !== null}
+                  onChange={(e) => {
+                    const files = [...(e.target.files ?? [])]
+                    e.target.value = ''
+                    if (files.length) void run(key, () => menuPhotos(files))
+                  }}
+                />
+              </label>
+              <button type="button" disabled={busy !== null} onClick={() => void run(key, () => post('/api/admin/main-dishes', { action: 'no_menu', resourceId: place.id }))} className={BUTTON}>
+                No menu online
+              </button>
+            </>
           )}
         </>
       )
@@ -771,6 +839,7 @@ export default function OpenedPlace({
                 </Fragment>
               )
             })}
+          {notRead}
           {error && <p className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
           {listing && <span className="pt-1">{listing}</span>}
         </div>
@@ -831,6 +900,7 @@ export default function OpenedPlace({
           )}
         </Box>
       ))}
+      {notRead}
       {adding && opened.add && (
         <section className="overflow-hidden rounded-[10px] border border-slate-200 bg-white" aria-label="Add a source">
           <p className="border-b border-slate-100 px-3.5 py-2.5 text-[15px] font-bold text-slate-900">Add a source</p>

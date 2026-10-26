@@ -15,6 +15,7 @@ vi.mock('@/lib/eruvStore', () => ({ listEruvimForAdmin: async () => ({ available
 vi.mock('@/lib/watchStore', () => ({ listWatches: async () => ({ available: true, watches: m.watches }), addWatch: m.addWatch, removeWatch: m.removeWatch }))
 vi.mock('@/lib/submissionStore', () => ({ submitEruvUpdate: m.submitEruvUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/categoryStore', () => ({ listCategoriesUncached: async () => [{ id: 'eruvin', kind: 'eruv', pluralLabel: 'Eruvin' }] }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
@@ -56,7 +57,7 @@ beforeEach(() => {
 })
 
 describe('reading an eruv’s website', () => {
-  it('files what differs as its suggestion, and says so on Eruv status', async () => {
+  it('files what differs as its suggestion, and its email opens the Eruvin page', async () => {
     const out = await runEruvWebsiteWatch('philly', URL_, NEW_NUMBER)
     expect(out).toMatchObject({ ok: true, filed: 1, check: { what: 'details', result: 'differs', queue: 'filed', differences: ['Lower Merion Eruv: Hotline (610) 664-5626, option 3 → (610) 555-0199'] } })
     expect(m.submitEruvUpdate).toHaveBeenCalledWith(
@@ -65,7 +66,7 @@ describe('reading an eruv’s website', () => {
       'Read from its website, https://lowermerioneruv.org/',
       { name: ERUV_WEBSITE_WATCH_NAME },
     )
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Eruv websites', [{ name: 'Lower Merion Eruv', what: 'Hotline' }], { path: '/philly/admin/watches/eruv', name: 'Eruv status' })
+    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Eruv websites', [{ name: 'Lower Merion Eruv', what: 'Hotline' }], { path: '/philly/admin/watches/kind/eruvin', name: 'Eruvin' })
   })
 
   it('agrees, and files nothing, when the page has its number', async () => {

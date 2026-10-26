@@ -13,9 +13,9 @@ import type { DishPlace, JobCounts } from '@/lib/watchJobs'
 import type { SitePlace } from '@/lib/watchPlaces'
 import type { EruvJobLoaded } from '@/lib/eruvJob'
 import type { LinkStanding } from '@/lib/linkCheck'
-import type { Hospital } from './HospitalsJob'
-import type { HoursPlace } from './HoursJob'
-import type { KosherLoaded } from './KosherJob'
+import type { Hospital } from './watchJobTypes'
+import type { HoursPlace } from './watchJobTypes'
+import type { KosherLoaded } from './watchJobTypes'
 import type { NightlyRunsLoaded } from './NightlyRuns'
 
 // Every job's places, as the Watches tab and its pages by kind of place

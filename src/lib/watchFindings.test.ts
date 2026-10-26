@@ -208,14 +208,17 @@ it('a website’s findings wait on Main dishes, or the place’s kind, and its e
   expect(onAJobPage(sub(), 'grocery', jobs)).toBe(true)
   expect(onAJobPage(sub(), 'cemetery', jobs)).toBe(false)
   expect([...jobs.sites!]).toEqual(['grocery'])
-  expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin/watches/dishes', name: 'Main dishes' })
-  expect(jobPageFor('philly', grocery)).toEqual({ path: '/philly/admin/watches/kind/grocery', name: 'Grocery' })
+  expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin/watches/kind/restaurant', name: 'Food' })
+  expect(jobPageFor('philly', grocery, 'g1')).toEqual({ path: '/philly/admin/watches/kind/grocery?place=g1', name: 'Grocery' })
   expect(jobPageFor('philly', cemetery)).toBeUndefined()
 })
 
-it('findingPage: the job’s admin page and its name', () => {
-  expect(findingPage('philly', 'kosher')).toEqual({ path: '/philly/admin/watches/kosher', name: 'Kosher certification' })
-  expect(findingPage('philly', 'hours', 'Mikvah hours')).toEqual({ path: '/philly/admin/watches/hours', name: 'Mikvah hours' })
+// Oct 26: the job pages are gone, so an alert's link opens the place on
+// its kind's page, or the Watches tab for a list's findings.
+it('findingPage: the place on its kind’s page, or the Watches tab', () => {
+  expect(findingPage('philly', { id: 'mikvah', pluralLabel: 'Mikvaos' }, 'm1')).toEqual({ path: '/philly/admin/watches/kind/mikvah?place=m1', name: 'Mikvaos' })
+  expect(findingPage('philly', { id: 'eruv', pluralLabel: 'Eruvin' })).toEqual({ path: '/philly/admin/watches/kind/eruv', name: 'Eruvin' })
+  expect(findingPage('philly')).toEqual({ path: '/philly/admin/watches', name: '' })
 })
 
 describe('pageOf', () => {

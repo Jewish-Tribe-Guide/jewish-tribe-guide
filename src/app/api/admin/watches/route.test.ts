@@ -73,12 +73,12 @@ describe('/api/admin/watches', () => {
   // current, so each listing says.
   it('says what each listing’s own page can keep current', async () => {
     m.listCategories.mockResolvedValue([
-      makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
+      makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
     ])
     const body = await (await GET(req('GET'))).json()
     expect(body.listings[0].reads).toBe('times')
-    // Step 6: and where what's read for it waits, so "Add a watch" can say.
-    expect(body.listings[0].job).toBe('Shul times')
+    // Step 6: and where what's read for it waits: its kind's page (Oct 26).
+    expect(body.listings[0].job).toBe('Synagogues')
   })
 
   it('adds a page typed without https, tied to a listing, and checks it at once', async () => {
@@ -127,7 +127,7 @@ describe('/api/admin/watches', () => {
   // keeps current, as a Refuah page is to its hospital.
   it('adds a listing’s own page only tied to a listing with times or hours, as the run’s kind of watch', async () => {
     m.listCategories.mockResolvedValue([
-      makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
+      makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
       makeCategory({ id: 'school', label: 'School', detailFields: [] }),
     ])
     const SCHOOL = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
@@ -161,7 +161,7 @@ describe('/api/admin/watches', () => {
   describe('by what it keeps current', () => {
     beforeEach(() => {
       m.listCategories.mockResolvedValue([
-        makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
+        makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
       ])
     })
 

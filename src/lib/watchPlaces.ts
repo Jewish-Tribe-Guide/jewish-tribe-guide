@@ -14,7 +14,7 @@ import { routes } from './routes'
 // category of the site, each counting its places waiting for you, not
 // checked, and up to date, and naming where they're read from. The jobs
 // still do the reading; this only puts each job's own standing for a place
-// together, so a row and the job pages can't disagree.
+// together, so a place says one thing wherever it's shown.
 //
 //   waiting      something read differs from the listing: a page's,
 //                Refuah's or a list's finding, a menu that would change
@@ -60,8 +60,6 @@ export type WatchedPlace = {
   /** Where it goes on Waiting for you: off a list, a closure, new, changes. */
   rank?: Rank
   sources: WatchSource[]
-  /** Where it's acted on: the job page holding what waits, or its listing. */
-  href: string
   /** Its listing on the site, for Open its listing; none for a place
    *  only a list has, or an eruv. */
   listing: string | null
@@ -110,7 +108,7 @@ const LIST_NAMES = { keystone: 'Keystone-K’s', mekor: 'Mekor Habracha’s' } a
 
 /** What one job says of a place: changes waiting, things not checked
  *  (each with its own pill), and where it reads it from. */
-type Say = { changes: number; unchecked: string[]; sources: WatchSource[]; href: string; pill?: string; rank?: Rank; red?: boolean }
+type Say = { changes: number; unchecked: string[]; sources: WatchSource[]; pill?: string; rank?: Rank; red?: boolean }
 
 /** Its sources, as its row on Up to date says them: "Google · its website". */
 export function placeSourcesText(sources: readonly WatchSource[]): string {
@@ -161,15 +159,13 @@ function placeOf(id: string, name: string, category: string, listingHref: string
     pill: pillOf(state, says),
     ...(state === 'waiting' ? { rank: first?.rank ?? 'changes', ...(first?.red ? { red: true } : {}) } : {}),
     sources: SOURCES.filter((s) => have.has(s)),
-    href: (waiting ?? unchecked)?.href ?? listingHref,
     listing: listingHref,
   }
 }
 
 // ── What each job says ──────────────────────────────────────────────────────
 
-function googleSays(p: GooglePlace, base: string): Say {
-  const href = `${base}/watches/google`
+function googleSays(p: GooglePlace): Say {
   const compare = p.decided ? null : p.compare
   const changes = compare?.rows.filter((r) => r.changed).length ?? 0
   const unchecked =
@@ -183,13 +179,12 @@ function googleSays(p: GooglePlace, base: string): Say {
   // for Keep closed or Show as open.
   if (closureWaits(p.closure)) {
     const pill = `${closureText(p.closure)}, says Google${p.closure.since ? ` · ${dayText(p.closure.since)}` : ''}`
-    return { changes, unchecked, sources, href, pill, rank: 'closed' }
+    return { changes, unchecked, sources, pill, rank: 'closed' }
   }
-  return { changes, unchecked, sources, href }
+  return { changes, unchecked, sources }
 }
 
-function dishesSays(p: DishesPlace, base: string, now: number): Say {
-  const href = `${base}/watches/dishes`
+function dishesSays(p: DishesPlace, now: number): Say {
   const status = dishJobStatus(p, now)
   let changes = 0
   if (status === 'differs') {
@@ -202,11 +197,10 @@ function dishesSays(p: DishesPlace, base: string, now: number): Say {
   const sources: WatchSource[] = []
   if (status !== 'off' && (p.menuWatch?.active || p.menuUrl || p.reading?.sourceUrl)) sources.push('menu')
   if (p.pages?.some((w) => w.active)) sources.push('website')
-  return { changes, unchecked, sources, href }
+  return { changes, unchecked, sources }
 }
 
-function pagesSays(p: PagesPlace, job: 'hours' | 'times', base: string, now: number): Say {
-  const href = `${base}/watches/${job}`
+function pagesSays(p: PagesPlace, job: 'hours' | 'times', now: number): Say {
   const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters }
   const section = hoursSection(state, now)
   const what = job === 'times' ? 'Times' : 'Hours'
@@ -216,39 +210,36 @@ function pagesSays(p: PagesPlace, job: 'hours' | 'times', base: string, now: num
   if (!p.off && p.pages.some((x) => x.watch.active)) sources.push('website')
   if (p.newsletters?.some((w) => w.active)) sources.push('newsletter')
   // A page that differs, not yet a finding, is one change.
-  return { changes: section === 'to_check' ? Math.max(1, p.findings?.length ?? 0) : 0, unchecked, sources, href }
+  return { changes: section === 'to_check' ? Math.max(1, p.findings?.length ?? 0) : 0, unchecked, sources }
 }
 
-function siteSays(p: SitePlace, base: string, now: number): Say {
-  const href = `${base}/watches/kind/${p.category}`
+function siteSays(p: SitePlace, now: number): Say {
   const live = p.pages.filter((x) => x.watch.active).map((x) => x.watch)
   const changes = p.findings?.length ?? 0
   const loads = live.some((w) => !['failing', 'stale'].includes(watchHealth(w, now).state))
-  return { changes, unchecked: changes || !live.length || loads ? [] : ['Website didn’t load'], sources: live.length ? ['website'] : [], href }
+  return { changes, unchecked: changes || !live.length || loads ? [] : ['Website didn’t load'], sources: live.length ? ['website'] : [] }
 }
 
-function hospitalSays(h: HospitalPlace, base: string, now: number): Say {
-  const href = `${base}/watches/hospitals`
+function hospitalSays(h: HospitalPlace, now: number): Say {
   const section = hospitalSection({ watch: h.watch, notOnRefuah: h.notOnRefuah, waiting: h.findings?.length }, now)
   const unchecked = section !== 'cant_read' ? [] : h.watch && didntLoad(h.watch, now) ? ['Refuah didn’t load'] : ['Not found on Refuah']
   const sources: WatchSource[] = h.watch?.active && !h.notOnRefuah ? ['refuah'] : []
-  return { changes: section === 'to_check' ? Math.max(1, h.findings?.length ?? 0) : 0, unchecked, sources, href }
+  return { changes: section === 'to_check' ? Math.max(1, h.findings?.length ?? 0) : 0, unchecked, sources }
 }
 
 /** "Off Keystone-K’s list · Oct 24", red: a list's removal. */
-function offSay(f: Found, href: string): Say | null {
+function offSay(f: Found): Say | null {
   if (f.operation !== 'delete' || !f.from) return null
-  return { changes: 1, unchecked: [], sources: [], href, pill: `Off ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}`, rank: 'off', red: true }
+  return { changes: 1, unchecked: [], sources: [], pill: `Off ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}`, rank: 'off', red: true }
 }
 
-function kosherSays(p: KosherJob['places'][number], base: string): Say {
-  const href = `${base}/watches/kosher`
+function kosherSays(p: KosherJob['places'][number]): Say {
   const waiting = p.findings?.length ?? 0
   const open = kosherSection({ ...p, waiting }) === 'to_check'
   const sources = [...new Set(p.on.map((o) => o.list))]
-  const off = (p.findings ?? []).map((f) => offSay(f, href)).find((x) => x)
+  const off = (p.findings ?? []).map((f) => offSay(f)).find((x) => x)
   if (off) return { ...off, changes: Math.max(1, waiting), sources }
-  return { changes: open ? Math.max(1, waiting) : 0, unchecked: [], sources, href }
+  return { changes: open ? Math.max(1, waiting) : 0, unchecked: [], sources }
 }
 
 // ── All of it, by kind of place ─────────────────────────────────────────────
@@ -262,30 +253,29 @@ export function notWatched(categories: WatchJobsIn['categories']): string[] {
 export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchKind[] {
   const says = new Map<string, Say[]>()
   const add = (id: string, say: Say) => says.set(id, [...(says.get(id) ?? []), say])
-  for (const p of jobs.dishes ?? []) add(p.id, dishesSays(p, base, now))
-  for (const p of jobs.hours ?? []) add(p.id, pagesSays(p, 'hours', base, now))
-  for (const p of jobs.times ?? []) add(p.id, pagesSays(p, 'times', base, now))
-  for (const p of jobs.sites ?? []) add(p.id, siteSays(p, base, now))
-  for (const h of jobs.hospitals ?? []) add(h.id, hospitalSays(h, base, now))
-  for (const p of jobs.kosher?.places ?? []) add(p.id, kosherSays(p, base))
+  for (const p of jobs.dishes ?? []) add(p.id, dishesSays(p, now))
+  for (const p of jobs.hours ?? []) add(p.id, pagesSays(p, 'hours', now))
+  for (const p of jobs.times ?? []) add(p.id, pagesSays(p, 'times', now))
+  for (const p of jobs.sites ?? []) add(p.id, siteSays(p, now))
+  for (const h of jobs.hospitals ?? []) add(h.id, hospitalSays(h, now))
+  for (const p of jobs.kosher?.places ?? []) add(p.id, kosherSays(p))
   // A link it shows that doesn't open, whatever reads the rest of it.
   const broken = new Map<string, LinkStanding>()
   for (const l of jobs.links ?? []) {
     if (!linkBroken(l)) continue
-    add(l.resourceId, { changes: 0, unchecked: ['Link doesn’t open'], sources: [], href: `${base}/watches/kind/${l.category}` })
+    add(l.resourceId, { changes: 0, unchecked: ['Link doesn’t open'], sources: [] })
     broken.set(l.resourceId, l)
   }
-  const kosherHref = `${base}/watches/kosher`
   // A list's finding that matches no place on its page now waits on the
   // listing it names, whatever its kind (a grocery), or on its own.
   const listed = new Set((jobs.google ?? []).map((g) => g.id))
   const loose: WatchedPlace[] = []
   for (const f of jobs.kosher?.others ?? []) {
-    if (f.targetId && listed.has(f.targetId)) add(f.targetId, offSay(f, kosherHref) ?? { changes: 1, unchecked: [], sources: [], href: kosherHref })
+    if (f.targetId && listed.has(f.targetId)) add(f.targetId, offSay(f) ?? { changes: 1, unchecked: [], sources: [] })
     else {
       const isNew = f.operation === 'create' && !!f.from
       const pill = isNew ? `New on ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}` : '1 change'
-      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], href: kosherHref, listing: null })
+      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], listing: null })
     }
   }
 
@@ -293,7 +283,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
   const put = (p: WatchedPlace) => byCategory.set(p.category, [...(byCategory.get(p.category) ?? []), p])
   // Every listing the jobs read is one Google covers (googleJobRun.ts).
   // A name two listings share says its street ("The Kosher Grill · S Broad St").
-  for (const g of jobs.google ?? []) put(placeOf(g.id, g.street ? `${g.name} · ${g.street}` : g.name, g.category, g.href, [googleSays(g, base), ...(says.get(g.id) ?? [])]))
+  for (const g of jobs.google ?? []) put(placeOf(g.id, g.street ? `${g.name} · ${g.street}` : g.name, g.category, g.href, [googleSays(g), ...(says.get(g.id) ?? [])]))
   // A place whose website is read and Google doesn't cover (its category
   // has no address) is its kind's all the same.
   for (const p of jobs.sites ?? []) if (!listed.has(p.id)) put(placeOf(p.id, p.name, p.category, p.href, says.get(p.id) ?? []))
@@ -305,14 +295,13 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
     const lists = [...new Set(n.on.map((o) => o.list))]
     const at = n.findings?.map((f) => f.at).filter((x): x is string => !!x).sort()[0]
     const pill = `New on ${lists.map((l) => LIST_NAMES[l]).join(' and ')} list${lists.length > 1 ? 's' : ''}${at ? ` · ${dayText(at)}` : ''}`
-    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: 'new', sources: lists, href: kosherHref, listing: null })
+    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: 'new', sources: lists, listing: null })
   }
   loose.forEach(put)
 
   const eruvKind = jobs.categories.find((c) => c.kind === 'eruv')
   if (eruvKind && jobs.eruvim) {
     const d = jobs.eruvim
-    const href = `${base}/watches/eruv`
     for (const e of d.eruvim) {
       const watch = websiteWatchOf(e, d.watches)
       const s = eruvStanding(e, { finding: findingFor(d.findings, e.id), watch, now: new Date(now), timezone: d.timezone })
@@ -320,7 +309,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
       if (e.statusUrl || watch?.active) sources.push('website')
       if (e.statusEmail) sources.push('email')
       const state: WatchState = s.tab === 'to_check' ? 'waiting' : s.tab === 'cant_read' ? 'not_checked' : 'up_to_date'
-      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, href, listing: routes.eruv(base.split('/')[1], e.id) })
+      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, listing: routes.eruv(base.split('/')[1], e.id) })
     }
   }
 

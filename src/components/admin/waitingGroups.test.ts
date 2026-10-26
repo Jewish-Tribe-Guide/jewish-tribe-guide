@@ -112,6 +112,21 @@ describe('waitingGroups', () => {
     expect(w.groups[0].decide).toEqual({ kind: 'findings', ids: ['f1'] })
   })
 
+  // Oct 26: a list that has it by a near name offers It's … now, as the
+  // Kosher page did.
+  it('off a list that has it by a near name: says the name it has', () => {
+    const off = finding({ id: 'k1', operation: 'delete', from: 'Keystone-K’s list', name: 'Stephen’s Cafe', notes: ['Not on Keystone-K’s list. The list does have "Stephen’s Cafe & Grill" (https://keystonek.example/stephens)'] })
+    const kosher = {
+      available: true,
+      categories: [restaurant(['Keystone-K'])],
+      lists: [{ list: 'keystone' as const, url: 'https://keystonek.example/list', watch: null, error: null, entries: 1, updated: null }],
+      counts: { ...counts, notListed: 0 },
+      places: [{ id: 'p', name: 'Stephen’s Cafe', category: 'restaurant', certs: ['Keystone-K'], levels: [], on: [], differences: [], href: '/x', box: { kosherCert: ['Keystone-K'] }, findings: [off] }],
+      newPlaces: [],
+    }
+    expect(waitingGroups('p', jobs({ kosher: kosher as never }), NOW).groups[0].decide).toEqual({ kind: 'off', id: 'k1', renamed: 'Stephen’s Cafe & Grill' })
+  })
+
   it('puts off a list first, then Google’s closure, then the changes', () => {
     const off = finding({ id: 'k1', operation: 'delete', from: 'Keystone-K’s list', name: 'Stephen’s Cafe' })
     const hours = finding({ id: 'h1', page: 'https://stephens.example/hours', lines: [{ key: 'hours', label: 'Hours', before: 'Sun–Thu 11 AM–9 PM', after: 'Sun–Thu 11 AM–10 PM', choosable: true }] })
