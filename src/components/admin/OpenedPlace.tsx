@@ -14,7 +14,10 @@ import { People } from './HospitalsJob'
 import { hoursRows } from '@/lib/hoursSections'
 import { groupedRows } from '@/lib/timesProposal'
 import { FindSheet } from './GoogleJob'
-import { checkedLines, openedPlace, type Change, type CheckedLine, type Foot, type OpenedBox, type Problem, type ReadStep } from './openedPlaceBoxes'
+import { checkedLines, openedPlace, type Change, type CheckedLine, type Foot, type OpenedBox, type Problem, type ReadStep, type Stop } from './openedPlaceBoxes'
+import EruvKeptEmail from './EruvKeptEmail'
+import { shortUrl } from './JobPage'
+import type { FoundStatusPage } from '@/lib/eruvFind'
 import type { Jobs } from './useWatchJobs'
 import { groupEdit, waitingGroups, type WaitGroup } from './waitingGroups'
 import { withSave } from './findingEdits'
@@ -124,7 +127,7 @@ function BoxBody({ box }: { box: OpenedBox }) {
 }
 
 /** "Same as mekorhabracha.org/davening · read Oct 23 · Change". */
-function FootLine({ foot, onChange }: { foot: Foot; onChange?: () => void }) {
+function FootLine({ foot, onChange, onStop }: { foot: Foot; onChange?: () => void; onStop?: () => void }) {
   return (
     <p className="text-[12.5px] text-slate-500 [overflow-wrap:anywhere]" data-testid="box-source">
       {foot.mail && <Mail />}
@@ -150,12 +153,37 @@ function FootLine({ foot, onChange }: { foot: Foot; onChange?: () => void }) {
           </button>
         </>
       )}
+      {onStop && (
+        <>
+          {' · '}
+          <button type="button" onClick={onStop} className={LINK}>
+            Stop
+          </button>
+        </>
+      )}
     </p>
   )
 }
 
+/** "Stop reading its map?", under its box. */
+function StopAsk({ what, busy, onStop, onKeep }: { what: string; busy: boolean; onStop: () => void; onKeep: () => void }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      <span>Stop reading {what}?</span>
+      <span className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={onStop} className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+          Stop reading
+        </button>
+        <button type="button" onClick={onKeep} className={BUTTON}>
+          Keep reading
+        </button>
+      </span>
+    </div>
+  )
+}
+
 /** A page, or an email, typed in: Add a source's box, or a box's Change. */
-function SourceForm({ label, email, save, busy, onSave, onCancel }: { label: string; email: boolean; save: string; busy: boolean; onSave: (v: string) => void; onCancel: () => void }) {
+function SourceForm({ label, email, save, busy, onSave, onCancel, readFor = 'times' }: { label: string; email: boolean; save: string; busy: boolean; onSave: (v: string) => void; onCancel: () => void; readFor?: string }) {
   const [value, setValue] = useState('')
   const isEmail = email && sourceKind(value) === 'email'
   return (
@@ -173,7 +201,7 @@ function SourceForm({ label, email, save, busy, onSave, onCancel }: { label: str
       {isEmail && (
         <span className="text-[13px] text-slate-600">
           <Mail />
-          An email: read for its times. Subscribe the guide’s inbox to it too.
+          An email: read for its {readFor}. Subscribe the guide’s inbox to it too.
         </span>
       )}
       <span className="flex gap-2">
@@ -240,7 +268,11 @@ const CHANGE_LABEL: Record<Change['kind'], string> = {
   newsletter: 'The email its newsletter comes from now',
   menu: 'Its menu page',
   refuah: 'Its page on Refuah',
+  'eruv-status': 'Its status page, or the address its emails come from',
+  'eruv-map': 'Its map',
 }
+const changeEmail = (c: Change) => c.kind === 'newsletter' || c.kind === 'eruv-status'
+const readFor = (c: Change | null) => (c?.kind === 'eruv-status' ? 'status' : 'times')
 
 export default function OpenedPlace({
   place,
@@ -268,6 +300,8 @@ export default function OpenedPlace({
   const [changing, setChanging] = useState<string | null>(null)
   const [more, setMore] = useState(false)
   const [finding, setFinding] = useState(false)
+  const [stopping, setStopping] = useState<string | null>(null)
+  const [found, setFound] = useState<{ found: FoundStatusPage[]; error: string | null } | null>(null)
   // Edit's box, open here: `n` the group's finding it's on, `saved` how
   // many of them Save put in.
   const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit; n: number; saved: number } | null>(null)
@@ -299,6 +333,8 @@ export default function OpenedPlace({
     if (s.job === 'dishes') return post('/api/admin/main-dishes', { action: 'read', resourceId: s.resourceId })
     if (s.job === 'refuah' || s.job === 'watch') return post('/api/admin/watches', { action: 'check', id: s.watchId })
     if (s.job === 'eruv') return post('/api/admin/eruvim', { id: s.id, action: 'check' })
+    // Its website, given its watch first when the daily run hasn't yet.
+    if (s.job === 'eruv-site') return post('/api/admin/watches/eruv', { action: 'read', id: s.id })
     const res = await post<{ read?: string[] }>(hoursApi(s.job), { action: 'check', resourceId: s.resourceId })
     for (const id of res.read ?? []) await post(hoursApi(s.job), { action: 'check', resourceId: s.resourceId, id })
   }
@@ -311,11 +347,34 @@ export default function OpenedPlace({
       await post('/api/admin/watches', { action: 'add', purpose: 'times', url, resourceId: place.id })
       await post('/api/admin/watches', { action: 'remove', id: c.replaces })
     } else if (c.kind === 'menu') await post('/api/admin/main-dishes', { action: 'link', resourceId: place.id, url })
-    else await post('/api/admin/watches/hospitals', { action: 'choose', resourceId: place.id, url })
+    else if (c.kind === 'eruv-status') await eruvSource(url)
+    else if (c.kind === 'eruv-map') {
+      const problem = sourceProblem('hours', url)
+      if (problem) throw new Error(problem)
+      await post('/api/admin/eruvim', { id: place.id, action: 'save', edit: { lineUrl: url } })
+      await post('/api/admin/eruvim', { id: place.id, action: 'check' })
+    } else await post('/api/admin/watches/hospitals', { action: 'choose', resourceId: place.id, url })
+  }
+
+  /** An eruv's one source for its status (eruvEdit.ts): a page or the
+   *  address its emails come from, the other emptied; a page read now. */
+  async function eruvSource(source: string, dated?: boolean) {
+    const problem = sourceProblem('eruv', source)
+    if (problem) throw new Error(problem)
+    const email = sourceKind(source) === 'email'
+    const edit = email ? { statusEmail: source, statusUrl: '' } : { statusUrl: source, statusEmail: '', ...(dated === undefined ? {} : { statusDated: dated }) }
+    await post('/api/admin/eruvim', { id: place.id, action: 'save', edit })
+    if (!email) await post('/api/admin/eruvim', { id: place.id, action: 'check' })
+  }
+
+  async function stopSource(s: Stop) {
+    if (s.kind === 'watch') await post('/api/admin/watches', { action: 'pause', id: s.watchId })
+    else await post('/api/admin/eruvim', { id: s.id, action: 'save', edit: s.kind === 'eruv-status' ? { statusUrl: '', statusEmail: '' } : { lineUrl: '' } })
   }
 
   async function addSource(url: string) {
     const a = opened.add!
+    if (a.job === 'eruv') return eruvSource(url)
     const problem = sourceProblem(a.job === 'times' ? 'times' : 'hours', url)
     if (problem) throw new Error(problem)
     if (a.job === 'dishes') await post('/api/admin/main-dishes', { action: 'link', resourceId: place.id, url })
@@ -555,6 +614,32 @@ export default function OpenedPlace({
             {f.text}
           </Link>
         )
+      if (f.kind === 'eruv-email') {
+        const e = jobs.eruvim?.eruvim.find((x) => x.id === f.id)
+        return e ? <EruvKeptEmail eruv={e} timezone={jobs.eruvim!.timezone} busy={busy !== null} onSays={(says) => void run(key, () => post('/api/admin/eruvim', { id: f.id, action: 'email-says', says }))} /> : null
+      }
+      if (f.kind === 'eruv-find')
+        return (
+          <>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() =>
+                void run(key, async () => {
+                  setFound(await post<{ found: FoundStatusPage[]; error: string | null }>('/api/admin/eruvim', { id: f.id, action: 'find' }))
+                })
+              }
+              className={GO}
+            >
+              {busy === key ? 'Searching its website…' : 'Find its status page'}
+            </button>
+            {changing !== key && (
+              <button type="button" disabled={busy !== null} onClick={() => setChanging(key)} className={BUTTON}>
+                Add a source
+              </button>
+            )}
+          </>
+        )
       if (changing === key) return null
       const label = f.kind === 'add' ? 'Add a source' : f.label
       return (
@@ -566,12 +651,43 @@ export default function OpenedPlace({
     const form = (p: Problem) => {
       const f = p.fix
       const key = `fix:${p.key}`
-      if (changing !== key || !f || (f.kind !== 'add' && f.kind !== 'change')) return null
+      const e = f?.kind === 'eruv-find' ? jobs.eruvim?.eruvim.find((x) => x.id === f.id) : null
+      const offered = e && found ? found.found.filter((x) => x.url !== e.statusUrl) : []
+      const pages = e && found && (
+        <div className="flex flex-col gap-2 pt-2.5 text-sm text-slate-700" data-testid="eruv-found">
+          {found.error ? (
+            <span>{found.error}.</span>
+          ) : offered.length === 0 ? (
+            <span>No page on {shortUrl(e.website ?? '')} says whether it’s up.</span>
+          ) : (
+            offered.map((x) => (
+              <span key={x.url} className="flex flex-col gap-0.5 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+                <span>
+                  {x.link ? `Its “${x.link}” page` : 'Its home page'}, <PageLink text={shortUrl(x.url)} url={x.url} />, says it’s <strong>{x.status}</strong>
+                </span>
+                {x.words && <span className="text-xs text-slate-500">“{x.words}”</span>}
+                <button type="button" disabled={busy !== null} onClick={() => void run(key, () => eruvSource(x.url, e.statusDated)).then((ok) => ok && setFound(null))} className={`self-start pt-1 ${LINK}`}>
+                  Read its status from here
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+      )
+      if (changing !== key || !f || (f.kind !== 'add' && f.kind !== 'change' && f.kind !== 'eruv-find')) return pages || null
       const a = opened.add
+      if (f.kind === 'eruv-find')
+        return (
+          <>
+            {pages}
+            <SourceForm label={a?.label ?? ''} email save="Add" busy={busy !== null} readFor="status" onCancel={() => setChanging(null)} onSave={(url) => void run(key, () => addSource(url)).then((ok) => ok && setChanging(null))} />
+          </>
+        )
       return (
         <SourceForm
+          readFor={f.kind === 'change' ? readFor(f.change) : opened.add?.job === 'eruv' ? 'status' : 'times'}
           label={f.kind === 'add' ? (a?.label ?? '') : CHANGE_LABEL[f.change.kind]}
-          email={f.kind === 'add' ? !!a?.email : f.change.kind === 'newsletter'}
+          email={f.kind === 'add' ? !!a?.email : changeEmail(f.change)}
           save={f.kind === 'add' ? 'Add' : 'Use this'}
           busy={busy !== null}
           onCancel={() => setChanging(null)}
@@ -632,7 +748,8 @@ export default function OpenedPlace({
                     <div className="py-2.5">
                       <SourceForm
                         label={CHANGE_LABEL[c.kind]}
-                        email={c.kind === 'newsletter'}
+                        email={changeEmail(c)}
+                        readFor={readFor(c)}
                         save="Use this"
                         busy={busy !== null}
                         onCancel={() => setChanging(null)}
@@ -676,11 +793,25 @@ export default function OpenedPlace({
       {opened.boxes.map((b) => (
         <Box key={b.key} name={b.title} defaultOpen>
           <BoxBody box={b} />
-          <FootLine foot={b.foot} onChange={b.foot.change && changing !== b.key ? () => setChanging(b.key) : undefined} />
+          {b.dated && (
+            <label className="flex items-center gap-2 text-[13px] text-slate-700">
+              <input type="checkbox" checked={b.dated.on} disabled={busy !== null} onChange={(ev) => void run('dated', () => post('/api/admin/eruvim', { id: b.dated!.id, action: 'save', edit: { statusDated: ev.target.checked } }))} />
+              Its page dates each week’s post
+            </label>
+          )}
+          <FootLine
+            foot={b.foot}
+            onChange={b.foot.change && changing !== b.key ? () => setChanging(b.key) : undefined}
+            onStop={b.foot.stop && stopping !== b.key ? () => setStopping(b.key) : undefined}
+          />
+          {b.foot.stop && stopping === b.key && (
+            <StopAsk what={b.foot.stop.what} busy={busy !== null} onKeep={() => setStopping(null)} onStop={() => void run('stop', () => stopSource(b.foot.stop!)).then((ok) => ok && setStopping(null))} />
+          )}
           {b.foot.change && changing === b.key && (
             <SourceForm
               label={CHANGE_LABEL[b.foot.change.kind]}
-              email={b.foot.change.kind === 'newsletter'}
+              email={changeEmail(b.foot.change)}
+              readFor={readFor(b.foot.change)}
               save="Use this"
               busy={busy !== null}
               onCancel={() => setChanging(null)}
@@ -696,6 +827,7 @@ export default function OpenedPlace({
             <SourceForm
               label={opened.add.label}
               email={opened.add.email}
+              readFor={opened.add.job === 'eruv' ? 'status' : 'times'}
               save="Add"
               busy={busy !== null}
               onCancel={() => setAdding(false)}

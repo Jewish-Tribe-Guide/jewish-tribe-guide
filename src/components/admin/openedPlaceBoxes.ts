@@ -1,6 +1,7 @@
 import { scheduleProposal, type ProposalRow, type WeekProposal } from '@/lib/timesProposal'
 import { TIMES_PART_LABELS } from '@/lib/timesParts'
 import { eruvStanding, findingFor, statusPill, websiteWatchOf } from '@/lib/eruvJob'
+import { detailsRows } from '@/lib/eruvWebsite'
 import { dishJobStatus, didntLoad, eruvSection, hospitalSection, sentThroughSite } from '@/lib/watchJobs'
 import { hoursDidntLoad, hoursSection } from '@/lib/hoursJob'
 import { formatHoursSummary } from '@/lib/hours'
@@ -32,13 +33,20 @@ export type Change =
   | { kind: 'newsletter'; replaces: string }
   | { kind: 'menu' }
   | { kind: 'refuah' }
+  | { kind: 'eruv-status'; id: string }
+  | { kind: 'eruv-map'; id: string }
+
+/** A source no longer read: an eruv's status or map emptied, or a watch
+ *  paused. `what`: "its status", for "Stop reading its status?". */
+export type Stop = ({ kind: 'eruv-status' | 'eruv-map'; id: string } | { kind: 'watch'; watchId: string }) & { what: string }
 
 export type FootLink = { text: string; url: string | null }
 /** "Same as its Google listing · read Oct 19". */
-export type Foot = { lead: string; links: FootLink[]; when: string | null; mail?: boolean; change?: Change }
+export type Foot = { lead: string; links: FootLink[]; when: string | null; mail?: boolean; change?: Change; stop?: Stop }
 
 type Row = { name: string; sub?: string; right?: string }
-export type OpenedBox = { key: string; title: string; foot: Foot } & (
+/** `dated`: an eruv's status page, and whether it dates each week's post. */
+export type OpenedBox = { key: string; title: string; foot: Foot; dated?: { id: string; on: boolean } } & (
   | { kind: 'usual'; rows: ProposalRow[] }
   | { kind: 'week'; week: WeekProposal }
   | { kind: 'section'; section: ListedSection }
@@ -54,9 +62,10 @@ export type ReadStep =
   | { job: 'refuah'; watchId: string }
   | { job: 'watch'; watchId: string }
   | { job: 'eruv'; id: string }
+  | { job: 'eruv-site'; id: string }
 
 /** What Add a source takes: a page, or for a shul a newsletter's email too. */
-export type AddSource = { job: 'hours' | 'times' | 'dishes'; email: boolean; label: string }
+export type AddSource = { job: 'hours' | 'times' | 'dishes' | 'eruv'; email: boolean; label: string }
 
 /** What a problem's own button does: Find it on Google (and Not on
  *  Google), read its page now, give it another page, add one, or, where
@@ -68,6 +77,8 @@ export type Fix =
   | { kind: 'add' }
   | { kind: 'job'; job: 'google' | 'eruv'; text: string }
   | { kind: 'link'; resourceId: string; key: string }
+  | { kind: 'eruv-email'; id: string }
+  | { kind: 'eruv-find'; id: string }
 export type Field = { label: string; value: string }
 /** A place not checked, by what's wrong (FinalFood3): "rivkacakes.com ·
  *  never read · added Oct 23", the fields it leaves unchecked, its fix. */
@@ -78,6 +89,7 @@ export type Problem = { key: string; page: FootLink | null; says: string; fields
 export type Opened = { boxes: OpenedBox[]; reads: ReadStep[]; pages: number; add: AddSource | null; problems: Problem[]; checked: OpenedBox[] }
 
 const read = (at: string | null | undefined) => (at ? `read ${day(at)}` : null)
+const sameSite = (a: string | null, b: string | null) => !!a && !!b && shortUrl(a).toLowerCase() === shortUrl(b).toLowerCase()
 const pageLink = (url: string): FootLink => ({ text: shortUrl(url), url })
 /** "Cakes, Meringue Rolls, Macarons and 7 more". */
 export const listText = (items: readonly string[], none = 'None listed') =>
@@ -280,31 +292,61 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     )
   }
 
-  // An eruv's status, from its status page or its emails.
+  // An eruv: its status, from its status page or its emails; its details
+  // from its website; its map. The Eruv page's boxes (EruvJob.tsx).
   const eruv = jobs.eruvim?.eruvim.find((x) => x.id === id)
   if (eruv) {
-    const pill = statusPill(eruv, new Date(now), jobs.eruvim!.timezone)
-    const foot: Foot = eruv.statusUrl
-      ? { lead: 'Same as', links: [{ text: 'its status page', url: eruv.statusUrl }], when: read(eruv.statusCheckedAt) }
-      : { lead: 'Same as', links: [{ text: `its emails, from ${eruv.statusEmail ?? ''}`, url: null }], when: read(eruv.statusCheckedAt), mail: true }
-    boxes.push({ key: 'eruv', kind: 'rows', title: 'Status', groups: [{ head: '', rows: [{ name: 'Status', right: pill.text, sub: eruv.statusWords ?? undefined }] }], foot })
-    if (eruv.statusUrl) {
-      pages += 1
-      reads.push({ job: 'eruv', id })
-    }
     const d = jobs.eruvim!
+    const pill = statusPill(eruv, new Date(now), d.timezone)
     const watch = websiteWatchOf(eruv, d.watches)
+    const section = eruvSection(eruv)
+    const stopStatus: Stop = { kind: 'eruv-status', id, what: 'its status' }
+    if (section !== 'no_source') {
+      const foot: Foot = eruv.statusUrl
+        ? { lead: 'Same as', links: [{ text: 'its status page', url: eruv.statusUrl }], when: read(eruv.statusCheckedAt), change: { kind: 'eruv-status', id }, stop: stopStatus }
+        : { lead: 'Same as', links: [{ text: `its emails, from ${eruv.statusEmail ?? ''}`, url: null }], when: read(eruv.statusCheckedAt), mail: true, change: { kind: 'eruv-status', id }, stop: stopStatus }
+      boxes.push({ key: 'eruv', kind: 'rows', title: 'Status', groups: [{ head: '', rows: [{ name: 'Status', right: pill.text, sub: eruv.statusWords ?? undefined }] }], foot, ...(eruv.statusUrl ? { dated: { id, on: eruv.statusDated } } : {}) })
+    }
+    const details = detailsRows(eruv)
+    if (details.length) {
+      const site = eruv.website
+      const foot: Foot = !site
+        ? { lead: 'Added by hand', links: [], when: null }
+        : watch?.active && watch.lastOkAt
+          ? { lead: 'Same as', links: [pageLink(site)], when: read(watch.lastOkAt), stop: { kind: 'watch', watchId: watch.id, what: 'its website' } }
+          : { lead: 'Read from', links: [pageLink(site)], when: watch && !watch.active ? 'off' : 'not read yet', ...(watch?.active ? { stop: { kind: 'watch' as const, watchId: watch.id, what: 'its website' } } : {}) }
+      boxes.push({ key: 'eruv-details', kind: 'rows', title: 'Details', groups: [{ head: '', rows: details.map((r) => ({ name: r.name, right: r.value })) }], foot })
+    }
+    if (eruv.lineUrl) {
+      boxes.push({
+        key: 'eruv-map',
+        kind: 'rows',
+        title: 'Map',
+        groups: [{ head: '', rows: [{ name: 'Map', right: eruv.lineError ? 'As last read' : 'Live' }] }],
+        foot: { lead: 'Same as', links: [{ text: 'its map', url: eruv.lineUrl }], when: read(eruv.lineReadAt), change: { kind: 'eruv-map', id }, stop: { kind: 'eruv-map', id, what: 'its map' } },
+      })
+    }
+    // Read them now: its status page, map and an email waiting, then its
+    // website, as the Eruv page's does.
+    const own = (eruv.statusUrl ? 1 : 0) + (eruv.lineUrl ? 1 : 0)
+    if (own || eruv.statusEmailKept) reads.push({ job: 'eruv', id })
+    if (eruv.website && (!watch || watch.active)) reads.push({ job: 'eruv-site', id })
+    pages += own + (eruv.website && (!watch || watch.active) && !sameSite(eruv.statusUrl, eruv.website) ? 1 : 0)
+    if (section === 'no_source') add = { job: 'eruv', email: true, label: 'Its status page, or the address its emails come from' }
+
     const standing = eruvStanding(eruv, { finding: findingFor(d.findings, id), watch, now: new Date(now), timezone: d.timezone })
     if (standing.tab === 'cant_read') {
       const status = [{ label: 'Status', value: eruv.status ? pill.text : '—' }]
-      const section = eruvSection(eruv)
-      const read: Fix = { kind: 'read', step: { job: 'eruv', id } }
+      const readIt: Fix = { kind: 'read', step: { job: 'eruv', id } }
       if (section !== 'read') drop.add('eruv')
-      if (section === 'no_source') problem({ key: 'eruv', page: null, says: 'Nothing gives its status', fields: status, fix: { kind: 'job', job: 'eruv', text: 'Give it a status page' } })
-      else if (section === 'email') problem({ key: 'eruv', page: { text: `its emails, from ${eruv.statusEmail ?? ''}`, url: null }, says: 'its last email couldn’t be read', fields: status, fix: { kind: 'job', job: 'eruv', text: 'Say what it says' } })
-      else if (section === 'didnt_load') problem({ key: 'eruv', page: { text: 'its status page', url: eruv.statusUrl }, says: eruv.statusErrorAt ? `didn’t load ${day(eruv.statusErrorAt)}` : 'didn’t load', fields: status, fix: read })
-      else if (eruv.lineUrl && eruv.lineError) problem({ key: 'map', page: { text: 'its map', url: eruv.lineUrl }, says: 'didn’t load', fields: [{ label: 'Map', value: 'As last read' }], fix: read })
-      else if (watch)
+      if (section === 'no_source') problem({ key: 'eruv', page: null, says: 'Nothing gives its status', fields: status, fix: eruv.website ? { kind: 'eruv-find', id } : { kind: 'add' } })
+      else if (section === 'email') problem({ key: 'eruv', page: { text: `its emails, from ${eruv.statusEmail ?? ''}`, url: null }, says: 'its last email couldn’t be read', fields: status, fix: { kind: 'eruv-email', id } })
+      else if (section === 'didnt_load') problem({ key: 'eruv', page: { text: 'its status page', url: eruv.statusUrl }, says: eruv.statusErrorAt ? `didn’t load ${day(eruv.statusErrorAt)}` : 'didn’t load', fields: status, fix: readIt })
+      else if (eruv.lineUrl && eruv.lineError) {
+        drop.add('eruv-map')
+        problem({ key: 'map', page: { text: 'its map', url: eruv.lineUrl }, says: 'didn’t load', fields: [{ label: 'Map', value: 'As last read' }], fix: readIt })
+      } else if (watch) {
+        drop.add('eruv-details')
         problem({
           key: watch.id,
           page: pageLink(watch.url),
@@ -315,6 +357,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
           ],
           fix: { kind: 'read', step: { job: 'watch', watchId: watch.id } },
         })
+      }
     }
   }
 

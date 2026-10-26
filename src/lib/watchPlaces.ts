@@ -7,6 +7,7 @@ import { KOSHER_JOB_CATEGORIES, kosherSection, type KosherPlace, type NewOnList 
 import { dishProposal } from './dishProposal'
 import { watchHealth, type Watch } from './watches'
 import { linkBroken, type LinkStanding } from './linkCheck'
+import { routes } from './routes'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab by kind of place (drawings settled Oct 24): a row per
@@ -319,7 +320,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
       if (e.statusUrl || watch?.active) sources.push('website')
       if (e.statusEmail) sources.push('email')
       const state: WatchState = s.tab === 'to_check' ? 'waiting' : s.tab === 'cant_read' ? 'not_checked' : 'up_to_date'
-      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, href, listing: null })
+      put({ id: e.id, name: e.name, category: eruvKind.id, state, pill: state === 'up_to_date' ? null : s.pill.text, ...(state === 'waiting' ? { rank: 'changes' as const } : {}), sources, href, listing: routes.eruv(base.split('/')[1], e.id) })
     }
   }
 

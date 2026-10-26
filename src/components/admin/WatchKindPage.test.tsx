@@ -346,3 +346,120 @@ describe('WatchKindPage', () => {
     expect(screen.getByText('Nothing of this kind is watched.')).toBeTruthy()
   })
 })
+
+// Oct 25 (the user): "the job page has all the info of eruv tracked but
+// … when you click eruv it only tracks eruv status". Its Details, Map and
+// what the Eruv page did with its sources, here.
+describe('an eruv, on its kind’s page', () => {
+  const at = new Date(Date.now() - 3_600_000).toISOString()
+  const BASE = {
+    id: 'x', name: 'x', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false,
+    status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
+    lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+    statusEmail: null, statusEmailKept: null,
+  }
+  const LM = { ...BASE, id: 'lm', name: 'Lower Merion Eruv', covers: 'Bala Cynwyd', website: 'https://lowermerioneruv.org/', hotline: '(610) 664-5626', statusUrl: 'https://lowermerioneruv.org/status', status: 'up', statusWords: 'The Eruv is UP!', statusCheckedAt: at, lineUrl: 'https://maps.example/lm.kml', lineReadAt: at }
+  const ELKINS = { ...BASE, id: 'elkins', name: 'Elkins Park Eruv', statusEmail: 'eruv@yiep.org', statusEmailKept: { messageId: 'm', subject: 'This week', sentAt: at, text: 'Shabbat shalom', words: null } }
+  const NORTHEAST = { ...BASE, id: 'ne', name: 'Northeast Eruv', website: 'https://neeruv.org/' }
+  const site = { id: 'w-lm', communityId: 'philly', kind: 'website', url: 'https://lowermerioneruv.org/', resourceId: null, active: true, lastRunAt: at, lastOkAt: at, lastError: null, failingSince: null, createdAt: at, lastCheck: null, createdBy: 'eruv website' }
+  const posts: unknown[] = []
+  const eruvPage = (found: unknown = { ok: true, found: [], error: null }) =>
+    renderPage([], 'eruv-information', (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'eruv-information', pluralLabel: 'Eruv Information', kind: 'eruv' }] }
+      if (url.includes('/api/admin/watches/eruv') && !init?.method) return { available: true, timezone: 'America/New_York', eruvim: [LM, ELKINS, NORTHEAST], findings: [], watches: [site] }
+      if (init?.method === 'POST') {
+        const body = JSON.parse(String(init.body))
+        posts.push([url.replace(/[?&]community=philly/, ''), body])
+        return body.action === 'find' ? found : { ok: true }
+      }
+    })
+  afterEach(() => {
+    posts.length = 0
+  })
+
+  it('opens in its Details, Status and Map, each footed with where it’s read, and stops or changes each', async () => {
+    await eruvPage()
+    const user = userEvent.setup()
+    await user.click(tab(/Up to date/))
+    await user.click(screen.getByRole('button', { name: /Lower Merion Eruv/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getAllByTestId('job-box').map((b) => b.getAttribute('aria-label'))).toEqual(['Status', 'Details', 'Map'])
+    expect(within(open).getAllByTestId('box-source').map((f) => f.textContent)).toEqual([
+      `Same as its status page · read ${day(at)} · Change · Stop`,
+      `Same as lowermerioneruv.org · read ${day(at)} · Stop`,
+      `Same as its map · read ${day(at)} · Change · Stop`,
+    ])
+    expect(within(open).getByText('(610) 664-5626')).toBeTruthy()
+    expect(within(open).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/eruv?item=lm')
+
+    // Read them now: its status page and map, then its website.
+    await user.click(within(open).getByRole('button', { name: 'Read them now' }))
+    expect(posts).toEqual([
+      ['/api/admin/eruvim', { id: 'lm', action: 'check' }],
+      ['/api/admin/watches/eruv', { action: 'read', id: 'lm' }],
+    ])
+
+    // Its page dates each week's post.
+    posts.length = 0
+    await user.click(within(open).getByRole('checkbox', { name: 'Its page dates each week’s post' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusDated: true } }]])
+
+    // Stop reading its map, asked first.
+    posts.length = 0
+    const map = within(open).getAllByTestId('job-box')[2]
+    await user.click(within(map).getByRole('button', { name: 'Stop' }))
+    await user.click(within(map).getByRole('button', { name: 'Keep reading' }))
+    expect(posts).toEqual([])
+    await user.click(within(map).getByRole('button', { name: 'Stop' }))
+    await user.click(within(map).getByRole('button', { name: 'Stop reading' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { lineUrl: '' } }]])
+
+    // Its website's read paused.
+    posts.length = 0
+    const details = within(open).getAllByTestId('job-box')[1]
+    await user.click(within(details).getByRole('button', { name: 'Stop' }))
+    await user.click(within(details).getByRole('button', { name: 'Stop reading' }))
+    expect(posts).toEqual([['/api/admin/watches', { action: 'pause', id: 'w-lm' }]])
+
+    // Change its status to its emails: the page emptied.
+    posts.length = 0
+    const status = within(open).getAllByTestId('job-box')[0]
+    await user.click(within(status).getByRole('button', { name: 'Change' }))
+    await user.type(within(status).getByLabelText('Its status page, or the address its emails come from'), 'eruv@lowermerioneruv.org')
+    expect(within(status).getByText('An email: read for its status. Subscribe the guide’s inbox to it too.')).toBeTruthy()
+    await user.click(within(status).getByRole('button', { name: 'Use this' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusEmail: 'eruv@lowermerioneruv.org', statusUrl: '' } }]])
+  })
+
+  it('an email it couldn’t read: say what it says, here', async () => {
+    await eruvPage()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Elkins Park Eruv/ }))
+    const open = screen.getByTestId('kind-place-open')
+    expect(within(open).getByTestId('eruv-kept-email').textContent).toContain('This week')
+    await user.click(within(open).getByRole('button', { name: 'It says up' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'elkins', action: 'email-says', says: 'up' }]])
+  })
+
+  it('nothing gives its status: find its status page on its website, or add one', async () => {
+    await eruvPage({ ok: true, found: [{ url: 'https://neeruv.org/status', link: 'Status', status: 'up', words: 'The eruv is up' }], error: null })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Northeast Eruv/ }))
+    const open = screen.getByTestId('kind-place-open')
+    await user.click(within(open).getByRole('button', { name: 'Find its status page' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'ne', action: 'find' }]])
+    expect(within(open).getByTestId('eruv-found').textContent).toContain('Its “Status” page, neeruv.org/status, says it’s up')
+    posts.length = 0
+    await user.click(within(open).getByRole('button', { name: 'Read its status from here' }))
+    expect(posts).toEqual([
+      ['/api/admin/eruvim', { id: 'ne', action: 'save', edit: { statusUrl: 'https://neeruv.org/status', statusEmail: '', statusDated: false } }],
+      ['/api/admin/eruvim', { id: 'ne', action: 'check' }],
+    ])
+
+    posts.length = 0
+    await user.click(within(open).getByRole('button', { name: 'Add a source' }))
+    await user.type(within(open).getByLabelText('Its status page, or the address its emails come from'), 'eruv@neeruv.org')
+    await user.click(within(open).getByRole('button', { name: 'Add' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'ne', action: 'save', edit: { statusEmail: 'eruv@neeruv.org', statusUrl: '' } }]])
+  })
+})

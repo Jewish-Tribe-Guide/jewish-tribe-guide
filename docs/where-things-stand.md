@@ -288,7 +288,8 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    <day> · Change":
    - Shuls: this week's (from its newsletter or page), usual weekday,
      usual Shabbos. Mikvahs: a box per section. Food: Dishes, Kosher.
-     Hospitals: their Refuah boxes. Eruvim: Status.
+     Hospitals: their Refuah boxes. Eruvim: Status, Details (from its
+     website) and Map, as the Eruv page has them (Oct 25).
    - Then Google's fields ("Name and contact", or "Hours and contact"),
      its website's, and a person's, each a box of its own. Google's and
      the lists' have no Change.
@@ -304,9 +305,12 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    Not done, on purpose:
    - Dishes come in one list: a menu reading keeps one page, so the
      drawing's heading per menu page needs the reader to keep its pages.
-   - No Add a source for hospitals or eruvim: each has one source. A
-     hospital's Change gives a new Refuah page. An eruv's box has no
-     Change yet; its job page sets the source.
+   - No Add a source for hospitals: one source. A hospital's Change
+     gives a new Refuah page. An eruv's Status and Map have Change (a
+     status page or its emails; a map), and Add a source when nothing
+     gives its status. Since Oct 25 an eruv's boxes also have Stop
+     ("Stop reading its map?"), and its Status box "Its page dates each
+     week's post".
    - On the test site, 13 food places have an approved menu reading but
      no dishes on the listing (Playa Bowls among them). They show no
      Dishes box rather than a "Same as its menu" that isn't so.
@@ -327,9 +331,11 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
    - Menus: never read (Read it now), can't be read (Give its menu
      page), didn't load (Read it now). Hospitals: Refuah didn't load
      (Read it now), not found (Give its page on Refuah).
-   - Eruvim: no status (a link to the Eruv page, "Give it a status
-     page"), an email it couldn't read ("Say what it says", same), a
-     status page or map that didn't load (Read it now).
+   - Eruvim: no status (Find its status page, searching its website,
+     and Add a source), an email it couldn't read (the email, with It
+     says up / down / Not about the status, right there), a status page
+     or map that didn't load (Read it now). Both were links to the Eruv
+     page until Oct 25.
    - Built with it, as agreed Oct 24: a "You" field goes back to Not
      checked after a year; Not on Google on a match Google stopped
      answering for drops the match (it used to be refused).
