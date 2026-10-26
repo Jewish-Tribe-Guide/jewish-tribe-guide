@@ -22,6 +22,11 @@
 // night before anything (watchRunOrder.ts), and starts no watch it might
 // not finish: what's left goes first the next night.
 //
+// Oct 25: one at a time, six slow AI reads took most of that, and 33 of
+// 107 were left. Now six are read at once, never two on one site or for
+// one place (runSideBySide, watchRunOrder.ts), and the kosher lists and
+// hospitals go first every night, ahead of any backlog.
+//
 // Before migration 070 there is no watch table: the built-in Keystone-K
 // watch runs as it did, with nothing recorded.
 //
@@ -37,7 +42,7 @@ import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
 import { syncRefuahWatches } from '@/lib/refuahMatchRun'
 import { syncHoursWatches } from '@/lib/hoursJobRun'
 import { syncEruvWebsiteWatches } from '@/lib/eruvWebsiteRun'
-import { orderForRun } from '@/lib/watchRunOrder'
+import { orderForRun, runSideBySide, sideBySideKeys } from '@/lib/watchRunOrder'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { watchesOutcome, type WatchesRun } from '@/lib/jobRuns'
 import { countWatchKinds } from '@/lib/nightKinds'
@@ -92,23 +97,21 @@ async function runAll(started = Date.now()): Promise<Body> {
   }
 
   const alerts = new Map<string, WatchHealthAlert[]>()
-  const results = []
   const budget = newMenuReadBudget()
   const queue = orderForRun(watches, started)
-  let left = 0
-  for (const [i, watch] of queue.entries()) {
-    if (Date.now() - started > START_NO_WATCH_AFTER_MS) {
-      left = queue.length - i
-      break
-    }
-    const { outcome, alert } = await runAndRecord(watch, undefined, budget)
-    results.push({ id: watch.id, url: watch.url, ...outcome })
-    if (alert) {
-      const list = alerts.get(watch.communityId) ?? []
-      list.push({ label: watch.label || watch.url, url: watch.url, alert, error: outcome.ok ? null : outcome.error })
-      alerts.set(watch.communityId, list)
-    }
-  }
+  const { results, left } = await runSideBySide(queue, {
+    keysOf: sideBySideKeys,
+    mayStart: () => Date.now() - started <= START_NO_WATCH_AFTER_MS,
+    run: async (watch) => {
+      const { outcome, alert } = await runAndRecord(watch, undefined, budget)
+      if (alert) {
+        const list = alerts.get(watch.communityId) ?? []
+        list.push({ label: watch.label || watch.url, url: watch.url, alert, error: outcome.ok ? null : outcome.error })
+        alerts.set(watch.communityId, list)
+      }
+      return { id: watch.id, url: watch.url, ...outcome }
+    },
+  })
 
   // Awaited, not left running: the response must not finish first.
   await Promise.all(

@@ -241,6 +241,32 @@ describe('/api/cron/watches', () => {
       ])
     })
 
+    // Oct 25: one at a time, six slow AI reads left 33 of 107 unread.
+    it('reads six sites at once, but one site a page at a time', async () => {
+      let reading = 0
+      let most = 0
+      let onRefuah = 0
+      let mostOnRefuah = 0
+      mockWebsite.mockImplementation(async (url: string) => {
+        const refuah = url.includes('refuah.com')
+        reading++
+        most = Math.max(most, reading)
+        if (refuah) mostOnRefuah = Math.max(mostOnRefuah, ++onRefuah)
+        await new Promise((r) => setTimeout(r, 5))
+        reading--
+        if (refuah) onRefuah--
+        return { ok: true, filed: 0, pageHash: 'h' }
+      })
+      const sites = Array.from({ length: 8 }, (_, i) => watch({ id: `s${i}`, url: `https://site${i}.example/` }))
+      mockList.mockResolvedValue({ available: true, watches: [...sites, watch({ id: 'h1', url: 'https://refuah.com/hospitals/a', createdBy: 'admin' }), watch({ id: 'h2', url: 'https://refuah.com/hospitals/b', createdBy: 'admin' })] })
+      const body = await (await GET(request())).json()
+      expect(body.results).toHaveLength(10)
+      expect(body.left).toBe(0)
+      expect(most).toBe(6)
+      expect(mockWebsite.mock.calls.filter(([u]) => String(u).includes('refuah.com'))).toHaveLength(2)
+      expect(mostOnRefuah).toBe(1)
+    })
+
     it('records a run that got to everything', async () => {
       mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b', failingSince: '2026-10-22T07:00:00.000Z' })] })
       mockWebsite.mockResolvedValueOnce({ ok: true, filed: 0, pageHash: 'h' }).mockResolvedValueOnce({ ok: false, error: 'The page answered 403' })

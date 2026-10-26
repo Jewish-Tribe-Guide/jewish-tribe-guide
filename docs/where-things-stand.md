@@ -1587,6 +1587,19 @@ about the same place every morning. Nothing showed it anywhere.
   goes first (`src/lib/watchRunOrder.ts`). No watch starts after 200
   seconds; what's left goes first the next night. The eruv maps now run
   alongside the start, not after every watch.
+- **Six at once, kosher and hospitals always first (Oct 25).** The Oct 25
+  run still read only 74 of 107: one at a time, six AI reads of a place's
+  own page (10–34s each) took 2½ of its 3½ minutes. And the backlog went
+  ahead of everything, so Keystone-K and the 7 Refuah pages, read the
+  night before, were the ones left over. Now six are read at once, never
+  two on one site (Refuah's go one after another) nor for one place
+  (`runSideBySide`, `watchRunOrder.ts`), and the kosher lists and
+  hospitals go ahead of any backlog. Replaying the Oct 25 night's own
+  times: 179s one at a time, about 34s six at once (its slowest read), so
+  the five minutes hold several times today's list; more at once is the
+  lever if it grows past that. The AI read cap holds as it is (each read
+  takes from it in one step). Not yet run live: the first proof is the
+  night after this deploys.
 - **Every nightly job records its runs** (migration 086, `job_run`;
   `src/lib/jobRunStore.ts`): Google hours, Watches, Menus and Walks. Each
   run saves a row when it starts and fills it in at the end with what it
