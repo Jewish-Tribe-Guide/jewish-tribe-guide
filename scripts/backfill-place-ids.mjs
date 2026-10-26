@@ -111,6 +111,8 @@ let skipped = 0
 let failed = 0
 for (const r of rows) {
   if (r.details?.placeId) { skipped++; continue }
+  // An admin's call: not on Google, or its match was the wrong place.
+  if (r.details?.notOnGoogle || r.details?.googleWrong) { skipped++; continue }
   if (!r.address) { skipped++; continue }
 
   const match = await findPlace(r.name, r.address)

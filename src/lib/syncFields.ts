@@ -24,6 +24,9 @@ export const SYNC_INTERNAL_FIELDS = [
   // never a submitter's.
   'googleKept',
   'notOnGoogle',
+  // Google matches an admin said were the wrong place (Wrong place, Oct
+  // 26), never offered again.
+  'googleWrong',
   'googleCheck',
   'googleStatusCheckedAt',
   'lastSyncError',

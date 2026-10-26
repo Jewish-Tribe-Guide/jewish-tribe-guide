@@ -17,6 +17,7 @@ import {
   pickGooglePlace,
   showAsOpen,
   applyGoogles,
+  wrongPlace,
 } from '@/lib/googleJobRun'
 
 // GET  /api/admin/watches/google — the Watches tab's Google page (Oct 22,
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
   }
 }
 
-const ACTIONS = ['check', 'find', 'pick', 'use', 'keep', 'edit', 'not_on_google', 'open'] as const
+const ACTIONS = ['check', 'find', 'pick', 'use', 'keep', 'edit', 'not_on_google', 'wrong_place', 'open'] as const
 type Action = (typeof ACTIONS)[number]
 
 export async function POST(request: Request) {
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
     } else if (action === 'use') place = await applyGoogles(slug, id, admin.email)
     else if (action === 'keep') place = await keepTheListing(slug, id)
     else if (action === 'not_on_google') place = await notOnGoogle(slug, id)
+    else if (action === 'wrong_place') place = await wrongPlace(slug, id)
     else if (action === 'open') place = await showAsOpen(slug, id, body?.open === true)
     else {
       const values = body?.values

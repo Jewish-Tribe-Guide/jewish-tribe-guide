@@ -1693,13 +1693,21 @@ read again, so a new week's times never arrived.
   since Oct 22, so its re-read should clear it.
 - Reaches the live site with the next merge and deploy.
 
+**Wrong place (built Oct 26, on `redesign/oct18-fixes`, PR 359):** a
+Google change waiting for you has Accept, Keep as is and **Wrong place**.
+Wrong place drops the match and everything it said: what Google wrote,
+the check, Keep as is, its closure and its description, which shows on the
+public listing. The listing's own values stay. Nothing checks its name
+until it's found on Google or said not to be, so the place opens on Find
+it on Google / Not on Google. The dropped place id is kept as
+`googleWrong`; Find it on Google never offers it again, and the place-id
+backfill script skips that listing.
+- **Still open: BZBI Early Childhood** (matched to the temple's place id).
+  It was decided with Keep as is before the button existed, so nothing is
+  waiting, and only a waiting Google change shows Wrong place. Its Google
+  phone is still read every night.
+
 **Found Oct 26, not fixed:**
-- **BZBI Early Childhood is matched to the temple's Google entry** (same
-  place id as Temple Beth Zion-Beth Israel). Keep as is (Oct 26) made its
-  name, hours and website the admin's, but the match stays: Google is
-  still asked about the temple every night and gives its phone. There's
-  no button for "Google's place is the wrong one" on a matched place; Find
-  it on Google and Not on Google only show when there's no match.
 - **Chabad of the Main Line's schedule page** answers every read with
   Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
   bot checks. Options: its email newsletter as the source, or Stop the

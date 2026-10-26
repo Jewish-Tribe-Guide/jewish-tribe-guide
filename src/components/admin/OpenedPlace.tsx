@@ -521,7 +521,14 @@ export default function OpenedPlace({
           { label: 'Keep it', work: each([d.id], () => ({ status: 'rejected' })) },
           ...(d.kind === 'off' && d.renamed ? [{ label: `It’s ${d.renamed} now`, work: () => post('/api/admin/watches/kosher', { action: 'renamed', id: d.id }) }] : []),
         ]
-      if (d.kind === 'google') return [{ label: 'Accept', work: google({ action: 'use' }) }, { label: 'Keep as is', work: google({ action: 'keep' }) }]
+      // Wrong place: Google matched another place. The match goes, and the
+      // place opens again on Find it on Google or Not on Google.
+      if (d.kind === 'google')
+        return [
+          { label: 'Accept', work: google({ action: 'use' }) },
+          { label: 'Keep as is', work: google({ action: 'keep' }) },
+          { label: 'Wrong place', work: google({ action: 'wrong_place' }) },
+        ]
       if (d.kind === 'menu') return [{ label: 'Accept', work: menu('use') }, { label: 'Keep as is', work: menu('skip') }]
       return [
         { label: 'Accept', work: each(d.ids, (id) => ({ status: 'approved', ...(d.only?.[id] ? { only: d.only[id] } : {}) })) },

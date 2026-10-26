@@ -292,7 +292,9 @@ export async function findOnGoogle(community: string, id: string, query?: string
   const { row } = await loadOne(community, id)
   const found = await searchPlaces(query?.trim() || [row.name, row.address].filter(Boolean).join(', '))
   if (found === null) throw new GoogleJobError('Google didn’t answer. Try again shortly.', 502)
-  return found
+  // A place said to be the wrong one isn't offered again.
+  const wrong = (row.details ?? {}).googleWrong
+  return Array.isArray(wrong) ? found.filter((f) => !wrong.includes(f.placeId)) : found
 }
 
 /** A place picked on Find it on Google becomes the listing's match, and is
@@ -349,6 +351,28 @@ export async function notOnGoogle(community: string, id: string, now = Date.now(
   await readOwnSiteNow(community, id).catch((err) => console.error('[googleJob] reading its website failed:', err))
   const [{ row: after }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
   await writeDetails(community, id, { ...(after.details ?? said), googleKept: keptNow(after, category, watches, now) })
+  return onePlace(community, id, now)
+}
+
+/** What a Google match wrote about the place, and what was decided about
+ *  it: all of it describes another place once the match is wrong. */
+const MATCH_KEYS = [
+  'placeId', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt', 'lastSyncError', 'lastSyncFailedAt', 'googleFields', 'googleCheck', 'googleKept',
+  'businessStatus', 'businessStatusBefore', 'businessStatusChangedAt', 'businessStatusOverride', 'businessStatusKeptAt', 'googleDescription',
+]
+
+/** Wrong place (Oct 26): Google matched it to another place (BZBI Early
+ *  Childhood to the temple). The match and all it said go, Find it on
+ *  Google stops offering it, and nothing checks the listing until it is
+ *  found on Google or said not to be. Its fields keep their values. */
+export async function wrongPlace(community: string, id: string, now = Date.now()): Promise<GooglePlace> {
+  const { row } = await loadOne(community, id)
+  const details = { ...(row.details ?? {}) }
+  const placeId = matchOf(details)
+  if (!placeId) throw new GoogleJobError('This listing has no Google match.', 400)
+  const wrong = Array.isArray(details.googleWrong) ? (details.googleWrong as unknown[]).filter((x): x is string => typeof x === 'string') : []
+  for (const k of MATCH_KEYS) delete details[k]
+  await writeDetails(community, id, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
   return onePlace(community, id, now)
 }
 

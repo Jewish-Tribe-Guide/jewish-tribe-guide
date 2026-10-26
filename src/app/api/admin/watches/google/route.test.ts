@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   checkAgainstGoogle: vi.fn(),
   keepTheListing: vi.fn(),
   applyGoogles: vi.fn(),
+  wrongPlace: vi.fn(),
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -19,6 +20,7 @@ vi.mock('@/lib/googleJobRun', async (importOriginal) => ({
   checkAgainstGoogle: m.checkAgainstGoogle,
   keepTheListing: m.keepTheListing,
   applyGoogles: m.applyGoogles,
+  wrongPlace: m.wrongPlace,
 }))
 
 const { GET, POST } = await import('./route')
@@ -30,7 +32,7 @@ beforeEach(() => {
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.enforceRateLimit.mockResolvedValue(null)
   m.loadGoogleJob.mockResolvedValue([{ section: 'to_check' }, { section: 'checked' }])
-  for (const f of [m.checkAgainstGoogle, m.keepTheListing, m.applyGoogles]) f.mockResolvedValue({ id: ID })
+  for (const f of [m.checkAgainstGoogle, m.keepTheListing, m.applyGoogles, m.wrongPlace]) f.mockResolvedValue({ id: ID })
 })
 
 describe('/api/admin/watches/google', () => {
@@ -63,6 +65,13 @@ describe('/api/admin/watches/google', () => {
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
     await post({ action: 'use', id: ID })
     expect(m.applyGoogles).toHaveBeenCalledWith('philly', ID, 'me@x.co')
+    expect(m.revalidatePublicContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('Wrong place drops the match, and the site is refreshed (its closure and description were the other place’s)', async () => {
+    const res = await post({ action: 'wrong_place', id: ID })
+    expect(res.status).toBe(200)
+    expect(m.wrongPlace).toHaveBeenCalledWith('philly', ID)
     expect(m.revalidatePublicContent).toHaveBeenCalledTimes(1)
   })
 
