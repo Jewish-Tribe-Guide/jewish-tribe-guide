@@ -153,7 +153,7 @@ describe('runMenuWatch', () => {
     const budget = { aiReads: 1 }
     expect((await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k' })).ok).toBe(true)
     expect(budget.aiReads).toBe(0)
-    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readMenu).toHaveBeenCalledTimes(1)
     expect(newMenuReadBudget().aiReads).toBeGreaterThan(0)
   })
@@ -170,7 +170,7 @@ describe('runMenuWatch', () => {
     const last = { aiReads: 1, menuReads: 0 }
     expect((await runMenuWatch({ ...watch, pageHash: 'old' }, last, { apiKey: 'k' })).ok).toBe(true)
     expect(last).toEqual({ aiReads: 0, menuReads: 0 })
-    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, last, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, last, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readMenu).toHaveBeenCalledTimes(2)
   })
 
@@ -297,7 +297,7 @@ describe('runMenuWatch: dishes added since its last read', () => {
 
   it('from the run’s AI reads: past them, it waits for a run with room', async () => {
     const out = await runMenuWatch(unchanged, { ...newMenuReadBudget(), aiReads: 0, menuReads: 0 }, { apiKey: 'k' })
-    expect(out).toEqual({ ok: true, filed: 0 })
+    expect(out).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readMenu).not.toHaveBeenCalled()
   })
 
@@ -377,7 +377,7 @@ describe('a menu drawn by a script', () => {
     expect(budget.renders).toBe(0)
 
     const second = renderer()
-    expect(await runMenuWatch(watch, budget, { apiKey: 'k', renderer: second })).toEqual({ ok: true, filed: 0 })
+    expect(await runMenuWatch(watch, budget, { apiKey: 'k', renderer: second })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(second.render).not.toHaveBeenCalled()
   })
 

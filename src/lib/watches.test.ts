@@ -71,6 +71,16 @@ describe('afterRun', () => {
     expect(update).toMatchObject({ lastOkAt: NOW, lastError: null, failingSince: null, lastFiled: 2 })
   })
 
+  // Oct 26: a page the night's AI reads had run out for counted as read.
+  it('one the run’s reads ran out for isn’t recorded as read: neither run date moves', () => {
+    const { update, alert } = afterRun(watch({ lastRunAt: '2026-10-05T07:00:00.000Z', lastOkAt: '2026-10-05T07:00:00.000Z', pageHash: 'old' }), { ok: true, filed: 0, skipped: true }, NOW)
+    expect(update).toEqual({})
+    expect(alert).toBeNull()
+    // It loaded, so a broken one isn't broken now, but it still isn't read.
+    const was = afterRun(watch({ failingSince: '2026-10-05T07:00:00.000Z', lastError: 'x' }), { ok: true, filed: 0, skipped: true }, NOW)
+    expect(was).toEqual({ update: { lastError: null, failingSince: null }, alert: 'recovered' })
+  })
+
   it('says nothing on an ordinary good run', () => {
     expect(afterRun(watch(), { ok: true, filed: 0 }, NOW).alert).toBeNull()
   })

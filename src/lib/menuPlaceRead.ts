@@ -102,12 +102,15 @@ async function dateIfAgreeing(slug: string, listing: DirectoryResource, kind: Di
   await dateMenuDishes(slug, listing.id, kind.field.key, kept.dishes.map((d) => d.name))
 }
 
-/** Food places a morning run reads, at most. */
-export const FIRST_READS_PER_RUN = 5
+/** Food places a morning run reads, at most. 5 in a minute's run got
+ *  through two or three: 18 waited on Oct 26, when places whose dishes
+ *  were dated before readings were kept joined them. */
+export const FIRST_READS_PER_RUN = 20
 
 /** No read is started after this long into a run: each is a page or a
- *  few, maybe drawn in a browser, then the AI, inside the run's minute. */
-export const FIRST_READS_FOR_MS = 30_000
+ *  few, maybe drawn in a browser, then the AI, inside the run's five
+ *  minutes (read-menus' maxDuration). */
+export const FIRST_READS_FOR_MS = 200_000
 
 /** A community's food places never read (needsFirstRead), by name. */
 async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: DishKind }[]> {
@@ -147,7 +150,7 @@ export async function listUnreadMenus(slug: string): Promise<{ id: string; name:
 export async function readUnreadMenus(
   apiKey: string,
   { perRun = FIRST_READS_PER_RUN, forMs = FIRST_READS_FOR_MS, now = Date.now }: { perRun?: number; forMs?: number; now?: () => number } = {},
-): Promise<{ community: string; read: number; left: number }[]> {
+): Promise<{ community: string; read: number; failed: number; left: number }[]> {
   const until = now() + forMs
   const { data: communities, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
@@ -157,6 +160,7 @@ export async function readUnreadMenus(
     const unread = await unreadMenus(slug)
     if (!unread.length) continue
     let done = 0
+    let failed = 0
     for (const { l, kind } of unread) {
       if (budget <= 0 || now() > until) break
       budget--
@@ -164,10 +168,12 @@ export async function readUnreadMenus(
         console.error(`[read-menus] ${l.name} failed:`, err)
         return null
       })
-      if (kept) done++
+      // One that couldn't be read is kept, saying why, but isn't a read.
+      if (kept?.status === 'failed') failed++
+      else if (kept) done++
       if (kept) await dateIfAgreeing(slug, l, kind, kept)
     }
-    out.push({ community: slug, read: done, left: unread.length - done })
+    out.push({ community: slug, read: done, failed, left: unread.length - done - failed })
   }
   return out
 }

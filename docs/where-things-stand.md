@@ -1681,7 +1681,66 @@ read again, so a new week's times never arrived.
   used to re-date the old finding to that morning. So an approval made
   after the real read looked older than the finding, and Mikvah Ohel Leah
   and LMC men's kept saying "differs". They now settle once approved.
+- **…and the two already stuck are read again (Oct 26, later).** Their
+  stored checks were re-dated to Oct 26 07:49 before that fix, after the
+  Oct 23 approvals they waited behind, so they'd never settle; the user saw
+  them as two mikvahs "Waiting for you" with no change. Now a check that
+  waited behind a suggestion is read again in full on the first night
+  nothing waits for the listing (`stoodBehind`, `listingPageRun.ts`): what
+  still differs is filed as a new suggestion, what doesn't clears. No
+  database write. Also covers the Little Shul's home page (waiting since
+  Oct 23). LMC men's "difference" was only spaces; notes ignore spacing
+  since Oct 22, so its re-read should clear it.
 - Reaches the live site with the next merge and deploy.
+
+**Wrong place (built Oct 26, on `redesign/oct18-fixes`, PR 359):** a
+Google change waiting for you has Accept, Keep as is and **Wrong place**.
+Wrong place drops the match and everything it said: what Google wrote,
+the check, Keep as is, its closure and its description, which shows on the
+public listing. The listing's own values stay. Nothing checks its name
+until it's found on Google or said not to be, so the place opens on Find
+it on Google / Not on Google. The dropped place id is kept as
+`googleWrong`; Find it on Google never offers it again, and the place-id
+backfill script skips that listing.
+- **Still open: BZBI Early Childhood** (matched to the temple's place id).
+  It was decided with Keep as is before the button existed, so nothing is
+  waiting, and only a waiting Google change shows Wrong place. Its Google
+  phone is still read every night. Decided Oct 26 (the user): Wrong place
+  stays on the waiting card only, not on an up-to-date place's Google box.
+
+**Nothing skipped shows as read (built Oct 26, on `redesign/oct18-fixes`):**
+the user: "really misleading that some things are skipped but shown as
+read". A shul page or menu that loaded but needed the AI after the night's
+reads were spent was recorded like a read: its read date moved, the run
+said "Checked 108 of 108", and the tab counted it read. Now:
+- **A watch skipped this way stays as it was.** Neither run date moves.
+  The tab says Not reached, and the next night takes it ahead of those it
+  read.
+- **The run says so:** "Ran out of reads: N not read, for the next night".
+- **The menus job** says "N couldn't be read" for a menu it couldn't find,
+  and no longer counts that as read.
+- **Enough reads for all of it:**
+  - 40 shul-page reads a night instead of 20. All 32 pages are due the
+    night their week starts, which would have left 9 on Oct 26.
+  - The menus job gets 5 minutes instead of 1, and up to 20 first reads a
+    night instead of 5. 18 places were never read on Oct 26; the old job
+    managed about 2–3 a night.
+  - The watches run starts watches until 250s instead of 200s. On Oct 26
+    it did 108 watches in 143s with about 30 AI reads. The night every
+    shul's page is read for its new week adds 32, which would have left the
+    menus (checked last) for the next night. The slowest read seen is 34s,
+    so one started at 250s still ends inside the 300s limit.
+- Not live until merged. PR 359 was merged before this, before Wrong place,
+  and before the waiting-mikvahs fix.
+
+**Found Oct 26, not fixed:**
+- **Elkins Park Eruv's website page** (`yiep.org/eruv-map`) is gone (404
+  since Oct 25). yiep.org now only links a Google map of the boundaries,
+  from /our-community/. Stop it on the eruv's page.
+- **Chabad of the Main Line's schedule page** answers every read with
+  Cloudflare's bot check (403 since Oct 20). The reader doesn't get past
+  bot checks. Options: its email newsletter as the source, or Stop the
+  page so the shul shows Not checked.
 
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 

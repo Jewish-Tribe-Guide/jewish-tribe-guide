@@ -78,6 +78,11 @@ describe('each job’s run, in a line', () => {
       warning: 'Ran out of time: 27 left for the next night',
       kinds: null,
     })
+    // Oct 26: what the night's reads ran out for isn't checked.
+    expect(watchesOutcome({ active: 108, ran: 99, notWorking: 0, left: 2, skipped: 9 })).toMatchObject({
+      summary: 'Checked 99 of 108 watches',
+      warning: 'Ran out of time: 2 left for the next night · Ran out of reads: 9 not read, for the next night',
+    })
     expect(watchesOutcome({ active: 1, ran: 1, notWorking: 0, left: 0, kinds: { philly: { eruvs: { of: 1, read: 1 } } } }).kinds).toEqual({ philly: { eruvs: { of: 1, read: 1 } } })
   })
 
@@ -96,6 +101,12 @@ describe('each job’s run, in a line', () => {
       ok: true,
       summary: 'Read 3 menus · 20 left for the next nights',
       kinds: { philly: { menus: { of: 23, read: 3 } } },
+    })
+    // One it couldn't read is said as that, not as read (Oct 26).
+    expect(readMenusOutcome({ menus: [{ community: 'philly', read: 1, failed: 2, left: 4 }] })).toEqual({
+      ok: true,
+      summary: 'Read 1 menu · 2 couldn’t be read · 4 left for the next nights',
+      kinds: { philly: { menus: { of: 7, read: 1 } } },
     })
     expect(readMenusOutcome({ menus: [] })).toMatchObject({ ok: true, summary: 'No menus left to read' })
     expect(readMenusOutcome({ skipped: 'no OPENAI_API_KEY' })).toMatchObject({ warning: 'Not set up: no OPENAI_API_KEY' })

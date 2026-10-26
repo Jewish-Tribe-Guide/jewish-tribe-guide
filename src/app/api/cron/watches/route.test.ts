@@ -227,18 +227,36 @@ describe('/api/cron/watches', () => {
       expect(ran).toEqual(['k', 'site', 'menu'])
     })
 
-    it('starts no watch after 200 seconds, and says how many it left for the next night', async () => {
+    it('starts no watch after 250 seconds, and says how many it left for the next night', async () => {
       let clock = Date.parse('2026-10-24T07:47:00.000Z')
       vi.spyOn(Date, 'now').mockImplementation(() => clock)
       mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'a' }), watch({ id: 'b' }), watch({ id: 'c' }), watch({ id: 'd' })] })
-      // Each page takes two minutes: a, b started; c would start at 240s.
-      mockWebsite.mockImplementation(async () => ((clock += 120_000), { ok: true, filed: 0, pageHash: 'h' }))
+      // One site, so a page at a time, each 125s: a, b, and c at 250s
+      // started (until Oct 26, c at 200s+ wasn't); d would start at 375s.
+      mockWebsite.mockImplementation(async () => ((clock += 125_000), { ok: true, filed: 0, pageHash: 'h' }))
       const body = await (await GET(request())).json()
-      expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b'])
-      expect(body.left).toBe(2)
+      expect(body.results.map((r: { id: string }) => r.id)).toEqual(['a', 'b', 'c'])
+      expect(body.left).toBe(1)
       expect(recordedOutcomes).toEqual([
-        { job: 'watches', ok: true, summary: 'Checked 2 of 4 watches', warning: 'Ran out of time: 2 left for the next night', kinds: { philly: { other: { of: 4, read: 2 } } } },
+        { job: 'watches', ok: true, summary: 'Checked 3 of 4 watches', warning: 'Ran out of time: 1 left for the next night', kinds: { philly: { other: { of: 4, read: 3 } } } },
       ])
+    })
+
+    // Oct 26: 9 shul pages the night's reads ran out for counted as read.
+    it('one the night’s reads ran out for isn’t checked or read, and isn’t saved as a run', async () => {
+      mockList.mockResolvedValue({
+        available: true,
+        watches: [
+          watch({ id: 'm1', url: 'https://a.example/menu', resourceId: 'r1', createdBy: 'menu links', pageHash: 'old' }),
+          watch({ id: 'm2', url: 'https://b.example/menu', resourceId: 'r2', createdBy: 'menu links', pageHash: 'old' }),
+        ],
+      })
+      mockMenu.mockResolvedValueOnce({ ok: true, filed: 0, pageHash: 'h' }).mockResolvedValueOnce({ ok: true, filed: 0, skipped: true })
+      await GET(request())
+      expect(recordedOutcomes).toEqual([
+        { job: 'watches', ok: true, summary: 'Checked 1 of 2 watches', warning: 'Ran out of reads: 1 not read, for the next night', kinds: { philly: { menus: { of: 2, read: 1 } } } },
+      ])
+      expect(mockUpdate).toHaveBeenCalledTimes(1)
     })
 
     // Oct 25: one at a time, six slow AI reads left 33 of 107 unread.

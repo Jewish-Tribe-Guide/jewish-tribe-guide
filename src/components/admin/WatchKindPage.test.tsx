@@ -136,7 +136,7 @@ describe('WatchKindPage', () => {
     const open = screen.getByTestId('kind-place-open')
     expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([
       `From lms.example/davening · ${day(at)}Shacharis · Mon–Fri6:30 AMWas 6:45 AMAcceptEditKeep as is`,
-      `From its Google listing · ${day(at)}Phone610-555-0199Was 610-555-0100AcceptEditKeep as is`,
+      `From its Google listing · ${day(at)}Phone610-555-0199Was 610-555-0100AcceptEditKeep as isWrong place`,
     ])
     // Edit opens the change here, not its job page.
     expect(within(open).queryByRole('link', { name: 'Edit' })).toBeNull()
@@ -149,6 +149,10 @@ describe('WatchKindPage', () => {
     sent.length = 0
     await user.click(within(google).getByRole('button', { name: 'Keep as is' }))
     expect(sent).toEqual([['POST', '/api/admin/watches/google', { action: 'keep', id: 'b' }]])
+    // Oct 26: BZBI Early Childhood, matched to the temple.
+    sent.length = 0
+    await user.click(within(google).getByRole('button', { name: 'Wrong place' }))
+    expect(sent).toEqual([['POST', '/api/admin/watches/google', { action: 'wrong_place', id: 'b' }]])
   })
 
   // Oct 25 (the user): "grocery should go to grocery". What a grocery's

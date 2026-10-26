@@ -64,9 +64,10 @@ export const LISTING_COMPARES_PER_RUN = 12
 /** A shul's times pages a cron run may read, apart from the menus' reads:
  *  each once a week (listingPageRun.ts) and whenever it changes, and its
  *  calendar changes on the Sunday and the Thursday. Taken first; past it,
- *  a page takes from the run's reads as before. Two nights for every
- *  shul's page, read on a Sunday with its new week (Oct 26). */
-export const TIMES_READS_PER_RUN = 20
+ *  a page takes from the run's reads as before. Every shul's page on the
+ *  night its new week starts: 32 on Oct 26, when 20 left 9 for the next
+ *  night, shown as read (the user: "really misleading"). */
+export const TIMES_READS_PER_RUN = 40
 
 /** Menu pages a cron run may draw in a browser. */
 export const MENU_RENDERS_PER_RUN = 1
@@ -166,7 +167,7 @@ export async function runMenuWatch(
   } finally {
     await renderer?.close()
   }
-  if (!source && undrawn) return { ok: true, filed: 0 }
+  if (!source && undrawn) return { ok: true, filed: 0, skipped: true }
   if (!source) {
     return {
       ok: false,
@@ -202,7 +203,7 @@ export async function runMenuWatch(
     if (!opts.full) return { ok: true, filed: 0 }
     return { ok: true, filed: 0, check: { what: 'dishes', from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the menu wasn’t read.' } }
   }
-  if (budget && !opts.full && !takeMenuReads(budget, 1)) return { ok: true, filed: 0 }
+  if (budget && !opts.full && !takeMenuReads(budget, 1)) return { ok: true, filed: 0, skipped: true }
   const listed = listedDishes(listing, category)
   let read
   try {

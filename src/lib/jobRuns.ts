@@ -40,8 +40,8 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
   {
     id: 'read-menus',
     name: 'Menus',
-    about: 'Reads a few menus never read yet. Once read, each menu’s watch keeps it current.',
-    limitSeconds: 60,
+    about: 'Reads the menus never read yet, up to 20 a night. Once read, each menu’s watch keeps it current.',
+    limitSeconds: 300,
   },
   {
     id: 'walk-routes',
@@ -131,26 +131,30 @@ export function syncHoursOutcome(run: SyncHoursRun): JobOutcome {
   return { ok: true, summary: parts.join(' · '), warning: run.failed ? `${plural(run.failed, 'listing')} couldn’t be asked` : null, kinds: run.kinds ?? null }
 }
 
-export type WatchesRun = { active: number; ran: number; notWorking: number; left: number; kinds?: RunKinds }
+/** `ran`: checked, not counting `skipped`, those the night's AI reads ran
+ *  out for (watches.ts). */
+export type WatchesRun = { active: number; ran: number; notWorking: number; left: number; skipped?: number; kinds?: RunKinds }
 
 export function watchesOutcome(run: WatchesRun): JobOutcome {
   const parts = [`Checked ${run.ran} of ${plural(run.active, 'watch', 'watches')}`]
   if (run.notWorking) parts.push(`${run.notWorking} not working`)
-  return { ok: true, summary: parts.join(' · '), warning: run.left ? `Ran out of time: ${run.left} left for the next night` : null, kinds: run.kinds ?? null }
+  const warnings = [run.left && `Ran out of time: ${run.left} left for the next night`, run.skipped && `Ran out of reads: ${run.skipped} not read, for the next night`].filter(Boolean)
+  return { ok: true, summary: parts.join(' · '), warning: warnings.length ? warnings.join(' · ') : null, kinds: run.kinds ?? null }
 }
 
 /** readUnreadMenus's, per community. */
-export type MenuReadRun = readonly { community: string; read: number; left: number }[]
+export type MenuReadRun = readonly { community: string; read: number; failed?: number; left: number }[]
 
 /** `kinds`: per community, of the menus never read, how many it read
  *  (the Watches tab's Menus line). */
 export function readMenusOutcome(run: { skipped: string } | { menus: MenuReadRun }): JobOutcome {
   if ('skipped' in run) return { ok: true, summary: 'Nothing read', warning: `Not set up: ${run.skipped}` }
   const read = sum(run.menus, (m) => m.read)
+  const failed = sum(run.menus, (m) => m.failed ?? 0)
   const left = sum(run.menus, (m) => m.left)
-  const kinds: RunKinds = Object.fromEntries(run.menus.map((m) => [m.community, { menus: { of: m.read + m.left, read: m.read } }]))
-  if (!read && !left) return { ok: true, summary: 'No menus left to read', kinds }
-  return { ok: true, summary: [`Read ${plural(read, 'menu')}`, left && `${left} left for the next nights`].filter(Boolean).join(' · '), kinds }
+  const kinds: RunKinds = Object.fromEntries(run.menus.map((m) => [m.community, { menus: { of: m.read + (m.failed ?? 0) + m.left, read: m.read } }]))
+  if (!read && !failed && !left) return { ok: true, summary: 'No menus left to read', kinds }
+  return { ok: true, summary: [`Read ${plural(read, 'menu')}`, failed && `${failed} couldn’t be read`, left && `${left} left for the next nights`].filter(Boolean).join(' · '), kinds }
 }
 
 export function walkRoutesOutcome(run: WalkRouteRun): JobOutcome {

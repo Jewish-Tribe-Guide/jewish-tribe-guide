@@ -73,7 +73,7 @@ describe('listUnreadMenus', () => {
 
 describe('readUnreadMenus', () => {
   it('reads only the places never read, with something to read, a few a run', async () => {
-    expect(await readUnreadMenus('key', { perRun: 2 })).toEqual([{ community: 'philly', read: 2, left: 2 }])
+    expect(await readUnreadMenus('key', { perRun: 2 })).toEqual([{ community: 'philly', read: 2, failed: 0, left: 2 }])
     expect(m.saveMenuReading.mock.calls.map(([, id]) => id)).toEqual(['a', 'b'])
     expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'a', expect.objectContaining({ status: 'proposed', dishes: [{ name: 'Falafel' }] }))
     expect(m.findMenus).toHaveBeenCalledWith('https://abe.example', expect.anything())
@@ -81,7 +81,8 @@ describe('readUnreadMenus', () => {
 
   it('keeps a menu it couldn’t find, saying why, so it isn’t read every morning', async () => {
     m.findMenus.mockResolvedValue([])
-    await readUnreadMenus('key', { perRun: 1 })
+    // Kept, but not a read: until Oct 26 the run said it read it.
+    expect(await readUnreadMenus('key', { perRun: 1 })).toEqual([{ community: 'philly', read: 0, failed: 1, left: 3 }])
     expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'a', expect.objectContaining({ status: 'failed', dishes: [] }))
   })
 
@@ -95,7 +96,7 @@ describe('readUnreadMenus', () => {
       t += 10
       return [source]
     })
-    expect(await readUnreadMenus('key', { perRun: 5, forMs: 15, now })).toEqual([{ community: 'philly', read: 1, left: 3 }])
+    expect(await readUnreadMenus('key', { perRun: 5, forMs: 15, now })).toEqual([{ community: 'philly', read: 1, failed: 0, left: 3 }])
     expect(m.findMenus).toHaveBeenCalledTimes(2)
   })
 

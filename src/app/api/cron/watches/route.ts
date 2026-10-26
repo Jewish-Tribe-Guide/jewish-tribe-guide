@@ -51,8 +51,11 @@ import { loadListings } from '@/lib/listingReads'
 export const maxDuration = 300
 
 /** No watch starts after this much of the run: one AI read can take half
- *  a minute (Oct 24: 31s), and the alerts still go out after the last. */
-const START_NO_WATCH_AFTER_MS = 200_000
+ *  a minute (Oct 24: 31s; 34s the slowest seen), and the alerts still go
+ *  out after the last, inside maxDuration. 200s until Oct 26, when the
+ *  night every shul's page is read for its new week (32 AI reads more)
+ *  would have left the menus, checked last, for the next night. */
+const START_NO_WATCH_AFTER_MS = 250_000
 
 async function eruvLines() {
   return runEruvLines().catch((err) => {
@@ -119,13 +122,16 @@ async function runAll(started = Date.now()): Promise<Body> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  const read = new Set(results.filter((r) => r.ok).map((r) => r.id))
+  // One its reads ran out for wasn't read (the user, Oct 26): not counted
+  // as checked, and its kind's line says Not reached.
+  const skipped = results.filter((r) => r.ok && r.skipped).length
+  const read = new Set(results.filter((r) => r.ok && !r.skipped).map((r) => r.id))
   // Without them, a listing's page goes by its label (watchGroupOf).
   const listings = await loadListings(queue.map((w) => w.communityId)).catch((err) => {
     console.error('[cron/watches] listing reads failed:', err)
     return undefined
   })
-  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
+  const run = { active: queue.length, ran: results.length - skipped, notWorking: results.filter((r) => !r.ok).length, left, skipped, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 

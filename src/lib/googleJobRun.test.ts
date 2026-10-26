@@ -267,6 +267,53 @@ describe('Not on Google', () => {
   })
 })
 
+// Oct 26: BZBI Early Childhood was matched to the temple. Keep as is
+// left the match, so Google still "checked" its phone.
+describe('Wrong place', () => {
+  it('drops the match and all it said, and nothing checks the listing until it’s found or not on Google', async () => {
+    await run.checkAgainstGoogle('philly', 'a1', NOW)
+    await run.keepTheListing('philly', 'a1', NOW)
+    Object.assign(m.rows[0].details as object, { businessStatus: 'CLOSED_TEMPORARILY', businessStatusKeptAt: '2026-10-20T10:00:00Z', googleDescription: 'A synagogue', verifiedPlaceId: 'ChIJ1' })
+    const p = await run.wrongPlace('philly', 'a1', NOW)
+    expect(p.matched).toBe(false)
+    expect(p.compare).toBeNull()
+    expect(p.decided ?? null).toBeNull()
+    expect(p.closure).toBeNull()
+    expect(by(p)).toEqual({ name: 'nothing', hours: 'nothing', phone: 'nothing', website: 'nothing' })
+    expect(p.section).toBe('to_check')
+    const details = m.rows[0].details as Record<string, unknown>
+    for (const k of ['placeId', 'verifiedPlaceId', 'googleFields', 'googleCheck', 'googleKept', 'googleSyncedAt', 'businessStatus', 'businessStatusKeptAt', 'googleDescription']) expect(details[k], k).toBeUndefined()
+    expect(details.googleWrong).toEqual(['ChIJ1'])
+    // The listing itself is as it was.
+    expect(details.website).toBe('https://bzbi.org/learn/preschool')
+    expect(m.rows[0].phone).toBe('(215) 735-5148')
+    expect(m.fetchPlaceSync).toHaveBeenCalledTimes(1)
+  })
+
+  it('its website, where read, still checks what it reads', async () => {
+    m.watches = [watch({})]
+    const p = await run.wrongPlace('philly', 'a1', NOW)
+    expect(by(p)).toEqual({ name: 'nothing', hours: 'website', phone: 'website', website: 'website' })
+  })
+
+  it('Find it on Google doesn’t offer it again; a second wrong one is added', async () => {
+    await run.wrongPlace('philly', 'a1', NOW)
+    m.searchPlaces.mockResolvedValue([
+      { placeId: 'ChIJ1', name: 'Temple Beth Zion-Beth Israel', address: '1800 Spruce St' },
+      { placeId: 'ChIJ2', name: 'BZBI Early Childhood Center', address: '1800 Spruce St' },
+    ])
+    expect((await run.findOnGoogle('philly', 'a1')).map((f) => f.placeId)).toEqual(['ChIJ2'])
+    await run.pickGooglePlace('philly', 'a1', 'ChIJ2', NOW)
+    await run.wrongPlace('philly', 'a1', NOW)
+    expect((m.rows[0].details as Record<string, unknown>).googleWrong).toEqual(['ChIJ1', 'ChIJ2'])
+  })
+
+  it('not for a listing with no match', async () => {
+    m.rows = [listing({ details: { placeId: null } })]
+    await expect(run.wrongPlace('philly', 'a1', NOW)).rejects.toThrow(/no Google match/)
+  })
+})
+
 describe('Find it on Google, then a pick', () => {
   it('searches by the listing’s name and address unless given another', async () => {
     m.searchPlaces.mockResolvedValue([])

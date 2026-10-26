@@ -1,7 +1,7 @@
 // GET|POST /api/cron/read-menus
 //
-// Reads the menus of the food places never read (menuPlaceRead.ts), a few
-// a morning, so the Main dishes page reads nothing when it's opened (the
+// Reads the menus of the food places never read (menuPlaceRead.ts), up to
+// 20 a morning in its five minutes, so the Main dishes page reads nothing when it's opened (the
 // user, Oct 22). Once a place has a reading, its menu watch keeps it
 // current (menuWatch.ts), and "Read now" reads it whenever an admin asks.
 // Meant to run daily (vercel.json).
@@ -15,7 +15,7 @@ import { readUnreadMenus } from '@/lib/menuPlaceRead'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { readMenusOutcome } from '@/lib/jobRuns'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 async function run(): Promise<NextResponse> {
   try {

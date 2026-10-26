@@ -149,7 +149,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/kind/synagogue?place=s1', name: 'Grocery Stores' })
     // Its reads spent: left for a later morning, its fingerprint unset.
     m.readShulWeek.mockClear()
-    expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     // Once read, it's read again only when it changes.
     expect(await runListingPageWatch({ ...found, pageHash: await hashOfPage(), lastCheck: lastRead(shul, shulCategory, 'differs') }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
@@ -215,7 +215,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     // From its own reads, never a changed page's.
     const budget = { aiReads: 1, compares: 0 }
     m.readShulWeek.mockClear()
-    expect(await runListingPageWatch(same, budget, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0 })
+    expect(await runListingPageWatch(same, budget, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     expect(budget.aiReads).toBe(1)
   })
@@ -387,7 +387,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
 
   it('shares the run’s AI reads: with them spent, the change waits for tomorrow', async () => {
     const budget = { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }
-    expect(await runListingPageWatch(changed, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(await runListingPageWatch(changed, budget, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(m.readShulWeek).not.toHaveBeenCalled()
     // Never the menus' own reads (MENU_READS_PER_RUN).
     expect(budget.menuReads).toBe(newMenuReadBudget().menuReads)
@@ -655,6 +655,29 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     const out = await runListingPageWatch({ ...watch, resourceId: 'mk1', pageHash: await hashOfPage(), lastCheck: lastWeek }, newMenuReadBudget(), { apiKey: 'k', now: NOW })
     expect(out).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
     expect(m.readMessage).not.toHaveBeenCalled()
+  })
+
+  // Oct 26: Lower Merion's men's page and Ohel Leah's what-to-expect waited
+  // behind suggestions approved Oct 23, and said "Waiting for you" with
+  // nothing to open.
+  describe('a difference that waited behind a suggestion', () => {
+    const behind = async () => ({ ...watch, resourceId: 'mk1', pageHash: await hashOfPage(), lastCheck: { ...lastRead(mikvah, mikvahCategory as typeof shulCategory, 'differs'), queue: 'waiting' as const } })
+
+    it('is read again in full once nothing waits for the listing, and files what still differs', async () => {
+      m.readMessage.mockResolvedValue(reading('19:30'))
+      expect(await runListingPageWatch(await behind(), newMenuReadBudget(), { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', queue: 'filed' } })
+    })
+
+    it('clears when the page now agrees', async () => {
+      m.readMessage.mockResolvedValue(reading('19:00'))
+      expect(await runListingPageWatch(await behind(), newMenuReadBudget(), { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees' } })
+    })
+
+    it('is left alone while a suggestion still waits', async () => {
+      m.pending = [{ id: 'p', payload: { details: {} } }]
+      expect(await runListingPageWatch(await behind(), newMenuReadBudget(), { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+      expect(m.readMessage).not.toHaveBeenCalled()
+    })
   })
 
   it('reads its hours with the any-field reader, and files only the hours that differ', async () => {
