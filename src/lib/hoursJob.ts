@@ -3,7 +3,8 @@ import { normalizeWatchUrl, settles, watchHealth, type Watch } from './watches'
 import type { HoursPage } from './hoursPages'
 import type { JobCounts } from './watchJobs'
 import type { CategoryConfig } from './categories'
-import { googleKeeps } from './contactRead'
+import { contactFields, googleKeeps } from './contactRead'
+import { HOSPITAL_CATEGORY } from './refuahMatch'
 
 // The hours job (the user, Oct 21): every place in a category with named
 // weekly hours (a mikvah's women's, men's and keilim hours) is read from
@@ -219,17 +220,44 @@ export function hoursWatchChanges(
   return { add, remove }
 }
 
-/** What a food place's website is read for (Main dishes board 3, Oct 22):
- *  its hours and its phone, each only when Google doesn't keep it on the
- *  listing. Its dishes are its menu's (menuWatch.ts). */
-export function homePageReads(category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>, place: Record<string, unknown>): ('hours' | 'phone')[] {
-  const out: ('hours' | 'phone')[] = []
+/** What a place's own website is read for (Main dishes board 3, Oct 22;
+ *  every kind of place since Oct 25): its hours, its phone and its email,
+ *  each only when Google doesn't keep it on the listing (contactFields;
+ *  an email is never Google's). A food place's dishes are its menu's
+ *  (menuWatch.ts). */
+export type HomePageRead = 'hours' | 'phone' | 'email'
+export function homePageReads(category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>, place: Record<string, unknown>): HomePageRead[] {
+  const out: HomePageRead[] = []
   if (category.detailFields.some((f) => f.key === 'hours' && f.type === 'hours') && !googleKeeps(place, 'hours')) out.push('hours')
-  if (category.hasPhone !== false && !googleKeeps(place, 'phone')) out.push('phone')
+  const kinds = new Set(contactFields(category, place).map((f) => f.kind))
+  if (kinds.has('phone')) out.push('phone')
+  if (kinds.has('email')) out.push('email')
   return out
 }
 
-/** A food place's home page watch: added when its website has something
+/** The kinds of place whose own websites are read for what Google doesn't
+ *  have (the user, Oct 25: "read phone, email and hours from the website
+ *  for the other kinds of place too, only where Google doesn't have
+ *  them"): all but those a job of their own reads (a shul's times, a
+ *  mikvah's hours, a hospital's Refuah page), with a phone, an email or
+ *  hours to read. Places only, not the site's other pages (the map,
+ *  zmanim). */
+export function ownSiteCategories<C extends Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields'>>(categories: readonly C[]): C[] {
+  return categories.filter(
+    (c) => c.kind === 'listing' && c.id !== HOSPITAL_CATEGORY && pageReadsFor(c)?.kind !== 'times' && !hoursJobCategories([c], 'hours').length && homePageReads(c, {}).length > 0,
+  )
+}
+
+/** Why a place's website is read, said on What's tracked (the user, Oct
+ *  25: make it clear it's for what Google doesn't have): "Not on Google",
+ *  "Google has no hours". '' once Google keeps them all. */
+export function siteGap(category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>, place: Record<string, unknown>): string {
+  if (typeof place.placeId !== 'string' || !place.placeId) return 'Not on Google'
+  const lacks = homePageReads(category, place)
+  return lacks.length ? `Google has no ${lacks.join(' or ')}` : ''
+}
+
+/** A place's home page watch: added when its website has something
  *  Google doesn't keep (homePageReads) and nothing watches that page yet;
  *  taken away, its own only, once Google keeps both. A page an admin gave,
  *  stopped or turned off is never touched. */

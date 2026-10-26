@@ -660,8 +660,8 @@ async function sendCommunityStatusChangeDigest(communitySlug: string, changes: S
 /** One suggestion a watch put in the queue, for its digest below. */
 export type WatchDigestItem = { name: string; what: string }
 
-/** The job page a watch's suggestions wait on (watchFindings.ts), by its
- *  admin path and its name ("Kosher certification"). */
+/** Where a watch's suggestions wait on the Watches tab (watchFindings.ts),
+ *  by its admin path and its name ("Synagogues"); no name, the tab. */
 export type WatchDigestPage = { path: string; name: string }
 
 /**
@@ -688,9 +688,9 @@ export async function sendWatchDigest(communitySlug: string, source: string, ite
     subject: items.length === 1 ? `${source}: ${items[0].name}` : `${source}: ${items.length} suggestions to check`,
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
       <h2 style="color:#1d4ed8;font-size:18px;">${escapeHtml(source)}</h2>
-      <p style="color:#334155;font-size:14px;">These are waiting ${page ? `on the Watches tab’s ${escapeHtml(page.name)} page, next to what each listing says` : 'in the moderation queue'}. Each one quotes what it was read from. Nothing changes until you approve it.</p>
+      <p style="color:#334155;font-size:14px;">These are waiting ${page ? `on the Watches tab${page.name ? `’s ${escapeHtml(page.name)} page` : ''}, next to what each listing says` : 'in the moderation queue'}. Each one quotes what it was read from. Nothing changes until you approve it.</p>
       <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
-      ${admin ? `<p style="font-size:13px;"><a href="${admin}${page ? escapeHtml(page.path) : ''}" style="color:#1d4ed8;">${page ? `Open ${escapeHtml(page.name)}` : 'Open the moderation queue'}</a></p>` : ''}
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}${page ? escapeHtml(page.path) : ''}" style="color:#1d4ed8;">${page ? `Open ${page.name ? escapeHtml(page.name) : 'the Watches tab'}` : 'Open the moderation queue'}</a></p>` : ''}
     </div>`,
   })
 }

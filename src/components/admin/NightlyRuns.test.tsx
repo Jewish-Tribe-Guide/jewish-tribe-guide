@@ -2,81 +2,133 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NIGHTLY_JOBS, type JobRun } from '@/lib/jobRuns'
-import NightlyRuns, { type NightlyRunsLoaded } from './NightlyRuns'
+import type { NightKindView } from '@/lib/nightKinds'
+import NightlyRuns from './NightlyRuns'
 
-const NOW = Date.parse('2026-10-24T14:00:00Z')
-const ago = (h: number) => new Date(NOW - h * 3_600_000).toISOString()
-
-function run(over: Partial<JobRun>): JobRun {
-  return { id: Math.random().toString(36), job: 'watches', startedAt: ago(6), finishedAt: ago(5.9), ok: true, summary: 'Checked 107 of 107 watches', warning: null, error: null, ...over }
+function kind(over: Partial<NightKindView>): NightKindView {
+  return { id: 'eruvs', name: 'Eruvs', about: 'Reads each eruv’s website for its hotline and email alerts.', when: '3:00 AM', count: '5 of 5 read', trouble: null, misses: [], tracked: [], nights: [], ...over }
 }
 
-function loaded(runs: Partial<Record<JobRun['job'], JobRun[]>>): NightlyRunsLoaded {
-  return { available: true, jobs: NIGHTLY_JOBS.map((j) => ({ ...j, runs: runs[j.id] ?? [] })) }
-}
+const GOOGLE = kind({ id: 'google', name: 'Google', about: 'Reads every place matched on Google.', when: '2:00 AM', count: '140 places read', nights: [{ date: 'Oct 25', result: '140 read', tone: 'good' }, { date: 'Oct 24', result: 'Didn’t run', tone: 'bad' }] })
+const ERUVS = kind({
+  count: '1 of 5 read',
+  trouble: '4 never read',
+  misses: [{ name: 'Lower Merion Eruv', why: 'Never read', page: 'kind/eruvin?place=lm' }, { name: 'A page', why: 'Didn’t load', page: '' }],
+  nights: [{ date: 'Oct 25', result: '1 of 5 read', tone: 'bad' }],
+})
 
-const row = (name: string) => screen.getAllByTestId('nightly-job').find((r) => within(r).queryByText(name))!
+const show = (kinds: NightKindView[], linkSender?: (id: string) => React.ReactNode) => render(<NightlyRuns runs={{ available: true, kinds }} base="/philly/admin" linkSender={linkSender} />)
+const lastNight = () => screen.getByRole('region', { name: 'What’s tracked' })
+const user = () => userEvent.setup()
 
 afterEach(cleanup)
 
-describe('Nightly runs on the Watches tab', () => {
-  it('a row per nightly job, each saying how it works', () => {
-    render(<NightlyRuns runs={loaded({})} now={NOW} />)
-    expect(screen.getAllByTestId('nightly-job')).toHaveLength(4)
-    expect(within(row('Walks')).getByText(/Works out walking times along the streets/)).toBeTruthy()
-    expect(within(row('Walks')).getByText('Not run yet')).toBeTruthy()
+describe('What’s tracked on the Watches tab', () => {
+  it('closed, says everything was read', () => {
+    show([GOOGLE, kind({})])
+    expect(lastNight()).toHaveTextContent('What’s trackedEverything read')
+    expect(screen.queryAllByTestId('night-kind')).toHaveLength(0)
   })
 
-  it('what the last run did, and when', () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({})] })} now={NOW} />)
-    expect(within(row('Watches')).getByText('Worked')).toBeTruthy()
-    expect(within(row('Watches')).getByText(/Checked 107 of 107 watches/)).toBeTruthy()
+  it('closed, says which kinds need a look', () => {
+    show([GOOGLE, ERUVS, kind({ id: 'menus', name: 'Menus', count: 'Didn’t run since Oct 22' })])
+    expect(lastNight()).toHaveTextContent('Eruvs and menus need a look')
   })
 
-  // Oct 24's run, as it would have shown: started, never finished.
-  it('a run that never finished shows as cut off, without opening anything', () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({ finishedAt: null, ok: null, summary: null })] })} now={NOW} />)
-    expect(within(row('Watches')).getByText('Cut off')).toBeTruthy()
-    expect(within(row('Watches')).getByText(/stopped before it finished/)).toBeTruthy()
+  it('opened, a line per kind with its time and what it read', async () => {
+    show([GOOGLE, ERUVS])
+    await user().click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    const rows = screen.getAllByTestId('night-kind')
+    expect(rows.map((r) => r.textContent)).toEqual(['Google2:00 AM140 places read', 'Eruvs3:00 AM1 of 5 read · 4 never read'])
   })
 
-  it('a failed run shows its error', () => {
-    render(<NightlyRuns runs={loaded({ 'sync-hours': [run({ job: 'sync-hours', ok: false, error: 'Google answered 403' })] })} now={NOW} />)
-    expect(within(row('Google hours')).getByText('Failed')).toBeTruthy()
-    expect(within(row('Google hours')).getByText(/Google answered 403/)).toBeTruthy()
+  // FinalNightly's Eruvs, opened.
+  it('a kind opens to what it reads, what wasn’t read, each a link, and its nights', async () => {
+    show([GOOGLE, ERUVS])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    await u.click(screen.getByRole('button', { name: /^Eruvs/ }))
+    const row = screen.getAllByTestId('night-kind')[1]
+    expect(within(row).getByText('Reads each eruv’s website for its hotline and email alerts.')).toBeTruthy()
+    const misses = within(row).getByRole('list', { name: 'Eruvs: not read last night' })
+    expect(within(misses).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([['Lower Merion EruvNever read', '/philly/admin/watches/kind/eruvin?place=lm']])
+    // A page with no job page of its own (added by hand) isn't a link.
+    expect(within(misses).getAllByRole('listitem')[1]).toHaveTextContent('A pageDidn’t load')
+    expect(within(row).getByRole('list', { name: 'Eruvs: last 14 nights' })).toHaveTextContent('Oct 251 of 5 read')
   })
 
-  it('a run that ran out of time says what it left', () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({ summary: 'Checked 80 of 107 watches', warning: 'Ran out of time: 27 left for the next night' })] })} now={NOW} />)
-    expect(within(row('Watches')).getByText('Needs a look')).toBeTruthy()
-    expect(within(row('Watches')).getByText('Ran out of time: 27 left for the next night')).toBeTruthy()
+  it('a kind with nothing missed says so', async () => {
+    show([GOOGLE])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    await u.click(screen.getByRole('button', { name: /^Google/ }))
+    expect(screen.getByText('Nothing missed last night')).toBeTruthy()
+    expect(within(screen.getByRole('list', { name: 'Google: last 14 nights' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Oct 25140 read', 'Oct 24Didn’t run'])
   })
 
-  it('a job with no run since the night before last didn’t run', () => {
-    render(<NightlyRuns runs={loaded({ 'walk-routes': [run({ job: 'walk-routes', startedAt: ago(54), finishedAt: ago(53.9) })] })} now={NOW} />)
-    expect(within(row('Walks')).getByText('Didn’t run')).toBeTruthy()
-    expect(within(row('Walks')).getByText(/Hasn’t run since/)).toBeTruthy()
+  it('while loading, when it couldn’t load, and before migration 086', () => {
+    const { rerender } = render(<NightlyRuns runs={undefined} base="/philly/admin" />)
+    expect(lastNight()).toHaveTextContent('Loading…')
+    rerender(<NightlyRuns runs={null} base="/philly/admin" />)
+    expect(lastNight()).toHaveTextContent('Couldn’t load what’s tracked')
+    rerender(<NightlyRuns runs={{ available: false, kinds: [] }} base="/philly/admin" />)
+    expect(lastNight()).toHaveTextContent(/needs database migration 086/)
+    expect(within(lastNight()).getByRole('button')).toBeDisabled()
   })
 
-  // The latest run is already the row's line; opening it adds the ones before.
-  it('opening a row shows the runs before the latest', async () => {
-    const runs = [run({ startedAt: ago(6) }), run({ startedAt: ago(30), finishedAt: null, ok: null, summary: null }), run({ startedAt: ago(54), summary: 'Checked 99 of 107 watches' })]
-    render(<NightlyRuns runs={loaded({ watches: runs })} now={NOW} />)
-    await userEvent.setup().click(within(row('Watches')).getByRole('button'))
-    const list = screen.getByRole('list', { name: 'Watches: earlier runs' })
-    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Didn’t finish'), expect.stringContaining('Checked 99 of 107 watches')])
+  // Oct 25 (the user): everything a kind tracks, not only what it missed.
+  it('a kind opens to everything it tracks, what needs a look first', async () => {
+    show([
+      kind({
+        tracked: [
+          { name: 'Northeast Eruv', status: 'Not loading since Oct 22', bad: true, page: 'kind/eruvin?place=ne' },
+          { name: 'Center City Eruv', status: 'Read Oct 25', bad: false, page: 'kind/eruvin?place=cc' },
+          { name: 'A page', status: 'Read Oct 25', bad: false, page: '' },
+        ],
+      }),
+    ])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    await u.click(screen.getByRole('button', { name: /^Eruvs/ }))
+    expect(screen.queryByRole('list', { name: 'Eruvs: all tracked' })).toBeNull()
+    await u.click(screen.getByRole('button', { name: 'All 3 tracked' }))
+    const all = screen.getByRole('list', { name: 'Eruvs: all tracked' })
+    expect(within(all).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Northeast EruvNot loading since Oct 22', 'Center City EruvRead Oct 25', 'A pageRead Oct 25'])
+    expect(within(all).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/philly/admin/watches/kind/eruvin?place=ne', '/philly/admin/watches/kind/eruvin?place=cc'])
+    expect(within(all).getByText('Not loading since Oct 22')).toHaveClass('text-amber-800')
   })
 
-  it('opening a row with one run says there are none before it', async () => {
-    render(<NightlyRuns runs={loaded({ watches: [run({})] })} now={NOW} />)
-    await userEvent.setup().click(within(row('Watches')).getByRole('button'))
-    expect(screen.queryByRole('list', { name: 'Watches: earlier runs' })).toBeNull()
-    expect(within(row('Watches')).getByText('No earlier runs.')).toBeTruthy()
+  // Newsletters come as they're sent: what needs a look, not last night,
+  // and a sender not linked to a shul gets its Link there.
+  it('Newsletters: what needs a look, a sender to link linked in place', async () => {
+    const news = kind({
+      id: 'newsletters', name: 'Newsletters', when: null, count: '2 newsletters · last email Oct 25', trouble: '1 to link',
+      misses: [{ name: 'info@lms.org', why: 'Not linked to a shul', page: '', link: 'w1' }],
+      tracked: [{ name: 'info@lms.org', status: 'Not linked to a shul', bad: true, page: '' }, { name: 'BZBI', status: 'Email Oct 25', bad: false, page: 'kind/synagogue?place=bzbi' }],
+    })
+    show([news], (id) => <span>Link box for {id}</span>)
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    expect(screen.getByTestId('night-kind')).toHaveTextContent('Newsletters2 newsletters · last email Oct 25 · 1 to link')
+    await u.click(screen.getByRole('button', { name: /^Newsletters/ }))
+    const needs = screen.getByRole('list', { name: 'Newsletters: needs a look' })
+    expect(needs).toHaveTextContent('info@lms.orgNot linked to a shulLink box for w1')
+    expect(screen.queryByText('Not read last night')).toBeNull()
   })
-
-  it('says when migration 086 hasn’t been run', () => {
-    render(<NightlyRuns runs={{ available: false, jobs: [] }} now={NOW} />)
-    expect(screen.getByText(/needs database migration 086/)).toBeTruthy()
+  // Links are checked once a week: what doesn't open needs a look, on its
+  // place's kind page.
+  it('Links: what doesn’t open needs a look, not last night', async () => {
+    const links = kind({
+      id: 'links', name: 'Links', when: 'Oct 25, 5:00 AM', count: '82 links', trouble: '1 doesn’t open', nights: [],
+      misses: [{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 25', page: 'kind/restaurant' }],
+      tracked: [{ name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 25', bad: true, page: 'kind/restaurant' }],
+    })
+    show([links])
+    const u = user()
+    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    await u.click(screen.getByRole('button', { name: /^Links/ }))
+    const needs = screen.getByRole('list', { name: 'Links: needs a look' })
+    expect(within(needs).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/kind/restaurant')
+    expect(screen.queryByText('Not read last night')).toBeNull()
   })
 })

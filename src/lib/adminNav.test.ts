@@ -114,7 +114,7 @@ describe('adminNavPosition', () => {
   const cases: [string, AdminGroup, AdminTab][] = [
     ['/philly/admin', 'todo', 'queue'],
     ['/philly/admin/watches', 'todo', 'watches'],
-    ['/philly/admin/watches/kosher', 'todo', 'watches'],
+    ['/philly/admin/watches/kind/restaurant', 'todo', 'watches'],
     ['/philly/admin/questions', 'todo', 'questions'],
     ['/philly/admin/responses', 'todo', 'responses'],
     ['/philly/admin/categories', 'listings', 'categories'],

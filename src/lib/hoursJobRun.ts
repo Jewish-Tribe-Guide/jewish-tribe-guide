@@ -6,10 +6,11 @@ import { fetchPublic, troubleClause, type Trouble } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readListingPage, type PageSource } from '@/lib/listingPageRun'
 import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
-import { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_JOBS, homePageWatchChanges, hoursJobCategories, hoursSearchedUrl, hoursWatchChanges, isHoursOff, isHoursSearched, jobWords, looksLikeHours, searchReason, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
+import { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_JOBS, homePageWatchChanges, hoursJobCategories, ownSiteCategories, hoursSearchedUrl, hoursWatchChanges, isHoursOff, isHoursSearched, jobWords, looksLikeHours, searchReason, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
+import { runAndRecord } from '@/lib/watchRunner'
+import { siteCategories } from '@/lib/watchFindings'
 import type { Watch } from '@/lib/watches'
-import { dishCategories } from '@/lib/watchFindings'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
 
@@ -81,10 +82,10 @@ export async function hoursJobPlaces(community: string, job: PageJob = 'hours'):
   return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow).sort((a, b) => a.name.localeCompare(b.name)) }
 }
 
-/** A community's food places with main dishes, and their categories
- *  (Main dishes' places). */
-async function dishPlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
-  const categories = dishCategories(await listCategoriesUncached(community))
+/** A community's places whose own websites are read for what Google
+ *  doesn't have (ownSiteCategories), and their categories. */
+async function ownSitePlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const categories = ownSiteCategories(await listCategoriesUncached(community))
   if (!categories.length) return { categories, places: [] }
   const { data, error } = await getAdminClient()
     .from('resource')
@@ -97,6 +98,16 @@ async function dishPlaces(community: string): Promise<{ categories: CategoryConf
     )
   if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
   return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow) }
+}
+
+/** The places whose website findings wait under their kind's row on the
+ *  Watches tab (siteCategories): ownSitePlaces less the food places, whose
+ *  wait on Main dishes. */
+export async function sitePlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const own = await ownSitePlaces(community)
+  const categories = siteCategories(own.categories)
+  const ids = new Set(categories.map((c) => c.id))
+  return { categories, places: own.places.filter((p) => ids.has(p.category)) }
 }
 
 export const websiteOf = (p: DirectoryResource): string | null => (typeof p.website === 'string' && p.website.trim() ? p.website.trim() : null)
@@ -138,8 +149,8 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
   for (const { slug } of (data ?? []) as { slug: string }[]) {
     const jobs = await Promise.all(PAGE_JOBS.map(async (job) => (await hoursJobPlaces(slug, job)).places.map((place) => ({ place, job }))))
     const places = jobs.flat()
-    const food = await dishPlaces(slug)
-    if (!places.length && !food.places.length) continue
+    const own = await ownSitePlaces(slug)
+    if (!places.length && !own.places.length) continue
     const { watches, available } = await listWatches(slug)
     if (!available) continue
     const searches = await Promise.all(
@@ -166,10 +177,10 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
       }
       if (!watches.some((w) => w.resourceId === place.id && isHoursOff(w))) await recordSearch(slug, place, job, searchReason(website, got, pages, job), watches)
     }
-    // A food place's website, for its hours and phone when Google doesn't
+    // A place's website, for its hours, phone and email when Google doesn't
     // keep them (homePageWatchChanges). No search: its home page is it.
-    for (const place of food.places) {
-      const category = food.categories.find((c) => c.id === place.category)
+    for (const place of own.places) {
+      const category = own.categories.find((c) => c.id === place.category)
       if (!category) continue
       const { add, remove } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
       for (const w of add) {
@@ -183,4 +194,24 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     out.push({ community: slug, added, removed })
   }
   return out
+}
+
+/** One place's website, watched and read now rather than at the morning's
+ *  run, when the admin has just said it's Not on Google (the user, Oct 25:
+ *  "CKids Philly doesn't check website once I said it's not on google").
+ *  Its page is read in full, as Read it now does, so what it says is in
+ *  before the admin is made the checker of anything. Nothing for a kind
+ *  of place whose website isn't read, or a place with none. Returns
+ *  whether a page was read. */
+export async function readOwnSiteNow(community: string, placeId: string): Promise<boolean> {
+  const own = await ownSitePlaces(community)
+  const place = own.places.find((p) => p.id === placeId)
+  const category = place && own.categories.find((c) => c.id === place.category)
+  if (!place || !category) return false
+  const { watches, available } = await listWatches(community)
+  if (!available) return false
+  const { add } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
+  const added = (await Promise.all(add.map((w) => addWatch(community, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })))).filter((w): w is Watch => !!w)
+  for (const w of added) await runAndRecord(w, undefined, undefined, { full: true })
+  return added.length > 0
 }

@@ -4,6 +4,7 @@ import { itemsField } from './listingView'
 import { keepsMenuLink, MENU_LINK_KEY, menuWebsite, readElsewhere, readMenuLink } from './menuLink'
 import { isOrderingApp, type MenuDish, type MenuSource } from './menuReader'
 import { MENU_WATCH_CREATOR } from './watches'
+import { readerMarks, type ListedDishes, type ReadDish } from './dishProposal'
 import type { DirectoryResource } from '@/types'
 
 export { MENU_WATCH_CREATOR }
@@ -117,6 +118,16 @@ export function newDishes(read: MenuDish[], listed: string[]): MenuDish[] {
   return read.filter((d) => !have.has(d.name.trim().toLowerCase()))
 }
 
+/** The listing's dishes its menu's last reading never looked for
+ *  (dishProposal's not_looked): added since, or by hand (the user, Oct 26:
+ *  they weren't being picked up, since an unchanged menu isn't read). The
+ *  daily run reads the menu again for them. None after a reading that named
+ *  no dishes, or only from pictures: reading it again would say no more. */
+export function dishesToLookFor(listed: ListedDishes, kept: { dishes: readonly Pick<ReadDish, 'name' | 'picture'>[]; missing?: readonly string[] } | null): string[] {
+  if (!kept?.dishes.some((d) => !d.picture)) return []
+  return [...readerMarks(listed, kept)].filter(([, mark]) => mark === 'not_looked').map(([name]) => name)
+}
+
 function dishDifferences(found: MenuDish[], missing: readonly string[]): string {
   const names = found.map((d) => d.name)
   const added = names.length ? ` ${names.length === 1 ? 'One dish isn’t' : `${names.length} dishes aren’t`} on the listing yet: ${names.join(', ')}.` : ''
@@ -124,9 +135,10 @@ function dishDifferences(found: MenuDish[], missing: readonly string[]): string 
   return `${added}${gone}`
 }
 
-/** The reading's note on the Main dishes tab. */
-export function changedMenuNote(found: MenuDish[], missing: readonly string[] = []): string {
-  return `Its menu changed.${dishDifferences(found, missing)}`
+/** The reading's note on the Main dishes tab. `changed` false: an
+ *  unchanged menu read again for dishes added since (dishesToLookFor). */
+export function changedMenuNote(found: MenuDish[], missing: readonly string[] = [], changed = true): string {
+  return changed ? `Its menu changed.${dishDifferences(found, missing)}` : dishDifferences(found, missing).trim()
 }
 
 /** The note on a reading from the page a menu moved to. Approving it makes

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedMenuNote, listedDishes, menuHash, menuMovedNote, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches, type FoundReading } from './menuWatch'
+import { changedMenuNote, dishesToLookFor, listedDishes, menuHash, menuMovedNote, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches, type FoundReading } from './menuWatch'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 
 const food = makeCategory({
@@ -158,5 +158,30 @@ describe('newDishes', () => {
   it('says what’s new on the Main dishes tab', () => {
     expect(changedMenuNote([read[1]])).toBe('Its menu changed. One dish isn’t on the listing yet: Shawarma.')
     expect(changedMenuNote(read.slice(1))).toBe('Its menu changed. 2 dishes aren’t on the listing yet: Shawarma, Burgers.')
+  })
+})
+
+// The user, Oct 26: dishes added by hand weren't being picked up. A menu
+// that doesn't change isn't read by the AI, so on production nothing had
+// looked for any of them since they were added.
+describe('dishesToLookFor', () => {
+  const listed = { dishes: ['Salads', 'Bagels', 'Babka'], menuDated: ['Salads'] }
+  const d = (name: string, picture?: true) => ({ name, ...(picture ? { picture } : {}) })
+
+  it('the dishes its last reading of the menu’s words never looked for', () => {
+    expect(dishesToLookFor(listed, { dishes: [d('Salads')], missing: ['Babka'] })).toEqual(['Bagels'])
+    expect(dishesToLookFor(listed, { dishes: [d('Salads'), d('Bagels')], missing: ['Babka'] })).toEqual([])
+  })
+
+  it('none after a reading with no dishes, or only from pictures, or none at all', () => {
+    expect(dishesToLookFor(listed, { dishes: [], missing: [] })).toEqual([])
+    expect(dishesToLookFor(listed, { dishes: [d('Salads', true)] })).toEqual([])
+    expect(dishesToLookFor(listed, null)).toEqual([])
+  })
+})
+
+describe('changedMenuNote: an unchanged menu read for dishes added since', () => {
+  it('says what differs, not that the menu changed', () => {
+    expect(changedMenuNote([], ['Bagels'], false)).toBe('One listed dish isn’t on it any more: Bagels.')
   })
 })

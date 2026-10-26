@@ -3,7 +3,6 @@ import {
   MATCH_MILES,
   REFUAH_NOT_LISTED_CREATOR,
   givenLine,
-  isHospitalWatch,
   isNotOnRefuah,
   nearestRefuah,
   notOnRefuahUrl,
@@ -127,9 +126,6 @@ describe('Not on Refuah', () => {
     const marker = { id: 'n', url: notOnRefuahUrl('pa'), resourceId: 'pa', createdBy: REFUAH_NOT_LISTED_CREATOR }
     expect(isNotOnRefuah(marker)).toBe(true)
     expect(wantedRefuahWatches(hospitals, matchRefuah(hospitals, LIST), [marker])).toEqual([])
-    // Its address is no Refuah hospital's page, so nothing ever reads it.
-    expect(isHospitalWatch(marker)).toBe(true)
-    expect(isHospitalWatch({ url: 'https://bzbi.org/', createdBy: null })).toBe(false)
   })
 
   it('nearestRefuah lists the nearest few, nearest first', () => {

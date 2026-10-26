@@ -169,16 +169,5 @@ export function detailsRows(now: Pick<Eruv, EruvSuggestionField>, next: Partial<
   })
 }
 
-/** The box's pill: "1 change", "1 new", "2 updates", else "Same". */
-export function detailsPill(rows: readonly DetailsRow[]): string {
-  const lit = rows.filter((r) => r.mark !== 'same')
-  const n = lit.length
-  if (!n) return 'Same'
-  const kinds = new Set(lit.map((r) => r.mark))
-  if (kinds.size > 1) return `${n} updates`
-  if (kinds.has('new')) return `${n} new`
-  return `${n} change${n === 1 ? '' : 's'}`
-}
-
 /** What Use this takes: the rows it changes. */
 export const detailsKeysToUse = (rows: readonly DetailsRow[]): EruvSuggestionField[] => rows.filter((r) => r.mark !== 'same').map((r) => r.key)

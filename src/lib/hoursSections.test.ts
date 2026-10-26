@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { hoursDays, hoursRows, hoursSections, noteChanged, offeredSections, openClose, readSectionSource, rebaseSection, sectionChanges, sectionOfKeys, splitSections } from './hoursSections'
+import { hoursDays, hoursRows, hoursSections, noteChanged, offeredSections, openClose, readSectionSource, rebaseSection, sectionOfKeys, splitSections } from './hoursSections'
 
 // The mikvah category as dev has it (Oct 22).
 const mikvah = makeCategory({
@@ -110,8 +110,6 @@ describe('a section’s rows, as its box shows them', () => {
       { days: 'Sunday', text: '7:30–9:30 PM', was: 'Closed', mark: 'changed' },
       { days: 'Monday to Thursday', text: '7:30–9:30 PM', was: '8:30–10:30 PM', mark: 'changed' },
     ])
-    expect(sectionChanges(rows, false)).toBe(2)
-    expect(sectionChanges(rows, true)).toBe(3)
   })
 
   it('a section that’s the same is its hours, unmarked; none at all is None', () => {

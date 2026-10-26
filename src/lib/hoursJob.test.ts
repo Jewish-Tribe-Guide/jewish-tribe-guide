@@ -12,6 +12,8 @@ import {
   homePageReads,
   homePageWatchChanges,
   looksLikeHours,
+  ownSiteCategories,
+  siteGap,
   timesPagesToRead,
   PAGE_STOPPED_CREATOR,
   sourceLine,
@@ -139,6 +141,26 @@ describe('hoursWatchChanges', () => {
   })
 })
 
+// Oct 25 (the user): "read phone, email and hours from the website for
+// the other kinds of place too, only where Google doesn't have them".
+describe('the kinds of place whose own websites are read', () => {
+  const hours = { key: 'hours', label: 'Hours', type: 'hours' } as CategoryConfig['detailFields'][number]
+  const kinds = [
+    { id: 'restaurant', hasPhone: true, detailFields: [hours] },
+    { id: 'grocery', hasPhone: true, detailFields: [hours] },
+    { id: 'hotel', hasPhone: true, detailFields: [] },
+    { id: 'cemetery', hasPhone: false, detailFields: [] },
+    { id: 'synagogue', hasPhone: true, detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] },
+    { id: 'mikvah', hasPhone: true, detailFields: [hours, { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' }] },
+    { id: 'hospital', hasPhone: true, detailFields: [hours] },
+    { id: 'zmanim', kind: 'zmanim', hasPhone: true, detailFields: [] },
+  ].map((c) => ({ kind: 'listing', ...c })) as Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields'>[]
+
+  it('every kind with a phone, an email or hours, but those a job of their own reads', () => {
+    expect(ownSiteCategories(kinds).map((c) => c.id)).toEqual(['restaurant', 'grocery', 'hotel'])
+  })
+})
+
 describe('a food place’s home page (Main dishes board 3)', () => {
   const food = { hasPhone: true, detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }, { key: 'dishes', label: 'Main dishes', type: 'tags' }] as CategoryConfig['detailFields'] }
   // Chalavita on live: no Google match, so its hours and phone are its website's.
@@ -149,6 +171,20 @@ describe('a food place’s home page (Main dishes board 3)', () => {
     expect(homePageReads(food, { placeId: 'g', googleFields: ['hours'] })).toEqual(['phone'])
     expect(homePageReads(food, { placeId: 'g', googleFields: ['hours', 'phone'] })).toEqual([])
     expect(homePageReads({ hasPhone: false, detailFields: [] }, {})).toEqual([])
+  })
+
+  // Oct 25 (the user): phone, email and hours, for every kind of place.
+  it('its email too, which is never Google’s, and a phone field of its own', () => {
+    const office = { hasPhone: true, detailFields: [{ key: 'office_email', label: 'Email', type: 'text' }, { key: 'office_phone', label: 'Office phone', type: 'tel' }] as CategoryConfig['detailFields'] }
+    expect(homePageReads(office, { placeId: 'g', googleFields: ['phone'] })).toEqual(['phone', 'email'])
+    expect(homePageReads({ hasPhone: true, detailFields: office.detailFields.slice(0, 1) }, { placeId: 'g', googleFields: ['phone'] })).toEqual(['email'])
+  })
+
+  it('says why it’s read', () => {
+    expect(siteGap(food, {})).toBe('Not on Google')
+    expect(siteGap(food, { placeId: 'g', googleFields: ['phone'] })).toBe('Google has no hours')
+    expect(siteGap(food, { placeId: 'g', googleFields: ['name'] })).toBe('Google has no hours or phone')
+    expect(siteGap(food, { placeId: 'g', googleFields: ['hours', 'phone'] })).toBe('')
   })
 
   it('is watched once, as its website, unless another watch already reads that page', () => {

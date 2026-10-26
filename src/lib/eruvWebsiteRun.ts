@@ -9,6 +9,8 @@
 import { createHash } from 'node:crypto'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
+import { listCategoriesUncached } from '@/lib/categoryStore'
+import { findingPage } from '@/lib/watchFindings'
 import { submitEruvUpdate } from '@/lib/submissionStore'
 import { listEruvimForAdmin, type AdminEruv } from '@/lib/eruvStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
@@ -126,7 +128,8 @@ export async function runEruvWebsiteWatch(community: string, url: string, fetche
     queue,
   }
   if (filed.length) {
-    await sendWatchDigest(community, 'Eruv websites', filed, { path: `/${community}/admin/watches/eruv`, name: 'Eruv status' }).catch((err) =>
+    const kind = (await listCategoriesUncached(community)).find((c) => c.kind === 'eruv')
+    await sendWatchDigest(community, 'Eruv websites', filed, findingPage(community, kind)).catch((err) =>
       console.error('[watch-eruv-website] digest failed:', err),
     )
   }

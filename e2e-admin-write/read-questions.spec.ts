@@ -25,7 +25,9 @@ function getAdminClient() {
 const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.replace(/\d/g, (d) => 'ghijklmnop'[Number(d)])
 const key = `qqzv read ${suffix}`
 
-const word = `qqzv${suffix}`
+// Ends in x: the search reads a word ending in s as a plural and teaches
+// it without the s, which failed this one run in 26.
+const word = `qqzv${suffix}x`
 
 test.afterEach(async () => {
   await getAdminClient().from('question_reading').delete().eq('community_id', 'philly').in('key', [key, word])

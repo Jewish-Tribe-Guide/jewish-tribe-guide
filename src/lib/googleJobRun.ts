@@ -4,6 +4,7 @@ import { isCategorySyncEligible, type CategoryConfig } from './categories'
 import { fetchPlaceSync, namesOverlap, nextGoogleFields, searchPlaces, syncMayWrite, type PlaceSync } from './googlePlaces'
 import { formatHoursSummary } from './hours'
 import { listWatches } from './watchStore'
+import { readOwnSiteNow } from './hoursJobRun'
 import { MENU_WATCH_CREATOR, watchHealth, type Watch } from './watches'
 import { isListingPageWatch, pageReadsFor } from './listingPageWatch'
 import { approveSubmission, submitListingUpdate } from './submissionStore'
@@ -32,7 +33,8 @@ import type { ResourceSubmission } from '@/types'
 //                its Website, one a listing-page job reads its hours from
 //                for its Hours (pageReadsFor), and any listing page for its
 //                Phone (contactRead.ts reads it off every one).
-//   You          Keep the listing, or Not on Google (details.googleKept).
+//   You          Keep the listing, or Not on Google (details.googleKept),
+//                for a year.
 //   Nothing      none of these.
 // What Check against Google found is kept on the listing
 // (details.googleCheck), so Use Google's and Keep the listing need no
@@ -53,6 +55,9 @@ type Row = {
 type CheckValues = Partial<Record<CheckedField, unknown>>
 type StoredCheck = { at: string; values: CheckValues; decided?: { what: 'used' | 'kept'; at: string } }
 
+/** A field you checked is yours this long, then nothing checks it again
+ *  (agreed Oct 24): a year on, the listing is worth a second look. */
+const KEPT_FOR_MS = 365 * 86_400_000
 /** A check's answer stays usable this long; after it, it's asked again. */
 const CHECK_KEEPS_MS = 7 * 86_400_000
 /** "Used Oct 22" shows this long after the decision. */
@@ -134,7 +139,7 @@ export function fieldRows(row: Row, category: CategoryConfig, watches: readonly 
         ? { kind: 'google', ...(failing ? { at: readAt } : {}) }
         : site.has(field)
           ? { kind: 'website' }
-          : typeof kept[field] === 'string'
+          : typeof kept[field] === 'string' && now - Date.parse(kept[field]) < KEPT_FOR_MS
             ? { kind: 'you', at: kept[field] }
             : { kind: 'nothing' }
     return { field, label: CHECKED_LABELS[field], value: shown(field, value), by }
@@ -146,7 +151,11 @@ function closureOf(details: Record<string, unknown>): GoogleClosure | null {
   if (status !== 'CLOSED_TEMPORARILY' && status !== 'CLOSED_PERMANENTLY') return null
   // Every read asks whether it's open; a status-only read asks nothing else.
   const reads = [isoOr(details.googleSyncedAt), isoOr(details.googleStatusCheckedAt)].filter((d): d is string => !!d).sort()
-  return { status, shownOpen: details.businessStatusOverride === 'OPERATIONAL', since: isoOr(details.businessStatusChangedAt), readAt: reads.at(-1) ?? null }
+  const since = isoOr(details.businessStatusChangedAt)
+  // Kept before Google last changed its answer is no longer an answer.
+  const keptAt = isoOr(details.businessStatusKeptAt)
+  const kept = keptAt && (!since || keptAt >= since) ? keptAt : null
+  return { status, shownOpen: details.businessStatusOverride === 'OPERATIONAL', since, readAt: reads.at(-1) ?? null, kept }
 }
 
 /** What a stored check left to decide, set against the listing as it is. */
@@ -320,11 +329,26 @@ export async function keepTheListing(community: string, id: string, now = Date.n
   return onePlace(community, id, now)
 }
 
-/** Not on Google: said once, and its fields nothing checks become yours. */
+/** Not on Google: said once. Its website, when its kind's is read for
+ *  what Google doesn't have, is watched and read at once (readOwnSiteNow),
+ *  and only the fields nothing checks after that become yours: until Oct
+ *  25 they all did, and a place no page had read yet showed as up to
+ *  date, with nothing checking it. */
 export async function notOnGoogle(community: string, id: string, now = Date.now()): Promise<GooglePlace> {
-  const [{ row, category }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
-  if (matchOf(row.details ?? {})) throw new GoogleJobError('This listing has a Google match.', 400)
-  await writeDetails(community, id, { ...(row.details ?? {}), notOnGoogle: new Date(now).toISOString(), googleKept: keptNow(row, category, watches, now) })
+  const { row, category } = await loadOne(community, id)
+  const details = { ...(row.details ?? {}) }
+  if (matchOf(details)) {
+    // A match Google stopped answering for is dropped (agreed Oct 24); a
+    // live one stays.
+    if (!isoOr(details.lastSyncError)) throw new GoogleJobError('This listing has a Google match.', 400)
+    for (const k of ['placeId', 'lastSyncError', 'lastSyncFailedAt', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt']) delete details[k]
+  }
+  const said = { ...details, notOnGoogle: new Date(now).toISOString() }
+  await writeDetails(community, id, said)
+  // A page that won't read leaves its fields to you, as before.
+  await readOwnSiteNow(community, id).catch((err) => console.error('[googleJob] reading its website failed:', err))
+  const [{ row: after }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
+  await writeDetails(community, id, { ...(after.details ?? said), googleKept: keptNow(after, category, watches, now) })
   return onePlace(community, id, now)
 }
 
@@ -412,15 +436,19 @@ async function markDecided(community: string, id: string, what: 'used' | 'kept',
   if (check) await writeDetails(community, id, { ...details, googleCheck: { ...check, decided: { what, at: new Date(now).toISOString() } } })
 }
 
-/** Show as open, over Google's closure; or Google's answer again. Only the
- *  override is written: Google's own `businessStatus` stays as the sync
- *  last had it, so the page still says what Google says, and clearing the
- *  override goes back to it. */
+/** Show as open, over Google's closure; or Google's answer again, which is
+ *  Keep closed (dated, so the closure stops waiting). Only the override is
+ *  written: Google's own `businessStatus` stays as the sync last had it, so
+ *  the page still says what Google says, and clearing the override goes
+ *  back to it. */
 export async function showAsOpen(community: string, id: string, open: boolean, now = Date.now()): Promise<GooglePlace> {
   const { row } = await loadOne(community, id)
   const details = { ...(row.details ?? {}) }
   if (open) details.businessStatusOverride = 'OPERATIONAL'
-  else delete details.businessStatusOverride
+  else {
+    delete details.businessStatusOverride
+    details.businessStatusKeptAt = new Date(now).toISOString()
+  }
   await writeDetails(community, id, details)
   return onePlace(community, id, now)
 }

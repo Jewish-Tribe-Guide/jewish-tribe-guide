@@ -121,6 +121,8 @@ describe('GET /api/cron/sync-hours', () => {
     const body = await res.json()
 
     expect(body).toMatchObject({ ok: true, total: 1, synced: 0, failed: 1 })
+    // For the Watches tab's Google line (nightKinds.ts).
+    expect(body.kinds).toEqual({ philly: { google: { of: 1, read: 0 } } })
     expect(writeBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         details: expect.objectContaining({

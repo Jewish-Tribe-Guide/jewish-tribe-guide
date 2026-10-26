@@ -28,6 +28,7 @@ import { refreshNight, syncOneListing, type SyncedRow } from '@/lib/syncListing'
 import { cronAuthorized as authorized } from '@/lib/cronAuth'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { syncHoursOutcome, type SyncHoursRun } from '@/lib/jobRuns'
+import { countGoogleKinds } from '@/lib/nightKinds'
 
 // Does network + DB work, so it's never prerendered or cached — that follows
 // from the work itself now rather than from a `dynamic` export, which Cache
@@ -88,10 +89,13 @@ async function runSync(): Promise<SyncHoursRun> {
   // bill). An hours change on Google reaches the guide within a week.
   const tonight = Math.floor(Date.now() / 86_400_000) % 7
   let refreshed = 0
+  // Who was asked, per community, for the Watches tab's Google line.
+  const asked: { community: string; ok: boolean }[] = []
   for (const row of rows) {
     const full = !row.details.googleSyncedAt || refreshNight(row.id) === tonight
     if (full) refreshed++
     const result = await syncOneListing(row, { statusOnly: !full })
+    asked.push({ community: row.community_id, ok: result.outcome !== 'failed' })
     if (result.outcome === 'failed') {
       failed++
       continue
@@ -123,6 +127,7 @@ async function runSync(): Promise<SyncHoursRun> {
     failed,
     flaggedClosed,
     statusChanged: statusChanges.length,
+    kinds: countGoogleKinds(asked),
   }
 }
 

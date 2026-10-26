@@ -13,13 +13,19 @@
 // (eruvLineRun.ts). Meant to run daily (vercel.json). Each run is recorded
 // on the watch, and the admins are emailed once when a watch breaks and
 // once when it recovers. The run itself is recorded too (jobRunStore.ts),
-// for the Watches tab.
+// for the Watches tab, with how many of each kind of source it read
+// (nightKinds.ts).
 //
 // Oct 24: the run had a minute and checked the watches in the order they
 // were added, so it stopped after the first 29 of 107 every morning. Now
 // it has five minutes, checks the most important first and what missed a
 // night before anything (watchRunOrder.ts), and starts no watch it might
 // not finish: what's left goes first the next night.
+//
+// Oct 25: one at a time, six slow AI reads took most of that, and 33 of
+// 107 were left. Now six are read at once, never two on one site or for
+// one place (runSideBySide, watchRunOrder.ts), and the kosher lists and
+// hospitals go first every night, ahead of any backlog.
 //
 // Before migration 070 there is no watch table: the built-in Keystone-K
 // watch runs as it did, with nothing recorded.
@@ -36,9 +42,11 @@ import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
 import { syncRefuahWatches } from '@/lib/refuahMatchRun'
 import { syncHoursWatches } from '@/lib/hoursJobRun'
 import { syncEruvWebsiteWatches } from '@/lib/eruvWebsiteRun'
-import { orderForRun } from '@/lib/watchRunOrder'
+import { orderForRun, runSideBySide, sideBySideKeys } from '@/lib/watchRunOrder'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { watchesOutcome, type WatchesRun } from '@/lib/jobRuns'
+import { countWatchKinds } from '@/lib/nightKinds'
+import { loadListings } from '@/lib/listingReads'
 
 export const maxDuration = 300
 
@@ -89,23 +97,21 @@ async function runAll(started = Date.now()): Promise<Body> {
   }
 
   const alerts = new Map<string, WatchHealthAlert[]>()
-  const results = []
   const budget = newMenuReadBudget()
   const queue = orderForRun(watches, started)
-  let left = 0
-  for (const [i, watch] of queue.entries()) {
-    if (Date.now() - started > START_NO_WATCH_AFTER_MS) {
-      left = queue.length - i
-      break
-    }
-    const { outcome, alert } = await runAndRecord(watch, undefined, budget)
-    results.push({ id: watch.id, url: watch.url, ...outcome })
-    if (alert) {
-      const list = alerts.get(watch.communityId) ?? []
-      list.push({ label: watch.label || watch.url, url: watch.url, alert, error: outcome.ok ? null : outcome.error })
-      alerts.set(watch.communityId, list)
-    }
-  }
+  const { results, left } = await runSideBySide(queue, {
+    keysOf: sideBySideKeys,
+    mayStart: () => Date.now() - started <= START_NO_WATCH_AFTER_MS,
+    run: async (watch) => {
+      const { outcome, alert } = await runAndRecord(watch, undefined, budget)
+      if (alert) {
+        const list = alerts.get(watch.communityId) ?? []
+        list.push({ label: watch.label || watch.url, url: watch.url, alert, error: outcome.ok ? null : outcome.error })
+        alerts.set(watch.communityId, list)
+      }
+      return { id: watch.id, url: watch.url, ...outcome }
+    },
+  })
 
   // Awaited, not left running: the response must not finish first.
   await Promise.all(
@@ -113,7 +119,13 @@ async function runAll(started = Date.now()): Promise<Body> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left }
+  const read = new Set(results.filter((r) => r.ok).map((r) => r.id))
+  // Without them, a listing's page goes by its label (watchGroupOf).
+  const listings = await loadListings(queue.map((w) => w.communityId)).catch((err) => {
+    console.error('[cron/watches] listing reads failed:', err)
+    return undefined
+  })
+  const run = { active: queue.length, ran: results.length, notWorking: results.filter((r) => !r.ok).length, left, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 

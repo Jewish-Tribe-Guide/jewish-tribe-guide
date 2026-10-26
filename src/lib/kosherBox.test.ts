@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { googleLine, kosherBoxKeys, kosherKeysToUse, kosherPill, kosherRows, renamedTo } from './kosherBox'
+import { kosherBoxKeys, kosherKeysToUse, kosherRows, renamedTo } from './kosherBox'
 
 // As dev's restaurants are set up (Oct 22).
 const RESTAURANT = makeCategory({
@@ -41,7 +41,6 @@ describe('the Kosher box', () => {
       ['Certificate', 'keystone-k.org/kosher/tasty-twisters-soft-pretzel-factory', 'same'],
       ['What isn’t kosher?', 'Only Plain/Salt Pretzels are kosher', 'same'],
     ])
-    expect(kosherPill(rows)).toBe('1 new')
     expect(kosherKeysToUse(rows)).toEqual(['t'])
   })
 
@@ -51,10 +50,8 @@ describe('the Kosher box', () => {
       ['Hechsher', 'IKC', 'IKC, Keystone-K', 'changed'],
       ['Meat, dairy or parve', 'Dairy', 'Meat', 'changed'],
     ])
-    expect(kosherPill(rows)).toBe('2 changes')
     const gone = kosherRows(RESTAURANT, TWISTERS, { ...TWISTERS, kosherCert: [], k: null })
     expect(gone.filter((r) => r.mark === 'gone').map((r) => r.value)).toEqual(['Keystone-K', 'keystone-k.org/kosher/tasty-twisters-soft-pretzel-factory'])
-    expect(kosherPill(gone)).toBe('2 off the list')
   })
 
   it('the same hechsherim in another order are the same', () => {
@@ -68,7 +65,6 @@ describe('the Kosher box', () => {
     const added = kosherRows(RESTAURANT, { kosherCert: ['Keystone-K'] }, TWISTERS)
     expect(added.find((r) => r.name === 'What isn’t kosher?')).toMatchObject({ mark: 'new' })
     expect(kosherKeysToUse(added)).toEqual(['k', 'kosherNote', 'kosherPartial'])
-    expect(kosherPill(added)).toBe('2 new')
   })
 
   it('a row neither says anything for is left out', () => {
@@ -83,8 +79,4 @@ describe('what a list’s note says', () => {
     expect(renamedTo(['Not on Keystone-K’s list.'])).toBeNull()
   })
 
-  it('Google’s line on a new place', () => {
-    expect(googleLine(['On Keystone-K’s list, not in the guide.\nKeystone-K\'s list says: "Rivka Cakes"\nGoogle: open, as Rivka Cakes.'])).toBe('Google: open, as Rivka Cakes')
-    expect(googleLine(['On the list.'])).toBeNull()
-  })
 })

@@ -42,7 +42,13 @@ export type GoogleClosure = {
   since: string | null
   /** Google is asked whether a place is open more often than for its fields. */
   readAt: string | null
+  /** When an admin said Keep closed, since Google last changed its answer. */
+  kept: string | null
 }
+
+/** A closure waits for the admin: shown on the site at once, Keep closed or
+ *  Show as open decides it. A later change of Google's asks again. */
+export const closureWaits = (c: GoogleClosure | null): c is GoogleClosure => !!c && !c.shownOpen && !c.kept
 
 export type GooglePlace = {
   id: string
@@ -69,8 +75,6 @@ export type GooglePlace = {
   decided?: { what: 'used' | 'kept'; at: string } | null
 }
 
-export type GoogleLoaded = { places: GooglePlace[] }
-
 /** A place's tab: Google stopped answering for its match; a field nothing
  *  checks; or everything checked. */
 export function googleSection(p: { matched: boolean; failing: boolean; fields: readonly Pick<GoogleFieldRow, 'by'>[] }): GoogleSection {
@@ -78,54 +82,8 @@ export function googleSection(p: { matched: boolean; failing: boolean; fields: r
   return p.fields.some((f) => f.by.kind === 'nothing') ? 'to_check' : 'checked'
 }
 
-const dayText = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-
-/** Who checks a field, as its row says it: "Google", "Its website", "You ·
- *  Oct 22", "Nothing", and a Google that stopped answering "Google · Sep 10". */
-export function checkerText(by: Checker): string {
-  if (by.kind === 'google') return by.at ? `Google · ${dayText(by.at)}` : 'Google'
-  if (by.kind === 'website') return 'Its website'
-  if (by.kind === 'you') return by.at ? `You · ${dayText(by.at)}` : 'You'
-  return 'Nothing'
-}
-
 const CLOSED_TEXT = { CLOSED_TEMPORARILY: 'Closed for now', CLOSED_PERMANENTLY: 'Closed for good' } as const
 export const closureText = (c: GoogleClosure) => (c.shownOpen ? 'Shown as open' : CLOSED_TEXT[c.status])
-
-/** A place's pill. To check: "Not on Google", "Website not checked", "3
- *  not checked". Can't be read: "Not read since Sep 10". Checked: a
- *  closure Google reports, else who checks it ("Google · its website"). */
-export function googlePill(p: Pick<GooglePlace, 'section' | 'matched' | 'fields' | 'readAt' | 'closure'>): string {
-  if (p.section === 'cant_read') return p.readAt ? `Not read since ${dayText(p.readAt)}` : 'Not read yet'
-  const nothing = p.fields.filter((f) => f.by.kind === 'nothing')
-  if (p.section === 'to_check') {
-    if (!p.matched) return 'Not on Google'
-    return nothing.length === 1 ? `${nothing[0].label} not checked` : `${nothing.length} not checked`
-  }
-  return p.closure ? closureText(p.closure) : whoText(p.fields)
-}
-
-/** Who checks a listing's fields, all told: "Google · its website". */
-export function whoText(fields: readonly Pick<GoogleFieldRow, 'by'>[]): string {
-  const kinds = new Set(fields.map((f) => f.by.kind))
-  const words = { google: 'Google', website: 'its website', you: 'you' } as const
-  const text = (['google', 'website', 'you'] as const).filter((k) => kinds.has(k)).map((k) => words[k]).join(' · ')
-  return text ? text[0].toUpperCase() + text.slice(1) : 'Checked'
-}
-
-/** The Fields box's pill: what's left to check, what a check found, or
- *  what was decided. */
-export function fieldsPill(p: Pick<GooglePlace, 'section' | 'matched' | 'fields' | 'readAt' | 'compare' | 'decided'>): string {
-  if (p.decided) return `${p.decided.what === 'used' ? 'Used' : 'Kept'} ${dayText(p.decided.at)}`
-  if (p.compare) {
-    const n = p.compare.rows.filter((r) => r.changed).length
-    return n ? `${n} change${n === 1 ? '' : 's'}` : 'Same as Google'
-  }
-  if (p.section === 'cant_read') return p.readAt ? `Not read since ${dayText(p.readAt)}` : 'Not read yet'
-  const n = p.fields.filter((f) => f.by.kind === 'nothing').length
-  if (!n) return whoText(p.fields)
-  return p.matched ? `${n} not checked` : 'Not on Google'
-}
 
 /** A category's Website field: the url field it calls Website, the one the
  *  morning's sync writes. */

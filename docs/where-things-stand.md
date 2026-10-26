@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 24, 2026.
+Last updated: Oct 26, 2026.
 
 ## The branch
 
@@ -70,6 +70,10 @@ for that exact change, in the same conversation. Show the dry run first.
 1e. **Migration 086 (`job_run`)** is run on both databases (the user,
    Oct 24; checked). The live jobs start recording once this branch is
    deployed.
+1f. **Migration 087 (`job_run.kinds`)** is run on both databases (the
+   user, Oct 25; checked). Each run saves its counts per kind from the
+   next run on, so Last night's earlier nights fill in one night at a
+   time (live, once this branch is deployed).
 
 ## For the user or the community
 
@@ -94,6 +98,45 @@ for that exact change, in the same conversation. Show the dry run first.
    Dishes added by hand are now looked for on each read after (see
    "dishes added by hand are checked"), so "Read again" after adding
    them shows which the reader finds.
+   **Oct 26, "is the reader picking up what I added?"** On the live site
+   5 places had 33 dishes added by hand (Espresso Cafe's Bagels, the 8
+   flavours on each of the 4 Dottie's Donuts). None had been looked for:
+   all were added after the Oct 22 reads, and a menu whose words don't
+   change was never read by the AI again. Asked locally (nothing saved),
+   the reader found all 33 ("Cream Cheese Bagel", "chocolate, vanilla,
+   …"): not a missed dish, a name mismatch or the wrong page. Now:
+   - Each dish no read has found yet says, on its place's Dishes box on
+     the kind page (and on its Dishes line under "more checked"): On its
+     menu, Not found on its menu, or Not looked for yet.
+   - The daily run reads an unchanged menu again when its listing has
+     dishes the last read never looked for, from the run's 3 AI reads
+     (`dishesToLookFor`). One it names gets its menu date; one it doesn't
+     waits on the kind page.
+   - Still open: two of the Dottie's branches share dotties.com with the
+     first branch's watch (one watch per page), so the daily run never
+     looks for theirs. Read it now on each does.
+   **Oct 26, "why does HipCityVeg say Oct 17, and Goldie?"** Two causes,
+   both fixed on `redesign/oct18-fixes` (not live until it deploys):
+   - Menus are checked last each night, and the shul and mikvah pages
+     spent the run's AI reads first: on Oct 26, 1 of 22 reads was a
+     menu. A changed menu (Goldie, Sweet Box, Roling's, Nanas, Sweet
+     Trading, Gelbstein's) kept its old date night after night. Menus now
+     have 8 reads a night of their own (`MENU_READS_PER_RUN`), taken
+     first, then the shared ones. Not ordered by who waited longest: with
+     8, every changed menu found on Oct 26 is read in one night.
+   - 7 places never read (HipCityVeg, Lipkin's, PKS, Center City Pretzel,
+     Star of David, The Brazilian BBQ, The Kosher Grill) had dishes dated
+     by the Oct 17–18 reads, before readings were kept. Dated dishes kept
+     them out of the morning first read (they looked "sent through the
+     site"), and with no reading and no menu link they had no watch. The
+     morning read (`/api/cron/read-menus`, 5 a morning) now reads them
+     too; one that agrees with the listing dates its dishes, one that
+     doesn't waits on the kind page, and from then on the place has a
+     watch. A place whose website menu can't be read now says so ("Menu
+     can't be read") instead of nothing.
+   - Mike's, Bar Bombón and Mama's need a browser to draw their menu,
+     1 a night; Tasty Twisters' page is unchanged but its date is stuck at
+     Oct 22, cause not found yet.
 
 ## Getting the branch live
 
@@ -253,7 +296,389 @@ for that exact change, in the same conversation. Show the dry run first.
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
 
+## Building: the Watches tab by kind of place (drawings settled Oct 24)
+
+Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
+is a new board beside the old one. Only the latest board for each screen,
+nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
+("Watches: what we're settling on"); a new settled board goes on both.
+
+**Building in five pieces** (agreed Oct 24, on `redesign/oct18-fixes`):
+
+1. **The tab's rows and each kind's page: BUILT Oct 25.** The tab starts
+   with a row per category in the site's order (alphabetical): its
+   sources line, then waiting for you / not checked / up to date, then
+   "Not watched:" for the kinds with no address. Each row opens
+   `/<community>/admin/watches/kind/<category>`, with the three tabs.
+   `watchPlaces.ts` puts each job's own standing for a place together,
+   so the counts can't disagree with the job pages. A list's finding
+   on a grocery goes under Grocery; a place only a list has goes under
+   Food. Not done yet, on purpose:
+   - Every row now opens in place (pieces 2 to 4).
+   - The old job rows stayed under "Job pages" until pieces 2 to 4 held
+     what they did; the job pages went Oct 26 (piece 6). The watch list
+     and Add a watch are gone (piece 5, What's tracked).
+   - On the test site Food shows 25 waiting (mostly places only a kosher
+     list has), 22 not checked and 49 up to date.
+2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
+   under itself on a computer, on its own screen on a phone, as drawn
+   (FinalShuls3, FinalPhoneShul3, FinalAddSource3, FinalFoodMenus3). A
+   box per part a source keeps, each footed "Same as <source> · read
+   <day> · Change":
+   - Shuls: this week's (from its newsletter or page), usual weekday,
+     usual Shabbos. Mikvahs: a box per section. Food: Dishes, Kosher.
+     Hospitals: their Refuah boxes. Eruvim: Status, Details (from its
+     website) and Map, as the Eruv page has them (Oct 25).
+   - Then Google's fields ("Name and contact", or "Hours and contact"),
+     its website's, and a person's, each a box of its own. Google's and
+     the lists' have no Change.
+   - Under them: Add a source (a shul: a page or its newsletter's email;
+     a mikvah: a page; a food place with no menu link: its menu page),
+     Read it now / Read them now (none with only Google and a
+     newsletter), Open its listing.
+   - Change gives a page in place of the one read (the old one is
+     stopped), a newsletter's new email, a new menu link, or a new
+     Refuah page.
+   - A read that finds something moves the place, and the page says
+     where it went.
+   Not done, on purpose:
+   - Dishes come in one list: a menu reading keeps one page, so the
+     drawing's heading per menu page needs the reader to keep its pages.
+   - No Add a source for hospitals: one source. A hospital's Change
+     gives a new Refuah page. An eruv's Status and Map have Change (a
+     status page or its emails; a map), and Add a source when nothing
+     gives its status. Its Status box has "Its page dates each week's
+     post".
+   - **Stop** (Oct 25), what each job page's Reads × did, asked first
+     ("Stop reading mekorhabracha.org/davening?"): a shul's or mikvah's
+     page stopped, a menu link unlinked (a menu found on its website:
+     No menu online), a Refuah page stopped, an eruv's status or map
+     emptied, its website's read paused. A hospital Refuah doesn't have
+     has Not on Refuah beside Give its page on Refuah. Newsletters have
+     no Stop, as on the Shul times page. A place's whole Off switch
+     isn't here: stopping each source does it, and giving a page turns
+     it back on.
+   - On the test site, 13 food places have an approved menu reading but
+     no dishes on the listing (Playa Bowls among them). They show no
+     Dishes box rather than a "Same as its menu" that isn't so.
+3. **Not checked, opened by what's wrong: BUILT Oct 25.** A not-checked
+   row opens in place too, as drawn (FinalFood3, FinalPhonePlace3,
+   FinalStopped2, EruvNotChecked): its pill, then a group per problem,
+   lit, each "<page> · <what's wrong>", the fields it leaves unchecked,
+   and its own button. Then "N more checked", a line each (what, the
+   listing's value, its source and when, Change), and Open its listing.
+   - Google: "Nothing checks its name" (Find it on Google / Not on
+     Google); "its Google listing · failed every night since Sep 10"
+     (the same two). A field a page of its website would check, once it
+     loads, goes with that page and its Read it now.
+   - Pages: "never read · added Oct 23", "failed every night since Oct
+     22", "not read since …" with Read it now; a site that's down is one
+     group ("· 5 pages", Read them now). Times or hours that can't be
+     read: Give the page with its times. No page: Add a source.
+   - Menus: never read (Read it now), can't be read (Give its menu
+     page), didn't load (Read it now). Hospitals: Refuah didn't load
+     (Read it now), not found (Give its page on Refuah).
+   - Eruvim: no status (Find its status page, searching its website,
+     and Add a source), an email it couldn't read (the email, with It
+     says up / down / Not about the status, right there), a status page
+     or map that didn't load (Read it now). Both were links to the Eruv
+     page until Oct 25.
+   - Built with it, as agreed Oct 24: a "You" field goes back to Not
+     checked after a year; Not on Google on a match Google stopped
+     answering for drops the match (it used to be refused).
+   Not done, on purpose:
+   - A matched place with a field nothing checks and no page to add
+     (a grocery's website) has "Check it against Google" (a paid call;
+     its answer waits with Use / Keep). It linked to the Google page
+     until Oct 26.
+   - The pills are piece 1's ("Google stopped answering Oct 17"), not a
+     count of the fields in the groups.
+4. **Waiting for you by source, in the agreed order: BUILT Oct 25.**
+   - **4a, the order: BUILT Oct 25.** A place off a kosher list first, its
+     pill red ("Off Keystone-K’s list · Oct 24"); then Google's closures
+     ("Closed for now, says Google · Oct 12"); then new places; then
+     changes. A closure waits until Keep closed (dated, so it stops
+     waiting until Google changes its answer again) or Show as open.
+   - **4b, a waiting place opened in place: BUILT Oct 25**
+     (`waitingGroups.ts`). A group per source, "From
+     mekorhabracha.org/davening · Oct 25", what it would change lit with
+     "Was …", its own buttons, then "3 more up to date" and Open its
+     listing. Each group decides what its job page would, by the same
+     calls:
+     - a change: Accept / Edit / Keep as is (Google's check: Use / Keep;
+       a menu read: Use / Skip; a kosher list's: only the Kosher box's
+       keys, through `kosherProposal`, now shared with the Kosher page);
+     - a closure: Keep closed / Show as open (FinalClosed);
+     - off a list with no hechsher left: Hechsher "None, was
+       Keystone-K", Remove the listing / Keep it / Edit (FinalDropped);
+     - a place only a list has: what it would add, Add as new / Don't
+       add (FinalNewPlace); one not filed yet says it's suggested after
+       tomorrow morning's read, with no buttons.
+     Fixed on the way: Open its listing on a place not checked went to
+     the job page it waits on, not its listing.
+     - **Edit opens the box here: BUILT Oct 25** (`findingEdits.ts`):
+       the same box its job page opens, filled in with what was read,
+       saved straight to the listing. A group with several changes opens
+       them one after another (a mikvah's two sections). An eruv's opens
+       the eruv editor. Each job page now builds its box from the same
+       code.
+     - **Bring it back: BUILT Oct 25.** A new place a kosher list has
+       that the guide archived ("Archived, as “…”") has Bring it back,
+       on its kind's row and on the Kosher page: the archived listing
+       comes back with the list's hechsher, and the suggestion closes.
+       It uses the Archived tab's restore, which already existed. Off a
+       list and archived: Bring it back alone.
+     Not done, on purpose:
+     - A waiting place with nothing a group can show (a page that
+       differs, nothing filed from it yet) has Read it again, to file
+       what it says. It linked to its job page until Oct 26. None seen on
+       the test site.
+5. **Last night, a line per kind: BUILT Oct 25** (`nightKinds.ts`,
+   `NightlyRuns.tsx`, FinalNightly). Closed: "Everything read", or which
+   kinds weren't ("Kosher certification, minyan times and menus not all
+   read"), amber. Opened: Google, Kosher certification, Hospitals,
+   Eruvs, Minyan times, Mikvah hours, Menus, each its run's time and "11 of
+   20 read · 9 didn’t load". A kind opens to what it reads, Not read last
+   night (Never read, Didn’t load, Not reached; a place's pages as one
+   line, "· 5 pages"), each a link to its job page, and its last 14
+   nights.
+   - Last night comes from the sources as they are now (each watch's
+     last read, each listing's last Google answer), so one read again
+     since stops showing. The nights before come from the count each run
+     saves per community and kind (migration 087, 1f).
+   - Newsletters aren't counted: they're read as each email comes in.
+   - **Mikvah hours, not Websites** (the user, Oct 25): the line is the
+     mikvahs' pages of hours only. A listing's page goes by its
+     listing's category, as the watch list does (`listingReads.ts`), so
+     Mikvah Moishe Zvi's page ("its website") is no longer counted as
+     Minyan times. A page added by hand for no shul or mikvah isn't
+     counted (none on either site).
+   - Gone from the tab: the old row per job. Walks have no line; their
+     email when they break still goes out.
+   - **The read-menus job is part of Menus** (the user, Oct 25). A food
+     place whose menu was never read is Never read on it, by name,
+     linking to Dishes, whether its menu's watch loaded or not. When that
+     job failed, didn't run or isn't set up, the line says so ("reading
+     new menus failed"). A night it read some says "· 3 new menus read".
+   - Each place missed goes by its name ("Menu · Say She Ate" is Say
+     She Ate; "Center City Eruv’s website" is Center City Eruv).
+   - **What's tracked, in place of the watch list: BUILT Oct 25** (the
+     user: "I want to see everything that's being tracked"). The section
+     is renamed What's tracked. Each line opens "All N tracked": every
+     place or page it covers, one line per place, its status ("Read Oct
+     24", "Not loading since Oct 20"), problems first, each a link to its
+     job page.
+     - **Newsletters** is a line of its own, with no run time: "2
+       newsletters · last email Oct 24 · 1 to link". Needs a look lists
+       senders not linked to a shul (with the Link box and Not a shul),
+       quiet for a month, or whose last email couldn't be read.
+     - **Other pages**: pages added by hand for no shul or mikvah. Shows
+       only when there are some (none on either site).
+     - **Phone, email and hours** ("Reads a place’s own website when
+       Google doesn’t have them."): a food place's own website, read for
+       the phone and hours Google doesn't keep. Each place says why: "Not
+       on Google · Read Oct 25", "Google has no hours · …". Five on the
+       live site (four not on Google, Sababa Falafel with no hours there),
+       which had been counted as Mikvah hours. Shows only when there are
+       some.
+     - **Every kind of place: BUILT Oct 25** (the user: "read phone,
+       email and hours from the website for the other kinds of place
+       too, only where Google doesn't have them"). `ownSiteCategories`:
+       every kind of place but shuls, mikvahs and hospitals (their own
+       jobs), with a phone, an email or hours to read. A place with no
+       hours field (a hotel) is read for phone and email alone, by code,
+       no AI. Hours are read by the AI only when the page changes. What a
+       food place's site finds waits on Dishes. Dry run on the live
+       site: the next morning adds GIANT (grocery, Google has no phone),
+       CKids Philly (not on Google) and BZBI's Early Childhood (Google
+       has no hours). Schools and hotels have no gaps today; cemeteries
+       have no phone field.
+     - **Findings wait under their kind: BUILT Oct 25** (the user:
+       "every category that has a watch of some sort should be on the
+       watch list. So grocery should go to grocery"). What a grocery's,
+       childcare's, hotel's or school's own website finds now waits under
+       that kind's row (counted in its Waiting for you, opened there with
+       Accept / Edit / Keep as is), not in the
+       moderation queue; its email links to that page. Every kind with a
+       watch has a row: a kind Google doesn't cover gets one from its
+       read websites. On the live site every watched place is a mikvah,
+       food place, hospital or shul today; Childcare already has a row
+       (from Google), and its websites join it once read.
+     - **Weekly link check: BUILT Oct 25** (the user: "let's also add a
+       check for links now"). Every Sunday (`/api/cron/check-links`,
+       added to `vercel.json`) each link a listing shows that nothing
+       else opens — kosher certificates, Refuah, WhatsApp groups,
+       websites Google doesn't keep — is opened once. No AI, nothing
+       read. Not found or no such site counts at once; didn't answer
+       counts only on a second check a week later. What's tracked has a
+       Links line; a link that doesn't open puts its place on Not
+       checked ("Link doesn’t open") with Check it again. A hospital's
+       Refuah link isn't checked: its Refuah watch reads that page
+       already (the link carries a `?q=` search the watch doesn't). Dry
+       run on the live site: 85 links, 1 doesn't open — House of
+       Kosher's certificate (houseofkosher.com/Philadelphia, 404). With
+       the user's yes, the live listing now links its Keystone-K page,
+       keystone-k.org/kosher/house-of-kosher/ (Oct 25), so the first
+       run should find none. The cron first runs on
+       production once this branch deploys.
+     - Gone with the watch list: Add a watch, and Pause, Remove and Check
+       now on leftover pages. Pages are added from a place's own box (Add
+       a source).
+6. **The job pages gone: BUILT Oct 26** (the user: "my goal would be to
+   have everything accounted for so then we can remove job pages"). The
+   seven pages under `/admin/watches/` (Google, Dishes, Hospitals, Mikvah
+   hours, Shul times, Eruv status, Kosher certification) and their
+   components are deleted; what only they did is on the kinds' pages:
+   - **Not read** under an opened place: a shul or mikvah turned off, a
+     page of it stopped, a hospital off Refuah, a menu marked No menu
+     online, a food place's or eruv's website stopped. Each has Read it
+     again (the job pages' Turn back on).
+   - **Kosher:** a food place on neither list gets a Kosher box ("On
+     neither list") whose Change gives its page on Keystone-K's list; on
+     Keystone-K's, the same Change. Off a list that has it by a near
+     name: It's <name> now, beside Remove the listing / Keep it. Read it
+     now also reads the lists it's on.
+   - **Menus:** a menu that can't be read has Photos of the menu and No
+     menu online beside Give its menu page.
+   - **Check it against Google** on its own place, not a link away.
+   - **A kosher list** is stopped, or read again, from its line in
+     What's tracked (Kosher lists, All N tracked).
+   - Every link that went to a job page — What's tracked's lines, the
+     findings' emails — opens the place on its kind's page instead
+     (`?place=<id>`, on its tab). A kosher list's findings email links
+     to the Watches tab.
+   Dropped on purpose: a whole Off switch per place (stopping each source
+   does it; giving a page turns it back on), and Stop on a newsletter (it
+   had none on the Shul times page either).
+
+Settled with the user so far:
+
+- Rows are the site's categories. A place's card shows only what needs
+  the admin. Tabs: Waiting for you, Not checked, Up to date.
+- **Not checked** holds only what won't fix itself: a field no source
+  covers, a source that stopped answering, or a source never read or not
+  read for over 36 hours (with Read it now). A source not yet read stays
+  off it for its first night. A place with two problems shows one group
+  per problem, each with its own buttons (Mix 7).
+- **Waiting for you** groups a place's changes by source, each group
+  with its own Accept / Edit / Keep as is (Mix 5). No Check now there.
+  Under one checker per field, two sources never disagree on a field.
+- **Nightly runs** is one line per kind of source (Google, Kosher
+  certification, Hospitals, Eruvs, Minyan times, Websites, Menus), its
+  run time on the right and what was read under it. Every line opens to
+  what it reads, last night's misses, and its last 14 nights. Walks are
+  not on it.
+- **The 3 AM watches run stays one job** (the user, Oct 24), not one
+  run per kind. Each kind's last night comes from its watches'
+  `last_check` times. Those times keep only the latest read, so a kind's
+  14 nights need the run to save its count per kind in its `job_run`
+  row (a new column, so a migration). Google's hours already have a job
+  and rows of their own.
+- **Not on Google** (`notOnGoogle()`, googleJobRun.ts) changes nothing on
+  the listing: it saves the date, and every field nothing else checks
+  becomes the admin's ("You · Oct 24"), so the place moves to Up to date.
+  Picking a Google match later clears it. A "You" field goes back to
+  Not checked after a year, and Not on Google on a place whose match has
+  died drops the dead match (both agreed Oct 24, built Oct 25 with
+  piece 3; a live match is still refused). Since Oct 25 it first adds
+  and reads the place's own website, where its kind reads one, so only
+  the fields that page doesn't give become the admin's. Before that,
+  CKids Philly came out all "You" with nothing reading its site until
+  the next morning's run (`readOwnSiteNow()`, hoursJobRun.ts).
+- **Minyan times come in every kind the live site already keeps**: the
+  usual weekday table and Shabbos, this week's times (including "No
+  minyan this week" and a whole posted week), Yom Tov schedules (replace
+  or add), zman-based times with limits, summer or winter only, minyanim
+  that need ten, minyanim at another place, and join links. The drawings
+  show only a one-off clock-time change. Built change lines say each one
+  the way the listing does: a zman rule as the rule, and a Yom Tov
+  schedule as one item ("Chanukah schedule, Dec 4–12"), not dozens of
+  times.
+- **A place with two sources** (a shul's website and its newsletter):
+  each finding is filed with its source and the page or email it came
+  from, so each source is its own group in Waiting, accepted on its own.
+  The website usually gives the usual times; the newsletter gives this
+  week's, as a week beside the usual times. For the same days a week from
+  the newsletter or a person wins over the website's (the user, Oct 20;
+  `postedBy` in schedules.ts). An agreeing website read confirms and
+  clears older findings; an approved newsletter change shows "Confirmed
+  by <shul>".
+- **Waiting for you, in order**: a place off a certifier's list first
+  (red pill), then Google closures, then new places, then changes. Drawn
+  Oct 24, accepted as drawn:
+  - **Off a kosher list** (Stephen's Cafe, made up): Hechsher "None, was
+    Keystone-K", Remove the listing / Keep it / Edit. That is what the
+    Keystone-K watch's `gone` finding already proposes (archive when it
+    was the only hechsher). Never filed yet.
+  - **Closed for now, says Google** (Rita's, Grant Ave, real since Oct
+    12): a closure is on the site at once today, so the card is Keep
+    closed / Show as open, and it reopens by itself when Google says so.
+    Three such places in Philly now (two Rita's, New York Bagel Bakery).
+  - Agreed Oct 24: a person's fix wins over a website that still
+    contradicts it, and that source stays quiet on the field until the
+    page's text changes. One place in two categories (House of Kosher)
+    gets one finding, shown in both rows, cleared by one approval.
+  - The settled canvas's row 1 still shows Food's Waiting as 13; the new
+    boards count 17 (13 new places, 3 closures, 1 drop).
+- **A Google match failing for more than a few nights** (agreed Oct 24):
+  the card offers only Find it on Google and Not on Google. Check again
+  (the same paid call on the same place) goes. Redrawn as Sababa, no
+  Check again, on both canvases.
+- **Up to date shows where each field comes from** (drawn Oct 24, not
+  reviewed; Synagogues, real Philly data): each row has a grey sources
+  line ("Google · its website · its newsletter"), so a shul with a
+  newsletter is told apart from one without (6 of 14 have one). An
+  opened place groups its fields by source, each with its link or
+  email and when it was last read: Mekor Habracha's Google fields, its
+  usual weekday and Shabbos times from mekorhabracha.org/davening, and
+  this week's from its newsletter. Change sits on a source you chose,
+  not on Google's.
+  **Redrawn Oct 24 in the live job pages' style** (the user preferred
+  it): an opened place is one box per section, laid out as the job
+  pages' `job-box` already does (day headings, what left, time right,
+  Summer/Winter under), with the source on a line at the box's foot
+  ("Same as mekorhabracha.org/davening · read Oct 23 · Change"). Boxes:
+  This week's schedule (from its newsletter), Usual weekday times, Usual
+  Shabbos times, Name and contact (its Google listing). No "Same" pills
+  in Up to date. "Add a source · Read them now · Open its listing" under
+  the boxes, replacing the job page's Reads box and "Add a page". Every
+  kind of place opens this way, with the box its job page already has.
+  B'nai Abraham (Add a source open) and Playa Bowls redrawn the same
+  way Oct 24; on the settled canvas they replace the grouped-look boards.
+  **Agreed Oct 24:** Add a source and Read now stay once per place
+  (Change is the one per source, on each box's foot). Read now says
+  "Read it now" for one page and "Read them now" for several. On a phone
+  the three links sit on one row. Agreed, not drawn: no Read now on
+  a place with only Google and a newsletter (nothing to read on demand).
+  The Final page of the original canvas shows only the latest boards;
+  earlier ones are on "Final, earlier versions".
+- **Add a source** (agreed Oct 24) sits at the bottom of every opened
+  place. One box takes a web page or the email a newsletter comes from;
+  an email also needs the guide's inbox subscribed, and the box says so
+  in one line. Drawn on B'nai Abraham Chabad. Only kinds that fit the
+  place are taken (newsletters for shul times and eruv status, as
+  `watchPurposes.ts` already allows).
+- **More than one menu page** (raised Oct 24, not decided): reading
+  already merges up to 3 menu pages (`readMenus`, `MAX_MENU_PAGES`), but
+  the nightly watch fingerprints only `details.menuUrl` and the Dishes
+  line shows one page. Recommended: watch each page that gave dishes and
+  list each on the Dishes line. Drawn Oct 24 as Playa Bowls, Wynnewood
+  (Food, Up to date): "From its menu: Bowls · Smoothies · Surf Quenchers
+  · Oct 22", one link per page. Those are the three pages `findMenus`
+  really finds on its site. Dishes holds ten in all, and today the first
+  page fills them (`readMenus` tops up from later pages only below ten),
+  so Bowls gives all ten and the other two pages add nothing. **Agreed
+  Oct 24: take a few from each page.** Redrawn with the Dishes field one
+  line per page (Bowls 4, Smoothies 4, Surf Quenchers 2, real names off
+  the pages). For the build: split the ten across the pages that gave
+  dishes, keeping anything already on the listing. In the boxed look
+  the Dishes box has a heading per page and its foot links all three
+  ("Same as its menu: Bowls · Smoothies · Surf Quenchers · read Oct 22").
+
 ## Building next: the job pages, as drawn (agreed Oct 21)
+
+**Gone Oct 26**: these pages were removed once the kinds' pages held what
+they did (piece 6 above). Kept for the history of what was decided.
 
 The user, Oct 21: "great, let's do it". There is one drawing per page, all
 agreed:
@@ -1234,6 +1659,30 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 26: shuls' times read each week; an approval settles its finding (on `redesign/oct18-fixes`)
+
+Found Oct 26 (read only, live): nothing from a shul's page had been filed
+since Oct 23. Every finding from Oct 19–23 had been decided, and the
+approved times are live. But a page whose text hadn't changed was never
+read again, so a new week's times never arrived.
+
+- **A shul's times page is read once each week, even if unchanged.** The
+  week starts Sunday. A full read files what differs, like a changed page.
+  The check keeps the week it read (`readWeek`). A compare after the
+  listing moved doesn't count as the week's read. Mikvah and other hours
+  pages are still read only when they change.
+- **Shuls' pages get 20 reads a night of their own.** Past that, they share
+  the run's 3, as before. Menus no longer hold them up. The cost is about
+  45 shul pages × 1 extra read a week.
+- **Compares go from 3 a night to 12.** About 45 pages are waiting to be
+  compared after the Oct 23 approvals. At 3 a night, a listing like Mei
+  Shalva's stayed dated Oct 18 for days.
+- **A carried check keeps its own date.** A run that read only the phone
+  used to re-date the old finding to that morning. So an approval made
+  after the real read looked older than the finding, and Mikvah Ohel Leah
+  and LMC men's kept saying "differs". They now settle once approved.
+- Reaches the live site with the next merge and deploy.
+
 ## Done Oct 24: every nightly job keeps a record; the watches all get checked (on `redesign/oct18-fixes`)
 
 Found Oct 24: the live watches run checked 29 of 107 watches and stopped,
@@ -1250,16 +1699,30 @@ about the same place every morning. Nothing showed it anywhere.
   goes first (`src/lib/watchRunOrder.ts`). No watch starts after 200
   seconds; what's left goes first the next night. The eruv maps now run
   alongside the start, not after every watch.
+- **Six at once, kosher and hospitals always first (Oct 25).** The Oct 25
+  run still read only 74 of 107: one at a time, six AI reads of a place's
+  own page (10–34s each) took 2½ of its 3½ minutes. And the backlog went
+  ahead of everything, so Keystone-K and the 7 Refuah pages, read the
+  night before, were the ones left over. Now six are read at once, never
+  two on one site (Refuah's go one after another) nor for one place
+  (`runSideBySide`, `watchRunOrder.ts`), and the kosher lists and
+  hospitals go ahead of any backlog. Replaying the Oct 25 night's own
+  times: 179s one at a time, about 34s six at once (its slowest read), so
+  the five minutes hold several times today's list; more at once is the
+  lever if it grows past that. The AI read cap holds as it is (each read
+  takes from it in one step). Not yet run live: the first proof is the
+  night after this deploys.
 - **Every nightly job records its runs** (migration 086, `job_run`;
   `src/lib/jobRunStore.ts`): Google hours, Watches, Menus and Walks. Each
   run saves a row when it starts and fills it in at the end with what it
   did in a line, a warning (ran out of time, not set up) or its error. A
   record that can't be saved never fails the job.
-- **The Watches tab has "Nightly runs"** (`NightlyRuns.tsx`): a row per
+- **The Watches tab had "Nightly runs"** (`NightlyRuns.tsx`): a row per
   job with how it works, the last run's line, and, without opening
   anything, Failed, Cut off (started, never finished), Didn't run (no run
-  in 30 hours) or Needs a look. Opening a row shows the runs before the
-  latest, up to 14 in all.
+  in 30 hours) or Needs a look. Replaced Oct 25 by Last night, a line per
+  kind (piece 5), which says the same per kind: "Didn’t run since Oct
+  22", "Failed", "stopped before it finished".
 - **Vercel allows the 300 seconds:** the preview of 23e02ab5 built and
   deployed with it.
 - **An email when a job breaks, and one when it works again**

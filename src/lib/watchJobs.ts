@@ -44,7 +44,7 @@ export function sentThroughSite(place: DishPlace): boolean {
   return !r || ((r.status === 'failed' || r.status === 'no_menu') && Date.parse(place.menuAt) > Date.parse(r.readAt))
 }
 
-/** Where a place is on the Dishes page (its tab, JobPage.tsx):
+/** Where a food place stands, by its menu:
  *   differs    its menu would change the listing's dishes (dishProposal)
  *   not_read   never read, with a website or menu link to read
  *   cant_read  no menu could be read, or nothing to read it from

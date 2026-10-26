@@ -5,7 +5,8 @@ import { itemsField } from '@/lib/listingView'
 import { itemMarks, itemWording } from '@/lib/itemMarks'
 import { findMenus, readMenuPage, readMenus, unreadMenuNote, menuPages, type Trouble } from '@/lib/menuReader'
 import { MENU_LINK_KEY, menuWebsite, readMenuLink } from '@/lib/menuLink'
-import { listMenuReadings, saveMenuReading, type StoredMenuReading } from '@/lib/menuReadingStore'
+import { dateMenuDishes, listMenuReadings, saveMenuReading, type StoredMenuReading } from '@/lib/menuReadingStore'
+import { listedDishes, newDishes } from '@/lib/menuWatch'
 import { pageRenderer } from '@/lib/renderPage'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
@@ -41,10 +42,13 @@ export function newestMenuDate(item: DirectoryResource, field: CategoryField): s
   return itemMarks(item, field).reduce<string | null>((newest, m) => (m.menuAt && (!newest || m.menuAt > newest) ? m.menuAt : newest), null)
 }
 
-/** Never read, with something to read it from, and no dishes from a menu
- *  someone sent through the site (watchJobs.ts's 'not_read'). */
+/** Never read, with something to read it from. Its dishes dated "on its
+ *  menu" too: until Oct 26 those were left out, as from a menu sent through
+ *  the site, but most were dated by the reads of Oct 17 and 18, before a
+ *  reading was kept, so with no reading and no menu link they had no watch
+ *  either, and HipCityVeg's dishes said Oct 17 for good. */
 export function needsFirstRead(item: DirectoryResource, kind: DishKind, read: boolean): boolean {
-  return !read && !!(menuLinkOf(item) || menuWebsite(item, kind.category)) && !newestMenuDate(item, kind.field)
+  return !read && !!(menuLinkOf(item) || menuWebsite(item, kind.category))
 }
 
 /** Reads a place's menu now and keeps what the AI proposed: its menu link
@@ -88,6 +92,16 @@ export async function readPlaceMenu(slug: string, listing: DirectoryResource, ki
   })
 }
 
+/** A first read that agrees with the listing (no dish new to it, none it
+ *  lists missing) dates every dish it named, as a menu watch's agreeing
+ *  read does (menuWatchRun.ts); one that doesn't waits on the Main dishes
+ *  tab, its dates as they were. */
+async function dateIfAgreeing(slug: string, listing: DirectoryResource, kind: DishKind, kept: StoredMenuReading): Promise<void> {
+  if (kept.status !== 'proposed' || kept.missing?.length) return
+  if (newDishes(kept.dishes, listedDishes(listing, kind.category)).length) return
+  await dateMenuDishes(slug, listing.id, kind.field.key, kept.dishes.map((d) => d.name))
+}
+
 /** Food places a morning run reads, at most. */
 export const FIRST_READS_PER_RUN = 5
 
@@ -95,42 +109,53 @@ export const FIRST_READS_PER_RUN = 5
  *  few, maybe drawn in a browser, then the AI, inside the run's minute. */
 export const FIRST_READS_FOR_MS = 30_000
 
-/** Every community's food places never read (needsFirstRead), read and
- *  kept, a few a run, one after another. A place whose read throws is
- *  left for the next run. Returns what it did, for the run's log. */
+/** A community's food places never read (needsFirstRead), by name. */
+async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: DishKind }[]> {
+  const kinds = dishKinds(await listCategoriesUncached(slug))
+  if (!kinds.length) return []
+  const { readings, available } = await listMenuReadings(slug)
+  if (!available) return []
+  const { data: rows, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('community_id', slug)
+    .eq('status', 'approved')
+    .in(
+      'category',
+      kinds.map((k) => k.category.id),
+    )
+  if (error) throw new Error(`Couldn’t list the food places: ${error.message}`)
+  const read = new Set(readings.map((r) => r.resourceId))
+  return ((rows ?? []) as ResourceRow[])
+    .map(normalizeRow)
+    .flatMap((l) => {
+      const kind = kinds.find((k) => k.category.id === l.category)
+      return kind && needsFirstRead(l, kind, read.has(l.id)) ? [{ l, kind }] : []
+    })
+    .sort((a, b) => a.l.name.localeCompare(b.l.name))
+}
+
+/** The food places whose menu was never read, for the Watches tab's
+ *  Menus line (nightKinds.ts). */
+export async function listUnreadMenus(slug: string): Promise<{ id: string; name: string }[]> {
+  return (await unreadMenus(slug)).map(({ l }) => ({ id: l.id, name: l.name }))
+}
+
+/** Every community's food places never read, read and kept, a few a run,
+ *  one after another. A place whose read throws is left for the next run.
+ *  Returns what it did, for the run's log. */
 export async function readUnreadMenus(
   apiKey: string,
   { perRun = FIRST_READS_PER_RUN, forMs = FIRST_READS_FOR_MS, now = Date.now }: { perRun?: number; forMs?: number; now?: () => number } = {},
 ): Promise<{ community: string; read: number; left: number }[]> {
   const until = now() + forMs
-  const supabase = getAdminClient()
-  const { data: communities, error } = await supabase.from('community').select('slug')
+  const { data: communities, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   let budget = perRun
   for (const { slug } of (communities ?? []) as { slug: string }[]) {
-    const kinds = dishKinds(await listCategoriesUncached(slug))
-    if (!kinds.length) continue
-    const { readings, available } = await listMenuReadings(slug)
-    if (!available) continue
-    const { data: rows, error: listError } = await supabase
-      .from('resource')
-      .select('*')
-      .eq('community_id', slug)
-      .eq('status', 'approved')
-      .in(
-        'category',
-        kinds.map((k) => k.category.id),
-      )
-    if (listError) throw new Error(`Couldn’t list the food places: ${listError.message}`)
-    const read = new Set(readings.map((r) => r.resourceId))
-    const unread = ((rows ?? []) as ResourceRow[])
-      .map(normalizeRow)
-      .flatMap((l) => {
-        const kind = kinds.find((k) => k.category.id === l.category)
-        return kind && needsFirstRead(l, kind, read.has(l.id)) ? [{ l, kind }] : []
-      })
-      .sort((a, b) => a.l.name.localeCompare(b.l.name))
+    const unread = await unreadMenus(slug)
+    if (!unread.length) continue
     let done = 0
     for (const { l, kind } of unread) {
       if (budget <= 0 || now() > until) break
@@ -140,6 +165,7 @@ export async function readUnreadMenus(
         return null
       })
       if (kept) done++
+      if (kept) await dateIfAgreeing(slug, l, kind, kept)
     }
     out.push({ community: slug, read: done, left: unread.length - done })
   }

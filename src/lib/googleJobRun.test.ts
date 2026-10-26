@@ -8,7 +8,9 @@ const m = vi.hoisted(() => ({
   approved: [] as string[],
   fetchPlaceSync: vi.fn(),
   searchPlaces: vi.fn(),
+  readOwnSiteNow: vi.fn(),
 }))
+vi.mock('@/lib/hoursJobRun', () => ({ readOwnSiteNow: m.readOwnSiteNow }))
 
 // The resource table, in memory: select().eq()… awaited or maybeSingle(),
 // and update(patch).eq()….
@@ -96,6 +98,7 @@ beforeEach(() => {
   m.filed = []
   m.approved = []
   m.fetchPlaceSync.mockResolvedValue(google)
+  m.readOwnSiteNow.mockResolvedValue(false)
 })
 
 describe('who checks each field', () => {
@@ -199,7 +202,7 @@ describe('Use Google’s', () => {
 })
 
 describe('Keep the listing', () => {
-  it('changes nothing on it, and makes you the checker of what nothing checks, for good', async () => {
+  it('changes nothing on it, and makes you the checker of what nothing checks, for a year', async () => {
     await run.checkAgainstGoogle('philly', 'a1', NOW)
     const p = await run.keepTheListing('philly', 'a1', NOW)
     expect(m.filed).toEqual([])
@@ -208,9 +211,12 @@ describe('Keep the listing', () => {
     expect(by(p)).toEqual({ name: 'you', hours: 'you', phone: 'google', website: 'google' })
     expect(p.section).toBe('checked')
     expect(p.decided?.what).toBe('kept')
-    // Months later it is still yours.
+    // Months later it is still yours; a year on, nothing checks it again.
     const [later] = await run.loadGoogleJob('philly', NOW + 200 * 86_400_000)
     expect(later.section).toBe('checked')
+    const [year] = await run.loadGoogleJob('philly', NOW + 366 * 86_400_000)
+    expect(by(year)).toMatchObject({ name: 'nothing', hours: 'nothing' })
+    expect(year.section).toBe('to_check')
   })
 })
 
@@ -224,8 +230,40 @@ describe('Not on Google', () => {
     expect(p.notOnGoogle).toBe(new Date(NOW).toISOString())
   })
 
+  // Oct 25: CKids Philly was made "yours" whole, and showed as up to date
+  // with nothing reading its website.
+  it('reads its website first, and leaves you only what that doesn’t check', async () => {
+    m.rows = [listing({ details: { placeId: null, googleFields: [] } })]
+    m.readOwnSiteNow.mockImplementation(async () => ((m.watches = [watch({})]), true))
+    const p = await run.notOnGoogle('philly', 'a1', NOW)
+    expect(m.readOwnSiteNow).toHaveBeenCalledWith('philly', 'a1')
+    expect(by(p)).toEqual({ name: 'you', hours: 'website', phone: 'website', website: 'website' })
+    expect((m.rows[0].details as Record<string, unknown>).googleKept).toEqual({ name: new Date(NOW).toISOString() })
+  })
+
+  it('a website that won’t read leaves its fields to you, as before', async () => {
+    m.rows = [listing({ details: { placeId: null, googleFields: [] } })]
+    m.readOwnSiteNow.mockRejectedValue(new Error('it couldn’t be reached'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const p = await run.notOnGoogle('philly', 'a1', NOW)
+    expect(by(p)).toEqual({ name: 'you', hours: 'you', phone: 'you', website: 'you' })
+    expect((m.rows[0].details as Record<string, unknown>).notOnGoogle).toBe(new Date(NOW).toISOString())
+  })
+
   it('not for a listing with a match', async () => {
     await expect(run.notOnGoogle('philly', 'a1', NOW)).rejects.toThrow(/has a Google match/)
+    expect(m.readOwnSiteNow).not.toHaveBeenCalled()
+  })
+
+  it('drops a match Google stopped answering for', async () => {
+    m.rows = [listing({ details: { lastSyncError: 'Google Places request failed', lastSyncFailedAt: '2026-09-10T14:00:00Z' } })]
+    const p = await run.notOnGoogle('philly', 'a1', NOW)
+    expect(p.matched).toBe(false)
+    expect(by(p)).toEqual({ name: 'you', hours: 'you', phone: 'you', website: 'you' })
+    expect(p.section).toBe('checked')
+    const details = m.rows[0].details as Record<string, unknown>
+    expect(details.placeId).toBeUndefined()
+    expect(details.lastSyncError).toBeUndefined()
   })
 })
 
@@ -255,10 +293,19 @@ describe('Show as open', () => {
   it('overrides Google’s closure, and back; Google’s own answer stays', async () => {
     m.rows = [listing({ details: { businessStatus: 'CLOSED_TEMPORARILY', businessStatusChangedAt: '2026-10-12T10:00:00Z' } })]
     let p = await run.showAsOpen('philly', 'a1', true, NOW)
-    expect(p.closure).toEqual({ status: 'CLOSED_TEMPORARILY', shownOpen: true, since: '2026-10-12T10:00:00Z', readAt: '2026-10-18T10:00:00Z' })
+    expect(p.closure).toEqual({ status: 'CLOSED_TEMPORARILY', shownOpen: true, since: '2026-10-12T10:00:00Z', readAt: '2026-10-18T10:00:00Z', kept: null })
     p = await run.showAsOpen('philly', 'a1', false, NOW)
     expect(p.closure?.shownOpen).toBe(false)
     expect((m.rows[0].details as Record<string, unknown>).businessStatusOverride).toBeUndefined()
+  })
+  it('Keep closed dates it, until Google changes its answer again', async () => {
+    m.rows = [listing({ details: { businessStatus: 'CLOSED_TEMPORARILY', businessStatusChangedAt: '2026-10-12T10:00:00Z' } })]
+    expect((await run.loadGoogleJob('philly', NOW))[0].closure?.kept).toBeNull()
+    const p = await run.showAsOpen('philly', 'a1', false, NOW)
+    expect(p.closure?.kept).toBe(new Date(NOW).toISOString())
+    // Google reopened it and closed it again since: it asks again.
+    ;(m.rows[0].details as Record<string, unknown>).businessStatusChangedAt = new Date(NOW + 86_400_000).toISOString()
+    expect((await run.loadGoogleJob('philly', NOW + 2 * 86_400_000))[0].closure?.kept).toBeNull()
   })
   it('read when Google was last asked whether it’s open, which is more often than its fields', async () => {
     m.rows = [listing({ details: { placeId: 'P', businessStatus: 'CLOSED_TEMPORARILY', googleSyncedAt: '2026-08-28T10:00:00Z', googleStatusCheckedAt: '2026-10-21T10:00:00Z' } })]

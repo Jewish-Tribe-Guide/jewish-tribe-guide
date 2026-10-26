@@ -1,6 +1,6 @@
 import type { ResourceRow, ResourceSubmission, SubmissionRow } from '@/types'
 import { companionKeys, type CategoryConfig, type CategoryField } from './categories'
-import { hoursJobCategories, hoursJobName } from './hoursJob'
+import { hoursJobCategories, ownSiteCategories } from './hoursJob'
 import { diffListing } from './submissionDiff'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { NEWSLETTER_WATCH_NAME } from './newsletter'
@@ -30,7 +30,7 @@ import { itemWording } from './itemMarks'
 // the queue, so nothing a watch finds goes unseen.
 
 /** The jobs whose pages show findings, and the watches that file them. */
-export type FindingJob = 'hours' | 'times' | 'dishes' | 'hospitals' | 'kosher'
+export type FindingJob = 'hours' | 'times' | 'dishes' | 'hospitals' | 'kosher' | 'sites'
 
 export const FINDING_SOURCES: Record<FindingJob, readonly string[]> = {
   hours: [LISTING_PAGE_WATCH_NAME],
@@ -40,6 +40,10 @@ export const FINDING_SOURCES: Record<FindingJob, readonly string[]> = {
   dishes: [LISTING_PAGE_WATCH_NAME],
   hospitals: [REFUAH_WATCH_NAME],
   kosher: [KEYSTONE_WATCH_NAME, MEKOR_WATCH_NAME],
+  // Any other place's website (a grocery's, a childcare's): its phone,
+  // email and hours, where Google doesn't have them. They wait under its
+  // kind's row on the Watches tab (the user, Oct 25).
+  sites: [LISTING_PAGE_WATCH_NAME],
 }
 
 /** Where a finding came from, said of the place ("From its website"). */
@@ -220,12 +224,20 @@ export function keepOnly(sent: ResourceSubmission, current: ResourceRow, keep: r
 /** The categories each job page reads, for the queue to leave out. */
 export type JobCategories = Partial<Record<FindingJob, ReadonlySet<string>>>
 
-export function jobCategories(categories: readonly Pick<CategoryConfig, 'id' | 'detailFields'>[]): JobCategories {
+export function jobCategories(categories: readonly Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields'>[]): JobCategories {
   return {
     hours: new Set(hoursJobCategories(categories, 'hours').map((c) => c.id)),
     times: new Set(hoursJobCategories(categories, 'times').map((c) => c.id)),
     dishes: new Set(dishCategories(categories).map((c) => c.id)),
+    sites: new Set(siteCategories(categories).map((c) => c.id)),
   }
+}
+
+/** The places whose own website is read with no job page of their own
+ *  (a grocery, a childcare, a hotel): what it finds waits on their kind's
+ *  page on the Watches tab. The food places' wait on Main dishes. */
+export function siteCategories<C extends Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields'>>(categories: readonly C[]): C[] {
+  return ownSiteCategories(categories).filter((c) => !dishCategories([c]).length)
 }
 
 /** The categories Main dishes reads: a list of dishes (the food places). */
@@ -248,29 +260,21 @@ export function onAJobPage(s: Pick<SubmissionRow, 'submitted_by' | 'target_type'
   if (!name) return false
   if (FINDING_SOURCES.hospitals.includes(name) || FINDING_SOURCES.kosher.includes(name)) return true
   if (!category) return false
-  return (['hours', 'times', 'dishes'] as const).some((job) => FINDING_SOURCES[job].includes(name) && !!jobs[job]?.has(category))
+  return (['hours', 'times', 'dishes', 'sites'] as const).some((job) => FINDING_SOURCES[job].includes(name) && !!jobs[job]?.has(category))
 }
 
-const PAGE_NAME: Record<Exclude<FindingJob, 'hours'>, string> = {
-  times: 'Shul times',
-  dishes: 'Main dishes',
-  hospitals: 'Hospitals',
-  kosher: 'Kosher certification',
+/** Where a watch's findings wait, for its email: a place's kind's page on
+ *  the Watches tab, opened on it when `placeId` is given; the tab itself
+ *  (no name) for a list's, which span kinds. */
+export function findingPage(community: string, category?: Pick<CategoryConfig, 'id' | 'pluralLabel'> | null, placeId?: string): { path: string; name: string } {
+  if (!category) return { path: `/${community}/admin/watches`, name: '' }
+  return { path: `/${community}/admin/watches/kind/${category.id}${placeId ? `?place=${placeId}` : ''}`, name: category.pluralLabel }
 }
 
-/** The job page a watch's findings wait on, for its email: its admin path
- *  and its name. Mikvah hours is named from its category ("Mikvah hours",
- *  hoursJobName), so it's given. */
-export function findingPage(community: string, job: FindingJob, hoursName?: string): { path: string; name: string } {
-  return { path: `/${community}/admin/watches/${job}`, name: job === 'hours' ? hoursName ?? 'Hours' : PAGE_NAME[job] }
-}
-
-/** The job page a place's findings wait on: Shul times or the hours job,
- *  for a category one of them reads; none otherwise, and they wait in the
- *  moderation queue. */
-export function jobPageFor(community: string, category: Pick<CategoryConfig, 'id' | 'label' | 'detailFields'>): { path: string; name: string } | undefined {
-  if (hoursJobCategories([category], 'times').length) return findingPage(community, 'times')
-  if (hoursJobCategories([category], 'hours').length) return findingPage(community, 'hours', hoursJobName([category]))
-  if (dishCategories([category]).length) return findingPage(community, 'dishes')
-  return undefined
+/** Where a place's findings wait: its kind's page, for a category Shul
+ *  times, the hours job, Main dishes or its own website reads; none
+ *  otherwise, and they wait in the moderation queue. */
+export function jobPageFor(community: string, category: Pick<CategoryConfig, 'id' | 'label' | 'pluralLabel' | 'kind' | 'hasPhone' | 'detailFields'>, placeId?: string): { path: string; name: string } | undefined {
+  const read = hoursJobCategories([category], 'times').length || hoursJobCategories([category], 'hours').length || dishCategories([category]).length || siteCategories([category]).length
+  return read ? findingPage(community, category, placeId) : undefined
 }
