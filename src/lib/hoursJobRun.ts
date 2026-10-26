@@ -8,6 +8,7 @@ import { readListingPage, type PageSource } from '@/lib/listingPageRun'
 import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
 import { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_JOBS, homePageWatchChanges, hoursJobCategories, ownSiteCategories, hoursSearchedUrl, hoursWatchChanges, isHoursOff, isHoursSearched, jobWords, looksLikeHours, searchReason, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
+import { runAndRecord } from '@/lib/watchRunner'
 import { siteCategories } from '@/lib/watchFindings'
 import type { Watch } from '@/lib/watches'
 import type { CategoryConfig } from '@/lib/categories'
@@ -193,4 +194,24 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     out.push({ community: slug, added, removed })
   }
   return out
+}
+
+/** One place's website, watched and read now rather than at the morning's
+ *  run, when the admin has just said it's Not on Google (the user, Oct 25:
+ *  "CKids Philly doesn't check website once I said it's not on google").
+ *  Its page is read in full, as Read it now does, so what it says is in
+ *  before the admin is made the checker of anything. Nothing for a kind
+ *  of place whose website isn't read, or a place with none. Returns
+ *  whether a page was read. */
+export async function readOwnSiteNow(community: string, placeId: string): Promise<boolean> {
+  const own = await ownSitePlaces(community)
+  const place = own.places.find((p) => p.id === placeId)
+  const category = place && own.categories.find((c) => c.id === place.category)
+  if (!place || !category) return false
+  const { watches, available } = await listWatches(community)
+  if (!available) return false
+  const { add } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
+  const added = (await Promise.all(add.map((w) => addWatch(community, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })))).filter((w): w is Watch => !!w)
+  for (const w of added) await runAndRecord(w, undefined, undefined, { full: true })
+  return added.length > 0
 }

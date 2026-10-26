@@ -4,6 +4,7 @@ import { isCategorySyncEligible, type CategoryConfig } from './categories'
 import { fetchPlaceSync, namesOverlap, nextGoogleFields, searchPlaces, syncMayWrite, type PlaceSync } from './googlePlaces'
 import { formatHoursSummary } from './hours'
 import { listWatches } from './watchStore'
+import { readOwnSiteNow } from './hoursJobRun'
 import { MENU_WATCH_CREATOR, watchHealth, type Watch } from './watches'
 import { isListingPageWatch, pageReadsFor } from './listingPageWatch'
 import { approveSubmission, submitListingUpdate } from './submissionStore'
@@ -328,9 +329,13 @@ export async function keepTheListing(community: string, id: string, now = Date.n
   return onePlace(community, id, now)
 }
 
-/** Not on Google: said once, and its fields nothing checks become yours. */
+/** Not on Google: said once. Its website, when its kind's is read for
+ *  what Google doesn't have, is watched and read at once (readOwnSiteNow),
+ *  and only the fields nothing checks after that become yours: until Oct
+ *  25 they all did, and a place no page had read yet showed as up to
+ *  date, with nothing checking it. */
 export async function notOnGoogle(community: string, id: string, now = Date.now()): Promise<GooglePlace> {
-  const [{ row, category }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
+  const { row, category } = await loadOne(community, id)
   const details = { ...(row.details ?? {}) }
   if (matchOf(details)) {
     // A match Google stopped answering for is dropped (agreed Oct 24); a
@@ -338,7 +343,12 @@ export async function notOnGoogle(community: string, id: string, now = Date.now(
     if (!isoOr(details.lastSyncError)) throw new GoogleJobError('This listing has a Google match.', 400)
     for (const k of ['placeId', 'lastSyncError', 'lastSyncFailedAt', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt']) delete details[k]
   }
-  await writeDetails(community, id, { ...details, notOnGoogle: new Date(now).toISOString(), googleKept: keptNow({ ...row, details }, category, watches, now) })
+  const said = { ...details, notOnGoogle: new Date(now).toISOString() }
+  await writeDetails(community, id, said)
+  // A page that won't read leaves its fields to you, as before.
+  await readOwnSiteNow(community, id).catch((err) => console.error('[googleJob] reading its website failed:', err))
+  const [{ row: after }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
+  await writeDetails(community, id, { ...(after.details ?? said), googleKept: keptNow(after, category, watches, now) })
   return onePlace(community, id, now)
 }
 

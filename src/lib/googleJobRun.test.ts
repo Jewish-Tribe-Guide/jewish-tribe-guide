@@ -8,7 +8,9 @@ const m = vi.hoisted(() => ({
   approved: [] as string[],
   fetchPlaceSync: vi.fn(),
   searchPlaces: vi.fn(),
+  readOwnSiteNow: vi.fn(),
 }))
+vi.mock('@/lib/hoursJobRun', () => ({ readOwnSiteNow: m.readOwnSiteNow }))
 
 // The resource table, in memory: select().eq()… awaited or maybeSingle(),
 // and update(patch).eq()….
@@ -96,6 +98,7 @@ beforeEach(() => {
   m.filed = []
   m.approved = []
   m.fetchPlaceSync.mockResolvedValue(google)
+  m.readOwnSiteNow.mockResolvedValue(false)
 })
 
 describe('who checks each field', () => {
@@ -227,8 +230,29 @@ describe('Not on Google', () => {
     expect(p.notOnGoogle).toBe(new Date(NOW).toISOString())
   })
 
+  // Oct 25: CKids Philly was made "yours" whole, and showed as up to date
+  // with nothing reading its website.
+  it('reads its website first, and leaves you only what that doesn’t check', async () => {
+    m.rows = [listing({ details: { placeId: null, googleFields: [] } })]
+    m.readOwnSiteNow.mockImplementation(async () => ((m.watches = [watch({})]), true))
+    const p = await run.notOnGoogle('philly', 'a1', NOW)
+    expect(m.readOwnSiteNow).toHaveBeenCalledWith('philly', 'a1')
+    expect(by(p)).toEqual({ name: 'you', hours: 'website', phone: 'website', website: 'website' })
+    expect((m.rows[0].details as Record<string, unknown>).googleKept).toEqual({ name: new Date(NOW).toISOString() })
+  })
+
+  it('a website that won’t read leaves its fields to you, as before', async () => {
+    m.rows = [listing({ details: { placeId: null, googleFields: [] } })]
+    m.readOwnSiteNow.mockRejectedValue(new Error('it couldn’t be reached'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const p = await run.notOnGoogle('philly', 'a1', NOW)
+    expect(by(p)).toEqual({ name: 'you', hours: 'you', phone: 'you', website: 'you' })
+    expect((m.rows[0].details as Record<string, unknown>).notOnGoogle).toBe(new Date(NOW).toISOString())
+  })
+
   it('not for a listing with a match', async () => {
     await expect(run.notOnGoogle('philly', 'a1', NOW)).rejects.toThrow(/has a Google match/)
+    expect(m.readOwnSiteNow).not.toHaveBeenCalled()
   })
 
   it('drops a match Google stopped answering for', async () => {

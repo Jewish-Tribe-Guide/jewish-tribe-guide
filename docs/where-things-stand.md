@@ -499,7 +499,11 @@ Settled with the user so far:
   Picking a Google match later clears it. A "You" field goes back to
   Not checked after a year, and Not on Google on a place whose match has
   died drops the dead match (both agreed Oct 24, built Oct 25 with
-  piece 3; a live match is still refused).
+  piece 3; a live match is still refused). Since Oct 25 it first adds
+  and reads the place's own website, where its kind reads one, so only
+  the fields that page doesn't give become the admin's. Before that,
+  CKids Philly came out all "You" with nothing reading its site until
+  the next morning's run (`readOwnSiteNow()`, hoursJobRun.ts).
 - **Minyan times come in every kind the live site already keeps**: the
   usual weekday table and Shabbos, this week's times (including "No
   minyan this week" and a whole posted week), Yom Tov schedules (replace

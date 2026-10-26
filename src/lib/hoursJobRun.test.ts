@@ -6,7 +6,9 @@ const m = vi.hoisted(() => ({
   addWatch: vi.fn(),
   removeWatch: vi.fn(),
   updateWatch: vi.fn(),
+  runAndRecord: vi.fn(),
 }))
+vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
 
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -52,7 +54,7 @@ vi.mock('@/lib/categoryStore', () => ({
   ],
 }))
 
-const { searchHoursPages, syncHoursWatches } = await import('./hoursJobRun')
+const { readOwnSiteNow, searchHoursPages, syncHoursWatches } = await import('./hoursJobRun')
 const { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, hoursSearchedUrl } = await import('./hoursJob')
 
 // Lower Merion's home page and two of its links, as they were Oct 21.
@@ -202,5 +204,25 @@ describe('syncHoursWatches', () => {
     m.listWatches.mockResolvedValue({ watches: [{ id: 'old', url: 'https://lmcmikvah.org/old-hours/', resourceId: 'lmc', createdBy: HOURS_FOUND_CREATOR, active: true }], available: true })
     expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 3, removed: 1 }])
     expect(m.removeWatch).toHaveBeenCalledWith('philly', 'old')
+  })
+})
+
+// Oct 25 (the user): "CKids Philly doesn't check website once I said it's
+// not on google". Its watch came only with the next morning's run.
+describe('readOwnSiteNow: a place said to be Not on Google', () => {
+  it('watches its website at once and reads it in full', async () => {
+    m.rows = [row('ck', 'CKids Philly', 'https://jewishpreschool.org/', 'grocery')]
+    m.addWatch.mockImplementation(async (_c: string, w: Record<string, unknown>) => ({ id: 'new', ...w }))
+    expect(await readOwnSiteNow('philly', 'ck')).toBe(true)
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://jewishpreschool.org/', resourceId: 'ck', label: 'CKids Philly · its website', createdBy: HOURS_FOUND_CREATOR })
+    expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'new', resourceId: 'ck' }), undefined, undefined, { full: true })
+  })
+
+  it('nothing for one already watched, one with no website, or a kind whose website isn’t read', async () => {
+    m.rows = [row('ck', 'CKids Philly', 'https://jewishpreschool.org/', 'grocery'), row('nw', 'No Website', null, 'grocery'), row('ce', 'Cemetery', 'https://cemetery.example/', 'cemetery')]
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'w', url: 'https://jewishpreschool.org/', resourceId: 'ck', createdBy: HOURS_FOUND_CREATOR, active: true }], available: true })
+    for (const id of ['ck', 'nw', 'ce', 'gone']) expect(await readOwnSiteNow('philly', id)).toBe(false)
+    expect(m.addWatch).not.toHaveBeenCalled()
+    expect(m.runAndRecord).not.toHaveBeenCalled()
   })
 })
