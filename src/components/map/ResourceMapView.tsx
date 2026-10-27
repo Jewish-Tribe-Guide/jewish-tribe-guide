@@ -7,7 +7,6 @@ import { createHighlight, type Highlight } from './highlight'
 import CategoryFilter, { CHIP_GLYPH, CHIP_SIZE, type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
 import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
-import { FilterChip } from '@/components/resources/FiltersSheet'
 import NearbyList, { type NearbyEruv } from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
@@ -21,7 +20,6 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
 import {
-  activeFilters,
   filterCount,
   filterFields,
   keepsHours,
@@ -59,10 +57,7 @@ import { mapQueryString } from '@/lib/routes'
 import { countEvent } from '@/lib/countEvent'
 import { useOptionalCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { neighborhoodsFor } from '@/lib/places'
-import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, type Reading } from '@/lib/questionReader'
-import { askReader } from '@/lib/askReader'
-import { needsReading, ownFrom, readingLoses } from '@/lib/readingSearch'
-import { withTaught } from '@/lib/askWords'
+import { learnFrom } from '@/lib/askReader'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { useKeptListScroll } from './useKeptListScroll'
 
@@ -731,25 +726,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const [input, setInput] = useState(initialQueryText)
   const [committedQuery, setCommittedQuery] = useState(initialQueryText)
 
-  // ── The question reader (questionReader.ts, askReader.ts) ───────────────
-  // A committed question that isn't a place's name is also read, by an AI,
-  // into the map's own categories and Filters, and those answer it: the
-  // chips show how it was read, and any of them can be removed. Until the
-  // reading arrives, or when there's none (off, busy, failed, or it found
-  // nothing it knew), today's search answers, as it always has. `before` is
-  // what the categories and Filters were until the reading set them, put
-  // back when the search is cleared or replaced.
-  type AppliedReading = { question: string; reading: Reading; before: { selected: Set<string> | null; filters: MapFilterState | null } }
-  const [applied, setApplied] = useState<AppliedReading | null>(null)
-  const [readingNow, setReadingNow] = useState<string | null>(null)
-  const readByReader = applied !== null && applied.question === committedQuery
-  function putBackReading() {
-    if (!applied) return
-    setSelected(applied.before.selected)
-    setOwnFilters(applied.before.filters)
-    setApplied(null)
-  }
-
   const commitQuery = (raw: string) => {
     const v = raw.trim()
     if (!v) return
@@ -759,11 +735,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       openNowEverywhere()
       return
     }
-    if (v !== committedQuery) putBackReading()
     setCommittedQuery(v)
   }
   const clearQuery = () => {
-    putBackReading()
     setInput('')
     setCommittedQuery('')
   }
@@ -842,7 +816,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const suppressNextCommitEffectRef = useRef(false)
   const selectSuggestion = (p: (typeof allPoints)[number]) => {
     suppressNextCommitEffectRef.current = true
-    putBackReading()
     setInput(p.name)
     setCommittedQuery(p.name)
     setSearchFocused(false)
@@ -888,8 +861,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // this replaces: typing alone no longer narrows the map/list.
   const activeTerms = useMemo(() => {
     const q = stripApostrophes(committedQuery.trim().toLowerCase())
-    return q && !isOpenNowWord(q) && !readByReader ? [q] : []
-  }, [committedQuery, readByReader])
+    return q && !isOpenNowWord(q) ? [q] : []
+  }, [committedQuery])
   // The listings the committed query answers, read as a question the same
   // way as the home and category searches (see askSearch.ts): "where can I
   // get cholov yisroel milk" pins the store that has it, "food" pins every
@@ -897,38 +870,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // so they keep matching on their name (see visiblePoints).
   // Each keeps what it matched on, for the place panel to mark it (see
   // SearchFound), the same as a listing opened from any other search.
-  // Read by the reader, the items it read are what's looked for ("challah":
-  // the places listing it), each place marked with those it has; with none,
-  // the categories and Filters alone answer.
   const askIds = useMemo(() => {
-    if (readByReader) {
-      const items = applied.reading.items ?? []
-      if (items.length === 0) return null
-      const terms = [...new Set(items.flatMap((i) => i.toLowerCase().split(/\s+/)))]
-      const out = new Map<string, SearchFound | null>()
-      for (const p of allPoints) {
-        const has = p.raw ? readingItemsOn(p.raw, items) : []
-        if (p.raw && has.length) out.set(p.raw.id, { terms, items: has, fields: [] })
-      }
-      return out
-    }
     if (activeTerms.length === 0) return null
     const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
     const result = searchAsk(raws, categories ?? [], committedQuery, { places: neighborhoodsFor(countCommunity) })
     return new Map<string, SearchFound | null>(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
-  }, [activeTerms, allPoints, categories, committedQuery, countCommunity, readByReader, applied])
+  }, [activeTerms, allPoints, categories, committedQuery, countCommunity])
   const foundOnPoint = (id: string | undefined) => (id ? (askIds?.get(id) ?? null) : null)
-  // How far a reading reaches ("within 3 miles", "near HUP", "in Center
-  // City"), measured from where the visitor is only to about a block, so a
-  // moving location doesn't refit the map on every update.
-  const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], countCommunity ?? ''), [listings, countCommunity])
-  const meRounded = activeLocation ? `${activeLocation.lat.toFixed(3)},${activeLocation.lng.toFixed(3)}` : ''
-  const reach = useMemo(() => {
-    if (!readByReader) return null
-    const [lat, lng] = meRounded ? meRounded.split(',').map(Number) : []
-    return readingReach(applied.reading, readerPlacesHere, meRounded ? { lat, lng } : null)
-  }, [readByReader, applied, readerPlacesHere, meRounded])
-
   // ── Filters, per category (see mapFilters.ts) ────────────────────────────
   // Read from the link (or a category page's own Map button) once the
   // categories have loaded, since a filter belongs to one of them; the
@@ -960,62 +908,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const updateFilters = (next: (f: MapFilterState) => MapFilterState) => setOwnFilters(next(filters))
   const [filtersOpen, setFiltersOpen] = useState(false)
 
-  // Asks the reader about each question committed, once the categories and
-  // listings are here to tell a question from a name. The answer applies
-  // only if it's still the question in the box.
-  const readForRef = useRef<string | null>(null)
-  const committedQueryRef = useRef(committedQuery)
+  // A question our own search found nothing for is also read by the AI in
+  // the background, for the admin's Read questions tab, where its words can
+  // be taught to the search (learnFrom). The map never waits for it or
+  // shows it (the user, Oct 27). A question is committed on Enter.
   useEffect(() => {
-    committedQueryRef.current = committedQuery
-  }, [committedQuery])
-  useEffect(() => {
-    const q = committedQuery.trim()
-    if (!q) readForRef.current = null
-    if (!q || !categories || !listings || readForRef.current === q) return
-    readForRef.current = q
-    // A place's own name is looked up, not read: "giant" is every GIANT.
-    const typed = stripApostrophes(q.toLowerCase())
-    if (allPoints.some((p) => stripApostrophes(p.name.toLowerCase()).includes(typed))) return
-    // Only when our own search left something it didn't understand
-    // (needsReading), and the reading can add to what it understood, never
-    // take it away (see readingSearch.ts). The map's Filters can't hold
-    // "until 10", "today" or "other than GIANT", so for those today's
-    // search, which can, answers; nor is a reading used that lost the kind
-    // of place our parser heard, when today's search finds something.
-    const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
-    const today = searchAsk(raws, categories, q, { places: neighborhoodsFor(countCommunity) })
-    if (!needsReading(today)) return
-    const own = ownFrom(today, readerPlacesHere)
-    if (own.openAt || own.openToday || own.excluding.length) return
-    const before = { selected, filters: ownFilters }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the request starts here; "Reading your question…" shows while it runs
-    setReadingNow(q)
-    void askReader(q, countCommunity).then((answer) => {
-      setReadingNow((now) => (now === q ? null : now))
-      if (!answer.ok || committedQueryRef.current !== q) return
-      if (readingLoses(q, answer.reading, categories) && today.hits.length > 0) return
-      // "Open now" the reading didn't carry is kept, for every kind of
-      // place it read that keeps hours.
-      // And the words an admin taught the search, as our own search read them.
-      const reading = withTaught(answer.reading, own.taught)
-      const saidNow = reading.categories.some((c) => c.openNow)
-      const hasHours = (id: string) => categories.some((x) => x.id === id && keepsHours(x))
-      // The place our own search found ("in Bala Cynwyd") is where, whatever
-      // the reading says.
-      const withNow = {
-        ...reading,
-        ...(own.openNow && !saidNow ? { categories: reading.categories.map((c) => (hasHours(c.id) ? { ...c, openNow: true } : c)) } : {}),
-        ...(own.place ? { near: own.place.name.toLowerCase(), place: own.place } : {}),
-      }
-      const { categories: ids, filters: read } = readingFilters(withNow)
-      const onMap = ids.filter((id) => options.some((o) => o.id === id))
-      if (onMap.length === 0 && !answer.reading.items?.length && !answer.reading.near) return
-      if (onMap.length) setSelected(new Set(onMap))
-      setOwnFilters(read)
-      setApplied({ question: q, reading: withNow, before })
-    })
+    if (!askIds || !categories || !listings) return
+    const found = allPoints.some((p) => (p.raw ? askIds.has(p.raw.id) : activeTerms.every((t) => stripApostrophes(p.searchText).includes(t))))
+    if (!found) learnFrom(committedQuery, countCommunity)
+    // Once per question committed, once it can be answered.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committedQuery, categories, listings])
+  }, [askIds, !!categories, !!listings])
 
   // Re-applies the query-string-derived view (selected chips, search text,
   // bool/select filters) whenever a NEW navigation actually changes it — a
@@ -1098,7 +1001,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setCommittedQuery(initialQueryText)
     setOwnFilters(null)
     setBaseFilters({ query: initialFiltersQuery, forCategory: filtersForCategory })
-    setApplied(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialViewKey])
 
@@ -1206,7 +1108,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     [filtersKey, clock, allPoints, hoursKeysByCat],
   )
 
-  const answeringPoints = useMemo(() => {
+  const visiblePoints = useMemo(() => {
     const openNow = new Set(openNowIds.split('|'))
     return allPoints
       // Pinned is a UNION with the category chips, not a replacement — a
@@ -1221,14 +1123,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       .filter((p) => !p.raw || !filters[p.raw.category]?.openNow || openNow.has(p.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPoints, effectiveSelected, askIds, activeTerms, passesOwnFilters, openNowIds, pinnedSelected])
-  // Then how far a reading reaches: "within 3 miles", "in Center City".
-  // "Near HUP" alone limits nothing (see readingReach).
-  const milesFrom = (from: LatLng, p: { lat: number; lng: number }) => haversineMiles(from, { lat: p.lat, lng: p.lng })
-  const shownReach = reach
-  const visiblePoints = useMemo(
-    () => (shownReach && shownReach.miles !== null ? answeringPoints.filter((p) => milesFrom(shownReach.from, p) <= shownReach.miles!) : answeringPoints),
-    [answeringPoints, shownReach],
-  )
   // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
   // JSX below would build a fresh array on every ResourceMapView render —
   // including ones that don't touch either input, e.g. a background tap
@@ -1286,9 +1180,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       if (!desktopEditing) setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
       setSidebarCollapsed(false)
     }
-    // A reading arriving is a commit too: it changes what answers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committedQuery, filtersKey, isMobile, readByReader])
+  }, [committedQuery, filtersKey, isMobile])
 
   // Whether every category is on: everything shows, saved places with the
   // rest, so the Saved chip doesn't count. Mirrors CategoryFilter's own
@@ -1483,7 +1376,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Every category showing that keeps hours: the sheet's top Open now,
   // typing "open now", and the search's own "Open now" suggestion.
   function openNowEverywhere() {
-    setApplied(null)
     setInput('')
     setCommittedQuery('')
     updateFilters((f) => setOpenNowFor(f, categories ?? [], true))
@@ -1947,39 +1839,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     </button>
   )
 
-  // No line of chips for the filters someone chose themselves (the user,
-  // Oct 15: they know what they tapped), as a category page has none under
-  // its heading: the Filters button turns solid with how many, and the
-  // sheet shows which. A question the reader read is different — nobody
-  // tapped those — so then the row says "Read as" and what it read: the
-  // Filters, its items and how far, each removable.
-  const onFilters = readByReader ? activeFilters(filters, showingCategories) : []
-  const readItems = readByReader ? (applied.reading.items ?? []) : []
-  const readReach = shownReach ? reachLabel(shownReach) : null
-  const dropFromReading = (change: Partial<Reading>) => applied && setApplied({ ...applied, reading: { ...applied.reading, ...change } })
-  const showReadingRow = readingNow !== null && readingNow === committedQuery
-  const activeFilterRow = (onFilters.length > 0 || readItems.length > 0 || readReach || showReadingRow) && (
-    <div className="chip-scroll mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" data-testid="map-active-filters">
-      {showReadingRow && (
-        // Only after a moment: a remembered question answers faster than that.
-        <span className="shrink-0 rounded-full bg-white/95 px-3 py-1.5 text-[13px] font-semibold text-slate-600 shadow-sm" style={{ animation: 'backdropIn 150ms ease-out 300ms both' }} role="status" data-testid="map-reading">
-          Reading your question…
-        </span>
-      )}
-      {readByReader && (
-        <span className="shrink-0 rounded-full bg-white/95 px-2 py-1 text-[12px] font-semibold text-slate-500 shadow-sm" data-testid="map-read-as">
-          Read as
-        </span>
-      )}
-      {readItems.map((item) => (
-        <FilterChip key={`item:${item}`} label={item} on onToggle={() => dropFromReading({ items: readItems.filter((i) => i !== item) })} />
-      ))}
-      {readReach && <FilterChip key="reach" label={readReach} on onToggle={() => dropFromReading({ near: null, withinMiles: null })} />}
-      {onFilters.map((a) => (
-        <FilterChip key={a.key} label={a.label} on onToggle={() => updateFilters(a.remove)} />
-      ))}
-    </div>
-  )
   const filtersSheet = (
     <MapFiltersSheet
       isOpen={filtersOpen}
@@ -2323,7 +2182,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             >
               <div data-testid="map-top-chips" className="pointer-events-auto min-w-0 flex-1 pt-2">
                 {desktopCategoryChips}
-                {activeFilterRow}
               </div>
               <div data-testid="map-top-corner" className="pointer-events-auto flex h-12 shrink-0 items-center gap-2">
                 {/* Address entry (fullscreen only): the map is
@@ -2580,8 +2438,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         campaignChip={campaignChip}
                         pinnedChip={pinnedChip}
                       />
-                      {activeFilterRow}
-                    </div>
+                          </div>
                   )}
 
                   {/* ── Autocomplete dropdown — Google-Maps-style: matching

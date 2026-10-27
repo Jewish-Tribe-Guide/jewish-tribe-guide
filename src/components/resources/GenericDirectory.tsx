@@ -31,11 +31,9 @@ import { foundFor, searchAsk } from '@/lib/askSearch'
 import { readMinyanimSearch } from '@/lib/minyanimSearch'
 import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
-import { readerPlaces } from '@/lib/questionReader'
-import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
 import { itemCounts, itemFields, listingHas, listingItems, sameItem, searchItems } from '@/lib/itemFilter'
 import { itemName } from '@/lib/itemNames'
-import { useReading } from '@/lib/useReading'
+import { learnFrom } from '@/lib/askReader'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
 import UpvoteButton from './UpvoteButton'
@@ -982,71 +980,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     [todayResult],
   )
 
-  // ── The question reader (questionReader.ts), as on the home search ──────
-  // Only when our own search left something it didn't understand
-  // (needsReading), on Enter or after a pause. Its reading of this category
-  // (Open now, its yes/nos and pick-lists, items) is switched on in the
-  // page's own Filters, where it can be seen and switched off, and the
-  // question stays in the box without being searched by again (see
-  // landedSearch). It used to narrow the list itself and show what it read
-  // as "Read as" chips above it, a second set of filters beside Filters
-  // (the user, Oct 13). Never a place's own name. When the reading is about
-  // another kind of place and today's search finds something here
-  // ("challah" on Food, read as Grocery), today's search answers: this page
-  // is about this category.
-  const reader = useReading(communitySlug)
-  // The neighbourhoods; a hospital named comes with where it is (see the route).
-  const readerPlacesHere = useMemo(() => readerPlaces(items, communitySlug ?? ''), [items, communitySlug])
-  const typedName = q.replace(/['’]/g, '')
-  const readable = !!todayResult && needsReading(todayResult) && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
-  const own = todayResult ? ownFrom(todayResult, readerPlacesHere) : null
-  const reading = readable ? reader.readingFor(search) : null
-  const applyReading = useEffectEvent((asked: NonNullable<typeof reading>, question: string) => {
-    const { reading: r, own: mine } = asked
-    if (!readingAnswers(r, category.id)) return
-    if ((todayMatches?.size ?? 0) > 0 && readingLoses(question, r, categories ?? [category])) return
-    const here = r.categories.find((c) => c.id === category.id)
-    const openNowAdded = hasFilterableHours && !!(here?.openNow || mine.openNow) && !openNow
-    if (openNowAdded) setOpenNow(true)
-    const bools = (here?.bool ?? []).filter((key) => filterableBooleans.some((f) => f.key === key))
-    if (bools.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(bools.map((key) => [key, true])) }))
-    const sels = Object.entries(here?.select ?? {}).filter(([key, v]) => v.length && filterableSelects.some((f) => f.key === key))
-    if (sels.length) setSelectFilters((prev) => ({ ...prev, ...Object.fromEntries(sels) }))
-    const field = itemFields(category)[0]
-    const hasAdded: string[] = []
-    if (field && r.items?.length) {
-      // As the listings spell it ("wine" read is their "Wine").
-      const known = new Map(itemCounts(items, field.key).map((i) => [i.tag.toLowerCase(), i.tag]))
-      const already = (hasFilters[field.key] ?? []).map((t) => t.toLowerCase())
-      for (const i of r.items) {
-        const tag = known.get(itemName(i).toLowerCase())
-        if (tag && !already.includes(tag.toLowerCase()) && !hasAdded.includes(tag)) hasAdded.push(tag)
-      }
-      if (hasAdded.length) setHasFilters((prev) => ({ ...prev, [field.key]: [...(prev[field.key] ?? []), ...hasAdded] }))
-    }
-    setLanded({
-      search: question,
-      openNow: openNowAdded,
-      bool: bools.filter((key) => !boolFilters[key]),
-      select: Object.fromEntries(sels.map(([key, v]) => [key, v.filter((x) => !(selectFilters[key] ?? []).includes(x))])),
-      has: field && hasAdded.length ? { [field.key]: hasAdded } : {},
-    })
-    onParamsChange?.({ read: '1' }, { replace: true })
-  })
-  useEffect(() => {
-    // Applied once, as a reading arrives from the reader, like a shared
-    // link's filters are on arrival (see appliedInitialFiltersRef).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (reading) applyReading(reading, search)
-    // Once per reading that arrives.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reading])
-  useEffect(() => {
-    if (!readable || !own) return
-    const timer = setTimeout(() => reader.ask(search, own), 1000)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readable, search])
   // A minyan question typed over the list of shuls ("mincha tonight") is
   // asked of Minyanim by time, as the home search would send it: the list
   // of shuls has nothing to answer it with.
@@ -1884,12 +1817,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 search={search}
                 onSearch={setSearch}
                 scope={minyanimView ? 'minyanim' : undefined}
-                reading={!minyanimView && reader.isReading(search)}
                 onSubmit={() => {
                   if (asksMinyan) setMinyanimViewOn(true)
-                  else if (readable && own) reader.ask(search, own)
+                  // Read in the background for Read questions (learnFrom).
+                  else if (searchFoundNothing) learnFrom(search, communitySlug)
                 }}
-                foundNothing={!minyanimView && searchFoundNothing && !reader.isReading(search)}
+                foundNothing={!minyanimView && searchFoundNothing}
                 save={searchSave}
               />
             </div>

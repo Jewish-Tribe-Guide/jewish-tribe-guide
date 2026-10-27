@@ -3,9 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the Read questions tab for real: a reading the AI made is listed
-// with how it was read, Approve stores who approved it and when (a rule,
-// used with no AI at all), Unapprove takes that back, and Forget deletes
-// it so the question is read afresh. The reading is inserted straight into
+// with how it was read, with no Approve (since Oct 27 a reading never
+// answers on the site), and Forget deletes it so the question is read
+// afresh. The reading is inserted straight into
 // question_reading: no test server ever calls the reader (QUESTION_READER
 // =off). Needs migration 062 (question_reading) on the test project.
 //
@@ -34,7 +34,7 @@ test.afterEach(async () => {
   await getAdminClient().from('question_word').delete().eq('community_id', 'philly').eq('word', word)
 })
 
-test('a read question is listed as read, approved and unapproved for real, and forgotten', async ({ page }) => {
+test('a read question is listed as read, has no Approve, and is forgotten for real', async ({ page }) => {
   const supabase = getAdminClient()
   const { data: cats } = await supabase.from('category').select('id, plural_label').eq('community_id', 'philly').limit(1)
   const category = cats![0] as { id: string; plural_label: string }
@@ -47,25 +47,16 @@ test('a read question is listed as read, approved and unapproved for real, and f
     hits: 3,
   })
   expect(error).toBeNull()
-  const stored = async () => (await supabase.from('question_reading').select('approved_at, approved_by').eq('community_id', 'philly').eq('key', key)).data
+  const stored = async () => (await supabase.from('question_reading').select('key').eq('community_id', 'philly').eq('key', key)).data
 
   await page.goto('/philly/admin/questions')
-  const review = page.locator('section', { has: page.getByRole('heading', { name: /^To review/ }) })
-  const row = review.getByTestId('read-question').filter({ hasText: `“${key}”` })
+  const list = page.locator('section', { has: page.getByRole('heading', { name: /^Questions/ }) })
+  const row = list.getByTestId('read-question').filter({ hasText: `“${key}”` })
   await expect(row).toBeVisible({ timeout: 20_000 })
   await expect(row).toContainText('3 times')
   await expect(row).toContainText(category.plural_label)
 
-  await row.getByRole('button', { name: 'Approve' }).click()
-  await expect(row).not.toBeVisible()
-  await expect.poll(async () => (await stored())?.[0]?.approved_at).toBeTruthy()
-  expect((await stored())?.[0]?.approved_by).toBeTruthy()
-
-  await page.getByRole('button', { name: 'Show Approved' }).click()
-  const approved = page.getByTestId('read-question').filter({ hasText: `“${key}”` })
-  await approved.getByRole('button', { name: 'Unapprove' }).click()
-  await expect(row).toBeVisible()
-  await expect.poll(async () => (await stored())?.[0]?.approved_at ?? null).toBeNull()
+  await expect(row.getByRole('button', { name: 'Approve' })).toHaveCount(0)
 
   await row.getByRole('button', { name: 'Forget' }).click()
   await expect(row).not.toBeVisible()

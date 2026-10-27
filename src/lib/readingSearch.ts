@@ -9,6 +9,13 @@ import { namesItem } from './itemNames'
 import { placeFor, reachLabel, readingFilters, readingItemsOn, readingReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
 
 // ── Answering a question from its reading (see questionReader.ts) ───────────
+// Not used by the live search since Oct 27: the AI isn't part of it (the
+// user: "feels weird to search, get an answer, then see reading question,
+// then get a different answer"). A question found nowhere is only read in
+// the background (askReader.ts, learnFrom), for the admin's Read questions
+// tab; what's here describes those readings there and serves the
+// compare-reader script. What follows is how it answered while it was.
+//
 // The home and category searches' side of the reader. The work is split
 // (decided Sep 30, after "meat restaurants open until 10pm or later" lost
 // its hours): the AI's reading picks what our own parser is weak at, the

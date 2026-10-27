@@ -1685,6 +1685,27 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 27, at the end: the AI is off the live search (on `redesign/oct18-fixes`)
+
+The user, after "trader joes" on Synagogues found nothing, then the AI's
+reading ("near Trader Joe's") showed every shul: "feels weird to search,
+get an answer, then see reading question, then get a different answer."
+On the live site the reader had read 41 questions, 23 into nothing, about
+15 of them half-typed words (it read after a one-second pause).
+
+- **The home, category pages and the map never wait for the AI or use its
+  reading.** No "Reading your question…", no "Read as" on the map.
+- **Enter on a search that finds nothing** reads it in the background
+  (`learnFrom`, askReader.ts), for the admin's Read questions tab. Typing
+  alone reads nothing; a shared link isn't read.
+- **Read questions** has no Approve any more (a reading never answers),
+  one list, and Teach, which is how the search learns.
+- **Next, agreed in principle, not built:** a "nothing found" box on the
+  map like a category page's (it says "Turn on a category above" today),
+  and a quiet "Nothing in the guide for …" row on the home while typing.
+  And typo matching for names ("Beth sholom", "bros medresh"), most of
+  what was asked.
+
 ## Done Oct 27, last: a week waiting for you is shown whole (on `redesign/oct18-fixes`)
 
 - **A week the listing hasn't got is shown whole, all of it new**, by day,

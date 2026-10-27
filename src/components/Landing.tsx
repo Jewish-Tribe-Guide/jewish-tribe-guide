@@ -9,12 +9,10 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { nearMiss, type AskResult } from '@/lib/askSearch'
 import type { Answer } from '@/lib/askAnswer'
-import { namedListings, type LinesContext, type SearchLine } from '@/lib/searchLands'
+import type { SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
 import { routes } from '@/lib/routes'
-import { readerPlaces } from '@/lib/questionReader'
-import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
-import { useReading } from '@/lib/useReading'
+import { learnFrom } from '@/lib/askReader'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -197,58 +195,30 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // The home's own cards the words name that aren't a kind of place with
   // listings (Patient & Family Support, a form): a line that opens them.
   const otherCards = (filtered ?? []).filter((c) => !categories?.some((cat) => cat.id === c.id && cat.kind === 'listing'))
-  const linesFor = (text: string, result: AskResult, answer: Answer | null, reading: LinesContext['reading'] = null): SearchLine[] =>
-    homeLines(text, result, answer, reading, categories ? otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })) : [])
+  const linesFor = (text: string, result: AskResult, answer: Answer | null): SearchLine[] =>
+    homeLines(text, result, answer, null, categories ? otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })) : [])
   // Our own search's lines.
   const ownLines = asked ? linesFor(q, asked.result, asked.answer) : []
 
-  // The question reader (questionReader.ts) reads only what our own search
-  // didn't understand: nothing found, or only the words found as text
-  // ("Food · 2 for “something to drink”"). Its reading then decides the
-  // lines, and the page it opens has that reading in its Filters. A
-  // question our search did understand ("kosher wine", "food open now") is
-  // never sent: the AI answered it differently from one try to the next,
-  // and Enter waited for it (the user, Oct 13: "super inconsistent", "why
-  // is AI reading the question when it's already showing the right
-  // answer"). Never a place's own name.
-  const reader = useReading(communitySlug)
-  const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], communitySlug), [listings, communitySlug])
-  const namesAPlace = !!q && namedListings(listings ?? [], q).length > 0
-  const readable = !!asked && !namesAPlace && needsReading(asked.result) && (ownLines.length === 0 || !!ownLines[0].loose)
-  const reading = readable ? reader.readingFor(q) : null
-  // Only a reading that names a kind of place, and doesn't lose the one our
-  // own parser is sure of (see readingLoses), decides the lines.
-  const todayFound = !!asked && (asked.result.hits.length > 0 || asked.result.noHours.length > 0)
-  const useReadingLines = !!reading && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
   const sharedQuestion = !!initialQuery && q === initialQuery.trim()
-  const own = asked ? ownFrom(asked.result, readerPlacesHere) : null
-  useEffect(() => {
-    if (!readable || !own) return
-    const timer = setTimeout(() => reader.ask(q, own), sharedQuestion ? 0 : 1000)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readable, q])
-  const readingNow = !!q && reader.isReading(q)
-  const readerAnswered = reader.answered(q)
 
-  const exact = asked && useReadingLines ? linesFor(q, asked.result, asked.answer, reading!.reading) : ownLines
   // Nothing as asked: the closest question that does find something, with
   // a word or two left out ("packaged pretzels" → pretzels; see nearMiss),
-  // each line saying what was left out. A reading, once it comes, has the
-  // lines instead when it found something.
-  const miss = asked && exact.length === 0 && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule?.now ?? 0), places }) : null
+  // each line saying what was left out.
+  const miss = asked && ownLines.length === 0 && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule?.now ?? 0), places }) : null
   const lines = miss
     ? linesFor(miss.kept, miss.result, null).map((line) => ({ ...line, sub: `${line.sub} · nothing for “${miss.dropped}”` }))
-    : exact
+    : ownLines
 
-  // Enter (or a "Try asking" tapped): the first line, as shown, at once.
-  // It waits only for a question being read (readable: our own search
-  // found nothing, or only the words as text), and says it's reading;
+  // Enter (or a "Try asking" tapped): the first line, as shown, at once;
   // nothing anywhere stays here and says so (nothingFor), with where to
-  // ask.
+  // ask. A question our own search found nothing for is also read by the
+  // AI in the background, for the admin's Read questions tab, where its
+  // words can be taught to the search (learnFrom). The page never waits
+  // for it or shows it (the user, Oct 27: "feels weird to search, get an
+  // answer, then see reading question, then get a different answer").
   const router = useRouter()
   const [nothingFor, setNothingFor] = useState<string | null>(null)
-  const [waitingFor, setWaitingFor] = useState<string | null>(null)
   const goTo = (line: SearchLine, text: string) => {
     track('search_landed', { kind: line.kind, query: text })
     if (line.listing) {
@@ -263,37 +233,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   }
   const submit = () => {
     if (!q || !listings || !schedule) return
-    const toRead = readable && !reading && !readerAnswered
-    if (lines[0] && !readingNow && !toRead) return goTo(lines[0], q)
-    if (toRead && own) {
-      reader.ask(q, own)
-      return setWaitingFor(q)
-    }
-    if (readingNow) return setWaitingFor(q)
+    if (ownLines.length === 0) learnFrom(q, communitySlug)
     if (lines[0]) return goTo(lines[0], q)
     setNothingFor(q)
   }
-  // The reading Enter waited for has arrived (or couldn't be had).
-  useEffect(() => {
-    if (!waitingFor || waitingFor !== q || (!readerAnswered && !reading)) return
-    // Acting once on something that arrived from outside (the reader's
-    // answer), not state derived from props on every render.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWaitingFor(null)
-    if (lines[0]) goTo(lines[0], q)
-    else setNothingFor(q)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waitingFor, readingNow, readerAnswered, lines[0]?.key])
   // A shared question (/philly/ask/…) goes where Enter would, once the page
   // can work out where; the address is replaced, so Back doesn't return to
   // a page that leaves again.
-  // A question to be read waits for the reader's answer (asked at once,
-  // above): it may be off, and then our own search's lines are where it
-  // goes.
   const sharedLanded = useRef(false)
   useEffect(() => {
     if (sharedLanded.current || !sharedQuestion || !asked) return
-    if (readable && !reading && !readerAnswered) return
     sharedLanded.current = true
     const first = lines[0]
     if (first?.href) router.replace(first.href)
@@ -302,7 +251,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     else setNothingFor(q)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sharedQuestion, !!asked, readerAnswered, !!reading])
+  }, [sharedQuestion, !!asked])
 
   // Questions to tap under the empty box (see searchPrompts.ts): each goes
   // where it would on Enter, so only ones that go somewhere are offered.
@@ -331,14 +280,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       <AskTheGroup query={q} {...askGroup} />
     </div>
   )
-  const linesNode = q && !foundNothing && <SearchLines lines={lines} categories={categories} typed={q} reading={readingNow || waitingFor === q} onPick={(line) => goTo(line, q)} />
+  const linesNode = q && !foundNothing && <SearchLines lines={lines} categories={categories} typed={q} onPick={(line) => goTo(line, q)} />
 
   // Capture searches that come up empty — the most actionable signal for what
   // content to add next. Only counts once data has loaded, so a slow load never
   // looks like a "miss".
   useLogSearchMiss({
     query,
-    hasResults: lines.length > 0 || readingNow,
+    hasResults: lines.length > 0,
     ready: allCards !== null && listings !== null,
     source: 'Home',
   })
