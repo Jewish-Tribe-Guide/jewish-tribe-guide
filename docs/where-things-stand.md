@@ -81,7 +81,16 @@ for that exact change, in the same conversation. Show the dry run first.
    The link isn't a round button too, and there's no Directions (Mike's
    kitchen is 52 miles away). Set on dev's Food "Delivery WhatsApp Group"
    (title Delivery, words Delivery Details). Live needs a yes for the same
-   setting, after this branch is deployed.
+   setting, after this branch is deployed. **Written to live Oct 27 with
+   the user's yes** (backup in `backups/`, untracked); shows once PR 363
+   deploys.
+1h. **Two delivery group links, approved, waiting on the user** (Oct 27):
+   That Sushi Spot - Lakewood's Delivery WhatsApp Group is empty, and
+   Shlomo's has none though its words say dates are announced there. The
+   user has said yes to writing both to live, and will send the invite
+   links. Not on either website or the web (Shlomo's only listed group is
+   its Virginia one). Remind the user until they're in; then write both,
+   with a backup, and refresh the live pages.
 
 ## For the user or the community
 
