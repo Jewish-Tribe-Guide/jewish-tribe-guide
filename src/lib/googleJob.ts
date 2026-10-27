@@ -22,8 +22,9 @@ export const CHECKED_FIELDS: readonly CheckedField[] = ['name', 'hours', 'phone'
 export const CHECKED_LABELS: Record<CheckedField, string> = { name: 'Name', hours: 'Hours', phone: 'Phone', website: 'Website' }
 
 /** Who checks a field: `at`, for you, when you said so; for Google, when it
- *  last answered, shown only once it has stopped answering. */
-export type Checker = { kind: 'google' | 'website' | 'you' | 'nothing'; at?: string | null }
+ *  last answered, shown only once it has stopped answering; for the Links
+ *  job (a website only, that it opens each week), when it last opened. */
+export type Checker = { kind: 'google' | 'website' | 'you' | 'links' | 'nothing'; at?: string | null }
 
 export type GoogleFieldRow = { field: CheckedField; label: string; value: string; by: Checker }
 

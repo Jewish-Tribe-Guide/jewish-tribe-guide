@@ -198,6 +198,16 @@ describe('openedPlace, not checked', () => {
     ])
   })
 
+  it('a website the Links job opened is checked, not Nothing checks its website (PKS, Oct 27)', () => {
+    const g = google({ name: 'PKS Kosher Market', fields: [
+      { field: 'name', label: 'Name', value: 'PKS Kosher Market', by: { kind: 'google' } },
+      { field: 'website', label: 'Website', value: 'https://www.phlfoodandshops.com/directory/pks-kosher-market/', by: { kind: 'links', at: '2026-11-01T09:00:00Z' } },
+    ] })
+    const o = openedPlace('p', jobs({ google: { counts: { checked: 1, toCheck: 0, cantRead: 0, didntLoad: 0 }, places: [g] } }), NOW)
+    expect(o.problems).toEqual([])
+    expect(checkedLines(o.checked).map((l) => [l.label, l.foot.lead, l.foot.when])).toContainEqual(['Website', 'Opens', 'checked Nov 1'])
+  })
+
   it('says Google stopped answering, with Find it on Google, and leaves its fields out of the checked', () => {
     const g = google({ section: 'cant_read', failedAt: '2026-09-10T14:00:00Z', fields: [{ field: 'name', label: 'Name', value: 'Sababa Falafel', by: { kind: 'google', at: '2026-09-09T08:00:00Z' } }] })
     const o = openedPlace('p', jobs({ google: { counts: { checked: 0, toCheck: 0, cantRead: 1, didntLoad: 0 }, places: [g] } }), NOW)

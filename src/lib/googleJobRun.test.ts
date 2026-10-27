@@ -126,6 +126,20 @@ describe('who checks each field', () => {
     expect(by((await run.loadGoogleJob('philly', NOW))[0])).toEqual({ name: 'nothing', hours: 'nothing', phone: 'google', website: 'website' })
   })
 
+  it('a website Google doesn’t have is the Links job’s once it opened that link (PKS, Oct 27)', async () => {
+    const pks = 'https://www.phlfoodandshops.com/directory/pks-kosher-market/'
+    const record = (over: Partial<Watch>) => watch({ id: 'l1', createdBy: 'link check', active: false, url: 'https://guide.invalid/link-check/a1/website', pageHash: pks, lastOkAt: '2026-11-01T09:00:00Z', ...over })
+    m.rows = [listing({ details: { website: pks } })]
+    m.watches = [record({})]
+    const [p] = await run.loadGoogleJob('philly', NOW)
+    expect(p.fields.find((f) => f.field === 'website')!.by).toEqual({ kind: 'links', at: '2026-11-01T09:00:00Z' })
+    // Not when it didn't open, nor a check of the link it had before.
+    m.watches = [record({ failingSince: '2026-11-01T09:00:00Z', lastError: 'Not found' })]
+    expect(by((await run.loadGoogleJob('philly', NOW))[0]).website).toBe('nothing')
+    m.watches = [record({ pageHash: 'https://pks.example/' })]
+    expect(by((await run.loadGoogleJob('philly', NOW))[0]).website).toBe('nothing')
+  })
+
   it('a mikvah’s page never checks its plain Hours', async () => {
     m.rows = [listing({ category: 'mikvah', details: { googleFields: ['phone', 'name'] } })]
     m.watches = [watch({})]

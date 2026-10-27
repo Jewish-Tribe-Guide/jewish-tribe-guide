@@ -541,6 +541,12 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        keystone-k.org/kosher/house-of-kosher/ (Oct 25), so the first
        run should find none. The cron first runs on
        production once this branch deploys.
+     - **A website Google doesn't have counts as checked by Links: BUILT
+       Oct 27** (the user, on PKS Kosher Market). Once the Sunday check
+       opened it, Google's "who checks each field" says Links, and the
+       opened place shows "Website · Opens · checked <day>" instead of
+       Nothing checks its website. A link that stops opening goes back to
+       Nothing. Until the first Sunday run, PKS still shows not checked.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add
        a source).
