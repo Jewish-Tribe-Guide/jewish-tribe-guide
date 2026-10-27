@@ -214,6 +214,8 @@ function SourceForm({ label, email, save, busy, onSave, onCancel, readFor = 'tim
   )
 }
 
+/** A group showing a whole week, some of it as the listing has it. */
+const whole = (g: WaitGroup) => g.lines.some((l) => l.same)
 const FIELDS = 'grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3.5 py-2 text-sm sm:grid-cols-[11rem_minmax(0,1fr)]'
 
 /** A page, opened in a new tab: "rivkacakes.com ↗". */
@@ -566,20 +568,26 @@ export default function OpenedPlace({
                   {g.when && ` · ${g.when}`}
                 </span>
                 {g.lines.length > 0 && (
-                  <div className="-mx-2 flex flex-col rounded-md bg-amber-50 px-2">
+                  // All of it changes: all highlighted. A whole week with
+                  // some as the listing has them: only the rest (Oct 27).
+                  <div className={`-mx-2 flex flex-col rounded-md px-2 ${whole(g) ? '' : 'bg-amber-50'}`}>
                     {g.lines.map((l, i) =>
                       l.heading ? (
                         <span key={i} data-testid="waiting-part" className={`pb-0.5 pt-2.5 text-[12.5px] font-bold text-slate-700 ${i ? 'border-t border-amber-200/70' : ''}`}>
                           {l.label}
                         </span>
+                      ) : l.day ? (
+                        <span key={i} data-testid="waiting-day" className="pt-2 text-[12.5px] font-semibold text-slate-500">
+                          {l.label}
+                        </span>
                       ) : (
-                        <span key={i} className={FIELDS}>
+                        <span key={i} data-changed={whole(g) && !l.same ? true : undefined} className={`${FIELDS} ${whole(g) && !l.same ? '-mx-2 rounded-md bg-amber-50 px-2' : ''}`}>
                           <span>{l.label}</span>
                           <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
                             <span className="font-semibold">{l.value}</span>
                             {l.old !== null && (
                               <span className="text-[12.5px] text-slate-500">
-                                {l.say === 'usually' ? 'Usually' : 'Was'} {l.old}
+                                Was {l.old}
                               </span>
                             )}
                             {l.say === 'new' && <span className="text-[12.5px] text-slate-500">New</span>}

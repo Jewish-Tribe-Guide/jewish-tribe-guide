@@ -437,7 +437,7 @@ describe('this week’s schedule (Oct 6)', () => {
 
   // Drawn Oct 26 (boards 2, 3 and 3b): the week's weekdays and This
   // Shabbos, ordered as the usual boxes are; a time already started today
-  // greyed; This Shabbos headed by Friday's candle lighting.
+  // greyed.
   describe('the week and This Shabbos (Oct 26)', () => {
     afterEach(() => {
       zmanimShabbos.candleLighting = null
@@ -471,21 +471,19 @@ describe('this week’s schedule (Oct 6)', () => {
       expect(dated()).toEqual(['davening-this-shabbos', 'davening-this-week'])
     })
 
-    it('This Shabbos starts with Friday’s candle lighting, a day of its own when the week gives Friday nothing', () => {
+    // The user, Oct 27: candle lighting is the city's time, not the shul's,
+    // and it's on the home page. Drawn Oct 26 at the top of This Shabbos;
+    // Kol Tzedek got a Friday with nothing else on it.
+    it('This Shabbos has no candle lighting, nor a Friday of its own when the week gives Friday nothing', () => {
       zmanimShabbos.candleLighting = { label: 'Candle lighting', time: '6:05 PM', iso: '2026-10-09T18:05:00-04:00' }
       showAt('2026-10-08T16:00:00-04:00', [fullWeek])
-      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent('Fri Oct 9Candle lighting6:05 PMKabbalas Shabbos6:20 PMSat Oct 10Shacharis9 AM')
-      // Not in the week's box.
-      expect(screen.getByTestId('davening-this-week')).not.toHaveTextContent('Candle lighting')
+      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent('Fri Oct 9Kabbalas Shabbos6:20 PMSat Oct 10Shacharis9 AM')
+      expect(screen.queryByText('Candle lighting')).not.toBeInTheDocument()
       cleanup()
       showAt('2026-10-08T16:00:00-04:00', [{ ...fullWeek, minyanim: fullWeek.minyanim.filter((m) => m.id !== 'f3') }])
-      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent(/Fri Oct 9Candle lighting6:05 PMSat Oct 10Shacharis9 AM/)
-    })
-
-    it('no candle lighting from another week’s zmanim', () => {
-      zmanimShabbos.candleLighting = { label: 'Candle lighting', time: '6:15 PM', iso: '2026-10-02T18:15:00-04:00' }
-      showAt('2026-10-08T16:00:00-04:00', [fullWeek])
-      expect(screen.queryByTestId('davening-candle-lighting')).not.toBeInTheDocument()
+      const shabbos = screen.getByTestId('davening-this-shabbos')
+      expect(within(shabbos).getByTestId('davening-this-week-days')).toHaveTextContent(/^Sat Oct 10Shacharis9 AM$/)
+      expect(within(shabbos).getByTestId('davening-this-shabbos-dates')).toHaveTextContent(/^Oct 10$/)
     })
 
     it('no dated This Shabbos while only the usual times are known', () => {
@@ -493,6 +491,60 @@ describe('this week’s schedule (Oct 6)', () => {
       expect(screen.getByTestId('davening-this-week')).toBeInTheDocument()
       expect(screen.queryByTestId('davening-this-shabbos')).not.toBeInTheDocument()
       expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Usual Shabbos times')
+    })
+  })
+
+  describe('the week’s box, as live shuls showed it (Oct 27)', () => {
+    const showTue = (schedules: unknown[], { rows = usual, ...over }: { rows?: unknown[] } & Record<string, unknown> = {}) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-10-06T10:00:00-04:00')) // Tue Oct 6
+      const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: rows, minyanim_schedules: schedules, ...over })
+      renderWithProviders(<DaveningCard item={shul} minyanim={rows} schedules={schedules} category={shuls} />, { content: { categories: [shuls] } })
+    }
+
+    // Rodeph Shalom: their whole week, one weekday minyan, read "Oct 29".
+    it('dated as this week, Sunday to Friday, not just the day it has a minyan', () => {
+      const whole = {
+        ...weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', whole: true }),
+        minyanim: [
+          { id: 'w1', tefillah: 'shacharis', on: ['2026-10-08'], time: '8:10am' },
+          { id: 'w2', tefillah: 'kabbalas_shabbos', on: ['2026-10-09'], time: '6:00pm' },
+        ],
+      }
+      showTue([whole])
+      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
+      expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 8Shacharis8:10 AM')
+    })
+
+    // BZBI: a pasted week to Thursday. The user, Oct 27: this week is
+    // Sunday to Friday; a day the week doesn't have has no minyan, never
+    // its usual times put in.
+    it('a weekday the week doesn’t reach has nothing, the box still dated to Friday', () => {
+      const rows = [...usual, { id: 'e', tefillah: 'shacharis', days: ['fri'], time: '7:30am' }]
+      const pasted = {
+        ...weekPost('Times for Oct 2 – Oct 8', '2026-10-02', '2026-10-08'),
+        minyanim: [
+          { id: 'p1', tefillah: 'shacharis', on: ['2026-10-05', '2026-10-08'], time: '6:45am' },
+          { id: 'p2', tefillah: 'shacharis', on: ['2026-10-06', '2026-10-07'], time: '7:00am' },
+        ],
+      }
+      showTue([pasted], { rows })
+      const week = screen.getByTestId('davening-this-week')
+      expect(within(week).getByTestId('davening-this-week-days')).toHaveTextContent(/Thu Oct 8Shacharis6:45 AM$/)
+      expect(week).not.toHaveTextContent('Fri Oct 9')
+      expect(week).not.toHaveTextContent('7:30 AM')
+      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
+    })
+
+    // Shtiebel: its website's week, approved by an admin, said only "last
+    // checked": the approval dates the whole listing, which no box goes by.
+    it('a week from their website, approved, says who gave it', () => {
+      const site = weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', postedAt: '2026-10-06T11:48:00.000Z' })
+      showTue([{ ...site, minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-07'], time: '7:30am' }] }], {
+        confirmedAt: '2026-10-06T18:56:00.000Z',
+        confirmedFrom: { from: 'Mekor Habracha', at: '2026-10-06T18:56:00.000Z' },
+      })
+      expect(within(screen.getByTestId('davening-this-week')).getByTestId('freshness')).toHaveTextContent(/^Times confirmed by Mekor Habracha, Oct 6\./)
     })
   })
 
@@ -635,7 +687,7 @@ describe('one week, from the newsletter and the website (Oct 20)', () => {
   it('is one week, day by day, the newsletter’s times on the day both give: weekdays, then This Shabbos', () => {
     show([website, newsletter])
     expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
-    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–7$/)
+    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
     const [week, shabbos] = screen.getAllByTestId('davening-this-week-days')
     expect(week).toHaveTextContent(/^Tue Oct 6TodayShacharis7 AMWed Oct 7Shacharis7 AM$/)
     expect(shabbos).toHaveTextContent(/^Fri Oct 9Kabbalas Shabbos6:10 PMSat Oct 10Shacharis9 AM$/)

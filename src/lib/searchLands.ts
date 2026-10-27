@@ -71,8 +71,10 @@ export type LandFilters = {
 
 export const NO_FILTERS: LandFilters = { openNow: false, bool: [], select: {}, has: {} }
 
+/** How many filters are on: each choice one (the user, Oct 27). */
 export function filterCount(f: LandFilters): number {
-  return (f.openNow ? 1 : 0) + f.bool.length + Object.values(f.select).filter((v) => v.length).length + Object.values(f.has).filter((v) => v.length).length
+  const choices = (m: Record<string, string[]>) => Object.values(m).reduce((n, v) => n + v.length, 0)
+  return (f.openNow ? 1 : 0) + f.bool.length + choices(f.select) + choices(f.has)
 }
 
 /** The listings a category page shows with these filters and nothing

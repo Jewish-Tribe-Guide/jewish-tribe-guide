@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Festival } from './festivals'
-import { asRegularTime, readRegular, readSchedule, readSunsetTime, readZmanTime, regularMessages, scheduleMessages, tidyRegularReading, tidyScheduleReading } from './scheduleReader'
+import { asRegularTime, clipNote, readRegular, readSchedule, readSunsetTime, readZmanTime, regularMessages, scheduleMessages, tidyRegularReading, tidyScheduleReading } from './scheduleReader'
 
 const sukkos: Festival = {
   festival: 'Sukkos',
@@ -490,5 +490,20 @@ describe('reading a shul’s regular times', () => {
     const fetchImpl = vi.fn(async () => Response.json({ choices: [{ message: { content: JSON.stringify({ kind: 'schedule', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00', quote: 'Shacharis 9:00' }] }) } }] }))
     const r = await readRegular({ text: POST }, DAYS, 'Mekor Habracha', { apiKey: 'k', fetchImpl: fetchImpl as unknown as typeof fetch, newId: id })
     expect(r.times[0]).toMatchObject({ days: ['sat'], time: '9:00am' })
+  })
+})
+
+// Oct 27, Sons of Israel's Shabbos Mincha: "…Weekly at the same time as
+// Shabbat Mincha at SOI. For", a note cut at 120 characters mid-sentence.
+describe('clipNote', () => {
+  const soi = 'Join for Mincha, stay for special Seudah Shlishit just for teens. Weekly at the same time as Shabbat Mincha at SOI. For teens in grades 8 to 12.'
+  it('ends at the last whole sentence that fits', () => {
+    expect(clipNote(soi, 120)).toBe('Join for Mincha, stay for special Seudah Shlishit just for teens. Weekly at the same time as Shabbat Mincha at SOI.')
+  })
+  it('with no sentence end to stop at, a whole word and …', () => {
+    expect(clipNote('Following the early minyan in the small beis medrash downstairs', 30)).toBe('Following the early minyan in…')
+  })
+  it('one that fits as it is', () => {
+    expect(clipNote('  following Kiddush ', 120)).toBe('following Kiddush')
   })
 })

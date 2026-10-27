@@ -501,12 +501,15 @@ export function shabbosIsOver(today: string, nowMs: number, havdalahIso: string 
  *  week post that has it (the newsletter's over the website's, as
  *  resolveDay picks), then that day's one-day additions, less any time
  *  the week already gives. `posts` are the week posts it shows, the
- *  newsletter's first. Days with nothing are left out. */
+ *  newsletter's first. Days with nothing are left out: a day the week
+ *  doesn't reach included, its usual times not put in (the user, Oct 27).
+ *  `range`: the days it looked at, today (or, after havdalah, Sunday) to
+ *  Shabbos. */
 export function thisWeeksDays(
   schedules: readonly SpecialSchedule[],
   date: string,
   { shabbosOver = false, regular = [] }: { shabbosOver?: boolean; regular?: readonly Minyan[] } = {},
-): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null } {
+): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null; range: { from: string; to: string } } {
   // Friday, the week ends with Shabbos, its last; once Shabbos is over
   // (shabbosIsOver), it's the week ahead, Sunday to Shabbos (the user, Oct
   // 23: "right when shabbos is over we need to show the week's schedule").
@@ -545,7 +548,7 @@ export function thisWeeksDays(
   // Nothing any day, and every day the shul's whole week's: no minyan this
   // week, which isn't the same as no week posted (SpecialSchedule.whole).
   const none = !days.length && whole.length === datesOf({ from: today, to: saturday }).length ? whole[0] : null
-  return { days, posts, none }
+  return { days, posts, none, range: { from: today, to: saturday } }
 }
 
 /** Whether a shul's Shabbos boxes go above its week's (the user, Oct 26):

@@ -78,7 +78,7 @@ export default function DaveningCard({
   // "This week's schedule" (the user, Oct 20: one schedule for a week):
   // the weeks the shul sent out or its website gives, and this week's
   // one-day additions, day by day (thisWeeksDays).
-  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver, regular: regularMinyanim(minyanim) }) : { days: [], posts: [], none: null }
+  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver, regular: regularMinyanim(minyanim) }) : { days: [], posts: [], none: null, range: null }
   const inThisWeek = new Set(thisWeek.days.flatMap((d) => d.minyanim.map((m) => m.from)))
   // Anything else today or tomorrow (a Yom Tov schedule) has its own box.
   const specialSchedule = posting
@@ -146,17 +146,6 @@ export default function DaveningCard({
       .filter((d) => d.rows.length > 0)
   const weekdayDays = daysOf(false)
   const shabbosDays = daysOf(true)
-  // Friday's candle lighting heads This Shabbos, when the zmanim are that
-  // Friday's: the shul's own, else the community's.
-  const shabbosFriday = shabbosDays.length ? (weekdayOf(shabbosDays[0].date) === 'fri' ? shabbosDays[0].date : dayBefore(shabbosDays.at(-1)!.date)) : null
-  const candleLighting = !shabbosFriday
-    ? null
-    : anchors?.candleLightingIso?.slice(0, 10) === shabbosFriday
-      ? resolveAnchorTime({ anchor: 'candle_lighting' }, anchors)
-      : schedule?.candleLighting?.iso.slice(0, 10) === shabbosFriday
-        ? schedule.candleLighting.time
-        : null
-  const shabbosShown = shabbosFriday && candleLighting && !shabbosDays.some((d) => d.date === shabbosFriday) ? [{ date: shabbosFriday, occasion: null, minyanim: [], rows: [] }, ...shabbosDays] : shabbosDays
 
   // Shabbos first once the week's last weekday minyan has started (the
   // user, Oct 26): on a Friday morning the Shacharis still ahead stays on
@@ -371,7 +360,11 @@ export default function DaveningCard({
     // later: never a date a check gave the whole listing (boxDates.ts).
     const weekDate = boxDate(item, THIS_WEEK_SECTION)
     const postedLater = !weekDate.confirmedAt || (!!fp.postedAt && fp.postedAt > weekDate.confirmedAt)
-    const postDate = { confirmedAt: postedLater ? fp.postedAt : weekDate.confirmedAt, ...(postedLater ? {} : { source: weekDate.source, by: weekDate.by }) }
+    // Read off the shul's website, it says so, as an agreeing read does: an
+    // approval dates the whole listing, which no box goes by (Shtiebel's
+    // week said only "last checked", the user, Oct 27).
+    const postedFrom = fp.postedBy === 'website' && fp.postedAt ? { source: { from: item.name, at: fp.postedAt } } : {}
+    const postDate = { confirmedAt: postedLater ? fp.postedAt : weekDate.confirmedAt, ...(postedLater ? postedFrom : { source: weekDate.source, by: weekDate.by }) }
     return onEditBox ? (
       <FreshnessFooter resourceId={item.id} {...postDate} onEdit={() => onEditBox('this_week', 'This week’s schedule', fp.id)} />
     ) : (
@@ -392,13 +385,24 @@ export default function DaveningCard({
   const shabbosRows = shabbosDays.flatMap((d) => d.rows)
   const weekdayRows = weekdayDays.flatMap((d) => d.rows)
 
+  // The days the week's box speaks for: a week the shul posted is this
+  // week's, Sunday to Friday, whichever days it has a minyan (the user, Oct
+  // 27: Rodeph Shalom's whole week read "Oct 29", its one weekday minyan).
+  // A day it doesn't reach has nothing, its usual times not put in.
+  const weekGivesWeekdays = weekdayDays.some((d) => d.minyanim.some((m) => m.from.kind === 'week'))
+  const weekdayDates = !weekdayDays.length
+    ? ''
+    : weekGivesWeekdays && thisWeek.range
+      ? datesText(daysFrom(thisWeek.range.to, -6), daysFrom(thisWeek.range.to, -1))
+      : datesText(weekdayDays[0].date, weekdayDays.at(-1)!.date)
+
   // This week's, as one: waiting for it, no minyan in it, or its weekdays.
   const weekDated = (
     <div key="week-dated" className="space-y-5 empty:hidden">
       {!waiting && weekdayDays.length > 0 && (
         <Card title="This week’s schedule" testId="davening-this-week" footer={postFootFor(weekFootPost, 'this-week')}>
           <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-week-dates">
-            {datesText(weekdayDays[0].date, weekdayDays.at(-1)!.date)}
+            {weekdayDates}
           </p>
           <WeekDays days={weekdayDays} todayDate={todayDate} nowMinutes={schedule?.nowMinutes} anchors={anchors} marks={!weekdayRows.every((m) => m.signUp)} />
           {!allSignUp &&
@@ -444,9 +448,9 @@ export default function DaveningCard({
       <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-shabbos-dates">
         {shabbosPost && !weekByDates(shabbosPost) && shabbosDays.every((d) => d.minyanim.every((m) => m.from === shabbosPost))
           ? postTitle(shabbosPost)
-          : datesText(shabbosShown[0].date, shabbosShown.at(-1)!.date)}
+          : datesText(shabbosDays[0].date, shabbosDays.at(-1)!.date)}
       </p>
-      <WeekDays days={shabbosShown} todayDate={todayDate} nowMinutes={schedule?.nowMinutes} anchors={anchors} marks={!shabbosRows.every((m) => m.signUp)} candleLighting={candleLighting && shabbosFriday ? { date: shabbosFriday, time: candleLighting } : undefined} />
+      <WeekDays days={shabbosDays} todayDate={todayDate} nowMinutes={schedule?.nowMinutes} anchors={anchors} marks={!shabbosRows.every((m) => m.signUp)} />
       {!allSignUp &&
         signUpBoxes(
           shabbosRows.filter((m) => m.signUp),
@@ -529,7 +533,7 @@ function datesText(fromDate: string, toDate: string): string {
 
 const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
-const dayBefore = (date: string) => new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+const daysFrom = (date: string, days: number) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -716,7 +720,6 @@ function WeekDays({
   nowMinutes,
   anchors,
   marks,
-  candleLighting,
 }: {
   days: (WeekDayTimes & { rows: Minyan[] })[]
   todayDate: string | null
@@ -724,8 +727,6 @@ function WeekDays({
   nowMinutes?: number
   anchors: AnchorTimes | undefined
   marks: boolean
-  /** This Shabbos's: Friday's candle lighting, heading that day. */
-  candleLighting?: { date: string; time: string }
 }) {
   const started = (isToday: boolean, time: string | null) => {
     const at = time === null ? null : clockMinutes(time)
@@ -743,12 +744,6 @@ function WeekDays({
               {d.occasion ? `${d.occasion}, ${date}` : date}
               {isToday && <span className="ml-1.5 text-emerald-700">Today</span>}
             </p>
-            {candleLighting?.date === d.date && (
-              <div className={`grid grid-cols-[9.5rem_1fr] gap-2.5 py-0.5 text-[15px] ${started(isToday, candleLighting.time) ? 'text-slate-400' : 'text-slate-900'}`} data-testid="davening-candle-lighting">
-                <span className="font-semibold">Candle lighting</span>
-                <b>{candleLighting.time}</b>
-              </div>
-            )}
             {d.rows.map((m) => {
               const note = noteText(m.notes)
               const known = m.anchor === 'sunset' ? isToday : m.anchor === 'candle_lighting' ? weekday === 'fri' : m.anchor === 'havdalah' && weekday === 'sat'

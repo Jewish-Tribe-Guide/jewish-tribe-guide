@@ -128,22 +128,34 @@ describe('waitingGroups', () => {
       ])
     })
 
-    it('a new week: how many, then only what differs from the usual times', () => {
+    // The user, Oct 27, of Sons of Israel's: "I want to see the whole
+    // schedule with the new ones highlighted." Day by day; the ones as
+    // usual (or as the listing has them) plain.
+    // "nothing matched!! It only matched usual. This is a different
+    // schedule": a week the listing hasn't got is new, all of it, not
+    // compared with the usual times.
+    it('a new week: the whole week by day, all of it new', () => {
       expect(lines([], [read])).toEqual([
         { label: 'This week’s schedule, Oct 26 – Oct 31', value: '', old: null, heading: true },
         { label: 'New week', value: '3 minyanim', old: null },
-        { label: 'Shacharis, Tue, Oct 27', value: '7 AM', old: '6:45 AM', say: 'usually' },
+        { label: 'Mon, Oct 26', value: '', old: null, day: true },
+        { label: 'Shacharis', value: '6:45 AM', old: null },
+        { label: 'Tue, Oct 27', value: '', old: null, day: true },
+        { label: 'Shacharis', value: '7 AM', old: null },
+        { label: 'Mincha', value: '5:45 PM', old: null },
       ])
     })
 
-    it('a week the listing has: what’s new, changed, taken off, and how many are unchanged', () => {
+    it('a week the listing has: the whole week by day, what’s new, changed or taken off marked', () => {
       const had = week([day('1', 'shacharis', '2026-10-26', '6:45am'), day('2', 'shacharis', '2026-10-27', '6:45am'), day('4', 'maariv', '2026-10-27', '9:00pm')])
       expect(lines([had], [read])).toEqual([
         { label: 'This week’s schedule, Oct 26 – Oct 31', value: '', old: null, heading: true },
-        { label: 'Shacharis, Tue, Oct 27', value: '7 AM', old: '6:45 AM' },
-        { label: 'Mincha, Tue, Oct 27', value: '5:45 PM', old: null, say: 'new' },
-        { label: 'Maariv, Tue, Oct 27', value: 'Taken off', old: '9 PM' },
-        { label: 'Unchanged', value: '1 minyan', old: null },
+        { label: 'Mon, Oct 26', value: '', old: null, day: true },
+        { label: 'Shacharis', value: '6:45 AM', old: null, same: true },
+        { label: 'Tue, Oct 27', value: '', old: null, day: true },
+        { label: 'Shacharis', value: '7 AM', old: '6:45 AM' },
+        { label: 'Mincha', value: '5:45 PM', old: null, say: 'new' },
+        { label: 'Maariv', value: 'Taken off', old: '9 PM' },
       ])
     })
   })

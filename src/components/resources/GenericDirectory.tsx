@@ -1480,13 +1480,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (key === minyanWithinSelect.key) return setMinyanWithin((prev) => (prev === value ? null : value))
     toggleSheetSelect(key, value)
   }
-  const minyanFilterCount = (sheetTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
-  // What the Filters button counts: everything the sheet shows ticked. A
-  // select's choices widen it (Meat or Dairy), so it's one; each Has item
-  // narrows it again (Challah and Wine), so each is one.
+  const minyanFilterCount = sheetTefillos.length + (minyanWithin ? 1 : 0)
+  // What the Filters button counts: everything the sheet shows ticked, each
+  // choice one, Meat and Dairy two as Challah and Wine are (the user, Oct
+  // 27: "If it filters more than one thing in one section that still counts
+  // as multiple filters").
   const sheetFilterCount =
     filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
-    filterableSelects.filter((f) => (selectFilters[f.key]?.length ?? 0) > 0 || searchSelects.has(f.key)).length +
+    filterableSelects.reduce((n, f) => n + new Set([...(selectFilters[f.key] ?? []), ...(searchSelects.get(f.key)?.keys() ?? [])]).size, 0) +
     sheetItems.reduce((n, f) => n + f.chosen.length, 0) +
     (sheetOpenNow ? 1 : 0)
 

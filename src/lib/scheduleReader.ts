@@ -168,7 +168,7 @@ export function tidyScheduleReading(raw: unknown, f: Festival, source: ScheduleS
     )
     if (!tefillah || !time || !quote || on.length === 0) continue
     if (text !== null && !text.includes(` ${plain(quote)} `)) continue
-    const notes = typeof x.notes === 'string' && x.notes.trim() ? x.notes.trim().slice(0, 120) : undefined
+    const notes = noteOf(x.notes, 120) ?? undefined
     const unsure = typeof x.unsure === 'string' && x.unsure.trim() ? x.unsure.trim().slice(0, 200) : undefined
     times.push({ id: newId(), tefillah, on: [...new Set(on)], ...asGuideTime(tefillah, time), ...(notes ? { notes } : {}), quote, checked: text !== null, ...(unsure ? { unsure } : {}) })
   }
@@ -352,6 +352,20 @@ function onDayNamed(date: string, quote: string): boolean {
 const seasonNote = (notes: string | undefined) => notes?.match(/\b(summer|winter)\s+only\b/i)?.[1].toLowerCase() ?? null
 const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
 
+/** A minyan's note at most `max` long: to its last whole sentence that
+ *  fits, else its last whole word and "…", never cut mid-sentence with
+ *  nothing to say so (Sons of Israel's "…Shabbat Mincha at SOI. For",
+ *  Oct 27). */
+export function clipNote(note: string, max: number): string {
+  const n = note.trim()
+  if (n.length <= max) return n
+  const cut = n.slice(0, max + 1)
+  const sentence = cut.match(/^([\s\S]*[.!?])\s/)?.[1]
+  if (sentence) return sentence
+  return `${cut.slice(0, max).replace(/\s+\S*$/, '').replace(/[\s,;:–-]+$/, '')}…`
+}
+const noteOf = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? clipNote(v, max) : null)
+
 /**
  * What the AI said about a shul's regular times, kept to what holds up: a
  * known tefillah, real weekdays or a date among the days ahead, a time,
@@ -381,7 +395,7 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     if (date && !onDayNamed(date, quote)) continue
     // A time's season goes where the rest of the guide reads it, its note
     // ("Winter only", seasonFromNotes), unless the note already says.
-    const said = str(x.notes, 120)
+    const said = noteOf(x.notes, 120)
     const season = x.season === 'summer' || x.season === 'winter' ? x.season : null
     const notes = season && !/\b(?:summer|winter)\s+only\b/i.test(said ?? '') ? `${season === 'summer' ? 'Summer' : 'Winter'} only${said ? `- ${said}` : ''}` : said
     // What a website says that isn't its weekly davening, read as if it

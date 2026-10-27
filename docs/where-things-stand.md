@@ -84,13 +84,9 @@ for that exact change, in the same conversation. Show the dry run first.
    setting, after this branch is deployed. **Written to live Oct 27 with
    the user's yes** (backup in `backups/`, untracked); shows once PR 363
    deploys.
-1h. **Two delivery group links, approved, waiting on the user** (Oct 27):
-   That Sushi Spot - Lakewood's Delivery WhatsApp Group is empty, and
-   Shlomo's has none though its words say dates are announced there. The
-   user has said yes to writing both to live, and will send the invite
-   links. Not on either website or the web (Shlomo's only listed group is
-   its Virginia one). Remind the user until they're in; then write both,
-   with a backup, and refresh the live pages.
+1h. **Two delivery group links: done by the user** (Oct 27). That Sushi
+   Spot - Lakewood's and Shlomo's Delivery WhatsApp Groups, added by the
+   user themselves.
 
 ## For the user or the community
 
@@ -1682,6 +1678,35 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 27, last: a week waiting for you is shown whole (on `redesign/oct18-fixes`)
+
+- **A week the listing hasn't got is shown whole, all of it new**, by day,
+  under "New week · N minyanim". It is not compared with the usual times
+  any more (the user: "This is a different schedule").
+- **A week the listing has is shown whole too**, by day, with only what
+  changes highlighted: "Was 6:45 AM", "New", "Taken off".
+- **A note read off a website ends at a whole sentence**, not cut at 120
+  letters ("…Shabbat Mincha at SOI. For"). Applies from the next read.
+- **Three listings the user checked on live:**
+  - Rodeph Shalom's whole week read "Oct 29", its one weekday minyan.
+    This week's box is dated Sunday to Friday ("Oct 25–30") whenever a
+    week the shul posted gives its weekdays, whatever days have a minyan.
+  - BZBI's pasted week runs Oct 23–29, so it has no Friday. The user: a
+    day the week doesn't have gets no minyan, never the usual times put
+    in. (Built that way first, then taken back the same day.)
+  - Shtiebel's week, approved from its website, didn't say who gave it. It
+    says "confirmed by" the shul now.
+- **No candle lighting on shul listings** (the user, Oct 27): it's the
+  city's time, not the shul's, and the home page has it. This Shabbos no
+  longer starts with it, and a Friday with nothing else on it (Kol
+  Tzedek's) is gone. A minyan "at candle lighting" still shows its time.
+- **Every filter choice counts** (the user, Oct 27): the Filters button
+  counts each choice ticked, so Meat and Dairy are two, like Challah and
+  Wine under Has, and Mincha and Maariv are two. The map already did.
+- **Waiting on the user:** whether a shul whose newsletter is watched
+  shows "Not on the guide yet" until this week's comes. Society Hill's
+  hasn't come yet. Its site gives only the usual times, which agree.
 
 ## Done Oct 27, later: Waiting for you says what it changes (on `redesign/oct18-fixes`)
 
