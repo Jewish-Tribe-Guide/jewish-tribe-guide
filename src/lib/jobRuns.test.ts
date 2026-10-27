@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, needsLook, NIGHTLY_JOBS, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
+import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, needsLook, NIGHTLY_JOBS, nextRunAt, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
 
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const ago = (ms: number) => new Date(NOW - ms).toISOString()
@@ -188,5 +188,23 @@ describe('jobAlert: emailing once when a job breaks, once when it works again', 
 
   it('cut off night after night: told once', () => {
     expect(jobAlert(JOB, [night(0, { warning: 'x' }), cutOff(1), cutOff(2)])).toBeNull()
+  })
+})
+
+// The user, Oct 27: the Links job said "once a week", not when. Its
+// first run comes from its schedule, which must be vercel.json's.
+describe('nextRunAt: when a job runs next, from its schedule', () => {
+  it('each job’s schedule is the one vercel.json runs it on', async () => {
+    const { crons } = (await import('../../vercel.json')).default as { crons: { path: string; schedule: string }[] }
+    expect(Object.fromEntries(NIGHTLY_JOBS.map((j) => [`/api/cron/${j.id}`, j.cron]))).toEqual(Object.fromEntries(crons.map((c) => [c.path, c.schedule])))
+  })
+
+  it('the next Sunday 9:00 UTC for the link check, today’s when it hasn’t come yet', () => {
+    const links = NIGHTLY_JOBS.find((j) => j.id === 'check-links')!
+    expect(new Date(nextRunAt(links, Date.parse('2026-10-25T14:00:00Z'))).toISOString()).toBe('2026-11-01T09:00:00.000Z')
+    expect(new Date(nextRunAt(links, Date.parse('2026-11-01T08:59:00Z'))).toISOString()).toBe('2026-11-01T09:00:00.000Z')
+    expect(new Date(nextRunAt(links, Date.parse('2026-11-01T09:00:00Z'))).toISOString()).toBe('2026-11-08T09:00:00.000Z')
+    const menus = NIGHTLY_JOBS.find((j) => j.id === 'read-menus')!
+    expect(new Date(nextRunAt(menus, Date.parse('2026-10-27T08:00:00Z'))).toISOString()).toBe('2026-10-28T07:30:00.000Z')
   })
 })

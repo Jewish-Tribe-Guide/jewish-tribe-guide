@@ -31,7 +31,7 @@ describe('/api/admin/watches/runs', () => {
     m.linkStandings.mockResolvedValue([{ resourceId: 'p', key: 'kosher_url', field: 'Kosher certificate', url: 'https://k.org/c', place: 'Sababa', category: 'restaurant', href: '/x', id: 'w', checkedAt: null, error: null, failingSince: null }])
     const body = await (await get()).json()
     expect(m.linkStandings).toHaveBeenCalledWith('philly')
-    expect(body.kinds.find((k: { name: string }) => k.name === 'Links')).toMatchObject({ count: '1 link · not checked yet', tracked: [{ name: 'Sababa · Kosher certificate', status: 'Not checked yet' }] })
+    expect(body.kinds.find((k: { name: string }) => k.name === 'Links')).toMatchObject({ count: '1 link · first check Sunday', tracked: [{ name: 'Sababa · Kosher certificate', status: 'Not checked yet' }] })
   })
 
   it('admins only', async () => {
