@@ -266,8 +266,8 @@ describe('hoursSection', () => {
     expect(at([], [news({ pageChangedAt: null })])).toBe('cant_read')
     expect(at([], [news({ failingSince: ago(1), lastError: 'No newsletter from them since Sep 1' })])).toBe('cant_read')
     expect(at([], [news({ active: false })])).toBe('cant_read')
-    // A page that differs is still to check.
-    expect(at([watch({ lastCheck: check('differs') })], [news()])).toBe('to_check')
+    // A page that differs, waiting behind a suggestion, is still to check.
+    expect(at([watch({ lastCheck: { ...check('differs'), queue: 'waiting' } })], [news()])).toBe('to_check')
   })
 
   it('counts them for the Watches tab’s row', () => {

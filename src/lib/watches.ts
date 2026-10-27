@@ -119,9 +119,14 @@ export function withoutListRead(c: WatchCheck | null): WatchCheck | null {
  *  waited behind a suggestion already in the queue is settled too once a
  *  finding was decided after it (`decidedAt`), since that was the one it
  *  waited behind (Sons of Israel's home page, Oct 22: "In the queue" with
- *  nothing to open). `waiting` unknown, nothing is settled. */
+ *  nothing to open). And one with no queue at all: a page read again only
+ *  to compare, after the listing moved, which never files (listingPageRun's
+ *  `compareOnly`); its page said nothing new, so whatever it says was dealt
+ *  with when it last changed (Ohel Leah's and Lower Merion's pages, Oct 27:
+ *  each gave part of the notes the listing has whole). `waiting` unknown,
+ *  nothing is settled. */
 export const settles = (c: WatchCheck, waiting: number | undefined, decidedAt?: string | null) =>
-  waiting === 0 && c.result === 'differs' && (c.queue === 'filed' || c.queue === 'before' || (c.queue === 'waiting' && !!decidedAt && decidedAt >= c.at))
+  waiting === 0 && c.result === 'differs' && (c.queue === 'filed' || c.queue === 'before' || c.queue === null || (c.queue === 'waiting' && !!decidedAt && decidedAt >= c.at))
 
 /** A check as a runner makes it; the run dates it. One carried over from
  *  an earlier read keeps that read's date: else it reads as this

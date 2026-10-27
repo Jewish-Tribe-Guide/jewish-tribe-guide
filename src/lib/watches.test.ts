@@ -119,6 +119,16 @@ describe('afterRun', () => {
     expect(kept.at).toBe(read)
     expect(settles(kept, 0, '2026-10-19T15:00:00.000Z')).toBe(true)
   })
+
+  // Mikvah Ohel Leah and Lower Merion's, Oct 27: a page read again only to
+  // compare, after an approval, gives part of the notes the listing has
+  // whole (from three pages). Never filed, so nothing to open.
+  it('settles a compare’s difference, which is never filed', () => {
+    const check: WatchCheck = { at: NOW, what: 'hours', from: 'page', result: 'differs', read: ['Women’s Notes: …'], differences: ['x'], queue: null }
+    expect(settles(check, 0)).toBe(true)
+    expect(settles(check, 1)).toBe(false)
+    expect(settles(check, undefined)).toBe(false)
+  })
 })
 
 describe('listCheck', () => {
