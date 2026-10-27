@@ -1480,11 +1480,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     toggleSheetSelect(key, value)
   }
   const minyanFilterCount = (sheetTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
-  // What the Filters button counts: everything the sheet shows ticked.
+  // What the Filters button counts: everything the sheet shows ticked. A
+  // select's choices widen it (Meat or Dairy), so it's one; each Has item
+  // narrows it again (Challah and Wine), so each is one.
   const sheetFilterCount =
     filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
     filterableSelects.filter((f) => (selectFilters[f.key]?.length ?? 0) > 0 || searchSelects.has(f.key)).length +
-    sheetItems.filter((f) => f.chosen.length > 0).length +
+    sheetItems.reduce((n, f) => n + f.chosen.length, 0) +
     (sheetOpenNow ? 1 : 0)
 
   // Desktop-only shared-element morph target for the same icon badge

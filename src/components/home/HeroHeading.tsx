@@ -205,6 +205,16 @@ export default function HeroHeading({
       const target = e.target as Node
       if ([searchShellRef, phoneShellRef].some((r) => r.current?.contains(target))) return
       dismiss()
+      // The tap that closes the results does only that. It used to go on to
+      // whatever was under it: search "hospital", tap away, and Grocery
+      // opened. The click follows this tap's mouseup; nothing else is eaten.
+      document.addEventListener('click', swallow, true)
+      document.addEventListener('mouseup', () => setTimeout(() => document.removeEventListener('click', swallow, true)), { once: true, capture: true })
+    }
+    function swallow(e: MouseEvent) {
+      e.preventDefault()
+      e.stopPropagation()
+      document.removeEventListener('click', swallow, true)
     }
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') dismiss()

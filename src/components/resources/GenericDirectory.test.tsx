@@ -2705,6 +2705,13 @@ describe('GenericDirectory — Has', () => {
     expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
   })
 
+  // The user, Oct 26: challah and wine read as one filter. Each item narrows
+  // the list again (a store must have all of them), so each is counted.
+  it('counts each item ticked: Challah and Wine are two filters', () => {
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} initialFilters={{ has_m: 'Challah,Wine' }} />)
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
+  })
+
   it('shows the 8 most common, then "All N items": every one, A to Z, with a box to find one', async () => {
     const user = userEvent.setup()
     const many = ['Apples', 'Beef', 'Cheese', 'Dates', 'Eggs', 'Figs', 'Grapes', 'Honey', 'Ice Cream', 'Jam']

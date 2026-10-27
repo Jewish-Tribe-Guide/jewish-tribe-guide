@@ -1659,6 +1659,17 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 26, later: two small fixes from the user (on `redesign/oct18-fixes`)
+
+- **A tap outside the home search's results only closes them.** It used
+  to go on to what was under it: search "hospital", tap away, and Grocery
+  opened. The next tap works as usual.
+- **Each Has item counts as a filter.** Challah, chicken and wine show
+  "Filters 3", not 1. Each one narrows the list again. A dropdown's
+  choices (Meat or Dairy) widen it, so they still count once.
+- **Open: a gold "+ Add" button**, so it stands out the way Mekor's
+  Assistant does. To be drawn beside the blue one first.
+
 ## Done Oct 26: shuls' times read each week; an approval settles its finding (on `redesign/oct18-fixes`)
 
 Found Oct 26 (read only, live): nothing from a shul's page had been filed
