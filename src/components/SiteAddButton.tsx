@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
-import { PlusIcon } from '@/components/icons'
+import { AddButton } from '@/components/AddButton'
 import { useCategories } from '@/lib/useCategories'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { ui } from '@/lib/uiConfig'
@@ -43,15 +43,7 @@ export default function SiteAddButton() {
   if (!community || !ui.contributions.add || !showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))) return null
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Add"
-        className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
-      >
-        <PlusIcon className="h-6 w-6 shrink-0" />
-        <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
-      </button>
+      <AddButton onClick={() => setOpen(true)} />
       {open && <TellUsSheet isOpen onClose={() => setOpen(false)} />}
     </>
   )

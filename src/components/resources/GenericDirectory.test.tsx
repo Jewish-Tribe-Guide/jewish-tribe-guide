@@ -402,6 +402,16 @@ describe('GenericDirectory', () => {
     expect(onAdd).not.toHaveBeenCalled()
   })
 
+  // Drawn Oct 26 (board K): apricot, the one colour meaning "you can add
+  // here", with the word on the phone too, not just the "+".
+  it('has the floating Add in apricot, with the word on the phone too', () => {
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    expect(add.className).toContain('bg-add')
+    expect(add.className).not.toContain('bg-primary')
+    expect(add.querySelector('span')?.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+  })
+
   // Regression coverage for the OLD mobile Filters/sort-row Add button,
   // which the floating one above replaced: that row was gated by
   // `hasFilterRow`, and a category with no filterable fields, upvotes, or
@@ -473,21 +483,6 @@ describe('GenericDirectory', () => {
     cleanup()
     renderWithProviders(<GenericDirectory category={caps({ add: false, edit: false })} items={[item]} {...handlers} reopenItemId={item.id} />)
     expect(screen.queryByRole('button', { name: 'Edit listing to Trader Joe’s' })).not.toBeInTheDocument()
-  })
-
-  // A bare icon circle is a mobile convention people already have a
-  // reflex for; desktop doesn't have that reflex, so it gets the same
-  // "Add a listing" wording made visible instead of relying only on the
-  // aria-label. `desktop:inline` on the label span (jsdom never applies
-  // CSS, so this is asserted out of the className, same as the
-  // desktop:hidden check above) is what makes it show up there but not on
-  // mobile, where it would just be redundant with the shape.
-  it('shows the "Add" label visibly for desktop, not just as an aria-label', () => {
-    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-
-    const label = screen.getByText('Add', { selector: 'span' })
-    expect(label.className).toContain('desktop:inline')
-    expect(label.className).toContain('hidden')
   })
 
   // Regression coverage for DirectoryHeader's old desktop-only toolbar "Add"

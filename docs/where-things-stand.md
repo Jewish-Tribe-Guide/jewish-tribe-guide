@@ -1659,6 +1659,20 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 26, last: "+ Add" in light apricot (on `redesign/oct18-fixes`)
+
+- **The floating "+ Add" is light apricot (`#fdba74`) with ink text**, on
+  every screen that has it: the site's own and each category page's. It now
+  says "Add" on the phone too, not just "+". Drawn as board K on the canvas
+  `8qmL8PXNLN7qqfM7GK75ix`, after gold, ink, blue and brighter warm colours
+  were turned down.
+- **A named change to "colour only for meaning":** apricot (`--color-add`)
+  means "you can add here" and is used nowhere else. Blue stays the colour
+  of everything else you tap.
+- Both buttons are one component now (`AddButton.tsx`).
+- Not checked on a real phone yet. The wider button covers a little more of
+  the bottom-right row.
+
 ## Done Oct 26, later: two small fixes from the user (on `redesign/oct18-fixes`)
 
 - **A tap outside the home search's results only closes them.** It used
@@ -1667,8 +1681,7 @@ compare, and one it can't read, on desktop and phone.
 - **Each Has item counts as a filter.** Challah, chicken and wine show
   "Filters 3", not 1. Each one narrows the list again. A dropdown's
   choices (Meat or Dairy) widen it, so they still count once.
-- **Open: a gold "+ Add" button**, so it stands out the way Mekor's
-  Assistant does. To be drawn beside the blue one first.
+- **A "+ Add" that stands out** became light apricot, not gold (above).
 
 ## Done Oct 26: shuls' times read each week; an approval settles its finding (on `redesign/oct18-fixes`)
 

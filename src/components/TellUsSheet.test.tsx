@@ -658,4 +658,13 @@ describe('SiteAddButton — opened by the search', () => {
     fireEvent(document, new CustomEvent('jpc:open-add'))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
+  // Drawn Oct 26 (board K): apricot, the one colour meaning "you can add
+  // here", with the word on the phone too, not just the "+".
+  it('is apricot and says Add on the phone too', () => {
+    renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
+    const add = screen.getByRole('button', { name: 'Add' })
+    expect(add.className).toContain('bg-add')
+    expect(add.className).not.toContain('bg-primary')
+    expect(add.querySelector('span')?.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+  })
 })

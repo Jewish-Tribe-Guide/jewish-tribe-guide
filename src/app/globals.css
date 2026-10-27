@@ -106,6 +106,9 @@ html {
   --color-ink: #13243a;
   --color-gold: #c9a45c;
   --color-gold-dark: #7a5a1c;
+  /* The floating "+ Add" only (AddButton.tsx), with ink text: the one place
+     a colour means "you can add here", so it stands out from the blue. */
+  --color-add: #fdba74;
 }
 
 /* Empty date inputs render their "mm/dd/yyyy" format text in the full text
