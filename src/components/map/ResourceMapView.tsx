@@ -53,11 +53,12 @@ import DroppedPinEditor from './DroppedPinEditor'
 import { useMapSidebar, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_SEARCH_INSET } from './useMapSidebar'
 import { useCampaignBanners } from '@/lib/contentContext'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
-import { mapQueryString } from '@/lib/routes'
+import { mapQueryString, routes } from '@/lib/routes'
 import { countEvent } from '@/lib/countEvent'
 import { useOptionalCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { neighborhoodsFor } from '@/lib/places'
 import { learnFrom } from '@/lib/askReader'
+import AskTheGroup from '@/components/home/AskTheGroup'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { useKeptListScroll } from './useKeptListScroll'
 
@@ -784,6 +785,30 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return [...starts.sort(byRank), ...contains.sort(byRank)].slice(0, 6)
   }, [allPoints, input, activeLocation, effectiveSelected])
 
+  // Words that find nothing anywhere in the guide: no place's name, and
+  // nothing our own search answers in any category, on or off (askSearch.ts).
+  // Then it says so, with where to ask, as a category page does: under the
+  // box as it's typed, and in the list once it's searched. Not only on
+  // Enter, which most people never press (the user, Oct 27). Not for the
+  // questions our search has its own answers to (the eruv, minyanim, times).
+  const findsNothing = (text: string) => {
+    const typed = stripApostrophes(text.trim().toLowerCase())
+    if (typed.length < 2 || isOpenNowWord(typed) || !categories || !listings) return false
+    if (allPoints.some((p) => stripApostrophes(p.searchText).includes(typed))) return false
+    if (listings.some((r) => stripApostrophes(r.name.toLowerCase()).includes(typed))) return false
+    // Every listing, not only the ones with a pin: a place the guide has but
+    // the map can't plot isn't "nothing in the guide".
+    const result = searchAsk(listings, categories, text, { places: neighborhoodsFor(countCommunity) })
+    const q = result.query
+    return !q.meta && !q.times && !q.eruv && !q.minyan && result.hits.length === 0 && result.noHours.length === 0
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const typedNothing = useMemo(() => findsNothing(input), [input, allPoints, categories, listings])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const searchedNothing = useMemo(() => findsNothing(committedQuery), [committedQuery, allPoints, categories, listings])
+  const nothingBox = (text: string, className?: string) =>
+    countCommunity ? <AskTheGroup query={text.trim()} nothingClose sharePath={routes.ask(countCommunity, text.trim())} className={className} /> : null
+
   // "Open now" is a real, working search (see OPEN_NOW_WORDS/openNowActive)
   // but a silent one — nothing on screen ever told a visitor typing into this
   // box that it's a valid thing to search, the way Google Maps' own
@@ -796,6 +821,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const q = input.trim().toLowerCase()
     return q.length === 0 || 'open now'.startsWith(q)
   }, [input])
+  // The box's dropdown: the suggestions, or that nothing's there.
+  const dropdownShown = searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0 || typedNothing)
   const selectOpenNow = () => {
     openNowEverywhere()
     setSearchFocused(false)
@@ -1536,7 +1563,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       {/* ── Autocomplete dropdown — same Google-Maps-style behavior as
               mobile's: matching places while typing, click one to jump
               straight to its card. ─────────────────────────────────────── */}
-      {searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0) && (
+      {dropdownShown && (
         <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
           {showOpenNowSuggestion && (
             <button
@@ -1582,6 +1609,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               </span>
             </button>
           ))}
+          {typedNothing && nothingBox(input, 'rounded-none border-0')}
         </div>
       )}
     </div>
@@ -2046,6 +2074,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         eruvim={listedEruvim}
                         onSelectEruv={openEruv}
                         onHover={hover.set}
+                        empty={searchedNothing ? nothingBox(committedQuery) : undefined}
                       />
                     </>,
                     true,
@@ -2424,7 +2453,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           (no separate "Filters" button/sheet). Ducks out of the
                           way while the autocomplete dropdown below is showing,
                           same as Google Maps swapping chips for suggestions. ── */}
-                  {options.length > 0 && !(searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0)) && (
+                  {options.length > 0 && !dropdownShown && (
                     <div className="mt-2">
                       <CategoryFilter
                         options={optionsWithFilters}
@@ -2444,7 +2473,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   {/* ── Autocomplete dropdown — Google-Maps-style: matching
                           places while typing, tap one to jump straight to its
                           card instead of just narrowing the list. ─────────── */}
-                  {searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0) && (
+                  {dropdownShown && (
                     <div className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5">
                       {showOpenNowSuggestion && (
                         <button
@@ -2492,6 +2521,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           </span>
                         </button>
                       ))}
+                      {typedNothing && nothingBox(input, 'rounded-none border-0')}
                     </div>
                   )}
                 </div>
@@ -2570,6 +2600,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   renderOther={(p, back) => (p.filterId === ERUV_FILTER_ID ? eruvDetail(p.id.slice(ERUV_PREFIX.length), back) : null)}
                   eruvim={listedEruvim}
                   onSelectEruv={openEruv}
+                  empty={searchedNothing ? nothingBox(committedQuery) : undefined}
                 />
               )}
           </div>
@@ -2580,7 +2611,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               is turned off (ui.map.nearbyList), since NearbyList otherwise
               already shows this same message inline (mobile sheet / desktop
               sidebar). ───────────────────────────────────────────────────── */}
-      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && mapEruvim.length === 0 && (
+      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && mapEruvim.length === 0 && searchedNothing && nothingBox(committedQuery, 'mt-3')}
+      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && mapEruvim.length === 0 && !searchedNothing && (
         <p className="mt-3 text-center text-sm text-slate-500">
           {activeTerms.length > 0 || hasFilters
             ? 'No places match every filter. Try removing one.'

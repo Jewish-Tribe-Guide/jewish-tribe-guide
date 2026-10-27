@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
 import SavedBadge from '@/components/SavedBadge'
@@ -58,6 +58,9 @@ type Props = {
    *  the map beside the list, as a category page's does (the user, Oct
    *  16). The computer's sidebar only; a phone has no pointer to follow. */
   onHover?: (id: string | null) => void
+  /** What an empty list says instead of "Turn on a category": a search that
+   *  found nothing anywhere says so, with where to ask. */
+  empty?: ReactNode
 }
 
 function distanceLabel(miles: number): string {
@@ -66,7 +69,7 @@ function distanceLabel(miles: number): string {
   return `${(Math.round(miles * 10) / 10).toFixed(1)} mi`
 }
 
-export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace, eruvim, onSelectEruv, onHover }: Props) {
+export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace, eruvim, onSelectEruv, onHover, empty }: Props) {
   const { toggle } = usePinned()
   // A row opened with a click unmounts the list before the pointer leaves
   // it, so its mouseleave never comes: let go of the pin as the list goes,
@@ -134,6 +137,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
 
   if (sorted.length === 0 && eruvRows) return eruvRows
 
+  if (sorted.length === 0 && empty) return empty
   if (sorted.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-slate-500">

@@ -1700,11 +1700,15 @@ On the live site the reader had read 41 questions, 23 into nothing, about
   alone reads nothing; a shared link isn't read.
 - **Read questions** has no Approve any more (a reading never answers),
   one list, and Teach, which is how the search learns.
-- **Next, agreed in principle, not built:** a "nothing found" box on the
-  map like a category page's (it says "Turn on a category above" today),
-  and a quiet "Nothing in the guide for …" row on the home while typing.
-  And typo matching for names ("Beth sholom", "bros medresh"), most of
-  what was asked.
+- **Nothing found says so as it's typed, on the home and the map**, with
+  the WhatsApp button, as a category page does. Not only on Enter (the
+  user: "I don't think most people click enter"). The map shows it under
+  the box while typing and in the list once searched, instead of "Turn on
+  a category above". "Nothing" means nothing anywhere in the guide, places
+  the map can't plot included.
+- **Open:** the background read still happens only on Enter.
+- **Next, agreed in principle, not built:** typo matching for names
+  ("Beth sholom", "bros medresh"), most of what was asked.
 
 ## Done Oct 27, last: a week waiting for you is shown whole (on `redesign/oct18-fixes`)
 

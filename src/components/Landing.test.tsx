@@ -342,6 +342,23 @@ describe('Landing', () => {
     expect(mockRouter.push).not.toHaveBeenCalled()
   })
 
+  // Not only on Enter: most people never press it (the user, Oct 27).
+  it('a search that finds nothing says so as it is typed, without Enter', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores' })
+    renderLanding(undefined, { content: { categories: [grocery] } }, [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery' })])
+    const box = screen.getAllByLabelText('Search resources')[0]!
+
+    await user.type(box, 'xyznotreal')
+    expect(screen.getAllByText('Nothing in the guide for “xyznotreal”.').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
+
+    await user.clear(box)
+    await user.type(box, 'test gro')
+    expect(screen.queryByText(/Nothing in the guide/)).not.toBeInTheDocument()
+    expect(lineTexts()[0]).toMatch(/Test Grocery/)
+  })
+
   // A place's name is the first line, and Enter opens its listing (board 2b)
   // — the listing alone, no search carried along to narrow its page.
   it("a place's name is the first line, and Enter opens its listing", async () => {

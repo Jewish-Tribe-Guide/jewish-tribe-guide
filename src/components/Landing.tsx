@@ -210,15 +210,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     ? linesFor(miss.kept, miss.result, null).map((line) => ({ ...line, sub: `${line.sub} · nothing for “${miss.dropped}”` }))
     : ownLines
 
-  // Enter (or a "Try asking" tapped): the first line, as shown, at once;
-  // nothing anywhere stays here and says so (nothingFor), with where to
-  // ask. A question our own search found nothing for is also read by the
+  // Enter (or a "Try asking" tapped): the first line, as shown, at once.
+  // Nothing anywhere says so under the box as it's typed, with where to
+  // ask: not only on Enter, which most people never press (the user,
+  // Oct 27). A question our own search found nothing for is also read by the
   // AI in the background, for the admin's Read questions tab, where its
   // words can be taught to the search (learnFrom). The page never waits
   // for it or shows it (the user, Oct 27: "feels weird to search, get an
   // answer, then see reading question, then get a different answer").
   const router = useRouter()
-  const [nothingFor, setNothingFor] = useState<string | null>(null)
   const goTo = (line: SearchLine, text: string) => {
     track('search_landed', { kind: line.kind, query: text })
     if (line.listing) {
@@ -234,8 +234,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const submit = () => {
     if (!q || !listings || !schedule) return
     if (ownLines.length === 0) learnFrom(q, communitySlug)
-    if (lines[0]) return goTo(lines[0], q)
-    setNothingFor(q)
+    if (lines[0]) goTo(lines[0], q)
   }
   // A shared question (/philly/ask/…) goes where Enter would, once the page
   // can work out where; the address is replaced, so Back doesn't return to
@@ -246,10 +245,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     sharedLanded.current = true
     const first = lines[0]
     if (first?.href) router.replace(first.href)
-    else if (first) goTo(first, q)
     // Once, when the shared question can first be placed.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    else setNothingFor(q)
+    else if (first) goTo(first, q)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sharedQuestion, !!asked])
 
@@ -272,7 +269,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     else changeQuery(p)
   }
 
-  const foundNothing = !!q && nothingFor === q
+  const foundNothing = !!asked && lines.length === 0
   const askGroup = foundNothing ? { nothingClose: true, sharePath: routes.ask(communitySlug, q) } : null
   // AskTheGroup says "Nothing in the guide for …" itself.
   const nothingNode = askGroup && (
