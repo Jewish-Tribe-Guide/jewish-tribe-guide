@@ -73,6 +73,18 @@ describe('the Minyanim view (step 4)', () => {
     ])
   })
 
+  // The week was built 24 hours at a time. Nov 1, 2026 has 25 (the clocks
+  // go back), so just after midnight that week two steps landed on Sunday
+  // and Monday was never shown (found 12:13 AM, Oct 27).
+  it('shows seven different days in the week the clocks go back', () => {
+    vi.setSystemTime(new Date('2026-10-27T00:13:00-04:00')) // Tue, just after midnight
+    view()
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
+    expect(tabs).toHaveLength(7)
+    expect(new Set(tabs).size).toBe(7)
+    expect(tabs.slice(-2)).toEqual(['SunNov 1', 'MonNov 2'])
+  })
+
   it('a minyan hovered lights its shul on the map, as a shul’s own row does', () => {
     const onHoverShul = vi.fn()
     renderWithProviders(<MinyanimView items={[mekor, kesher]} categoryId="synagogue" onHoverShul={onHoverShul} />, { content: { categories: [shuls] } })

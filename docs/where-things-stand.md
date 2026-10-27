@@ -1659,19 +1659,29 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
-## Done Oct 26, last: "+ Add" in light apricot (on `redesign/oct18-fixes`)
+## Done Oct 27: the week's days when the clocks go back (on `redesign/oct18-fixes`)
 
-- **The floating "+ Add" is light apricot (`#fdba74`) with ink text**, on
-  every screen that has it: the site's own and each category page's. It now
-  says "Add" on the phone too, not just "+". Drawn as board K on the canvas
+- **The Minyanim view's week no longer loses a day.** It was built 24 hours
+  at a time. Nov 1 has 25 (the clocks go back), so just after midnight that
+  week Sunday showed twice and Monday never did. Days are now counted on the
+  calendar. The same fix covers the spring day that has 23.
+- Not fixed: `itemMarks.ts` says "yesterday" by taking away 24 hours, so on
+  the day after the clocks go forward, just after midnight, it can miss.
+
+## Done Oct 26, last: "+ Add" in light apricot, with an edge (on `redesign/oct18-fixes`)
+
+- **The floating "+ Add" is light apricot (`#fdba74`) with ink text and a
+  1.5px deeper apricot edge (`#f59e5a`)**, on every screen that has it: the
+  site's own and each category page's. Drawn as board O on the canvas
   `8qmL8PXNLN7qqfM7GK75ix`, after gold, ink, blue and brighter warm colours
   were turned down.
-- **A named change to "colour only for meaning":** apricot (`--color-add`)
-  means "you can add here" and is used nowhere else. Blue stays the colour
-  of everything else you tap.
+- **Smaller on the phone (48px), with the word "Add" there too.** Desktop
+  stays 56px.
+- **A named change to "colour only for meaning":** apricot (`--color-add`,
+  `--color-add-edge`) means "you can add here" and is used nowhere else.
+  Blue stays the colour of everything else you tap.
 - Both buttons are one component now (`AddButton.tsx`).
-- Not checked on a real phone yet. The wider button covers a little more of
-  the bottom-right row.
+- Not checked on a real phone yet.
 
 ## Done Oct 26, later: two small fixes from the user (on `redesign/oct18-fixes`)
 
