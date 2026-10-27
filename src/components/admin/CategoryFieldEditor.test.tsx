@@ -165,3 +165,42 @@ describe('FieldEditor — a minyan, not a shul', () => {
     expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
   })
 })
+
+// Board B, Oct 27: a link an opened listing leads with, in its own box.
+describe('FieldEditor — a link that leads its own box', () => {
+  it('turns on with a title, takes a field for its words, and turns off', async () => {
+    const user = userEvent.setup()
+    let latestField: CategoryField = { key: 'delivery_whatsapp_group', label: 'Delivery WhatsApp Group', type: 'url', renderAs: 'row' }
+    function Spy() {
+      const [field, setField] = useState(latestField)
+      latestField = field
+      return (
+        <FieldEditor
+          field={field}
+          index={0}
+          total={1}
+          canRequire
+          audienceOptions={[]}
+          showIfOptions={[]}
+          badgeFieldOptions={[]}
+          textFieldOptions={[{ key: 'delivery_details', label: 'Delivery Details' }]}
+          onChange={(patch) => setField((f) => { latestField = { ...f, ...patch }; return latestField })}
+          onRemove={() => {}}
+          onMove={() => {}}
+          hasCaveat={false}
+          onToggleCaveat={() => {}}
+        />
+      )
+    }
+    render(<Spy />)
+    expect(screen.queryByLabelText('Box title')).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText(/its own box first/))
+    expect(latestField.leadBox).toEqual({ title: 'Delivery WhatsApp Group' })
+    await user.clear(screen.getByLabelText('Box title'))
+    await user.type(screen.getByLabelText('Box title'), 'Delivery')
+    await user.selectOptions(screen.getByLabelText('Words in the box'), 'delivery_details')
+    expect(latestField.leadBox).toEqual({ title: 'Delivery', text: 'delivery_details' })
+    await user.click(screen.getByLabelText(/its own box first/))
+    expect(latestField.leadBox).toBeUndefined()
+  })
+})

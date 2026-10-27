@@ -891,3 +891,42 @@ describe('ListingView — Edit under every box (Oct 15)', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
   })
 })
+
+// Board B, Oct 27: a delivery's WhatsApp group is how it's ordered, and was
+// a blue line 1.6 screens down. The admin's leadBox on the link: its own
+// box first, under the buttons, the link a wide green Join in it.
+describe('ListingView — a box that leads (board B)', () => {
+  const kind: CategoryField = { key: 'foodType', label: 'Store Type', type: 'select', renderAs: 'badge', filterable: true, multiSelect: true, options: [{ value: 'Restaurant', label: 'Restaurant' }, { value: 'Scheduled Deliveries', label: 'Scheduled Deliveries' }] }
+  const showIf = { field: 'foodType', equals: 'Scheduled Deliveries' }
+  const group: CategoryField = { key: 'delivery_whatsapp_group', label: 'Delivery WhatsApp Group', type: 'url', renderAs: 'row', linkLabel: 'Join WhatsApp Group', showIf, leadBox: { title: 'Delivery', text: 'delivery_details' } }
+  const details: CategoryField = { key: 'delivery_details', label: 'Delivery Details', type: 'textarea', renderAs: 'row', showIf }
+  const delivery = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [website, kind, certLink, group, details] })
+  const said = 'Delivers on Thursday around 5:30pm. $10 delivery fee.'
+  const mikes = (over: Record<string, unknown> = {}) =>
+    makeListing({ id: 'mikes', name: 'Mike’s Chicken', phone: '(469) 278-6249', website: 'https://mikeschicken.com/', foodType: ['Scheduled Deliveries'], delivery_whatsapp_group: 'https://chat.whatsapp.com/Mikes', delivery_details: said, geo: { lat: 33, lng: -96 }, ...over })
+
+  it('its box right under the buttons: the title, what it says, then Join the group', () => {
+    view({ item: mikes(), category: delivery })
+    const box = screen.getByTestId('listing-lead-box')
+    expect(screen.getByTestId('listing-actions').nextElementSibling).toBe(box)
+    expect(within(box).getByRole('heading', { name: 'Delivery' })).toBeInTheDocument()
+    const join = within(box).getByRole('link', { name: 'Join the group' })
+    expect(join).toHaveAttribute('href', 'https://chat.whatsapp.com/Mikes')
+    expect(within(box).getByText(said).compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(box).getByTestId('freshness')).toBeInTheDocument()
+    // Said once: not again in About or the contact box.
+    expect(screen.getAllByText(said)).toHaveLength(1)
+    expect(screen.getAllByRole('link').filter((a) => a.getAttribute('href') === 'https://chat.whatsapp.com/Mikes')).toHaveLength(1)
+    // It comes to you: no Directions to the kitchen.
+    expect(screen.queryByText('Directions')).not.toBeInTheDocument()
+  })
+
+  it('with only what it says, no button; none on a place it isn’t for', () => {
+    view({ item: mikes({ delivery_whatsapp_group: '' }), category: delivery })
+    expect(within(screen.getByTestId('listing-lead-box')).queryByRole('link')).not.toBeInTheDocument()
+    cleanup()
+    view({ item: mikes({ foodType: ['Restaurant'] }), category: delivery })
+    expect(screen.queryByTestId('listing-lead-box')).not.toBeInTheDocument()
+    expect(screen.getByText('Directions')).toBeInTheDocument()
+  })
+})

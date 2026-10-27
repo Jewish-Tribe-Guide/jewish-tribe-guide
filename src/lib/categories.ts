@@ -122,6 +122,11 @@ export type CategoryField = {
    *  instead of a round button (a hospital's page on Refuah, Oct 6), so the
    *  buttons stay every listing's Directions, Call, Website, Share. */
   linkInDetails?: boolean
+  /** For `type: 'url'`: on an opened listing that has it, a box of its own
+   *  first, under the buttons: `title`, the text of the field `text`, and
+   *  the link as a wide button; in place of Directions, for a place that
+   *  comes to you (a delivery's WhatsApp group, board B, Oct 27). */
+  leadBox?: { title: string; text?: string }
   /** For a row field: render just the value, without the "Label:" prefix. */
   hideLabel?: boolean
   // ── Presentation hints (used by the generic card renderer) ──

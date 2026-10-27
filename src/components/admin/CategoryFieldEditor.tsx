@@ -32,6 +32,7 @@ export function FieldEditor({
   audienceOptions,
   showIfOptions,
   badgeFieldOptions,
+  textFieldOptions = [],
   onChange,
   onRemove,
   onMove,
@@ -54,6 +55,9 @@ export function FieldEditor({
    *  could replace — see CategoryField.countReplacesKey. Empty when the
    *  category has no other badge-eligible field yet. */
   badgeFieldOptions: { key: string; label: string }[]
+  /** The category's own text fields a link's lead box could say (see
+   *  CategoryField.leadBox). */
+  textFieldOptions?: { key: string; label: string }[]
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
@@ -261,6 +265,38 @@ export function FieldEditor({
             />
             On an opened listing, a line with the address and phone, not a round button
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!f.leadBox}
+              onChange={(e) => onChange({ leadBox: e.target.checked ? { title: f.label } : undefined })}
+              className="rounded border-slate-300"
+            />
+            On an opened listing, its own box first, with no Directions (a place that comes to you)
+          </label>
+          {f.leadBox && (
+            <div className="ml-5 flex flex-col gap-2 sm:flex-row">
+              <label className="block sm:w-1/2">
+                <span className={fieldLabel}>Box title</span>
+                <input value={f.leadBox.title} onChange={(e) => onChange({ leadBox: { ...f.leadBox!, title: e.target.value } })} className={inputClass} placeholder="e.g. Delivery" />
+              </label>
+              <label className="block sm:w-1/2">
+                <span className={fieldLabel}>Words in the box</span>
+                <select
+                  value={f.leadBox.text ?? ''}
+                  onChange={(e) => onChange({ leadBox: { title: f.leadBox!.title, ...(e.target.value ? { text: e.target.value } : {}) } })}
+                  className={inputClass}
+                >
+                  <option value="">None</option>
+                  {textFieldOptions.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
         </>
       )}
 
