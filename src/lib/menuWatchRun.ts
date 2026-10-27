@@ -188,7 +188,10 @@ export async function runMenuWatch(
     const kept = watch.pageHash && field ? await getMenuReading(watch.communityId, listing.id) : null
     lookingFor = dishesToLookFor({ dishes: listedDishes(listing, category), menuDated: menuDated(listing) }, kept)
     if (!lookingFor.length) {
-      if (watch.pageHash && field) {
+      // Only after a kept reading found dishes on it: dishes dated before
+      // readings were kept, on a page no read has named them from, aren't
+      // "seen" because it didn't change (Charlie was a sinner., Oct 27).
+      if (watch.pageHash && field && kept?.dishes.length) {
         const missing = new Set((kept?.missing ?? []).map((n) => n.trim().toLowerCase()))
         await dateMenuDishes(watch.communityId, listing.id, field.key, menuDated(listing).filter((n) => !missing.has(n.trim().toLowerCase())))
       }

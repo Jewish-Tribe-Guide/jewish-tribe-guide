@@ -74,6 +74,14 @@ for that exact change, in the same conversation. Show the dry run first.
    user, Oct 25; checked). Each run saves its counts per kind from the
    next run on, so Last night's earlier nights fill in one night at a
    time (live, once this branch is deployed).
+1g. **Delivery listings lead with their box (board B, Oct 27):** built as
+   a setting on any link field (Admin → category → the link → "its own
+   box first, with no Directions", with a title and the field it says).
+   The box sits under the buttons: its words, then a wide Join the group.
+   The link isn't a round button too, and there's no Directions (Mike's
+   kitchen is 52 miles away). Set on dev's Food "Delivery WhatsApp Group"
+   (title Delivery, words Delivery Details). Live needs a yes for the same
+   setting, after this branch is deployed.
 
 ## For the user or the community
 
@@ -134,6 +142,13 @@ for that exact change, in the same conversation. Show the dry run first.
      doesn't waits on the kind page, and from then on the place has a
      watch. A place whose website menu can't be read now says so ("Menu
      can't be read") instead of nothing.
+   - **"Seen today" on a menu never read** (Charlie was a sinner., Oct
+     27): an unchanged page dated again every dish already dated, and 17
+     live places had dates from the Oct 17–18 reads but no reading. So
+     their dishes said "seen" each morning the page (Charlie's home page)
+     didn't change, while the Menus line said never read. An unchanged
+     page now dates only after a kept reading found dishes on it. Their
+     dates stop moving; the morning first read reads them.
    - Mike's, Bar Bombón and Mama's need a browser to draw their menu,
      1 a night; Tasty Twisters' page is unchanged but its date is stuck at
      Oct 22, cause not found yet.

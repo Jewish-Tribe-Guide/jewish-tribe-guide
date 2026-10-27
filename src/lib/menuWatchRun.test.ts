@@ -92,10 +92,23 @@ describe('runMenuWatch', () => {
   // The user, Oct 23: "Everything should date what they check." A menu
   // that hasn't changed still names what it named.
   it('an unchanged menu dates again each dish dated from it, not one its last read found missing', async () => {
-    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, dishes: ['Falafel', 'Kugel', 'Soup'], itemMenu: { dishes: { Falafel: '2026-10-01T00:00:00Z', Kugel: '2026-10-01T00:00:00Z' } } } })
-    m.getMenuReading.mockResolvedValue({ status: 'proposed', dishes: [], missing: ['kugel'] })
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, dishes: ['Falafel', 'Kugel'], itemMenu: { dishes: { Falafel: '2026-10-01T00:00:00Z', Kugel: '2026-10-01T00:00:00Z' } } } })
+    m.getMenuReading.mockResolvedValue({ status: 'proposed', dishes: [{ name: 'Falafel' }], missing: ['kugel'] })
     await runMenuWatch({ ...watch, pageHash: menuHash(page) }, undefined, { apiKey: 'k' })
     expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r1', 'dishes', ['Falafel'])
+  })
+
+  // Oct 27, Charlie was a sinner.: its dishes said "seen today" while the
+  // Menus line said its menu was never read. Dated by a read on Oct 17,
+  // before readings were kept, they were dated again every morning its
+  // home page hadn't changed, though nothing ever found them on it.
+  it('an unchanged menu dates nothing when no kept reading found dishes on it', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, dishes: ['Falafel'], itemMenu: { dishes: { Falafel: '2026-10-17T00:00:00Z' } } } })
+    for (const kept of [null, { status: 'failed', dishes: [], missing: [] }, { status: 'skipped', dishes: [], missing: [] }]) {
+      m.getMenuReading.mockResolvedValue(kept)
+      expect(await runMenuWatch({ ...watch, pageHash: menuHash(page) }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: menuHash(page) })
+    }
+    expect(m.dateMenuDishes).not.toHaveBeenCalled()
   })
 
   it('the first read dates nothing', async () => {
