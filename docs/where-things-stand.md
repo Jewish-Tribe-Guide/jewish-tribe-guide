@@ -1695,9 +1695,10 @@ On the live site the reader had read 41 questions, 23 into nothing, about
 
 - **The home, category pages and the map never wait for the AI or use its
   reading.** No "Reading your question…", no "Read as" on the map.
-- **Enter on a search that finds nothing** reads it in the background
-  (`learnFrom`, askReader.ts), for the admin's Read questions tab. Typing
-  alone reads nothing; a shared link isn't read.
+- **A search that finds nothing is read in the background** on Enter, or
+  once the typing stops for 2.5 seconds (`useLearnAfterPause`; the user:
+  "I don't think most people click enter"), for the admin's Read questions
+  tab. Words that find something aren't read; a shared link isn't read.
 - **Read questions** has no Approve any more (a reading never answers),
   one list, and Teach, which is how the search learns.
 - **Nothing found says so as it's typed, on the home and the map**, with
@@ -1706,7 +1707,6 @@ On the live site the reader had read 41 questions, 23 into nothing, about
   the box while typing and in the list once searched, instead of "Turn on
   a category above". "Nothing" means nothing anywhere in the guide, places
   the map can't plot included.
-- **Open:** the background read still happens only on Enter.
 - **Next, agreed in principle, not built:** typo matching for names
   ("Beth sholom", "bros medresh"), most of what was asked.
 

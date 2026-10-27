@@ -13,6 +13,7 @@ import type { SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
 import { routes } from '@/lib/routes'
 import { learnFrom } from '@/lib/askReader'
+import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -214,8 +215,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // Nothing anywhere says so under the box as it's typed, with where to
   // ask: not only on Enter, which most people never press (the user,
   // Oct 27). A question our own search found nothing for is also read by the
-  // AI in the background, for the admin's Read questions tab, where its
-  // words can be taught to the search (learnFrom). The page never waits
+  // AI in the background, on Enter or once the typing stops, for the admin's
+  // Read questions tab, where its words can be taught to the search
+  // (learnFrom, useLearnAfterPause). The page never waits
   // for it or shows it (the user, Oct 27: "feels weird to search, get an
   // answer, then see reading question, then get a different answer").
   const router = useRouter()
@@ -288,6 +290,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     ready: allCards !== null && listings !== null,
     source: 'Home',
   })
+  // And read in the background once the typing stops, as Enter does. Not a
+  // shared question, which nobody here asked.
+  useLearnAfterPause({ query: q, foundNothing: !!asked && ownLines.length === 0, ready: !sharedQuestion, community: communitySlug })
 
   // The desktop gateway's own block order (admin-editable — see
   // HomeSectionManager/DesktopTopicsManager's Home screen cards list).

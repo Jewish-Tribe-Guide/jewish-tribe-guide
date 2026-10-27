@@ -34,6 +34,7 @@ import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { itemCounts, itemFields, listingHas, listingItems, sameItem, searchItems } from '@/lib/itemFilter'
 import { itemName } from '@/lib/itemNames'
 import { learnFrom } from '@/lib/askReader'
+import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
 import UpvoteButton from './UpvoteButton'
@@ -1666,6 +1667,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // was only more to read. Not when filters hid what it found: then
   // Filters is the way back.
   const searchFoundNothing = typed && filtered.length === 0 && !hiddenByFilters
+  // Read in the background once the typing stops, as Enter does
+  // (useLearnAfterPause). Not a search a shared link arrived with.
+  useLearnAfterPause({
+    query: search,
+    foundNothing: !!searchFoundNothing && !minyanimView && !asksMinyan,
+    ready: search !== (initialSearch ?? ''),
+    community: communitySlug,
+  })
   const listHeading = searchFoundNothing ? null : (
       <ListHeading
         // Open groups: the first group's heading is the list's own ("Open

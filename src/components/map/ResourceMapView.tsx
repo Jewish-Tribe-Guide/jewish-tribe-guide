@@ -58,6 +58,7 @@ import { countEvent } from '@/lib/countEvent'
 import { useOptionalCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { neighborhoodsFor } from '@/lib/places'
 import { learnFrom } from '@/lib/askReader'
+import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { useKeptListScroll } from './useKeptListScroll'
@@ -804,6 +805,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const typedNothing = useMemo(() => findsNothing(input), [input, allPoints, categories, listings])
+  // Read in the background once the typing stops, as Enter does. Not the
+  // words a shared link arrived with.
+  useLearnAfterPause({ query: input, foundNothing: typedNothing, ready: input !== initialQueryText, community: countCommunity })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const searchedNothing = useMemo(() => findsNothing(committedQuery), [committedQuery, allPoints, categories, listings])
   const nothingBox = (text: string, className?: string) =>
@@ -938,7 +942,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // A question our own search found nothing for is also read by the AI in
   // the background, for the admin's Read questions tab, where its words can
   // be taught to the search (learnFrom). The map never waits for it or
-  // shows it (the user, Oct 27). A question is committed on Enter.
+  // shows it (the user, Oct 27). A question is committed on Enter; one
+  // typed and left is read too (useLearnAfterPause, by typedNothing).
   useEffect(() => {
     if (!askIds || !categories || !listings) return
     const found = allPoints.some((p) => (p.raw ? askIds.has(p.raw.id) : activeTerms.every((t) => stripApostrophes(p.searchText).includes(t))))

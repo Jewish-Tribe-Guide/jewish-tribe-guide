@@ -5,9 +5,11 @@ import { categoryWithHoursField, defaultCommunity, dismissLocationPrompt } from 
 // Synagogues found nothing, then the reading showed every shul; "feels weird
 // to search, get an answer, then see reading question, then get a different
 // answer"). A question our own search finds nothing for is read in the
-// background on Enter, for the admin's Read questions tab, where its words
-// can be taught to the search; the home, a category page and the map never
-// wait for the reading or use it, and typing alone reads nothing.
+// background, on Enter or once the typing stops (the user: "I don't think
+// most people click enter"), for the admin's Read questions tab, where its
+// words can be taught to the search; the home, a category page and the map
+// never wait for the reading or use it. Words that find something are
+// never read.
 //
 // The reader is stood in for with page.route, answering with a reading that
 // would change each page if it were used: every test server has it off
@@ -24,13 +26,25 @@ async function standIn(page: Page, categoryId: string) {
   return asked
 }
 
-/** Typed, a pause longer than the reader's old one, then Enter. */
+/** Typed, read once the typing stops (useLearnAfterPause's 2.5s), once. */
+async function typeAndLeave(page: Page, box: ReturnType<Page['getByRole']>, asked: string[]) {
+  await box.fill(QUESTION)
+  await page.waitForTimeout(1500)
+  expect(asked).toEqual([])
+  await expect.poll(() => asked, { timeout: 8000 }).toEqual([QUESTION])
+  await page.waitForTimeout(3000)
+  expect(asked).toEqual([QUESTION])
+}
+
+/** Typed, Enter before the pause is up: read at once, and only once. */
 async function typeThenEnter(page: Page, box: ReturnType<Page['getByRole']>, asked: string[]) {
   await box.fill(QUESTION)
   await page.waitForTimeout(1500)
   expect(asked).toEqual([])
   await box.press('Enter')
   await expect.poll(() => asked).toEqual([QUESTION])
+  await page.waitForTimeout(3000)
+  expect(asked).toEqual([QUESTION])
 }
 
 test('the home: Enter reads it in the background and says it found nothing', async ({ page, request }) => {
@@ -83,4 +97,31 @@ test('the map: Enter reads it in the background, and nothing says "Read as"', as
   await expect(page.getByTestId('map-read-as')).toHaveCount(0)
   expect(new URL(page.url()).searchParams.get('open')).toBeNull()
   expect(new URL(page.url()).searchParams.get('cat')).toBeNull()
+})
+
+test('typed and left, without Enter: read once the typing stops, on every page', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithHoursField(request, community)
+  const asked = await standIn(page, category.id)
+
+  await page.goto(`/${community}`)
+  await dismissLocationPrompt(page)
+  const home = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
+  // Words that find something are never read, however long they're left.
+  await home.fill(category.pluralLabel)
+  await expect(page.getByTestId('search-lines').filter({ visible: true })).toBeVisible()
+  await page.waitForTimeout(3500)
+  expect(asked).toEqual([])
+  await typeAndLeave(page, home, asked)
+
+  // Each page is its own visit: the tab's answers don't carry over a load.
+  asked.length = 0
+  await page.goto(`/${community}/${category.id}`)
+  await dismissLocationPrompt(page)
+  await typeAndLeave(page, page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` }), asked)
+
+  asked.length = 0
+  await page.goto(`/${community}/map`)
+  await dismissLocationPrompt(page)
+  await typeAndLeave(page, page.getByPlaceholder(/Search name, address/).filter({ visible: true }), asked)
 })
