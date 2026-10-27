@@ -84,13 +84,9 @@ for that exact change, in the same conversation. Show the dry run first.
    setting, after this branch is deployed. **Written to live Oct 27 with
    the user's yes** (backup in `backups/`, untracked); shows once PR 363
    deploys.
-1h. **Two delivery group links, approved, waiting on the user** (Oct 27):
-   That Sushi Spot - Lakewood's Delivery WhatsApp Group is empty, and
-   Shlomo's has none though its words say dates are announced there. The
-   user has said yes to writing both to live, and will send the invite
-   links. Not on either website or the web (Shlomo's only listed group is
-   its Virginia one). Remind the user until they're in; then write both,
-   with a backup, and refresh the live pages.
+1h. **Two delivery group links: done by the user** (Oct 27). That Sushi
+   Spot - Lakewood's and Shlomo's Delivery WhatsApp Groups, added by the
+   user themselves.
 
 ## For the user or the community
 
