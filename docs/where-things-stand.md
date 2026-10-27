@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 26, 2026.
+Last updated: Oct 27, 2026.
 
 ## The branch
 
@@ -1658,6 +1658,38 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 27, later: Waiting for you says what it changes (on `redesign/oct18-fixes`)
+
+- **Two mikvahs no longer wait with nothing to decide.** Ohel Leah's and
+  Lower Merion Community Mikvah's pages were read again only to compare
+  (Oct 27), and each gave part of the notes the listing has whole. Such a
+  read never files anything, so it now counts as dealt with.
+- **The menu read can't hang the whole run.** On Oct 27 Center City Pretzel
+  Co.'s menu never came back, the run was stopped at its five minutes, and
+  the 16 places after it waited. Now each read gets 90 seconds (less when
+  the run is nearly out of time). A read that takes longer is kept as not
+  read, saying "Its menu took too long to read", and the run moves on. 17
+  menus were unread on live that morning; they go through on the next runs.
+- **The Links job says when.** Until its first run it shows its first check
+  ("Nov 1, 4:00 AM · first check Sunday"), and it says "every Sunday
+  morning". Each job's schedule now matches vercel.json, which a test checks.
+- **Shul times name their part** in each group: "Usual weekday times",
+  "This week's schedule, Oct 25 – Oct 31".
+- **A week is compared with the listing's own copy of it:** each minyan
+  new, changed or taken off, then "Unchanged: N minyanim". A week the
+  listing hasn't got reads "New week, 24 minyanim", then only the ones that
+  differ from usual ("Usually 15 min before sunset"). Usual times also say
+  how many stay the same.
+- **A part's finding is only its part.** Lower Merion's week came with the
+  hours the listing had when it was read, so it showed as one big line.
+  Now it shows the times alone. Approving it keeps every other detail the
+  listing has now, including any added since the read.
+- **This week's minyanim keep their usual sign-up group and join link.**
+  Mikveh Israel's week, read off its calendar, lost their WhatsApp groups.
+  Its waiting week fills in on its next read.
+- **A menu's new dishes come with what's already listed** ("Already
+  listed: Shawarma, Laffa", or "None").
 
 ## Done Oct 27: the week's days when the clocks go back (on `redesign/oct18-fixes`)
 

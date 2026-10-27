@@ -218,14 +218,17 @@ describe('submissionStore (integration)', () => {
     const weekdays = await file([{ ...weekday, time: '7:00am' }, shabbos], 'weekday')
     const shabbosPart = await file([weekday, { ...shabbos, time: '8:30am' }], 'shabbos')
     await approveSubmission(weekdays.id)
-    // And a new phone number, approved meanwhile.
-    await getAdminClient().from('resource').update({ phone: '555-0199' }).eq('id', created!.id)
+    // And a new phone number, approved meanwhile, and a detail the listing
+    // gained since the read (Oct 27: Lower Merion's hours, read with its week).
+    const { data: mid } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    await getAdminClient().from('resource').update({ phone: '555-0199', details: { ...mid!.details, hours: 'Sun–Thu 9 AM–5 PM' } }).eq('id', created!.id)
     await approveSubmission(shabbosPart.id)
 
     const { data: after } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
     const times = (after!.details.minyanim as { days: string[]; time: string }[]).map((m) => `${m.days.join(',')} ${m.time}`).sort()
     expect(times).toEqual(['mon,tue,wed,thu,fri 7:00am', 'sat 8:30am'])
     expect(after!.phone).toBe('555-0199')
+    expect(after!.details.hours).toBe('Sun–Thu 9 AM–5 PM')
   })
 
   // Oct 22: a mikvah's hours, the same way, a section at a time

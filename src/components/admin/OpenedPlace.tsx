@@ -567,15 +567,26 @@ export default function OpenedPlace({
                 </span>
                 {g.lines.length > 0 && (
                   <div className="-mx-2 flex flex-col rounded-md bg-amber-50 px-2">
-                    {g.lines.map((l, i) => (
-                      <span key={i} className={FIELDS}>
-                        <span>{l.label}</span>
-                        <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
-                          <span className="font-semibold">{l.value}</span>
-                          {l.old !== null && <span className="text-[12.5px] text-slate-500">Was {l.old}</span>}
+                    {g.lines.map((l, i) =>
+                      l.heading ? (
+                        <span key={i} data-testid="waiting-part" className={`pb-0.5 pt-2.5 text-[12.5px] font-bold text-slate-700 ${i ? 'border-t border-amber-200/70' : ''}`}>
+                          {l.label}
                         </span>
-                      </span>
-                    ))}
+                      ) : (
+                        <span key={i} className={FIELDS}>
+                          <span>{l.label}</span>
+                          <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
+                            <span className="font-semibold">{l.value}</span>
+                            {l.old !== null && (
+                              <span className="text-[12.5px] text-slate-500">
+                                {l.say === 'usually' ? 'Usually' : 'Was'} {l.old}
+                              </span>
+                            )}
+                            {l.say === 'new' && <span className="text-[12.5px] text-slate-500">New</span>}
+                          </span>
+                        </span>
+                      ),
+                    )}
                   </div>
                 )}
                 {g.facts.map((x) => (

@@ -93,12 +93,81 @@ describe('waitingGroups', () => {
       ['times:https://mekorhabracha.org/davening', 'mekorhabracha.org/davening', 'Oct 25'],
       ['google', 'its Google listing', 'Oct 24'],
     ])
-    expect(w.groups[0].lines).toEqual([{ label: 'Shacharis · Mon–Fri', value: '6:30 AM', old: '6:45 AM' }])
+    // Its part named first (the user, Oct 27: "hard to tell which of the
+    // shul schedules it's updating").
+    expect(w.groups[0].lines).toEqual([
+      { label: 'Usual weekday times', value: '', old: null, heading: true },
+      { label: 'Shacharis · Mon–Fri', value: '6:30 AM', old: '6:45 AM' },
+    ])
     expect(w.groups[0].decide).toEqual({ kind: 'findings', ids: ['f1'] })
     expect(w.groups[1].lines).toEqual([{ label: 'Phone', value: '(215) 525-4247', old: '(215) 525-4246' }])
     expect(w.groups[1].decide).toEqual({ kind: 'google' })
     // Its weekday times and its phone are in the groups; the rest is up to date.
     expect(w.checked.map((l) => l.label)).toEqual(['Usual Shabbos times', 'Name', 'Website'])
+  })
+
+  // Oct 27 (the user): Sons of Israel's and the Shtiebel's weeks showed a
+  // line or three, and Edit a whole week: "Are those new or not?"
+  describe('this week’s schedule', () => {
+    const day = (id: string, tefillah: Minyan['tefillah'], on: string, time: string) => ({ id, tefillah, on: [on], time })
+    const week = (minyanim: ReturnType<typeof day>[]) => ({ id: 'w', name: 'Times for Oct 26 – Oct 31', from: '2026-10-26', to: '2026-10-31', mode: 'replace' as const, kind: 'week' as const, minyanim })
+    const lines = (currentSchedules: ReturnType<typeof week>[], proposedSchedules: ReturnType<typeof week>[]) =>
+      waitingGroups(
+        'p',
+        jobs({ times: { name: 'Shul times', places: [shul([finding({ page: 'https://mekorhabracha.org/davening', part: 'week', times: { field: {} as never, current: WEEKDAY, proposed: WEEKDAY, currentSchedules, proposedSchedules } })]) as never] } }),
+        NOW,
+      ).groups[0].lines
+    const read = week([day('1', 'shacharis', '2026-10-26', '6:45am'), day('2', 'shacharis', '2026-10-27', '7:00am'), day('3', 'mincha', '2026-10-27', '5:45pm')])
+
+    it('the usual times: what changes, and how many stay', () => {
+      const two = [...WEEKDAY, minyan('m', 'mincha', ['mon', 'tue', 'wed', 'thu'], '1:30 PM')]
+      const f = finding({ part: 'weekday', times: { field: {} as never, current: two, proposed: [WEEKDAY[0], { ...two[1], time: '1:45 PM' }], currentSchedules: [], proposedSchedules: [] } })
+      expect(waitingGroups('p', jobs({ times: { name: 'Shul times', places: [shul([f]) as never] } }), NOW).groups[0].lines.slice(1)).toEqual([
+        { label: 'Mincha · Mon–Thu', value: '1:45 PM', old: '1:30 PM' },
+        { label: 'Unchanged', value: '1 minyan', old: null },
+      ])
+    })
+
+    it('a new week: how many, then only what differs from the usual times', () => {
+      expect(lines([], [read])).toEqual([
+        { label: 'This week’s schedule, Oct 26 – Oct 31', value: '', old: null, heading: true },
+        { label: 'New week', value: '3 minyanim', old: null },
+        { label: 'Shacharis, Tue, Oct 27', value: '7 AM', old: '6:45 AM', say: 'usually' },
+      ])
+    })
+
+    it('a week the listing has: what’s new, changed, taken off, and how many are unchanged', () => {
+      const had = week([day('1', 'shacharis', '2026-10-26', '6:45am'), day('2', 'shacharis', '2026-10-27', '6:45am'), day('4', 'maariv', '2026-10-27', '9:00pm')])
+      expect(lines([had], [read])).toEqual([
+        { label: 'This week’s schedule, Oct 26 – Oct 31', value: '', old: null, heading: true },
+        { label: 'Shacharis, Tue, Oct 27', value: '7 AM', old: '6:45 AM' },
+        { label: 'Mincha, Tue, Oct 27', value: '5:45 PM', old: null, say: 'new' },
+        { label: 'Maariv, Tue, Oct 27', value: 'Taken off', old: '9 PM' },
+        { label: 'Unchanged', value: '1 minyan', old: null },
+      ])
+    })
+  })
+
+  // The user, Oct 27: "rather than just show one thing that's being added,
+  // to also see what else is already there".
+  it('a menu’s new dishes, beside the ones it already lists', () => {
+    const place = (dishes: string[]) => ({
+      id: 'p',
+      name: 'Hummus Place',
+      href: '/x',
+      website: 'https://hummus.example',
+      menuUrl: null,
+      dishes,
+      menuDated: ['Tofu'],
+      reading: { status: 'proposed' as const, readAt: AT, sourceUrl: 'https://hummus.example/menu', dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }, { name: 'Shawarma', quote: 'Shawarma', checked: true }], missing: ['Tofu'] },
+    })
+    const lines = (dishes: string[]) => waitingGroups('p', jobs({ dishes: [place(dishes)] }), NOW).groups[0].lines
+    expect(lines(['Shawarma', 'Tofu', 'Laffa'])).toEqual([
+      { label: 'New on its menu', value: 'Falafel', old: null },
+      { label: 'Not on its menu', value: 'Tofu', old: null },
+      { label: 'Already listed', value: 'Shawarma, Laffa', old: null },
+    ])
+    expect(lines([]).at(-1)).toEqual({ label: 'Already listed', value: 'None', old: null })
   })
 
   // Oct 25 (the user): "grocery should go to grocery". A grocery's own

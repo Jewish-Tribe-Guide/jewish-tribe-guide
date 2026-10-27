@@ -113,6 +113,18 @@ describe('findingFrom: a shul’s times', () => {
     expect(old.part).toBeUndefined()
   })
 
+  // Oct 27: Lower Merion's week, filed with the hours the listing had then.
+  // Its hours since changed, so it showed as one big line of times, hours
+  // and all; approved, it applies its part only (submissionStore.ts).
+  it('a part’s finding is its part only, whatever else differs', () => {
+    const now = [{ id: 'a', tefillah: 'shacharis', days: ['sun'], time: '8:30am' }]
+    const s = read({ minyanim: now, hours: 'Sun 9 AM–1 PM' })
+    ;(s.payload as Record<string, unknown>).source = { readBy: 'ai', from: 'its website', part: { part: 'weekday', field: 'minyanim' } }
+    const f = findingFrom(s, { ...shul, details: { ...shul.details, hours: 'Sun 9 AM–2 PM' } }, [...TIMES, { key: 'hours', label: 'Hours', type: 'text' }])
+    expect(f.lines.map((l) => l.key)).toEqual(['minyanim'])
+    expect(f.times).toMatchObject({ current: was, proposed: now })
+  })
+
   it('none when it would change something else too, so it’s shown line by line', () => {
     const f = findingFrom(read({ minyanim: was, rabbi: 'Rabbi Cohen' }), shul, [...TIMES, { key: 'rabbi', label: 'Rabbi', type: 'text' }])
     expect(f.lines.map((l) => l.key)).toEqual(['rabbi'])

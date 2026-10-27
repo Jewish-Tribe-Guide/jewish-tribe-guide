@@ -130,8 +130,8 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   await expect(group).toHaveCount(1)
   await expect(group).toContainText('From menu.example.invalid/menu')
   await expect(group).toContainText('New on its menuFalafel')
-  await expect(group).toContainText('Not on its menuTofu')
-  await expect(group).not.toContainText('Laffa')
+  // Laffa, added by hand, stays: beside the rest, never as one off.
+  await expect(group).toContainText('Not on its menuTofuAlready listedShawarma, Laffa')
 
   await group.getByRole('button', { name: 'Accept' }).click()
   // Nothing left to decide: it's off Waiting straight away, on Not
