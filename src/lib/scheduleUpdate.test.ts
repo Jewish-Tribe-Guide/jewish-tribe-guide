@@ -461,6 +461,33 @@ describe('a minyan that only runs when enough sign up', () => {
       expect(changes.join('\n')).toContain('5:45pm · only if enough sign up')
     })
 
+    // Mikveh Israel, Oct 27: its week read off the calendar, each of its
+    // usual sign-up minyanim in it, and none with its WhatsApp group.
+    it('this week’s minyan is sign-up, or online, as the usual one it is', () => {
+      const join = 'https://zoom.us/j/1'
+      const usual: Minyan[] = [
+        { id: 'sh', tefillah: 'shacharis', days: ['mon', 'thu'], time: '7:15am', signUp },
+        { id: 'mi', tefillah: 'mincha', days: ['mon', 'tue'], time: '2:00pm', joinLink: join },
+      ]
+      const read: RegularReading = {
+        ...week,
+        from: '2026-10-26',
+        to: '2026-10-27',
+        times: [t({ tefillah: 'shacharis', date: '2026-10-26', time: '7:15am' }), t({ tefillah: 'mincha', date: '2026-10-26', time: '2:00pm' }), t({ tefillah: 'mincha', date: '2026-10-27', time: '2:30pm' }), t({ tefillah: 'shacharis', date: '2026-10-27', time: '7:15am' })],
+      }
+      const { schedules } = applyUpdate(usual, [], compareTimes(usual, read, { season: null, newId }), { newId, evenIfSame: true })
+      expect(schedules[0].minyanim.map((m) => [m.on[0], m.tefillah, m.signUp ?? null, m.joinLink ?? null])).toEqual(
+        expect.arrayContaining([
+          ['2026-10-26', 'shacharis', signUp, null],
+          ['2026-10-26', 'mincha', null, join],
+          // A new time for the usual Mincha: still online.
+          ['2026-10-27', 'mincha', null, join],
+          // Not a day the usual Shacharis is.
+          ['2026-10-27', 'shacharis', null, null],
+        ]),
+      )
+    })
+
     it('is kept when the admin’s copy comes back to be applied', () => {
       const back = cleanUpdate(JSON.parse(JSON.stringify(u)), Date.parse('2026-10-11T12:00:00Z'))
       expect(back?.rows.filter((r) => r.signUp).map((r) => r.tefillah)).toEqual(['shacharis', 'mincha_maariv'])
