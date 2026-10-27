@@ -1,6 +1,7 @@
 import { DAY_KEYS, dayLabel, type DayKey } from './hours'
 import { formatAnchorRule, isMinyanim, joinText, parseTimeToMinutes, SEASON_LABELS, signUpText, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
 import type { CalendarDay } from './jewishDays'
+import { isShabbosRow } from './minyanText'
 
 // ── Special schedules: a shul's Yom Tov times (step 4, agreed Oct 1) ────────
 // A shul posts different times for a festival: "Sukkos 5787, Sep 26 – Oct
@@ -501,12 +502,13 @@ export function shabbosIsOver(today: string, nowMs: number, havdalahIso: string 
  *  week post that has it (the newsletter's over the website's, as
  *  resolveDay picks), then that day's one-day additions, less any time
  *  the week already gives. `posts` are the week posts it shows, the
- *  newsletter's first. Days with nothing are left out. */
+ *  newsletter's first. Days with nothing are left out. `range`: the days it
+ *  looked at, today (or, after havdalah, Sunday) to Shabbos. */
 export function thisWeeksDays(
   schedules: readonly SpecialSchedule[],
   date: string,
   { shabbosOver = false, regular = [] }: { shabbosOver?: boolean; regular?: readonly Minyan[] } = {},
-): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null } {
+): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null; range: { from: string; to: string } } {
   // Friday, the week ends with Shabbos, its last; once Shabbos is over
   // (shabbosIsOver), it's the week ahead, Sunday to Shabbos (the user, Oct
   // 23: "right when shabbos is over we need to show the week's schedule").
@@ -516,19 +518,31 @@ export function thisWeeksDays(
   const days: WeekDayTimes[] = []
   const used = new Set<SpecialSchedule>()
   const whole: SpecialSchedule[] = []
+  // Whether this week's posts stand in for the usual weekday times: the
+  // shul's whole week, or one giving a weekday's times. A Shabbos's own
+  // times leave the weekdays to the usual box.
+  const weekdayOf = (d: ScheduleDay) => (isDate(d) ? weekdayOfDate(d) : d)
+  const replacesWeekdays = weeks.some((s) => s.whole || s.minyanim.some((m) => m.on.some((d) => (['sun', 'mon', 'tue', 'wed', 'thu'] as string[]).includes(weekdayOf(d)))))
   for (const date of datesOf({ from: today, to: saturday })) {
     const weekday = weekdayOfDate(date)
     const post = firstCovering(weeks.filter((s) => s.from <= date && date <= s.to))
     if (post?.whole) whole.push(post)
-    const own = post ? post.minyanim.filter((m) => m.on.includes(date) || m.on.includes(weekday)).map((minyan) => ({ minyan, from: post })) : []
-    if (own.length) used.add(post!)
+    // A weekday no week covers keeps its usual times, in the week's box:
+    // BZBI's pasted week ran to Thursday, and with the usual weekday times
+    // folded under it, Friday's Shacharis showed nowhere (the user, Oct 27).
+    // Shabbos's usual times stay in their own box.
+    const usual = !post && replacesWeekdays ? regular.filter((m) => !m.season && m.days.includes(weekday) && !isShabbosRow({ ...m, days: [weekday] })) : []
+    const own = post
+      ? post.minyanim.filter((m) => m.on.includes(date) || m.on.includes(weekday)).map((minyan) => ({ minyan, from: post }))
+      : usual.map(({ days: _days, ...m }) => (void _days, { minyan: { ...m, on: [date] }, from: firstCovering(weeks)! }))
+    if (own.length && post) used.add(post)
     const extras = schedules.filter((s) => isOneDayAddition(s) && s.from === date)
     // A time the day has already isn't added: the week's, or, where the
     // week gives none that day, the usual one (resolveDay's rule). BZBI's
     // newsletter gave "Sat Oct 24, 9:30 AM" before it had a usual Shabbos
     // time; once it had one, the box showed the usual time as this week's
     // (the user, Oct 23).
-    const held = [...own.map((o) => o.minyan), ...(own.length || post?.whole ? [] : regular.filter((m) => !m.season && m.days.includes(weekday)))]
+    const held = [...own.map((o) => o.minyan), ...(post && (own.length || post.whole) ? [] : regular.filter((m) => !m.season && m.days.includes(weekday)))]
     const added = extras.flatMap((s) =>
       s.minyanim
         .filter((m) => !held.some((o) => o.tefillah === m.tefillah && sameClock(o.time, m.time)))
@@ -545,7 +559,7 @@ export function thisWeeksDays(
   // Nothing any day, and every day the shul's whole week's: no minyan this
   // week, which isn't the same as no week posted (SpecialSchedule.whole).
   const none = !days.length && whole.length === datesOf({ from: today, to: saturday }).length ? whole[0] : null
-  return { days, posts, none }
+  return { days, posts, none, range: { from: today, to: saturday } }
 }
 
 /** Whether a shul's Shabbos boxes go above its week's (the user, Oct 26):

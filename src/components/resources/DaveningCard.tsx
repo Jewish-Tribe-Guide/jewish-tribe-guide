@@ -78,7 +78,7 @@ export default function DaveningCard({
   // "This week's schedule" (the user, Oct 20: one schedule for a week):
   // the weeks the shul sent out or its website gives, and this week's
   // one-day additions, day by day (thisWeeksDays).
-  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver, regular: regularMinyanim(minyanim) }) : { days: [], posts: [], none: null }
+  const thisWeek = schedule ? thisWeeksDays(schedules, schedule.today.date, { shabbosOver: schedule.shabbosOver, regular: regularMinyanim(minyanim) }) : { days: [], posts: [], none: null, range: null }
   const inThisWeek = new Set(thisWeek.days.flatMap((d) => d.minyanim.map((m) => m.from)))
   // Anything else today or tomorrow (a Yom Tov schedule) has its own box.
   const specialSchedule = posting
@@ -371,7 +371,11 @@ export default function DaveningCard({
     // later: never a date a check gave the whole listing (boxDates.ts).
     const weekDate = boxDate(item, THIS_WEEK_SECTION)
     const postedLater = !weekDate.confirmedAt || (!!fp.postedAt && fp.postedAt > weekDate.confirmedAt)
-    const postDate = { confirmedAt: postedLater ? fp.postedAt : weekDate.confirmedAt, ...(postedLater ? {} : { source: weekDate.source, by: weekDate.by }) }
+    // Read off the shul's website, it says so, as an agreeing read does: an
+    // approval dates the whole listing, which no box goes by (Shtiebel's
+    // week said only "last checked", the user, Oct 27).
+    const postedFrom = fp.postedBy === 'website' && fp.postedAt ? { source: { from: item.name, at: fp.postedAt } } : {}
+    const postDate = { confirmedAt: postedLater ? fp.postedAt : weekDate.confirmedAt, ...(postedLater ? postedFrom : { source: weekDate.source, by: weekDate.by }) }
     return onEditBox ? (
       <FreshnessFooter resourceId={item.id} {...postDate} onEdit={() => onEditBox('this_week', 'This week’s schedule', fp.id)} />
     ) : (
@@ -392,13 +396,23 @@ export default function DaveningCard({
   const shabbosRows = shabbosDays.flatMap((d) => d.rows)
   const weekdayRows = weekdayDays.flatMap((d) => d.rows)
 
+  // The days the week's box speaks for: the rest of the week to Friday when
+  // it knows every one of them (times, or the shul's whole week with none
+  // that day), not just the days it has a minyan (Rodeph Shalom's whole
+  // week read "Oct 29", its one weekday minyan, the user, Oct 27).
+  const wholeOn = (date: string) => [...thisWeek.posts, ...(thisWeek.none ? [thisWeek.none] : [])].some((p) => p.whole && p.from <= date && date <= p.to)
+  const restOfWeek: string[] = []
+  if (thisWeek.range) for (let d = thisWeek.range.from; d < thisWeek.range.to; d = dayAfter(d)) restOfWeek.push(d)
+  const knowsRest = restOfWeek.length > 0 && restOfWeek.every((d) => wholeOn(d) || weekdayDays.some((w) => w.date === d))
+  const weekdayDates = !weekdayDays.length ? '' : knowsRest ? datesText(restOfWeek[0], restOfWeek.at(-1)!) : datesText(weekdayDays[0].date, weekdayDays.at(-1)!.date)
+
   // This week's, as one: waiting for it, no minyan in it, or its weekdays.
   const weekDated = (
     <div key="week-dated" className="space-y-5 empty:hidden">
       {!waiting && weekdayDays.length > 0 && (
         <Card title="This week’s schedule" testId="davening-this-week" footer={postFootFor(weekFootPost, 'this-week')}>
           <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-week-dates">
-            {datesText(weekdayDays[0].date, weekdayDays.at(-1)!.date)}
+            {weekdayDates}
           </p>
           <WeekDays days={weekdayDays} todayDate={todayDate} nowMinutes={schedule?.nowMinutes} anchors={anchors} marks={!weekdayRows.every((m) => m.signUp)} />
           {!allSignUp &&
@@ -530,6 +544,7 @@ function datesText(fromDate: string, toDate: string): string {
 const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
 const dayBefore = (date: string) => new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+const dayAfter = (date: string) => new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 

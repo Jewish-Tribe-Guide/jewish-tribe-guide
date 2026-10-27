@@ -496,6 +496,60 @@ describe('this week’s schedule (Oct 6)', () => {
     })
   })
 
+  describe('the week’s box, as live shuls showed it (Oct 27)', () => {
+    const showTue = (schedules: unknown[], { rows = usual, ...over }: { rows?: unknown[] } & Record<string, unknown> = {}) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-10-06T10:00:00-04:00')) // Tue Oct 6
+      const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: rows, minyanim_schedules: schedules, ...over })
+      renderWithProviders(<DaveningCard item={shul} minyanim={rows} schedules={schedules} category={shuls} />, { content: { categories: [shuls] } })
+    }
+
+    // Rodeph Shalom: their whole week, one weekday minyan, read "Oct 29".
+    it('dated for the rest of the week, not just the day it has a minyan', () => {
+      const whole = {
+        ...weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', whole: true }),
+        minyanim: [
+          { id: 'w1', tefillah: 'shacharis', on: ['2026-10-08'], time: '8:10am' },
+          { id: 'w2', tefillah: 'kabbalas_shabbos', on: ['2026-10-09'], time: '6:00pm' },
+        ],
+      }
+      showTue([whole])
+      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–9$/)
+      expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 8Shacharis8:10 AM')
+    })
+
+    // BZBI: a pasted week to Thursday; Friday's usual Shacharis showed
+    // nowhere, the usual weekday times folded under the week.
+    it('a weekday the week doesn’t reach keeps its usual times, in the week’s box', () => {
+      const rows = [...usual, { id: 'e', tefillah: 'shacharis', days: ['fri'], time: '7:30am' }]
+      const pasted = {
+        ...weekPost('Times for Oct 2 – Oct 8', '2026-10-02', '2026-10-08'),
+        minyanim: [
+          { id: 'p1', tefillah: 'shacharis', on: ['2026-10-05', '2026-10-08'], time: '6:45am' },
+          { id: 'p2', tefillah: 'shacharis', on: ['2026-10-06', '2026-10-07'], time: '7:00am' },
+        ],
+      }
+      showTue([pasted], { rows })
+      const week = screen.getByTestId('davening-this-week')
+      expect(week).toHaveTextContent('Thu Oct 8Shacharis6:45 AMFri Oct 9Shacharis7:30 AM')
+      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–9$/)
+      // Friday night is Shabbos's, in its usual box: not this week's.
+      expect(week).not.toHaveTextContent('Mincha')
+      expect(screen.queryByTestId('davening-this-shabbos')).not.toBeInTheDocument()
+    })
+
+    // Shtiebel: its website's week, approved by an admin, said only "last
+    // checked": the approval dates the whole listing, which no box goes by.
+    it('a week from their website, approved, says who gave it', () => {
+      const site = weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', postedAt: '2026-10-06T11:48:00.000Z' })
+      showTue([{ ...site, minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-07'], time: '7:30am' }] }], {
+        confirmedAt: '2026-10-06T18:56:00.000Z',
+        confirmedFrom: { from: 'Mekor Habracha', at: '2026-10-06T18:56:00.000Z' },
+      })
+      expect(within(screen.getByTestId('davening-this-week')).getByTestId('freshness')).toHaveTextContent(/^Times confirmed by Mekor Habracha, Oct 6\./)
+    })
+  })
+
   it('a shul that has never sent one out just shows its usual times', () => {
     show([])
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()

@@ -1692,6 +1692,21 @@ compare, and one it can't read, on desktop and phone.
   changes highlighted: "Was 6:45 AM", "New", "Taken off".
 - **A note read off a website ends at a whole sentence**, not cut at 120
   letters ("…Shabbat Mincha at SOI. For"). Applies from the next read.
+- **Three listings the user checked on live:**
+  - Rodeph Shalom's whole week read "Oct 29", its one weekday minyan. The
+    week's box is dated to Friday when it knows every day.
+  - BZBI's pasted week ran to Thursday, so Friday's usual Shacharis showed
+    nowhere. A weekday no week reaches keeps its usual times, in the
+    week's box.
+  - Shtiebel's week, approved from its website, didn't say who gave it. It
+    says "confirmed by" the shul now.
+- **Waiting on the user:**
+  - Whether shul listings show candle lighting at all. Leyv Ha-Ir and Kol
+    Tzedek show it as drawn Oct 26; Kol Tzedek gets a Friday of its own
+    with nothing else on it.
+  - Whether a shul whose newsletter is watched shows "Not on the guide
+    yet" until this week's comes. Society Hill's hasn't come yet. Its
+    site gives only the usual times, which agree.
 
 ## Done Oct 27, later: Waiting for you says what it changes (on `redesign/oct18-fixes`)
 
