@@ -1701,6 +1701,9 @@ compare, and one it can't read, on desktop and phone.
   city's time, not the shul's, and the home page has it. This Shabbos no
   longer starts with it, and a Friday with nothing else on it (Kol
   Tzedek's) is gone. A minyan "at candle lighting" still shows its time.
+- **Every filter choice counts** (the user, Oct 27): the Filters button
+  counts each choice ticked, so Meat and Dairy are two, like Challah and
+  Wine under Has, and Mincha and Maariv are two. The map already did.
 - **Waiting on the user:** whether a shul whose newsletter is watched
   shows "Not on the guide yet" until this week's comes. Society Hill's
   hasn't come yet. Its site gives only the usual times, which agree.

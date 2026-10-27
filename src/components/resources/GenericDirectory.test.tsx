@@ -1293,6 +1293,16 @@ describe('GenericDirectory — the list heading', () => {
     expect(heading.getByRole('button', { name: 'Sort Popularity' })).toBeInTheDocument()
   })
 
+  // The user, Oct 27: Meat and Dairy read as one filter. Every choice
+  // counts, in a dropdown as in Has.
+  it('counts each choice ticked: Meat and Dairy are two filters, with Shabbat friendly three', () => {
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} initialFilters={{ sel_t: 'Meat,Dairy' }} />)
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
+    cleanup()
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} initialFilters={{ sel_t: 'Meat,Dairy', f_shabbatFriendly: '1' }} />)
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('3')
+  })
+
   it('puts the category’s own link (“Other Mikvahs”) after the last row, not in the heading', () => {
     const mikvahs = { ...food, externalLink: { label: 'Other Mikvahs', url: 'https://mikvah.org/directory' } }
     renderWithProviders(<GenericDirectory category={mikvahs} items={items} {...handlers} />)
@@ -2329,6 +2339,8 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         // Maariv beside it shows both, not neither.
         await user.click(within(sheet()).getByRole('button', { name: 'Maariv' }))
         expect(within(sheet()).getByRole('button', { name: 'Show 3 minyanim' })).toBeInTheDocument()
+        // Each counts (the user, Oct 27): Mincha and Maariv are two.
+        expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
         await user.click(within(sheet()).getByRole('button', { name: 'Mincha' }))
         expect(screen.getByRole('searchbox')).toHaveValue('')
         expect(within(sheet()).getByRole('button', { name: 'Mincha' })).toHaveAttribute('aria-pressed', 'false')
