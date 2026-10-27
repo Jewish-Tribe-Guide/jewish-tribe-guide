@@ -109,8 +109,11 @@ export function itemMarks(item: DirectoryResource, field: CategoryField): ItemMa
 export function dayText(iso: string, now: number | null, timezone: string): string {
   if (now !== null) {
     const day = dayInTimezone(timezone, new Date(iso))
-    if (day === dayInTimezone(timezone, new Date(now))) return 'today'
-    if (day === dayInTimezone(timezone, new Date(now - 86_400_000))) return 'yesterday'
+    const today = dayInTimezone(timezone, new Date(now))
+    if (day === today) return 'today'
+    // The calendar day before, not 24 hours back: the night the clocks go
+    // forward has 23, so that was the day before yesterday just after midnight.
+    if (day === new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)) return 'yesterday'
   }
   const d = new Date(iso)
   const old = now !== null && now - d.getTime() > 300 * 86_400_000

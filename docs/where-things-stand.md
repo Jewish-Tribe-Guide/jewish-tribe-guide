@@ -1665,8 +1665,9 @@ compare, and one it can't read, on desktop and phone.
   at a time. Nov 1 has 25 (the clocks go back), so just after midnight that
   week Sunday showed twice and Monday never did. Days are now counted on the
   calendar. The same fix covers the spring day that has 23.
-- Not fixed: `itemMarks.ts` says "yesterday" by taking away 24 hours, so on
-  the day after the clocks go forward, just after midnight, it can miss.
+- **An item seen the day before reads "yesterday" after the clocks go
+  forward too.** It took away 24 hours, so just after midnight the morning
+  after, it said the date instead.
 
 ## Done Oct 26, last: "+ Add" in light apricot, with an edge (on `redesign/oct18-fixes`)
 
