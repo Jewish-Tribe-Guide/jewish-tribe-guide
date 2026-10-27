@@ -1700,13 +1700,13 @@ compare, and one it can't read, on desktop and phone.
     week's box.
   - Shtiebel's week, approved from its website, didn't say who gave it. It
     says "confirmed by" the shul now.
-- **Waiting on the user:**
-  - Whether shul listings show candle lighting at all. Leyv Ha-Ir and Kol
-    Tzedek show it as drawn Oct 26; Kol Tzedek gets a Friday of its own
-    with nothing else on it.
-  - Whether a shul whose newsletter is watched shows "Not on the guide
-    yet" until this week's comes. Society Hill's hasn't come yet. Its
-    site gives only the usual times, which agree.
+- **No candle lighting on shul listings** (the user, Oct 27): it's the
+  city's time, not the shul's, and the home page has it. This Shabbos no
+  longer starts with it, and a Friday with nothing else on it (Kol
+  Tzedek's) is gone. A minyan "at candle lighting" still shows its time.
+- **Waiting on the user:** whether a shul whose newsletter is watched
+  shows "Not on the guide yet" until this week's comes. Society Hill's
+  hasn't come yet. Its site gives only the usual times, which agree.
 
 ## Done Oct 27, later: Waiting for you says what it changes (on `redesign/oct18-fixes`)
 

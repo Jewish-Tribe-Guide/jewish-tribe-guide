@@ -437,7 +437,7 @@ describe('this week’s schedule (Oct 6)', () => {
 
   // Drawn Oct 26 (boards 2, 3 and 3b): the week's weekdays and This
   // Shabbos, ordered as the usual boxes are; a time already started today
-  // greyed; This Shabbos headed by Friday's candle lighting.
+  // greyed.
   describe('the week and This Shabbos (Oct 26)', () => {
     afterEach(() => {
       zmanimShabbos.candleLighting = null
@@ -471,21 +471,19 @@ describe('this week’s schedule (Oct 6)', () => {
       expect(dated()).toEqual(['davening-this-shabbos', 'davening-this-week'])
     })
 
-    it('This Shabbos starts with Friday’s candle lighting, a day of its own when the week gives Friday nothing', () => {
+    // The user, Oct 27: candle lighting is the city's time, not the shul's,
+    // and it's on the home page. Drawn Oct 26 at the top of This Shabbos;
+    // Kol Tzedek got a Friday with nothing else on it.
+    it('This Shabbos has no candle lighting, nor a Friday of its own when the week gives Friday nothing', () => {
       zmanimShabbos.candleLighting = { label: 'Candle lighting', time: '6:05 PM', iso: '2026-10-09T18:05:00-04:00' }
       showAt('2026-10-08T16:00:00-04:00', [fullWeek])
-      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent('Fri Oct 9Candle lighting6:05 PMKabbalas Shabbos6:20 PMSat Oct 10Shacharis9 AM')
-      // Not in the week's box.
-      expect(screen.getByTestId('davening-this-week')).not.toHaveTextContent('Candle lighting')
+      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent('Fri Oct 9Kabbalas Shabbos6:20 PMSat Oct 10Shacharis9 AM')
+      expect(screen.queryByText('Candle lighting')).not.toBeInTheDocument()
       cleanup()
       showAt('2026-10-08T16:00:00-04:00', [{ ...fullWeek, minyanim: fullWeek.minyanim.filter((m) => m.id !== 'f3') }])
-      expect(screen.getByTestId('davening-this-shabbos')).toHaveTextContent(/Fri Oct 9Candle lighting6:05 PMSat Oct 10Shacharis9 AM/)
-    })
-
-    it('no candle lighting from another week’s zmanim', () => {
-      zmanimShabbos.candleLighting = { label: 'Candle lighting', time: '6:15 PM', iso: '2026-10-02T18:15:00-04:00' }
-      showAt('2026-10-08T16:00:00-04:00', [fullWeek])
-      expect(screen.queryByTestId('davening-candle-lighting')).not.toBeInTheDocument()
+      const shabbos = screen.getByTestId('davening-this-shabbos')
+      expect(within(shabbos).getByTestId('davening-this-week-days')).toHaveTextContent(/^Sat Oct 10Shacharis9 AM$/)
+      expect(within(shabbos).getByTestId('davening-this-shabbos-dates')).toHaveTextContent(/^Oct 10$/)
     })
 
     it('no dated This Shabbos while only the usual times are known', () => {
