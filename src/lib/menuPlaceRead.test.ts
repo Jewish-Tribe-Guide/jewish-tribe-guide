@@ -100,6 +100,36 @@ describe('readUnreadMenus', () => {
     expect(m.findMenus).toHaveBeenCalledTimes(2)
   })
 
+  // Oct 27: Bar Bombón read, then Center City Pretzel Co. never came back,
+  // the run was stopped at its five minutes and kept no record, and the 16
+  // after it by name waited behind it every morning.
+  it('keeps a menu that takes too long as not read, saying so, and goes on', async () => {
+    vi.useFakeTimers()
+    try {
+      m.findMenus.mockImplementationOnce(() => new Promise(() => {}))
+      const run = readUnreadMenus('key', { perRun: 2, readMs: 1000 })
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(await run).toEqual([{ community: 'philly', read: 1, failed: 1, left: 2 }])
+      expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'a', expect.objectContaining({ status: 'failed', dishes: [], note: expect.stringMatching(/too long/) }))
+      expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'b', expect.objectContaining({ status: 'proposed' }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('gives a read only the time the run has left', async () => {
+    vi.useFakeTimers()
+    try {
+      m.findMenus.mockImplementation(() => new Promise(() => {}))
+      // Started 50ms before no read may start, 60ms before the run ends.
+      const run = readUnreadMenus('key', { perRun: 1, readMs: 10_000, forMs: 50, endMs: 60 })
+      await vi.advanceTimersByTimeAsync(60)
+      expect(await run).toEqual([{ community: 'philly', read: 0, failed: 1, left: 3 }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Oct 26: HipCityVeg's dishes were dated by a read on Oct 17, before a
   // reading was kept. With no reading it had no watch, and dated dishes
   // kept it from a first read, so they said Oct 17 for good.
