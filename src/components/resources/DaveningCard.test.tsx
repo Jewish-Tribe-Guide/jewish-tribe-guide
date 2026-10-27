@@ -503,7 +503,7 @@ describe('this week’s schedule (Oct 6)', () => {
     }
 
     // Rodeph Shalom: their whole week, one weekday minyan, read "Oct 29".
-    it('dated for the rest of the week, not just the day it has a minyan', () => {
+    it('dated as this week, Sunday to Friday, not just the day it has a minyan', () => {
       const whole = {
         ...weekPost('Times for Oct 4 – Oct 10', '2026-10-04', '2026-10-10', { postedBy: 'website', whole: true }),
         minyanim: [
@@ -512,13 +512,14 @@ describe('this week’s schedule (Oct 6)', () => {
         ],
       }
       showTue([whole])
-      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–9$/)
+      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
       expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 8Shacharis8:10 AM')
     })
 
-    // BZBI: a pasted week to Thursday; Friday's usual Shacharis showed
-    // nowhere, the usual weekday times folded under the week.
-    it('a weekday the week doesn’t reach keeps its usual times, in the week’s box', () => {
+    // BZBI: a pasted week to Thursday. The user, Oct 27: this week is
+    // Sunday to Friday; a day the week doesn't have has no minyan, never
+    // its usual times put in.
+    it('a weekday the week doesn’t reach has nothing, the box still dated to Friday', () => {
       const rows = [...usual, { id: 'e', tefillah: 'shacharis', days: ['fri'], time: '7:30am' }]
       const pasted = {
         ...weekPost('Times for Oct 2 – Oct 8', '2026-10-02', '2026-10-08'),
@@ -529,11 +530,10 @@ describe('this week’s schedule (Oct 6)', () => {
       }
       showTue([pasted], { rows })
       const week = screen.getByTestId('davening-this-week')
-      expect(week).toHaveTextContent('Thu Oct 8Shacharis6:45 AMFri Oct 9Shacharis7:30 AM')
-      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–9$/)
-      // Friday night is Shabbos's, in its usual box: not this week's.
-      expect(week).not.toHaveTextContent('Mincha')
-      expect(screen.queryByTestId('davening-this-shabbos')).not.toBeInTheDocument()
+      expect(within(week).getByTestId('davening-this-week-days')).toHaveTextContent(/Thu Oct 8Shacharis6:45 AM$/)
+      expect(week).not.toHaveTextContent('Fri Oct 9')
+      expect(week).not.toHaveTextContent('7:30 AM')
+      expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
     })
 
     // Shtiebel: its website's week, approved by an admin, said only "last
@@ -687,7 +687,7 @@ describe('one week, from the newsletter and the website (Oct 20)', () => {
   it('is one week, day by day, the newsletter’s times on the day both give: weekdays, then This Shabbos', () => {
     show([website, newsletter])
     expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
-    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–7$/)
+    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
     const [week, shabbos] = screen.getAllByTestId('davening-this-week-days')
     expect(week).toHaveTextContent(/^Tue Oct 6TodayShacharis7 AMWed Oct 7Shacharis7 AM$/)
     expect(shabbos).toHaveTextContent(/^Fri Oct 9Kabbalas Shabbos6:10 PMSat Oct 10Shacharis9 AM$/)

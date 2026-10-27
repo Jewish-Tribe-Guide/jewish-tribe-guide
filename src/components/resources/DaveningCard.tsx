@@ -385,15 +385,16 @@ export default function DaveningCard({
   const shabbosRows = shabbosDays.flatMap((d) => d.rows)
   const weekdayRows = weekdayDays.flatMap((d) => d.rows)
 
-  // The days the week's box speaks for: the rest of the week to Friday when
-  // it knows every one of them (times, or the shul's whole week with none
-  // that day), not just the days it has a minyan (Rodeph Shalom's whole
-  // week read "Oct 29", its one weekday minyan, the user, Oct 27).
-  const wholeOn = (date: string) => [...thisWeek.posts, ...(thisWeek.none ? [thisWeek.none] : [])].some((p) => p.whole && p.from <= date && date <= p.to)
-  const restOfWeek: string[] = []
-  if (thisWeek.range) for (let d = thisWeek.range.from; d < thisWeek.range.to; d = dayAfter(d)) restOfWeek.push(d)
-  const knowsRest = restOfWeek.length > 0 && restOfWeek.every((d) => wholeOn(d) || weekdayDays.some((w) => w.date === d))
-  const weekdayDates = !weekdayDays.length ? '' : knowsRest ? datesText(restOfWeek[0], restOfWeek.at(-1)!) : datesText(weekdayDays[0].date, weekdayDays.at(-1)!.date)
+  // The days the week's box speaks for: a week the shul posted is this
+  // week's, Sunday to Friday, whichever days it has a minyan (the user, Oct
+  // 27: Rodeph Shalom's whole week read "Oct 29", its one weekday minyan).
+  // A day it doesn't reach has nothing, its usual times not put in.
+  const weekGivesWeekdays = weekdayDays.some((d) => d.minyanim.some((m) => m.from.kind === 'week'))
+  const weekdayDates = !weekdayDays.length
+    ? ''
+    : weekGivesWeekdays && thisWeek.range
+      ? datesText(daysFrom(thisWeek.range.to, -6), daysFrom(thisWeek.range.to, -1))
+      : datesText(weekdayDays[0].date, weekdayDays.at(-1)!.date)
 
   // This week's, as one: waiting for it, no minyan in it, or its weekdays.
   const weekDated = (
@@ -532,7 +533,7 @@ function datesText(fromDate: string, toDate: string): string {
 
 const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
-const dayAfter = (date: string) => new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+const daysFrom = (date: string, days: number) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 

@@ -1693,11 +1693,12 @@ compare, and one it can't read, on desktop and phone.
 - **A note read off a website ends at a whole sentence**, not cut at 120
   letters ("…Shabbat Mincha at SOI. For"). Applies from the next read.
 - **Three listings the user checked on live:**
-  - Rodeph Shalom's whole week read "Oct 29", its one weekday minyan. The
-    week's box is dated to Friday when it knows every day.
-  - BZBI's pasted week ran to Thursday, so Friday's usual Shacharis showed
-    nowhere. A weekday no week reaches keeps its usual times, in the
-    week's box.
+  - Rodeph Shalom's whole week read "Oct 29", its one weekday minyan.
+    This week's box is dated Sunday to Friday ("Oct 25–30") whenever a
+    week the shul posted gives its weekdays, whatever days have a minyan.
+  - BZBI's pasted week runs Oct 23–29, so it has no Friday. The user: a
+    day the week doesn't have gets no minyan, never the usual times put
+    in. (Built that way first, then taken back the same day.)
   - Shtiebel's week, approved from its website, didn't say who gave it. It
     says "confirmed by" the shul now.
 - **No candle lighting on shul listings** (the user, Oct 27): it's the
