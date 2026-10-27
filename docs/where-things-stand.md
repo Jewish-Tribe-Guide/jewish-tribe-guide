@@ -1672,8 +1672,9 @@ compare, and one it can't read, on desktop and phone.
 ## Done Oct 26, last: "+ Add" in light apricot, with an edge (on `redesign/oct18-fixes`)
 
 - **The floating "+ Add" is light apricot (`#fdba74`) with ink text and a
-  1.5px deeper apricot edge (`#f59e5a`)**, on every screen that has it: the
-  site's own and each category page's. Drawn as board O on the canvas
+  deeper apricot edge (`#f59e5a`), 1px on the phone and 1.5px on desktop**,
+  on every screen that has it: the site's own and each category page's.
+  Drawn as boards N (phone) and O (desktop) on the canvas
   `8qmL8PXNLN7qqfM7GK75ix`, after gold, ink, blue and brighter warm colours
   were turned down.
 - **Smaller on the phone (48px), with the word "Add" there too.** Desktop
