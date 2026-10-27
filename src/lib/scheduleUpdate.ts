@@ -559,10 +559,16 @@ export function applyUpdate(
       day: r.day as DayKey,
     })
   }
-  /** A dated row as a schedule's minyan, sign-up with its group. */
+  /** A dated row as a schedule's minyan, sign-up with its group. One that
+   *  is a usual minyan that day, at its time or a new one, is sign-up or
+   *  online as that one is: a week's page gives the time, not the group
+   *  (Mikveh Israel's calendar, Oct 27). */
   const onDate = (r: UpdateRow) => {
-    const signUp = signUpOf(r, weekdayOf(r.day))
-    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}), ...(signUp ? { signUp } : {}) }
+    const weekday = weekdayOf(r.day)
+    const usual = r.rowId ? current.find((m) => m.id === r.rowId && m.tefillah === r.tefillah && m.days.includes(weekday)) : undefined
+    const signUp = signUpOf(r, weekday, usual)
+    const joinLink = usual?.joinLink?.trim()
+    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
   }
 
   const weekly = (r: UpdateRow) => (DAY_KEYS as readonly string[]).includes(r.day)

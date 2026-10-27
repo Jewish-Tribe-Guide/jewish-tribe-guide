@@ -112,6 +112,23 @@ export const FIRST_READS_PER_RUN = 20
  *  minutes (read-menus' maxDuration). */
 export const FIRST_READS_FOR_MS = 200_000
 
+/** How long one place's read may take. Oct 27, Center City Pretzel Co.'s
+ *  never came back: the run was stopped at its five minutes, kept no
+ *  record, and the 16 after it by name waited behind it every morning. */
+export const FIRST_READ_MS = 90_000
+
+/** The run is done by now, whatever it's reading, so it ends inside its
+ *  five minutes and records what it did. */
+export const FIRST_READS_END_MS = 270_000
+
+const TOO_LONG = Symbol('too long')
+/** `work`, or TOO_LONG once `ms` pass; the read is left behind. */
+function within<T>(ms: number, work: Promise<T>): Promise<T | typeof TOO_LONG> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<typeof TOO_LONG>((resolve) => (timer = setTimeout(() => resolve(TOO_LONG), Math.max(0, ms))))
+  return Promise.race([work, late]).finally(() => clearTimeout(timer))
+}
+
 /** A community's food places never read (needsFirstRead), by name. */
 async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: DishKind }[]> {
   const kinds = dishKinds(await listCategoriesUncached(slug))
@@ -149,9 +166,17 @@ export async function listUnreadMenus(slug: string): Promise<{ id: string; name:
  *  Returns what it did, for the run's log. */
 export async function readUnreadMenus(
   apiKey: string,
-  { perRun = FIRST_READS_PER_RUN, forMs = FIRST_READS_FOR_MS, now = Date.now }: { perRun?: number; forMs?: number; now?: () => number } = {},
+  {
+    perRun = FIRST_READS_PER_RUN,
+    forMs = FIRST_READS_FOR_MS,
+    readMs = FIRST_READ_MS,
+    endMs = FIRST_READS_END_MS,
+    now = Date.now,
+  }: { perRun?: number; forMs?: number; readMs?: number; endMs?: number; now?: () => number } = {},
 ): Promise<{ community: string; read: number; failed: number; left: number }[]> {
-  const until = now() + forMs
+  const start = now()
+  const until = start + forMs
+  const end = start + endMs
   const { data: communities, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
@@ -164,10 +189,22 @@ export async function readUnreadMenus(
     for (const { l, kind } of unread) {
       if (budget <= 0 || now() > until) break
       budget--
-      const kept = await readPlaceMenu(slug, l, kind, apiKey).catch((err) => {
-        console.error(`[read-menus] ${l.name} failed:`, err)
-        return null
-      })
+      const read = await within(
+        Math.min(readMs, end - now()),
+        readPlaceMenu(slug, l, kind, apiKey).catch((err) => {
+          console.error(`[read-menus] ${l.name} failed:`, err)
+          return null
+        }),
+      )
+      // Kept as not read, saying why, so it's on the Main dishes page with
+      // Read now rather than first in line again tomorrow.
+      const kept =
+        read === TOO_LONG
+          ? await saveMenuReading(slug, l.id, { status: 'failed', sourceUrl: menuLinkOf(l) ?? menuWebsite(l, kind.category), dishes: [], note: 'Its menu took too long to read.', model: null }).catch((err) => {
+              console.error(`[read-menus] ${l.name} took too long, and couldn’t be kept:`, err)
+              return null
+            })
+          : read
       // One that couldn't be read is kept, saying why, but isn't a read.
       if (kept?.status === 'failed') failed++
       else if (kept) done++

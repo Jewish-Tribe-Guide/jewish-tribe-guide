@@ -32,6 +32,7 @@ import {
   listingDistance,
   listingFacts,
   listingKind,
+  leadBox,
   mainThing,
   nearbyListings,
   primaryLink,
@@ -399,6 +400,35 @@ export default function ListingView({ item, category, color, place = null, upvot
     </div>
   )
 
+  // A place that comes to you (a delivery, board B, Oct 27): the admin's
+  // leadBox on a link, its own box right under the buttons, what it says
+  // and the link as one wide button. Dated on its own.
+  const lead = leadBox(item, category)
+  const leadKey = lead && (lead.text ?? lead.field).key
+  const leadBoxView = lead && (
+    <Card
+      testId="listing-lead-box"
+      title={lead.title}
+      footer={<FreshnessFooter resourceId={item.id} {...boxDate(item, leadKey!)} section={leadKey!} onEdit={editBox ? () => editBox({ title: lead.title, fields: lead.text ? [lead.text, lead.field] : [lead.field] }) : undefined} />}
+    >
+      {lead.text && <p className="whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
+      {lead.href && (
+        <a
+          href={lead.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => track('listing_action', { action: lead.field.linkLabel ?? lead.field.label })}
+          className={`mt-3 mb-1 flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-[15.5px] font-bold text-white transition-colors sm:max-w-sm ${
+            isWhatsAppLink(lead.href) ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-primary hover:bg-primary-dark'
+          }`}
+        >
+          {isWhatsAppLink(lead.href) ? <JoinIcon className="h-5 w-5" /> : <GlobeIcon className="h-5 w-5" />}
+          {joinLabel(lead.field, category, lead.href)}
+        </a>
+      )}
+    </Card>
+  )
+
   // ── 3 · The main thing ─────────────────────────────────────────────────
   let mainSection: ReactNode = null
   const named = main === 'section' ? mainCardOf(category) : null
@@ -495,6 +525,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     ...(shabbosFields ?? []).map((f) => f.key),
     ...joinAbout.map((f) => f.key),
     ...(join ? [join.field.key] : []),
+    ...(lead ? [lead.field.key, ...(lead.text ? [lead.text.key] : [])] : []),
     ...buttons.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
     ...extra.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
   ])
@@ -695,6 +726,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {foundBox}
       <TappedMinyanBox item={item} category={category} />
       {actions}
+      {leadBoxView}
       {caveatFirst && (
         <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
           <h2 className="text-base font-extrabold text-caution">What isn’t kosher</h2>
@@ -821,14 +853,16 @@ function hasAny(v: unknown): boolean {
 }
 
 const isWhatsApp = (category: CategoryConfig) => /whatsapp/i.test(category.label)
+const isWhatsAppLink = (href: string) => /^https?:\/\/(chat\.)?whatsapp\.com\//i.test(href)
 
 /** The one link's button: "Join the group" for a WhatsApp group (one line
  *  on a phone, under "WhatsApp Group"); "Visit tribe12.org" for a website
  *  (Oct 6: a network's listing is its site, and "Website" in WhatsApp green
- *  read as a group); otherwise what the admin called it. */
+ *  read as a group); otherwise what the admin called it. A WhatsApp link
+ *  is a group anywhere (a delivery's, board B). */
 function joinLabel(field: CategoryField, category: CategoryConfig, href: string): string {
   const label = field.linkLabel ?? field.label
-  if (isWhatsApp(category) && /^join/i.test(label)) return 'Join the group'
+  if ((isWhatsApp(category) || isWhatsAppLink(href)) && /^join/i.test(label)) return 'Join the group'
   if (/website/i.test(label)) {
     const site = siteName(href)
     return site ? `Visit ${site}` : label

@@ -21,6 +21,8 @@ export type NightlyJob = {
   limitSeconds: number
   /** How many days apart it runs: 1, every night, unless said. */
   everyDays?: number
+  /** When it runs, UTC: vercel.json's schedule, kept the same by a test. */
+  cron: string
 }
 
 /** In the order they run (vercel.json's hours). */
@@ -30,33 +32,49 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
     name: 'Google hours',
     about: 'Asks Google whether each listing is still open, and refreshes a seventh of their hours, phones and websites.',
     limitSeconds: 300,
+    cron: '0 6 * * *',
   },
   {
     id: 'watches',
     name: 'Watches',
     about: 'Checks every watch below, most important first. What one couldn’t reach goes first the next night.',
     limitSeconds: 300,
+    cron: '0 7 * * *',
   },
   {
     id: 'read-menus',
     name: 'Menus',
     about: 'Reads the menus never read yet, up to 20 a night. Once read, each menu’s watch keeps it current.',
     limitSeconds: 300,
+    cron: '30 7 * * *',
   },
   {
     id: 'walk-routes',
     name: 'Walks',
     about: 'Works out walking times along the streets. Most are done when a listing is approved; this catches up on the rest.',
     limitSeconds: 60,
+    cron: '0 8 * * *',
   },
   {
     id: 'check-links',
     name: 'Links',
-    about: 'Opens every link a listing shows that nothing else reads, once a week, to see it’s still there.',
+    about: 'Opens every link a listing shows that nothing else reads, every Sunday morning, to see it’s still there.',
     limitSeconds: 300,
     everyDays: 7,
+    cron: '0 9 * * 0',
   },
 ]
+
+/** When a job next runs after `now`, from its schedule ("M H * * D", D a
+ *  weekday or *): for one not run yet, so the tab can say when it will. */
+export function nextRunAt(job: Pick<NightlyJob, 'cron'>, now: number): number {
+  const [minute, hour, , , weekday] = job.cron.split(' ')
+  const at = new Date(now)
+  at.setUTCHours(Number(hour), Number(minute), 0, 0)
+  if (weekday !== '*') at.setUTCDate(at.getUTCDate() + ((Number(weekday) - at.getUTCDay() + 7) % 7))
+  if (at.getTime() <= now) at.setUTCDate(at.getUTCDate() + (weekday === '*' ? 1 : 7))
+  return at.getTime()
+}
 
 /** The kinds of source the tab gives a line each (nightKinds.ts). */
 export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'newsletters' | 'hours' | 'sites' | 'menus' | 'other' | 'links'

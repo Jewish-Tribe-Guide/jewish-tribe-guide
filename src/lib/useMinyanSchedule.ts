@@ -89,11 +89,16 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
   // Today and the six days after it: what "Shabbos" or "Sunday" means when
   // asked this week, which a festival can change (Shemini Atzeres on
-  // Shabbos).
+  // Shabbos). Counted on the calendar from today, not 24 hours at a time:
+  // the day the clocks go back has 25, so just after midnight that week two
+  // steps landed on it and the last day was never shown.
+  const todayDate = now === null ? null : dayInTimezone(timezone, new Date(now))
   const dates =
-    now === null
+    todayDate === null
       ? []
-      : Array.from({ length: 7 }, (_, i) => factsFor(dayInTimezone(timezone, new Date(now + i * 86_400_000)), zmanimData?.days, zmanimData?.daysThrough))
+      : Array.from({ length: 7 }, (_, i) =>
+          factsFor(new Date(Date.parse(`${todayDate}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10), zmanimData?.days, zmanimData?.daysThrough),
+        )
   // Today's Yom Tov answer is the converter's own (isYomTov); the days
   // ahead only fill in what it doesn't say.
   if (dates[0] && typeof zmanimData?.isYomTov === 'boolean') dates[0] = { ...dates[0], yomTov: zmanimData.isYomTov }

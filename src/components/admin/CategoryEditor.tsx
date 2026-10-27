@@ -608,6 +608,10 @@ export function CategoryEditor({
                   badgeFieldOptions={draft.fields
                     .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== f.key)
                     .map((other) => ({ key: other.key, label: other.label }))}
+                  // Words a link's own box could say (CategoryField.leadBox).
+                  textFieldOptions={draft.fields
+                    .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== f.key)
+                    .map((other) => ({ key: other.key, label: other.label }))}
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}

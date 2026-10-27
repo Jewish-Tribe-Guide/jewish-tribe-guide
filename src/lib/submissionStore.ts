@@ -462,8 +462,10 @@ export async function approveSubmission(
     const now = row as Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>
     const current = now.details ?? {}
     const times = new Set([part.field, schedulesKey(part.field)])
-    // The finding's own keys, each as the listing has it now (none, gone).
-    const listing = Object.fromEntries(Object.keys({ ...sent.details, ...Object.fromEntries([...times].map((k) => [k, null])) }).map((k) => [k, current[k] ?? null]))
+    // The listing's details as they are now, the finding's own keys among
+    // them (none, gone): the approved details replace the listing's, so a
+    // detail it gained since the read is kept (Oct 27).
+    const listing = Object.fromEntries(Object.keys({ ...sent.details, ...current, ...Object.fromEntries([...times].map((k) => [k, null])) }).map((k) => [k, current[k] ?? null]))
     submission.payload = {
       ...sent,
       name: now.name,

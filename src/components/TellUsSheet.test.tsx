@@ -658,4 +658,19 @@ describe('SiteAddButton — opened by the search', () => {
     fireEvent(document, new CustomEvent('jpc:open-add'))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
+  // Drawn Oct 26 (boards N and O): apricot, the one colour meaning "you
+  // can add here", with a deeper edge; 48px on the phone, with the word.
+  it('is apricot with an edge, smaller on the phone, and says Add there too', () => {
+    renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
+    const add = screen.getByRole('button', { name: 'Add' })
+    expect(add.className).toContain('bg-add')
+    expect(add.className).not.toContain('bg-primary')
+    expect(add.className).toContain('border-add-edge')
+    // 1px on the phone (board N), 1.5px on desktop (board O).
+    expect(add.className).toMatch(/(^|\s)border(\s|$)/)
+    expect(add.className).toContain('desktop:border-[1.5px]')
+    expect(add.className).toMatch(/(^|\s)h-12(\s|$)/)
+    expect(add.className).toContain('desktop:h-14')
+    expect(add.querySelector('span')?.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+  })
 })

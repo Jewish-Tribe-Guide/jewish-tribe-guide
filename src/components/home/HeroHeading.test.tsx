@@ -247,6 +247,24 @@ describe('HeroHeading — the search dropdown', () => {
     expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
   })
 
+  // The user, Oct 26: search "hospital", tap away, and Grocery opened.
+  it('the tap that closes it opens nothing else; the next one does', async () => {
+    const user = userEvent.setup()
+    const onTap = vi.fn()
+    const { container } = render(
+      <>
+        <Wrapper />
+        <button type="button" onClick={onTap}>Grocery</button>
+      </>,
+    )
+    await user.type(desktopSearchInput(container), 'food')
+    await user.click(screen.getByRole('button', { name: 'Grocery' }))
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+    expect(onTap).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Grocery' }))
+    expect(onTap).toHaveBeenCalledTimes(1)
+  })
+
   // Reported via a shared answer (/philly/ask/…): it opened with the answer
   // showing, the location prompt came up over it, and tapping "Not now"
   // closed the answer.

@@ -90,6 +90,15 @@ describe('how a date reads', () => {
     expect(dayText('2026-10-09T15:00:00Z', null, TZ)).toBe('Oct 9')
   })
 
+  // "Yesterday" was 24 hours ago. The night the clocks go forward has 23,
+  // so just after midnight the next day, 24 hours back was the day before
+  // yesterday, and the day just gone read as a date.
+  it('yesterday is the day before, even after the clocks go forward', () => {
+    const justAfterMidnight = Date.parse('2026-03-09T00:30:00-04:00') // Mon; clocks went forward Sun Mar 8
+    expect(dayText('2026-03-08T15:00:00Z', justAfterMidnight, TZ)).toBe('yesterday')
+    expect(dayText('2026-03-07T15:00:00Z', justAfterMidnight, TZ)).toBe('Mar 7')
+  })
+
   it('amber after 90 days with no one seeing it', () => {
     const mark = { name: 'Wine', key: 'm', sometimes: false, goneAt: null }
     expect(seenLabel({ ...mark, seenAt: new Date(now - 89 * day).toISOString() }, now, TZ)?.old).toBe(false)

@@ -12,6 +12,7 @@ import {
   googleKeepsBox,
   siteName,
   isStale,
+  leadBox,
   listingActions,
   listingDistance,
   listingFacts,
@@ -464,5 +465,39 @@ describe('boxKeysHolding', () => {
     expect(boxKeysHolding(item, hospital, ['packages'])).toEqual(['pantry'])
     expect(boxKeysHolding(item, hospital, ['liaisons', 'transportation'])).toEqual(['liaisons', 'transportation'])
     expect(boxKeysHolding(item, hospital, [])).toEqual([])
+  })
+})
+
+// Board B, Oct 27: a delivery's WhatsApp group is how it's ordered, and was
+// a blue line 1.6 screens down. An admin's setting on a link (leadBox): a
+// listing that has it opens with its box, the link a wide button in it.
+describe('leadBox', () => {
+  const kind: CategoryField = { ...foodType, multiSelect: true, options: [...foodType.options!, { value: 'Scheduled Deliveries', label: 'Scheduled Deliveries' }] }
+  const showIf = { field: 'foodType', equals: 'Scheduled Deliveries' }
+  const group: CategoryField = { key: 'delivery_whatsapp_group', label: 'Delivery WhatsApp Group', type: 'url', renderAs: 'row', linkLabel: 'Join WhatsApp Group', showIf, leadBox: { title: 'Delivery', text: 'delivery_details' } }
+  const details: CategoryField = { key: 'delivery_details', label: 'Delivery Details', type: 'textarea', renderAs: 'row', showIf }
+  const cat = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [website, kind, certLink, group, details] })
+  const mikes = (over: Record<string, unknown> = {}) =>
+    makeListing({ phone: '(469) 278-6249', website: 'https://mikeschicken.com/', k: 'https://mikeschicken.com/kashrut', foodType: ['Scheduled Deliveries'], delivery_whatsapp_group: 'https://chat.whatsapp.com/Mikes', delivery_details: 'Delivers on Thursday around 5:30pm.', ...over })
+
+  it('its title, its text and its link', () => {
+    expect(leadBox(mikes(), cat)).toEqual({ title: 'Delivery', field: group, href: 'https://chat.whatsapp.com/Mikes', text: details })
+  })
+
+  it('in place of Directions, and its link isn’t a button too', () => {
+    expect(listingActions(mikes(), cat).buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['call', 'Website', 'Certificate'])
+    expect(listingActions(mikes(), cat).extra).toEqual([])
+  })
+
+  it('with only its text, or only its link', () => {
+    expect(leadBox(mikes({ delivery_whatsapp_group: '' }), cat)).toMatchObject({ href: null, text: details })
+    expect(leadBox(mikes({ delivery_details: '' }), cat)).toMatchObject({ href: 'https://chat.whatsapp.com/Mikes', text: null })
+  })
+
+  it('none when it has neither, or isn’t the kind of place it’s for', () => {
+    expect(leadBox(mikes({ delivery_whatsapp_group: '', delivery_details: '' }), cat)).toBeNull()
+    const restaurant = mikes({ foodType: ['Restaurant'] })
+    expect(leadBox(restaurant, cat)).toBeNull()
+    expect(listingActions(restaurant, cat).buttons[0]).toEqual({ kind: 'directions' })
   })
 })

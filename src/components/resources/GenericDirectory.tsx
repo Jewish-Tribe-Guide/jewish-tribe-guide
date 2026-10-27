@@ -24,6 +24,7 @@ import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import MinyanimView from './MinyanimView'
 import { PlusIcon } from '@/components/icons'
+import { AddButton } from '@/components/AddButton'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
@@ -1480,11 +1481,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     toggleSheetSelect(key, value)
   }
   const minyanFilterCount = (sheetTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
-  // What the Filters button counts: everything the sheet shows ticked.
+  // What the Filters button counts: everything the sheet shows ticked. A
+  // select's choices widen it (Meat or Dairy), so it's one; each Has item
+  // narrows it again (Challah and Wine), so each is one.
   const sheetFilterCount =
     filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
     filterableSelects.filter((f) => (selectFilters[f.key]?.length ?? 0) > 0 || searchSelects.has(f.key)).length +
-    sheetItems.filter((f) => f.chosen.length > 0).length +
+    sheetItems.reduce((n, f) => n + f.chosen.length, 0) +
     (sheetOpenNow ? 1 : 0)
 
   // Desktop-only shared-element morph target for the same icon badge
@@ -2211,26 +2214,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {filtered.length > 0 && !openDialogItemId && !minyanimView && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
 
       {canAdd && (!openDialogItemId || (!isMobile && columnItem)) && (
-        <button
+        <AddButton
           onClick={() => {
             setOpenItem(null)
             setTellOpen(true)
           }}
-          // Generic, not "Add {category label}" — the empty-state button
-          // further up already uses that exact phrasing, and giving this
-          // the same name would make the two indistinguishable to anything
-          // querying by accessible name (they're both in the DOM at once
-          // for an empty category, since this isn't gated on `filtered`).
-          // Kept even now that desktop shows the same words visibly —
-          // aria-label always wins for the accessible name regardless, so
-          // this keeps mobile's icon-only button correctly named without
-          // needing a second, viewport-conditional way of deriving it.
-          aria-label="Add"
-          className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform`}
-        >
-          <PlusIcon className="h-6 w-6 shrink-0" />
-          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
-        </button>
+        />
       )}
       {/* Its own boundary: loading it the first time otherwise hid the page
           for a moment, the open listing under it included. */}

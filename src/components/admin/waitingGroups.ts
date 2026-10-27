@@ -5,7 +5,8 @@ import { detailsKeysToUse, detailsRows } from '@/lib/eruvWebsite'
 import { kosherBoxKeys, kosherInTheBox, kosherProposal, kosherRows, renamedTo } from '@/lib/kosherBox'
 import type { CategoryConfig } from '@/lib/categories'
 import { KOSHER_LIST_NAMES, type KosherList } from '@/lib/kosherJob'
-import { scheduleProposal } from '@/lib/timesProposal'
+import { weekChanges } from '@/lib/timesProposal'
+import { TIMES_PART_LABELS } from '@/lib/timesParts'
 import type { Finding } from '@/lib/watchFindings'
 import { day, shortUrl } from './watchText'
 import { usualRows } from './TimesProposal'
@@ -41,7 +42,10 @@ import type { DirectoryResource } from '@/types'
 export type WaitJob = 'google' | 'times' | 'hours' | 'sites' | 'dishes' | 'hospitals' | 'kosher' | 'eruv'
 /** "Hours  Sun–Thu 11 AM–10 PM, was Sun–Thu 11 AM–9 PM"; `old` none for
  *  a value the listing doesn't have yet. */
-export type WaitLine = { label: string; value: string; old: string | null }
+/** `old` reads "Was …", or with `say` "usually", "Usually …"; `say` new
+ *  marks one the listing hasn't got. A heading names the part of a shul's
+ *  times the lines below it change. */
+export type WaitLine = { label: string; value: string; old: string | null; say?: 'new' | 'usually'; heading?: true }
 /** A line that's only so: "On the site  Shown closed since Oct 12". */
 export type WaitFact = { label: string; value: string; url?: string | null }
 export type Decide =
@@ -70,31 +74,51 @@ const was = (v: string) => (v === NONE || !v.trim() ? 'none' : v)
 const pageLink = (url: string): FootLink => ({ text: shortUrl(url), url })
 const latest = (fs: readonly Finding[]) => fs.map((f) => f.at).sort().at(-1) ?? null
 
-/** A shul's times as the finding would make them: only what changes. */
+/** A shul's times as the finding would make them: only what changes,
+ *  under the part it changes. This week's, against the listing's own copy
+ *  of the week, or for a week it hasn't got, how many and what differs
+ *  from the usual times (the user, Oct 27: Edit showed a whole week where
+ *  this showed three lines, "Are those new or not?"). */
 function timesLines(f: Finding): WaitLine[] | null {
   const t = f.times
   if (!t || !f.part) return null
+  const heading = (label: string): WaitLine => ({ label, value: '', old: null, heading: true })
+  const minyanim = (n: number) => `${n} ${n === 1 ? 'minyan' : 'minyanim'}`
   if (f.part === 'week') {
-    const { weeks, gone } = scheduleProposal(t.currentSchedules, t.proposedSchedules, t.proposed)
+    const { weeks, gone } = weekChanges(t.currentSchedules, t.proposedSchedules, t.current)
     const lines: WaitLine[] = []
     for (const w of weeks) {
-      if (w.none) lines.push({ label: 'No minyan this week', value: w.range, old: null })
-      const rows = w.days.flatMap((d) => d.rows.map((r) => ({ d, r })))
-      // What differs from the usual times; a week that differs in nothing
-      // shown whole.
-      const differs = rows.filter((x) => x.r.usually)
-      for (const { d, r } of differs.length ? differs : rows) lines.push({ label: `${r.what}, ${d.label}`, value: r.when, old: r.usually })
+      lines.push(heading(w.title))
+      if (w.none) {
+        lines.push({ label: 'No minyan', value: 'All week', old: w.had ? minyanim(w.had) : null })
+        continue
+      }
+      if (!w.had) lines.push({ label: 'New week', value: minyanim(w.total), old: null })
+      for (const r of w.rows) {
+        const line: WaitLine = { label: `${r.what}, ${r.day}`, value: r.when, old: r.was }
+        lines.push(r.status === 'new' ? { ...line, say: 'new' } : r.status === 'usual' ? { ...line, say: 'usually' } : line)
+      }
+      if (w.had && w.same) lines.push({ label: 'Unchanged', value: minyanim(w.same), old: null })
     }
+    if (gone.length && !weeks.length) lines.push(heading(TIMES_PART_LABELS.week))
     for (const g of gone) lines.push({ label: g, value: 'Taken off', old: null })
     return lines
   }
-  return usualRows(f.part, t.current, t.proposed)
-    .filter((r) => r.status !== 'same')
-    .map((r) => ({
-      label: r.what,
-      value: r.status === 'gone' ? 'Taken off' : [r.when, r.note, r.season].filter(Boolean).join(' · '),
-      old: r.status === 'changed' ? [r.was?.days, r.was?.when ?? r.when, r.was?.note ?? r.note, r.was?.season ?? r.season].filter(Boolean).join(' · ') : r.status === 'gone' ? r.when : null,
-    }))
+  const all = usualRows(f.part, t.current, t.proposed)
+  const rows = all.filter((r) => r.status !== 'same')
+  const same = all.length - rows.length
+  return [
+    heading(TIMES_PART_LABELS[f.part]),
+    ...rows.map((r): WaitLine => {
+      const line = {
+        label: r.what,
+        value: r.status === 'gone' ? 'Taken off' : [r.when, r.note, r.season].filter(Boolean).join(' · '),
+        old: r.status === 'changed' ? [r.was?.days, r.was?.when ?? r.when, r.was?.note ?? r.note, r.was?.season ?? r.season].filter(Boolean).join(' · ') : r.status === 'gone' ? r.when : null,
+      }
+      return r.status === 'new' ? { ...line, say: 'new' } : line
+    }),
+    ...(same ? [{ label: 'Unchanged', value: minyanim(same), old: null }] : []),
+  ]
 }
 
 const findingLines = (f: Finding): WaitLine[] =>
@@ -277,6 +301,8 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         lines: [
           ...(named('new').length ? [{ label: 'New on its menu', value: named('new').join(', '), old: null }] : []),
           ...(named('gone').length ? [{ label: 'Not on its menu', value: named('gone').join(', '), old: null }] : []),
+          // What stays, so a new dish is seen beside the rest (the user, Oct 27).
+          { label: 'Already listed', value: dishes.dishes.filter((d) => !named('gone').includes(d)).join(', ') || 'None', old: null },
         ],
         facts: [],
         note: null,

@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 26, 2026.
+Last updated: Oct 27, 2026.
 
 ## The branch
 
@@ -74,6 +74,23 @@ for that exact change, in the same conversation. Show the dry run first.
    user, Oct 25; checked). Each run saves its counts per kind from the
    next run on, so Last night's earlier nights fill in one night at a
    time (live, once this branch is deployed).
+1g. **Delivery listings lead with their box (board B, Oct 27):** built as
+   a setting on any link field (Admin → category → the link → "its own
+   box first, with no Directions", with a title and the field it says).
+   The box sits under the buttons: its words, then a wide Join the group.
+   The link isn't a round button too, and there's no Directions (Mike's
+   kitchen is 52 miles away). Set on dev's Food "Delivery WhatsApp Group"
+   (title Delivery, words Delivery Details). Live needs a yes for the same
+   setting, after this branch is deployed. **Written to live Oct 27 with
+   the user's yes** (backup in `backups/`, untracked); shows once PR 363
+   deploys.
+1h. **Two delivery group links, approved, waiting on the user** (Oct 27):
+   That Sushi Spot - Lakewood's Delivery WhatsApp Group is empty, and
+   Shlomo's has none though its words say dates are announced there. The
+   user has said yes to writing both to live, and will send the invite
+   links. Not on either website or the web (Shlomo's only listed group is
+   its Virginia one). Remind the user until they're in; then write both,
+   with a backup, and refresh the live pages.
 
 ## For the user or the community
 
@@ -134,6 +151,13 @@ for that exact change, in the same conversation. Show the dry run first.
      doesn't waits on the kind page, and from then on the place has a
      watch. A place whose website menu can't be read now says so ("Menu
      can't be read") instead of nothing.
+   - **"Seen today" on a menu never read** (Charlie was a sinner., Oct
+     27): an unchanged page dated again every dish already dated, and 17
+     live places had dates from the Oct 17–18 reads but no reading. So
+     their dishes said "seen" each morning the page (Charlie's home page)
+     didn't change, while the Menus line said never read. An unchanged
+     page now dates only after a kept reading found dishes on it. Their
+     dates stop moving; the morning first read reads them.
    - Mike's, Bar Bombón and Mama's need a browser to draw their menu,
      1 a night; Tasty Twisters' page is unchanged but its date is stuck at
      Oct 22, cause not found yet.
@@ -1658,6 +1682,74 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 27, later: Waiting for you says what it changes (on `redesign/oct18-fixes`)
+
+- **Two mikvahs no longer wait with nothing to decide.** Ohel Leah's and
+  Lower Merion Community Mikvah's pages were read again only to compare
+  (Oct 27), and each gave part of the notes the listing has whole. Such a
+  read never files anything, so it now counts as dealt with.
+- **The menu read can't hang the whole run.** On Oct 27 Center City Pretzel
+  Co.'s menu never came back, the run was stopped at its five minutes, and
+  the 16 places after it waited. Now each read gets 90 seconds (less when
+  the run is nearly out of time). A read that takes longer is kept as not
+  read, saying "Its menu took too long to read", and the run moves on. 17
+  menus were unread on live that morning; they go through on the next runs.
+- **The Links job says when.** Until its first run it shows its first check
+  ("Nov 1, 4:00 AM · first check Sunday"), and it says "every Sunday
+  morning". Each job's schedule now matches vercel.json, which a test checks.
+- **Shul times name their part** in each group: "Usual weekday times",
+  "This week's schedule, Oct 25 – Oct 31".
+- **A week is compared with the listing's own copy of it:** each minyan
+  new, changed or taken off, then "Unchanged: N minyanim". A week the
+  listing hasn't got reads "New week, 24 minyanim", then only the ones that
+  differ from usual ("Usually 15 min before sunset"). Usual times also say
+  how many stay the same.
+- **A part's finding is only its part.** Lower Merion's week came with the
+  hours the listing had when it was read, so it showed as one big line.
+  Now it shows the times alone. Approving it keeps every other detail the
+  listing has now, including any added since the read.
+- **This week's minyanim keep their usual sign-up group and join link.**
+  Mikveh Israel's week, read off its calendar, lost their WhatsApp groups.
+  Its waiting week fills in on its next read.
+- **A menu's new dishes come with what's already listed** ("Already
+  listed: Shawarma, Laffa", or "None").
+
+## Done Oct 27: the week's days when the clocks go back (on `redesign/oct18-fixes`)
+
+- **The Minyanim view's week no longer loses a day.** It was built 24 hours
+  at a time. Nov 1 has 25 (the clocks go back), so just after midnight that
+  week Sunday showed twice and Monday never did. Days are now counted on the
+  calendar. The same fix covers the spring day that has 23.
+- **An item seen the day before reads "yesterday" after the clocks go
+  forward too.** It took away 24 hours, so just after midnight the morning
+  after, it said the date instead.
+
+## Done Oct 26, last: "+ Add" in light apricot, with an edge (on `redesign/oct18-fixes`)
+
+- **The floating "+ Add" is light apricot (`#fdba74`) with ink text and a
+  deeper apricot edge (`#f59e5a`), 1px on the phone and 1.5px on desktop**,
+  on every screen that has it: the site's own and each category page's.
+  Drawn as boards N (phone) and O (desktop) on the canvas
+  `8qmL8PXNLN7qqfM7GK75ix`, after gold, ink, blue and brighter warm colours
+  were turned down.
+- **Smaller on the phone (48px), with the word "Add" there too.** Desktop
+  stays 56px.
+- **A named change to "colour only for meaning":** apricot (`--color-add`,
+  `--color-add-edge`) means "you can add here" and is used nowhere else.
+  Blue stays the colour of everything else you tap.
+- Both buttons are one component now (`AddButton.tsx`).
+- Not checked on a real phone yet.
+
+## Done Oct 26, later: two small fixes from the user (on `redesign/oct18-fixes`)
+
+- **A tap outside the home search's results only closes them.** It used
+  to go on to what was under it: search "hospital", tap away, and Grocery
+  opened. The next tap works as usual.
+- **Each Has item counts as a filter.** Challah, chicken and wine show
+  "Filters 3", not 1. Each one narrows the list again. A dropdown's
+  choices (Meat or Dairy) widen it, so they still count once.
+- **A "+ Add" that stands out** became light apricot, not gold (above).
 
 ## Done Oct 26: shuls' times read each week; an approval settles its finding (on `redesign/oct18-fixes`)
 

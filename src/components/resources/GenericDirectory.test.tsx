@@ -402,6 +402,22 @@ describe('GenericDirectory', () => {
     expect(onAdd).not.toHaveBeenCalled()
   })
 
+  // Drawn Oct 26 (boards N and O): apricot, the one colour meaning "you
+  // can add here", with a deeper edge; 48px on the phone, with the word.
+  it('has the floating Add in apricot with an edge, smaller on the phone, with the word there too', () => {
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    expect(add.className).toContain('bg-add')
+    expect(add.className).not.toContain('bg-primary')
+    expect(add.className).toContain('border-add-edge')
+    // 1px on the phone (board N), 1.5px on desktop (board O).
+    expect(add.className).toMatch(/(^|\s)border(\s|$)/)
+    expect(add.className).toContain('desktop:border-[1.5px]')
+    expect(add.className).toMatch(/(^|\s)h-12(\s|$)/)
+    expect(add.className).toContain('desktop:h-14')
+    expect(add.querySelector('span')?.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+  })
+
   // Regression coverage for the OLD mobile Filters/sort-row Add button,
   // which the floating one above replaced: that row was gated by
   // `hasFilterRow`, and a category with no filterable fields, upvotes, or
@@ -473,21 +489,6 @@ describe('GenericDirectory', () => {
     cleanup()
     renderWithProviders(<GenericDirectory category={caps({ add: false, edit: false })} items={[item]} {...handlers} reopenItemId={item.id} />)
     expect(screen.queryByRole('button', { name: 'Edit listing to Trader Joe’s' })).not.toBeInTheDocument()
-  })
-
-  // A bare icon circle is a mobile convention people already have a
-  // reflex for; desktop doesn't have that reflex, so it gets the same
-  // "Add a listing" wording made visible instead of relying only on the
-  // aria-label. `desktop:inline` on the label span (jsdom never applies
-  // CSS, so this is asserted out of the className, same as the
-  // desktop:hidden check above) is what makes it show up there but not on
-  // mobile, where it would just be redundant with the shape.
-  it('shows the "Add" label visibly for desktop, not just as an aria-label', () => {
-    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-
-    const label = screen.getByText('Add', { selector: 'span' })
-    expect(label.className).toContain('desktop:inline')
-    expect(label.className).toContain('hidden')
   })
 
   // Regression coverage for DirectoryHeader's old desktop-only toolbar "Add"
@@ -2703,6 +2704,13 @@ describe('GenericDirectory — Has', () => {
     expect(screen.queryByText('Acme')).not.toBeInTheDocument()
     expect(screen.getByText('ShopRite')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
+  })
+
+  // The user, Oct 26: challah and wine read as one filter. Each item narrows
+  // the list again (a store must have all of them), so each is counted.
+  it('counts each item ticked: Challah and Wine are two filters', () => {
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} initialFilters={{ has_m: 'Challah,Wine' }} />)
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
   })
 
   it('shows the 8 most common, then "All N items": every one, A to Z, with a box to find one', async () => {

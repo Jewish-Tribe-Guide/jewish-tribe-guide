@@ -1,4 +1,4 @@
-import { jobHealth, NIGHTLY_JOBS, type JobId, type NightlyJob, type JobRun, type KindCount, type NightKindId, type RunKinds } from './jobRuns'
+import { jobHealth, nextRunAt, NIGHTLY_JOBS, type JobId, type NightlyJob, type JobRun, type KindCount, type NightKindId, type RunKinds } from './jobRuns'
 import { watchGroupOf, type ReadsOf } from './watchGroups'
 import { isIgnoredSender, isNewsletterWatch } from './newsletter'
 import type { ListingInfo, SiteGap } from './listingReads'
@@ -50,7 +50,7 @@ export const NIGHT_KINDS: readonly NightKind[] = [
   { id: 'sites', name: 'Phone, email and hours', job: 'watches', about: 'Reads a place’s own website when Google doesn’t have them.' },
   { id: 'menus', name: 'Menus', job: 'watches', about: 'Reads each food place’s menu when it changes, and a few never read each night.' },
   { id: 'other', name: 'Other pages', job: 'watches', about: 'Pages added by hand. What they find goes to the moderation queue.' },
-  { id: 'links', name: 'Links', job: 'check-links', about: 'Opens every link a listing shows that nothing else reads, once a week.' },
+  { id: 'links', name: 'Links', job: 'check-links', about: 'Opens every link a listing shows that nothing else reads, every Sunday morning.' },
 ]
 
 type KindWatch = Pick<Watch, 'kind' | 'url' | 'createdBy' | 'label' | 'resourceId'>
@@ -128,6 +128,7 @@ export type NightKindView = {
 const ZONE = 'America/New_York'
 const dayKey = (t: number) => new Date(t).toLocaleDateString('en-CA', { timeZone: ZONE })
 const dayName = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: ZONE })
+const weekdayOf = (t: number) => new Date(t).toLocaleDateString('en-US', { weekday: 'long', timeZone: ZONE })
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ZONE })
 const after = (iso: string | null | undefined, start: number) => !!iso && Date.parse(iso) >= start
 
@@ -355,7 +356,11 @@ function linksView(kind: NightKind, job: NightlyJob, runs: readonly JobRun[], li
   const health = jobHealth(job, runs, now)
   // With no run kept (before migration 086), its links' own checks.
   const checkedAt = links.map((l) => l.checkedAt).filter((x): x is string => !!x).sort().at(-1)
-  if (!last && !checkedAt) return { ...base, when: null, count: links.length ? `${n} · not checked yet` : 'Not run yet', trouble: null, misses: [] }
+  // Not run yet: when it will (the user, Oct 27: the others say when).
+  if (!last && !checkedAt) {
+    const next = nextRunAt(job, now)
+    return { ...base, when: `${dayName(next)}, ${timeOf(new Date(next).toISOString())}`, count: links.length ? `${n} · first check ${weekdayOf(next)}` : 'Not run yet', trouble: null, misses: [] }
+  }
   const at = last?.startedAt ?? checkedAt!
   const when = `${dayName(Date.parse(at))}, ${timeOf(at)}`
   if (health.state === 'late') return { ...base, when, count: `Didn’t run since ${dayName(Date.parse(health.since))}`, trouble: null, misses: [] }

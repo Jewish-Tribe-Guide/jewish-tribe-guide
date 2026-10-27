@@ -321,3 +321,100 @@ export function scheduleProposal(current: readonly SpecialSchedule[], proposed: 
   const kept = new Set(proposed.map((s) => s.id))
   return { weeks, gone: current.filter((s) => !kept.has(s.id)).map((s) => s.name) }
 }
+
+export type WeekChangeRow = {
+  what: string
+  /** "Mon, Oct 26". */
+  day: string
+  /** Its time and note as proposed; "Taken off" for one gone. */
+  when: string
+  /** new, changed, gone: against the listing's own copy of the week;
+   *  usual: a week it hasn't got, differing from the usual times. */
+  status: 'new' | 'changed' | 'gone' | 'usual'
+  /** What the listing's week says, or the usual time. */
+  was: string | null
+}
+export type WeekChange = {
+  title: string
+  /** How many minyanim the listing's own copy of the week has; null, none. */
+  had: number | null
+  /** How many the week would have. */
+  total: number
+  /** Of them, how many the listing's copy has as they are. */
+  same: number
+  none: boolean
+  rows: WeekChangeRow[]
+}
+
+/** One minyan on one day, in a line: "8:15 AM · Sign-up: chat.whatsapp.com/MI". */
+const dayLine = (m: ScheduleMinyan) => [timeText(m), noteText(m.notes), m.signUp && signUpText(m.signUp), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ')
+const byClock = (a: ScheduleMinyan, b: ScheduleMinyan) => (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60)
+const dayLabel = (on: string) => (isDate(on) ? shortDay(on) : scheduleDayText(on))
+
+/** The listing's own copy of a week: the same schedule, or one on the
+ *  same dates (the same week read again under a new id). */
+const ownCopy = (current: readonly SpecialSchedule[], s: SpecialSchedule) =>
+  current.find((c) => c.id === s.id) ?? current.find((c) => c.from === s.from && c.to === s.to && (c.kind ?? null) === (s.kind ?? null))
+
+/** Each day's minyanim of one tefillah: "2026-10-26 shacharis". */
+function byDayTefillah(s: SpecialSchedule): Map<string, ScheduleMinyan[]> {
+  const out = new Map<string, ScheduleMinyan[]>()
+  for (const m of s.minyanim) for (const on of m.on) out.set(`${on} ${m.tefillah}`, [...(out.get(`${on} ${m.tefillah}`) ?? []), m])
+  return out
+}
+
+/** What a week the website gives would change, against the listing's own
+ *  copy of that week: a minyan new, changed or taken off, a day and
+ *  tefillah at a time, and how many are as they are. A week the listing
+ *  hasn't got (or has with nothing in it) is new: how many minyanim, and
+ *  the ones that differ from the usual times. `gone`, the names of the
+ *  schedules it would take off. */
+export function weekChanges(current: readonly SpecialSchedule[], proposed: readonly SpecialSchedule[], usual: readonly Minyan[]): { weeks: WeekChange[]; gone: string[] } {
+  const plain = (s: SpecialSchedule) => JSON.stringify(s)
+  const had = new Set(current.map(plain))
+  const mine = new Set<string>()
+  const weeks = proposed
+    .filter((s) => !had.has(plain(s)))
+    .flatMap((s): WeekChange[] => {
+      const own = ownCopy(current, s)
+      if (own) mine.add(own.id)
+      const dates = `${dateText(s.from)}${s.to !== s.from ? ` – ${dateText(s.to)}` : ''}`
+      const title = s.kind === 'week' ? `This week’s schedule, ${dates}` : `${s.name}, ${dates}`
+      const total = s.minyanim.reduce((n, m) => n + m.on.length, 0)
+      const base = { title, total, none: !!s.whole && !s.minyanim.length }
+      const rows: (WeekChangeRow & { on: string; tefillah: Minyan['tefillah']; at: number })[] = []
+      const push = (on: string, m: ScheduleMinyan, status: WeekChangeRow['status'], was: string | null, when = dayLine(m)) =>
+        rows.push({ what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when, status, was, on, tefillah: m.tefillah, at: clockMinutes(m.time) ?? 24 * 60 })
+      let same = 0
+      if (!own?.minyanim.length) {
+        for (const m of s.minyanim) for (const on of m.on) {
+          const was = usually(m, on, usual)
+          if (was) push(on, m, 'usual', was)
+        }
+      } else {
+        const before = byDayTefillah(own)
+        const after = byDayTefillah(s)
+        for (const key of new Set([...before.keys(), ...after.keys()])) {
+          const on = key.split(' ')[0]
+          const left = [...(before.get(key) ?? [])]
+          const right: ScheduleMinyan[] = []
+          for (const m of after.get(key) ?? []) {
+            const i = left.findIndex((o) => dayLine(o) === dayLine(m))
+            if (i >= 0) {
+              left.splice(i, 1)
+              same++
+            } else right.push(m)
+          }
+          left.sort(byClock)
+          right.sort(byClock)
+          right.forEach((m, i) => (left[i] ? push(on, m, 'changed', dayLine(left[i])) : push(on, m, 'new', null)))
+          for (const o of left.slice(right.length)) push(on, o, 'gone', dayLine(o), 'Taken off')
+        }
+      }
+      if (own?.minyanim.length && !rows.length) return []
+      rows.sort((a, b) => a.on.localeCompare(b.on) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || a.at - b.at)
+      return [{ ...base, had: own ? own.minyanim.reduce((n, m) => n + m.on.length, 0) : null, same, rows: rows.map(({ what, day, when, status, was }) => ({ what, day, when, status, was })) }]
+    })
+  const kept = new Set(proposed.map((s) => s.id))
+  return { weeks, gone: current.filter((s) => !kept.has(s.id) && !mine.has(s.id)).map((s) => s.name) }
+}

@@ -1,4 +1,4 @@
-import { resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from './categories'
+import { fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { ui } from './uiConfig'
 import { fmt12, getOpenStatus, hasAnyHours, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
 
@@ -325,9 +325,11 @@ export type ActionSpec =
  *  a hospital's Refuah page) is always among the extra. */
 export function listingActions(item: DirectoryResource, category: CategoryConfig): { buttons: ActionSpec[]; extra: ActionSpec[] } {
   const all: ActionSpec[] = []
-  if (category.hasAddress !== false && item.address) all.push({ kind: 'directions' })
+  // A place whose box leads (a delivery) comes to you: no Directions.
+  const lead = leadBox(item, category)
+  if (category.hasAddress !== false && item.address && !lead) all.push({ kind: 'directions' })
   if (category.hasPhone !== false && item.phone) all.push({ kind: 'call' })
-  const primary = primaryLink(item, category)?.field.key
+  const primary = primaryLink(item, category)?.field.key ?? lead?.field.key
   // A link on the admin's main card is said there, not twice.
   const onCard = new Set(mainCardOf(category)?.fields.map((f) => f.key) ?? [])
   const inDetails: ActionSpec[] = []
@@ -339,6 +341,25 @@ export function listingActions(item: DirectoryResource, category: CategoryConfig
     else if (f.type === 'text' && EMAIL.test(v)) all.push({ kind: 'email', field: f, address: v })
   }
   return { buttons: all.slice(0, 4), extra: [...all.slice(4), ...inDetails] }
+}
+
+export type LeadBox = { title: string; field: CategoryField; href: string | null; text: CategoryField | null }
+
+/** The box an admin set a link to lead with (CategoryField.leadBox), when
+ *  this listing has its link or its text: Mike's Chicken's "Delivery", its
+ *  drop-off and cutoff, then Join the group. None where the link isn't
+ *  shown (its showIf: not a Scheduled Deliveries place). */
+export function leadBox(item: DirectoryResource, category: CategoryConfig): LeadBox | null {
+  const values = item as unknown as Record<string, unknown>
+  const filled = (f: CategoryField | null | undefined) => !!f && fieldIsVisible(f, values) && String(item[f.key] ?? '').trim() !== ''
+  for (const field of category.detailFields) {
+    if (field.type !== 'url' || !field.leadBox || !fieldIsVisible(field, values)) continue
+    const text = category.detailFields.find((f) => f.key === field.leadBox!.text) ?? null
+    const href = filled(field) ? String(item[field.key]).trim() : null
+    if (!href && !filled(text)) continue
+    return { title: field.leadBox.title.trim() || field.label, field, href, text: filled(text) ? text : null }
+  }
+  return null
 }
 
 // ── How sure ─────────────────────────────────────────────────────────────────

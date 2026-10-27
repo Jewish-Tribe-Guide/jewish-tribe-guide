@@ -462,7 +462,9 @@ describe('Links', () => {
   })
 
   it('not run yet, or not for over a week', () => {
-    expect(view([link({ checkedAt: null })], {})).toMatchObject({ when: null, count: '1 link · not checked yet', trouble: null })
+    // Not run yet: when it will, as the others say when they did (the
+    // user, Oct 27). Sunday 9:00 UTC, an hour earlier once the clocks go back.
+    expect(view([link({ checkedAt: null })], {})).toMatchObject({ when: 'Nov 1, 4:00 AM', count: '1 link · first check Sunday', trouble: null })
     // No run kept, but checked: the links say.
     expect(view([link({ error: 'Not found', failingSince: after(RUN_AT, 1) })], {})).toMatchObject({ when: 'Oct 18, 5:01 AM', count: '1 link', trouble: '1 doesn’t open' })
     const old = { 'check-links': [run({ job: 'check-links', startedAt: night(RUN_AT, 2) })] }

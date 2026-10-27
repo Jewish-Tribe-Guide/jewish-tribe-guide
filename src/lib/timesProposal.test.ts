@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { boxPill, changeCount, daysHeading, groupedRows, joinClocks, proposalLine, rangeText, scheduleProposal, usualProposal } from './timesProposal'
+import { boxPill, changeCount, daysHeading, groupedRows, joinClocks, proposalLine, rangeText, scheduleProposal, usualProposal, weekChanges } from './timesProposal'
 
 const rule: Pick<Minyan, 'time' | 'anchor' | 'offsetMinutes' | 'notAfter'> = { time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting', offsetMinutes: 0, notAfter: '19:00' }
 const shacharis: Minyan = { id: 's1', tefillah: 'shacharis', days: ['mon', 'thu', 'rosh_chodesh'], time: '6:45am' }
@@ -190,5 +190,58 @@ describe('as the drawing groups it', () => {
       ['Wed, Oct 21 and Thu, Oct 22', ['Shacharis 6:45 and 8:15 AM', 'Mincha & Maariv 5:55 PM']],
       ['Shabbos, Oct 24', ['Shacharis 9 AM']],
     ])
+  })
+})
+
+// The user, Oct 27, of Sons of Israel's and the Shtiebel's weeks in Waiting
+// for you: "It's only suggesting one field for this week's schedule but
+// then you click edit and you see a bunch. Are those new or not?" A week
+// is compared with the listing's own copy of it; one it hasn't got, with
+// the usual times.
+describe('weekChanges', () => {
+  const minyan = (id: string, tefillah: Minyan['tefillah'], on: string, time: string) => ({ id, tefillah, on: [on], time })
+  const week = (id: string, minyanim: SpecialSchedule['minyanim']): SpecialSchedule => ({ id, name: 'Times for Oct 25 – Oct 31', from: '2026-10-25', to: '2026-10-31', mode: 'replace', kind: 'week', postedBy: 'website', minyanim })
+  const usual: Minyan[] = [{ id: 'u', tefillah: 'shacharis', days: ['mon', 'tue'], time: '6:45am' }]
+
+  it('a week the listing has: what’s new, changed and taken off, and how many are unchanged', () => {
+    const had = week('w', [minyan('1', 'shacharis', '2026-10-26', '6:45am'), minyan('2', 'shacharis', '2026-10-26', '8:00am'), minyan('3', 'maariv', '2026-10-27', '9:00pm'), minyan('4', 'shacharis', '2026-10-27', '7:00am')])
+    const read = week('w', [minyan('1', 'shacharis', '2026-10-26', '6:45am'), minyan('2', 'shacharis', '2026-10-26', '8:15am'), minyan('4', 'shacharis', '2026-10-27', '7:00am'), minyan('5', 'mincha', '2026-10-27', '5:45pm')])
+    expect(weekChanges([had], [read], usual)).toEqual({
+      weeks: [
+        {
+          title: 'This week’s schedule, Oct 25 – Oct 31',
+          had: 4,
+          total: 4,
+          same: 2,
+          none: false,
+          rows: [
+            { what: 'Shacharis', day: 'Mon, Oct 26', when: '8:15 AM', status: 'changed', was: '8 AM' },
+            { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', status: 'new', was: null },
+            { what: 'Maariv', day: 'Tue, Oct 27', when: 'Taken off', status: 'gone', was: '9 PM' },
+          ],
+        },
+      ],
+      gone: [],
+    })
+  })
+
+  it('a week it hasn’t got, or has with nothing in it: how many, and only what differs from the usual times', () => {
+    const read = week('w', [minyan('1', 'shacharis', '2026-10-26', '6:45am'), minyan('2', 'shacharis', '2026-10-27', '7:00am'), minyan('3', 'mincha', '2026-10-27', '5:45pm')])
+    const rows = [{ what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', status: 'usual', was: '6:45 AM' }]
+    expect(weekChanges([], [read], usual).weeks).toEqual([{ title: 'This week’s schedule, Oct 25 – Oct 31', had: null, total: 3, same: 0, none: false, rows }])
+    // The Shtiebel's, Oct 27: the listing had the week, empty.
+    expect(weekChanges([week('w', [])], [read], usual).weeks[0]).toMatchObject({ had: 0, total: 3, rows })
+  })
+
+  it('a week it has under another id is the same week', () => {
+    const had = week('old', [minyan('1', 'shacharis', '2026-10-26', '6:45am')])
+    const read = week('new', [minyan('1', 'shacharis', '2026-10-26', '7:00am')])
+    expect(weekChanges([had], [read], usual)).toMatchObject({ weeks: [{ had: 1, rows: [{ status: 'changed', when: '7 AM', was: '6:45 AM' }] }], gone: [] })
+  })
+
+  it('a minyan whose sign-up or link changes is changed, saying so', () => {
+    const had = week('w', [minyan('1', 'shacharis', '2026-10-26', '7:15am')])
+    const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), signUp: { link: 'https://chat.whatsapp.com/MI' } }])
+    expect(weekChanges([had], [read], usual).weeks[0].rows).toEqual([{ what: 'Shacharis', day: 'Mon, Oct 26', when: '7:15 AM · Sign-up: chat.whatsapp.com/MI', status: 'changed', was: '7:15 AM' }])
   })
 })

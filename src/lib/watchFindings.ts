@@ -160,11 +160,16 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
   const payload = s.payload as unknown as ResourceSubmission
   const source = submissionSource(s)
   const editable = editableKeys(fields)
+  // A shul's times read a part at a time change only that part when
+  // approved (submissionStore.ts), so they show only it: whatever else
+  // the listing has changed since the read isn't theirs (Oct 27).
+  const part = source.part?.field
+  const partKeys = part ? new Set([part, schedulesKey(part)]) : null
   const lines =
     s.operation === 'delete' || !payload?.details
       ? []
       : diffListing(s.operation === 'create' ? null : current, payload, [...fields])
-          .filter((d) => d.changed && !NOT_A_LINE.has(d.key))
+          .filter((d) => d.changed && !NOT_A_LINE.has(d.key) && (!partKeys || partKeys.has(d.key)))
           .map(({ key, label, before, after }) => {
             const choosable = s.operation === 'update' && editable.has(key)
             return { key, label, before, after, choosable, ...(choosable && after === NONE && before !== NONE ? { empties: true } : {}) }
