@@ -184,6 +184,30 @@ describe('WatchKindPage', () => {
     expect(sent).toEqual([['POST', '/api/admin/watches/google', { action: 'wrong_place', id: 'b' }]])
   })
 
+  // The user, Oct 27: "I want to see the whole schedule with the new ones
+  // highlighted." A week the listing has: all of it by day, only what
+  // changes highlighted; one it hasn't got, all of it, all highlighted.
+  it('a week’s times: the whole week by day, what changes highlighted', async () => {
+    const at = new Date().toISOString()
+    const day1 = (id: string, on: string, time: string) => ({ id, tefillah: 'shacharis', on: [on], time })
+    const week = (minyanim: ReturnType<typeof day1>[]) => ({ id: 'w', name: 'Times for Oct 26 – Oct 31', from: '2026-10-26', to: '2026-10-31', mode: 'replace', kind: 'week', minyanim })
+    const had = week([day1('1', '2026-10-26', '6:45am'), day1('2', '2026-10-27', '6:45am')])
+    const read = week([day1('1', '2026-10-26', '6:45am'), day1('2', '2026-10-27', '7:00am')])
+    const finding = (currentSchedules: unknown[]) => ({ id: 'f1', operation: 'update', targetId: 'b', name: 'Sons of Israel', from: 'its website', says: 'Its page says', named: null, at, notes: [], lines: [], page: 'https://soi.example/cal', part: 'week', times: { field: {}, current: [], proposed: [], currentSchedules, proposedSchedules: [read] } })
+    for (const [schedules, changed] of [[[had], ['Shacharis7 AMWas 6:45 AM']], [[], []]] as const) {
+      const shul = { id: 'b', name: 'Sons of Israel', href: '/philly/synagogues/b', website: 'https://soi.example', pages: [], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: [], schedules }, findings: [finding([...schedules])] }
+      await renderPage([place('b', 'Sons of Israel')], 'synagogue', (url, init) => {
+        if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
+      })
+      await userEvent.setup().click(screen.getByRole('button', { name: /Sons of Israel/ }))
+      const group = within(screen.getByTestId('kind-place-open')).getByTestId('waiting-group')
+      expect(within(group).getAllByTestId('waiting-day').map((d) => d.textContent)).toEqual(['Mon, Oct 26', 'Tue, Oct 27'])
+      expect([...group.querySelectorAll('[data-changed]')].map((r) => r.textContent)).toEqual(changed)
+      if (!schedules.length) expect(group).toHaveTextContent('New week2 minyanim')
+      cleanup()
+    }
+  })
+
   // Oct 25 (the user): "grocery should go to grocery". What a grocery's
   // own website found waits here, with no job page of its own.
   it('a grocery’s website finding waits under Grocery: Accept or Keep as is', async () => {

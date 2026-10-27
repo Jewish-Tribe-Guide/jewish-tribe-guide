@@ -45,7 +45,9 @@ export type WaitJob = 'google' | 'times' | 'hours' | 'sites' | 'dishes' | 'hospi
 /** `old` reads "Was …", or with `say` "usually", "Usually …"; `say` new
  *  marks one the listing hasn't got. A heading names the part of a shul's
  *  times the lines below it change. */
-export type WaitLine = { label: string; value: string; old: string | null; say?: 'new' | 'usually'; heading?: true }
+/** `day`: a day's heading in a week. `same`: a line as the listing has it,
+ *  in a whole week shown with what changes marked. */
+export type WaitLine = { label: string; value: string; old: string | null; say?: 'new'; heading?: true; day?: true; same?: true }
 /** A line that's only so: "On the site  Shown closed since Oct 12". */
 export type WaitFact = { label: string; value: string; url?: string | null }
 export type Decide =
@@ -74,18 +76,18 @@ const was = (v: string) => (v === NONE || !v.trim() ? 'none' : v)
 const pageLink = (url: string): FootLink => ({ text: shortUrl(url), url })
 const latest = (fs: readonly Finding[]) => fs.map((f) => f.at).sort().at(-1) ?? null
 
-/** A shul's times as the finding would make them: only what changes,
- *  under the part it changes. This week's, against the listing's own copy
- *  of the week, or for a week it hasn't got, how many and what differs
- *  from the usual times (the user, Oct 27: Edit showed a whole week where
- *  this showed three lines, "Are those new or not?"). */
+/** A shul's times as the finding would make them, under the part it
+ *  changes: the usual times, only what changes. This week's, the whole
+ *  week by day (the user, Oct 27: "I want to see the whole schedule with
+ *  the new ones highlighted"), against the listing's own copy of it; a
+ *  week it hasn't got is all new. */
 function timesLines(f: Finding): WaitLine[] | null {
   const t = f.times
   if (!t || !f.part) return null
   const heading = (label: string): WaitLine => ({ label, value: '', old: null, heading: true })
   const minyanim = (n: number) => `${n} ${n === 1 ? 'minyan' : 'minyanim'}`
   if (f.part === 'week') {
-    const { weeks, gone } = weekChanges(t.currentSchedules, t.proposedSchedules, t.current)
+    const { weeks, gone } = weekChanges(t.currentSchedules, t.proposedSchedules)
     const lines: WaitLine[] = []
     for (const w of weeks) {
       lines.push(heading(w.title))
@@ -94,11 +96,12 @@ function timesLines(f: Finding): WaitLine[] | null {
         continue
       }
       if (!w.had) lines.push({ label: 'New week', value: minyanim(w.total), old: null })
+      let day = ''
       for (const r of w.rows) {
-        const line: WaitLine = { label: `${r.what}, ${r.day}`, value: r.when, old: r.was }
-        lines.push(r.status === 'new' ? { ...line, say: 'new' } : r.status === 'usual' ? { ...line, say: 'usually' } : line)
+        if (r.day !== day) lines.push({ label: (day = r.day), value: '', old: null, day: true })
+        const line: WaitLine = { label: r.what, value: r.when, old: r.was }
+        lines.push(r.status === 'same' ? { ...line, same: true } : r.status === 'new' && w.had ? { ...line, say: 'new' } : line)
       }
-      if (w.had && w.same) lines.push({ label: 'Unchanged', value: minyanim(w.same), old: null })
     }
     if (gone.length && !weeks.length) lines.push(heading(TIMES_PART_LABELS.week))
     for (const g of gone) lines.push({ label: g, value: 'Taken off', old: null })

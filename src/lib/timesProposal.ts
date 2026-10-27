@@ -328,10 +328,10 @@ export type WeekChangeRow = {
   day: string
   /** Its time and note as proposed; "Taken off" for one gone. */
   when: string
-  /** new, changed, gone: against the listing's own copy of the week;
-   *  usual: a week it hasn't got, differing from the usual times. */
-  status: 'new' | 'changed' | 'gone' | 'usual'
-  /** What the listing's week says, or the usual time. */
+  /** Against the listing's own copy of the week; every one new in a
+   *  week it hasn't got. */
+  status: 'new' | 'changed' | 'gone' | 'same'
+  /** What the listing's week says. */
   was: string | null
 }
 export type WeekChange = {
@@ -364,12 +364,13 @@ function byDayTefillah(s: SpecialSchedule): Map<string, ScheduleMinyan[]> {
 }
 
 /** What a week the website gives would change, against the listing's own
- *  copy of that week: a minyan new, changed or taken off, a day and
- *  tefillah at a time, and how many are as they are. A week the listing
- *  hasn't got (or has with nothing in it) is new: how many minyanim, and
- *  the ones that differ from the usual times. `gone`, the names of the
+ *  copy of that week: every minyan in it, as it is (same) or new, changed
+ *  or taken off, a day and tefillah at a time. A week the listing hasn't
+ *  got (or has with nothing in it) is new, all of it: not compared with
+ *  the usual times (the user, Oct 27: "nothing matched!! It only matched
+ *  usual. This is a different schedule"). `gone`, the names of the
  *  schedules it would take off. */
-export function weekChanges(current: readonly SpecialSchedule[], proposed: readonly SpecialSchedule[], usual: readonly Minyan[]): { weeks: WeekChange[]; gone: string[] } {
+export function weekChanges(current: readonly SpecialSchedule[], proposed: readonly SpecialSchedule[]): { weeks: WeekChange[]; gone: string[] } {
   const plain = (s: SpecialSchedule) => JSON.stringify(s)
   const had = new Set(current.map(plain))
   const mine = new Set<string>()
@@ -387,10 +388,7 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
         rows.push({ what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when, status, was, on, tefillah: m.tefillah, at: clockMinutes(m.time) ?? 24 * 60 })
       let same = 0
       if (!own?.minyanim.length) {
-        for (const m of s.minyanim) for (const on of m.on) {
-          const was = usually(m, on, usual)
-          if (was) push(on, m, 'usual', was)
-        }
+        for (const m of s.minyanim) for (const on of m.on) push(on, m, 'new', null)
       } else {
         const before = byDayTefillah(own)
         const after = byDayTefillah(s)
@@ -402,6 +400,7 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
             const i = left.findIndex((o) => dayLine(o) === dayLine(m))
             if (i >= 0) {
               left.splice(i, 1)
+              push(on, m, 'same', null)
               same++
             } else right.push(m)
           }
@@ -411,7 +410,7 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
           for (const o of left.slice(right.length)) push(on, o, 'gone', dayLine(o), 'Taken off')
         }
       }
-      if (own?.minyanim.length && !rows.length) return []
+      if (own?.minyanim.length && rows.every((r) => r.status === 'same')) return []
       rows.sort((a, b) => a.on.localeCompare(b.on) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || a.at - b.at)
       return [{ ...base, had: own ? own.minyanim.reduce((n, m) => n + m.on.length, 0) : null, same, rows: rows.map(({ what, day, when, status, was }) => ({ what, day, when, status, was })) }]
     })

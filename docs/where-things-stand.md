@@ -1683,6 +1683,16 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 27, last: a week waiting for you is shown whole (on `redesign/oct18-fixes`)
+
+- **A week the listing hasn't got is shown whole, all of it new**, by day,
+  under "New week · N minyanim". It is not compared with the usual times
+  any more (the user: "This is a different schedule").
+- **A week the listing has is shown whole too**, by day, with only what
+  changes highlighted: "Was 6:45 AM", "New", "Taken off".
+- **A note read off a website ends at a whole sentence**, not cut at 120
+  letters ("…Shabbat Mincha at SOI. For"). Applies from the next read.
+
 ## Done Oct 27, later: Waiting for you says what it changes (on `redesign/oct18-fixes`)
 
 - **Two mikvahs no longer wait with nothing to decide.** Ohel Leah's and
