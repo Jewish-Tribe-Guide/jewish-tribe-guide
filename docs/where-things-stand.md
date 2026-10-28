@@ -88,9 +88,10 @@ for that exact change, in the same conversation. Show the dry run first.
    Spot - Lakewood's and Shlomo's Delivery WhatsApp Groups, added by the
    user themselves.
 
-1i. **Dottie's Donuts /shop listing (f52e1951):** menu link to
-   https://www.dotties.com/, as its other three listings, so its flavours
-   are dated from that menu (Oct 28).
+1i. **Dottie's Donuts /shop listing (f52e1951): done** (Oct 28, with the
+   user's yes). Menu link changed from /shop to https://www.dotties.com/
+   on live, nothing else (backup in that session's scratchpad). Its
+   flavours get dated from that menu once PR 365 deploys.
 
 ## For the user or the community
 
@@ -1719,10 +1720,10 @@ Bowls weren't "seen today" a day after Sweet Box's fix.
 - Open: a menu read from the kind page (Read it now) doesn't move its
   watch's fingerprint, so the nightly run reads it again as changed (the
   four above, read on Oct 28).
-- Open, needs a yes: Dottie's /shop listing (f52e1951) has a pictures-only
-  reading ("Donuts"), so its flavours are never looked for. Pointing its
-  menu link at https://www.dotties.com/, as its other three, makes it a
-  branch of that watch.
+- Done (Oct 28, with the user's yes): Dottie's /shop listing (f52e1951)
+  had a pictures-only reading ("Donuts"), so its flavours were never
+  looked for. Its menu link is now https://www.dotties.com/, as its other
+  three, which makes it a branch of that watch.
 - Open: Center City Pretzel's first menu read timed out ("took too long to
   read"), so it has no reading and no watch.
 
