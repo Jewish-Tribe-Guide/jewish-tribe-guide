@@ -88,6 +88,10 @@ for that exact change, in the same conversation. Show the dry run first.
    Spot - Lakewood's and Shlomo's Delivery WhatsApp Groups, added by the
    user themselves.
 
+1i. **Dottie's Donuts /shop listing (f52e1951):** menu link to
+   https://www.dotties.com/, as its other three listings, so its flavours
+   are dated from that menu (Oct 28).
+
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -1684,6 +1688,43 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 28, later: every dish a read found gets its date (on `redesign/oct18-fixes`)
+
+The user, Oct 28: HipCityVeg, Dottie's Donuts, Center City Pretzel and Playa
+Bowls weren't "seen today" a day after Sweet Box's fix.
+
+- **A read with a question still dates what it agrees on.** Every listed
+  dish a read finds is dated from it, whatever else waits; one it finds
+  missing isn't. Before, a single doubtful dish (Dottie's "Donuts",
+  HipCity's "Philly Cheesesteak") held back every date, and skipping it
+  dated nothing.
+- **An unchanged menu dates what its last reading found**, not only dishes
+  dated before. A dish people added, once found, is never looked for
+  again, so it never got a date (Dottie's flavours).
+- **Branches sharing a menu link share its dates.** One watch per link
+  dated only its own listing: Playa Bowls' Penn branch, three Rita's, a
+  Dottie's, a PLNT Burger and a LUHV. Each by its own names for the dishes.
+- **Not read last night is Not checked**, on the Food page, saying why
+  ("Not read last night · ran out of reads"), not Up to date, and not
+  "didn't load" after two nights. What's tracked says "ran out of reads"
+  for a run that had time but no reads left; "ran out of time" only when
+  it ran out of time.
+- **Why four menus missed two nights** (A La Karte, Espresso, Mike's,
+  Gelbstein's): menus get about 11 AI reads a night (8 their own, 3
+  shared), oldest waiting first. Oct 28's first five (Goldie, Nanas, Sweet
+  Trading, Dottie's, Nothing Bundt Cakes) had waited longer and used them
+  all. Mike's also needs the one browser draw a night. Nothing Bundt Cakes'
+  page changes every night, so it takes a read every night.
+- Open: a menu read from the kind page (Read it now) doesn't move its
+  watch's fingerprint, so the nightly run reads it again as changed (the
+  four above, read on Oct 28).
+- Open, needs a yes: Dottie's /shop listing (f52e1951) has a pictures-only
+  reading ("Donuts"), so its flavours are never looked for. Pointing its
+  menu link at https://www.dotties.com/, as its other three, makes it a
+  branch of that watch.
+- Open: Center City Pretzel's first menu read timed out ("took too long to
+  read"), so it has no reading and no watch.
 
 ## Done Oct 28: times and dishes in boxes again; a dish by another name isn't new (on `redesign/oct18-fixes`)
 

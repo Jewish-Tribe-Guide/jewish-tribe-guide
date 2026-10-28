@@ -14,8 +14,10 @@ import {
   MENU_AI_READS_PER_RUN,
   MENU_WATCH_CREATOR,
   menuWatchChanges,
+  namedOnListing,
   newDishes,
   wantedMenuWatches,
+  watchableMenuLink,
 } from '@/lib/menuWatch'
 import { checkFrom, pageCheck } from '@/lib/listingPageWatch'
 import { pageRenderer } from '@/lib/renderPage'
@@ -191,9 +193,13 @@ export async function runMenuWatch(
       // Only after a kept reading found dishes on it: dishes dated before
       // readings were kept, on a page no read has named them from, aren't
       // "seen" because it didn't change (Charlie was a sinner., Oct 27).
+      // Those dated from it and those its kept reading found, waiting or
+      // skipped too: one people added, once found, is never looked for
+      // again, so it would never get a date (Dottie's Donuts, Oct 28).
       if (watch.pageHash && field && kept?.dishes.length) {
         const missing = new Set((kept?.missing ?? []).map((n) => n.trim().toLowerCase()))
-        await dateMenuDishes(watch.communityId, listing.id, field.key, menuDated(listing).filter((n) => !missing.has(n.trim().toLowerCase())))
+        const named = [...new Set([...menuDated(listing), ...kept.dishes.map((d) => d.name)])].filter((n) => !missing.has(n.trim().toLowerCase()))
+        await dateFromMenu(watch, listing, category, field.key, named)
       }
       return { ok: true, filed: 0, pageHash }
     }
@@ -229,11 +235,11 @@ export async function runMenuWatch(
       ],
       queue,
     })
-  if (found.length === 0 && missing.length === 0) {
-    // It agrees: every dish it named is dated from it.
-    if (field) await dateMenuDishes(watch.communityId, listing.id, field.key, read.dishes.map((d) => d.name))
-    return { ok: true, filed: 0, pageHash, check: check(null) }
-  }
+  // Every listed dish it named is dated from it, whatever else waits for
+  // an admin: it was on the menu today (the user, Oct 28). One it found
+  // missing isn't among them.
+  if (field) await dateFromMenu(watch, listing, category, field.key, read.dishes.map((d) => d.name))
+  if (found.length === 0 && missing.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
   if (opts.full) {
     const kept = await getMenuReading(watch.communityId, listing.id)
     const lower = (n: string) => n.trim().toLowerCase()
@@ -303,6 +309,29 @@ async function lookElsewhere(
     model: read.model,
   })
   return `. Its menu was found at ${url}, waiting on the Main dishes tab.`
+}
+
+/** Dates the dishes a read of this page named, on its listing and on every
+ *  other branch whose menu link is the same page: two branches sharing a
+ *  menu share one watch (wantedMenuWatches), which dated only its own
+ *  listing, so Playa Bowls' second branch kept Oct 18 (the user, Oct 28).
+ *  Each branch by its own names for them (namedOnListing). */
+async function dateFromMenu(watch: Pick<Watch, 'communityId' | 'url'>, listing: DirectoryResource, category: CategoryConfig, fieldKey: string, names: readonly string[]): Promise<void> {
+  if (!names.length) return
+  await dateMenuDishes(watch.communityId, listing.id, fieldKey, names)
+  for (const branch of await branchesOn(watch, listing, category)) {
+    await dateMenuDishes(watch.communityId, branch.id, fieldKey, namedOnListing(listedDishes(branch, category), names))
+  }
+}
+
+/** The other live listings in its category whose menu link is this page. */
+async function branchesOn(watch: Pick<Watch, 'communityId' | 'url'>, listing: DirectoryResource, category: CategoryConfig): Promise<DirectoryResource[]> {
+  const { data, error } = await getAdminClient().from('resource').select('*').eq('community_id', watch.communityId).eq('status', 'approved').eq('category', category.id)
+  if (error) {
+    console.error(`[menu-watch] couldn’t list ${listing.name}’s branches:`, error.message)
+    return []
+  }
+  return ((data ?? []) as ResourceRow[]).map(normalizeRow).filter((b) => b.id !== listing.id && watchableMenuLink(b) === watch.url)
 }
 
 /** The dishes the listing has dated from its menu (details.itemMenu). */

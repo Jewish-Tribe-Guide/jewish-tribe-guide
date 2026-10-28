@@ -114,6 +114,23 @@ describe('watchKinds', () => {
     expect(placeSourcesText(place(input, 'sababa').sources)).toBe('Google · its menu')
   })
 
+  // The user, Oct 28: Playa Bowls sat under Up to date while last night's
+  // run ran out of reads before its menu, so its dishes weren't dated.
+  it('a menu last night’s run didn’t get to is Not checked, saying why, not Up to date or Didn’t load', () => {
+    const menu = 'https://playa.example/menu'
+    const unread = (days: number) => ({ url: menu, active: true, lastRunAt: ago(days), lastOkAt: ago(days), lastError: null, failingSince: null, missed: 'ran out of reads' })
+    const input = jobs({
+      google: [google('playa', 'restaurant'), google('goldie', 'restaurant')],
+      dishes: [
+        { id: 'playa', name: 'playa', href: '', dishes: ['Bowls'], website: null, menuUrl: menu, menuWatch: unread(1), reading: { status: 'approved', readAt: ago(5), sourceUrl: menu } },
+        // Two nights unread: still why, not "didn’t load".
+        { id: 'goldie', name: 'goldie', href: '', dishes: ['Falafel'], website: null, menuUrl: menu, menuWatch: unread(2.5), reading: { status: 'approved', readAt: ago(5), sourceUrl: menu } },
+      ],
+    })
+    expect(place(input, 'playa')).toMatchObject({ state: 'not_checked', pill: 'Not read last night · ran out of reads' })
+    expect(place(input, 'goldie')).toMatchObject({ state: 'not_checked', pill: 'Not read last night · ran out of reads' })
+  })
+
   it('leaves a page read but not compared yet up to date, not unchecked', () => {
     const input = jobs({ google: [google('new', 'synagogue')], times: [shul('new', { pages: [{ watch: watch({ lastRunAt: null, lastOkAt: null, lastCheck: null }) }] })] })
     expect(place(input, 'new').state).toBe('up_to_date')

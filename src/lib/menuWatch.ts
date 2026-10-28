@@ -4,7 +4,7 @@ import { itemsField } from './listingView'
 import { keepsMenuLink, MENU_LINK_KEY, menuWebsite, readElsewhere, readMenuLink } from './menuLink'
 import { isOrderingApp, type MenuDish, type MenuSource } from './menuReader'
 import { MENU_WATCH_CREATOR } from './watches'
-import { listedAlready, readerMarks, type ListedDishes, type ReadDish } from './dishProposal'
+import { listedAlready, readerMarks, sameDish, type ListedDishes, type ReadDish } from './dishProposal'
 import type { DirectoryResource } from '@/types'
 
 export { MENU_WATCH_CREATOR }
@@ -110,6 +110,13 @@ export function listedDishes(listing: DirectoryResource, category: CategoryConfi
   const field = itemsField(category)
   if (!field) return []
   return [...selectValues(listing[field.key]), ...selectValues(listing[`${field.key}_sometimes`])]
+}
+
+/** Of a listing's dishes, the ones a read of its menu named, by its own
+ *  names: a branch sharing the menu may spell them another way (sameDish). */
+export function namedOnListing(listed: readonly string[], named: readonly string[]): string[] {
+  const exact = new Set(named.map((n) => n.trim().toLowerCase()))
+  return listed.filter((n) => exact.has(n.trim().toLowerCase()) || named.some((x) => sameDish(x, n)))
 }
 
 /** The dishes a reading found that the listing doesn't have, by any

@@ -496,3 +496,53 @@ describe('runMenuWatch: a menu page that stops opening', () => {
     expect(m.findMenus).toHaveBeenCalledTimes(1)
   })
 })
+
+// The user, Oct 28: HipCityVeg, Dottie's Donuts and Playa Bowls weren't
+// "seen today". A read that found a dish people added, but had something
+// else to ask, dated nothing; once found, the dish was never looked for
+// again, and an unchanged menu dated only dishes it had dated before, so it
+// never got a date. A branch sharing a menu shares its watch, which dated
+// only its own listing.
+describe('runMenuWatch: every dish a read found gets its date', () => {
+  const unchanged = { ...watch, pageHash: menuHash(page) }
+
+  it('an unchanged menu dates a dish people added that its kept reading found', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, dishes: ['Falafel', 'Kugel'], itemMenu: { dishes: { Falafel: '2026-10-22T00:00:00Z' } } } })
+    m.getMenuReading.mockResolvedValue({ status: 'skipped', sourceUrl: URL_, dishes: [{ name: 'Falafel', quote: 'Falafel plate', checked: true }, { name: 'Kugel', quote: 'Potato kugel', checked: true }], missing: [] })
+    expect(await runMenuWatch(unchanged, newMenuReadBudget(), { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: menuHash(page) })
+    expect(m.readMenu).not.toHaveBeenCalled()
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r1', 'dishes', expect.arrayContaining(['Falafel', 'Kugel']))
+  })
+
+  it('a read with something to ask still dates the listed dishes it found', async () => {
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })).toMatchObject({ filed: 1 })
+    expect(m.saveMenuReading).toHaveBeenCalled()
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r1', 'dishes', expect.arrayContaining(['Falafel']))
+  })
+
+  it('a dish the read found missing is never dated', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, dishes: ['Falafel', 'Kugel'] } })
+    m.readMenu.mockResolvedValue({ ...twoDishes, dishes: [twoDishes.dishes[0]], missing: ['Kugel'] })
+    await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })
+    for (const call of m.dateMenuDishes.mock.calls) expect(call[3]).not.toContain('Kugel')
+  })
+
+  const branch = { id: 'r9', category: 'restaurant', name: 'Judah', status: 'approved', details: { dishes: ['falafel', 'Kugel'], menuUrl: URL_ } }
+  const elsewhere = { id: 'r8', category: 'restaurant', name: 'Other', status: 'approved', details: { dishes: ['Falafel'], menuUrl: 'https://other.example/menu' } }
+
+  it('a branch on the same menu link gets the dates too, by its own names', async () => {
+    m.resources = [row, branch, elsewhere]
+    m.readMenu.mockResolvedValue({ ...twoDishes, dishes: [twoDishes.dishes[0]] })
+    await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r9', 'dishes', ['falafel'])
+    expect(m.dateMenuDishes.mock.calls.map((c) => c[1])).not.toContain('r8')
+  })
+
+  it('so does a branch whose menu hasn’t changed', async () => {
+    m.resources = [row, branch, elsewhere]
+    m.getResourceRowById.mockResolvedValue({ ...row, details: { ...row.details, itemMenu: { dishes: { Falafel: '2026-10-22T00:00:00Z' } } } })
+    m.getMenuReading.mockResolvedValue({ status: 'approved', sourceUrl: URL_, dishes: [{ name: 'Falafel', quote: 'Falafel plate', checked: true }], missing: [] })
+    await runMenuWatch(unchanged, newMenuReadBudget(), { apiKey: 'k' })
+    expect(m.dateMenuDishes).toHaveBeenCalledWith('philly', 'r9', 'dishes', ['falafel'])
+  })
+})

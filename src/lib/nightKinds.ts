@@ -197,7 +197,7 @@ export type UnreadMenu = { id: string; name: string }
 
 /** `unread`, for Menus: a place never read is missed as Never read, its
  *  menu's watch or not (one that loaded only checked for a change). */
-function liveWatches(kind: NightKind, watches: readonly Watch[], start: number, unread: readonly UnreadMenu[], listings?: ListingInfo): Live {
+function liveWatches(kind: NightKind, watches: readonly Watch[], start: number, unread: readonly UnreadMenu[], listings?: ListingInfo, ranOut: string | null = null): Live {
   const own = watches.filter((w) => w.active && Date.parse(w.createdAt) < start && nightKindOf(w, listings?.readsOf, listings?.siteGap) === kind.id)
   const live: Live = { count: { of: own.length, read: 0 }, misses: [], failed: 0, never: 0, notReached: 0 }
   const neverRead = new Map(unread.map((u) => [u.id, u]))
@@ -215,10 +215,12 @@ function liveWatches(kind: NightKind, watches: readonly Watch[], start: number, 
       live.count.read++
       continue
     }
-    const why = after(w.lastRunAt, start) ? 'Didn’t load' : w.lastRunAt ? 'Not reached' : 'Never read'
-    if (why === 'Didn’t load') live.failed++
-    else if (why === 'Never read') live.never++
+    const reached = after(w.lastRunAt, start) ? 'Didn’t load' : w.lastRunAt ? null : 'Never read'
+    if (reached === 'Didn’t load') live.failed++
+    else if (reached === 'Never read') live.never++
     else live.notReached++
+    // Not reached, it says why: "Ran out of reads" (the user, Oct 28).
+    const why = reached ?? (ranOut ? ranOut[0].toUpperCase() + ranOut.slice(1) : 'Not reached')
     live.misses.push({ name: watchName(w), why, page: pageOf(kind, w, listings) })
   }
   for (const u of unread) {
@@ -371,8 +373,36 @@ function linksView(kind: NightKind, job: NightlyJob, runs: readonly JobRun[], li
   return { ...base, when, count: links.length ? n : 'No links to check', trouble, misses: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page })) }
 }
 
-function troubleOf(live: Live, ranOut: boolean): string | null {
-  const parts = [live.failed && `${live.failed} didn’t load`, live.never && `${live.never} never read`, live.notReached && (ranOut ? 'ran out of time' : `${live.notReached} not reached`)]
+/** Why a run left watches unread, from its warning (watchesOutcome):
+ *  "ran out of reads" when it had time but its AI reads were spent, as
+ *  on Oct 27 and 28, not "ran out of time" (the user, Oct 28). */
+export function ranOutText(warning: string | null | undefined): string | null {
+  const time = /Ran out of time/.test(warning ?? '')
+  const reads = /Ran out of reads/.test(warning ?? '')
+  return time && reads ? 'ran out of time and reads' : time ? 'ran out of time' : reads ? 'ran out of reads' : null
+}
+
+/** Last night's watches run, for what it didn't read (missedLastNight). */
+export type LastNight = { startedAt: string; ranOut: string | null }
+
+/** The newest watches run that finished. */
+export function lastNight(runs: readonly JobRun[] | undefined): LastNight | null {
+  const run = (runs ?? []).find((r) => r.finishedAt)
+  return run ? { startedAt: run.startedAt, ranOut: ranOutText(run.warning) } : null
+}
+
+/** A watch last night's run didn't get to, why ("ran out of reads"), for
+ *  its place's Not checked: not one that failed, never ran, was added
+ *  since or is off, which say so themselves. Null when it was read. */
+export function missedLastNight(w: Pick<Watch, 'active' | 'createdAt' | 'lastRunAt' | 'lastError'>, night: LastNight | null | undefined): string | null {
+  if (!night || !w.active || w.lastError || !w.lastRunAt) return null
+  const start = Date.parse(night.startedAt)
+  if (Date.parse(w.createdAt) >= start || Date.parse(w.lastRunAt) >= start) return null
+  return night.ranOut ?? 'not reached'
+}
+
+function troubleOf(live: Live, ranOut: string | null): string | null {
+  const parts = [live.failed && `${live.failed} didn’t load`, live.never && `${live.never} never read`, live.notReached && (ranOut ?? `${live.notReached} not reached`)]
   return parts.filter(Boolean).join(' · ') || null
 }
 
@@ -413,10 +443,11 @@ export function nightKinds(
     if (health.state === 'running') return { ...base, when, count: 'Running now', trouble: null, misses: [] }
     if (health.state === 'failed') return { ...base, when, count: 'Failed', trouble: health.error, misses: [] }
     const start = Date.parse(last.startedAt)
-    const live = kind.id === 'google' ? liveGoogle(google, start) : liveWatches(kind, watches, start, kind.id === 'menus' ? unread : [], listings)
+    const ranOut = ranOutText(last.warning)
+    const live = kind.id === 'google' ? liveGoogle(google, start) : liveWatches(kind, watches, start, kind.id === 'menus' ? unread : [], listings, ranOut)
     const count = live.count.of ? countLine(kind, live.count) : 'Nothing to read'
     const also = kind.id === 'menus' ? newMenusTrouble(runs['read-menus'] ?? [], now) : null
-    const trouble = [health.state === 'cut off' && 'stopped before it finished', troubleOf(live, !!last.warning), also].filter(Boolean).join(' · ') || null
+    const trouble = [health.state === 'cut off' && 'stopped before it finished', troubleOf(live, ranOut), also].filter(Boolean).join(' · ') || null
     return { ...base, when, count, trouble, misses: live.misses }
   })
   return views.filter((v) => (v.id !== 'other' && v.id !== 'sites' && v.id !== 'links') || v.tracked.length)

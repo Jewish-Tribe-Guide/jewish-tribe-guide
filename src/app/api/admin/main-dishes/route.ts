@@ -28,6 +28,8 @@ import { pageRenderer } from '@/lib/renderPage'
 import { listWatches, updateWatch } from '@/lib/watchStore'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { runAndRecord } from '@/lib/watchRunner'
+import { listJobRuns } from '@/lib/jobRunStore'
+import { lastNight, missedLastNight, type LastNight } from '@/lib/nightKinds'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
 import { listedContact } from '@/lib/contactRead'
@@ -109,10 +111,14 @@ const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unli
 /** A place's website pages the daily run reads for its hours and phone. */
 const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) => w.resourceId === id && isListingPageWatch(w))
 
-/** A place's menu watch, as the tab needs it. */
-function menuWatchOf(watches: readonly Watch[], id: string) {
+/** A place's menu watch, as the tab needs it. `missed`: why last night's
+ *  run didn't read it ("ran out of reads"), so the kind page puts it under
+ *  Not checked, not Up to date (the user, Oct 28). */
+function menuWatchOf(watches: readonly Watch[], id: string, night: LastNight | null) {
   const w = watches.find((x) => x.resourceId === id && x.createdBy === MENU_WATCH_CREATOR)
-  return w ? { url: w.url, active: w.active, lastRunAt: w.lastRunAt, lastOkAt: w.lastOkAt, lastError: w.lastError, failingSince: w.failingSince } : null
+  if (!w) return null
+  const missed = missedLastNight(w, night)
+  return { url: w.url, active: w.active, lastRunAt: w.lastRunAt, lastOkAt: w.lastOkAt, lastError: w.lastError, failingSince: w.failingSince, ...(missed ? { missed } : {}) }
 }
 
 /** A reading as the tab gets it: "no menu" said as its own status. */
@@ -173,11 +179,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [categories, listings, { readings, available }, { watches }] = await Promise.all([
+    const [categories, listings, { readings, available }, { watches }, night] = await Promise.all([
       listCategories(community.slug),
       listApprovedResources(community.slug),
       listMenuReadings(community.slug),
       listWatches(community.slug),
+      listJobRuns()
+        .then(({ runs }) => lastNight(runs.watches))
+        .catch(() => null),
     ])
     const kinds = dishKinds(categories)
     const { findings } = await jobFindings(
@@ -201,7 +210,7 @@ export async function GET(request: Request) {
           menuAt: newestMenuDate(l, field),
           reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
           pages: pagesOf(watches, l.id),
-          menuWatch: menuWatchOf(watches, l.id),
+          menuWatch: menuWatchOf(watches, l.id, night),
           findings: findings.filter((f) => f.targetId === l.id),
           hours: homePageReads(category, l as unknown as Record<string, unknown>).includes('hours') ? (l.hours ?? null) : undefined,
           contact: listedContact(category, l as unknown as Record<string, unknown>),

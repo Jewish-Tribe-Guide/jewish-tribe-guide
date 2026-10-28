@@ -297,9 +297,10 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     const fields = [{ label: 'Dishes', value: listText(food.dishes) }]
     const url = menu ?? food.website
     const page: FootLink | null = url ? pageLink(url) : null
-    if (status === 'not_read' || status === 'cant_read' || status === 'didnt_load') drop.add('dishes')
+    if (status === 'not_read' || status === 'cant_read' || status === 'didnt_load' || status === 'not_reached') drop.add('dishes')
     if (status === 'not_read') problem({ key: 'menu', page, says: 'never read', fields, fix: url ? { kind: 'read', step } : { kind: 'add' } })
     if (status === 'cant_read') problem({ key: 'menu', page, says: 'can’t be read', fields, fix: { kind: 'change', change: { kind: 'menu' }, label: 'Give its menu page' } })
+    if (status === 'not_reached') problem({ key: 'menu', page: menu ? pageLink(menu) : page, says: `not read last night · ${food.menuWatch?.missed}`, fields, fix: { kind: 'read', step } })
     if (status === 'didnt_load') {
       const w = food.menuWatch
       problem({ key: 'menu', page: w ? pageLink(w.url) : page, says: (w && pageSays(w, now)) ?? 'didn’t load', fields, fix: { kind: 'read', step }, stop: stopMenu })
