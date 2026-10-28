@@ -32,7 +32,6 @@ export default function SearchLines({
   categories,
   onPick,
   typed = '',
-  reading = false,
   className = '',
 }: {
   lines: SearchLine[]
@@ -41,13 +40,11 @@ export default function SearchLines({
   categories: readonly CategoryConfig[] | null
   /** A line was chosen (tap, click or Enter): the page goes there. */
   onPick: (line: SearchLine) => void
-  /** The question is being read (questionReader.ts): its lines follow. */
-  reading?: boolean
   className?: string
 }) {
   const saved = useSavedSearches()
   const { isPinned, toggle: togglePlace } = usePinned()
-  if (lines.length === 0 && !reading) return null
+  if (lines.length === 0) return null
   // The bookmark a line ends with, beside the line rather than inside its
   // link (a button can't sit in a link); null for a line that saves nothing.
   const lineSave = (line: SearchLine) => {
@@ -96,11 +93,6 @@ export default function SearchLines({
           </li>
         ))}
       </ul>
-      {reading && (
-        <p role="status" className={`px-4 py-3 text-[13.5px] font-medium text-slate-500 ${lines.length ? 'border-t border-slate-100' : ''}`}>
-          Reading your question…
-        </p>
-      )}
     </div>
   )
 }

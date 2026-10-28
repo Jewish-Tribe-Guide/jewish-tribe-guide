@@ -541,6 +541,12 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
        keystone-k.org/kosher/house-of-kosher/ (Oct 25), so the first
        run should find none. The cron first runs on
        production once this branch deploys.
+     - **A website Google doesn't have counts as checked by Links: BUILT
+       Oct 27** (the user, on PKS Kosher Market). Once the Sunday check
+       opened it, Google's "who checks each field" says Links, and the
+       opened place shows "Website · Opens · checked <day>" instead of
+       Nothing checks its website. A link that stops opening goes back to
+       Nothing. Until the first Sunday run, PKS still shows not checked.
      - Gone with the watch list: Add a watch, and Pause, Remove and Check
        now on leftover pages. Pages are added from a place's own box (Add
        a source).
@@ -1678,6 +1684,36 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 27, at the end: the AI is off the live search (on `redesign/oct18-fixes`)
+
+The user, after "trader joes" on Synagogues found nothing, then the AI's
+reading ("near Trader Joe's") showed every shul: "feels weird to search,
+get an answer, then see reading question, then get a different answer."
+On the live site the reader had read 41 questions, 23 into nothing, about
+15 of them half-typed words (it read after a one-second pause).
+
+- **The home, category pages and the map never wait for the AI or use its
+  reading.** No "Reading your question…", no "Read as" on the map.
+- **A search that finds nothing is read in the background** on Enter, or
+  once the typing stops for 2.5 seconds (`useLearnAfterPause`; the user:
+  "I don't think most people click enter"), for the admin's Read questions
+  tab. Words that find something aren't read; a shared link isn't read.
+- **Read questions** has no Approve any more (a reading never answers),
+  one list, and Teach, which is how the search learns.
+- **Nothing found says so as it's typed, on the home and the map**, with
+  the WhatsApp button, as a category page does. Not only on Enter (the
+  user: "I don't think most people click enter"). The map shows it under
+  the box while typing and in the list once searched, instead of "Turn on
+  a category above". "Nothing" means nothing anywhere in the guide, places
+  the map can't plot included.
+- **The "+ Add" box on a phone** (the user, Oct 27): it opens tall enough
+  to show "Fill it in yourself" (it sat under the screen's edge at half
+  height), never shorter than half, and slides and fades away when closed,
+  as a listing does, instead of vanishing with its dimmed backdrop in one
+  frame (`MobileSheet`'s `fit`; the box stays mounted once opened).
+- **Next, agreed in principle, not built:** typo matching for names
+  ("Beth sholom", "bros medresh"), most of what was asked.
 
 ## Done Oct 27, last: a week waiting for you is shown whole (on `redesign/oct18-fixes`)
 

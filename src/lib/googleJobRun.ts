@@ -7,6 +7,7 @@ import { listWatches } from './watchStore'
 import { readOwnSiteNow } from './hoursJobRun'
 import { MENU_WATCH_CREATOR, watchHealth, type Watch } from './watches'
 import { isListingPageWatch, pageReadsFor } from './listingPageWatch'
+import { isLinkCheck } from './linkCheck'
 import { approveSubmission, submitListingUpdate } from './submissionStore'
 import { listingSlug } from './listingSlug'
 import { routes } from './routes'
@@ -141,9 +142,21 @@ export function fieldRows(row: Row, category: CategoryConfig, watches: readonly 
           ? { kind: 'website' }
           : typeof kept[field] === 'string' && now - Date.parse(kept[field]) < KEPT_FOR_MS
             ? { kind: 'you', at: kept[field] }
-            : { kind: 'nothing' }
+            : field === 'website' && linkOpenedAt(row.id, value, watches)
+              ? { kind: 'links', at: linkOpenedAt(row.id, value, watches) }
+              : { kind: 'nothing' }
     return { field, label: CHECKED_LABELS[field], value: shown(field, value), by }
   })
+}
+
+/** When the Links job last opened this website of the listing's, on a
+ *  check of this link that opened: a website Google doesn't have is checked
+ *  that way (PKS Kosher Market's, the airport's page for it: the user, Oct
+ *  27). */
+function linkOpenedAt(id: string, website: unknown, watches: readonly Watch[]): string | null {
+  if (typeof website !== 'string' || !website) return null
+  const record = watches.find((w) => isLinkCheck(w) && w.resourceId === id && w.pageHash === website.trim())
+  return record && !record.failingSince ? record.lastOkAt : null
 }
 
 function closureOf(details: Record<string, unknown>): GoogleClosure | null {

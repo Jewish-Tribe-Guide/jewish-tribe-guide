@@ -41,8 +41,6 @@ type Props = {
    *  and 6, agreed Oct 2): the box says "in Minyanim". What's typed narrows
    *  the minyanim below (MinyanimView). */
   scope?: 'minyanim'
-  /** The question is being read (see GenericDirectory's reader). */
-  reading?: boolean
   /** Enter. */
   onSubmit?: () => void
   /** The search found nothing here: where to ask instead. */
@@ -52,7 +50,7 @@ type Props = {
   save?: ReactNode
 }
 
-export default function CategoryAsk({ category, search, onSearch, scope, reading = false, onSubmit, foundNothing = false, save }: Props) {
+export default function CategoryAsk({ category, search, onSearch, scope, onSubmit, foundNothing = false, save }: Props) {
   const communitySlug = useOptionalCommunitySlug()
   const categories = useCategories() ?? [category]
   const q = search.trim()
@@ -128,11 +126,6 @@ export default function CategoryAsk({ category, search, onSearch, scope, reading
         )}
       </label>
 
-      {q && reading && (
-        <p className="text-[13.5px] font-medium text-slate-500" role="status">
-          Reading your question…
-        </p>
-      )}
       {askGroup && <AskTheGroup query={q} {...askGroup} />}
     </div>
   )

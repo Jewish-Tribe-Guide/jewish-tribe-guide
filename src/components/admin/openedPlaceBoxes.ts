@@ -458,6 +458,9 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
     const you = by('you')
     const youAt = you.map((f) => f.by.at).filter((x): x is string => !!x).sort().at(-1)
     if (you.length) boxes.push({ key: 'you', kind: 'rows', title: g.length || web.length ? 'Checked by a person' : fieldsTitle(you), groups: [{ head: '', rows: fieldRows(you) }], foot: { lead: 'Checked by a person', links: [], when: youAt ? day(youAt) : null } })
+    // A website Google doesn't have, that the Links job opens each week.
+    const links = by('links')
+    if (links.length) boxes.push({ key: 'links', kind: 'rows', title: g.length || web.length || you.length ? 'Opened each week' : fieldsTitle(links), groups: [{ head: '', rows: fieldRows(links) }], foot: { lead: 'Opens', links: [], when: links[0].by.at ? `checked ${day(links[0].by.at)}` : null } })
   }
 
   // A link it shows that doesn't open (linkCheck.ts): "Kosher

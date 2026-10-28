@@ -137,7 +137,10 @@ describe('WatchKindPage', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /House of Kosher/ }))
     const open = screen.getByTestId('kind-place-open')
-    expect(within(open).getAllByTestId('problem').map((p) => p.textContent)).toEqual([`Kosher certificate·not found since ${day(since)}Linkhouseofkosher.com/PhiladelphiaCheck it again`])
+    // A link's day is New York's (linkCheck.ts), not the machine's: CI runs
+    // in UTC, where after 8 PM here it's already tomorrow.
+    const nyDay = new Date(since).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
+    expect(within(open).getAllByTestId('problem').map((p) => p.textContent)).toEqual([`Kosher certificate·not found since ${nyDay}Linkhouseofkosher.com/PhiladelphiaCheck it again`])
     await user.click(within(open).getByRole('button', { name: 'Check it again' }))
     expect(posts).toEqual([['/api/admin/watches/links', { action: 'check', resourceId: 'b', key: 'kosher_url' }]])
   })

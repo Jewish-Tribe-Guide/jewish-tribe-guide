@@ -32,7 +32,7 @@ vi.mock('@/lib/backForwardNavigation', () => ({
 
 // The question reader (an AI, over the network): off unless a test reads.
 const readerMock = vi.hoisted(() => ({ answer: { ok: false, reason: 'off' } as unknown }))
-vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), forgetReaderAnswers: vi.fn() }))
+vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), learnFrom: vi.fn(), forgetReaderAnswers: vi.fn() }))
 
 // GenericListingCard is real and separately tested (GenericListingCard.test.tsx)
 // — stubbed here, same "mock the heavy leaf child" pattern as Landing.test.tsx's
@@ -2862,22 +2862,39 @@ describe('GenericDirectory — Has', () => {
     expect(screen.getByText('Acme')).toBeInTheDocument()
   })
 
-  // The reader's reading goes into the page's own Filters, not "Read as"
-  // chips over the list (Oct 13).
-  it('a question the reader reads switches its Filters on, and the address says so', async () => {
+  // The AI isn't part of the search (the user, Oct 27: "trader joes" on
+  // Synagogues found nothing, then its reading showed every shul). A
+  // question found nowhere here is read in the background on Enter, for
+  // the admin's Read questions tab; the page never waits for the reading
+  // or uses it, and typing alone reads nothing.
+  it('Enter on a search that finds nothing reads it in the background, and the list stays as found', async () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
+    const { askReader, learnFrom } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    vi.mocked(learnFrom).mockClear()
     readerMock.answer = { ok: true, reading: { categories: [{ id: 'grocery' }], items: ['Wine'] } }
     renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} onParamsChange={onParamsChange} />)
-    await user.type(screen.getByRole('searchbox'), 'something to drink for kiddush{Enter}')
+    await user.type(screen.getByRole('searchbox'), 'something to drink for kiddush')
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(askReader).not.toHaveBeenCalled()
+    expect(learnFrom).not.toHaveBeenCalled()
 
-    // While it's read, the sentence finds nothing: wait for the reading.
-    await vi.waitFor(() => {
-      expect(screen.getByText('ShopRite')).toBeInTheDocument()
-      expect(screen.queryByText('Acme')).not.toBeInTheDocument()
-    })
-    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
-    expect(screen.queryByText(/Read as/)).not.toBeInTheDocument()
-    expect(onParamsChange).toHaveBeenCalledWith({ read: '1' }, { replace: true })
+    await user.keyboard('{Enter}')
+    expect(vi.mocked(learnFrom).mock.calls.map((c) => c[0])).toEqual(['something to drink for kiddush'])
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText('ShopRite')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Reading your question/)).not.toBeInTheDocument()
+    expect(onParamsChange).not.toHaveBeenCalledWith({ read: '1' }, { replace: true })
+  })
+
+  it('Enter on a search that finds something reads nothing', async () => {
+    const user = userEvent.setup()
+    const { learnFrom } = await import('@/lib/askReader')
+    vi.mocked(learnFrom).mockClear()
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+    await user.type(screen.getByRole('searchbox'), 'challah{Enter}')
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+    expect(learnFrom).not.toHaveBeenCalled()
   })
 })

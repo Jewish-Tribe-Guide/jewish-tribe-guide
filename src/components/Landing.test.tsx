@@ -53,7 +53,7 @@ const zmanimMock = vi.hoisted(() => ({ result: { data: null as unknown, status: 
 vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => zmanimMock.result }))
 // The question reader (an AI, over the network): off unless a test reads.
 const readerMock = vi.hoisted(() => ({ answer: { ok: false, reason: 'off' } as unknown }))
-vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), forgetReaderAnswers: vi.fn() }))
+vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), learnFrom: vi.fn(), forgetReaderAnswers: vi.fn() }))
 
 /** The lines under the home box (SearchLines), each as its text. jsdom
  *  applies no CSS, so the phone's and the desktop's copies are both there:
@@ -342,6 +342,23 @@ describe('Landing', () => {
     expect(mockRouter.push).not.toHaveBeenCalled()
   })
 
+  // Not only on Enter: most people never press it (the user, Oct 27).
+  it('a search that finds nothing says so as it is typed, without Enter', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores' })
+    renderLanding(undefined, { content: { categories: [grocery] } }, [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery' })])
+    const box = screen.getAllByLabelText('Search resources')[0]!
+
+    await user.type(box, 'xyznotreal')
+    expect(screen.getAllByText('Nothing in the guide for “xyznotreal”.').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
+
+    await user.clear(box)
+    await user.type(box, 'test gro')
+    expect(screen.queryByText(/Nothing in the guide/)).not.toBeInTheDocument()
+    expect(lineTexts()[0]).toMatch(/Test Grocery/)
+  })
+
   // A place's name is the first line, and Enter opens its listing (board 2b)
   // — the listing alone, no search carried along to narrow its page.
   it("a place's name is the first line, and Enter opens its listing", async () => {
@@ -391,8 +408,9 @@ describe('Landing', () => {
   it('a question our own search understood isn’t sent to the reader: Enter goes where its line says, at once', async () => {
     const user = userEvent.setup()
     mockRouter.push.mockClear()
-    const { askReader } = await import('@/lib/askReader')
+    const { askReader, learnFrom } = await import('@/lib/askReader')
     vi.mocked(askReader).mockClear()
+    vi.mocked(learnFrom).mockClear()
     readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant' }] } }
     const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
     // A Food place whose type is "Wine Bar": "wine" there isn't an item,
@@ -410,14 +428,23 @@ describe('Landing', () => {
       expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=wine')
       await new Promise((r) => setTimeout(r, 1200))
       expect(askReader).not.toHaveBeenCalled()
+      expect(learnFrom).not.toHaveBeenCalled()
     } finally {
       readerMock.answer = { ok: false, reason: 'off' }
     }
   })
 
-  it('a question the reader reads lands with its reading in the Filters', async () => {
+  // The AI isn't part of the search (the user, Oct 27: "feels weird to
+  // search, get an answer, then see reading question, then get a different
+  // answer"). A question our own search found nothing for is read in the
+  // background on Enter, for the admin's Read questions tab; the page never
+  // waits for it or uses it, and typing alone reads nothing.
+  it('a question our own search found nothing for is read in the background on Enter, and never answers', async () => {
     const user = userEvent.setup()
     mockRouter.push.mockClear()
+    const { askReader, learnFrom } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    vi.mocked(learnFrom).mockClear()
     readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] } }
     const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }] }] })
     try {
@@ -425,10 +452,17 @@ describe('Landing', () => {
         makeListing({ id: 'm', category: 'restaurant', name: 'Grill', t: 'Meat' }),
         makeListing({ id: 'd', category: 'restaurant', name: 'Cafe', t: 'Dairy' }),
       ])
-      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'somewhere fleishig for a sit down dinner{Enter}')
-      await vi.waitFor(() =>
-        expect(mockRouter.push).toHaveBeenCalledWith('/test-community/restaurant?q=somewhere+fleishig+for+a+sit+down+dinner&sel_t=Meat&read=1'),
-      )
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'somewhere fleishig')
+      await new Promise((r) => setTimeout(r, 1200))
+      expect(askReader).not.toHaveBeenCalled()
+      expect(learnFrom).not.toHaveBeenCalled()
+
+      await user.keyboard('{Enter}')
+      expect(vi.mocked(learnFrom).mock.calls).toEqual([['somewhere fleishig', 'test-community']])
+      expect(await screen.findAllByText('Nothing in the guide for “somewhere fleishig”.')).not.toHaveLength(0)
+      await new Promise((r) => setTimeout(r, 50))
+      expect(mockRouter.push).not.toHaveBeenCalled()
+      expect(screen.queryByText(/Reading your question/)).not.toBeInTheDocument()
     } finally {
       readerMock.answer = { ok: false, reason: 'off' }
     }
@@ -1029,16 +1063,18 @@ describe('Landing — a shared question', () => {
     await vi.waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/test-community/grocery?q=challah'))
   })
 
-  // The reader is off on most servers: a question to read is read once,
-  // then goes where our own search would, here nowhere.
-  it('a question the reader can’t read is asked of it once, then says it found nothing', async () => {
-    const { askReader } = await import('@/lib/askReader')
+  // Nobody pressed Enter on a shared link: it's not read, and says at once
+  // that it found nothing.
+  it('a shared question that finds nothing says so at once, and isn’t read', async () => {
+    const { askReader, learnFrom } = await import('@/lib/askReader')
     vi.mocked(askReader).mockClear()
+    vi.mocked(learnFrom).mockClear()
     mockRouter.replace.mockClear()
     renderLanding({ initialQuery: 'dentist' }, { content: { categories: [grocery] } }, [store])
     expect(await screen.findAllByText('Nothing in the guide for “dentist”.')).not.toHaveLength(0)
     await new Promise((r) => setTimeout(r, 50))
-    expect(vi.mocked(askReader)).toHaveBeenCalledTimes(1)
+    expect(askReader).not.toHaveBeenCalled()
+    expect(learnFrom).not.toHaveBeenCalled()
     expect(mockRouter.replace).not.toHaveBeenCalled()
   })
 

@@ -81,6 +81,8 @@ type Props = {
   /** The eruvim on the map, listed first, before any places (NearbyList). */
   eruvim?: NearbyEruv[]
   onSelectEruv?: (id: string) => void
+  /** What the list says when it's empty (NearbyList's own `empty`). */
+  empty?: ReactNode
 }
 
 export type MobileNearbySheetHandle = {
@@ -130,7 +132,7 @@ export type MobileNearbySheetHandle = {
  * is still visible underneath.
  */
 const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
-  { points, userLocation, onViewListing, categories, foundOn, containerHeight, onSelectionChange, onHeightChange, renderOther, eruvim, onSelectEruv },
+  { points, userLocation, onViewListing, categories, foundOn, containerHeight, onSelectionChange, onHeightChange, renderOther, eruvim, onSelectEruv, empty },
   ref,
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
@@ -616,7 +618,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         ) : selected && selected.raw && selectedCategory ? (
           <MapPlaceDetail item={selected.raw} category={selectedCategory} color={selected.color} onBack={clearSelection} found={foundOn?.(selected.raw.id) ?? null} />
         ) : (
-          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} eruvim={eruvim} onSelectEruv={onSelectEruv} />
+          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} eruvim={eruvim} onSelectEruv={onSelectEruv} empty={empty} />
         ),
         !selected,
       )}

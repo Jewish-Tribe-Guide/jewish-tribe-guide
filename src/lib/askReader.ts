@@ -2,9 +2,10 @@
 
 import { questionKey, type Reading } from './questionReader'
 
-// The page's side of the question reader (POST /api/ask/read). Every way it
-// can't read a question comes back as an answer, never a throw, and the
-// page then answers with today's search alone, as it always has.
+// The page's side of the question reader (POST /api/ask/read). Since Oct 27
+// the pages only call it through learnFrom, in the background, and never
+// use the answer. Every way it can't read a question comes back as an
+// answer, never a throw.
 //
 // A question asked twice in one visit is asked once: the answer is kept
 // for the tab's life (the server remembers it for everyone, this saves the
@@ -56,4 +57,12 @@ async function ask(question: string, community: string | null): Promise<ReaderAn
 export function forgetReaderAnswers() {
   answers.clear()
   off = false
+}
+
+/** A question our own search found nothing for, read in the background for
+ *  the admin's Read questions tab, where its words can be taught to the
+ *  search (askWords.ts). Nothing on the page waits for it or uses it: the
+ *  AI is not part of the search (the user, Oct 27). */
+export function learnFrom(question: string, community: string | null) {
+  if (question.trim().length >= 2) void askReader(question.trim(), community)
 }

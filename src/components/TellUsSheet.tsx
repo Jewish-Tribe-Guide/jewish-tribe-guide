@@ -144,24 +144,32 @@ export default function TellUsSheet({
   // The step says where it goes; the header only shows it.
   const [hasBack, setHasBack] = useState(false)
   const back = useRef<() => void>(() => {})
-  const close = () => {
-    setStepTitle(null)
-    setHasBack(false)
-    onClose()
+  // Each open starts at the first step, with its own title and no Back. Reset
+  // on opening, not on closing: the box stays on the page while it slides
+  // away (its caller keeps it mounted), and should leave as it was.
+  const [opens, setOpens] = useState(0)
+  const [wasOpen, setWasOpen] = useState(false)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) {
+      setOpens((n) => n + 1)
+      setStepTitle(null)
+      setHasBack(false)
+    }
   }
   // Named for what it does (Oct 10): "Tell us about…" read like feedback.
   const title = stepTitle ?? heading ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
   const onBack = hasBack ? () => back.current() : undefined
   const body = (
     <TellUsBody
-      key={isOpen ? 'open' : 'shut'}
+      key={opens}
       about={about}
       pageCategory={category}
       placeholder={placeholder}
       onEditYourself={onEditYourself}
       yourselfLabel={yourselfLabel}
       kind={kind}
-      onClose={close}
+      onClose={onClose}
       onTitle={setStepTitle}
       onBack={(go) => {
         back.current = go ?? (() => {})
@@ -170,11 +178,11 @@ export default function TellUsSheet({
     />
   )
   return isMobile ? (
-    <MobileSheet isOpen={isOpen} onClose={close} title={title} onBack={onBack} draggable>
+    <MobileSheet isOpen={isOpen} onClose={onClose} title={title} onBack={onBack} draggable fit>
       {body}
     </MobileSheet>
   ) : (
-    <ActionDialog isOpen={isOpen} onClose={close} title={title} onBack={onBack}>
+    <ActionDialog isOpen={isOpen} onClose={onClose} title={title} onBack={onBack}>
       {body}
     </ActionDialog>
   )

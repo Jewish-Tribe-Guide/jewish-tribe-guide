@@ -8,16 +8,14 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import CollapsibleSection from './CollapsibleSection'
 
 // ── The "Read questions" tab: what the AI reader made of what people asked ──
-// Every question the site's own search didn't fully understand, and so the
-// AI read into the site's own filters (see questionReader.ts), most asked
-// first, each with its reading in words. Approve makes a reading a rule a
-// person has checked: the site uses it with no AI at all, even when the
-// reader is off or over its limits (/api/ask/read). Forget throws a wrong
-// one away, and the question is read afresh the next time it's asked.
-//
-// And each reading suggests words to teach the search itself ("ikc" means
-// Kosher Cert: IKC, see askWords.ts): taught, the site's own search reads
-// that word that way in every question, and the AI isn't asked.
+// Every question the site's own search found nothing for, which the AI read
+// in the background into the site's own filters (see questionReader.ts,
+// learnFrom), most asked first, each with its reading in words. The AI
+// isn't part of the search (the user, Oct 27): a reading never answers on
+// the site, so there's nothing to approve. What it's for is the words it
+// suggests teaching the search itself ("ikc" means Kosher Cert: IKC, see
+// askWords.ts): taught, the site's own search reads that word that way in
+// every question, instantly. Forget throws a wrong reading away.
 
 type Word = { word: string; categoryId: string; field?: string; value?: string; label: string }
 type TaughtWord = Word & { fromQuestion: string | null; taughtBy: string; taughtAt: string }
@@ -29,17 +27,14 @@ type ReadQuestion = {
   hits: number
   model: string
   lastUsedAt: string
-  approvedAt: string | null
-  approvedBy: string | null
 }
 type Loaded = { readings: ReadQuestion[]; available: boolean; words: TaughtWord[]; wordsAvailable: boolean }
-type Action = 'approve' | 'unapprove' | 'forget'
 
 function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function QuestionRow({ q, busy, onAct, onTeach }: { q: ReadQuestion; busy: boolean; onAct: (action: Action) => void; onTeach: (word: Word) => void }) {
+function QuestionRow({ q, busy, onForget, onTeach }: { q: ReadQuestion; busy: boolean; onForget: () => void; onTeach: (word: Word) => void }) {
   return (
     <li className="px-4 py-3" data-testid="read-question">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -75,22 +70,7 @@ function QuestionRow({ q, busy, onAct, onTeach }: { q: ReadQuestion; busy: boole
         </ul>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-        {q.approvedAt ? (
-          <>
-            <span className="text-muted">
-              Approved {formatDay(q.approvedAt)}
-              {q.approvedBy ? ` by ${q.approvedBy}` : ''}
-            </span>
-            <button type="button" disabled={busy} onClick={() => onAct('unapprove')} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
-              Unapprove
-            </button>
-          </>
-        ) : (
-          <button type="button" disabled={busy} onClick={() => onAct('approve')} className="font-semibold text-primary hover:underline disabled:opacity-50">
-            Approve
-          </button>
-        )}
-        <button type="button" disabled={busy} onClick={() => onAct('forget')} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={onForget} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
           Forget
         </button>
         <span className="text-muted">Read by {q.model}</span>
@@ -117,25 +97,16 @@ export default function ReadQuestions({ token }: { token: string }) {
 
   useLoadOnMount(load)
 
-  async function act(key: string, action: Action) {
+  async function forget(key: string) {
     setSaveError(null)
     setBusy(key)
     try {
       await fetchJson(
         withCommunity('/api/admin/read-questions', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key, action }) },
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key, action: 'forget' }) },
         'Could not save.',
       )
-      setData(
-        (d) =>
-          d && {
-            ...d,
-            readings:
-              action === 'forget'
-                ? d.readings.filter((r) => r.key !== key)
-                : d.readings.map((r) => (r.key === key ? { ...r, approvedAt: action === 'approve' ? new Date().toISOString() : null, approvedBy: action === 'approve' ? 'you' : null } : r)),
-          },
-      )
+      setData((d) => d && { ...d, readings: d.readings.filter((r) => r.key !== key) })
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save.')
     } finally {
@@ -188,31 +159,16 @@ export default function ReadQuestions({ token }: { token: string }) {
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading read questions…</p>
 
-  const toReview = data.readings.filter((r) => !r.approvedAt)
-  const approved = data.readings.filter((r) => r.approvedAt)
-  const rows = (list: ReadQuestion[]) => (
-    <ul className="divide-y divide-slate-100">
-      {list.map((q) => (
-        <QuestionRow key={q.key} q={q} busy={busy === q.key} onAct={(a) => void act(q.key, a)} onTeach={(w) => void teach(q.key, q.question, w)} />
-      ))}
-    </ul>
-  )
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Questions the site&rsquo;s own search didn&rsquo;t fully understand, and how the AI read them into the guide&rsquo;s own
-        filters, most asked first. The AI only ever picks filters; the listings give the answers. <strong>Approve</strong> a
-        reading you&rsquo;ve checked and it becomes a rule, used with no AI at all. <strong>Forget</strong> a wrong one and the
-        question is read afresh next time. Only the words and a count are kept, never who asked.
-      </p>
-      <p className="text-sm text-muted">
-        <strong>Teach</strong> a word and the site&rsquo;s own search reads it that way in every question, instantly and
-        with no AI. It means that everywhere someone types it, so teach only what it always means.
+        Searches that found nothing, as the AI read them, most asked first. Nothing here reaches the site until you{' '}
+        <strong>Teach</strong> a word: then the search reads it that way everywhere, so teach only what it always means.
       </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Nothing is kept until database migration 062 is applied. The reader still works, reading every question afresh.
+          Nothing is kept until database migration 062 is applied.
         </p>
       )}
       {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
@@ -222,13 +178,13 @@ export default function ReadQuestions({ token }: { token: string }) {
         data.available && (
           <>
             <section className="bg-white border border-slate-200 rounded-lg shadow-sm">
-              <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">To review ({toReview.length})</h3>
-              <p className="px-4 pb-2 text-xs text-muted">Read by the AI, not yet checked by a person.</p>
-              {toReview.length > 0 ? rows(toReview) : <p className="px-4 pb-3 text-sm text-slate-600">None right now.</p>}
+              <h3 className="px-4 pt-3 pb-1 text-sm font-semibold text-slate-800">Questions ({data.readings.length})</h3>
+              <ul className="divide-y divide-slate-100">
+                {data.readings.map((q) => (
+                  <QuestionRow key={q.key} q={q} busy={busy === q.key} onForget={() => void forget(q.key)} onTeach={(w) => void teach(q.key, q.question, w)} />
+                ))}
+              </ul>
             </section>
-            <CollapsibleSection title="Approved" description="Rules a person has checked: used with no AI at all." count={approved.length} contentClassName="">
-              {rows(approved)}
-            </CollapsibleSection>
           </>
         )
       )}

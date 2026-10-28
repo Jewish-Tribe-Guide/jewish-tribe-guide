@@ -37,22 +37,23 @@ afterEach(() => {
 })
 
 describe('ReadQuestions', () => {
-  it('lists what’s to review with how it was read, and folds the approved away', async () => {
+  it('lists every question read, with how it was read, approved before or not', async () => {
     await renderList([ikc, bagels])
-    const review = screen.getByRole('heading', { name: /To review \(1\)/ }).closest('section')!
-    const row = within(review).getByTestId('read-question')
-    expect(row.textContent).toContain('“IKC dairy?”')
-    expect(row.textContent).toContain('4 times')
-    expect(within(row).getByText('Kosher Cert: IKC')).toBeTruthy()
-    expect(screen.queryByText('“bagels”')).toBeNull()
-    expect(screen.getByRole('button', { name: /Approved/ }).textContent).toContain('1')
+    const list = screen.getByRole('heading', { name: /Questions \(2\)/ }).closest('section')!
+    const rows = within(list).getAllByTestId('read-question')
+    expect(rows[0].textContent).toContain('“IKC dairy?”')
+    expect(rows[0].textContent).toContain('4 times')
+    expect(within(rows[0]).getByText('Kosher Cert: IKC')).toBeTruthy()
+    expect(rows[1].textContent).toContain('“bagels”')
   })
 
-  it('Approve makes it a rule, saved for real, and moves it to Approved', async () => {
-    await renderList([ikc])
-    await userEvent.click(screen.getByRole('button', { name: 'Approve' }))
-    expect(posted()).toEqual([{ key: 'ikc dairy', action: 'approve' }])
-    expect(screen.getByRole('heading', { name: /To review \(0\)/ })).toBeTruthy()
+  // The AI isn't part of the search (the user, Oct 27): a reading never
+  // answers on the site, so there's nothing to approve, only words to teach.
+  it('has no Approve: a reading never answers on the site', async () => {
+    await renderList([ikc, bagels])
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Unapprove' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Approved/ })).toBeNull()
   })
 
   it('Forget takes it off the list', async () => {
@@ -94,6 +95,6 @@ describe('ReadQuestions', () => {
   it('says plainly when the table isn’t there yet', async () => {
     await renderList([], false)
     expect(screen.getByText(/migration 062/)).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: /To review/ })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /Questions/ })).toBeNull()
   })
 })
