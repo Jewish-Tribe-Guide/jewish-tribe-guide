@@ -39,6 +39,14 @@ type Props = {
   /** The page's soft grey instead of white, for an opened listing: its
    *  boxes are white on it (Oct 6). */
   surface?: boolean
+  /** With `draggable`: opens tall enough for its content, up to full,
+   *  instead of half, and follows the content as it changes. Never shorter
+   *  than half: a short step (Find the place's one box) would sit under the
+   *  keyboard, and the sheet would jump as its results came in. For the
+   *  "+ Add" box (Oct 27): at half, "Fill it in yourself" sat under the
+   *  screen's edge, and full left a third of the screen empty under it.
+   *  Dragged to full, it stays full. */
+  fit?: boolean
 }
 
 // ── One sheet at a time (Oct 10) ────────────────────────────────────────────
@@ -161,7 +169,7 @@ const MOMENTUM_MIN_VELOCITY = 0.02
  *  instead of resizing/dismissing the sheet the way the map's list already
  *  does — see onContentPointerDown's own doc for why the fix is the same
  *  hand-driven-scroll takeover MobileNearbySheet uses, not a smaller one. */
-export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false, onBack, surface = false }: Props) {
+export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false, onBack, surface = false, fit = false }: Props) {
   const [phase, setPhase] = useState<Phase>(isOpen ? 'open' : 'closed')
   useBodyScrollLock(phase !== 'closed')
 
@@ -267,12 +275,35 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, covered, close])
 
+  // `fit`: the whole height its content wants, the handle and header
+  // included. Measured before paint, so it opens at that height, and again
+  // whenever the content's size changes.
+  const panelRef = useRef<HTMLDivElement>(null)
+  const fitRef = useRef<HTMLDivElement>(null)
+  const [fitPx, setFitPx] = useState<number | null>(null)
+  const fitOn = fit && draggable && phase === 'open'
+  useLayoutEffect(() => {
+    if (!fitOn) return
+    const panel = panelRef.current
+    const content = contentRef.current
+    const inner = fitRef.current
+    if (!panel || !content || !inner) return
+    const measure = () => setFitPx(Math.ceil(content.getBoundingClientRect().top - panel.getBoundingClientRect().top + content.scrollHeight))
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(inner)
+    return () => observer.disconnect()
+  }, [fitOn])
+
   const halfPx = Math.round(viewportH * HALF_FRACTION)
   // max: on a short viewport, viewportH - TOP_INSET_PX could fall below
   // half — a fixed viewport-independent inset has no such floor built in
   // the way a fraction naturally would. Same guard MobileNearbySheet's own
   // full-height calc has (there against its own peek).
-  const heights = { half: halfPx, full: Math.max(halfPx, viewportH - TOP_INSET_PX) }
+  const fullPx = Math.max(halfPx, viewportH - TOP_INSET_PX)
+  // `fit` puts its content's height where half would be, if that's taller.
+  const heights = { half: fit && fitPx !== null ? Math.min(Math.max(fitPx, halfPx), fullPx) : halfPx, full: fullPx }
   // Closing shrinks height to 0 rather than switching to some other
   // mechanism (a transform-based slide, say) — see close()'s own doc for
   // why: whatever height a drag-to-dismiss was ALREADY mid-shrinking
@@ -559,6 +590,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
         role="presentation"
       >
         <div
+          ref={panelRef}
           className={`flex w-full flex-col rounded-t-2xl ${surface ? 'bg-surface' : 'bg-white'} shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable || over ? '' : 'max-h-[85vh]'}`}
           // Covered: hidden once the one over it has slid up (SHEET_UP_MS).
           // Uncovered, back at once: a transition is read from the new style.
@@ -640,7 +672,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
             // listing's "Suggest an edit") would otherwise sit under it.
             className={`overflow-y-auto overscroll-contain px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ${draggable ? 'touch-none' : ''}`}
           >
-            {children}
+            {fit ? <div ref={fitRef}>{children}</div> : children}
           </div>
         </div>
       </div>

@@ -1707,6 +1707,11 @@ On the live site the reader had read 41 questions, 23 into nothing, about
   the box while typing and in the list once searched, instead of "Turn on
   a category above". "Nothing" means nothing anywhere in the guide, places
   the map can't plot included.
+- **The "+ Add" box on a phone** (the user, Oct 27): it opens tall enough
+  to show "Fill it in yourself" (it sat under the screen's edge at half
+  height), never shorter than half, and slides and fades away when closed,
+  as a listing does, instead of vanishing with its dimmed backdrop in one
+  frame (`MobileSheet`'s `fit`; the box stays mounted once opened).
 - **Next, agreed in principle, not built:** typo matching for names
   ("Beth sholom", "bros medresh"), most of what was asked.
 

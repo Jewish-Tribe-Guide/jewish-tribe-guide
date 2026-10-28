@@ -667,6 +667,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
   // one tap inside it, "Add a place".
   const [tellOpen, setTellOpen] = useState(false)
+  // Kept on the page once opened, so it slides and fades away when closed
+  // (SiteAddButton's note).
+  const [tellMounted, setTellMounted] = useState(false)
+  if (tellOpen && !tellMounted) setTellMounted(true)
   // The listing the box is about, when its Suggest an edit opened it, and
   // what that Suggest an edit opened before: the listing's own editor, in
   // place, for the box's "Edit the details myself" (Oct 6). Without one,
@@ -2167,9 +2171,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {/* Its own boundary: loading it the first time otherwise hid the page
           for a moment, the open listing under it included. */}
       <Suspense fallback={null}>
-        {tellOpen && (
+        {tellMounted && (
           <TellUsSheet
-            isOpen
+            isOpen={tellOpen}
             onClose={() => setTellOpen(false)}
             about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
             category={category}

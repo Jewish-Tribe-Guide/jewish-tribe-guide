@@ -33,6 +33,10 @@ export default function SiteAddButton() {
   const community = useOptionalCommunitySlug()
   const categories = useCategories()
   const [open, setOpen] = useState(false)
+  // Kept on the page once opened, so it slides and fades away when closed,
+  // as a listing does, instead of vanishing in one frame (the user, Oct 27).
+  const [mounted, setMounted] = useState(false)
+  if (open && !mounted) setMounted(true)
   // "How do I add a listing?" in the home search opens this same box
   // (searchLands.ts), as tapping "+ Add" would.
   useEffect(() => {
@@ -44,7 +48,7 @@ export default function SiteAddButton() {
   return (
     <>
       <AddButton onClick={() => setOpen(true)} />
-      {open && <TellUsSheet isOpen onClose={() => setOpen(false)} />}
+      {mounted && <TellUsSheet isOpen={open} onClose={() => setOpen(false)} />}
     </>
   )
 }
