@@ -230,6 +230,27 @@ describe('the listing’s own dishes, looked for on every read', () => {
     expect(r.missing).toEqual(['Hummus plate'])
   })
 
+  // The user, Oct 28: "Hipcity has Philly Cheese steak and it suggests to
+  // add Philly Cheesesteak"; Goldie's "Hummus" beside its Hummus Platter.
+  it('one the listing has by another name is the listing’s; a kind of one it has isn’t a dish of its own', () => {
+    const menu: MenuSource = { url: 'https://hip.example/menu', text: 'Philly Cheesesteak\nQuart of Hummus\nHummus Platter\nFries', pdf: null }
+    const has = ['Philly Cheese Steak', 'Hummus Platter']
+    const r = tidyMenuReading(
+      {
+        dishes: [{ name: 'Philly Cheesesteak', quote: 'Philly Cheesesteak' }, { name: 'Hummus', quote: 'Quart of Hummus' }],
+        listed: [{ name: 'Hummus Platter', quote: 'Hummus Platter' }],
+      },
+      menu,
+      has,
+    )
+    expect(r.dishes).toEqual([
+      { name: 'Philly Cheese Steak', quote: 'Philly Cheesesteak', checked: true, named: true, onListing: true },
+      { name: 'Hummus Platter', quote: 'Hummus Platter', checked: true, named: true, onListing: true },
+    ])
+    expect(r.missing).toEqual([])
+    expect((menuMessages(menu, 'HipCityVeg', has) as { content: unknown }[])[0].content).toMatch(/is that listed dish, never a new one/)
+  })
+
   it('the listing’s own come on top of the ten', () => {
     const ten = Array.from({ length: 12 }, (_, i) => ({ name: `Dish ${String.fromCharCode(65 + i)}`, quote: 'Fountain drinks' }))
     const r = tidyMenuReading({ dishes: ten, listed: [{ name: 'Falafel', quote: 'Falafel in pita' }] }, source, ['Falafel'])

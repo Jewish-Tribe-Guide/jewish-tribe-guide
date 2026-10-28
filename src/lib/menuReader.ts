@@ -4,6 +4,7 @@ import { isIP } from 'node:net'
 import { ITEM_NAMES, itemName, itemWords } from './itemNames'
 import { words } from './ask'
 import { addedItemName, cleanItemName } from './itemMarks'
+import { listedAlready, sameDish } from './dishProposal'
 import { DEFAULT_READER_MODEL } from './readQuestion'
 import { WATCH_FETCH_HEADERS } from './websiteWatch'
 
@@ -625,7 +626,7 @@ Rules:
 - Fewer is better than padding. If you were shown only part of a menu (a few photos, one section), pick the main dishes in that part; never fill the list with vegetables, rice, noodles or other sides because nothing else is there. Return fewer, or none, and say in "note" that it looks like only part of the menu.
 - For each dish, "quote" is a few words copied exactly from the menu where you read it (a heading or an item line), so a person can find it. Copy the words exactly as written, including their spelling and capitals.
 - If what you were given isn't a menu, or names no dishes, return no dishes and say why in "note".
-- When you're told the dishes the place's listing has already, check each against the menu: put each one the menu names in "listed", with its name as given and a "quote" copied exactly from the menu as above. Leave out any it doesn't name; never guess. A listed dish can be in "dishes" too, if it's one of the main dishes.
+- When you're told the dishes the place's listing has already, check each against the menu: put each one the menu names in "listed", with its name as given and a "quote" copied exactly from the menu as above. Leave out any it doesn't name; never guess. A listed dish can be in "dishes" too, if it's one of the main dishes, under the listing's name. One the listing has already, spelled another way or as a kind of it (its "Hummus Platter" is the menu's hummus, its "Chocolate Donuts" its donuts), is that listed dish, never a new one.
 
 Answer in JSON only: {"dishes": [{"name": "...", "quote": "..."}], "listed": [{"name": "...", "quote": "..."}], "note": "..."}`
 
@@ -682,7 +683,7 @@ export function tidyMenuReading(raw: unknown, source: MenuSource, listed: readon
     const said = plain(quote)
     if (!said) return null
     if (page && !page.includes(` ${said} `)) return null
-    const named = onListing.get(keyOf(name)) ?? addedItemName(name)
+    const named = onListing.get(keyOf(name)) ?? listed.find((n) => sameDish(n, name)) ?? addedItemName(name)
     const nameWords = new Set(itemWords(named))
     return { name: named, quote, checked: !!page, named: words(quote).some((w) => nameWords.has(w)), ...(onListing.has(keyOf(named)) ? { onListing: true as const } : {}) }
   }
@@ -692,6 +693,9 @@ export function tidyMenuReading(raw: unknown, source: MenuSource, listed: readon
     if (dishes.length >= MAX_DISHES) break
     const dish = take(d)
     if (!dish || seen.has(keyOf(dish.name))) continue
+    // A kind of one the listing has isn't a dish of its own: Goldie's
+    // "Hummus" beside its Hummus Platter (the user, Oct 28).
+    if (!dish.onListing && listedAlready(dish.name, listed)) continue
     seen.add(keyOf(dish.name))
     dishes.push(dish)
   }

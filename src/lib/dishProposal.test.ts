@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dishProposal, readerMarks } from './dishProposal'
+import { dishProposal, listedAlready, readerMarks, sameDish } from './dishProposal'
 
 const dish = (name: string, quote = name.toUpperCase()) => ({ name, quote, checked: true, named: true })
 
@@ -90,5 +90,62 @@ describe('readerMarks', () => {
 
   it('with no reading, nothing was looked for', () => {
     expect([...readerMarks({ dishes: ['Bagels'] }, null)]).toEqual([['Bagels', 'not_looked']])
+  })
+})
+
+// The user, Oct 28: "Goldie already has hummus platter and it suggested
+// hummus as another item. Dotties has all types of donuts flavors and it
+// suggests to add donuts … Hipcity has Philly Cheese steak and it suggests
+// to add Philly Cheesesteak." Their readings, as production has them.
+describe('a dish the listing has by another name', () => {
+  it('isn’t new: Goldie’s, Dottie’s and HipCity’s readings change nothing', () => {
+    const goldie = dishProposal(
+      { dishes: ['Falafel', 'Chopped Salad', 'Hummus Platter'], menuDated: ['Falafel', 'Chopped Salad', 'Hummus Platter'] },
+      {
+        dishes: [
+          { name: 'Falafel', quote: 'Falafel $12', checked: true },
+          { name: 'Chopped Salad', quote: 'Chopped Salad', checked: true },
+          { name: 'Hummus Platter', quote: 'Hummus Platter', checked: true },
+          { name: 'Hummus', quote: 'Quart of Hummus', checked: true },
+        ],
+        missing: [],
+      },
+    )
+    expect(goldie.updates).toBe(0)
+    expect(goldie.rows.map((r) => r.name)).toEqual(['Falafel', 'Chopped Salad', 'Hummus Platter'])
+
+    const flavours = ['Chocolate Donuts', 'Vanilla Donuts', 'Vanilla Sprinkles Donuts', 'Cinnamon Sugar Donuts', 'Boston Cream Donuts', 'Apple Fritters', 'Cinnamon Buns', 'Brownies']
+    const dotties = dishProposal({ dishes: flavours }, { dishes: [{ name: 'Donuts', quote: '1000+ donuts a day', checked: true, named: true }], missing: [] })
+    expect(dotties.updates).toBe(0)
+
+    const listed = ['Burgers', 'Philly Cheese Steak', 'Sandwiches', 'Chick’n', 'Nuggets', 'Snack Wraps', 'Salads']
+    const hip = dishProposal(
+      { dishes: listed, menuDated: listed },
+      {
+        dishes: [
+          { name: 'Burgers', quote: 'Burgers & Sandwiches', checked: true },
+          { name: 'Philly Cheesesteak', quote: 'Philly Cheesesteak', checked: true },
+          { name: 'Philly Cheese Steak', quote: 'Philly Cheesesteak', checked: true },
+          { name: 'Sandwiches', quote: 'Burgers & Sandwiches', checked: true },
+        ],
+        missing: ['Philly Cheese Steak'],
+      },
+    )
+    expect(hip.updates).toBe(0)
+    // Its own name for it, once, and not as one off the menu.
+    expect(hip.rows.filter((r) => /philly/i.test(r.name))).toEqual([{ name: 'Philly Cheese Steak', status: 'same', quote: 'Philly Cheesesteak', checked: true }])
+  })
+
+  it('a dish of its own still is new', () => {
+    expect(sameDish('Philly Cheesesteaks', 'philly cheese steak')).toBe(true)
+    expect(sameDish('Knishes', 'Knish')).toBe(true)
+    expect(listedAlready('Cheesesteak', ['Philly Cheese Steak'])).toBe(true)
+    expect(listedAlready('Hummus', ['Hummus Platter'])).toBe(true)
+    // Words, not letters: tea isn't in steak.
+    expect(listedAlready('Tea', ['Steak'])).toBe(false)
+    // More than the listing's isn't the listing's.
+    expect(listedAlready('Pizza Bagels', ['Pizza'])).toBe(false)
+    expect(listedAlready('Chicken Soup', ['Chicken'])).toBe(false)
+    expect(dishProposal({ dishes: ['Pizza'] }, { dishes: [{ name: 'Pizza Bagels', quote: 'Pizza Bagels', checked: true }] }).updates).toBe(1)
   })
 })

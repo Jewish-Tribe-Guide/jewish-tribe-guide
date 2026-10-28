@@ -4,7 +4,7 @@ import { itemsField } from './listingView'
 import { keepsMenuLink, MENU_LINK_KEY, menuWebsite, readElsewhere, readMenuLink } from './menuLink'
 import { isOrderingApp, type MenuDish, type MenuSource } from './menuReader'
 import { MENU_WATCH_CREATOR } from './watches'
-import { readerMarks, type ListedDishes, type ReadDish } from './dishProposal'
+import { listedAlready, readerMarks, type ListedDishes, type ReadDish } from './dishProposal'
 import type { DirectoryResource } from '@/types'
 
 export { MENU_WATCH_CREATOR }
@@ -112,10 +112,10 @@ export function listedDishes(listing: DirectoryResource, category: CategoryConfi
   return [...selectValues(listing[field.key]), ...selectValues(listing[`${field.key}_sometimes`])]
 }
 
-/** The dishes a reading found that the listing doesn't have. */
+/** The dishes a reading found that the listing doesn't have, by any
+ *  name (listedAlready). */
 export function newDishes(read: MenuDish[], listed: string[]): MenuDish[] {
-  const have = new Set(listed.map((d) => d.trim().toLowerCase()))
-  return read.filter((d) => !have.has(d.name.trim().toLowerCase()))
+  return read.filter((d) => !listedAlready(d.name, listed))
 }
 
 /** The listing's dishes its menu's last reading never looked for
