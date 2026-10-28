@@ -1690,6 +1690,17 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 28, evening: the queue's address fills the rest from Google (on `redesign/oct18-fixes`)
+
+The user: picking an address while fixing a suggestion in the moderation
+queue didn't fill the other rows "like it normally does". It never had: the
+queue's form (SubmissionReview, Oct 5) had its own address box, wired for the
+address and map point only. Now a picked place fills the name, phone, hours
+and website, and a description where there's none, as Add and Edit listing
+do (`placeSeed`); each row it fills opens. Google's place id still isn't
+taken from the queue (reviewEdits.ts), so a pick there doesn't link the
+listing to Google's place for the nightly sync.
+
 ## Done Oct 28, later: every dish a read found gets its date (on `redesign/oct18-fixes`)
 
 The user, Oct 28: HipCityVeg, Dottie's Donuts, Center City Pretzel and Playa

@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
-import { companionKeys, fieldIsVisible, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { companionKeys, fieldIsVisible, isCategorySyncEligible, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { diffListing, flatListing } from '@/lib/submissionDiff'
 import { markTimes, submissionSource, type SubmissionSource } from '@/lib/submissionSource'
 import { schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { formatPhone } from '@/lib/validation'
-import AddressInput from '@/components/intake/AddressInput'
+import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
+import { placeSeed } from '@/components/resources/useListingDraft'
 import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 import { linkify } from './SubmissionCard'
 
@@ -108,6 +109,33 @@ export function SubmissionReview({
     setDraft((d) => ({ ...d, details: { ...d.details, [key]: value } }))
   }
 
+  /** A place picked in the address fills the rest from Google, as it does
+   *  in the listing's own editor (handlePlaceSelect): the name, phone, hours
+   *  and website, and a description where there's none. Every row it
+   *  fills opens, so nothing changes out of sight. Google's place id isn't
+   *  taken: the server keeps a suggestion's own (reviewEdits.ts). */
+  function fillFromPlace(place: PlaceSelectResult) {
+    if (!category) return
+    const { values } = placeSeed(category, place)
+    const keep = (k: string) => (k === 'phone' ? hasPhone : k !== 'placeId' && k !== 'businessStatus')
+    const keys = Object.keys(values).filter(keep)
+    setDraft((d) => {
+      const details = { ...d.details }
+      for (const k of keys) {
+        if (k === 'name' || k === 'phone') continue
+        if (k === 'googleDescription' && String(details[k] ?? '').trim()) continue
+        details[k] = values[k]
+      }
+      return {
+        ...d,
+        ...(typeof values.name === 'string' ? { name: values.name } : {}),
+        ...(hasPhone && typeof values.phone === 'string' ? { phone: values.phone } : {}),
+        details,
+      }
+    })
+    setExtra((x) => [...x, ...keys.filter((k) => !x.includes(k))])
+  }
+
   /** "Keep it as it was": the field, and what goes with it, back to the
    *  listing's own values. */
   function keepAsIs(key: string) {
@@ -147,6 +175,8 @@ export function SubmissionReview({
             value={draft.address ?? ''}
             onChange={(v) => setDraft((d) => ({ ...d, address: v }))}
             onCoords={(geo) => setDraft((d) => ({ ...d, geo }))}
+            onPlaceSelect={fillFromPlace}
+            placeholder={category && isCategorySyncEligible(category) ? 'Search by business name or address…' : 'Start typing an address…'}
           />
         </div>
       )
