@@ -1685,6 +1685,41 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 28: this week's schedule compares this week (on `redesign/oct18-fixes`)
+
+The user, Oct 28: "Never fill this week's schedule with usual times …
+This week compares this week. Usual compares usual." Lower Merion's
+Wednesday read put the usual "10 min before sunset" on Tuesday and took
+off its 9 PM Late Ma'ariv. Mikveh Israel's "Shabbat Vayera" came back as
+a new week, holding the two times its calendar's week already had.
+
+- **A week read off a shul's website or newsletter holds only what it
+  gives.** A usual minyan it doesn't mention isn't put in it (that was
+  added Oct 21 with the Mikveh Israel dated-times fix, not asked for). A
+  day it gives nothing for shows the usual times, as usual times, not as
+  this week's. What that costs: a page that gives Shabbos morning and not
+  Shabbos Mincha shows only the morning that day.
+- **It's compared with the listing's copy of that week, day by day**
+  (`mergeReadWeek`, `scheduleUpdate.ts`), never with the usual times. A
+  day before today is left as the listing has it: Lower Merion's page
+  shows only the days ahead, so its words change every night and it's
+  read every night. A day the read doesn't give keeps what the listing's
+  week has, unless the calendar is the shul's whole week.
+- **Nothing ahead changed, nothing filed.** A time the listing's week
+  has that day, the same time under another name ("other" for
+  Mincha/Maariv) or without a note the read left out ("Late"), is the
+  listing's.
+- **One week per week.** A week from the same place over the same days
+  is that week, whatever the page calls it, so "Shabbat Vayera" goes into
+  "Times for Oct 25 – Oct 31".
+- **The admin's note compares with the listing's week too**: "Times for
+  Oct 25 – Oct 31: mincha maariv · Wed Oct 28 · 6:00 PM, was 5:50 PM", not
+  "usually 10 min before sunset".
+- A person's paste or "+ Add" week is posted as they left it: they see
+  every row it keeps, and can take one off.
+- Live after the next deploy. Lower Merion's and Mikveh Israel's pending
+  findings were read the old way: Reject them.
+
 ## Done Oct 27, at the end: the AI is off the live search (on `redesign/oct18-fixes`)
 
 The user, after "trader joes" on Synagogues found nothing, then the AI's

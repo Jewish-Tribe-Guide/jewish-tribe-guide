@@ -436,8 +436,10 @@ async function readTimesText(
     if (changing(own) < changing(listed)) heldByDate = true
     const update = yieldToNewsletter(own, schedules)
     if (changing(update) < changing(own)) held = true
-    if (!update || !changesAnything(update)) continue
-    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website' })
+    // A week is compared with the listing's copy of it, so one that now
+    // matches the usual times still changes a week that didn't.
+    if (!update || (!changesAnything(update) && !(week && update.from && update.to && schedules.some((s) => s.kind === 'week' && s.postedBy === 'website' && s.from <= update.to! && s.to >= update.from!)))) continue
+    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website', ...(week ? { onlyRead: { today } } : {}) })
     if (applied.changes.length === 0) continue
     // Already on the listing as it would be (read again the next day).
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
@@ -554,7 +556,7 @@ export function listedWeeks(reading: PageReading, listing: DirectoryResource, ca
     if (schedules.some((x) => !had.has(x.id) && x.from <= w.to && x.to >= w.from)) continue
     const update = yieldToNewsletter({ kind: 'week', complete: true, season: null, title: null, startsOn: null, from: w.from, to: w.to, rows, otherSeason: 0 }, schedules)
     if (!update || !update.rows.length) continue
-    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: weekName(w), evenIfSame: true, whole: true, now })
+    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: weekName(w), evenIfSame: true, whole: true, now, onlyRead: { today: dayIn(now) } })
     // Already on the listing as it would be (read again the next day).
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
     minyanim = applied.minyanim
@@ -595,7 +597,7 @@ export function noMinyanWeeks(
     read.push(noMinyanLine(w, from))
     if (datesBetween(w.from, w.to).some((d) => held.has(d))) continue
     const empty = { kind: 'week' as const, complete: true, season: null, title: null, startsOn: null, from: w.from, to: w.to, rows: [] }
-    const applied = applyUpdate(minyanim, schedules, empty, { postedBy: 'website', name: weekName(w), whole: true, now })
+    const applied = applyUpdate(minyanim, schedules, empty, { postedBy: 'website', name: weekName(w), whole: true, now, onlyRead: { today: dayIn(now) } })
     // Already on the listing as no minyan (read again the next day).
     const was = readSchedules(listing[sk]).find((s) => s.name === weekName(w))
     if (was?.whole && !was.minyanim.length && was.from <= w.from && was.to >= w.to) continue
@@ -664,7 +666,7 @@ async function readCalendarWeeks(
     const update = yieldToNewsletter(own, schedules)
     if (changing(update) < changing(own) || (!update && own.rows.length)) notes.push(NEWSLETTER_HELD)
     if (!update || !update.rows.length) continue
-    const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: weekName(w), evenIfSame: true, whole })
+    const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: weekName(w), evenIfSame: true, whole, ...(update.kind === 'week' ? { onlyRead: { today: dayIn(Date.now()) } } : {}) })
     // The calendar's join links onto its times (withJoinLinks), by code.
     const linked = withJoinLinks(posted.schedules, w.joins ?? [])
     const applied = { ...posted, schedules: linked.schedules, changes: [...posted.changes, ...linked.changes] }

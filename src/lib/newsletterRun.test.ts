@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { NEWSLETTER_IGNORED_CREATOR, NEWSLETTER_WATCH_CREATOR, NEWSLETTER_WATCH_NAME } from './newsletter'
 import type { Watch } from './watches'
@@ -228,6 +228,10 @@ describe('receiveNewsletter: what it changes', () => {
   })
 
   it('files a week’s times as this week’s schedule', async () => {
+    // The week is ahead: a day gone by is left as the listing has it.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.parse('2026-10-22T14:00:00Z'))
+    onTestFinished(() => void vi.useRealTimers())
     m.readShulWeek.mockResolvedValue({
       update: { ...changed, kind: 'week', title: 'Shabbos Noach', from: '2026-10-23', to: '2026-10-24', rows: [{ id: 'a', day: '2026-10-24', tefillah: 'shacharis', time: '9:00am', status: 'new', quote: 'Shacharis 9:00am' }] },
       model: 'x',
