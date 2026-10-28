@@ -5,7 +5,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { sourceKind, sourceProblem } from '@/lib/watchPurposes'
 import { placeSourcesText, type WatchedPlace } from '@/lib/watchPlaces'
-import { Box, BoxRow, BoxRows, BUTTON, GO, LINK } from './JobBoxes'
+import { Box, BoxRow, BoxRows, BUTTON, GO, LINK, Pill } from './JobBoxes'
 import { Groups, UsualRow } from './TimesProposal'
 import { Notes, Rows } from './MikvahHours'
 import { People } from './People'
@@ -17,7 +17,7 @@ import EruvKeptEmail from './EruvKeptEmail'
 import { shortUrl } from './watchText'
 import type { FoundStatusPage } from '@/lib/eruvFind'
 import type { Jobs } from './useWatchJobs'
-import { groupEdit, waitingGroups, type WaitGroup } from './waitingGroups'
+import { groupEdit, waitingGroups, type WaitBox, type WaitGroup } from './waitingGroups'
 import { withSave } from './findingEdits'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import EruvEditor, { type EruvValues } from '@/components/resources/EruvEditor'
@@ -214,8 +214,51 @@ function SourceForm({ label, email, save, busy, onSave, onCancel, readFor = 'tim
   )
 }
 
-/** A group showing a whole week, some of it as the listing has it. */
-const whole = (g: WaitGroup) => g.lines.some((l) => l.same)
+/** A shul's times or a menu's dishes, as the listing's box: a row each,
+ *  what changes highlighted. */
+function WaitingBox({ box }: { box: WaitBox }) {
+  return (
+    <div className="grid gap-1.5 pt-1.5" data-testid="waiting-box">
+      <span data-testid="waiting-part" className="flex items-center gap-2 text-[13.5px] font-bold text-slate-900">
+        {box.name}
+        {box.tag && <Pill tone="amber">{box.tag}</Pill>}
+      </span>
+      {box.groups.map((x, i) => (
+        <div key={i}>
+          {x.head && (
+            <h4 data-testid="waiting-day" className="pb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {x.head}
+            </h4>
+          )}
+          <BoxRows>
+            {x.rows.map((r, j) => (
+              <BoxRow
+                key={j}
+                name={r.name}
+                sub={
+                  (r.sub || r.struck || r.flag) && (
+                    <>
+                      {r.sub}
+                      {r.flag && <span className="text-amber-800"> · {r.flag}</span>}
+                      {r.struck?.map((w) => (
+                        <s key={w} className="ml-1.5">
+                          {w}
+                        </s>
+                      ))}
+                    </>
+                  )
+                }
+                right={r.right}
+                mark={r.mark}
+                was={r.was}
+              />
+            ))}
+          </BoxRows>
+        </div>
+      ))}
+    </div>
+  )
+}
 const FIELDS = 'grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3.5 py-2 text-sm sm:grid-cols-[11rem_minmax(0,1fr)]'
 
 /** A page, opened in a new tab: "rivkacakes.com ↗". */
@@ -568,35 +611,19 @@ export default function OpenedPlace({
                   {g.when && ` · ${g.when}`}
                 </span>
                 {g.lines.length > 0 && (
-                  // All of it changes: all highlighted. A whole week with
-                  // some as the listing has them: only the rest (Oct 27).
-                  <div className={`-mx-2 flex flex-col rounded-md px-2 ${whole(g) ? '' : 'bg-amber-50'}`}>
-                    {g.lines.map((l, i) =>
-                      l.heading ? (
-                        <span key={i} data-testid="waiting-part" className={`pb-0.5 pt-2.5 text-[12.5px] font-bold text-slate-700 ${i ? 'border-t border-amber-200/70' : ''}`}>
-                          {l.label}
+                  <div className="-mx-2 flex flex-col rounded-md bg-amber-50 px-2">
+                    {g.lines.map((l, i) => (
+                      <span key={i} className={FIELDS}>
+                        <span>{l.label}</span>
+                        <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
+                          <span className="font-semibold">{l.value}</span>
+                          {l.old !== null && <span className="text-[12.5px] text-slate-500">Was {l.old}</span>}
                         </span>
-                      ) : l.day ? (
-                        <span key={i} data-testid="waiting-day" className="pt-2 text-[12.5px] font-semibold text-slate-500">
-                          {l.label}
-                        </span>
-                      ) : (
-                        <span key={i} data-changed={whole(g) && !l.same ? true : undefined} className={`${FIELDS} ${whole(g) && !l.same ? '-mx-2 rounded-md bg-amber-50 px-2' : ''}`}>
-                          <span>{l.label}</span>
-                          <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
-                            <span className="font-semibold">{l.value}</span>
-                            {l.old !== null && (
-                              <span className="text-[12.5px] text-slate-500">
-                                Was {l.old}
-                              </span>
-                            )}
-                            {l.say === 'new' && <span className="text-[12.5px] text-slate-500">New</span>}
-                          </span>
-                        </span>
-                      ),
-                    )}
+                      </span>
+                    ))}
                   </div>
                 )}
+                {g.boxes?.map((b, i) => <WaitingBox key={i} box={b} />)}
                 {g.facts.map((x) => (
                   <span key={x.label} className={`${FIELDS} border-t border-slate-100`}>
                     <span>{x.label}</span>

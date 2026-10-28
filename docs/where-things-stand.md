@@ -1685,6 +1685,34 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 28: times and dishes in boxes again; a dish by another name isn't new (on `redesign/oct18-fixes`)
+
+The user, Oct 28: "the way we displayed minyan times before we changed was
+normal and good", "Why are we displaying some things side to side … weren't
+dishes top down before", "didn't the reader used to say the words it got
+their suggestion from?"
+
+- **Waiting on a kind's page, a shul's times and a menu's dishes are the
+  listing's box again**, as the job pages drew them before Oct 26: a row
+  each, top down, the time on the right, what changes highlighted, the old
+  time struck under the new one. What comes off is crossed out ("Taken off"
+  is gone). Usual times show every minyan ("Unchanged: 6 minyanim" is
+  gone). A week is by day, "New" beside one the listing hasn't got.
+- **Each dish has the menu's words under it**, and "these words don't
+  name it" when they don't. Every other field still reads as label and
+  value.
+- **A dish the listing has by another name isn't new**: spelled another way
+  ("Philly Cheesesteak" is HipCity's "Philly Cheese Steak") or a kind of
+  one it has (Goldie's "Hummus" beside its Hummus Platter, Dottie's "Donuts"
+  beside its flavours). Checked on reading (`tidyMenuReading`), on filing
+  (`newDishes`) and on showing (`dishProposal`), so Goldie's, Dottie's and
+  HipCity's waiting readings change nothing now. The reader is also told
+  so. More than a listed one is still new ("Pizza Bagels" beside "Pizza").
+- Open: a dish whose words don't name it is still offered, flagged. Should
+  it be dropped?
+- Open: Gelbstein's "couldn't read" isn't explained. Its last stored read is
+  fine (all five dishes found). Note: its store is the Lakewood, NJ bakery.
+
 ## Done Oct 28: this week's schedule compares this week (on `redesign/oct18-fixes`)
 
 The user, Oct 28: "Never fill this week's schedule with usual times …

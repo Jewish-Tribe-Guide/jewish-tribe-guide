@@ -167,7 +167,7 @@ describe('WatchKindPage', () => {
     await user.click(screen.getByRole('button', { name: /Lower Merion Synagogue/ }))
     const open = screen.getByTestId('kind-place-open')
     expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([
-      `From lms.example/davening · ${day(at)}Usual weekday timesShacharis · Mon–Fri6:30 AMWas 6:45 AMAcceptEditKeep as is`,
+      `From lms.example/davening · ${day(at)}Usual weekday timesMonday to FridayShacharis6:30 AM6:45 AMAcceptEditKeep as is`,
       `From its Google listing · ${day(at)}Phone610-555-0199Was 610-555-0100AcceptEditKeep as isWrong place`,
     ])
     // Edit opens the change here, not its job page.
@@ -197,7 +197,7 @@ describe('WatchKindPage', () => {
     const had = week([day1('1', '2026-10-26', '6:45am'), day1('2', '2026-10-27', '6:45am')])
     const read = week([day1('1', '2026-10-26', '6:45am'), day1('2', '2026-10-27', '7:00am')])
     const finding = (currentSchedules: unknown[]) => ({ id: 'f1', operation: 'update', targetId: 'b', name: 'Sons of Israel', from: 'its website', says: 'Its page says', named: null, at, notes: [], lines: [], page: 'https://soi.example/cal', part: 'week', times: { field: {}, current: [], proposed: [], currentSchedules, proposedSchedules: [read] } })
-    for (const [schedules, changed] of [[[had], ['Shacharis7 AMWas 6:45 AM']], [[], []]] as const) {
+    for (const [schedules, changed] of [[[had], ['Shacharis7 AM6:45 AM']], [[], ['Shacharis6:45 AM', 'Shacharis7 AM']]] as const) {
       const shul = { id: 'b', name: 'Sons of Israel', href: '/philly/synagogues/b', website: 'https://soi.example', pages: [], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: [], schedules }, findings: [finding([...schedules])] }
       await renderPage([place('b', 'Sons of Israel')], 'synagogue', (url, init) => {
         if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
@@ -205,8 +205,11 @@ describe('WatchKindPage', () => {
       await userEvent.setup().click(screen.getByRole('button', { name: /Sons of Israel/ }))
       const group = within(screen.getByTestId('kind-place-open')).getByTestId('waiting-group')
       expect(within(group).getAllByTestId('waiting-day').map((d) => d.textContent)).toEqual(['Mon, Oct 26', 'Tue, Oct 27'])
-      expect([...group.querySelectorAll('[data-changed]')].map((r) => r.textContent)).toEqual(changed)
-      if (!schedules.length) expect(group).toHaveTextContent('New week2 minyanim')
+      // A row a minyan (the user, Oct 28: "the way we displayed minyan
+      // times before we changed was normal and good"), the old time struck.
+      expect([...group.querySelectorAll('[data-testid=box-row]:not([data-mark=same])')].map((r) => r.textContent)).toEqual(changed)
+      expect([...group.querySelectorAll('[data-testid=box-row] s')].map((r) => r.textContent)).toEqual(schedules.length ? ['6:45 AM'] : [])
+      if (!schedules.length) expect(within(group).getByTestId('waiting-part')).toHaveTextContent('This week’s schedule, Oct 26 – Oct 31New')
       cleanup()
     }
   })

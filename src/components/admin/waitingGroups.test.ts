@@ -93,12 +93,12 @@ describe('waitingGroups', () => {
       ['times:https://mekorhabracha.org/davening', 'mekorhabracha.org/davening', 'Oct 25'],
       ['google', 'its Google listing', 'Oct 24'],
     ])
-    // Its part named first (the user, Oct 27: "hard to tell which of the
-    // shul schedules it's updating").
-    expect(w.groups[0].lines).toEqual([
-      { label: 'Usual weekday times', value: '', old: null, heading: true },
-      { label: 'Shacharis · Mon–Fri', value: '6:30 AM', old: '6:45 AM' },
-    ])
+    // In a box named for its part (the user, Oct 27: "hard to tell which
+    // of the shul schedules it's updating"), a row a minyan, as the job
+    // page drew it (Oct 28: "the way we displayed minyan times before we
+    // changed was normal and good").
+    expect(w.groups[0].lines).toEqual([])
+    expect(w.groups[0].boxes).toEqual([{ name: 'Usual weekday times', groups: [{ head: 'Monday to Friday', rows: [{ name: 'Shacharis', right: '6:30 AM', was: '6:45 AM', mark: 'changed' }] }] }])
     expect(w.groups[0].decide).toEqual({ kind: 'findings', ids: ['f1'] })
     expect(w.groups[1].lines).toEqual([{ label: 'Phone', value: '(215) 525-4247', old: '(215) 525-4246' }])
     expect(w.groups[1].decide).toEqual({ kind: 'google' })
@@ -116,15 +116,19 @@ describe('waitingGroups', () => {
         'p',
         jobs({ times: { name: 'Shul times', places: [shul([finding({ page: 'https://mekorhabracha.org/davening', part: 'week', times: { field: {} as never, current: WEEKDAY, proposed: WEEKDAY, currentSchedules, proposedSchedules } })]) as never] } }),
         NOW,
-      ).groups[0].lines
+      ).groups[0].boxes
     const read = week([day('1', 'shacharis', '2026-10-26', '6:45am'), day('2', 'shacharis', '2026-10-27', '7:00am'), day('3', 'mincha', '2026-10-27', '5:45pm')])
 
-    it('the usual times: what changes, and how many stay', () => {
-      const two = [...WEEKDAY, minyan('m', 'mincha', ['mon', 'tue', 'wed', 'thu'], '1:30 PM')]
-      const f = finding({ part: 'weekday', times: { field: {} as never, current: two, proposed: [WEEKDAY[0], { ...two[1], time: '1:45 PM' }], currentSchedules: [], proposedSchedules: [] } })
-      expect(waitingGroups('p', jobs({ times: { name: 'Shul times', places: [shul([f]) as never] } }), NOW).groups[0].lines.slice(1)).toEqual([
-        { label: 'Mincha · Mon–Thu', value: '1:45 PM', old: '1:30 PM' },
-        { label: 'Unchanged', value: '1 minyan', old: null },
+    // The user, Oct 28: "Unchanged 6 minyanim" said nothing; every minyan,
+    // what stays plain, what comes off crossed out.
+    it('the usual times: every minyan, what changes marked', () => {
+      const three = [...WEEKDAY, minyan('m', 'mincha', ['mon', 'tue', 'wed', 'thu'], '1:30 PM'), minyan('n', 'maariv', ['mon', 'tue', 'wed', 'thu'], '9:00 PM')]
+      const f = finding({ part: 'weekday', times: { field: {} as never, current: three, proposed: [WEEKDAY[0], { ...three[1], time: '1:45 PM' }], currentSchedules: [], proposedSchedules: [] } })
+      const rows = waitingGroups('p', jobs({ times: { name: 'Shul times', places: [shul([f]) as never] } }), NOW).groups[0].boxes!.flatMap((b) => b.groups.flatMap((g) => g.rows))
+      expect(rows).toEqual([
+        { name: 'Shacharis', right: '6:45 AM', mark: 'same' },
+        { name: 'Mincha', right: '1:45 PM', was: '1:30 PM', mark: 'changed' },
+        { name: 'Maariv', right: '9 PM', mark: 'gone' },
       ])
     })
 
@@ -136,26 +140,41 @@ describe('waitingGroups', () => {
     // compared with the usual times.
     it('a new week: the whole week by day, all of it new', () => {
       expect(lines([], [read])).toEqual([
-        { label: 'This week’s schedule, Oct 26 – Oct 31', value: '', old: null, heading: true },
-        { label: 'New week', value: '3 minyanim', old: null },
-        { label: 'Mon, Oct 26', value: '', old: null, day: true },
-        { label: 'Shacharis', value: '6:45 AM', old: null },
-        { label: 'Tue, Oct 27', value: '', old: null, day: true },
-        { label: 'Shacharis', value: '7 AM', old: null },
-        { label: 'Mincha', value: '5:45 PM', old: null },
+        {
+          name: 'This week’s schedule, Oct 26 – Oct 31',
+          tag: 'New',
+          groups: [
+            { head: 'Mon, Oct 26', rows: [{ name: 'Shacharis', right: '6:45 AM', mark: 'new' }] },
+            {
+              head: 'Tue, Oct 27',
+              rows: [
+                { name: 'Shacharis', right: '7 AM', mark: 'new' },
+                { name: 'Mincha', right: '5:45 PM', mark: 'new' },
+              ],
+            },
+          ],
+        },
       ])
     })
 
-    it('a week the listing has: the whole week by day, what’s new, changed or taken off marked', () => {
+    // The user, Oct 28: "Taken off" should be a cross-out.
+    it('a week the listing has: the whole week by day, what’s new or changed marked, what comes off crossed out', () => {
       const had = week([day('1', 'shacharis', '2026-10-26', '6:45am'), day('2', 'shacharis', '2026-10-27', '6:45am'), day('4', 'maariv', '2026-10-27', '9:00pm')])
       expect(lines([had], [read])).toEqual([
-        { label: 'This week’s schedule, Oct 26 – Oct 31', value: '', old: null, heading: true },
-        { label: 'Mon, Oct 26', value: '', old: null, day: true },
-        { label: 'Shacharis', value: '6:45 AM', old: null, same: true },
-        { label: 'Tue, Oct 27', value: '', old: null, day: true },
-        { label: 'Shacharis', value: '7 AM', old: '6:45 AM' },
-        { label: 'Mincha', value: '5:45 PM', old: null, say: 'new' },
-        { label: 'Maariv', value: 'Taken off', old: '9 PM' },
+        {
+          name: 'This week’s schedule, Oct 26 – Oct 31',
+          groups: [
+            { head: 'Mon, Oct 26', rows: [{ name: 'Shacharis', right: '6:45 AM', mark: 'same' }] },
+            {
+              head: 'Tue, Oct 27',
+              rows: [
+                { name: 'Shacharis', right: '7 AM', was: '6:45 AM', mark: 'changed' },
+                { name: 'Mincha', right: '5:45 PM', mark: 'new' },
+                { name: 'Maariv', right: '9 PM', mark: 'gone' },
+              ],
+            },
+          ],
+        },
       ])
     })
   })
@@ -173,13 +192,19 @@ describe('waitingGroups', () => {
       menuDated: ['Tofu'],
       reading: { status: 'proposed' as const, readAt: AT, sourceUrl: 'https://hummus.example/menu', dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }, { name: 'Shawarma', quote: 'Shawarma', checked: true }], missing: ['Tofu'] },
     })
-    const lines = (dishes: string[]) => waitingGroups('p', jobs({ dishes: [place(dishes)] }), NOW).groups[0].lines
-    expect(lines(['Shawarma', 'Tofu', 'Laffa'])).toEqual([
-      { label: 'New on its menu', value: 'Falafel', old: null },
-      { label: 'Not on its menu', value: 'Tofu', old: null },
-      { label: 'Already listed', value: 'Shawarma, Laffa', old: null },
+    // The user, Oct 28: "didn't the reader used to say the words it got
+    // their suggestion from?" and "weren't dishes top down before?"
+    const rows = (dishes: string[]) => waitingGroups('p', jobs({ dishes: [place(dishes)] }), NOW).groups[0].boxes!.flatMap((b) => b.groups.flatMap((g) => g.rows))
+    expect(rows(['Shawarma', 'Tofu', 'Laffa'])).toEqual([
+      { name: 'Tofu', mark: 'gone' },
+      { name: 'Falafel', sub: '“Falafel”', mark: 'new' },
+      { name: 'Shawarma', sub: '“Shawarma”', mark: 'same' },
+      { name: 'Laffa', mark: 'same' },
     ])
-    expect(lines([]).at(-1)).toEqual({ label: 'Already listed', value: 'None', old: null })
+    expect(rows([]).map((r) => r.name)).toEqual(['Falafel', 'Shawarma'])
+    // Words that don't name the dish, said so.
+    const near = { ...place([]), reading: { ...place([]).reading, dishes: [{ name: 'Hummus', quote: 'Hummus platter', checked: true, named: false }] } }
+    expect(waitingGroups('p', jobs({ dishes: [near] }), NOW).groups[0].boxes![0].groups[0].rows).toEqual([{ name: 'Hummus', sub: '“Hummus platter”', flag: 'these words don’t name it', mark: 'new' }])
   })
 
   // Oct 25 (the user): "grocery should go to grocery". A grocery's own
