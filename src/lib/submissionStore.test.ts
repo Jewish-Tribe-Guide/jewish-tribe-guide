@@ -1253,6 +1253,39 @@ describe('approveSubmission: placeId vs verifiedPlaceId', () => {
     expect(written.details.verifiedPlaceId).toBeUndefined()
   })
 
+  // FINE WINE & GOOD SPIRITS (Oct 28): sent with the street address picked,
+  // fixed in the queue by picking the store. Approval links the store, and
+  // Google owns the rows it filled.
+  it('links the place an admin picked in the queue, and gives Google the rows it filled', async () => {
+    const sent = listingPayload({
+      name: '1515 Locust St',
+      phone: '',
+      details: { placeId: 'place-address', googleAutofill: { name: '1515 Locust St' } },
+    })
+    const sub = baseSubmission({ operation: 'create', payload: sent as unknown as Record<string, unknown> })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    const edited = {
+      ...sent,
+      name: 'FINE WINE & GOOD SPIRITS',
+      phone: '(215) 545-1112',
+      details: {
+        ...sent.details,
+        placeId: 'place-store',
+        businessStatus: 'OPERATIONAL',
+        googleAutofill: { name: 'FINE WINE & GOOD SPIRITS', phone: '(215) 545-1112' },
+      },
+    }
+    await approveSubmission('sub-1', 'philly', 'admin@example.org', edited)
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.placeId).toBe('place-store')
+    expect(written.details.verifiedPlaceId).toBeUndefined()
+    expect(written.details.businessStatus).toBe('OPERATIONAL')
+    expect(written.details.googleFields).toEqual(expect.arrayContaining(['name', 'phone']))
+  })
+
   it('trusts a placeId with no autofill name captured to compare against', async () => {
     const sub = baseSubmission({
       operation: 'create',

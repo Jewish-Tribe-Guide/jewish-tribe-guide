@@ -112,11 +112,14 @@ export function SubmissionReview({
   /** A place picked in the address fills the rest from Google, as it does
    *  in the listing's own editor (handlePlaceSelect): the name, phone, hours
    *  and website, and a description where there's none. Every row it
-   *  fills opens, so nothing changes out of sight. Google's place id isn't
-   *  taken: the server keeps a suggestion's own (reviewEdits.ts). */
+   *  fills opens, so nothing changes out of sight. Where Google keeps the
+   *  category current, the place goes too, with what it filled, so
+   *  approving links the listing and Google owns those rows (the user,
+   *  Oct 28; reviewEdits.ts). */
   function fillFromPlace(place: PlaceSelectResult) {
     if (!category) return
-    const { values } = placeSeed(category, place)
+    const { values, autofilled } = placeSeed(category, place)
+    const linked = 'placeId' in values
     const keep = (k: string) => (k === 'phone' ? hasPhone : k !== 'placeId' && k !== 'businessStatus')
     const keys = Object.keys(values).filter(keep)
     setDraft((d) => {
@@ -125,6 +128,12 @@ export function SubmissionReview({
         if (k === 'name' || k === 'phone') continue
         if (k === 'googleDescription' && String(details[k] ?? '').trim()) continue
         details[k] = values[k]
+      }
+      if (linked) {
+        details.placeId = values.placeId
+        if (values.businessStatus) details.businessStatus = values.businessStatus
+        else delete details.businessStatus
+        details.googleAutofill = JSON.parse(JSON.stringify(autofilled))
       }
       return {
         ...d,

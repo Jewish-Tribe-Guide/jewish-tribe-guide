@@ -93,6 +93,11 @@ for that exact change, in the same conversation. Show the dry run first.
    on live, nothing else (backup in that session's scratchpad). Its
    flavours get dated from that menu once PR 365 deploys.
 
+1j. **FINE WINE & GOOD SPIRITS (live, Oct 28):** has no Google place
+   (only the street address's, for Directions), so the nightly sync skips
+   it. Fix: set its place id to the store's, on live; needs a yes, after
+   looking the id up and showing it.
+
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -1697,9 +1702,16 @@ queue didn't fill the other rows "like it normally does". It never had: the
 queue's form (SubmissionReview, Oct 5) had its own address box, wired for the
 address and map point only. Now a picked place fills the name, phone, hours
 and website, and a description where there's none, as Add and Edit listing
-do (`placeSeed`); each row it fills opens. Google's place id still isn't
-taken from the queue (reviewEdits.ts), so a pick there doesn't link the
-listing to Google's place for the nightly sync.
+do (`placeSeed`); each row it fills opens (PR 367).
+
+Then, the same evening: FINE WINE & GOOD SPIRITS, approved that way, went
+live with no Google place, since the queue sent only the values. Its
+submitter had picked the street address, so approval kept that place only
+for Directions (verifiedPlaceId), Google owned no rows, and the nightly sync
+skips it. Now the queue's pick sends its place too, with what Google filled
+and its status, and approval takes them (reviewEdits.ts: only with the fill
+record, so a bare place id still isn't a pick). The listing is linked,
+Google owns the rows it filled, and the sync right after approval runs.
 
 ## Done Oct 28, later: every dish a read found gets its date (on `redesign/oct18-fixes`)
 

@@ -514,10 +514,15 @@ describe('ModerationQueue — an address picked from Google', () => {
     const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
     expect(body.payload).toMatchObject({ name: 'Bakery on the Way', phone: '(215) 555-0100', address: '1 Bakery Way, Philadelphia, PA 19103, USA', geo: { lat: 39.95, lng: -75.17 } })
     expect(body.payload.details).toMatchObject({ hours, w: 'https://bakery.example/', hechsher: 'KCL' })
-    // A description already written is kept; Google's place id isn't taken
-    // from the queue (reviewEdits.ts).
+    // A description already written is kept.
     expect(body.payload.details.googleDescription).toBe('Our own words')
-    expect(body.payload.details.placeId).toBeUndefined()
+    // The place goes with it, and what Google filled, so approving links the
+    // listing and Google owns those rows (reviewEdits.ts).
+    expect(body.payload.details).toMatchObject({
+      placeId: 'ChIJbakery',
+      businessStatus: 'OPERATIONAL',
+      googleAutofill: { name: 'Bakery on the Way', phone: '(215) 555-0100', hours: JSON.stringify(hours), website: 'https://bakery.example/', description: 'A bakery, said Google' },
+    })
   })
 
   it('fills a description only where there is none', async () => {
