@@ -1,4 +1,7 @@
 import type { Locator, Page, APIRequestContext } from '@playwright/test'
+import { listingActions } from '../src/lib/listingView'
+import type { CategoryConfig } from '../src/lib/categories'
+import type { DirectoryResource } from '../src/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers.
@@ -115,27 +118,25 @@ export async function categoryWithListings(
   throw new Error('No listing category has any listings — cannot test a populated directory')
 }
 
-/** A listing whose opened view has four action buttons before Share:
- *  Directions, Call and two links (listingActions in src/lib/listingView.ts,
- *  which stops at four). For anything about how that row is laid out at its
- *  fullest; a listing with fewer never spread across the width anyway. */
+/** A listing whose opened view has four action buttons before Share
+ *  (listingActions in src/lib/listingView.ts, which stops at four). For
+ *  anything about how that row is laid out at its fullest; a listing with
+ *  fewer never spread across the width anyway. Asked of listingActions
+ *  itself: counting address, phone and links here went stale once a
+ *  delivery listing stopped showing Directions. */
 export async function listingWithFourActions(
   request: APIRequestContext,
   community: string,
 ): Promise<{ category: Category; item: { id: string; name: string } }> {
   const all = await categories(request, community)
-  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
-    const fields = ((category as Category & { detailFields?: { key: string; type: string; audienceKey?: string }[] }).detailFields ?? []).filter(
-      (f) => f.type === 'url' && !f.audienceKey,
-    )
+  for (const category of all.filter((c) => c.kind === 'listing')) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     if (!body.ok) continue
-    for (const item of body.resources as Record<string, unknown>[]) {
-      const links = fields.filter((f) => String(item[f.key] ?? '').trim()).length
-      if (item.address && item.phone && links >= 2) return { category, item: { id: String(item.id), name: String(item.name) } }
+    for (const item of body.resources as DirectoryResource[]) {
+      if (listingActions(item, category as unknown as CategoryConfig).buttons.length === 4) return { category, item: { id: String(item.id), name: String(item.name) } }
     }
   }
-  throw new Error('No listing has an address, a phone and two links')
+  throw new Error('No listing has four action buttons')
 }
 
 /** A listing-kind category that is actually distance-based — `hasAddress` is
