@@ -193,7 +193,15 @@ function dishesSays(p: DishesPlace, now: number): Say {
     changes = Math.max(1, (p.findings?.length ?? 0) + menu)
   }
   const unchecked =
-    status === 'not_read' ? ['Menu never read'] : status === 'cant_read' ? ['Menu can’t be read'] : status === 'didnt_load' ? ['Menu didn’t load'] : []
+    status === 'not_read'
+      ? ['Menu never read']
+      : status === 'cant_read'
+        ? ['Menu can’t be read']
+        : status === 'didnt_load'
+          ? ['Menu didn’t load']
+          : status === 'not_reached'
+            ? [`Not read last night · ${p.menuWatch?.missed}`]
+            : []
   const sources: WatchSource[] = []
   if (status !== 'off' && (p.menuWatch?.active || p.menuUrl || p.reading?.sourceUrl)) sources.push('menu')
   if (p.pages?.some((w) => w.active)) sources.push('website')

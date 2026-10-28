@@ -88,6 +88,11 @@ for that exact change, in the same conversation. Show the dry run first.
    Spot - Lakewood's and Shlomo's Delivery WhatsApp Groups, added by the
    user themselves.
 
+1i. **Dottie's Donuts /shop listing (f52e1951): done** (Oct 28, with the
+   user's yes). Menu link changed from /shop to https://www.dotties.com/
+   on live, nothing else (backup in that session's scratchpad). Its
+   flavours get dated from that menu once PR 365 deploys.
+
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -1684,6 +1689,108 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 28, later: every dish a read found gets its date (on `redesign/oct18-fixes`)
+
+The user, Oct 28: HipCityVeg, Dottie's Donuts, Center City Pretzel and Playa
+Bowls weren't "seen today" a day after Sweet Box's fix.
+
+- **A read with a question still dates what it agrees on.** Every listed
+  dish a read finds is dated from it, whatever else waits; one it finds
+  missing isn't. Before, a single doubtful dish (Dottie's "Donuts",
+  HipCity's "Philly Cheesesteak") held back every date, and skipping it
+  dated nothing.
+- **An unchanged menu dates what its last reading found**, not only dishes
+  dated before. A dish people added, once found, is never looked for
+  again, so it never got a date (Dottie's flavours).
+- **Branches sharing a menu link share its dates.** One watch per link
+  dated only its own listing: Playa Bowls' Penn branch, three Rita's, a
+  Dottie's, a PLNT Burger and a LUHV. Each by its own names for the dishes.
+- **Not read last night is Not checked**, on the Food page, saying why
+  ("Not read last night · ran out of reads"), not Up to date, and not
+  "didn't load" after two nights. What's tracked says "ran out of reads"
+  for a run that had time but no reads left; "ran out of time" only when
+  it ran out of time.
+- **Why four menus missed two nights** (A La Karte, Espresso, Mike's,
+  Gelbstein's): menus get about 11 AI reads a night (8 their own, 3
+  shared), oldest waiting first. Oct 28's first five (Goldie, Nanas, Sweet
+  Trading, Dottie's, Nothing Bundt Cakes) had waited longer and used them
+  all. Mike's also needs the one browser draw a night. Nothing Bundt Cakes'
+  page changes every night, so it takes a read every night.
+- Open: a menu read from the kind page (Read it now) doesn't move its
+  watch's fingerprint, so the nightly run reads it again as changed (the
+  four above, read on Oct 28).
+- Done (Oct 28, with the user's yes): Dottie's /shop listing (f52e1951)
+  had a pictures-only reading ("Donuts"), so its flavours were never
+  looked for. Its menu link is now https://www.dotties.com/, as its other
+  three, which makes it a branch of that watch.
+- Open: Center City Pretzel's first menu read timed out ("took too long to
+  read"), so it has no reading and no watch.
+
+## Done Oct 28: times and dishes in boxes again; a dish by another name isn't new (on `redesign/oct18-fixes`)
+
+The user, Oct 28: "the way we displayed minyan times before we changed was
+normal and good", "Why are we displaying some things side to side … weren't
+dishes top down before", "didn't the reader used to say the words it got
+their suggestion from?"
+
+- **Waiting on a kind's page, a shul's times and a menu's dishes are the
+  listing's box again**, as the job pages drew them before Oct 26: a row
+  each, top down, the time on the right, what changes highlighted, the old
+  time struck under the new one. What comes off is crossed out ("Taken off"
+  is gone). Usual times show every minyan ("Unchanged: 6 minyanim" is
+  gone). A week is by day, "New" beside one the listing hasn't got.
+- **Each dish has the menu's words under it**, and "these words don't
+  name it" when they don't. Every other field still reads as label and
+  value.
+- **A dish the listing has by another name isn't new**: spelled another way
+  ("Philly Cheesesteak" is HipCity's "Philly Cheese Steak") or a kind of
+  one it has (Goldie's "Hummus" beside its Hummus Platter, Dottie's "Donuts"
+  beside its flavours). Checked on reading (`tidyMenuReading`), on filing
+  (`newDishes`) and on showing (`dishProposal`), so Goldie's, Dottie's and
+  HipCity's waiting readings change nothing now. The reader is also told
+  so. More than a listed one is still new ("Pizza Bagels" beside "Pizza").
+- **A new dish whose words don't name it is dropped**, not offered flagged
+  (the user, Oct 28: "drop a dish whose quote doesn't name it"). Dottie's
+  "Donuts" from "chocolate, vanilla, vanilla sprinkles" is one. A listed
+  dish found that way is still kept, marked "these words don't name it".
+- Open: Gelbstein's "couldn't read" isn't explained. Its last stored read is
+  fine (all five dishes found). Note: its store is the Lakewood, NJ bakery.
+
+## Done Oct 28: this week's schedule compares this week (on `redesign/oct18-fixes`)
+
+The user, Oct 28: "Never fill this week's schedule with usual times …
+This week compares this week. Usual compares usual." Lower Merion's
+Wednesday read put the usual "10 min before sunset" on Tuesday and took
+off its 9 PM Late Ma'ariv. Mikveh Israel's "Shabbat Vayera" came back as
+a new week, holding the two times its calendar's week already had.
+
+- **A week read off a shul's website or newsletter holds only what it
+  gives.** A usual minyan it doesn't mention isn't put in it (that was
+  added Oct 21 with the Mikveh Israel dated-times fix, not asked for). A
+  day it gives nothing for shows the usual times, as usual times, not as
+  this week's. What that costs: a page that gives Shabbos morning and not
+  Shabbos Mincha shows only the morning that day.
+- **It's compared with the listing's copy of that week, day by day**
+  (`mergeReadWeek`, `scheduleUpdate.ts`), never with the usual times. A
+  day before today is left as the listing has it: Lower Merion's page
+  shows only the days ahead, so its words change every night and it's
+  read every night. A day the read doesn't give keeps what the listing's
+  week has, unless the calendar is the shul's whole week.
+- **Nothing ahead changed, nothing filed.** A time the listing's week
+  has that day, the same time under another name ("other" for
+  Mincha/Maariv) or without a note the read left out ("Late"), is the
+  listing's.
+- **One week per week.** A week from the same place over the same days
+  is that week, whatever the page calls it, so "Shabbat Vayera" goes into
+  "Times for Oct 25 – Oct 31".
+- **The admin's note compares with the listing's week too**: "Times for
+  Oct 25 – Oct 31: mincha maariv · Wed Oct 28 · 6:00 PM, was 5:50 PM", not
+  "usually 10 min before sunset".
+- A person's paste or "+ Add" week is posted as they left it: they see
+  every row it keeps, and can take one off.
+- Live after the next deploy. Lower Merion's and Mikveh Israel's pending
+  findings were read the old way: Reject them.
 
 ## Done Oct 27, at the end: the AI is off the live search (on `redesign/oct18-fixes`)
 

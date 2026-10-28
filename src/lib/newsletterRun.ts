@@ -4,6 +4,7 @@
 // Gmail script sends. Server-only.
 
 import { createHash } from 'node:crypto'
+import { community as communityConfig } from '@/community.config'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
 import { findingPage } from '@/lib/watchFindings'
@@ -215,7 +216,10 @@ async function readAndFile(
         : null
   if (key && update && changesAnything(update.u)) {
     const sk = schedulesKey(key)
-    const applied = applyUpdate(regularMinyanim(shul[key]), readSchedules(shul[sk]), update.u)
+    // A newsletter's week holds what it gives, never the usual times it
+    // left out (the user, Oct 28).
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(new Date())
+    const applied = applyUpdate(regularMinyanim(shul[key]), readSchedules(shul[sk]), update.u, update.u.kind === 'week' ? { onlyRead: { today } } : {})
     if (applied.changes.length) {
       const photoUrl = update.file && email.attachment ? await keepAttachment(email.attachment) : null
       const whole = editSubmission(shulCategory, shul, {

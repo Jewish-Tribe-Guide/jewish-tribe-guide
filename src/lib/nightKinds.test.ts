@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countGoogleKinds, countWatchKinds, kindBad, lastNightLine, nightKindOf, nightKinds, type GoogleLive, type NightKindView } from './nightKinds'
+import { countGoogleKinds, countWatchKinds, kindBad, lastNight, lastNightLine, missedLastNight, nightKindOf, nightKinds, type GoogleLive, type NightKindView } from './nightKinds'
 import type { JobRun } from './jobRuns'
 import type { Watch } from './watches'
 import type { LinkStanding } from './linkCheck'
@@ -156,7 +156,29 @@ describe('last night, a line per kind', () => {
     const view = kind(nightKinds('philly', { ...runs, watches: [run({ warning: 'Ran out of time: 1 left for the next night' })] }, watches, google, NOW), 'Minyan times')
     expect(view.count).toBe('1 of 2 read')
     expect(view.trouble).toBe('ran out of time')
-    expect(view.misses).toEqual([{ name: 'BZBI', why: 'Not reached', page: '' }])
+    expect(view.misses).toEqual([{ name: 'BZBI', why: 'Ran out of time', page: '' }])
+  })
+
+  // Oct 27 and 28: it had time; its AI reads ran out. The line said "ran
+  // out of time" (the user, Oct 28).
+  it('a run that ran out of reads says that, on the line and each place', () => {
+    const shul = (id: string, over: Partial<Watch> = {}) => watch({ id, createdBy: 'listing pages', resourceId: id, label: `${id} · davening times on their website`, ...over })
+    const watches = [shul('Beth Am'), shul('BZBI', { lastRunAt: night(WATCHES_AT, 1), lastOkAt: night(WATCHES_AT, 1) })]
+    const view = kind(nightKinds('philly', { ...runs, watches: [run({ warning: 'Ran out of reads: 7 not read, for the next night' })] }, watches, google, NOW), 'Minyan times')
+    expect(view.trouble).toBe('ran out of reads')
+    expect(view.misses).toEqual([{ name: 'BZBI', why: 'Ran out of reads', page: '' }])
+  })
+
+  it('says which a watch missed last night for, and nothing for one read, failed, new or off', () => {
+    const last = lastNight([run({ finishedAt: null, startedAt: after(WATCHES_AT, 1440) }), run({ warning: 'Ran out of time: 3 left for the next night · Ran out of reads: 7 not read, for the next night' })])
+    expect(last).toEqual({ startedAt: WATCHES_AT, ranOut: 'ran out of time and reads' })
+    const old = { lastRunAt: night(WATCHES_AT, 1), lastOkAt: night(WATCHES_AT, 1) }
+    expect(missedLastNight(watch(old), last)).toBe('ran out of time and reads')
+    expect(missedLastNight(watch({}), last)).toBeNull()
+    expect(missedLastNight(watch({ ...old, lastError: '404' }), last)).toBeNull()
+    expect(missedLastNight(watch({ ...old, createdAt: after(WATCHES_AT, 1) }), last)).toBeNull()
+    expect(missedLastNight(watch({ ...old, active: false }), last)).toBeNull()
+    expect(missedLastNight(watch({ ...old, lastRunAt: null }), last)).toBeNull()
   })
 
   // Added after the run started, or paused: not last night's to read.

@@ -398,6 +398,98 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
+  // The user, Oct 28: "Never fill this week's schedule with usual times …
+  // This week compares this week. Usual compares usual." Lower Merion's
+  // home page shows only the days ahead, so its words change every night;
+  // read on a Wednesday, Tuesday came back as the usual "10 min before
+  // sunset", the 9 PM Maariv lost its "Late", and Friday's 5:50 PM was
+  // named again. NOW is a Tuesday: Sunday and Monday are gone by.
+  describe('a week read against the listing’s copy of that week', () => {
+    const sunset = { id: 'mm', tefillah: 'mincha_maariv' as const, days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '10 min before Sunset', anchor: 'sunset' as const, offsetMinutes: -10 }
+    const at = (id: string, on: string, tefillah: string, time: string, notes?: string) => ({ id, on: [on], tefillah, time, ...(notes ? { notes } : {}) })
+    const listed = {
+      id: 'lw',
+      name: 'Times for Oct 18 – Oct 24',
+      from: '2026-10-18',
+      to: '2026-10-24',
+      mode: 'replace',
+      kind: 'week',
+      postedBy: 'website',
+      minyanim: [
+        at('a', '2026-10-18', 'shacharis', '7:30am'),
+        at('b', '2026-10-19', 'mincha_maariv', '5:50 PM'),
+        at('c', '2026-10-19', 'maariv', '9:00 PM', 'Late'),
+        at('d', '2026-10-20', 'mincha_maariv', '5:50 PM'),
+        at('e', '2026-10-20', 'maariv', '9:00 PM', 'Late'),
+        at('f', '2026-10-21', 'mincha_maariv', '5:50 PM'),
+        at('g', '2026-10-21', 'maariv', '9:00 PM', 'Late'),
+        at('h', '2026-10-23', 'other', '5:50 PM'),
+      ],
+    }
+    type Row = TimesUpdate['rows'][number]
+    const r = (day: string, tefillah: Row['tefillah'], time: string, status: Row['status'], extra: Partial<Row> = {}): Row => ({ id: `${day}${tefillah}${time}`, day, tefillah, time, status, quote: `${day} ${time}`, ...extra })
+    const kept = (day: string): Row => r(day, 'mincha_maariv', '10 min before Sunset', 'kept', { anchor: 'sunset', offsetMinutes: -10, rowId: 'mm' })
+    // The page's week as compared with the usual times (shulWeekReading.ts):
+    // the days gone by have nothing read, so the usual time is "kept".
+    const asRead = (wed = '5:50 PM'): TimesUpdate => ({
+      ...moved,
+      kind: 'week',
+      from: '2026-10-18',
+      to: '2026-10-24',
+      rows: [
+        kept('2026-10-18'),
+        kept('2026-10-19'),
+        r('2026-10-20', 'mincha_maariv', '5:50 PM', 'changed', { was: '10 min before Sunset', rowId: 'mm' }),
+        r('2026-10-20', 'maariv', '9:00 PM', 'new'),
+        r('2026-10-21', 'mincha_maariv', wed, 'changed', { was: '10 min before Sunset', rowId: 'mm' }),
+        r('2026-10-21', 'maariv', '9:00 PM', 'new'),
+        kept('2026-10-22'),
+        r('2026-10-23', 'mincha_maariv', '5:50 PM', 'new'),
+      ],
+    })
+    const lms = { ...shul, details: { minyanim: [sunset], minyanim_schedules: [listed] } }
+    beforeEach(() => m.getResourceRowById.mockResolvedValue(lms))
+    const filedWeek = () => (m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as (typeof listed)[]).filter((s) => s.kind === 'week')
+
+    it('files nothing when no day ahead differs from the listing’s week', async () => {
+      m.readShulWeek.mockResolvedValue({ update: asRead(), model: 'cheap' })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0 })
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+
+    it('files a day ahead that changed, the days gone by as the listing has them and no usual time put in', async () => {
+      m.readShulWeek.mockResolvedValue({ update: asRead('6:00 PM'), model: 'cheap' })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+      const [week, ...more] = filedWeek()
+      expect(more).toEqual([])
+      expect(week).toMatchObject({ name: 'Times for Oct 18 – Oct 24', from: '2026-10-18', to: '2026-10-24' })
+      const times = week.minyanim.map((x) => `${x.on[0]} ${x.tefillah} ${x.time}${x.notes ? ` ${x.notes}` : ''}`).sort()
+      expect(times).toEqual([
+        '2026-10-18 shacharis 7:30am',
+        '2026-10-19 maariv 9:00 PM Late',
+        '2026-10-19 mincha_maariv 5:50 PM',
+        '2026-10-20 maariv 9:00 PM Late',
+        '2026-10-20 mincha_maariv 5:50 PM',
+        '2026-10-21 maariv 9:00 PM Late',
+        '2026-10-21 mincha_maariv 6:00 PM',
+        '2026-10-23 other 5:50 PM',
+      ])
+      const note = m.submitListingUpdate.mock.calls[0][3] as string
+      expect(note.split('\n').filter((l) => l.startsWith('Times for'))).toEqual(['Times for Oct 18 – Oct 24: mincha maariv · Wed Oct 21 · 6:00 PM, was 5:50 PM'])
+    })
+
+    // Mikveh Israel's home page, Oct 28: "Shabbat Vayera", Friday 5:45 PM
+    // and Shabbos 9:00 AM, both already on its calendar's week.
+    it('a week the page names its own way, already on the listing’s week, files nothing', async () => {
+      const shabbat = { ...listed, minyanim: [at('k', '2026-10-23', 'kabbalas_shabbos', '5:45PM'), at('s', '2026-10-24', 'shacharis', '9:00am')] }
+      m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [shabbat] } })
+      const vayera: TimesUpdate = { ...moved, kind: 'week', title: 'Shabbat Vayera', from: '2026-10-23', to: '2026-10-24', rows: [r('2026-10-23', 'kabbalas_shabbos', '5:45PM', 'new'), r('2026-10-24', 'shacharis', '9:00am', 'new')] }
+      m.readShulWeek.mockResolvedValue({ update: vayera, model: 'cheap' })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0 })
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+  })
+
   it('never files again what it filed before, whatever became of it', async () => {
     m.earlier = [{ payload: { details: { minyanim: [{ id: 'other-id', tefillah: 'mincha', days: ['sun'], time: '6:05pm' }] } } }]
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toMatchObject({ ok: true, filed: 0, pageHash: await hashOfPage(), check: { result: 'differs', queue: 'before' } })
@@ -1038,7 +1130,7 @@ describe('readListingPage: a page with a calendar', () => {
       expect(filedWeeks()).toEqual([
         expect.objectContaining({ name: 'Times for Nov 1 – Nov 7', from: '2026-11-03', to: '2026-11-07', whole: true, minyanim: [expect.objectContaining({ on: ['2026-11-07'], time: '10:00am' })] }),
       ])
-      expect(m.submitListingUpdate.mock.calls[0][3]).toContain('posted as this week’s schedule')
+      expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Nov 1 – Nov 7: new, shacharis · Sat Nov 7 · 10:00am')
     })
 
     it('says nothing of a week when its dates stop before it, or leave out a usual minyan', async () => {
@@ -1138,7 +1230,9 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     expect(second.text).toMatch(/2026-10-30 \(Fri\) 6:00 PM: Kabbalat Shabbat\n2026-10-31 \(Sat\) 10:45 AM: Shabbat Morning Service$/)
   })
 
-  it('a week is this week’s schedule, its usual times and all, a usual minyan it doesn’t mention kept; filed though the next matches', async () => {
+  // The user, Oct 28: "Never fill this week's schedule with usual times."
+  // Saturday's Mincha, which the calendar doesn't give, isn't in the week.
+  it('a week is this week’s schedule: what the calendar gives, at the usual times or not, never a usual minyan it leaves out; filed though the next matches', async () => {
     expect(await run()).toMatchObject({ ok: true, filed: 1 })
     const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
     expect(payload.details.minyanim).toEqual(usual.map((u) => expect.objectContaining({ tefillah: u.tefillah, days: u.days, time: u.time })))
@@ -1148,12 +1242,11 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
       ['2026-10-22', 'shacharis', '8:10am'],
       ['2026-10-23', 'kabbalas_shabbos', '6:00pm'],
       ['2026-10-24', 'shacharis', '10:45am'],
-      ['2026-10-24', 'mincha', '5:30pm'],
     ])
     expect(two).toMatchObject({ name: 'Times for Oct 25 – Oct 31', from: '2026-10-25', to: '2026-10-31', kind: 'week', postedBy: 'website' })
     expect(note).toContain('Times for Oct 18 – Oct 24: new, shacharis · Thu Oct 22 · 8:10am')
-    expect(note).toContain('Times for Oct 25 – Oct 31: the same as their usual times, posted as this week’s schedule')
-    expect(note).not.toMatch(/not held/)
+    expect(note).toContain('Times for Oct 25 – Oct 31: new, kabbalas shabbos · Fri Oct 30 · 6:00pm')
+    expect(note).not.toMatch(/not held|mincha/)
   })
 
   it('files nothing for a week already on the listing as it would be', async () => {
@@ -1209,7 +1302,8 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     const next = schedulesFiled().find((x) => x.name === 'Times for Oct 25 – Oct 31')!
     expect(next).toMatchObject({ whole: true })
     expect(next.minyanim.map((x) => [x.on[0], x.tefillah])).toEqual([['2026-10-30', 'kabbalas_shabbos']])
-    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 25 – Oct 31: not held, shacharis')
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 25 – Oct 31: new, kabbalas shabbos · Fri Oct 30 · 6:00pm')
+    expect(m.submitListingUpdate.mock.calls[0][3]).not.toMatch(/Oct 25 – Oct 31: new, shacharis/)
   })
 
   it('the newsletter keeps the days it gave; the website’s week keeps its others', async () => {
@@ -1268,7 +1362,6 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
         ['2026-10-22', '8:10am', ZOOM],
         ['2026-10-23', '6:00pm', null],
         ['2026-10-24', '10:45am', null],
-        ['2026-10-24', '5:30pm', null],
       ])
       expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 18 – Oct 24: Shacharis, Thu Oct 22, 8:10am · Online: upenn.zoom.us/j/97084263584')
       expect(m.readShulWeek.mock.calls[0][2].text).not.toContain('zoom')

@@ -129,9 +129,12 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   const group = open.getByTestId('waiting-group')
   await expect(group).toHaveCount(1)
   await expect(group).toContainText('From menu.example.invalid/menu')
-  await expect(group).toContainText('New on its menuFalafel')
+  // A dish a row, the menu's words under it (the user, Oct 28).
+  const row = (mark: string) => group.locator(`[data-testid=box-row][data-mark=${mark}]`)
+  await expect(row('new')).toHaveText(['Falafel“Falafel in pita”'])
+  await expect(row('gone')).toHaveText(['Tofu'])
   // Laffa, added by hand, stays: beside the rest, never as one off.
-  await expect(group).toContainText('Not on its menuTofuAlready listedShawarma, Laffa')
+  await expect(row('same')).toHaveText([/^Shawarma“Chicken Shawarma Plate”/, /^Laffa/])
 
   await group.getByRole('button', { name: 'Accept' }).click()
   // Nothing left to decide: it's off Waiting straight away, on Not

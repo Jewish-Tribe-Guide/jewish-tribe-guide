@@ -33,7 +33,9 @@ export type DishPlace = ListedDishes & {
   menuWatch?: MenuWatchState | null
 }
 
-export type MenuWatchState = Pick<Watch, 'url' | 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'>
+/** `missed`: why last night's run didn't read it ("ran out of reads",
+ *  missedLastNight), set by the server. */
+export type MenuWatchState = Pick<Watch, 'url' | 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'> & { missed?: string }
 
 /** Its dishes came from a menu someone sent through the site ("+ Add"),
  *  approved after the tab last failed to read one, or said it had none.
@@ -84,16 +86,21 @@ export function menuDidntLoad(p: Pick<DishPlace, 'menuWatch' | 'reading'>, now: 
 }
 
 /** Where a place is on the Dishes page, its menu page not loading
- *  included: an update or "no menu" said first. */
-export type DishJobStatus = DishPlaceStatus | 'didnt_load'
+ *  included: an update or "no menu" said first. `not_reached`: last
+ *  night's run didn't get to its menu, so its dishes weren't dated, which
+ *  isn't Up to date (Playa Bowls, Oct 28). */
+export type DishJobStatus = DishPlaceStatus | 'didnt_load' | 'not_reached'
 export function dishJobStatus(p: DishPlace, now: number): DishJobStatus {
   const s = dishStatus(p)
-  return s !== 'differs' && s !== 'off' && menuDidntLoad(p, now) ? 'didnt_load' : s
+  if (s !== 'same' && s !== 'cant_read' && s !== 'not_read') return s
+  // Not reached isn't "didn't load": two nights unread looks stale.
+  if (p.menuWatch?.missed && s === 'same') return 'not_reached'
+  return menuDidntLoad(p, now) ? 'didnt_load' : s
 }
 
 export function dishCounts(places: readonly DishPlace[], now: number): JobCounts {
   const n = (...of: DishJobStatus[]) => places.filter((p) => of.includes(dishJobStatus(p, now))).length
-  return { checked: n('same'), toCheck: n('differs', 'not_read'), cantRead: n('cant_read'), didntLoad: n('didnt_load') }
+  return { checked: n('same'), toCheck: n('differs', 'not_read'), cantRead: n('cant_read'), didntLoad: n('didnt_load', 'not_reached') }
 }
 
 // ── Hospitals ───────────────────────────────────────────────────────────────

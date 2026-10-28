@@ -5,9 +5,10 @@ import { detailsKeysToUse, detailsRows } from '@/lib/eruvWebsite'
 import { kosherBoxKeys, kosherInTheBox, kosherProposal, kosherRows, renamedTo } from '@/lib/kosherBox'
 import type { CategoryConfig } from '@/lib/categories'
 import { KOSHER_LIST_NAMES, type KosherList } from '@/lib/kosherJob'
-import { weekChanges } from '@/lib/timesProposal'
+import { groupedRows, weekChanges } from '@/lib/timesProposal'
 import { TIMES_PART_LABELS } from '@/lib/timesParts'
 import type { Finding } from '@/lib/watchFindings'
+import type { RowMark } from './JobBoxes'
 import { day, shortUrl } from './watchText'
 import { usualRows } from './TimesProposal'
 import { checkedLines, openedPlace, type CheckedLine, type FootLink } from './openedPlaceBoxes'
@@ -42,12 +43,17 @@ import type { DirectoryResource } from '@/types'
 export type WaitJob = 'google' | 'times' | 'hours' | 'sites' | 'dishes' | 'hospitals' | 'kosher' | 'eruv'
 /** "Hours  Sun–Thu 11 AM–10 PM, was Sun–Thu 11 AM–9 PM"; `old` none for
  *  a value the listing doesn't have yet. */
-/** `old` reads "Was …", or with `say` "usually", "Usually …"; `say` new
- *  marks one the listing hasn't got. A heading names the part of a shul's
- *  times the lines below it change. */
-/** `day`: a day's heading in a week. `same`: a line as the listing has it,
- *  in a whole week shown with what changes marked. */
-export type WaitLine = { label: string; value: string; old: string | null; say?: 'new'; heading?: true; day?: true; same?: true }
+export type WaitLine = { label: string; value: string; old: string | null }
+/** One row of a box, as the job pages drew them before Oct 26 (the user,
+ *  Oct 28: "the way we displayed minyan times before we changed was normal
+ *  and good"): a minyan or a dish, top down, its time on the right. A
+ *  changed one has what it was struck under it; one going is crossed out.
+ *  `struck`: a changed day, season or note, under its name. `flag`: said in
+ *  amber after `sub` ("these words don't name it"). */
+export type WaitRow = { name: string; sub?: string; struck?: string[]; flag?: string; right?: string; was?: string; mark: RowMark }
+/** A part of the listing, its rows under their headings (a day, "Friday
+ *  night"). `tag`: beside its name, "New" for a week the listing hasn't got. */
+export type WaitBox = { name: string; tag?: string; groups: { head?: string; rows: WaitRow[] }[] }
 /** A line that's only so: "On the site  Shown closed since Oct 12". */
 export type WaitFact = { label: string; value: string; url?: string | null }
 export type Decide =
@@ -66,7 +72,9 @@ export type Decide =
   /** Nothing to decide yet: a list's new place, filed after its next read;
    *  Bring it back all the same, when the guide has it archived. */
   | { kind: 'later'; archivedId?: string }
-export type WaitGroup = { key: string; job: WaitJob; page: FootLink | null; when: string | null; lines: WaitLine[]; facts: WaitFact[]; note: string | null; decide: Decide }
+/** `boxes`: a shul's times and a menu's dishes, drawn as the listing's
+ *  boxes instead of lines. */
+export type WaitGroup = { key: string; job: WaitJob; page: FootLink | null; when: string | null; lines: WaitLine[]; boxes?: WaitBox[]; facts: WaitFact[]; note: string | null; decide: Decide }
 
 export type Waiting = { groups: WaitGroup[]; checked: CheckedLine[] }
 
@@ -76,56 +84,42 @@ const was = (v: string) => (v === NONE || !v.trim() ? 'none' : v)
 const pageLink = (url: string): FootLink => ({ text: shortUrl(url), url })
 const latest = (fs: readonly Finding[]) => fs.map((f) => f.at).sort().at(-1) ?? null
 
-/** A shul's times as the finding would make them, under the part it
- *  changes: the usual times, only what changes. This week's, the whole
- *  week by day (the user, Oct 27: "I want to see the whole schedule with
- *  the new ones highlighted"), against the listing's own copy of it; a
- *  week it hasn't got is all new. */
-function timesLines(f: Finding): WaitLine[] | null {
+/** A shul's times as the finding would make them, in a box named for the
+ *  part it changes, every minyan in it: the usual times against the
+ *  listing's usual times, a week against the listing's copy of that week
+ *  (the user, Oct 28: "This week compares this week. Usual compares
+ *  usual."). A week it hasn't got is all new. */
+function timesBoxes(f: Finding): WaitBox[] | null {
   const t = f.times
   if (!t || !f.part) return null
-  const heading = (label: string): WaitLine => ({ label, value: '', old: null, heading: true })
-  const minyanim = (n: number) => `${n} ${n === 1 ? 'minyan' : 'minyanim'}`
   if (f.part === 'week') {
     const { weeks, gone } = weekChanges(t.currentSchedules, t.proposedSchedules)
-    const lines: WaitLine[] = []
-    for (const w of weeks) {
-      lines.push(heading(w.title))
-      if (w.none) {
-        lines.push({ label: 'No minyan', value: 'All week', old: w.had ? minyanim(w.had) : null })
-        continue
-      }
-      if (!w.had) lines.push({ label: 'New week', value: minyanim(w.total), old: null })
-      let day = ''
+    const boxes: WaitBox[] = weeks.map((w) => {
+      const tag = w.had === null ? { tag: 'New' } : {}
+      if (w.none) return { name: w.title, ...tag, groups: [{ rows: [{ name: 'No minyan', right: 'All week', mark: 'changed' }] }] }
+      const days = new Map<string, WaitRow[]>()
       for (const r of w.rows) {
-        if (r.day !== day) lines.push({ label: (day = r.day), value: '', old: null, day: true })
-        const line: WaitLine = { label: r.what, value: r.when, old: r.was }
-        lines.push(r.status === 'same' ? { ...line, same: true } : r.status === 'new' && w.had ? { ...line, say: 'new' } : line)
+        const row: WaitRow =
+          r.status === 'gone' ? { name: r.what, right: r.was ?? undefined, mark: 'gone' } : { name: r.what, right: r.when, ...(r.status === 'changed' && r.was ? { was: r.was } : {}), mark: r.status }
+        days.set(r.day, [...(days.get(r.day) ?? []), row])
       }
-    }
-    if (gone.length && !weeks.length) lines.push(heading(TIMES_PART_LABELS.week))
-    for (const g of gone) lines.push({ label: g, value: 'Taken off', old: null })
-    return lines
+      return { name: w.title, ...tag, groups: [...days].map(([head, rows]) => ({ head, rows })) }
+    })
+    if (gone.length) boxes.push({ name: TIMES_PART_LABELS.week, groups: [{ rows: gone.map((g): WaitRow => ({ name: g, mark: 'gone' })) }] })
+    return boxes
   }
-  const all = usualRows(f.part, t.current, t.proposed)
-  const rows = all.filter((r) => r.status !== 'same')
-  const same = all.length - rows.length
-  return [
-    heading(TIMES_PART_LABELS[f.part]),
-    ...rows.map((r): WaitLine => {
-      const line = {
-        label: r.what,
-        value: r.status === 'gone' ? 'Taken off' : [r.when, r.note, r.season].filter(Boolean).join(' · '),
-        old: r.status === 'changed' ? [r.was?.days, r.was?.when ?? r.when, r.was?.note ?? r.note, r.was?.season ?? r.season].filter(Boolean).join(' · ') : r.status === 'gone' ? r.when : null,
-      }
-      return r.status === 'new' ? { ...line, say: 'new' } : line
+  const groups = groupedRows(usualRows(f.part, t.current, t.proposed)).map((g) => ({
+    head: g.label,
+    rows: g.rows.map((r): WaitRow => {
+      const sub = [r.season, r.note].filter(Boolean).join(' · ')
+      const struck = [r.was?.days, r.was?.season, r.was?.note].filter((w): w is string => !!w)
+      return { name: r.tefillah, ...(sub ? { sub } : {}), ...(struck.length ? { struck } : {}), right: r.when, ...(r.was?.when ? { was: r.was.when } : {}), mark: r.status }
     }),
-    ...(same ? [{ label: 'Unchanged', value: minyanim(same), old: null }] : []),
-  ]
+  }))
+  return [{ name: TIMES_PART_LABELS[f.part], groups }]
 }
 
-const findingLines = (f: Finding): WaitLine[] =>
-  timesLines(f) ?? f.lines.map((l) => ({ label: l.label, value: value(l.after), old: f.operation === 'create' ? null : was(l.before) }))
+const findingLines = (f: Finding): WaitLine[] => (f.times && f.part ? [] : f.lines.map((l) => ({ label: l.label, value: value(l.after), old: f.operation === 'create' ? null : was(l.before) })))
 
 /** Its findings from one job, a group per page (or list, or Refuah) they
  *  came from. */
@@ -143,6 +137,7 @@ function findingGroups(job: WaitJob, findings: readonly Finding[], pageOf: (f: F
       page: pageOf(fs[0]),
       when: at ? day(at) : null,
       lines: fs.flatMap(findingLines),
+      ...(fs.some((f) => f.times && f.part) ? { boxes: fs.flatMap((f) => timesBoxes(f) ?? []) } : {}),
       facts: [],
       note: null,
       decide: { kind: 'findings', ids: fs.map((f) => f.id) },
@@ -294,18 +289,28 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
   if (dishes && r?.status === 'proposed') {
     const proposal = dishProposal(dishes, { dishes: r.dishes ?? [], missing: r.missing })
     if (proposal.updates > 0) {
-      const named = (s: string) => proposal.rows.filter((x) => x.status === s).map((x) => x.name)
       const url = r.sourceUrl ?? dishes.menuUrl
       changes.push({
         key: 'menu',
         job: 'dishes',
         page: url ? pageLink(url) : { text: 'its menu', url: null },
         when: day(r.readAt),
-        lines: [
-          ...(named('new').length ? [{ label: 'New on its menu', value: named('new').join(', '), old: null }] : []),
-          ...(named('gone').length ? [{ label: 'Not on its menu', value: named('gone').join(', '), old: null }] : []),
-          // What stays, so a new dish is seen beside the rest (the user, Oct 27).
-          { label: 'Already listed', value: dishes.dishes.filter((d) => !named('gone').includes(d)).join(', ') || 'None', old: null },
+        lines: [],
+        // Every dish, top down, what the menu said of it under it (the
+        // user, Oct 28: "didn't the reader used to say the words it got
+        // their suggestion from?"), as the Main dishes page drew it.
+        boxes: [
+          {
+            name: 'Main dishes',
+            groups: [
+              {
+                rows: proposal.rows.map((d): WaitRow => {
+                  const sub = d.quote ? `“${d.quote}”` : d.status === 'not_found' ? 'Not found on its menu' : undefined
+                  return { name: d.name, ...(sub ? { sub } : {}), ...(d.quote && d.named === false ? { flag: 'these words don’t name it' } : {}), mark: d.status === 'gone' || d.status === 'new' ? d.status : 'same' }
+                }),
+              },
+            ],
+          },
         ],
         facts: [],
         note: null,

@@ -80,7 +80,7 @@ export function BoxRow({ name, sub, right, mark = 'same', why, was }: { name: Re
       </span>
       {/* Capped, so a long rule ("Approximately 45 minutes before
           shkiya") wraps rather than squeezing the name to a word a line. */}
-      <span className="max-w-[10rem] text-right tabular-nums sm:max-w-[16rem]">
+      <span className={`max-w-[10rem] text-right tabular-nums sm:max-w-[16rem] ${mark === 'gone' ? 'text-slate-600 line-through' : ''}`}>
         {right}
         {was && <s className="block text-xs text-slate-500">{was}</s>}
       </span>

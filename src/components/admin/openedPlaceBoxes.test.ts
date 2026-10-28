@@ -249,6 +249,12 @@ describe('openedPlace, not checked', () => {
     expect(openedPlace('p', jobs({ dishes }), NOW).problems.find((p) => p.key === 'menu')?.stop).toEqual({ kind: 'menu', action: 'unlink', what: 'its menu' })
   })
 
+  it('says a menu last night’s run didn’t get to wasn’t read, and why, with Read it now', () => {
+    const menu = { ...watch('m', 'https://grill.example/menu', { lastRunAt: '2026-10-24T08:00:00Z', lastOkAt: '2026-10-24T08:00:00Z' }), missed: 'ran out of reads' }
+    const dishes = [{ id: 'p', name: 'Grill', href: '/x', dishes: ['Schnitzel'], website: 'https://grill.example', menuUrl: 'https://grill.example/menu', menuWatch: menu, reading: { status: 'approved' as const, readAt: '2026-10-19T08:00:00Z', sourceUrl: 'https://grill.example/menu' } }]
+    expect(openedPlace('p', jobs({ dishes }), NOW).problems.find((p) => p.key === 'menu')).toMatchObject({ says: 'not read last night · ran out of reads', fields: [{ label: 'Dishes', value: 'Schnitzel' }], fix: { kind: 'read' } })
+  })
+
   it('asks for a hospital’s page on Refuah when it isn’t found there', () => {
     const hospitals = [{ id: 'p', name: 'CHOP', href: '/x', watch: null, notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }]
     const o = openedPlace('p', jobs({ hospitals }), NOW)
