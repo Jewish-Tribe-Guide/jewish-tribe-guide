@@ -257,9 +257,28 @@ describe('ModerationQueue — moderating', () => {
 
 // The opened card (agreed Oct 5, canvas QOpen): the original beside a form
 // the admin can fix, so a typo is fixed instead of rejected and redone.
+// "Pick the Google place" stands in for choosing a suggestion: Google's
+// details for it are `picked`.
+const picked = vi.hoisted(() => ({
+  place: null as null | Record<string, unknown>,
+}))
 vi.mock('@/components/intake/AddressInput', () => ({
-  default: ({ id, value, onChange }: { id?: string; value: string; onChange: (v: string) => void }) => (
-    <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({ id, value, onChange, onCoords, onPlaceSelect }: { id?: string; value: string; onChange: (v: string) => void; onCoords?: (g: { lat: number; lng: number }) => void; onPlaceSelect?: (p: never) => void }) => (
+    <>
+      <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
+      {onPlaceSelect && (
+        <button
+          type="button"
+          onClick={() => {
+            onChange('1 Bakery Way, Philadelphia, PA 19103, USA')
+            onCoords?.({ lat: 39.95, lng: -75.17 })
+            onPlaceSelect(picked.place as never)
+          }}
+        >
+          Pick the Google place
+        </button>
+      )}
+    </>
   ),
 }))
 
@@ -431,5 +450,89 @@ describe('ModerationQueue — an opened card', () => {
     expect(screen.getByRole('button', { name: 'Open Giant' })).toBeInTheDocument()
     expect(screen.getByText(/needs its address/)).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Approve' })).toHaveLength(1)
+  })
+})
+
+// Picking a place in the address fills the rest from Google, as the
+// listing's own editor does (the user, Oct 28: it didn't in the queue).
+describe('ModerationQueue — an address picked from Google', () => {
+  const bakery = makeCategory({
+    id: 'bakery',
+    pluralLabel: 'Bakeries',
+    detailFields: [
+      { key: 'hours', type: 'hours', label: 'Hours' },
+      { key: 'w', type: 'url', label: 'Website' },
+      { key: 'googleDescription', type: 'text', label: 'Description' },
+      { key: 'hechsher', type: 'text', label: 'Hechsher' },
+    ],
+  })
+  const hours = { mon: { open: '07:00', close: '15:00' } }
+  const current = { id: 'b-1', category: 'bakery', name: 'Bakery', address: '', phone: '', details: { hechsher: 'KCL', googleDescription: 'Our own words' } }
+  const edit = submission({
+    id: 'sub-b',
+    operation: 'update',
+    target_id: 'b-1',
+    categoryLabel: 'Bakeries',
+    current: current as never,
+    payload: { category: 'bakery', name: 'Bakery', address: '1 Bakery Way', phone: '', details: { hechsher: 'KCL', googleDescription: 'Our own words' } },
+  })
+
+  beforeEach(() => {
+    picked.place = {
+      placeId: 'ChIJbakery',
+      name: 'Bakery on the Way',
+      phone: '2155550100',
+      hours,
+      website: 'https://bakery.example/',
+      description: 'A bakery, said Google',
+      businessStatus: 'OPERATIONAL',
+    }
+  })
+
+  function renderBakeryQueue() {
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200))
+    vi.mocked(parseOkJson).mockResolvedValue({ submissions: [edit] })
+    vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+    return renderWithProviders(<ModerationQueue session={session()} />, { content: { categories: [bakery] } })
+  }
+
+  it('fills the name, phone, hours and website, opens each row, and approves with them', async () => {
+    const user = userEvent.setup()
+    renderBakeryQueue()
+    await user.click(await screen.findByText('Bakeries'))
+    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Pick the Google place' }))
+    expect(screen.getByLabelText('Name')).toHaveValue('Bakery on the Way')
+    expect(screen.getByLabelText('Phone')).toHaveValue('(215) 555-0100')
+    const rows = screen.getAllByTestId('review-field').map((r) => r.textContent ?? '')
+    expect(rows.some((t) => t.includes('Hours'))).toBe(true)
+    expect(rows.some((t) => t.includes('Website'))).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: 'Approve with your changes' }))
+    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.payload).toMatchObject({ name: 'Bakery on the Way', phone: '(215) 555-0100', address: '1 Bakery Way, Philadelphia, PA 19103, USA', geo: { lat: 39.95, lng: -75.17 } })
+    expect(body.payload.details).toMatchObject({ hours, w: 'https://bakery.example/', hechsher: 'KCL' })
+    // A description already written is kept; Google's place id isn't taken
+    // from the queue (reviewEdits.ts).
+    expect(body.payload.details.googleDescription).toBe('Our own words')
+    expect(body.payload.details.placeId).toBeUndefined()
+  })
+
+  it('fills a description only where there is none', async () => {
+    const user = userEvent.setup()
+    edit.payload = { ...(edit.payload as object), details: { hechsher: 'KCL' } } as never
+    try {
+      renderBakeryQueue()
+      await user.click(await screen.findByText('Bakeries'))
+      await user.click(screen.getByRole('button', { name: 'Pick the Google place' }))
+      await user.click(screen.getByRole('button', { name: 'Approve with your changes' }))
+      await waitFor(() => expect(fetchJson).toHaveBeenCalled())
+      const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+      expect(body.payload.details.googleDescription).toBe('A bakery, said Google')
+    } finally {
+      edit.payload = { category: 'bakery', name: 'Bakery', address: '1 Bakery Way', phone: '', details: { hechsher: 'KCL', googleDescription: 'Our own words' } } as never
+    }
   })
 })

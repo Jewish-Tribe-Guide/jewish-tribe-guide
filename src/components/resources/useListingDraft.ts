@@ -192,8 +192,8 @@ export type ListingDraft = ReturnType<typeof useListingDraft>
 
 /** What a Google pick fills in on a new listing, and the record of it the
  *  server compares against (handlePlaceSelect does the same, picked in the
- *  form). */
-function placeSeed(category: CategoryConfig, place: PlaceSelectResult) {
+ *  form; so does the moderation queue's address, SubmissionReview). */
+export function placeSeed(category: CategoryConfig, place: PlaceSelectResult) {
   const sync = isCategorySyncEligible(category)
   const hoursField = category.detailFields.find((f) => f.type === 'hours')
   const websiteField = category.detailFields.find((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')
