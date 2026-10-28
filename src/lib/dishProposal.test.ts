@@ -148,4 +148,20 @@ describe('a dish the listing has by another name', () => {
     expect(listedAlready('Chicken Soup', ['Chicken'])).toBe(false)
     expect(dishProposal({ dishes: ['Pizza'] }, { dishes: [{ name: 'Pizza Bagels', quote: 'Pizza Bagels', checked: true }] }).updates).toBe(1)
   })
+
+  // The user, Oct 28: "drop a dish whose quote doesn't name it, instead of
+  // offering it flagged". Dottie's reading, as production has it.
+  it('one whose words don’t name it isn’t offered; a listed one stays, marked', () => {
+    const p = dishProposal(
+      { dishes: ['Brownies'] },
+      {
+        dishes: [
+          { name: 'Donuts', quote: 'chocolate, vanilla, vanilla sprinkles', checked: true, named: false },
+          { name: 'Brownies', quote: 'treats', checked: true, named: false },
+        ],
+      },
+    )
+    expect(p.updates).toBe(0)
+    expect(p.rows).toEqual([{ name: 'Brownies', status: 'same', quote: 'treats', checked: true, named: false }])
+  })
 })

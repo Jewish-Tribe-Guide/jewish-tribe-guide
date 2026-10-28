@@ -694,8 +694,11 @@ export function tidyMenuReading(raw: unknown, source: MenuSource, listed: readon
     const dish = take(d)
     if (!dish || seen.has(keyOf(dish.name))) continue
     // A kind of one the listing has isn't a dish of its own: Goldie's
-    // "Hummus" beside its Hummus Platter (the user, Oct 28).
-    if (!dish.onListing && listedAlready(dish.name, listed)) continue
+    // "Hummus" beside its Hummus Platter (the user, Oct 28). Nor is one
+    // whose words don't name it: Dottie's "Donuts" from "chocolate,
+    // vanilla, vanilla sprinkles" (the user, Oct 28: drop it, don't offer
+    // it flagged).
+    if (!dish.onListing && (!dish.named || listedAlready(dish.name, listed))) continue
     seen.add(keyOf(dish.name))
     dishes.push(dish)
   }

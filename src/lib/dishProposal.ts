@@ -113,6 +113,9 @@ export function dishProposal(listed: ListedDishes, reading: { dishes: readonly R
     // One the listing has as a kind of it isn't new; nor is one it has
     // twice, by its own name and by the reader's.
     if (!listedName && listedAlready(d.name, listed.dishes)) return []
+    // Nor one whose words don't name it (the user, Oct 28): read before
+    // the reader dropped them, it isn't offered.
+    if (!listedName && d.named === false) return []
     if (listedName && lower(listedName) !== lower(d.name) && reading.dishes.some((o) => lower(o.name) === lower(listedName))) return []
     return [{
       name: listedName ?? d.name,

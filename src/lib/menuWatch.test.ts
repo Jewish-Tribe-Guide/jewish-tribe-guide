@@ -161,6 +161,10 @@ describe('newDishes', () => {
     expect(newDishes([{ name: 'Donuts', quote: 'Donuts', checked: true }], ['Chocolate Donuts', 'Brownies'])).toEqual([])
   })
 
+  it('none whose words don’t name it', () => {
+    expect(newDishes([{ name: 'Donuts', quote: 'chocolate, vanilla, vanilla sprinkles', checked: true, named: false }], ['Brownies'])).toEqual([])
+  })
+
   it('says what’s new on the Main dishes tab', () => {
     expect(changedMenuNote([read[1]])).toBe('Its menu changed. One dish isn’t on the listing yet: Shawarma.')
     expect(changedMenuNote(read.slice(1))).toBe('Its menu changed. 2 dishes aren’t on the listing yet: Shawarma, Burgers.')

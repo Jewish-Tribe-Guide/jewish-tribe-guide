@@ -113,9 +113,9 @@ export function listedDishes(listing: DirectoryResource, category: CategoryConfi
 }
 
 /** The dishes a reading found that the listing doesn't have, by any
- *  name (listedAlready). */
+ *  name (listedAlready), named by the menu's own words. */
 export function newDishes(read: MenuDish[], listed: string[]): MenuDish[] {
-  return read.filter((d) => !listedAlready(d.name, listed))
+  return read.filter((d) => d.named !== false && !listedAlready(d.name, listed))
 }
 
 /** The listing's dishes its menu's last reading never looked for

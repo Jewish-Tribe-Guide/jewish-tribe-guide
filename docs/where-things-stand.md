@@ -1708,8 +1708,10 @@ their suggestion from?"
   (`newDishes`) and on showing (`dishProposal`), so Goldie's, Dottie's and
   HipCity's waiting readings change nothing now. The reader is also told
   so. More than a listed one is still new ("Pizza Bagels" beside "Pizza").
-- Open: a dish whose words don't name it is still offered, flagged. Should
-  it be dropped?
+- **A new dish whose words don't name it is dropped**, not offered flagged
+  (the user, Oct 28: "drop a dish whose quote doesn't name it"). Dottie's
+  "Donuts" from "chocolate, vanilla, vanilla sprinkles" is one. A listed
+  dish found that way is still kept, marked "these words don't name it".
 - Open: Gelbstein's "couldn't read" isn't explained. Its last stored read is
   fine (all five dishes found). Note: its store is the Lakewood, NJ bakery.
 

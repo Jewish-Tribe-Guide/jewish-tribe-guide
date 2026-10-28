@@ -202,9 +202,13 @@ describe('waitingGroups', () => {
       { name: 'Laffa', mark: 'same' },
     ])
     expect(rows([]).map((r) => r.name)).toEqual(['Falafel', 'Shawarma'])
-    // Words that don't name the dish, said so.
-    const near = { ...place([]), reading: { ...place([]).reading, dishes: [{ name: 'Hummus', quote: 'Hummus platter', checked: true, named: false }] } }
-    expect(waitingGroups('p', jobs({ dishes: [near] }), NOW).groups[0].boxes![0].groups[0].rows).toEqual([{ name: 'Hummus', sub: '“Hummus platter”', flag: 'these words don’t name it', mark: 'new' }])
+    // A listed dish found by words that don't name it, said so; a new one
+    // isn't offered at all (the user, Oct 28).
+    const near = { ...place(['Laffa']), reading: { ...place([]).reading, dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true }, { name: 'Laffa', quote: 'wrapped in bread', checked: true, named: false }, { name: 'Hummus', quote: 'chickpeas', checked: true, named: false }] } }
+    expect(waitingGroups('p', jobs({ dishes: [near] }), NOW).groups[0].boxes![0].groups[0].rows).toEqual([
+      { name: 'Falafel', sub: '“Falafel”', mark: 'new' },
+      { name: 'Laffa', sub: '“wrapped in bread”', flag: 'these words don’t name it', mark: 'same' },
+    ])
   })
 
   // Oct 25 (the user): "grocery should go to grocery". A grocery's own
