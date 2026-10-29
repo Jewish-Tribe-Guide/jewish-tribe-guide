@@ -10,10 +10,10 @@ import { CandleIcon, ChevronRightIcon, ClockIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { haversineMiles, milesText, type LatLng } from '@/lib/geo'
-import { candlesToday, initialsOf, listingRowFacts, type RowFact } from '@/lib/listingRow'
+import { initialsOf, listingRowFacts, type RowFact } from '@/lib/listingRow'
 import { formatStartsIn, nextMinyansAcross, type NextMinyanLine } from '@/lib/upcomingDavening'
 import { fixedViewSlug, routes } from '@/lib/routes'
-import { beforeCandles, itemList, openNowTitle, shabbosMoment, shoppingTitle, type ShabbosMoment } from '@/lib/todayHome'
+import { beforeCandles, candleItemHref, candleItemLine, itemList, openNowTitle, shabbosMoment, type ShabbosMoment } from '@/lib/todayHome'
 import type { TodayBlockId } from '@/lib/siteSettings'
 import type { CardDef } from './sections'
 import type { Change } from '@/lib/whatChanged'
@@ -244,41 +244,27 @@ function endsLabel(z: { label: string; time: string; iso?: string }, now: number
 export type BeforeCandlesProps = Pick<Props, 'listings' | 'categories' | 'items' | 'schedule' | 'zmanim' | 'from' | 'communitySlug' | 'onOpenListing'>
 
 /** Also the phone home's, on Friday (RightNow). */
-export function BeforeCandles({ listings, categories, items, schedule, zmanim, from, communitySlug, onOpenListing }: BeforeCandlesProps) {
+export function BeforeCandles({ listings, categories, items, schedule, from, communitySlug }: BeforeCandlesProps) {
   if (!listings || !schedule || items.length === 0) return null
-  const now = new Date(schedule.now)
-  const { rows, missing } = beforeCandles(listings, categories, items, now, from)
-  const storeKind = rows[0]?.category ?? categories.find((c) => c.detailFields.some((f) => f.type === 'tags' && f.showCountInHeader))
-  if (!storeKind) return null
-  // Tonight's candles, so a store that shuts first says "Until 4 PM, before
-  // candles" (the category pages' own wording).
-  const candlesAt = candlesToday(zmanim, now)
+  const { rows, missing } = beforeCandles(listings, categories, items, new Date(schedule.now), from)
+  if (rows.length === 0 && missing.length === 0) return null
   return (
-    <Block testId="today-before-candles" title="Before candles" more={{ label: 'Other stores ›', href: routes.slug(communitySlug, storeKind.id) }}>
-      {rows.map((row) => {
-        const status = listingRowFacts(row.store, row.category, now, { candlesAt }).find((f) => f.tone === 'open' || f.tone === 'caution')
-        return (
-          <PlaceRow
-            key={row.store.id}
-            item={row.store}
-            category={row.category}
-            categories={categories}
-            title={shoppingTitle(row, items.length)}
-            sub={
-              <>
-                {itemList(row.has)}
-                {status && (
-                  <>
-                    {' · '}
-                    <span className={TONE[status.tone]}>{status.text}</span>
-                  </>
-                )}
-              </>
-            }
-            onOpen={() => onOpenListing(row.store)}
-          />
-        )
-      })}
+    <Block testId="today-before-candles" title="Before candles">
+      {rows.length > 0 && (
+        <ul>
+          {rows.map((row) => (
+            <li key={row.item} className="border-t border-slate-100 first:border-t-0">
+              <Link href={candleItemHref(communitySlug, row)} prefetch={false} className="flex min-h-14 items-center gap-3 py-2.5 hover:bg-slate-50">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-bold leading-snug text-ink">{row.item}</span>
+                  <span className="block text-[13.5px] text-slate-600">{candleItemLine(row)}</span>
+                </span>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
       {missing.length > 0 && <p className="mt-1.5 text-[13.5px] text-slate-600">No store open now lists {itemList(missing).toLowerCase()}.</p>}
     </Block>
   )

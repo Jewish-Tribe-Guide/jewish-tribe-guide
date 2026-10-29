@@ -20,7 +20,7 @@ vi.mock('next/navigation', () => ({
 // the clock fixed: what's open on a weekday, the candles card and Before
 // candles on Friday, the card alone on Shabbos, and never the next minyan.
 const NY = 'America/New_York'
-const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours' }
+const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', filterable: true }
 const meatDairy: CategoryField = {
   key: 't',
   label: 'Type',
@@ -142,7 +142,7 @@ describe('Right now', () => {
     expect(eruv).toHaveTextContent('Eruvim1 up1 by phone')
     expect(eruv).toHaveAttribute('href', '/test-community/eruv')
     expect(within(card).getAllByRole('link').map((a) => a.textContent)).toEqual([eruv.textContent, 'Minyanim', 'Zmanim'])
-    expect(screen.getByTestId('today-before-candles')).toHaveTextContent('Trader Joe’s')
+    expect(screen.getByTestId('today-before-candles')).toHaveTextContent('Challah2 stores open · closest 0.2 mi')
     expect(section).not.toHaveTextContent('open now')
   })
 

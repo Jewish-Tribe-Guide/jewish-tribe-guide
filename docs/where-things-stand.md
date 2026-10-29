@@ -405,7 +405,17 @@ real prod numbers (Friday Oct 30, 1 PM; candles 5:44 PM).
   Davening, Kept by the Community and Shabbat & Holiday Times cards (Right
   now and the candles card answer them). The email signup becomes a thin
   band above the footer.
-- To decide: per-item rows alone (recommended), or with the one-stop row.
+- **Decided Oct 28: per-item rows alone** (no one-stop row). **Built** on
+  `redesign/oct18-fixes`: `beforeCandles()` now gives a row per item (stores
+  open now with it, the nearest's distance), counted with the Grocery page's
+  own Has and Open now checks so the number is the list a tap opens
+  (`candleItemHref`: `?openNow=1&has_m=Challah`). "Other stores ›" is gone.
+  An item no store open now lists still gets its one line. One category
+  answers every row, the one whose open places carry the most of the items
+  (Grocery): Food's main dishes are an item list too, and on the test
+  project they answered "Challah" and "Chicken" with restaurants until this.
+- The computer home (boards 4 and 5) is drawn, not built: waiting on the
+  user.
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 

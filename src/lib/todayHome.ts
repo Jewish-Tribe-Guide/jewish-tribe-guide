@@ -1,10 +1,12 @@
 import type { DirectoryResource, ZmanEntry, ZmanimData } from '@/types'
-import { selectValues, type CategoryConfig } from '@/lib/categories'
+import type { CategoryConfig } from '@/lib/categories'
 import { itemsField } from '@/lib/listingView'
-import { getOpenStatus } from '@/lib/hours'
+import { listingHas } from '@/lib/itemFilter'
+import { businessClosure, hoursOpenNow } from '@/lib/hours'
 import { haversineMiles, milesText, type LatLng } from '@/lib/geo'
 import { dayInTimezone } from '@/lib/activity'
 import { groupListings } from '@/lib/listGroups'
+import { routes } from '@/lib/routes'
 
 // ── The Today home (step 6) ─────────────────────────────────────────────────
 // The home page that changes with the day, behind SiteSettings.homeStyle.
@@ -91,61 +93,78 @@ function isTonight(z: ZmanEntry | null | undefined, now: number, timezone: strin
 
 // ── Before candles ──────────────────────────────────────────────────────────
 
-export type ShoppingRow = {
-  store: DirectoryResource
+export type CandleItemRow = {
+  /** The admin's name for it: "Challah". */
+  item: string
+  /** Where it's kept: Grocery, and its items field. */
   category: CategoryConfig
-  /** The admin's items this store's list has, in the admin's order. */
-  has: string[]
-  miles: number | null
+  fieldKey: string
+  /** How many stores open now have it, always or sometimes. */
+  stores: number
+  /** The nearest of them, when any says where it is. */
+  closest: number | null
 }
 
-/** Friday's shopping, as few stores as it takes: the nearest store open now
- *  whose list has the most of the admin's items, then the same for whatever
- *  it doesn't have. An item is on a store's list when an item there is
- *  named exactly that (any capitals): "Chicken" isn't "Chicken soup".
- *  `missing`: the items no store open now lists. */
+/** Friday's shopping, one row per item (the user, Oct 28: "people don't want
+ *  to see one store"): how many stores open now have it, and how near the
+ *  nearest is. Each row opens Grocery with "Has: Challah" and "Open now" on,
+ *  so it counts the way those filters do (listingHas, the page's own open-now
+ *  check in searchLands' withFilters): the number is the list it opens.
+ *
+ *  One category answers for every row: the one whose places open now carry
+ *  the most of the items, nearly always Grocery. Food keeps an item list too
+ *  (its main dishes), and a restaurant's chicken dish is not where you buy
+ *  chicken for Shabbos; nor should one row open Grocery and the next Food.
+ *  `missing`: the items none of its places open now lists. */
 export function beforeCandles(
   listings: readonly DirectoryResource[],
   categories: readonly CategoryConfig[],
   items: readonly string[],
   now: Date,
   from: LatLng,
-): { rows: ShoppingRow[]; missing: string[] } {
-  const stores: ShoppingRow[] = []
+): { rows: CandleItemRow[]; missing: string[] } {
+  let best: { rows: CandleItemRow[]; missing: string[]; found: number } | null = null
   for (const category of categories) {
     const field = itemsField(category)
-    if (!field) continue
-    const hoursKeys = category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
-    for (const store of listings) {
-      if (store.category !== category.id) continue
-      if (hoursKeys.length === 0 || !getOpenStatus(store as Record<string, unknown>, hoursKeys, now).isOpen) continue
-      const listed = new Set([...selectValues(store[field.key]), ...selectValues(store[`${field.key}_sometimes`])].map((t) => t.trim().toLowerCase()))
-      const has = items.filter((i) => listed.has(i.trim().toLowerCase()))
-      if (has.length === 0) continue
-      stores.push({ store, category, has, miles: store.geo ? haversineMiles(from, store.geo) : null })
+    // Without a filterable hours field the page has no "Open now" to turn on.
+    const hours = category.detailFields.filter((f) => f.type === 'hours' && f.filterable)
+    if (!field || hours.length === 0) continue
+    const open = listings.filter(
+      (store) =>
+        store.category === category.id &&
+        !businessClosure(store as unknown as Record<string, unknown>) &&
+        hours.some((h) => hoursOpenNow(store[h.key], now) === true),
+    )
+    const rows: CandleItemRow[] = []
+    const missing: string[] = []
+    for (const item of items) {
+      const have = open.filter((store) => listingHas(store, field.key, [item]))
+      if (have.length === 0) {
+        missing.push(item)
+        continue
+      }
+      const miles = have.flatMap((s) => (s.geo ? [haversineMiles(from, s.geo)] : []))
+      rows.push({ item, category, fieldKey: field.key, stores: have.length, closest: miles.length ? Math.min(...miles) : null })
     }
+    const found = rows.reduce((n, r) => n + r.stores, 0)
+    if (found > (best?.found ?? 0)) best = { rows, missing, found }
   }
-  const rows: ShoppingRow[] = []
-  let left = [...items]
-  while (left.length > 0) {
-    const best = stores
-      .map((s) => ({ ...s, has: s.has.filter((i) => left.includes(i)) }))
-      .filter((s) => s.has.length > 0)
-      .sort((a, b) => b.has.length - a.has.length || (a.miles ?? Infinity) - (b.miles ?? Infinity))[0]
-    if (!best) break
-    rows.push(best)
-    left = left.filter((i) => !best.has.includes(i))
-  }
-  return { rows, missing: left }
+  return best ? { rows: best.rows, missing: best.missing } : { rows: [], missing: [...items] }
 }
 
-const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six']
+/** Grocery with "Has: Challah" and "Open now" on: the address searchLands'
+ *  categoryHref gives the same filters, built here so the home doesn't load
+ *  the search's code for it. */
+export function candleItemHref(communitySlug: string, row: CandleItemRow): string {
+  const p = new URLSearchParams({ openNow: '1', [`has_${row.fieldKey}`]: row.item })
+  return `${routes.slug(communitySlug, row.category.id)}?${p}`
+}
 
-/** "Trader Joe’s, 0.2 mi, has all three"; "Spruce Market, 0.4 mi". */
-export function shoppingTitle(row: ShoppingRow, asked: number): string {
-  const where = row.miles != null ? `, ${milesText(row.miles)}` : ''
-  const all = asked > 1 && row.has.length === asked ? `, has all ${COUNT_WORDS[asked] ?? asked}` : ''
-  return `${row.store.name}${where}${all}`
+/** "10 stores open · closest 0.2 mi"; "1 store open · 0.4 mi". */
+export function candleItemLine(row: CandleItemRow): string {
+  const count = `${row.stores} ${row.stores === 1 ? 'store' : 'stores'} open`
+  if (row.closest == null) return count
+  return `${count} · ${row.stores === 1 ? '' : 'closest '}${milesText(row.closest)}`
 }
 
 /** "Challah, wine and chicken": the first capitalised, as a list reads. */

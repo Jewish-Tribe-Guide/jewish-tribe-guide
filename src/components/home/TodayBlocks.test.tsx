@@ -24,7 +24,7 @@ vi.mock('next/navigation', () => ({
 // shows, in what order, and what doesn't. Real-looking data from the guide:
 // Trader Joe's with all three items, two shuls, a vegan lunch spot.
 const NY = 'America/New_York'
-const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours' }
+const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', filterable: true }
 const items: CategoryField = { key: 'm', label: 'Items', type: 'tags', showCountInHeader: true }
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [hours, items] })
 const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours] })
@@ -125,12 +125,18 @@ describe('the Today home on a Friday afternoon', () => {
     expect(within(screen.getByTestId('today-candles')).getByRole('link', { name: 'Zmanim' })).toHaveAttribute('href', '/philly/zmanim')
   })
 
-  it('Before candles names the one store with all three, from its own list and hours', () => {
+  // The user, Oct 28: one row per item, each opening Grocery with that
+  // item and Open now on, not the one store that has them all.
+  it('Before candles: a row per item, how many stores open have it, opening Grocery filtered', () => {
     show(scheduleAt(friday, 'fri', {}), week)
     const block = screen.getByTestId('today-before-candles')
-    expect(block).toHaveTextContent('Trader Joe’s, 0.2 mi, has all three')
-    expect(block).toHaveTextContent('Challah, wine and chicken · Open until 9 PM')
-    expect(within(block).getByRole('link', { name: 'Other stores ›' })).toHaveAttribute('href', '/philly/grocery')
+    const links = within(block).getAllByRole('link')
+    expect(links.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Challah1 store open · 0.2 mi', '/philly/grocery?openNow=1&has_m=Challah'],
+      ['Wine1 store open · 0.2 mi', '/philly/grocery?openNow=1&has_m=Wine'],
+      ['Chicken1 store open · 0.2 mi', '/philly/grocery?openNow=1&has_m=Chicken'],
+    ])
+    expect(block).not.toHaveTextContent('Trader Joe’s')
   })
 
   it('the next minyan, and the nearest shul’s when that’s another shul', () => {

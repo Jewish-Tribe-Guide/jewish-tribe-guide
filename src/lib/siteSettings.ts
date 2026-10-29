@@ -117,7 +117,7 @@ export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
  *  when it shows, for the admin's on/off list. */
 export const TODAY_BLOCKS = [
   { id: 'candles', label: 'Today card', when: 'Candles and the countdown on Friday and Erev Yom Tov; havdalah on Shabbos and Yom Tov.' },
-  { id: 'beforeCandles', label: 'Before candles', when: 'Friday and Erev Yom Tov, until candle lighting: the nearest store open now that has the items below.' },
+  { id: 'beforeCandles', label: 'Before candles', when: 'Friday and Erev Yom Tov, until candle lighting: a row for each item below, saying how many stores open now have it.' },
   { id: 'nextMinyan', label: 'Next minyan', when: 'Every day: the next one anywhere, and the nearest shul’s.' },
   { id: 'openNow', label: 'Open now', when: 'Weekdays: food open now, titled by the meal (“Lunch, open now”). Never on Shabbos or Yom Tov.' },
   { id: 'pinned', label: 'Pinned', when: 'Only when the visitor has pinned something, on their device.' },

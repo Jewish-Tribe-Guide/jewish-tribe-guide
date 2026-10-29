@@ -324,7 +324,7 @@ export default function SiteSettingsEditor({
           <span className="block text-xs font-medium text-slate-700 mb-1">Before candles looks for</span>
           <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
           <span className="block text-[11px] text-muted mt-1">
-            On the Today home, on Friday and Erev Yom Tov: the nearest store open now whose item list has these, separated by commas, at most {MAX_BEFORE_CANDLE_ITEMS}. Each is matched to a store&rsquo;s items by its exact name.
+            On the home, on Friday and Erev Yom Tov: a row for each, saying how many stores open now have it. Separated by commas, at most {MAX_BEFORE_CANDLE_ITEMS}. Each is matched to a store&rsquo;s items by its name.
           </span>
         </label>
         <fieldset data-testid="today-blocks" className="mt-4">

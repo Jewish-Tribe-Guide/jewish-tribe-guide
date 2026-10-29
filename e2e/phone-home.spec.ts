@@ -114,6 +114,26 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText('open now')
   })
 
+  // The user, Oct 28: a row per item, not the one store that has them all.
+  // Each opens its stores with Has and Open now on, and the list it opens is
+  // as long as the row says.
+  test('Friday afternoon: Before candles is a row per item, opening the stores open now that have it', async ({ page }) => {
+    const community = await openHome(page, 'friday')
+    await expect(page.getByTestId('today-candles')).toBeVisible()
+    const rows = page.getByTestId('today-before-candles').getByRole('link')
+    test.skip((await rows.count()) === 0, 'no store in the test project lists a Before candles item')
+    for (const link of await rows.all()) {
+      await expect(link).toHaveAttribute('href', new RegExp(`^/${community}/[^/?]+\\?openNow=1&has_[^=&]+=[^&]+$`))
+      await expect(link).toContainText(/\d+ stores? open/)
+    }
+    const first = rows.first()
+    const href = (await first.getAttribute('href'))!
+    const stores = Number((await first.textContent())!.match(/(\d+) stores? open/)![1])
+    await first.click()
+    await expect(page).toHaveURL(href)
+    await expect(page.getByTestId('directory-row').filter({ visible: true })).toHaveCount(stores)
+  })
+
   test('Shabbos: the card says when it ends; nothing to buy and nothing open', async ({ page }) => {
     await openHome(page, 'shabbos')
     await expect(page.getByTestId('right-now')).toHaveAttribute('data-moment', 'shabbos')
