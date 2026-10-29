@@ -245,7 +245,6 @@ export default function TodoList({
 
       <div className="bg-white border border-slate-200 rounded-[10px] overflow-hidden">
         <AdminRow href={`${base}/watches`} name="Watches" line={watches} />
-        <AdminRow href={`${base}/searches`} name="Searches" line="Answered, dismissed and taught" />
         {data.responses.length === 0 && <AdminRow href={`${base}/responses`} name="Responses" />}
       </div>
     </div>

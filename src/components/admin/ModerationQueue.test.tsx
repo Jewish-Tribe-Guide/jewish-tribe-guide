@@ -571,6 +571,15 @@ describe('ModerationQueue — Set up your guide', () => {
     expect(row.getAttribute('href')).toMatch(/\/admin\/places$/)
   })
 
+  // The full Searches page opens from Reports; To do keeps only the
+  // searches still waiting (the user, Oct 29).
+  it('leads on to Watches and Responses only, not every search', async () => {
+    renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true })
+    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
+    const links = screen.getAllByRole('link').map((l) => l.getAttribute('href')!.replace(/^.*\/admin/, ''))
+    expect(links).toEqual(['/watches', '/responses'])
+  })
+
   it('is gone once all four are done', async () => {
     renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true })
     expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()

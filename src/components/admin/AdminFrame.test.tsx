@@ -65,8 +65,8 @@ describe('AdminFrame', () => {
     expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
     expect(screen.queryByRole('link', { name: '‹ To do' })).toBeNull()
     cleanup()
-    const { heading, lit } = show('/philly/admin/searches')
-    expect(heading).toBe('Searches')
+    const { heading, lit } = show('/philly/admin/responses')
+    expect(heading).toBe('Responses')
     expect(lit).toEqual(['To do'])
     expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
     for (const back of screen.getAllByRole('link', { name: '‹ To do' })) expect(back).toHaveAttribute('href', '/philly/admin')
@@ -82,11 +82,13 @@ describe('AdminFrame', () => {
     expect(show('/philly/admin').phoneBar[0]).toBe('To do')
   })
 
-  // Reports is one page (step 5); History opens from its last row and is
-  // still Reports.
-  it('shows Reports, and History under it, with no tabs', () => {
-    for (const path of ['/philly/admin/metrics', '/philly/admin/history/rejected']) {
-      expect(show(path).heading).toBe('Reports')
+  // Reports is one page (step 5); History and every search nobody found
+  // open from its rows and are still Reports.
+  it('shows Reports, and History and Searches under it, with no tabs', () => {
+    for (const path of ['/philly/admin/metrics', '/philly/admin/history/rejected', '/philly/admin/searches']) {
+      const { heading, lit } = show(path)
+      expect(heading).toBe('Reports')
+      expect(lit).toEqual(['Reports'])
       expect(screen.queryByRole('navigation', { name: 'Reports' })).toBeNull()
       cleanup()
     }

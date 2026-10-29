@@ -76,7 +76,7 @@ describe('adminAreas', () => {
 
   it('is To do, Places, Site, Reports and Settings, Communities only for a superadmin', () => {
     expect(shape(true)).toEqual([
-      ['To do', ['To do', 'Watches', 'Searches', 'Responses']],
+      ['To do', ['To do', 'Watches', 'Responses']],
       ['Places', ['Places']],
       ['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Reports']],
@@ -115,7 +115,8 @@ describe('adminNavPosition', () => {
     ['/philly/admin', 'todo', 'queue'],
     ['/philly/admin/watches', 'todo', 'watches'],
     ['/philly/admin/watches/kind/restaurant', 'todo', 'watches'],
-    ['/philly/admin/searches', 'todo', 'searches'],
+    // Opened from Reports, like History; To do shows only what's waiting.
+    ['/philly/admin/searches', 'reports', 'metrics'],
     ['/philly/admin/responses', 'todo', 'responses'],
     ['/philly/admin/places', 'places', 'places'],
     ['/philly/admin/categories', 'site', 'categories'],

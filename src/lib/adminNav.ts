@@ -38,7 +38,6 @@ export type AdminTab =
   | 'pages'
   | 'campaigns'
   | 'metrics'
-  | 'searches'
   | 'watches'
   | 'team'
   | 'community'
@@ -71,7 +70,6 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
         // others are where its bottom rows lead.
         { tab: 'queue', href: base, label: 'To do' },
         { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
-        { tab: 'searches', href: `${base}/searches`, label: 'Searches' },
         { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
       ],
     },
@@ -127,9 +125,10 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
 }
 
 // Paths a tab covers besides its own: History (/history/approved and
-// /history/rejected) is part of Reports.
+// /history/rejected) and every search nobody found (/searches) are part of
+// Reports, which opens them. To do shows only the searches still waiting.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
-  metrics: ['/history'],
+  metrics: ['/history', '/searches'],
 }
 
 /** Which area is open and which tab is lit, for the current path. The

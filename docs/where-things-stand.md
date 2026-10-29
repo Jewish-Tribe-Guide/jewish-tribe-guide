@@ -425,9 +425,17 @@ brief, one round of drawings, then the build in pieces.
    card. The nav counts the same list (`src/lib/todo.ts`, one store in
    `useTodo.ts`), in the sidebar and as "To do · N" on a phone. Watches
    says how many pages are read and when they last ran.
-   Not as drawn: a Searches row (and Responses when none are new) sits
-   under Watches, since To do has no tabs and those pages hold the
-   dismissed searches, taught words and handled responses. The opened
+   Not as drawn: a Responses row (when none are new) sits under Watches,
+   since To do has no tabs and that page holds the handled responses. (A
+   Searches row sat there too until Oct 29; every search nobody found now
+   opens from Reports, under it like History, with "‹ Reports".)
+   **Drifted from the drawing, found Oct 29:** what a watch found (new
+   places off the kosher lists, a shul newsletter's changes, a website's
+   hours) is drawn in To do's New places and Changes, and the brief agreed
+   they sit with people's suggestions. The build leaves them out (the
+   queue's read drops them; they wait only on Watches' pages), and the
+   count leaves them out too. Live has 16 waiting that To do doesn't show.
+   Not fixed yet. The opened
    suggestion's wording (boards 3 and 4: "Update the listing", "Edit, then
    update", "Leave it") is still the old card's; its heading still says
    To do.
