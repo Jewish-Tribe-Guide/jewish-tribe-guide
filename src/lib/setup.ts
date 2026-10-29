@@ -1,8 +1,10 @@
-// To do's "Set up your guide" (the admin redesign's board "Setup"): the five
+// To do's "Set up your guide" (the admin redesign's board "Setup"): the four
 // things a new community's guide needs before it's ready, each ticked off
 // by what's actually saved, never by a box someone checks. Shown on To do
-// until all five are done, then never again; the nav's count takes in the
-// ones left.
+// until all four are done, then never again; the nav's count takes in the
+// ones left. The board's fifth, "Kosher lists to watch", is left out: a new
+// community has no way to add a list yet (only Keystone-K and Mekor are
+// read), so it could never be ticked.
 
 import { defaultHeroSplit } from './siteSettings'
 
@@ -18,8 +20,6 @@ export type SetupState = {
   /** The home page's big line has been saved for this community, not left
    *  to the starting copy. */
   heroWords: boolean
-  /** A kosher agency's list is read for this community. */
-  kosherLists: number
 }
 
 export type SetupStep = { key: string; name: string; line: string; href: string; done: boolean }
@@ -37,7 +37,6 @@ export function setupSteps(s: SetupState, base: string): SetupStep[] {
       done: s.categories > 0 && s.places > 0,
     },
     { key: 'words', name: 'The home page’s words', line: 'The big line and the line under it', href: `${base}/home`, done: s.heroWords },
-    { key: 'kosher', name: 'Kosher lists to watch', line: 'New places on them come here to decide', href: `${base}/watches`, done: s.kosherLists > 0 },
   ]
 }
 
@@ -52,7 +51,7 @@ export function ownHeroWords(saved: { headline: string | null; subhead: string |
   return headline !== start.headline || (saved?.subhead?.trim() ?? '') !== start.subhead
 }
 
-/** How many of the five are left; 0 once the guide is set up. */
+/** How many of the four are left; 0 once the guide is set up. */
 export function setupLeft(s: SetupState | null): number {
   return s ? setupSteps(s, '').filter((step) => !step.done).length : 0
 }

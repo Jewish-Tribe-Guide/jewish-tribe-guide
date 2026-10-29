@@ -14,7 +14,7 @@ vi.mock('@/lib/setupStore', () => ({ getSetupState: m.getSetupState }))
 
 const { GET } = await import('./route')
 const req = () => new Request('http://x/api/admin/setup?community=newtown')
-const STATE = { logo: false, admins: 1, categories: 0, places: 0, heroWords: false, kosherLists: 0 }
+const STATE = { logo: false, admins: 1, categories: 0, places: 0, heroWords: false }
 
 beforeEach(() => {
   vi.resetAllMocks()

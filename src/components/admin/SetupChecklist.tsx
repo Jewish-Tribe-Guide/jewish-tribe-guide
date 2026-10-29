@@ -6,8 +6,8 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { setupSteps, type SetupState } from '@/lib/setup'
 import { Chevron } from './AdminUI'
 
-// To do's "Set up your guide" (board "Setup"): five rows, each opening the
-// screen that does it, ticked when it's saved. Gone once all five are done.
+// To do's "Set up your guide" (board "Setup"): four rows, each opening the
+// screen that does it, ticked when it's saved. Gone once all four are done.
 
 export default function SetupChecklist({ setup }: { setup: SetupState }) {
   const base = adminBase(useCommunitySlug())

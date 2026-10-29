@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { ownHeroWords, setupLeft, setupSteps, type SetupState } from './setup'
 
-const NEW: SetupState = { logo: false, admins: 1, categories: 0, places: 0, heroWords: false, kosherLists: 0 }
+const NEW: SetupState = { logo: false, admins: 1, categories: 0, places: 0, heroWords: false }
 
 describe('setupSteps', () => {
-  it('a new community has all five to do, in the drawn order', () => {
+  it('a new community has all four to do, in the drawn order, without the kosher lists', () => {
     expect(setupSteps(NEW, '/x/admin').map((s) => [s.name, s.done])).toEqual([
       ['Name and logo', false],
       ['A second admin', false],
       ['Your first category', false],
       ['The home page’s words', false],
-      ['Kosher lists to watch', false],
     ])
-    expect(setupLeft(NEW)).toBe(5)
+    expect(setupLeft(NEW)).toBe(4)
   })
 
   it('ticks each off by what is saved', () => {
@@ -23,11 +22,10 @@ describe('setupSteps', () => {
     expect(done({ categories: 1 })).toEqual([])
     expect(done({ categories: 1, places: 3 })).toEqual(['category'])
     expect(done({ heroWords: true })).toEqual(['words'])
-    expect(done({ kosherLists: 2 })).toEqual(['kosher'])
   })
 
-  it('nothing left once all five are done, and nothing counted when it could not be read', () => {
-    expect(setupLeft({ logo: true, admins: 2, categories: 1, places: 1, heroWords: true, kosherLists: 1 })).toBe(0)
+  it('nothing left once all four are done, and nothing counted when it could not be read', () => {
+    expect(setupLeft({ logo: true, admins: 2, categories: 1, places: 1, heroWords: true })).toBe(0)
     expect(setupLeft(null)).toBe(0)
   })
 })

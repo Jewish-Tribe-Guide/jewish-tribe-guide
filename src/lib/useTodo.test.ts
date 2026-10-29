@@ -29,13 +29,13 @@ afterEach(() => {
 
 describe('useTodoCount', () => {
   it('counts the setup steps left with what there is to decide', async () => {
-    answer({ logo: true, admins: 2, categories: 0, places: 0, heroWords: false, kosherLists: 0 })
+    answer({ logo: true, admins: 2, categories: 0, places: 0, heroWords: false })
     const { result } = renderHook(() => useTodoCount('tok', 'newtown'))
-    await waitFor(() => expect(result.current).toBe(4))
+    await waitFor(() => expect(result.current).toBe(3))
   })
 
   it('counts no setup once it is done, or when it could not be read', async () => {
-    answer({ logo: true, admins: 2, categories: 1, places: 1, heroWords: true, kosherLists: 1 })
+    answer({ logo: true, admins: 2, categories: 1, places: 1, heroWords: true })
     const done = renderHook(() => useTodoCount('tok', 'philly'))
     await waitFor(() => expect(done.result.current).toBe(1))
     done.unmount()
