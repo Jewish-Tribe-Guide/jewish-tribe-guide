@@ -337,10 +337,8 @@ export async function setCommunityEmailLists(
 /** Adds one email to a community's admin allowlist — the one write a
  *  community's OWN admin console can make to it (see
  *  POST /api/admin/team), as opposed to the full replace
- *  setCommunityEmailLists offers the superadmin console. Deliberately
- *  add-only: there is no matching "remove" here, so a regular admin can
- *  grow their own team's access but never shrink anyone else's — only
- *  the superadmin console's edit panel can remove an address. Case-
+ *  setCommunityEmailLists offers the superadmin console. Removing is
+ *  removeCommunityAdminEmail, from the Team tab. Case-
  *  insensitively deduped against what's already there; a no-op (not an
  *  error) if the email is already on the list. */
 export async function addCommunityAdminEmail(slug: string, email: string): Promise<string[]> {
@@ -375,10 +373,9 @@ export async function getCommunityNotifyPreferenceLists(
   return { notifyMutedEmails: row?.notify_muted_emails ?? [], notifyReviewEmails: row?.notify_review_emails ?? [] }
 }
 
-/** Removes one email from a community's admin allowlist — the superadmin
- *  console's roster "Remove" button, and the only place an admin is ever
- *  removed (see addCommunityAdminEmail's own comment on why the community's
- *  own Team tab is add-only). Also strips that address from
+/** Removes one email from a community's admin allowlist — the Team tab's
+ *  Remove (DELETE /api/admin/team, which never lets anyone remove
+ *  themselves). Also strips that address from
  *  notify_muted_emails and notify_review_emails in the same update, so a
  *  removed admin's old preference doesn't linger as a stale row that
  *  outlives their access — nothing else in this module ever cleaned those up

@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     submission =
       decision === 'approved'
         ? await approveSubmission(id, community.slug, admin.email, body.payload, only as string[] | undefined)
-        : await rejectSubmission(id, community.slug, admin.email)
+        : await rejectSubmission(id, community.slug, admin.email, reason)
   } catch (err) {
     if (err instanceof ReviewEditError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 400 })

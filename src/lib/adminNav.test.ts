@@ -79,10 +79,10 @@ describe('adminAreas', () => {
       ['To do', ['To do', 'Watches', 'Searches', 'Responses']],
       ['Places', ['Places']],
       ['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns', 'About and Privacy']],
-      ['Reports', ['Numbers', 'History']],
-      ['Settings', ['Team', 'Communities']],
+      ['Reports', ['Reports']],
+      ['Settings', ['Team', 'Community', 'Communities']],
     ])
-    expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
+    expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Community']])
     expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns']])
   })
 
@@ -127,9 +127,10 @@ describe('adminNavPosition', () => {
     ['/philly/admin/menus', 'site', 'menus'],
     ['/philly/admin/pages', 'site', 'pages'],
     ['/philly/admin/metrics', 'reports', 'metrics'],
-    ['/philly/admin/history/approved', 'reports', 'history'],
-    ['/philly/admin/history/rejected', 'reports', 'history'],
+    ['/philly/admin/history/approved', 'reports', 'metrics'],
+    ['/philly/admin/history/rejected', 'reports', 'metrics'],
     ['/philly/admin/team', 'settings', 'team'],
+    ['/philly/admin/community', 'settings', 'community'],
     ['/philly/admin/communities', 'settings', 'communities'],
   ]
   it.each(cases)('%s opens %s, with %s lit', (path, area, tab) => {

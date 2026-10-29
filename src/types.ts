@@ -263,6 +263,9 @@ export type SubmissionRow = {
    *  — null for anything reviewed before this existed, and for anything
    *  still pending. */
   reviewed_by: string | null
+  /** What the admin typed when leaving it out. Optional: migration 089 adds
+   *  the column, and nothing before it has one. */
+  review_reason?: string | null
   /** A plain, auto-incrementing number — what admin-facing emails lead
    *  with (see email.ts's own doc) so two different emails about the same
    *  submission are trivially recognizable as such. Not a business key:

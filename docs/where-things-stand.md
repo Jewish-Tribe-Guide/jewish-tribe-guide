@@ -509,7 +509,27 @@ brief, one round of drawings, then the build in pieces.
    "+ Add a form" and "Delete this form" are kept (not drawn); a
    campaign's photo is shown, not picked (it's fixed in code); the
    campaign preview has no Computer/Phone switch; "Button first" is kept.
-   Next: step 5 (Reports and the gear), then step 6 (Setup).
+12. **Build, step 5 (Reports and the gear): BUILT Oct 29.**
+   Reports (was Metrics): Week / Month / Year; listing views as a bar a
+   day (a month, for a year) with "N since …"; Most viewed places; Decided
+   this month as Taken / Left for New places, Changes and Removals,
+   grouped the way To do groups them; Searches nobody found (how many
+   different searches); History. History is no longer its own tab: it
+   opens from Reports, says Taken / Left, and a left-out card shows the
+   reason it was left out. The gear: Team lists every admin, adds one, and
+   removes one (asks once; nobody can remove themselves, your own row says
+   "You"), and has your two email switches; Community has Name and logo
+   (moved off Header and menus). Communities (site owner) no longer has
+   its own admin list: it links to that community's Team.
+   **You run migration 089** (`submission.review_reason`) in the SQL
+   editor, dev and live. Until then leaving something out still works,
+   but its reason isn't kept, so History shows none.
+   Fixed on the way: saving a Site tab sent every setting, so a tab left
+   open could put back an older name or Feedback heading. It now sends
+   only what changed on that tab.
+   Not as drawn: nothing. Gone, as drawn: the Pending count (To do has
+   it), approval rate and time to approval.
+   Next: step 6 (Setup).
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

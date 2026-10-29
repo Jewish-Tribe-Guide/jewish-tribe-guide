@@ -12,15 +12,16 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
 import { AdminEmpty } from './AdminUI'
 
+// Taken and Left, the words Reports counts them in.
 const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = {
-  approved: { title: 'Approved', empty: 'Nothing has been approved yet.' },
-  rejected: { title: 'Rejected', empty: 'Nothing has been rejected yet.' },
+  approved: { title: 'Taken', empty: 'Nothing taken yet.' },
+  rejected: { title: 'Left', empty: 'Nothing left out yet.' },
 }
 
 // Read-only, most-recently-decided-first view of what happened to
-// already-moderated submissions — the Metrics tab's Approved/Rejected tiles
-// link here so an admin can answer "what did we approve" or "did I actually
-// reject that" without going into Supabase directly.
+// already-moderated submissions, with who decided and, for one left out,
+// why — Reports' History row opens it, so an admin can answer "what did we
+// take" or "did I actually leave that out" without going into Supabase.
 export default function SubmissionHistory({ token, status }: { token: string; status: 'approved' | 'rejected' }) {
   const community = useCommunitySlug()
   const [items, setItems] = useState<EnrichedSubmission[] | null>(null)
@@ -47,6 +48,10 @@ export default function SubmissionHistory({ token, status }: { token: string; st
 
   return (
     <div>
+      <Link href={`${adminBase(community)}/metrics`} className="inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary">
+        ‹ Reports
+      </Link>
+      <h2 className="mt-0 mb-3 text-[26px] font-bold text-slate-900">History</h2>
       <div role="group" aria-label="Show" className="flex gap-2 mb-4">
         {(['approved', 'rejected'] as const).map((s) => (
           <Link

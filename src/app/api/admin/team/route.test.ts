@@ -5,6 +5,7 @@ const m = vi.hoisted(() => ({
   resolveCommunity: vi.fn(),
   getCommunityAdminEmails: vi.fn(),
   addCommunityAdminEmail: vi.fn(),
+  removeCommunityAdminEmail: vi.fn(),
   getAdminNotifyPreference: vi.fn(),
   getAdminReviewNotifyPreference: vi.fn(),
   setAdminNotifyPreference: vi.fn(),
@@ -16,13 +17,14 @@ vi.mock('@/lib/communityStore', () => ({
   resolveCommunity: m.resolveCommunity,
   getCommunityAdminEmails: m.getCommunityAdminEmails,
   addCommunityAdminEmail: m.addCommunityAdminEmail,
+  removeCommunityAdminEmail: m.removeCommunityAdminEmail,
   getAdminNotifyPreference: m.getAdminNotifyPreference,
   getAdminReviewNotifyPreference: m.getAdminReviewNotifyPreference,
   setAdminNotifyPreference: m.setAdminNotifyPreference,
   setAdminReviewNotifyPreference: m.setAdminReviewNotifyPreference,
 }))
 
-const { GET, PATCH, POST } = await import('./route')
+const { GET, PATCH, POST, DELETE } = await import('./route')
 const req = (method: string, body?: unknown, query = '') =>
   new Request(`http://x/api/admin/team${query}`, { method, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) })
 
@@ -41,6 +43,7 @@ describe.each([
   ['GET', () => GET(req('GET', undefined, '?community=ues'))],
   ['PATCH', () => PATCH(req('PATCH', { notify: true }, '?community=ues'))],
   ['POST', () => POST(req('POST', { email: 'a@b.co' }, '?community=ues'))],
+  ['DELETE', () => DELETE(req('DELETE', { email: 'other@x.co' }, '?community=ues'))],
 ])('%s /api/admin/team access', (_m, call) => {
   it('401s without an admin for THIS community, changing nothing', async () => {
     m.getAdminUserForCommunity.mockResolvedValue(null)
@@ -48,6 +51,7 @@ describe.each([
     expect(m.getAdminUserForCommunity).toHaveBeenCalledWith(expect.anything(), 'ues')
     expect(m.setAdminNotifyPreference).not.toHaveBeenCalled()
     expect(m.addCommunityAdminEmail).not.toHaveBeenCalled()
+    expect(m.removeCommunityAdminEmail).not.toHaveBeenCalled()
   })
 })
 
@@ -128,5 +132,31 @@ describe('POST /api/admin/team', () => {
     const res = await POST(req('POST', { email: 'a@b.co' }))
     expect(res.status).toBe(502)
     expect((await res.json()).errors).toEqual(['already on the list'])
+  })
+})
+
+describe('DELETE /api/admin/team', () => {
+  it('takes the address off this community and returns the new list', async () => {
+    m.removeCommunityAdminEmail.mockResolvedValue(['me@x.co'])
+    const res = await DELETE(req('DELETE', { email: ' other@x.co ' }))
+    expect(await res.json()).toEqual({ ok: true, adminEmails: ['me@x.co'] })
+    expect(m.removeCommunityAdminEmail).toHaveBeenCalledWith('ues', 'other@x.co')
+  })
+
+  it('never removes the admin asking, whatever the case', async () => {
+    const res = await DELETE(req('DELETE', { email: 'ME@x.co' }))
+    expect(res.status).toBe(400)
+    expect(m.removeCommunityAdminEmail).not.toHaveBeenCalled()
+  })
+
+  it('400s without an email', async () => {
+    expect((await DELETE(req('DELETE', {}))).status).toBe(400)
+    expect((await DELETE(req('DELETE', 'nope'))).status).toBe(400)
+    expect(m.removeCommunityAdminEmail).not.toHaveBeenCalled()
+  })
+
+  it('502s when removing fails', async () => {
+    m.removeCommunityAdminEmail.mockRejectedValue(new Error('boom'))
+    expect((await DELETE(req('DELETE', { email: 'other@x.co' }))).status).toBe(502)
   })
 })

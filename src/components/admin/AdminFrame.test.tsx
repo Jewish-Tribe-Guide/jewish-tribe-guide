@@ -82,9 +82,14 @@ describe('AdminFrame', () => {
     expect(show('/philly/admin').phoneBar[0]).toBe('To do')
   })
 
-  it('names the one page of an area whose page is called something else', () => {
-    show('/philly/admin/team')
-    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link').textContent).toBe('Team')
+  // Reports is one page (step 5); History opens from its last row and is
+  // still Reports.
+  it('shows Reports, and History under it, with no tabs', () => {
+    for (const path of ['/philly/admin/metrics', '/philly/admin/history/rejected']) {
+      expect(show(path).heading).toBe('Reports')
+      expect(screen.queryByRole('navigation', { name: 'Reports' })).toBeNull()
+      cleanup()
+    }
   })
 
   it('shows no tabs for an area with one page of its own name, and a plain heading off the map', () => {
@@ -114,11 +119,12 @@ describe('AdminFrame', () => {
 
   it('offers Communities under Settings to the site owner only', () => {
     show('/philly/admin/team')
-    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Team'])
+    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Team', 'Community'])
     cleanup()
     show('/philly/admin/team', true)
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual([
       'Team',
+      'Community',
       'Communities',
     ])
   })

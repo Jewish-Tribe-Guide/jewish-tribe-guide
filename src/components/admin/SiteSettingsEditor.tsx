@@ -48,6 +48,12 @@ export function countChanges(
   return settings + (sectionsEqual(sections, sectionsDraft) ? 0 : 1)
 }
 
+/** The settings the draft changes, and nothing else. */
+export function changedSettings(saved: SiteSettings, draft: SiteSettings): Partial<SiteSettings> {
+  const keys = Object.keys(draft) as (keyof SiteSettings)[]
+  return Object.fromEntries(keys.filter((k) => JSON.stringify(saved[k]) !== JSON.stringify(draft[k])).map((k) => [k, draft[k]]))
+}
+
 /** The items as one line, "Challah, Wine, Chicken". What was typed stays
  *  while it still says the same list, so a comma or a space isn't swallowed
  *  mid-word; after an Undo or a save it's the list again. */
@@ -86,7 +92,6 @@ export default function SiteSettingsEditor({
   // ImageUploadField's memory of "the real original behind `value`", kept
   // here so it survives the field unmounting when the tab switches (this
   // component stays mounted across both tabs; the fields don't).
-  const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
   const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
 
   const load = useCallback(async () => {
@@ -135,13 +140,17 @@ export default function SiteSettingsEditor({
     setError(null)
     setSaving(true)
     try {
-      if (JSON.stringify(settings) !== JSON.stringify(draft)) {
+      // Only what changed here: Forms (the feedback form) and Settings (the
+      // name and logo) save their own settings, and this draft may hold
+      // what they had before they saved.
+      const changed = changedSettings(settings, draft)
+      if (Object.keys(changed).length > 0) {
         const body = await fetchJson<{ settings: SiteSettings }>(
           withCommunity('/api/admin/site-settings', community.slug),
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(draft),
+            body: JSON.stringify(changed),
           },
           'Save failed.',
         )
@@ -280,26 +289,6 @@ export default function SiteSettingsEditor({
             </>
           ) : (
             <>
-              <AdminBox title="Name and logo">
-                <div className="flex flex-col gap-4 p-4">
-                  <AdminField label="Name">
-                    <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  <div>
-                    <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Logo</span>
-                    <ImageUploadField
-                      value={draft.logoUrl ?? ''}
-                      onChange={(url) => set('logoUrl', url || null)}
-                      uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
-                      token={token}
-                      shape="square"
-                      originalSource={logoOriginal}
-                      onOriginalSourceChange={setLogoOriginal}
-                    />
-                  </div>
-                </div>
-              </AdminBox>
-
               <AdminBox title="Top of the page, on a computer">
                 <div className="p-4">
                   <DesktopNavEditor items={draft.desktopNavItems} onChange={(items) => set('desktopNavItems', items)} />

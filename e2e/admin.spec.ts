@@ -102,13 +102,19 @@ test.describe('admin console', () => {
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
-  test('the Header and menus tab shows the real saved site name', async ({ page, request }) => {
+  test('Settings → Community shows the real saved site name', async ({ page, request }) => {
     const res = await request.get('/api/site-settings')
     const settings = (await res.json()).settings as { name: string }
 
-    await page.goto('/philly/admin/menus')
+    await page.goto('/philly/admin/community')
     await expect(page.getByRole('heading', { name: 'Name and logo' })).toBeVisible()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue(settings.name)
+    await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
+  })
+
+  test('the Header and menus tab shows the computer’s and the phone’s menus', async ({ page }) => {
+    await page.goto('/philly/admin/menus')
+    await expect(page.getByRole('heading', { name: 'Top of the page, on a computer' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Tabs, on a phone' })).toBeVisible()
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
@@ -120,15 +126,13 @@ test.describe('admin console', () => {
     }
   })
 
-  test('the Metrics tab shows real submission stats, not stuck loading', async ({ page }) => {
+  test('Reports loads real numbers, not stuck loading', async ({ page }) => {
     await page.goto('/philly/admin/metrics')
 
-    // Loading text should resolve to a real number, not sit forever — and
-    // "Approved"/"Rejected" tiles always render even with zero decided
-    // submissions (getSubmissionFunnelStats returns 0s, not an error).
-    await expect(page.getByText('Loading metrics…')).not.toBeVisible({ timeout: 10_000 })
-    await expect(page.getByText('Pending')).toBeVisible()
-    await expect(page.getByText('Approval rate')).toBeVisible()
+    // Every box renders even with nothing counted or decided yet.
+    await expect(page.getByRole('heading', { name: 'Listing views' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: /^Decided in / })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Taken' })).toBeVisible()
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 

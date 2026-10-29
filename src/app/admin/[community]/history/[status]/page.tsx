@@ -25,7 +25,7 @@ export default function AdminHistoryPage() {
         <p className="text-sm text-red-700">
           Unknown status &ldquo;{params.status}&rdquo;.{' '}
           <Link href={`${adminBase(community)}/metrics`} className="underline">
-            Back to Metrics
+            Back to Reports
           </Link>
         </p>
       )}

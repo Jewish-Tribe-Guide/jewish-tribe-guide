@@ -7,9 +7,8 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import TeamManager from './TeamManager'
 
-// Add-only by design — see this component's own comment. There is
-// deliberately no "remove" affordance and no test for one; removing an
-// admin is a superadmin-only action from CommunityManager instead.
+// Settings' Team tab: one list, added to and removed from here, never
+// yourself; and your own two emails, as switches.
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -25,7 +24,7 @@ function mockList(adminEmails: string[], myNotify = true, myReviewNotify = false
 
 async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com'], myNotify = true, myReviewNotify = false) {
   mockList(adminEmails, myNotify, myReviewNotify)
-  const view = renderWithProviders(<TeamManager token="tok" />, { community: { slug: 'ues' } })
+  const view = renderWithProviders(<TeamManager token="tok" me="me@example.com" />, { community: { slug: 'ues' } })
   await waitFor(() => expect(screen.queryByText('Loading team…')).toBeNull())
   return view
 }
@@ -37,11 +36,12 @@ afterEach(() => {
 })
 
 describe('TeamManager', () => {
-  it('lists every configured admin email', async () => {
-    await renderAndWaitForList(['jane@example.com', 'sam@example.com'])
+  it('lists every admin, with You on your own row instead of Remove', async () => {
+    await renderAndWaitForList(['Me@Example.com', 'sam@example.com'])
 
-    expect(screen.getByText('jane@example.com')).toBeInTheDocument()
-    expect(screen.getByText('sam@example.com')).toBeInTheDocument()
+    const rows = screen.getAllByRole('listitem')
+    expect(rows.map((r) => r.textContent)).toEqual(['Me@Example.comYou', 'sam@example.comRemove'])
+    expect(screen.queryByRole('button', { name: 'Remove Me@Example.com' })).toBeNull()
   })
 
   it('scopes the GET to the active community', async () => {
@@ -53,16 +53,10 @@ describe('TeamManager', () => {
     )
   })
 
-  it('shows a fallback message when nobody has been added yet', async () => {
-    await renderAndWaitForList([])
-
-    expect(screen.getByText(/falls back to the site owner/i)).toBeInTheDocument()
-  })
-
-  it('disables Add until something is typed', async () => {
+  it('disables Add admin until something is typed', async () => {
     await renderAndWaitForList()
 
-    expect(screen.getByRole('button', { name: /^add$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add admin' })).toBeDisabled()
   })
 
   it('POSTs the typed email, scoped to the active community, and adds it to the list', async () => {
@@ -70,8 +64,8 @@ describe('TeamManager', () => {
     await renderAndWaitForList(['jane@example.com'])
     vi.mocked(fetchJson).mockResolvedValueOnce({ adminEmails: ['jane@example.com', 'sam@example.com'] })
 
-    await user.type(screen.getByPlaceholderText(/teammate@example.com/i), 'sam@example.com')
-    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'sam@example.com')
+    await user.click(screen.getByRole('button', { name: 'Add admin' }))
 
     await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
     const call = vi.mocked(fetchJson).mock.calls[0]!
@@ -82,114 +76,90 @@ describe('TeamManager', () => {
     expect(JSON.parse(init.body as string)).toEqual({ email: 'sam@example.com' })
 
     expect(await screen.findByText('sam@example.com')).toBeInTheDocument()
-    // The input clears after a successful add.
-    expect(screen.getByPlaceholderText(/teammate@example.com/i)).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('')
   })
 
-  it('shows a server-side error inline and leaves the typed email in place', async () => {
+  it('shows a server-side error and leaves the typed email in place', async () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('A valid email is required.'))
     const user = userEvent.setup()
     await renderAndWaitForList()
 
-    await user.type(screen.getByPlaceholderText(/teammate@example.com/i), 'not-an-email')
-    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'not-an-email')
+    await user.click(screen.getByRole('button', { name: 'Add admin' }))
 
     expect(await screen.findByText('A valid email is required.')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/teammate@example.com/i)).toHaveValue('not-an-email')
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('not-an-email')
   })
 
-  it('shows an error inline when the initial load fails', async () => {
+  it('removes someone after asking, with DELETE, and Leave it keeps them', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList(['me@example.com', 'sam@example.com'])
+
+    await user.click(screen.getByRole('button', { name: 'Remove sam@example.com' }))
+    expect(screen.getByText('Remove sam@example.com?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Leave it' }))
+    expect(fetchJson).not.toHaveBeenCalled()
+    expect(screen.getByText('sam@example.com')).toBeInTheDocument()
+
+    vi.mocked(fetchJson).mockResolvedValueOnce({ adminEmails: ['me@example.com'] })
+    await user.click(screen.getByRole('button', { name: 'Remove sam@example.com' }))
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => expect(screen.queryByText('sam@example.com')).toBeNull())
+    const init = vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit
+    expect(vi.mocked(fetchJson).mock.calls[0]![0]).toBe('/api/admin/team?community=ues')
+    expect(init.method).toBe('DELETE')
+    expect(JSON.parse(init.body as string)).toEqual({ email: 'sam@example.com' })
+  })
+
+  it('shows an error when the initial load fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response))
     vi.mocked(parseOkJson).mockRejectedValue(new Error('Failed to load the team list.'))
-    renderWithProviders(<TeamManager token="tok" />, { community: { slug: 'ues' } })
+    renderWithProviders(<TeamManager token="tok" me="me@example.com" />, { community: { slug: 'ues' } })
 
     expect(await screen.findByText('Failed to load the team list.')).toBeInTheDocument()
   })
 
-  describe('notification checkbox', () => {
-    it('reflects the signed-in admin\'s own myNotify value from the load', async () => {
-      await renderAndWaitForList(['jane@example.com'], true)
-      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
+  // Only the signed-in admin's own: on by default for something new to
+  // decide, off for another admin's decisions (see the notify_review_emails
+  // migration's comment). Saved as soon as it's switched, put back on a
+  // failure.
+  describe.each([
+    ['Something new to decide', 'notify', 'Another admin decided something'],
+    ['Another admin decided something', 'reviewNotify', 'Something new to decide'],
+  ] as const)('the %s switch', (label, field, other) => {
+    const on = (field === 'notify') as boolean
 
-      cleanup()
-      await renderAndWaitForList(['jane@example.com'], false)
-      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).not.toBeChecked()
+    it('shows the value it loaded with', async () => {
+      await renderAndWaitForList(['jane@example.com'], true, false)
+      expect(screen.getByRole('switch', { name: label })).toHaveAttribute('aria-checked', String(on))
     })
 
-    it('unchecking it PATCHes { notify: false } scoped to the active community', async () => {
+    it('PATCHes only itself, scoped to the active community', async () => {
       const user = userEvent.setup()
-      await renderAndWaitForList(['jane@example.com'], true)
-      vi.mocked(fetchJson).mockResolvedValueOnce({ myNotify: false })
+      await renderAndWaitForList(['jane@example.com'], true, false)
+      vi.mocked(fetchJson).mockResolvedValueOnce({})
 
-      await user.click(screen.getByRole('checkbox', { name: /email me about new submissions/i }))
+      await user.click(screen.getByRole('switch', { name: label }))
 
       await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
       const call = vi.mocked(fetchJson).mock.calls[0]!
       expect(call[0]).toBe('/api/admin/team?community=ues')
-      const init = call[1] as RequestInit
-      expect(init.method).toBe('PATCH')
-      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
-      expect(JSON.parse(init.body as string)).toEqual({ notify: false })
-      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).not.toBeChecked()
+      expect((call[1] as RequestInit).method).toBe('PATCH')
+      expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ [field]: !on })
+      expect(screen.getByRole('switch', { name: label })).toHaveAttribute('aria-checked', String(!on))
+      expect(screen.getByRole('switch', { name: other })).toHaveAttribute('aria-checked', String(!on))
     })
 
-    it('reverts the checkbox and shows an error when the PATCH fails', async () => {
-      const user = userEvent.setup()
-      await renderAndWaitForList(['jane@example.com'], true)
-      vi.mocked(fetchJson).mockRejectedValueOnce(new Error('Could not update your notification preference.'))
-
-      await user.click(screen.getByRole('checkbox', { name: /email me about new submissions/i }))
-
-      expect(await screen.findByText('Could not update your notification preference.')).toBeInTheDocument()
-      // Reverted, not left on the optimistic (unchecked) value.
-      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
-    })
-  })
-
-  // Opt-in (defaults off), unlike the new-submissions checkbox above — see
-  // the notify_review_emails migration's own comment on why. Otherwise the
-  // same self-only, optimistic-with-revert shape.
-  describe('review-notification checkbox', () => {
-    it('defaults to unchecked and reflects myReviewNotify from the load', async () => {
-      await renderAndWaitForList(['jane@example.com'], true, false)
-      expect(
-        screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }),
-      ).not.toBeChecked()
-
-      cleanup()
-      await renderAndWaitForList(['jane@example.com'], true, true)
-      expect(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i })).toBeChecked()
-    })
-
-    it('checking it PATCHes { reviewNotify: true } scoped to the active community, without touching notify', async () => {
-      const user = userEvent.setup()
-      await renderAndWaitForList(['jane@example.com'], true, false)
-      vi.mocked(fetchJson).mockResolvedValueOnce({ myReviewNotify: true })
-
-      await user.click(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }))
-
-      await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-      const call = vi.mocked(fetchJson).mock.calls[0]!
-      expect(call[0]).toBe('/api/admin/team?community=ues')
-      const init = call[1] as RequestInit
-      expect(init.method).toBe('PATCH')
-      expect(JSON.parse(init.body as string)).toEqual({ reviewNotify: true })
-      expect(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i })).toBeChecked()
-      // The other checkbox's own value is untouched.
-      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
-    })
-
-    it('reverts the checkbox and shows an error when the PATCH fails', async () => {
+    it('goes back and says so when the save fails', async () => {
       const user = userEvent.setup()
       await renderAndWaitForList(['jane@example.com'], true, false)
       vi.mocked(fetchJson).mockRejectedValueOnce(new Error('Could not update your notification preference.'))
 
-      await user.click(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }))
+      await user.click(screen.getByRole('switch', { name: label }))
 
       expect(await screen.findByText('Could not update your notification preference.')).toBeInTheDocument()
-      expect(
-        screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }),
-      ).not.toBeChecked()
+      expect(screen.getByRole('switch', { name: label })).toHaveAttribute('aria-checked', String(on))
     })
   })
 })

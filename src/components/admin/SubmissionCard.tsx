@@ -24,8 +24,8 @@ const OP_META: Record<EnrichedSubmission['operation'], { label: string; cls: str
 }
 
 const STATUS_META: Record<'approved' | 'rejected', { label: string; cls: string }> = {
-  approved: { label: 'Approved', cls: 'bg-green-50 text-green-700 border border-green-200' },
-  rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border border-red-200' },
+  approved: { label: 'Taken', cls: 'bg-green-50 text-green-700 border border-green-200' },
+  rejected: { label: 'Left', cls: 'bg-red-50 text-red-700 border border-red-200' },
 }
 
 
@@ -208,6 +208,9 @@ export function SubmissionCard({
                   "unknown admin". */}
               {s.reviewed_by && <span className="ml-2">by {s.reviewed_by}</span>}
             </p>
+          )}
+          {!onModerate && s.status === 'rejected' && s.review_reason && (
+            <p className="text-xs text-slate-700 mt-1">&ldquo;{s.review_reason}&rdquo;</p>
           )}
         </div>
 

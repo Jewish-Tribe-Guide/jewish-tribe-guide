@@ -682,110 +682,20 @@ describe('CommunityManager — publishing a community', () => {
   })
 })
 
-describe('CommunityManager — admin roster', () => {
-  const ues = makeCommunity({
-    slug: 'ues',
-    name: 'Upper East Side',
-    region: 'Manhattan',
-    adminEmails: ['jane@example.com', 'sam@example.com'],
-    // jane is muted on submissions (opted out) and opted in to review-action
-    // emails; sam is on the defaults for both — exercises every combination
-    // of the two read-only pills at once.
-    notifyMutedEmails: ['jane@example.com'],
-    notifyReviewEmails: ['jane@example.com'],
-  })
+// Who can sign in is each community's own Team tab now (the admin
+// redesign's step 5): a card says how many, and links there.
+describe('CommunityManager — admins', () => {
+  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', adminEmails: ['jane@example.com', 'sam@example.com'] })
 
-  it('shows every admin with their own submission and review-action preference', async () => {
+  it('links each community to its own Team tab, with no list to change here', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
     const card = cardFor(/upper east side/i)
+    expect(within(card).getByText(/2 admins/)).toBeInTheDocument()
     await openCard(user, card)
 
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    expect(within(janeRow).getByText('Off')).toBeInTheDocument()
-    expect(within(janeRow).getByText('On')).toBeInTheDocument()
-
-    const samRow = within(card).getByText('sam@example.com').closest('tr')!
-    expect(within(samRow).getByText('On')).toBeInTheDocument()
-    expect(within(samRow).getByText('Off')).toBeInTheDocument()
-  })
-
-  it('shows the empty state when no admins are configured', async () => {
-    const user = userEvent.setup()
-    const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
-    await renderAndWaitForList([empty])
-    await openCard(user, cardFor(/empty community/i))
-    expect(screen.getByText(/no admins set — only the site owner can sign in/i)).toBeInTheDocument()
-  })
-
-  it('adds a new admin', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-    vi.mocked(fetchJson).mockResolvedValueOnce({
-      community: { ...ues, adminEmails: [...ues.adminEmails, 'new@example.com'] },
-    })
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    await user.type(within(card).getByPlaceholderText(/new-admin@example.com/i), 'new@example.com')
-    await user.click(within(card).getByRole('button', { name: /^add admin$/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ addAdminEmail: 'new@example.com' })
-    expect(await within(card).findByText('new@example.com')).toBeInTheDocument()
-  })
-
-  it('removes an admin after a confirm step', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-    vi.mocked(fetchJson).mockResolvedValueOnce({
-      community: { ...ues, adminEmails: ['sam@example.com'], notifyMutedEmails: [], notifyReviewEmails: [] },
-    })
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
-    // Not sent yet — confirmation is required first.
-    expect(fetchJson).not.toHaveBeenCalled()
-
-    await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ removeAdminEmail: 'jane@example.com' })
-    expect(within(card).queryByText('jane@example.com')).not.toBeInTheDocument()
-  })
-
-  it('Cancel on the remove confirmation leaves the admin in place', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
-    await user.click(within(janeRow).getByRole('button', { name: /^cancel$/i }))
-
-    expect(fetchJson).not.toHaveBeenCalled()
-    expect(within(card).getByText('jane@example.com')).toBeInTheDocument()
-  })
-
-  it('shows a server-side error inline when removing an admin fails', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not remove that admin.'))
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
-    await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))
-
-    expect(await within(card).findByText('Could not remove that admin.')).toBeInTheDocument()
-    expect(within(card).getByText('jane@example.com')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Change who can sign in' })).toHaveAttribute('href', '/ues/admin/team')
+    expect(within(card).queryByText('jane@example.com')).toBeNull()
+    expect(within(card).queryByRole('button', { name: /remove/i })).toBeNull()
   })
 })

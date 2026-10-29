@@ -291,7 +291,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   expect(reloaded?.status).toBe('rejected')
 })
 
-test('a rejected submission shows up on the Metrics tab\'s Rejected history view', async ({ page }) => {
+test('a left-out submission shows up in History, with its reason', async ({ page }) => {
   const supabase = getAdminClient()
   const name = `E2E Admin Write ${randomUUID()}`
 
@@ -315,16 +315,25 @@ test('a rejected submission shows up on the Metrics tab\'s Rejected history view
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Reject' }).click()
+  const reason = `Already listed ${randomUUID().slice(0, 8)}`
+  await review.getByLabel(/Reason for rejection/).fill(reason)
   await review.getByRole('button', { name: 'Confirm rejection' }).click()
   await expect(review).not.toBeVisible()
 
-  // The click-through this test actually exists to prove: Metrics' Rejected
-  // tile links to /admin/history/rejected, and the just-rejected submission
-  // is on it — the real-world case is "did I actually reject that?".
+  // The click-through this test actually exists to prove: Reports' History
+  // row, then Left, and the submission just left out is on it — the
+  // real-world case is "did I actually leave that out?".
   await page.goto('/philly/admin/metrics')
-  await page.getByRole('link', { name: /Rejected/ }).click()
+  await page.getByRole('link', { name: /History/ }).click()
+  await page.getByRole('link', { name: 'Left', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/history\/rejected/)
-  await expect(page.locator('div.rounded-lg.shadow-sm', { hasText: name })).toBeVisible()
+  const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
+  await expect(card).toBeVisible()
+
+  // With its reason, once the database keeps one (migration 089). Before
+  // that, leaving it out still has to work, which the rest of this proves.
+  const { error: noColumn } = await supabase.from('submission').select('review_reason').limit(1)
+  if (!noColumn) await expect(card.getByText(`“${reason}”`)).toBeVisible()
 
   const { data: reloaded } = await supabase.from('submission').select('status').eq('id', submission.id).single()
   expect(reloaded?.status).toBe('rejected')

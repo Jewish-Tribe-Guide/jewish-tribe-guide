@@ -38,10 +38,10 @@ export type AdminTab =
   | 'pages'
   | 'campaigns'
   | 'metrics'
-  | 'history'
   | 'searches'
   | 'watches'
   | 'team'
+  | 'community'
   | 'communities'
 
 export type AdminTabLink = { tab: AdminTab; href: string; label: string }
@@ -101,8 +101,8 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'reports',
       label: 'Reports',
       tabs: [
-        { tab: 'metrics', href: `${base}/metrics`, label: 'Numbers' },
-        { tab: 'history', href: `${base}/history/approved`, label: 'History' },
+        // One page (step 5); History opens from its last row.
+        { tab: 'metrics', href: `${base}/metrics`, label: 'Reports' },
         // Held back from the site for now (see features.ts).
         ...(features.whatChanged ? [{ tab: 'changes' as const, href: `${base}/changes`, label: 'What changed' }] : []),
       ],
@@ -112,6 +112,7 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       label: 'Settings',
       tabs: [
         { tab: 'team', href: `${base}/team`, label: 'Team' },
+        { tab: 'community', href: `${base}/community`, label: 'Community' },
         ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
       ],
     },
@@ -125,10 +126,10 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
   return adminAreas(community, isSuperAdmin).flatMap((a) => a.tabs)
 }
 
-// Paths a tab covers besides its own: History opens on /history/approved and
-// also covers /history/rejected.
+// Paths a tab covers besides its own: History (/history/approved and
+// /history/rejected) is part of Reports.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
-  history: ['/history'],
+  metrics: ['/history'],
 }
 
 /** Which area is open and which tab is lit, for the current path. The

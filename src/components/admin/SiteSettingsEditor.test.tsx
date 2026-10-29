@@ -213,18 +213,25 @@ describe('SiteSettingsEditor — Home page', () => {
 })
 
 describe('SiteSettingsEditor — Header and menus', () => {
-  // Feedback moved to the Forms tab (FeedbackEditor.test.tsx).
-  it('holds the name and logo, the computer’s top of the page and the phone’s tabs', async () => {
+  // Feedback moved to the Forms tab (FeedbackEditor.test.tsx), and the name
+  // and logo to Settings (CommunityEditor.test.tsx).
+  it('holds the computer’s top of the page and the phone’s tabs', async () => {
     await renderEditor('menus')
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(boxes).toEqual(['Name and logo', 'Top of the page, on a computer', 'Tabs, on a phone'])
+    expect(boxes).toEqual(['Top of the page, on a computer', 'Tabs, on a phone'])
+    expect(screen.queryByLabelText('Name')).toBeNull()
     expect(screen.queryByText('Below it, in this order')).toBeNull()
   })
 
-  it('shows the name, and a logo that can be repositioned', async () => {
-    await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', logoUrl: 'https://example.com/logo.png' })
-    expect(screen.getByLabelText('Name')).toHaveValue('Test Directory')
-    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+  // Forms and Settings save the feedback form and the name on their own.
+  // This draft may hold what they were before, so sending it whole put
+  // them back.
+  it('saves only what changed here', async () => {
+    const user = userEvent.setup()
+    await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Old name', feedbackHeading: 'Old heading' })
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    await saveWith(user, SITE_SETTINGS_DEFAULTS)
+    expect(Object.keys(sentBody())).toEqual(['desktopNavItems'])
   })
 
   // Regression: the editor showed the default items whenever the draft's list

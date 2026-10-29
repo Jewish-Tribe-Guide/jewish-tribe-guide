@@ -253,7 +253,7 @@ test('deleting a community through the real UI removes it and everything in it',
     await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
 
-  // Publish/Unpublish, Delete and the Admins roster all live behind one
+  // Publish/Unpublish, Delete and the Team link all live behind one
   // "Show"/"Hide" toggle on the card now (see CommunityManager.tsx's own
   // comment on why) — collapsed by default, so Delete isn't in the DOM
   // until this is clicked.
