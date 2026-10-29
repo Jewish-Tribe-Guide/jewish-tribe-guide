@@ -3,8 +3,9 @@ import { listCommunities } from '@/lib/communityStore'
 import { newsletterSenders, receiveNewsletter, type NewsletterEmail } from '@/lib/newsletterRun'
 import { receiveEruvEmail } from '@/lib/eruvEmailRun'
 import { senderEmail } from '@/lib/eruvEmail'
+import { communityOfNewsletterKey, recordNewsletterCheck } from '@/lib/newsletterSetupStore'
 
-// POST /api/inbound/newsletter   Authorization: Bearer <NEWSLETTER_SECRET>
+// POST /api/inbound/newsletter   Authorization: Bearer <key>
 //   { community, messageId, from, list?, subject, date?, text, attachment?: { mime, b64 } }
 // `list` is the mailing list it came through (its List-Post address), when
 // it did: a list's emails are from whoever posted them.
@@ -20,52 +21,61 @@ import { senderEmail } from '@/lib/eruvEmail'
 // sender an admin gave the eruv, it's read for up or down by code alone, so
 // it needs no OPENAI_API_KEY, and goes live at once.
 //
-// GET /api/inbound/newsletter?community=philly   (the same secret)
+// GET /api/inbound/newsletter?community=philly   (the same key)
+//   X-Guide-Account: the Gmail the script runs in
 //   → { senders: ['office@shul.org', …] }
 // Whose emails to send: the script asks first and searches the inbox for
 // just those (watchedSenders, and the eruvim's senders), so nothing else
-// leaves it.
+// leaves it. It asks every hour, so the asking is recorded too: the
+// Newsletters page's "Last checked" (newsletterSetupStore.ts).
 //
-// Auth: NEWSLETTER_SECRET, its own secret rather than CRON_SECRET, since it
-// lives in a script in a Gmail account. Without one the route is closed,
-// everywhere: it files suggestions and spends model calls.
+// The key: the community's own (newsletter_setup, migration 090), in the
+// script the admin console hands out, good for that community alone; or
+// NEWSLETTER_SECRET, good for every community, which a script set up
+// before Oct 29 carries. Its own keys rather than CRON_SECRET, since they
+// live in a script in a Gmail account. Without either the route is closed:
+// it files suggestions and spends model calls.
 
 export const maxDuration = 60
 
 const MAX_TEXT = 200_000
 const MAX_ATTACHMENT_B64 = 4_000_000
 
-function authorized(request: Request): boolean {
-  const secret = process.env.NEWSLETTER_SECRET
-  if (!secret) return false
-  const sent = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
+function sameSecret(sent: string, secret: string): boolean {
   const a = Buffer.from(sent)
   const b = Buffer.from(secret)
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-/** The script's door is shut without a secret, and to anyone without it. */
-function refused(request: Request): Response | null {
-  if (!process.env.NEWSLETTER_SECRET)
-    return Response.json(
-      {
-        ok: false,
-        error: 'Newsletters aren’t set up here (NEWSLETTER_SECRET).',
-      },
-      { status: 503 },
-    )
-  if (!authorized(request)) return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  return null
+/** Who the key is good for: every community (NEWSLETTER_SECRET), the one
+ *  whose own key it is, or no one. */
+async function keyHolder(request: Request): Promise<'every' | string | null> {
+  const sent = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() ?? ''
+  if (!sent) return null
+  const secret = process.env.NEWSLETTER_SECRET
+  if (secret && sameSecret(sent, secret)) return 'every'
+  return communityOfNewsletterKey(sent)
 }
+
+const unauthorized = () => Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+const mayActFor = (holder: string, community: string) => holder === 'every' || holder === community
 
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
 
+/** The Gmail the script says it runs in, if it looks like an address. */
+function accountOf(request: Request): string | null {
+  const said = request.headers.get('x-guide-account')?.trim().toLowerCase().slice(0, 254) ?? ''
+  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(said) ? said : null
+}
+
 export async function GET(request: Request) {
-  const refusal = refused(request)
-  if (refusal) return refusal
+  const holder = await keyHolder(request)
+  if (!holder) return unauthorized()
   const slug = new URL(request.url).searchParams.get('community')
   const community = (await listCommunities()).find((c) => c.slug === slug)
   if (!community) return Response.json({ ok: false, error: 'No such community.' }, { status: 400 })
+  if (!mayActFor(holder, community.slug)) return unauthorized()
+  await recordNewsletterCheck(community.slug, accountOf(request))
   try {
     return Response.json({ ok: true, senders: await newsletterSenders(community.slug) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
@@ -75,13 +85,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const refusal = refused(request)
-  if (refusal) return refusal
+  const holder = await keyHolder(request)
+  if (!holder) return unauthorized()
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return Response.json({ ok: false, error: 'Invalid request.' }, { status: 400 })
   const community = (await listCommunities()).find((c) => c.slug === body.community)
   if (!community) return Response.json({ ok: false, error: 'No such community.' }, { status: 400 })
+  if (!mayActFor(holder, community.slug)) return unauthorized()
 
   const messageId = str(body.messageId, 300)
   const from = str(body.from, 300)

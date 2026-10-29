@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 27, 2026.
+Last updated: Oct 29, 2026.
 
 ## The branch
 
@@ -570,6 +570,24 @@ brief, one round of drawings, then the build in pieces.
    Philadelphia for any community; the nav's count updates when To do is
    opened, not when a step is saved elsewhere.
    Not as drawn: the kosher lists step (above).
+14. **Newsletters set up from the console: BUILT Oct 29** (drawings 18
+   and 18b). Watches → Newsletters (the Newsletters line on What's tracked
+   opens it) hands out the Gmail script with the site, the community and
+   that community's own key already in it: make a Gmail, Copy the script,
+   open script.google.com, Run install. Once it runs, the page says
+   "Checking <gmail> every hour · Last checked …" (or "Stopped checking"
+   after 3 hours quiet), with Set up again. Newsletters are listed there
+   with their shul and when the last one came in; "+ Add a newsletter"
+   takes the shul and its email. A sender with no shul is linked (or
+   skipped, Not a shul) here now, not on What's tracked.
+   Each community's key is in `newsletter_setup` (**migration 090, not run
+   anywhere yet: run it on dev and live**). Without it the page says
+   newsletters can't be set up yet, and everything else works as before.
+   `NEWSLETTER_SECRET` still works for every community, so Philly's script
+   carries on unchanged; a community's own key works for it alone.
+   Not as drawn: the unlinked-sender row and the "Stopped checking" line.
+   Not built: making a new key (if one leaks, delete the row and open the
+   page again).
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

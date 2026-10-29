@@ -17,7 +17,7 @@ const ERUVS = kind({
   nights: [{ date: 'Oct 25', result: '1 of 5 read', tone: 'bad' }],
 })
 
-const show = (kinds: NightKindView[], linkSender?: (id: string) => React.ReactNode) => render(<NightlyRuns runs={{ available: true, kinds }} base="/philly/admin" linkSender={linkSender} />)
+const show = (kinds: NightKindView[]) => render(<NightlyRuns runs={{ available: true, kinds }} base="/philly/admin" />)
 const lastNight = () => screen.getByRole('region', { name: 'What’s tracked' })
 const user = () => userEvent.setup()
 
@@ -98,23 +98,22 @@ describe('What’s tracked on the Watches tab', () => {
     expect(within(all).getByText('Not loading since Oct 22')).toHaveClass('text-amber-800')
   })
 
-  // Newsletters come as they're sent: what needs a look, not last night,
-  // and a sender not linked to a shul gets its Link there.
-  it('Newsletters: what needs a look, a sender to link linked in place', async () => {
+  // Newsletters open their own page (Oct 29, drawing 18), where they're set
+  // up, added and linked to a shul: here, only counted.
+  it('Newsletters: counted, and opening their own page', async () => {
     const news = kind({
-      id: 'newsletters', name: 'Newsletters', when: null, count: '2 newsletters · last email Oct 25', trouble: '1 to link',
-      misses: [{ name: 'info@lms.org', why: 'Not linked to a shul', page: '', link: 'w1' }],
-      tracked: [{ name: 'info@lms.org', status: 'Not linked to a shul', bad: true, page: '' }, { name: 'BZBI', status: 'Email Oct 25', bad: false, page: 'kind/synagogue?place=bzbi' }],
+      id: 'newsletters', name: 'Newsletters', when: null, count: '2 newsletters · last in Oct 25', trouble: '1 to link',
+      misses: [{ name: 'info@lms.org', why: 'Not linked to a shul', page: '' }],
+      tracked: [{ name: 'info@lms.org', status: 'Not linked to a shul', bad: true, page: '' }],
     })
-    show([news], (id) => <span>Link box for {id}</span>)
-    const u = user()
-    await u.click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
-    expect(screen.getByTestId('night-kind')).toHaveTextContent('Newsletters2 newsletters · last email Oct 25 · 1 to link')
-    await u.click(screen.getByRole('button', { name: /^Newsletters/ }))
-    const needs = screen.getByRole('list', { name: 'Newsletters: needs a look' })
-    expect(needs).toHaveTextContent('info@lms.orgNot linked to a shulLink box for w1')
-    expect(screen.queryByText('Not read last night')).toBeNull()
+    show([news])
+    await user().click(within(lastNight()).getByRole('button', { name: /What’s tracked/ }))
+    const row = screen.getByRole('link', { name: /^Newsletters/ })
+    expect(row).toHaveAttribute('href', '/philly/admin/watches/newsletters')
+    expect(row).toHaveTextContent('Newsletters2 newsletters · last in Oct 25 · 1 to link')
+    expect(screen.queryByRole('button', { name: /^Newsletters/ })).toBeNull()
   })
+
   // Links are checked once a week: what doesn't open needs a look, on its
   // place's kind page.
   it('Links: what doesn’t open needs a look, not last night', async () => {

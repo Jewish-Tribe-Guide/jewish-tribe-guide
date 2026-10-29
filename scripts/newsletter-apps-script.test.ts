@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
+import { fillNewsletterScript } from '../src/lib/newsletterScript'
 
 // The Gmail script (newsletter-apps-script.js) runs in Google's Apps Script,
 // not here, so it's run in a sandbox with Gmail and the site stood in for.
@@ -17,11 +18,28 @@ const SOURCE = readFileSync(join(__dirname, 'newsletter-apps-script.js'), 'utf8'
 type Message = { id: string; from: string; list?: string }
 type Thread = { id: string; last: number; messages: Message[] }
 
-function run({ senders, inbox = [], sendersStatus = 200 }: { senders: string[]; inbox?: Thread[]; sendersStatus?: number }) {
+function run({
+  senders,
+  inbox = [],
+  sendersStatus = 200,
+  source = SOURCE,
+  entry = 'readNewsletters',
+  account = 'guide@gmail.com',
+}: {
+  senders: string[]
+  inbox?: Thread[]
+  sendersStatus?: number
+  /** A copy as the console hands it out (newsletterScript.ts). */
+  source?: string
+  entry?: 'readNewsletters' | 'install'
+  account?: string
+}) {
   const searches: string[] = []
   const posted: string[] = []
   const payloads: Record<string, unknown>[] = []
   const asked: string[] = []
+  const accounts: string[] = []
+  const triggers: string[] = []
   const props = new Map<string, string>([['NEWSLETTER_SECRET', 's3cret']])
   const response = (code: number, body: unknown) => ({ getResponseCode: () => code, getContentText: () => JSON.stringify(body) })
   const message = (m: Message) => ({
@@ -48,6 +66,7 @@ function run({ senders, inbox = [], sendersStatus = 200 }: { senders: string[]; 
       fetch: (url: string, opts: { method?: string; payload?: string; headers?: Record<string, string> }) => {
         if ((opts.method ?? 'get') === 'get') {
           asked.push(`${url} ${opts.headers?.Authorization}`)
+          accounts.push(opts.headers?.['X-Guide-Account'] ?? '')
           return response(sendersStatus, sendersStatus === 200 ? { ok: true, senders } : { ok: false, error: 'nope' })
         }
         payloads.push(JSON.parse(opts.payload!))
@@ -71,16 +90,39 @@ function run({ senders, inbox = [], sendersStatus = 200 }: { senders: string[]; 
       },
     },
     Utilities: { base64Encode: () => '' },
-    ScriptApp: {},
+    Session: { getEffectiveUser: () => ({ getEmail: () => account }) },
+    ScriptApp: {
+      getProjectTriggers: () => [],
+      newTrigger: (fn: string) => ({ timeBased: () => ({ everyHours: (h: number) => ({ create: () => triggers.push(`${fn} every ${h}h`) }) }) }),
+    },
   }
-  runInNewContext(`${SOURCE}\nreadNewsletters()`, context)
-  return { searches, posted, asked, payloads }
+  runInNewContext(`${source}\n${entry}()`, context)
+  return { searches, posted, asked, payloads, accounts, triggers }
 }
 
 describe('the Gmail script', () => {
   it('asks the site, with the secret, whose emails to send', () => {
     const { asked } = run({ senders: ['info@mekor.org'] })
     expect(asked).toEqual(['https://phillyjewishguide.com/api/inbound/newsletter?community=philly Bearer s3cret'])
+  })
+
+  // Oct 29: the console's copy has the community's own key in it, so
+  // setting it up needs no Script properties.
+  it('a copy from the console uses its own site, community and key', () => {
+    const source = fillNewsletterScript(SOURCE, { site: 'https://guide.example', community: 'riverton', key: 'nl_abc' })
+    const { asked, payloads } = run({ senders: ['office@shul.org'], source, inbox: [{ id: 't1', last: 1, messages: [{ id: 'a', from: 'office@shul.org' }] }] })
+    expect(asked).toEqual(['https://guide.example/api/inbound/newsletter?community=riverton Bearer nl_abc'])
+    expect(payloads[0]).toMatchObject({ community: 'riverton' })
+  })
+
+  it('says which Gmail it runs in each time it asks', () => {
+    expect(run({ senders: [], account: 'riverton.guide@gmail.com' }).accounts).toEqual(['riverton.guide@gmail.com'])
+  })
+
+  it('install sets the hourly run and reads once there and then', () => {
+    const { triggers, asked } = run({ senders: [], entry: 'install' })
+    expect(triggers).toEqual(['readNewsletters every 1h'])
+    expect(asked).toHaveLength(1)
   })
 
   it('sends only the watched senders’ emails, oldest first', () => {

@@ -98,9 +98,7 @@ export function countGoogleKinds(rows: readonly { community: string; ok: boolean
 
 // ── What the tab shows ──────────────────────────────────────────────────────
 
-/** `link`: a newsletter sender not linked to a shul yet, by its watch's
- *  id, for the tab to link it there. */
-export type KindMiss = { name: string; why: string; page: string; link?: string }
+export type KindMiss = { name: string; why: string; page: string }
 /** One source a kind tracks, in "All N tracked": its name and how it is
  *  ("Read Oct 25", "Not loading since Oct 22"). */
 export type TrackedSource = { name: string; status: string; bad: boolean; page: string; watch?: ListSwitch }
@@ -312,33 +310,53 @@ function trackedGoogle(places: readonly GoogleLive[]): TrackedSource[] {
     .sort(byNeed)
 }
 
-/** Newsletters: every sender linked to a place, or waiting to be. One not
- *  linked is a miss the tab links in place; so is one gone quiet for a
- *  month (the run's quietError) or one that couldn't be read. */
-function newsletterView(kind: NightKind, watches: readonly Watch[], listings?: ListingInfo): NightKindView {
+/** One shul newsletter, as the Newsletters page lists it and What's
+ *  tracked counts it. `page`: its shul on its kind's page, under the
+ *  Watches tab; '' when it isn't linked to one. */
+export type NewsletterLine = { watchId: string; email: string; shul: string | null; status: string; bad: boolean; page: string }
+
+/** Every sender linked to a shul, or waiting to be; what needs a look
+ *  first. One not linked, gone quiet for a month (the run's quietError) or
+ *  that couldn't be read needs a look. */
+export function newsletterLines(watches: readonly Watch[], listings?: ListingInfo): NewsletterLine[] {
   // A sender not linked yet waits inactive until it is (newsletter.ts).
   const own = watches.filter((w) => (w.active || !w.resourceId) && isNewsletterWatch(w) && !isIgnoredSender(w))
-  const tracked: (TrackedSource & { link?: string })[] = own.map((w) => {
-    const name = (w.resourceId && listings?.nameOf(w.resourceId)) || watchName(w).replace(/^mailto:/, '')
-    const page = placePage(w.resourceId, listings)
-    const day = (iso: string) => dayName(Date.parse(iso))
-    if (!w.resourceId) return { name, status: 'Not linked to a shul', bad: true, page: '', link: w.id }
-    if (w.failingSince && /^No newsletter/.test(w.lastError ?? '')) return { name, status: w.pageChangedAt ? `No email since ${day(w.pageChangedAt)}` : 'No email since it was linked', bad: true, page }
-    if (w.failingSince) return { name, status: 'Couldn’t read the last one', bad: true, page }
-    return { name, status: w.pageChangedAt ? `Email ${day(w.pageChangedAt)}` : 'No email yet', bad: false, page }
-  })
-  const n = (status: RegExp) => tracked.filter((t) => t.bad && status.test(t.status)).length
-  const latest = own.map((w) => w.pageChangedAt).filter((d): d is string => !!d).sort().pop()
-  const trouble = [n(/^Not linked/) && `${n(/^Not linked/)} to link`, n(/^No email/) && `${n(/^No email/)} quiet for a month`, n(/^Couldn/) && `${n(/^Couldn/)} couldn’t be read`].filter(Boolean).join(' · ') || null
+  const day = (iso: string) => dayName(Date.parse(iso))
+  return own
+    .map((w) => {
+      const email = w.url.replace(/^mailto:/, '')
+      const shul = (w.resourceId && listings?.nameOf(w.resourceId)) || null
+      const line = { watchId: w.id, email, shul, page: placePage(w.resourceId, listings) }
+      if (!w.resourceId) return { ...line, status: 'Not linked to a shul', bad: true }
+      if (w.failingSince && /^No newsletter/.test(w.lastError ?? '')) return { ...line, status: w.pageChangedAt ? `Nothing in since ${day(w.pageChangedAt)}` : 'Nothing in since it was linked', bad: true }
+      if (w.failingSince) return { ...line, status: 'Couldn’t read the last one', bad: true }
+      return { ...line, status: w.pageChangedAt ? `Last in ${day(w.pageChangedAt)}` : 'Nothing in yet', bad: false }
+    })
+    .sort((a, b) => Number(b.bad) - Number(a.bad) || (a.shul ?? a.email).localeCompare(b.shul ?? b.email))
+}
+
+/** Newsletters: opened on their own page (the Newsletters page), so here
+ *  only counted. */
+function newsletterView(kind: NightKind, watches: readonly Watch[], listings?: ListingInfo): NightKindView {
+  const lines = newsletterLines(watches, listings)
+  const n = (status: RegExp) => lines.filter((t) => t.bad && status.test(t.status)).length
+  const latest = watches
+    .filter((w) => lines.some((l) => l.watchId === w.id))
+    .map((w) => w.pageChangedAt)
+    .filter((d): d is string => !!d)
+    .sort()
+    .pop()
+  const trouble = [n(/^Not linked/) && `${n(/^Not linked/)} to link`, n(/^Nothing in since/) && `${n(/^Nothing in since/)} quiet for a month`, n(/^Couldn/) && `${n(/^Couldn/)} couldn’t be read`].filter(Boolean).join(' · ') || null
+  const tracked = lines.map((l) => ({ name: l.shul ?? l.email, status: l.status, bad: l.bad, page: l.page }))
   return {
     id: kind.id,
     name: kind.name,
     about: kind.about,
     when: null,
-    count: own.length ? `${own.length} newsletter${own.length === 1 ? '' : 's'}${latest ? ` · last email ${dayName(Date.parse(latest))}` : ''}` : 'None yet',
+    count: lines.length ? `${lines.length} newsletter${lines.length === 1 ? '' : 's'}${latest ? ` · last in ${dayName(Date.parse(latest))}` : ''}` : 'None yet',
     trouble,
-    misses: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page, ...(t.link ? { link: t.link } : {}) })),
-    tracked: tracked.map(({ name, status, bad, page }) => ({ name, status, bad, page })).sort(byNeed),
+    misses: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page })),
+    tracked,
     nights: [],
   }
 }

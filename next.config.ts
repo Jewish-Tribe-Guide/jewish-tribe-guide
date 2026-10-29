@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
     ['/api/admin/main-dishes', '/api/admin/watches', '/api/cron/watches'].map((route) => [
       route,
       ['./node_modules/@sparticuz/chromium/**', './node_modules/playwright-core/**'],
+    ]).concat([
+      // The Gmail script, read at run time and handed out filled in for the
+      // community (newsletterScript.ts): a path tracing can't see.
+      ['/api/admin/watches/newsletters', ['./scripts/newsletter-apps-script.js']],
     ]),
   ),
   images: {

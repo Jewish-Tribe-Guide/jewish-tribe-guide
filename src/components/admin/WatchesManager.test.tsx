@@ -217,40 +217,4 @@ describe('WatchesManager', () => {
     await user.click(within(tracked).getByRole('button', { name: 'Read again' }))
     expect(posts.map((p) => p.body)).toEqual([{ action: 'pause', id: 'k' }, { action: 'resume', id: 'm' }])
   })
-
-  // Shul newsletters (newsletter.ts): a sender the inbox hasn't seen comes
-  // in unlinked, to be tied to its shul, now from the Newsletters line.
-  it('links a new newsletter sender to its shul from Newsletters', async () => {
-    const kinds = [
-      {
-        id: 'newsletters', name: 'Newsletters', about: 'Reads each shul’s newsletter as it comes in.', when: null, count: '1 newsletter', trouble: '1 to link',
-        misses: [{ name: 'info@lms.org', why: 'Not linked to a shul', page: '', link: 'n' }], tracked: [{ name: 'info@lms.org', status: 'Not linked to a shul', bad: true, page: '' }], nights: [],
-      },
-    ]
-    await renderTab([], { runs: { available: true, kinds } })
-    const user = userEvent.setup()
-    const tracked = screen.getByRole('region', { name: 'What’s tracked' })
-    await user.click(within(tracked).getByRole('button', { name: /What’s tracked/ }))
-    await user.click(within(tracked).getByRole('button', { name: /Newsletters/ }))
-    const needs = within(tracked).getByRole('list', { name: 'Newsletters: needs a look' })
-    const link = within(needs).getByRole('button', { name: 'Link' })
-    expect(link).toBeDisabled()
-    await user.type(within(needs).getByLabelText('The shul it’s from'), 'Lower Merion Synagogue')
-    const reads = vi.mocked(fetchJson).mock.calls.filter(([u]) => String(u).includes('/api/admin/watches/runs')).length
-    await user.click(link)
-    expect(posts.map((p) => p.body)).toEqual([{ action: 'link', id: 'n', resourceId: 'shul-1' }])
-    // Read again, so the line says it's linked.
-    expect(vi.mocked(fetchJson).mock.calls.filter(([u]) => String(u).includes('/api/admin/watches/runs')).length).toBeGreaterThan(reads)
-  })
-
-  it('a sender that isn’t a shul is skipped from there too', async () => {
-    const kinds = [{ id: 'newsletters', name: 'Newsletters', about: '', when: null, count: '1 newsletter', trouble: '1 to link', misses: [{ name: 'x@y.org', why: 'Not linked to a shul', page: '', link: 'n' }], tracked: [], nights: [] }]
-    await renderTab([], { runs: { available: true, kinds } })
-    const user = userEvent.setup()
-    const tracked = screen.getByRole('region', { name: 'What’s tracked' })
-    await user.click(within(tracked).getByRole('button', { name: /What’s tracked/ }))
-    await user.click(within(tracked).getByRole('button', { name: /Newsletters/ }))
-    await user.click(within(tracked).getByRole('button', { name: 'Not a shul' }))
-    expect(posts.map((p) => p.body)).toEqual([{ action: 'ignore', id: 'n' }])
-  })
 })

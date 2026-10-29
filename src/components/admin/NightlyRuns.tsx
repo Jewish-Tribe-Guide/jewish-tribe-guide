@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { kindBad, lastNightLine, type KindNight, type NightKindView } from '@/lib/nightKinds'
 
 // ── The Watches tab's "What's tracked" (Oct 25, FinalNightly) ───────────────
@@ -11,8 +11,8 @@ import { kindBad, lastNightLine, type KindNight, type NightKindView } from '@/li
 // last night and why, each a link to its place on its kind's page (or to
 // nothing, for a list or a page added by hand), everything it tracks
 // ("All 52 tracked", the user, Oct 25: it replaced the tab's watch list)
-// and its last 14 nights. Newsletters come as they're sent: what needs a
-// look, a sender not linked to a shul linked in place (`linkSender`).
+// and its last 14 nights. Newsletters open their own page instead
+// (NewslettersPage.tsx), where they're set up, added and linked to a shul.
 
 export type NightlyRunsLoaded = { available: boolean; kinds: NightKindView[] }
 
@@ -38,17 +38,28 @@ function CountLine({ kind }: { kind: NightKindView }) {
   )
 }
 
-type LinkSender = (watchId: string) => ReactNode
 /** A kosher list's Stop or Read again. */
 type OnList = (watchId: string, action: 'pause' | 'resume') => void
 
-function KindRow({ kind, base, linkSender, onList }: { kind: NightKindView; base: string; linkSender?: LinkSender; onList?: OnList }) {
+function KindRow({ kind, base, onList }: { kind: NightKindView; base: string; onList?: OnList }) {
   const [open, setOpen] = useState(false)
   const [all, setAll] = useState(false)
   const page = (p: string) => `${base}/watches/${p}`
-  // Newsletters come as they're sent, links are checked weekly: what needs
-  // a look, not last night.
-  const nightly = kind.id !== 'newsletters' && kind.id !== 'links'
+  // Links are checked weekly: what needs a look, not last night.
+  const nightly = kind.id !== 'links'
+  if (kind.id === 'newsletters') {
+    return (
+      <li className="border-t border-slate-100" data-testid="night-kind">
+        <Link href={page('newsletters')} className="flex min-h-11 w-full items-center gap-2.5 px-3.5 py-3 text-left">
+          <span className="min-w-0 flex-1 space-y-0.5">
+            <span className="block text-[15px] font-bold text-slate-900">{kind.name}</span>
+            <CountLine kind={kind} />
+          </span>
+          <Chevron open={false} />
+        </Link>
+      </li>
+    )
+  }
   return (
     <li className="border-t border-slate-100" data-testid="night-kind">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex min-h-11 w-full cursor-pointer items-start gap-2.5 px-3.5 py-3 text-left">
@@ -71,13 +82,12 @@ function KindRow({ kind, base, linkSender, onList }: { kind: NightKindView; base
               <ul aria-label={`${kind.name}: ${nightly ? 'not read last night' : 'needs a look'}`}>
                 {kind.misses.map((m, i) => (
                   <li key={i} className="ml-10 border-t border-slate-100">
-                    {m.link || !m.page ? (
+                    {!m.page ? (
                       <div className="py-2.5 pr-3.5">
                         <span className="flex items-center gap-2.5">
                           <span className="min-w-0 flex-1 text-sm font-semibold text-slate-900">{m.name}</span>
                           <span className="whitespace-nowrap text-[12.5px] font-semibold text-amber-800">{m.why}</span>
                         </span>
-                        {m.link && linkSender?.(m.link)}
                       </div>
                     ) : (
                       <Link href={page(m.page)} className="flex min-h-11 items-center gap-2.5 py-2.5 pr-3.5 text-slate-900">
@@ -151,7 +161,7 @@ function KindRow({ kind, base, linkSender, onList }: { kind: NightKindView; base
 }
 
 /** `runs`: undefined while loading, null when it couldn't be loaded. */
-export default function NightlyRuns({ runs, base, linkSender, onList }: { runs: NightlyRunsLoaded | null | undefined; base: string; linkSender?: LinkSender; onList?: OnList }) {
+export default function NightlyRuns({ runs, base, onList }: { runs: NightlyRunsLoaded | null | undefined; base: string; onList?: OnList }) {
   const [open, setOpen] = useState(false)
   const kinds = runs?.available ? runs.kinds : null
   const line = kinds && lastNightLine(kinds)
@@ -190,7 +200,7 @@ export default function NightlyRuns({ runs, base, linkSender, onList }: { runs: 
       {open && kinds && (
         <ul>
           {kinds.map((k) => (
-            <KindRow key={k.id} kind={k} base={base} linkSender={linkSender} onList={onList} />
+            <KindRow key={k.id} kind={k} base={base} onList={onList} />
           ))}
         </ul>
       )}

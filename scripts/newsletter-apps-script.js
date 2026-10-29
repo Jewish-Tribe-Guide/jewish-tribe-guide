@@ -5,17 +5,20 @@
 // for changed times and files them for an admin to approve. Nothing on the
 // site changes from here.
 //
-// Not part of the app: it's pasted into script.google.com. To set it up,
-// signed in to the guide's Gmail:
+// Not part of the app: it's pasted into script.google.com. The admin
+// console hands it out with SITE, COMMUNITY and the community's own KEY
+// filled in (To do → Watches → Newsletters, newsletterScript.ts), with the
+// steps beside it. Signed in to the guide's Gmail:
 //
-//   1. script.google.com → New project. Replace the code with this file.
-//   2. Project Settings (the gear) → Script properties → Add:
-//        NEWSLETTER_SECRET = the same value as the site's NEWSLETTER_SECRET
-//   3. Back in the editor, pick `install` in the function menu and Run it.
-//      Google asks to let the script read the Gmail account and reach the
-//      site: allow it. From then on it runs every hour on its own.
-//   4. Run `readNewsletters` once by hand to see it work: View → Executions
-//      shows what each email came to.
+//   1. script.google.com → New project. Replace the code with the copy.
+//   2. Pick `install` in the function menu and Run it. Google asks to let
+//      the script read the Gmail account and reach the site: allow it. It
+//      reads once there and then, and every hour from then on.
+//
+// Each run tells the site it ran, and which Gmail it's in, so the
+// Newsletters page can say it's working. A copy without a KEY (one set up
+// before Oct 29) reads NEWSLETTER_SECRET from Project Settings → Script
+// properties instead: the site's own, good for every community.
 //
 // Only the newsletters on the admin Watches tab are sent: each run asks the
 // site for their addresses first and searches the inbox for just those, so
@@ -33,10 +36,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install and readNewsletters by name */
-/* global GmailApp, PropertiesService, ScriptApp, UrlFetchApp, Utilities */
+/* global GmailApp, PropertiesService, ScriptApp, Session, UrlFetchApp, Utilities */
 
 var SITE = 'https://phillyjewishguide.com'
 var COMMUNITY = 'philly'
+/** This community's own key (newsletter_setup), filled in by the console's
+ *  copy. Empty: the NEWSLETTER_SECRET script property. */
+var KEY = ''
 /** Stop starting new emails after this long: a run may take six minutes,
  *  and one email can take a minute to read. */
 var RUN_BUDGET_MS = 4 * 60 * 1000
@@ -55,12 +61,14 @@ function install() {
     if (t.getHandlerFunction() === 'readNewsletters') ScriptApp.deleteTrigger(t)
   })
   ScriptApp.newTrigger('readNewsletters').timeBased().everyHours(1).create()
+  // Once now, so the Newsletters page says it's working straight away.
+  readNewsletters()
 }
 
 function readNewsletters() {
   var props = PropertiesService.getScriptProperties()
-  var secret = props.getProperty('NEWSLETTER_SECRET')
-  if (!secret) throw new Error('Add NEWSLETTER_SECRET under Project Settings → Script properties.')
+  var secret = KEY || props.getProperty('NEWSLETTER_SECRET')
+  if (!secret) throw new Error('No key: copy the script again from the guide’s Newsletters page.')
   var sent = JSON.parse(props.getProperty('SENT') || '{}')
   var started = Date.now()
 
@@ -125,7 +133,7 @@ function readNewsletters() {
 function watchedSenders(secret) {
   var res = UrlFetchApp.fetch(SITE + '/api/inbound/newsletter?community=' + COMMUNITY, {
     method: 'get',
-    headers: { Authorization: 'Bearer ' + secret },
+    headers: { Authorization: 'Bearer ' + secret, 'X-Guide-Account': account() },
     muteHttpExceptions: true,
   })
   var code = res.getResponseCode()
@@ -137,6 +145,16 @@ function watchedSenders(secret) {
   }
   if (code !== 200 || !Array.isArray(body.senders)) throw new Error('The site refused: ' + (body.error || code))
   return body.senders
+}
+
+/** The Gmail this runs in, for the Newsletters page; '' if Google won't
+ *  say. */
+function account() {
+  try {
+    return Session.getEffectiveUser().getEmail() || ''
+  } catch (e) {
+    return ''
+  }
 }
 
 /** Their threads from the last two weeks, oldest first, so a backlog is
