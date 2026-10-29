@@ -429,13 +429,18 @@ brief, one round of drawings, then the build in pieces.
    since To do has no tabs and that page holds the handled responses. (A
    Searches row sat there too until Oct 29; every search nobody found now
    opens from Reports, under it like History, with "‹ Reports".)
-   **Drifted from the drawing, found Oct 29:** what a watch found (new
+   **Drifted from the drawing, fixed Oct 29:** what a watch found (new
    places off the kosher lists, a shul newsletter's changes, a website's
    hours) is drawn in To do's New places and Changes, and the brief agreed
-   they sit with people's suggestions. The build leaves them out (the
-   queue's read drops them; they wait only on Watches' pages), and the
-   count leaves them out too. Live has 16 waiting that To do doesn't show.
-   Not fixed yet. The opened
+   they sit with people's suggestions. The build left them out (the
+   queue's read dropped them, so they waited only on Watches' pages), and
+   the count did too: live had 16 waiting that To do didn't show. Now
+   they're in New places and Changes, counted, and open to be decided
+   like anything else ("1 of 22", "from Mekor Habracha's list"). They
+   still wait on their kind's page on Watches too, with Compare.
+   Small, seen on the way: on a new place with no hours, the deciding
+   screen draws every day as "Closed". Approving it unedited saves no
+   hours (only what's edited is sent), but it reads as if it says closed. The opened
    suggestion's wording (boards 3 and 4: "Update the listing", "Edit, then
    update", "Leave it") is still the old card's; its heading still says
    To do.

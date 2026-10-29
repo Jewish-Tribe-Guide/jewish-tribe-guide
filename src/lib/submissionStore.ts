@@ -17,7 +17,7 @@ import { rebaseSection } from './hoursSections'
 import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
-import { jobCategories, keepOnly, onAJobPage, watchNameOf } from './watchFindings'
+import { keepOnly } from './watchFindings'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -60,11 +60,10 @@ export async function listSubmissionsByStatus(
 
   // Resolve category labels for display.
   const categories = await listCategories(community)
-  // What a watch found waits on the job page that reads the place, next to
-  // what the listing says, not here: "The queue keeps what people send in"
-  // (watchFindings.ts). Decided ones stay in the history either way.
-  const jobs = status === 'pending' && all.some((s) => watchNameOf(s)) ? jobCategories(categories) : null
-  const submissions = jobs ? all.filter((s) => !onAJobPage(s, (s.payload as { category?: string }).category, jobs)) : all
+  // What a watch found is here too, beside what people send in: To do
+  // groups by what's decided, not by who sent it (the admin redesign's
+  // brief). It also waits on its kind's page on Watches, with Compare.
+  const submissions = all
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label

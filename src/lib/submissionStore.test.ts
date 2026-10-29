@@ -300,9 +300,10 @@ describe('listSubmissionsByStatus', () => {
     expect(result.current).toEqual({ id: 'res-1', category: 'synagogue' })
   })
 
-  // Step 6 of keeping listings current: a watch's finding waits on the job
-  // page that reads its place, so the queue keeps only what people send in.
-  it('leaves out of the queue what a job page shows, and keeps the rest', async () => {
+  // To do groups by what's decided, not who sent it (the admin redesign's
+  // brief, Oct 28): a watch's finding sits with what people send in. It
+  // used to be left out, so To do never showed the kosher lists' new places.
+  it('keeps what a watch found with what people send in', async () => {
     const watch = (id: string, name: string, category: string) =>
       baseSubmission({ id, operation: 'update', target_id: `res-${id}`, submitted_by: { name }, payload: listingPayload({ category }) as never })
     const subs = [
@@ -321,7 +322,7 @@ describe('listSubmissionsByStatus', () => {
       { id: 'hospital', label: 'Hospitals', detailFields: [] },
     ])
 
-    expect((await listSubmissionsByStatus('philly', 'pending')).map((s) => s.id)).toEqual(['food', 'visitor'])
+    expect((await listSubmissionsByStatus('philly', 'pending')).map((s) => s.id)).toEqual(['shul', 'mikvah', 'food', 'kosher', 'hospital', 'visitor'])
     // Decided, they're history like anything else.
     expect(await listSubmissionsByStatus('philly', 'approved')).toHaveLength(6)
   })

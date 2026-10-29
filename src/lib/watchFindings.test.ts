@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ResourceRow, SubmissionRow } from '@/types'
 import type { CategoryField } from './categories'
-import { ERUV_WEBSITE_WATCH_NAME } from './eruvWebsite'
-import { findingFrom, findingPage, jobCategories, jobPageFor, keepOnly, onAJobPage, pageOf } from './watchFindings'
+import { findingFrom, findingPage, jobPageFor, keepOnly, pageOf, siteCategories } from './watchFindings'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
-import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 
 const FIELDS: CategoryField[] = [
@@ -184,27 +182,6 @@ describe('keepOnly', () => {
   })
 })
 
-describe('onAJobPage', () => {
-  const jobs = { hours: new Set(['mikvah']), times: new Set(['synagogue']) }
-  it('a website’s finding is on a job page only when its place is one a job reads', () => {
-    const s = sub()
-    expect(onAJobPage(s, 'mikvah', jobs)).toBe(true)
-    expect(onAJobPage(s, 'restaurant', jobs)).toBe(false)
-  })
-  it('Refuah’s and the kosher lists’ always are; a visitor’s never is', () => {
-    expect(onAJobPage(sub({ submitted_by: { name: REFUAH_WATCH_NAME } }), 'hospital', {})).toBe(true)
-    expect(onAJobPage(sub({ submitted_by: { name: KEYSTONE_WATCH_NAME }, target_id: null }), undefined, {})).toBe(true)
-    expect(onAJobPage(sub({ submitted_by: { email: 'someone@example.com' } }), 'mikvah', jobs)).toBe(false)
-    expect(onAJobPage(sub({ target_type: 'eruv' }), 'mikvah', jobs)).toBe(false)
-  })
-  // Oct 22: an eruv's website's wait on Eruv status; a visitor's eruv fix
-  // stays in the queue.
-  it('an eruv website’s always is; a visitor’s eruv fix never is', () => {
-    expect(onAJobPage(sub({ target_type: 'eruv', target_id: null, submitted_by: { name: ERUV_WEBSITE_WATCH_NAME } }), undefined, {})).toBe(true)
-    expect(onAJobPage(sub({ target_type: 'eruv', target_id: null, submitted_by: { email: 'someone@example.com' } }), undefined, {})).toBe(false)
-  })
-})
-
 // Oct 22: a food place's website gives its hours and phone (Main dishes
 // board 3), so its findings wait on Main dishes, not in the queue. Oct 25:
 // any other place's website (a grocery's) waits under its kind's row on
@@ -215,11 +192,7 @@ it('a website’s findings wait on Main dishes, or the place’s kind, and its e
   const restaurant = { id: 'restaurant', label: 'Food', pluralLabel: 'Food', kind: 'listing', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] as CategoryField[] } as const
   const grocery = { id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', kind: 'listing', detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags', showCountInHeader: true }] as CategoryField[] } as const
   const cemetery = { id: 'cemetery', label: 'Cemetery', pluralLabel: 'Cemeteries', kind: 'listing', hasPhone: false, detailFields: [] as CategoryField[] } as const
-  const jobs = jobCategories([restaurant, grocery, cemetery])
-  expect(onAJobPage(sub(), 'restaurant', jobs)).toBe(true)
-  expect(onAJobPage(sub(), 'grocery', jobs)).toBe(true)
-  expect(onAJobPage(sub(), 'cemetery', jobs)).toBe(false)
-  expect([...jobs.sites!]).toEqual(['grocery'])
+  expect(siteCategories([restaurant, grocery, cemetery]).map((c) => c.id)).toEqual(['grocery'])
   expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin/watches/kind/restaurant', name: 'Food' })
   expect(jobPageFor('philly', grocery, 'g1')).toEqual({ path: '/philly/admin/watches/kind/grocery?place=g1', name: 'Grocery' })
   expect(jobPageFor('philly', cemetery)).toBeUndefined()

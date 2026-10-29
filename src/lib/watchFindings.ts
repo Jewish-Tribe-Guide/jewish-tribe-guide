@@ -7,7 +7,6 @@ import { NEWSLETTER_WATCH_NAME } from './newsletter'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_WATCH_NAME } from './mekorWatch'
-import { ERUV_WEBSITE_WATCH_NAME } from './eruvWebsite'
 import { submissionSource } from './submissionSource'
 import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
 import type { Minyan } from './davening'
@@ -226,18 +225,6 @@ export function keepOnly(sent: ResourceSubmission, current: ResourceRow, keep: r
   return { ...out, details, ...(sent.geo ? { geo: sent.geo } : {}) }
 }
 
-/** The categories each job page reads, for the queue to leave out. */
-export type JobCategories = Partial<Record<FindingJob, ReadonlySet<string>>>
-
-export function jobCategories(categories: readonly Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields'>[]): JobCategories {
-  return {
-    hours: new Set(hoursJobCategories(categories, 'hours').map((c) => c.id)),
-    times: new Set(hoursJobCategories(categories, 'times').map((c) => c.id)),
-    dishes: new Set(dishCategories(categories).map((c) => c.id)),
-    sites: new Set(siteCategories(categories).map((c) => c.id)),
-  }
-}
-
 /** The places whose own website is read with no job page of their own
  *  (a grocery, a childcare, a hotel): what it finds waits on their kind's
  *  page on the Watches tab. The food places' wait on Main dishes. */
@@ -251,21 +238,6 @@ export function dishCategories<C extends Pick<CategoryConfig, 'detailFields'>>(c
     const field = itemsField(c as unknown as CategoryConfig)
     return !!field && itemWording(field).noun === 'dish'
   })
-}
-
-/** Whether a job page shows this pending suggestion, so the moderation
- *  queue leaves it out. Refuah's, the kosher lists' and an eruv website's
- *  are always on theirs;
- *  a website's or a newsletter's only when its place is one a job reads. */
-export function onAJobPage(s: Pick<SubmissionRow, 'submitted_by' | 'target_type'>, category: string | undefined, jobs: JobCategories): boolean {
-  // An eruv's website's: on Eruv status (eruvWebsite.ts).
-  if (s.target_type === 'eruv') return watchNameOf(s) === ERUV_WEBSITE_WATCH_NAME
-  if (s.target_type !== 'listing') return false
-  const name = watchNameOf(s)
-  if (!name) return false
-  if (FINDING_SOURCES.hospitals.includes(name) || FINDING_SOURCES.kosher.includes(name)) return true
-  if (!category) return false
-  return (['hours', 'times', 'dishes', 'sites'] as const).some((job) => FINDING_SOURCES[job].includes(name) && !!jobs[job]?.has(category))
 }
 
 /** Where a watch's findings wait, for its email: a place's kind's page on
