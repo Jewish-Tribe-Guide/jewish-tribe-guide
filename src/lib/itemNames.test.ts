@@ -135,7 +135,7 @@ describe('main dishes on Food (agreed Oct 1)', () => {
         multiSelect: true,
         options: ['Meat', 'Dairy', 'Parve'].map((v) => ({ value: v, label: v })),
       },
-      { key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'dish', showCountInHeader: true, expandedOnly: true },
+      { key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'dish', showCountInHeader: true },
     ],
   })
   const place = (name: string, t: string[], details: Record<string, unknown>, lat: number): DirectoryResource => ({

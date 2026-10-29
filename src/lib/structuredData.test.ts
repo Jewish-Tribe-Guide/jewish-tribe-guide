@@ -44,12 +44,12 @@ describe('schemaTypeForCategory', () => {
     ['hotel', 'Hotel'],
     ['cemetery', 'Cemetery'],
   ])('%s -> %s', (id, type) => {
-    expect(schemaTypeForCategory(id)).toBe(type)
+    expect(schemaTypeForCategory({ id })).toBe(type)
   })
 
   it('falls back to LocalBusiness for an admin-defined category it does not know', () => {
-    expect(schemaTypeForCategory('mikvah')).toBe('LocalBusiness')
-    expect(schemaTypeForCategory('kosher-butchers')).toBe('LocalBusiness')
+    expect(schemaTypeForCategory({ id: 'mikvah' })).toBe('LocalBusiness')
+    expect(schemaTypeForCategory({ id: 'kosher-butchers' })).toBe('LocalBusiness')
   })
 })
 

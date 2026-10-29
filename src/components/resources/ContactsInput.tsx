@@ -65,7 +65,7 @@ export default function ContactsInput({ field, label, value, onChange }: { field
                 // Split as typed, nothing dropped, so a comma just typed
                 // stays put; readContacts tidies the spaces and blanks.
                 onChange={(ev) => set(i, { phones: ev.target.value ? ev.target.value.split(',') : undefined })}
-                placeholder="(215) 555-0100, a comma between"
+                placeholder="(555) 555-0100, a comma between"
                 className={inputClass}
               />
             </Small>

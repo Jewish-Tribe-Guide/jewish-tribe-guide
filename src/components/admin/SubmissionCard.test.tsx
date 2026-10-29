@@ -236,6 +236,19 @@ describe('read-only history card — who reviewed it', () => {
     expect(screen.getByText(/by jane@example\.com/)).toBeInTheDocument()
   })
 
+  it('says Taken or Left, the words Reports counts them in', () => {
+    renderHistoryCard({ status: 'approved' })
+    expect(screen.getByText('Taken')).toBeInTheDocument()
+    cleanup()
+    renderHistoryCard({ status: 'rejected' })
+    expect(screen.getByText('Left')).toBeInTheDocument()
+  })
+
+  it('shows why one was left out, when a reason was given', () => {
+    renderHistoryCard({ status: 'rejected', review_reason: 'Already listed' })
+    expect(screen.getByText('“Already listed”')).toBeInTheDocument()
+  })
+
   it('shows nothing extra for a submission decided before reviewed_by existed', () => {
     renderHistoryCard({ reviewed_by: null })
     expect(screen.queryByText(/^by /)).not.toBeInTheDocument()

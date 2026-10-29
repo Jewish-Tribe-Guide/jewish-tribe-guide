@@ -105,8 +105,7 @@ export default function CampaignBannerCard() {
           ✕
         </button>
 
-        {/* Same eyebrow treatment as the Browse card's `desktopBrowseEyebrow`
-            ("Get started") — text-xs/uppercase/tracking-wide. Static, not
+        {/* The site's usual card eyebrow — text-xs/uppercase/tracking-wide. Static, not
             admin-editable: every banner is "happening now" by definition
             (activeCampaignBanner already filters to live ones), so there's
             nothing per-campaign for an admin to set here. */}

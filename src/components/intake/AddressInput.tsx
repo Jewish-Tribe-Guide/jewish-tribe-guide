@@ -194,7 +194,9 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
         const periods = p.regularOpeningHours?.periods ?? null
         onPlaceSelect({
           placeId: place.id,
-          name: p.displayName ?? null,
+          // A plain address's displayName is the street ("Cedar Lane"), not a
+          // name: it would replace the one typed.
+          name: isBusiness ? (p.displayName ?? null) : null,
           phone: p.nationalPhoneNumber ?? null,
           hours: periods ? placesApiHoursToStructured(periods) : null,
           website: p.websiteURI ?? null,

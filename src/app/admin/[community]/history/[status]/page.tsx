@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import SubmissionHistory from '@/components/admin/SubmissionHistory'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -20,14 +19,13 @@ export default function AdminHistoryPage() {
 
   return (
     <div>
-      <AdminNav />
       {status ? (
         <SubmissionHistory token={session.access_token} status={status} />
       ) : (
         <p className="text-sm text-red-700">
           Unknown status &ldquo;{params.status}&rdquo;.{' '}
           <Link href={`${adminBase(community)}/metrics`} className="underline">
-            Back to Metrics
+            Back to Reports
           </Link>
         </p>
       )}

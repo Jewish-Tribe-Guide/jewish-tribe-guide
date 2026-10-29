@@ -18,8 +18,6 @@ import { community } from '@/community.config'
 export type SiteSettings = {
   /** Site name — the header title, footer name, and copyright line. */
   name: string
-  /** Shown under the site name in the header. */
-  tagline: string
   /** The big heading on the home screen, e.g. "What are you looking for?". */
   heroTitle: string
   /** Mobile tab's "Subhead" field — shown under the home screen heading on
@@ -51,28 +49,10 @@ export type SiteSettings = {
    *  More, by default), in order. Empty falls back to
    *  DEFAULT_DESKTOP_NAV_ITEMS. Mobile has no top nav and ignores this. */
   desktopNavItems: DesktopNavItem[]
-  /** Desktop only — the small amber-ish eyebrow above the Browse/Search
-   *  card's heading (e.g. "Get started"). */
-  desktopBrowseEyebrow: string
-  /** Desktop only — the Browse/Search card's own heading. Was the same
-   *  field as `heroTitle` (mobile's big heading); now separate so the two
-   *  can read differently even though they're describing the same search. */
-  desktopBrowseHeading: string
-  /** Desktop only — the Davening Times card's eyebrow/heading. */
-  desktopDaveningEyebrow: string
-  desktopDaveningHeading: string
   /** Desktop only — the Update Listings card's eyebrow/heading (the
    *  Add/Edit/Report card, "Kept by the Community" by default). */
   desktopListingsEyebrow: string
   desktopListingsHeading: string
-  /** Desktop only — the Map card's eyebrow/heading, from back when the map
-   *  was embedded directly on the home screen. That card is retired (the
-   *  user's own call: the map only ever lives at its own full-screen route
-   *  now) — these two fields have no render site left, kept only because
-   *  DDL widens the DB's allowed columns, never narrows (same precedent as
-   *  a retired home_section `kind`; see homeSections.ts's own doc). */
-  desktopMapEyebrow: string
-  desktopMapHeading: string
   /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
    *  heading. */
   desktopSubscribeEyebrow: string
@@ -117,7 +97,7 @@ export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
  *  when it shows, for the admin's on/off list. */
 export const TODAY_BLOCKS = [
   { id: 'candles', label: 'Today card', when: 'Candles and the countdown on Friday and Erev Yom Tov; havdalah on Shabbos and Yom Tov.' },
-  { id: 'beforeCandles', label: 'Before candles', when: 'Friday and Erev Yom Tov, until candle lighting: the nearest store open now that has the items below.' },
+  { id: 'beforeCandles', label: 'Before candles', when: 'Friday and Erev Yom Tov, until candle lighting: a row for each item below, saying how many stores open now have it.' },
   { id: 'nextMinyan', label: 'Next minyan', when: 'Every day: the next one anywhere, and the nearest shul’s.' },
   { id: 'openNow', label: 'Open now', when: 'Weekdays: food open now, titled by the meal (“Lunch, open now”). Never on Shabbos or Yom Tov.' },
   { id: 'pinned', label: 'Pinned', when: 'Only when the visitor has pinned something, on their device.' },
@@ -231,18 +211,13 @@ export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
 export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
 
 export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, mikvah…'
-export const DEFAULT_DESKTOP_BROWSE_EYEBROW = 'Get started'
 
 // Every desktop card's default eyebrow/heading — exactly today's literal
 // strings, so nothing changes on screen until an admin edits one. See
 // DesktopTopicsManager's CARD_META for the admin labels ("Davening Times
 // Card", etc.) these fields' inputs are grouped under.
-export const DEFAULT_DESKTOP_DAVENING_EYEBROW = 'Today'
-export const DEFAULT_DESKTOP_DAVENING_HEADING = 'Upcoming Davening'
 export const DEFAULT_DESKTOP_LISTINGS_EYEBROW = 'Community run'
 export const DEFAULT_DESKTOP_LISTINGS_HEADING = 'Kept by the Community'
-export const DEFAULT_DESKTOP_MAP_EYEBROW = 'Discover nearby'
-export const DEFAULT_DESKTOP_MAP_HEADING = 'Explore the Map'
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
 export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
@@ -264,7 +239,6 @@ const heroSplit = defaultHeroSplit(community.mission)
  *  unreachable) and whenever no row exists yet in `site_settings`. */
 export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   name: community.name,
-  tagline: community.tagline,
   heroTitle: DEFAULT_HERO_TITLE,
   mission: community.mission,
   logoUrl: null,
@@ -275,14 +249,8 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   mobileTabs: DEFAULT_MOBILE_TABS,
   searchPlaceholder: DEFAULT_SEARCH_PLACEHOLDER,
   desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
-  desktopBrowseEyebrow: DEFAULT_DESKTOP_BROWSE_EYEBROW,
-  desktopBrowseHeading: DEFAULT_HERO_TITLE,
-  desktopDaveningEyebrow: DEFAULT_DESKTOP_DAVENING_EYEBROW,
-  desktopDaveningHeading: DEFAULT_DESKTOP_DAVENING_HEADING,
   desktopListingsEyebrow: DEFAULT_DESKTOP_LISTINGS_EYEBROW,
   desktopListingsHeading: DEFAULT_DESKTOP_LISTINGS_HEADING,
-  desktopMapEyebrow: DEFAULT_DESKTOP_MAP_EYEBROW,
-  desktopMapHeading: DEFAULT_DESKTOP_MAP_HEADING,
   desktopSubscribeEyebrow: DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW,
   desktopSubscribeHeading: DEFAULT_DESKTOP_SUBSCRIBE_HEADING,
   desktopJewishTimesHeading: DEFAULT_DESKTOP_JEWISH_TIMES_HEADING,

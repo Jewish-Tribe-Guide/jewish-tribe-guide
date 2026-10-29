@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -34,7 +34,7 @@ async function renderList(searches: ClassifiedMiss[], dismissalsAvailable = true
     init.method === 'POST' ? { ok: true } : { ok: true, searches, total: searches.length, addable, dismissalsAvailable },
   )
   renderWithProviders(<MissedSearches token="tok" />, { community: { slug: 'philly' } })
-  await screen.findByText(/most asked first/)
+  await waitFor(() => expect(screen.queryByText('Loading missed searches…')).toBeNull())
 }
 
 const section = (name: RegExp) => screen.getByRole('heading', { name }).closest('section')!
@@ -88,6 +88,6 @@ describe('MissedSearches', () => {
   it('offers no Dismiss, and says why, before the dismissals table exists', async () => {
     await renderList([dentist], false)
     expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull()
-    expect(screen.getByText(/migration 058/)).toBeTruthy()
+    expect(screen.getByText(/Dismiss isn.t set up on this site yet/)).toBeTruthy()
   })
 })

@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
+import { isPlaceKind, PLACE_KIND_INFO, placeKindFromSlug, type PlaceKind } from './placeKinds'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { withAskWords } from './askWordStore'
@@ -37,7 +38,8 @@ type CategoryRow = {
   external_link_label: string | null
   external_link_url: string | null
   card_image_url: string | null
-  card_text_color: string | null
+  // card_text_color is still a column, but nothing reads it: the home's
+  // photo tile it coloured is gone.
   card_band_image_url: string | null
   pin_color: string | null
   icon_image_url: string | null
@@ -50,6 +52,7 @@ type CategoryRow = {
   // Optional the same way: undefined before migration 059, null once
   // migrated but never set. Either way, one ungrouped list.
   group_by?: unknown
+  place_kind?: string | null
   question_card?: unknown
   walk_list?: unknown
   listing_parts?: unknown
@@ -74,7 +77,6 @@ function toConfig(row: CategoryRow): CategoryConfig {
         ? { label: row.external_link_label, url: row.external_link_url }
         : null,
     cardImageUrl: row.card_image_url,
-    cardTextColor: row.card_text_color,
     cardBandImageUrl: row.card_band_image_url,
     pinColor: row.pin_color,
     iconImageUrl: row.icon_image_url,
@@ -88,6 +90,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     questionCard: parseQuestionCard(row.question_card) ?? undefined,
     walkList: parseWalkLists(row.walk_list).length ? parseWalkLists(row.walk_list) : undefined,
     listingParts: hasListingParts(parseListingParts(row.listing_parts)) ? parseListingParts(row.listing_parts) : undefined,
+    placeKind: isPlaceKind(row.place_kind) ? row.place_kind : placeKindFromSlug(row.id),
   }
 }
 
@@ -169,6 +172,20 @@ const KIND_LABELS: Record<CategoryKind, string> = {
   medical: 'Jewish Medical Resources category',
 }
 
+// Until migration 088 adds `place_kind`, a kind is only known from the web
+// address (placeKindFromSlug), so one the address doesn't say can't be kept.
+// Says so, and the address that keeps it (each kind's own name is one),
+// instead of the database's words.
+function kindNotSavedYet(error: { message: string }, kind: PlaceKind): void {
+  if (!/place_kind/.test(error.message)) return
+  const { label } = PLACE_KIND_INFO[kind]
+  throw new Error(
+    kind === 'plain'
+      ? `${label} can’t be saved with this web address yet. Change the web address.`
+      : `${label} can’t be saved with this web address yet. A web address of “${kind}” keeps it.`,
+  )
+}
+
 export async function createCategory(community: string, input: {
   label: string
   /** An admin-chosen URL slug (see CategoryEditor's id field) — validated and
@@ -190,11 +207,14 @@ export async function createCategory(community: string, input: {
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
-  cardTextColor?: string | null
   cardBandImageUrl?: string | null
   pinColor?: string | null
   iconImageUrl?: string | null
   active?: boolean
+  /** Saved only when given, which the editor does only when it differs from
+   *  what the slug implies, so creating a category works on a database
+   *  without migration 088. */
+  placeKind?: PlaceKind
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'listing'
@@ -250,11 +270,11 @@ export async function createCategory(community: string, input: {
     external_link_label: input.externalLink?.label ?? null,
     external_link_url: input.externalLink?.url ?? null,
     card_image_url: input.cardImageUrl?.trim() || null,
-    card_text_color: input.cardTextColor?.trim() || null,
     card_band_image_url: input.cardBandImageUrl?.trim() || null,
     pin_color: input.pinColor?.trim() || null,
     icon_image_url: input.iconImageUrl?.trim() || null,
     active: input.active ?? true,
+    ...(input.placeKind && { place_kind: input.placeKind }),
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
@@ -264,6 +284,7 @@ export async function createCategory(community: string, input: {
     if (error.code === '23505' && kind !== 'listing') {
       throw new Error(`A ${KIND_LABELS[kind]} already exists.`)
     }
+    if (input.placeKind) kindNotSavedYet(error, input.placeKind)
     throw new Error(`Failed to create category: ${error.message}`)
   }
   return toConfig(data as CategoryRow)
@@ -289,7 +310,6 @@ export async function updateCategory(
     capabilities?: Partial<CategoryCapabilities>
     externalLink?: { label: string; url: string } | null
     cardImageUrl?: string | null
-    cardTextColor?: string | null
     cardBandImageUrl?: string | null
     pinColor?: string | null
     iconImageUrl?: string | null
@@ -300,6 +320,7 @@ export async function updateCategory(
     questionCard?: QuestionCard | null
     walkList?: WalkList[] | null
     listingParts?: ListingParts | null
+    placeKind?: PlaceKind
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -321,7 +342,6 @@ export async function updateCategory(
     row.external_link_url = patch.externalLink?.url ?? null
   }
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
-  if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
   if (patch.cardBandImageUrl !== undefined) row.card_band_image_url = patch.cardBandImageUrl?.trim() || null
   if (patch.pinColor !== undefined) row.pin_color = patch.pinColor?.trim() || null
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
@@ -335,6 +355,8 @@ export async function updateCategory(
   // And for migration 061.
   if (patch.walkList !== undefined) row.walk_list = patch.walkList?.length ? patch.walkList : null
   // And for migration 066.
+  // And for migration 088.
+  if (patch.placeKind !== undefined) row.place_kind = patch.placeKind
   if (patch.listingParts !== undefined) row.listing_parts = patch.listingParts && hasListingParts(patch.listingParts) ? patch.listingParts : null
 
   // Scoped by community as well as id — the composite primary key means a
@@ -350,7 +372,10 @@ export async function updateCategory(
     .select('*')
     .maybeSingle()
 
-  if (error) throw new Error(`Failed to update category: ${error.message}`)
+  if (error) {
+    if (patch.placeKind) kindNotSavedYet(error, patch.placeKind)
+    throw new Error(`Failed to update category: ${error.message}`)
+  }
   return data ? toConfig(data as CategoryRow) : null
 }
 

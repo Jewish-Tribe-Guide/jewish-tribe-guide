@@ -9,6 +9,7 @@ import {
 } from '@/lib/categories'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
 import { slugify } from '@/lib/routes'
+import { PLACE_KIND_INFO, type PlaceKind } from '@/lib/placeKinds'
 import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEditorLogic'
 
 // ── The draft state behind CategoryEditor and every mutation of it: naming,
@@ -108,9 +109,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
       cardImageUrl: lastAppliedTemplate
         ? (d.cardImageUrl === (lastAppliedTemplate.cardImageUrl ?? '') ? (template.cardImageUrl ?? '') : d.cardImageUrl)
         : (d.cardImageUrl || template.cardImageUrl || ''),
-      cardTextColor: lastAppliedTemplate
-        ? (d.cardTextColor === (lastAppliedTemplate.cardTextColor ?? '#ffffff') ? (template.cardTextColor ?? '#ffffff') : d.cardTextColor)
-        : (template.cardTextColor || d.cardTextColor),
       hasAddress: template.hasAddress ?? d.hasAddress,
       hasPhone: template.hasPhone ?? d.hasPhone,
       upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,
@@ -128,6 +126,33 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
       })(),
     }))
     setLastAppliedTemplate(template)
+  }
+
+  // A kind picked for a new category (board 6's kind box): it brings its
+  // template's fields, as picking that template did. A kind with none
+  // (Hospitals, Plain) puts back a new category's own fields, in case
+  // another kind's had been picked first; a name typed by hand stays.
+  function pickKind(kind: PlaceKind) {
+    const template = PLACE_KIND_INFO[kind].template
+    if (template) applyTemplate(template)
+    else if (lastAppliedTemplate) {
+      const fresh = toDraft(null)
+      setDraft((d) => ({
+        ...d,
+        ...(d.pluralLabel === lastAppliedTemplate.pluralLabel && { pluralLabel: '', label: '', ...(!idTouched && { id: '' }) }),
+        icon: d.icon === (lastAppliedTemplate.icon ?? '') ? '' : d.icon,
+        description: d.description === (lastAppliedTemplate.categoryDescription ?? '') ? '' : d.description,
+        cardImageUrl: d.cardImageUrl === (lastAppliedTemplate.cardImageUrl ?? '') ? '' : d.cardImageUrl,
+        hasAddress: fresh.hasAddress,
+        hasPhone: fresh.hasPhone,
+        upvotesEnabled: fresh.upvotesEnabled,
+        capabilities: fresh.capabilities,
+        fields: fresh.fields,
+      }))
+      setLastAppliedTemplate(null)
+    }
+    // The slug follows the name a template brought, as it follows a typed one.
+    setDraft((d) => ({ ...d, placeKind: kind, id: isNew && !idTouched ? slugify(d.pluralLabel) : d.id }))
   }
 
   function updateField(i: number, patch: Partial<CategoryField>) {
@@ -361,6 +386,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
     setId,
     setCap,
     applyTemplate,
+    pickKind,
     updateField,
     addField,
     removeField,

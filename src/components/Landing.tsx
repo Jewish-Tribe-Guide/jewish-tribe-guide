@@ -626,9 +626,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
         {(() => {
           function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
-            // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
-            // the WHOLE card — left side of the header row, with the "View
-            // all" toggle on the right. No search box of its own (see the
+            // A fixed "Explore by Category" titles the WHOLE card — left side
+            // of the header row, with the "View all" toggle on the right.
+            // No search box of its own (see the
             // section comment above this card) — and, since
             // HeroSearchDropdown started giving the hero's own search box a
             // live results panel of its own, this card no longer reacts to
@@ -659,12 +659,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 data-testid="browse-everything-card"
                 className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
               >
-                  {/* Hardcoded, not settings.desktopBrowseEyebrow/Heading —
-                      the user's own reference image titles this "Explore
-                      by Category" with no small eyebrow label above it,
-                      unlike every other card on this page. The admin
-                      fields still exist (DesktopTopicsManager) but have no
-                      render site left here. "Show fewer categories" sits up
+                  {/* Hardcoded — the user's own reference image titles this
+                      "Explore by Category" with no small eyebrow label above
+                      it, unlike every other card on this page, so it has no
+                      admin field. "Show fewer categories" sits up
                       here, top-right of the heading, once expanded — the
                       user's own call, moving it back from below the grid
                       (where the "More" tile it collapses used to be). */}

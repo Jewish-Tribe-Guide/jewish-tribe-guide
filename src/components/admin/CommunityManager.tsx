@@ -15,26 +15,12 @@ import type { Community } from '@/lib/communityStore'
 // itself, since that type also feeds the public GET /api/communities.
 type CommunityWithAdminEmail = Community & {
   adminEmails: string[]
-  // The same two preferences each admin sets for themselves on their own
-  // community's Team tab (see TeamManager.tsx) — membership in these two
-  // arrays, not a per-admin row (there isn't one; see communityStore.ts's
-  // own notes on getAdminNotifyPreference/getAdminReviewNotifyPreference).
-  // Shown here read-only, so the roster below derives each admin's two
-  // states from these rather than storing anything of its own.
-  notifyMutedEmails: string[]
-  notifyReviewEmails: string[]
   previewToken: string | null
 }
 
-function isMuted(list: string[], email: string): boolean {
-  const target = email.trim().toLowerCase()
-  return list.some((e) => e.trim().toLowerCase() === target)
-}
-
 // Comma-separated, same convention the SUPERADMIN_EMAILS env var already
-// uses — only still needed for the "new community" form's admin-emails
-// field below; the per-community roster further down edits one address at a
-// time instead.
+// uses — the "new community" form's admin-emails field below; after that,
+// each community's own Team tab adds and removes them one at a time.
 function parseEmailList(value: string): string[] {
   return value
     .split(',')
@@ -84,8 +70,6 @@ type Draft = {
   nameTouched: boolean
   slug: string
   slugTouched: boolean
-  tagline: string
-  taglineTouched: boolean
   mission: string
   missionTouched: boolean
   region: string
@@ -106,8 +90,6 @@ function emptyDraft(): Draft {
     nameTouched: false,
     slug: '',
     slugTouched: false,
-    tagline: '',
-    taglineTouched: false,
     mission: '',
     missionTouched: false,
     region: '',
@@ -126,7 +108,7 @@ function emptyDraft(): Draft {
 }
 
 // Google's `formattedAddress` for a locality reads "Baltimore, MD, USA" —
-// the part before the first comma is what a name/region/tagline actually
+// the part before the first comma is what a name/region actually
 // wants ("Baltimore"), not the full string. Good enough for the common case;
 // everything it feeds stays editable if a city's real name needs adjusting.
 function cityShortName(cityQuery: string): string {
@@ -161,9 +143,9 @@ export default function CommunityManager({ token }: { token: string }) {
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [draft, setDraft] = useState<Draft>(emptyDraft())
-  // Tagline/mission/region/timezone/map center/brand colors — everything
+  // Mission/region/timezone/map center/brand colors — everything
   // the city picker fills in, or that's editable later from the admin
-  // console (tagline/mission via Site Settings) and so isn't worth blocking
+  // console (mission via Site Settings) and so isn't worth blocking
   // creation on. Collapsed by default; opens on its own if lat/lng end up
   // missing at submit time (no city picked, e.g. Places unavailable) so the
   // manual fallback is never hidden from someone who actually needs it.
@@ -186,26 +168,10 @@ export default function CommunityManager({ token }: { token: string }) {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
   // The "Add admin" input's typed value, one per community (keyed by slug)
   // so switching which card you're typing into doesn't clobber another.
-  const [newAdminEmail, setNewAdminEmail] = useState<Record<string, string>>({})
-  // Which community is mid-flight on an add or remove, and which email a
-  // remove is acting on — enough to disable just the affected row/button
-  // rather than the whole roster.
-  const [rosterBusySlug, setRosterBusySlug] = useState<string | null>(null)
-  const [rosterError, setRosterError] = useState<Record<string, string>>({})
-  // Which single roster row (slug + email) is showing its inline "remove
-  // this admin?" confirmation, if any — same one-at-a-time,
-  // click-again-to-confirm shape as ArchivedListings.tsx's confirmDeleteId,
-  // just keyed by a pair since the roster spans every community at once.
-  const [confirmRemove, setConfirmRemove] = useState<{ slug: string; email: string } | null>(null)
   // Which community cards are expanded — each one collapsed by default,
   // independently toggleable (not one-at-a-time). Everything but identity
   // (name/badges/slug/region/admin count) lives behind this: Publish/
-  // Unpublish, Delete, the preview link, and the whole Admins roster. The
-  // Admins roster used to have its own separate CollapsibleSection nested
-  // one level in — that meant two clicks to reach it and a redundant
-  // "Show" the outer card's own Show already implied. One toggle per card
-  // now, matching how CommunityManager.test.tsx exercises admin roster
-  // rows further down (via `card` scoping).
+  // Unpublish, Delete, the preview link, and the way to its Team tab.
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
 
   function toggleExpanded(slug: string) {
@@ -258,10 +224,6 @@ export default function CommunityManager({ token }: { token: string }) {
     setDraft((d) => ({ ...d, region, regionTouched: true }))
   }
 
-  function setTagline(tagline: string) {
-    setDraft((d) => ({ ...d, tagline, taglineTouched: true }))
-  }
-
   function setMission(mission: string) {
     setDraft((d) => ({ ...d, mission, missionTouched: true }))
   }
@@ -278,7 +240,7 @@ export default function CommunityManager({ token }: { token: string }) {
   // setCityQuery has already landed the chosen city's text — see that
   // function's own note on why reading d.cityQuery here is safe. Auto-fills
   // everything a real address would otherwise make an admin hunt down by
-  // hand (map center, timezone, region, a starting name/slug/tagline/
+  // hand (map center, timezone, region, a starting name/slug/
   // mission), without overwriting anything already edited by hand.
   function setCityCoords(coords: { lat: number; lng: number } | null) {
     setDraft((d) => {
@@ -297,7 +259,6 @@ export default function CommunityManager({ token }: { token: string }) {
         // suffix ends up baked into the URL (e.g. baltimore-jewish-guide).
         // A hand-typed name still drives the slug as before.
         slug: d.slugTouched ? d.slug : slugify(d.nameTouched ? name : city),
-        tagline: d.taglineTouched ? d.tagline : 'Guide for residents & visitors',
         mission: d.missionTouched
           ? d.mission
           : `A guide to Jewish ${city} — community resources for residents and visitors.`,
@@ -347,7 +308,6 @@ export default function CommunityManager({ token }: { token: string }) {
             // blank field (cleared by hand, or never auto-filled because no
             // city was picked) still needs something real to submit rather
             // than an empty string admin-visible copy would render as.
-            tagline: draft.tagline.trim() || 'Guide for residents & visitors',
             mission: draft.mission.trim() || `A guide to the ${draft.region.trim() || draft.name.trim()} Jewish community.`,
             region: draft.region.trim(),
             timezone: draft.timezone.trim(),
@@ -412,67 +372,8 @@ export default function CommunityManager({ token }: { token: string }) {
     }
   }
 
-  function applyRosterUpdate(slug: string, community: CommunityWithAdminEmail) {
-    setCommunities(
-      (cs) =>
-        cs?.map((c) =>
-          c.slug === slug
-            ? {
-                ...c,
-                adminEmails: community.adminEmails,
-                notifyMutedEmails: community.notifyMutedEmails,
-                notifyReviewEmails: community.notifyReviewEmails,
-              }
-            : c,
-        ) ?? cs,
-    )
-  }
 
-  async function addAdmin(slug: string) {
-    const email = (newAdminEmail[slug] ?? '').trim()
-    if (!email) return
-    setRosterBusySlug(slug)
-    setRosterError((e) => ({ ...e, [slug]: '' }))
-    try {
-      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
-        `/api/admin/communities/${slug}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ addAdminEmail: email }),
-        },
-        'Could not add that admin.',
-      )
-      applyRosterUpdate(slug, community)
-      setNewAdminEmail((v) => ({ ...v, [slug]: '' }))
-    } catch (err) {
-      setRosterError((e) => ({ ...e, [slug]: err instanceof Error ? err.message : 'Could not add that admin.' }))
-    } finally {
-      setRosterBusySlug(null)
-    }
-  }
 
-  async function removeAdmin(slug: string, email: string) {
-    setConfirmRemove(null)
-    setRosterBusySlug(slug)
-    setRosterError((e) => ({ ...e, [slug]: '' }))
-    try {
-      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
-        `/api/admin/communities/${slug}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ removeAdminEmail: email }),
-        },
-        'Could not remove that admin.',
-      )
-      applyRosterUpdate(slug, community)
-    } catch (err) {
-      setRosterError((e) => ({ ...e, [slug]: err instanceof Error ? err.message : 'Could not remove that admin.' }))
-    } finally {
-      setRosterBusySlug(null)
-    }
-  }
 
   function startDeleting(slug: string) {
     setDeletingSlug(slug)
@@ -564,7 +465,7 @@ export default function CommunityManager({ token }: { token: string }) {
             />
           </label>
           <p className="text-xs text-muted mt-1">
-            Fills in the name, URL slug, region, timezone, map center, tagline and mission below — pick a suggestion
+            Fills in the name, URL slug, region, timezone, map center and mission below — pick a suggestion
             from the dropdown rather than just typing, so those actually get set.
           </p>
         </div>
@@ -626,27 +527,17 @@ export default function CommunityManager({ token }: { token: string }) {
             picker above, or safe to leave at its default — a new community
             starts unpublished (see the visibility migration), so none of
             this needs to be right, or even present, before creating it.
-            Tagline/mission are editable later from Site Settings too. */}
+            Mission is editable later from Site Settings too. */}
         <button
           type="button"
           onClick={() => setDetailsOpen((v) => !v)}
           className="text-sm font-medium text-primary hover:underline cursor-pointer"
         >
-          {detailsOpen ? '− Hide' : '+ Show'} more details (tagline, mission, region, timezone, map center, colors)
+          {detailsOpen ? '− Hide' : '+ Show'} more details (mission, region, timezone, map center, colors)
         </button>
 
         {detailsOpen && (
           <div className="space-y-4 border-t border-slate-200 pt-4">
-            <label className={labelClass}>
-              Tagline
-              <input
-                className={inputClass}
-                value={draft.tagline}
-                onChange={(e) => setTagline(e.target.value)}
-                placeholder="Guide for residents & visitors"
-              />
-            </label>
-
             <label className={labelClass}>
               Mission
               <textarea
@@ -739,7 +630,7 @@ export default function CommunityManager({ token }: { token: string }) {
       </div>
 
       {deletionDisabled && (
-        <p className="text-xs text-muted mb-3">Deleting a community isn&rsquo;t available in production.</p>
+        <p className="text-xs text-muted mb-3">Communities can&rsquo;t be deleted on the live site.</p>
       )}
       {toggleError && <p className="text-xs text-red-700 mb-3">{toggleError}</p>}
 
@@ -854,137 +745,12 @@ export default function CommunityManager({ token }: { token: string }) {
                   </div>
                 )}
 
+                {/* Who can sign in is each community's own Team tab now
+                    (the admin redesign's step 5). */}
                 <div className="border-t border-slate-100 pt-3">
-              <p className="text-sm font-semibold text-slate-900 mb-2">Admins</p>
-              {rosterError[c.slug] && <p className="text-xs text-red-700 mb-2">{rosterError[c.slug]}</p>}
-
-              {c.adminEmails.length > 0 ? (
-                // Four columns do not fit a phone. A table cannot render
-                // narrower than its min-content width — `w-full` is only a
-                // preference — and a column of font-mono email addresses is a
-                // wall of unbreakable characters, so this table rendered
-                // 390px wide inside a 309px card and pushed the whole
-                // document to 422px on a 375px screen, leaving Remove off the
-                // right edge entirely.
-                //
-                // Below `sm` the same elements lay out as stacked rows
-                // instead: email on its own line, then the two pills and
-                // Remove beneath it. The DOM is untouched — still a real
-                // table, still real <tr>s — so this stays presentational, and
-                // both the unit tests' `closest('tr')` and the e2e row
-                // locators keep meaning what they meant.
-                //
-                // overflow-x-auto is the backstop: at any width where the
-                // table still can't fit, it scrolls inside its own card
-                // rather than dragging the page sideways with it.
-                <div className="overflow-x-auto">
-                <table className="w-full text-xs max-sm:block">
-                  <thead className="max-sm:hidden">
-                    <tr className="text-left text-slate-400">
-                      <th className="font-medium pb-1">Email</th>
-                      <th className="font-medium pb-1 text-center w-24">Submissions</th>
-                      <th className="font-medium pb-1 text-center w-24">Approve/reject</th>
-                      <th className="w-14" />
-                    </tr>
-                  </thead>
-                  <tbody className="max-sm:block">
-                    {c.adminEmails.map((email) => {
-                      const submissionsOn = !isMuted(c.notifyMutedEmails, email)
-                      const reviewOn = isMuted(c.notifyReviewEmails, email)
-                      const confirming = confirmRemove?.slug === c.slug && confirmRemove.email === email
-                      return (
-                        <tr
-                          key={email}
-                          className="border-t border-slate-100 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:py-1"
-                        >
-                          {/* break-all, not just wrapping: an email address
-                              has no spaces to break at, and it is the one column
-                              that was setting the table's floor. */}
-                          <td className="py-1.5 font-mono text-slate-700 break-all max-sm:block max-sm:basis-full max-sm:pb-0">
-                            {email}
-                          </td>
-                          <td className="py-1.5 text-center max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:pt-1">
-                            {/* The header row is hidden at this width, so each
-                                pill carries its own label — two bare "On"s
-                                side by side say nothing about which is which. */}
-                            <span className="hidden max-sm:inline text-slate-400">Submissions</span>
-                            <span
-                              className={
-                                submissionsOn
-                                  ? 'inline-block rounded-full px-2 py-0.5 bg-green-50 text-green-700'
-                                  : 'inline-block rounded-full px-2 py-0.5 bg-slate-100 text-slate-500'
-                              }
-                            >
-                              {submissionsOn ? 'On' : 'Off'}
-                            </span>
-                          </td>
-                          <td className="py-1.5 text-center max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:pt-1">
-                            <span className="hidden max-sm:inline text-slate-400">Approve/reject</span>
-                            <span
-                              className={
-                                reviewOn
-                                  ? 'inline-block rounded-full px-2 py-0.5 bg-green-50 text-green-700'
-                                  : 'inline-block rounded-full px-2 py-0.5 bg-slate-100 text-slate-500'
-                              }
-                            >
-                              {reviewOn ? 'On' : 'Off'}
-                            </span>
-                          </td>
-                          <td className="py-1.5 text-right max-sm:ml-auto max-sm:pt-1">
-                            {confirming ? (
-                              <span className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                <button
-                                  onClick={() => removeAdmin(c.slug, email)}
-                                  disabled={rosterBusySlug === c.slug}
-                                  className="font-medium text-red-600 hover:underline cursor-pointer disabled:opacity-60"
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  onClick={() => setConfirmRemove(null)}
-                                  className="font-medium text-slate-500 hover:underline cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmRemove({ slug: c.slug, email })}
-                                className="font-medium text-red-600 hover:underline cursor-pointer"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500 italic">
-                  No admins set — falls back to the superadmin list (SUPERADMIN_EMAILS).
-                </p>
-              )}
-
-              <div className="flex gap-2 mt-2">
-                <input
-                  className="flex-1 min-w-0 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                  value={newAdminEmail[c.slug] ?? ''}
-                  onChange={(e) => setNewAdminEmail((v) => ({ ...v, [c.slug]: e.target.value }))}
-                  onKeyDown={(e) => e.key === 'Enter' && addAdmin(c.slug)}
-                  placeholder="new-admin@example.com"
-                  type="email"
-                />
-                <button
-                  onClick={() => addAdmin(c.slug)}
-                  disabled={rosterBusySlug === c.slug || !(newAdminEmail[c.slug] ?? '').trim()}
-                  className="text-xs font-medium border border-slate-300 text-slate-600 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
-                >
-                  Add admin
-                </button>
-              </div>
+                  <Link href={`${adminBase(c.slug)}/team`} className="text-sm font-semibold text-primary hover:underline">
+                    Change who can sign in
+                  </Link>
                 </div>
 
                 {deletingSlug === c.slug && (

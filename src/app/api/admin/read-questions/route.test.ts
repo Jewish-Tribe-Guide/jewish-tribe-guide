@@ -6,7 +6,6 @@ const m = vi.hoisted(() => ({
   resolveCommunity: vi.fn(),
   listCategories: vi.fn(),
   listReadings: vi.fn(),
-  setReadingApproved: vi.fn(),
   forgetReading: vi.fn(),
   listApprovedResources: vi.fn(),
   listTaughtWords: vi.fn(),
@@ -20,7 +19,7 @@ vi.mock('@/lib/communityStore', () => ({
   resolveCommunity: m.resolveCommunity,
 }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
-vi.mock('@/lib/questionReadingStore', () => ({ listReadings: m.listReadings, setReadingApproved: m.setReadingApproved, forgetReading: m.forgetReading }))
+vi.mock('@/lib/questionReadingStore', () => ({ listReadings: m.listReadings, forgetReading: m.forgetReading }))
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/askWordStore', () => ({ listTaughtWords: m.listTaughtWords, teachWord: m.teachWord, unteachWord: m.unteachWord }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
@@ -60,8 +59,6 @@ beforeEach(() => {
         hits: 4,
         createdAt: '2026-09-30T10:00:00Z',
         lastUsedAt: '2026-09-30T12:00:00Z',
-        approvedAt: null,
-        approvedBy: null,
       },
     ],
   })
@@ -71,10 +68,10 @@ describe('/api/admin/read-questions', () => {
   it('admins only, both ways', async () => {
     m.getAdminUserForCommunity.mockResolvedValue(null)
     expect((await GET(req('GET'))).status).toBe(401)
-    expect((await POST(req('POST', { key: 'ikc dairy', action: 'approve' }))).status).toBe(401)
+    expect((await POST(req('POST', { key: 'ikc dairy', action: 'forget' }))).status).toBe(401)
     expect((await POST(req('POST', { action: 'teach', word: { word: 'ikc', categoryId: 'restaurant' } }))).status).toBe(401)
     expect(m.teachWord).not.toHaveBeenCalled()
-    expect(m.setReadingApproved).not.toHaveBeenCalled()
+    expect(m.forgetReading).not.toHaveBeenCalled()
   })
 
   it('lists each reading in words, never who asked', async () => {
@@ -91,8 +88,6 @@ describe('/api/admin/read-questions', () => {
       hits: 4,
       model: 'gpt-6-luna',
       lastUsedAt: '2026-09-30T12:00:00Z',
-      approvedAt: null,
-      approvedBy: null,
     })
   })
 
@@ -131,26 +126,25 @@ describe('/api/admin/read-questions', () => {
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 
-  it('approve records who; unapprove takes it back; forget deletes', async () => {
-    expect((await POST(req('POST', { key: 'ikc dairy', action: 'approve' }))).status).toBe(200)
-    expect(m.setReadingApproved).toHaveBeenLastCalledWith('philly', 'ikc dairy', 'me@x.co')
-    await POST(req('POST', { key: 'ikc dairy', action: 'unapprove' }))
-    expect(m.setReadingApproved).toHaveBeenLastCalledWith('philly', 'ikc dairy', null)
-    await POST(req('POST', { key: 'ikc dairy', action: 'forget' }))
+  it('forget deletes', async () => {
+    expect((await POST(req('POST', { key: 'ikc dairy', action: 'forget' }))).status).toBe(200)
     expect(m.forgetReading).toHaveBeenCalledWith('philly', 'ikc dairy')
   })
 
   it('refuses anything else', async () => {
-    for (const body of ['not json', { key: '', action: 'approve' }, { key: 'x', action: 'delete-all' }, { key: 'x'.repeat(201), action: 'forget' }]) {
+    // approve/unapprove had no button left, and approval did nothing a
+    // visitor could see; both are gone.
+    for (const body of ['not json', { key: '', action: 'forget' }, { key: 'x', action: 'approve' }, { key: 'x', action: 'unapprove' }, { key: 'x', action: 'delete-all' }, { key: 'x'.repeat(201), action: 'forget' }]) {
       expect((await POST(req('POST', body))).status, JSON.stringify(body)).toBe(400)
     }
     expect(m.forgetReading).not.toHaveBeenCalled()
   })
 
-  it('says why, when the table isn’t there yet', async () => {
-    m.setReadingApproved.mockRejectedValue(new Error('relation does not exist'))
-    const res = await POST(req('POST', { key: 'ikc dairy', action: 'approve' }))
+  // No migration numbers: the admin reading this can't run one.
+  it('says it couldn’t save, in words an admin can read', async () => {
+    m.forgetReading.mockRejectedValue(new Error('relation does not exist'))
+    const res = await POST(req('POST', { key: 'ikc dairy', action: 'forget' }))
     expect(res.status).toBe(502)
-    expect((await res.json()).errors[0]).toMatch(/migration 062/)
+    expect((await res.json()).errors[0]).toBe('Could not save.')
   })
 })

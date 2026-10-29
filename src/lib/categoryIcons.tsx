@@ -23,6 +23,8 @@
 // convention (see e.g. Google's own hospital POI pins) — rendered as text
 // rather than a stroked path, since a stroked letterform at icon weight/size
 // just looks smudged.
+import { useCategoriesIfAny } from './contentContext'
+import { kindKeyById } from './placeKinds'
 const CATEGORY_ICON_TEXT: Record<string, string> = {
   hospital: 'H',
   __hospitals__: 'H',
@@ -97,6 +99,13 @@ export function hasCategoryIcon(categoryId: string | undefined): boolean {
   return !!categoryId && (categoryId in CATEGORY_ICON_TEXT || categoryId in CATEGORY_ICON_MARKUP)
 }
 
+/** The key a category's drawn icon is found by: its kind's (see
+ *  placeKinds.ts), when the site's categories are at hand. */
+export function useGlyphKey(categoryId: string | undefined): string | undefined {
+  const categories = useCategoriesIfAny()
+  return categoryId && kindKeyById(categoryId, categories)
+}
+
 type Props = {
   /** The category (or hospitals-filter) id — CategoryConfig.id, or
    *  ResourceMapView's HOSPITALS_FILTER_ID. Undefined (a place with no
@@ -119,7 +128,10 @@ type Props = {
  *  the same thing regardless of which category it ends up drawing; a plain
  *  text span sized by width/height classes doesn't scale its font to fit
  *  them the way viewBox-relative SVG content does. */
-export function CategoryGlyph({ categoryId, icon, className }: Props) {
+export function CategoryGlyph({ categoryId: id, icon, className }: Props) {
+  // Drawn by the category's kind (placeKinds.ts), so a community whose
+  // shuls aren't at /synagogue still gets the shul icon.
+  const categoryId = useGlyphKey(id)
   const text = categoryId ? CATEGORY_ICON_TEXT[categoryId] : undefined
   if (text) {
     return (

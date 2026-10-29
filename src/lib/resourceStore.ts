@@ -6,6 +6,7 @@ import { isValidPhone, isHttpUrl } from './validation'
 import { LIMITS, tooLong, oversizedField } from './limits'
 import { getVoteCounts } from './voteStore'
 import type { ResourceRow, DirectoryResource, ResourceSubmission } from '@/types'
+import type { AdminPlace } from './adminPlaces'
 
 // Flattens a DB row into the shape the display components consume: shared fields
 // at the top level, with `details` (category-specific keys like isKosher, hours)
@@ -151,6 +152,33 @@ export async function hardDeleteArchivedResource(id: string, community: string):
 
   if (error) throw new Error(`Failed to permanently delete listing: ${error.message}`)
   return !!data
+}
+
+// Every listing an admin looks after, on the site or archived, for Places
+// (the admin redesign's step 3). Uncached: an admin's own edit shows at once.
+export async function listResourcesForAdmin(community: string): Promise<ResourceRow[]> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('community_id', community)
+    .in('status', ['approved', 'archived'])
+
+  if (error) throw new Error(`Failed to load listings: ${error.message}`)
+  return data as ResourceRow[]
+}
+
+/** A listing as Places lists it. `takesAddress`: whether its category asks
+ *  for an address at all, so a WhatsApp group never shows as missing one. */
+export function toAdminPlace(row: ResourceRow, takesAddress: boolean): AdminPlace {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    status: row.status === 'archived' ? 'archived' : 'approved',
+    hasAddress: !takesAddress || !!row.address?.trim(),
+    changedAt: row.reviewed_at ?? row.created_at,
+    listing: normalizeRow(row),
+  }
 }
 
 // ── Validation ───────────────────────────────────────────────────────────────

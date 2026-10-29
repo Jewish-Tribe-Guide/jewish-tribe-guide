@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { listCommunities } from '@/lib/communityStore'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
@@ -43,6 +44,14 @@ async function resolveFromPath(slug: string) {
 export async function generateStaticParams() {
   const communities = await listCommunities()
   return communities.map((c) => ({ community: c.slug }))
+}
+
+/** The tab says whose admin it is; without this every community's console
+ *  took the root layout's title, the first community's name. */
+export async function generateMetadata(props: LayoutProps<'/admin/[community]'>): Promise<Metadata> {
+  const { community: slug } = await props.params
+  const { community } = await resolveFromPath(slug)
+  return community ? { title: `Admin · ${community.name}` } : {}
 }
 
 export default async function AdminLayout(props: LayoutProps<'/admin/[community]'>) {

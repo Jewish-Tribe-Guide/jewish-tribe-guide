@@ -66,7 +66,6 @@ function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
     slug: 'philly',
     name: 'Philadelphia Jewish Community',
     shortName: 'PJC',
-    tagline: 'Guide for residents & visitors',
     mission: 'A guide to Jewish Philadelphia.',
     manifestDescription: 'A guide to Jewish Philadelphia.',
     region: 'Philadelphia',
@@ -102,8 +101,8 @@ async function renderAndWaitForList(communities: TestCommunity[] = [makeCommunit
 // can isolate exactly one validation branch. Region/lat/lng are filled by
 // hand (under "More details") rather than via the city picker, so this
 // stays independent of that auto-fill behavior — see the "city picker"
-// tests below for that. Deliberately leaves tagline/mission blank (no
-// longer required — they default at submit time) and theme/background
+// tests below for that. Deliberately leaves mission blank (no
+// longer required — it defaults at submit time) and theme/background
 // colors at their (valid) component defaults.
 async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^name$/i), 'Baltimore Jewish Community')
@@ -196,7 +195,7 @@ describe('CommunityManager — new community form', () => {
     expect(fetchJson).not.toHaveBeenCalled()
   })
 
-  it('leaving tagline and mission blank still creates the community, with generated defaults', async () => {
+  it('leaving mission blank still creates the community, with generated defaults', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
@@ -207,7 +206,7 @@ describe('CommunityManager — new community form', () => {
     await waitFor(() => expect(fetchJson).toHaveBeenCalled())
     const call = vi.mocked(fetchJson).mock.calls[0]!
     const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body.tagline).toBe('Guide for residents & visitors')
+    expect(body).not.toHaveProperty('tagline')
     expect(body.mission).toBe('A guide to the Baltimore Jewish community.')
   })
 
@@ -320,7 +319,6 @@ describe('CommunityManager — new community form', () => {
     expect(body).toMatchObject({
       slug: 'baltimore-jewish-community',
       name: 'Baltimore Jewish Community',
-      tagline: 'Guide for residents & visitors',
       mission: 'A guide to the Baltimore Jewish community.',
       region: 'Baltimore',
       mapCenter: { lat: 39.369, lng: -76.715 },
@@ -360,7 +358,7 @@ describe('CommunityManager — new community form', () => {
 })
 
 describe('CommunityManager — the city picker auto-fills the rest of the form', () => {
-  it('fills name, slug, region, map center, tagline and mission from a single city pick', async () => {
+  it('fills name, slug, region, map center and mission from a single city pick', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
@@ -377,7 +375,6 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
       region: 'Baltimore',
       mapCenter: { lat: 39.2904, lng: -76.6122 },
       timezone: 'America/New_York',
-      tagline: 'Guide for residents & visitors',
       mission: 'A guide to Jewish Baltimore — community resources for residents and visitors.',
     })
   })
@@ -396,14 +393,13 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
     expect(screen.getByLabelText(/url slug/i)).toHaveValue('my-custom-community-name')
   })
 
-  it('never overwrites region/tagline/mission already typed by hand', async () => {
+  it('never overwrites region/mission already typed by hand', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
     await user.click(screen.getByRole('button', { name: /show more details/i }))
 
     await user.type(screen.getByLabelText(/^region$/i), 'Custom Region')
-    await user.type(screen.getByLabelText(/^tagline$/i), 'Custom tagline')
     await user.type(screen.getByLabelText(/^mission$/i), 'Custom mission.')
 
     await user.click(screen.getByRole('button', { name: /simulate city select/i }))
@@ -413,7 +409,6 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
     const call = vi.mocked(fetchJson).mock.calls[0]!
     const body = JSON.parse((call[1] as RequestInit).body as string)
     expect(body.region).toBe('Custom Region')
-    expect(body.tagline).toBe('Custom tagline')
     expect(body.mission).toBe('Custom mission.')
     // Map center and timezone aren't hand-typed here, so the pick still sets them.
     expect(body.mapCenter).toEqual({ lat: 39.2904, lng: -76.6122 })
@@ -572,7 +567,7 @@ describe('CommunityManager — deleting a community', () => {
     await openCard(user, cardFor(/upper east side/i))
 
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/deleting a community isn.t available in production/i)).toBeInTheDocument()
+    expect(screen.getByText(/communities can.t be deleted on the live site/i)).toBeInTheDocument()
   })
 })
 
@@ -687,110 +682,20 @@ describe('CommunityManager — publishing a community', () => {
   })
 })
 
-describe('CommunityManager — admin roster', () => {
-  const ues = makeCommunity({
-    slug: 'ues',
-    name: 'Upper East Side',
-    region: 'Manhattan',
-    adminEmails: ['jane@example.com', 'sam@example.com'],
-    // jane is muted on submissions (opted out) and opted in to review-action
-    // emails; sam is on the defaults for both — exercises every combination
-    // of the two read-only pills at once.
-    notifyMutedEmails: ['jane@example.com'],
-    notifyReviewEmails: ['jane@example.com'],
-  })
+// Who can sign in is each community's own Team tab now (the admin
+// redesign's step 5): a card says how many, and links there.
+describe('CommunityManager — admins', () => {
+  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', adminEmails: ['jane@example.com', 'sam@example.com'] })
 
-  it('shows every admin with their own submission and review-action preference', async () => {
+  it('links each community to its own Team tab, with no list to change here', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
     const card = cardFor(/upper east side/i)
+    expect(within(card).getByText(/2 admins/)).toBeInTheDocument()
     await openCard(user, card)
 
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    expect(within(janeRow).getByText('Off')).toBeInTheDocument()
-    expect(within(janeRow).getByText('On')).toBeInTheDocument()
-
-    const samRow = within(card).getByText('sam@example.com').closest('tr')!
-    expect(within(samRow).getByText('On')).toBeInTheDocument()
-    expect(within(samRow).getByText('Off')).toBeInTheDocument()
-  })
-
-  it('shows the empty state when no admins are configured', async () => {
-    const user = userEvent.setup()
-    const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
-    await renderAndWaitForList([empty])
-    await openCard(user, cardFor(/empty community/i))
-    expect(screen.getByText(/no admins set — falls back to the superadmin list/i)).toBeInTheDocument()
-  })
-
-  it('adds a new admin', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-    vi.mocked(fetchJson).mockResolvedValueOnce({
-      community: { ...ues, adminEmails: [...ues.adminEmails, 'new@example.com'] },
-    })
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    await user.type(within(card).getByPlaceholderText(/new-admin@example.com/i), 'new@example.com')
-    await user.click(within(card).getByRole('button', { name: /^add admin$/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ addAdminEmail: 'new@example.com' })
-    expect(await within(card).findByText('new@example.com')).toBeInTheDocument()
-  })
-
-  it('removes an admin after a confirm step', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-    vi.mocked(fetchJson).mockResolvedValueOnce({
-      community: { ...ues, adminEmails: ['sam@example.com'], notifyMutedEmails: [], notifyReviewEmails: [] },
-    })
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
-    // Not sent yet — confirmation is required first.
-    expect(fetchJson).not.toHaveBeenCalled()
-
-    await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ removeAdminEmail: 'jane@example.com' })
-    expect(within(card).queryByText('jane@example.com')).not.toBeInTheDocument()
-  })
-
-  it('Cancel on the remove confirmation leaves the admin in place', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
-    await user.click(within(janeRow).getByRole('button', { name: /^cancel$/i }))
-
-    expect(fetchJson).not.toHaveBeenCalled()
-    expect(within(card).getByText('jane@example.com')).toBeInTheDocument()
-  })
-
-  it('shows a server-side error inline when removing an admin fails', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not remove that admin.'))
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-
-    const card = cardFor(/upper east side/i)
-    await openCard(user, card)
-    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
-    await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))
-
-    expect(await within(card).findByText('Could not remove that admin.')).toBeInTheDocument()
-    expect(within(card).getByText('jane@example.com')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Change who can sign in' })).toHaveAttribute('href', '/ues/admin/team')
+    expect(within(card).queryByText('jane@example.com')).toBeNull()
+    expect(within(card).queryByRole('button', { name: /remove/i })).toBeNull()
   })
 })

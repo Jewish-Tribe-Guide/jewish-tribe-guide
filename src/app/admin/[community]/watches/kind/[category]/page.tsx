@@ -3,7 +3,6 @@
 import { Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import WatchKindPage from '@/components/admin/WatchKindPage'
 
 // One kind of place on the Watches tab, by its category's id
@@ -14,7 +13,6 @@ import WatchKindPage from '@/components/admin/WatchKindPage'
 export default function AdminWatchKindPage() {
   return (
     <div>
-      <AdminNav />
       <Suspense fallback={null}>
         <Kind />
       </Suspense>

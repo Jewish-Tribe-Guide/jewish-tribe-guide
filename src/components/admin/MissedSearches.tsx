@@ -9,6 +9,7 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import type { ClassifiedMiss } from '@/lib/missedSearches'
 import CollapsibleSection from './CollapsibleSection'
+import { AdminEmpty } from './AdminUI'
 
 // ── The "Missed searches" tab: the seeding to-do list ───────────────────────
 // Searches on the site that found nothing, most asked first, each re-run
@@ -197,19 +198,14 @@ export default function MissedSearches({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
-        Searches on the site that found nothing, most asked first. Each one is run through today&rsquo;s search again, so
-        once you add the answer it moves to &ldquo;Found now&rdquo; by itself. Only the words and a daily count are kept,
-        never who searched.
-      </p>
       {!data.dismissalsAvailable && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Dismiss isn&rsquo;t available until database migration 058 is applied.
+          Dismiss isn&rsquo;t set up on this site yet.
         </p>
       )}
       {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
       {data.searches.length === 0 ? (
-        <p className="text-sm text-slate-600">No missed searches yet.</p>
+        <AdminEmpty />
       ) : (
         <>
           <section className="bg-white border border-slate-200 rounded-lg shadow-sm">

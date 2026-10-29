@@ -372,6 +372,6 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, dishes, sometimes: lists.sometimes, menuDated: dishes.filter((n) => menuDated.has(n.toLowerCase())) })
   } catch (err) {
     console.error('[admin/main-dishes] POST failed:', err)
-    return Response.json({ ok: false, errors: ['Could not do that. If this keeps happening, migration 065 may not be applied yet.'] }, { status: 502 })
+    return Response.json({ ok: false, errors: ['Could not do that.'] }, { status: 502 })
   }
 }

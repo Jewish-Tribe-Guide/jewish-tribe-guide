@@ -69,8 +69,8 @@ test('editing a page through the real Pages tab saves to the database', async ({
     // this actually wants and can't be broadened by a future sibling control.
     const bodyField = page.getByRole('textbox', { name: 'Page body' })
     await bodyField.fill(newBody)
-    await page.getByRole('button', { name: 'Save changes' }).click()
-    await expect(page.getByText('Saved.')).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('status')).toHaveText('Saved.', { timeout: 10_000 })
 
     const { data: after } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
     // Not toBe(newBody): the Pages tab stores sanitized HTML now rather than
@@ -128,8 +128,8 @@ test('formatting applied in the Pages tab survives the save', async ({ page }) =
     await bodyField.press('ControlOrMeta+a')
     await page.getByRole('button', { name: 'Bold (⌘B)' }).click()
 
-    await page.getByRole('button', { name: 'Save changes' }).click()
-    await expect(page.getByText('Saved.')).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('status')).toHaveText('Saved.', { timeout: 10_000 })
 
     const { data: after } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
     const saved = after!.body as string

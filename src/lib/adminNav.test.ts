@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { adminGroups, adminNavPosition, adminTabs, superAdminTabs, type AdminGroup, type AdminTab } from './adminNav'
+import { adminAreas, adminNavPosition, adminTabs, superAdminTabs, type AdminArea, type AdminTab } from './adminNav'
 
 const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
 vi.mock('./features', () => ({ features }))
@@ -16,8 +16,8 @@ describe('adminTabs', () => {
     expect(adminTabs('philly', false).find((t) => t.tab === 'changes')).toBeUndefined()
     features.whatChanged = true
     try {
-      const insights = adminGroups('philly', false).find((g) => g.group === 'insights')!
-      expect(insights.tabs.at(-1)).toEqual({ tab: 'changes', href: '/philly/admin/changes', label: 'What changed' })
+      const reports = adminAreas('philly', false).find((a) => a.area === 'reports')!
+      expect(reports.tabs.at(-1)).toEqual({ tab: 'changes', href: '/philly/admin/changes', label: 'What changed' })
     } finally {
       features.whatChanged = false
     }
@@ -49,49 +49,49 @@ describe('adminTabs', () => {
   it('every other tab is present regardless of superadmin status', () => {
     const nonSuperTabs = adminTabs('philly', false).map((t) => t.tab)
     const superTabs = adminTabs('philly', true).map((t) => t.tab)
-    expect(superTabs.filter((t) => t !== 'communities')).toEqual(nonSuperTabs)
+    expect(superTabs.filter((t) => t !== 'communities' && t !== 'pages')).toEqual(nonSuperTabs)
   })
 
-  // Real bug this replaced: Pages (About/Privacy — a site-wide singleton,
-  // not per-community) used to be a tab here too, gated by the same global
-  // SUPERADMIN_EMAILS check underneath as Communities — but with no
-  // isSuperAdmin guard on the tab itself, so every ordinary admin of a
-  // community saw a "Pages" tab that always dead-ended in "Not authorized".
-  // It moved to the standalone superadmin console instead (superAdminTabs
-  // below) rather than gaining the same guard Communities has, so there's
-  // exactly one Pages screen, not a per-community mirage of one.
-  it('has no Pages tab at all, for anyone', () => {
-    // Label, not `t.tab === 'pages'` — 'pages' isn't a valid AdminTab any
-    // more (see the type itself), so that comparison would be a compile
-    // error rather than a real runtime check.
-    expect(adminTabs('philly', false).find((t) => t.label === 'Pages')).toBeUndefined()
-    expect(adminTabs('philly', true).find((t) => t.label === 'Pages')).toBeUndefined()
+  // About and Privacy is one copy for every community, edited through
+  // /api/admin/pages, which only the site owner passes. It used to be a tab
+  // every admin saw and dead-ended in "Not authorized" for all but one;
+  // under Site now (brief question 5), it has the same guard Communities
+  // has, so nobody else sees it at all.
+  it('offers About and Privacy to the site owner only', () => {
+    expect(adminTabs('philly', false).find((t) => t.tab === 'pages')).toBeUndefined()
+    expect(adminTabs('philly', true).find((t) => t.tab === 'pages')).toEqual({
+      tab: 'pages',
+      href: '/philly/admin/pages',
+      label: 'About and Privacy',
+    })
   })
 })
 
-// Fifteen tabs in one row became five groups (Oct 22). The groups as agreed
-// with the user, in order, each with its tabs in order.
-describe('adminGroups', () => {
+// The admin redesign's four areas and a gear (brief agreed Oct 28), in
+// order, each with today's screens as its tabs until the later steps fold
+// them together.
+describe('adminAreas', () => {
   const shape = (superAdmin: boolean) =>
-    adminGroups('philly', superAdmin).map((g) => [g.label, g.tabs.map((t) => t.label)])
+    adminAreas('philly', superAdmin).map((a) => [a.label, a.tabs.map((t) => t.label)])
 
-  it('is the five agreed groups, Communities only for a superadmin', () => {
+  it('is To do, Places, Site, Reports and Settings, Communities only for a superadmin', () => {
     expect(shape(true)).toEqual([
-      ['To do', ['Moderation queue', 'Watches', 'Read questions', 'Responses']],
-      ['Listings', ['Categories', 'Campaigns', 'Archived']],
-      ['Look', ['Site', 'Desktop', 'Mobile']],
-      ['Insights', ['Metrics', 'Missed searches']],
-      ['Settings', ['Team', 'Communities']],
+      ['To do', ['To do', 'Watches', 'Responses']],
+      ['Places', ['Places']],
+      ['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns', 'About and Privacy']],
+      ['Reports', ['Reports']],
+      ['Settings', ['Team', 'Community', 'Communities']],
     ])
-    expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
+    expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Community']])
+    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns']])
   })
 
-  it('puts every tab in exactly one group, whatever is switched on', () => {
+  it('puts every tab in exactly one area, whatever is switched on', () => {
     for (const whatChanged of [false, true]) {
       features.whatChanged = whatChanged
       try {
         for (const superAdmin of [false, true]) {
-          const grouped = adminGroups('philly', superAdmin).flatMap((g) => g.tabs.map((t) => t.tab))
+          const grouped = adminAreas('philly', superAdmin).flatMap((a) => a.tabs.map((t) => t.tab))
           expect(new Set(grouped).size).toBe(grouped.length)
           expect(grouped).toEqual(adminTabs('philly', superAdmin).map((t) => t.tab))
           expect(grouped.includes('changes')).toBe(whatChanged)
@@ -102,8 +102,8 @@ describe('adminGroups', () => {
     }
   })
 
-  it("links each group to its first tab, and every href is under the community's console", () => {
-    for (const g of adminGroups('ues', true)) {
+  it("links each area to its first tab, and every href is under the community's console", () => {
+    for (const g of adminAreas('ues', true)) {
       expect(g.href).toBe(g.tabs[0].href)
       for (const t of g.tabs) expect(t.href === '/ues/admin' || t.href.startsWith('/ues/admin/')).toBe(true)
     }
@@ -111,36 +111,38 @@ describe('adminGroups', () => {
 })
 
 describe('adminNavPosition', () => {
-  const cases: [string, AdminGroup, AdminTab][] = [
+  const cases: [string, AdminArea, AdminTab][] = [
     ['/philly/admin', 'todo', 'queue'],
     ['/philly/admin/watches', 'todo', 'watches'],
     ['/philly/admin/watches/kind/restaurant', 'todo', 'watches'],
-    ['/philly/admin/questions', 'todo', 'questions'],
+    // Opened from Reports, like History; To do shows only what's waiting.
+    ['/philly/admin/searches', 'reports', 'metrics'],
     ['/philly/admin/responses', 'todo', 'responses'],
-    ['/philly/admin/categories', 'listings', 'categories'],
-    ['/philly/admin/categories/cat:abc', 'listings', 'categories'],
-    ['/philly/admin/campaigns', 'listings', 'campaigns'],
-    ['/philly/admin/archived', 'listings', 'archived'],
-    ['/philly/admin/site', 'look', 'site'],
-    ['/philly/admin/desktop', 'look', 'desktop'],
-    ['/philly/admin/mobile', 'look', 'mobile'],
-    ['/philly/admin/metrics', 'insights', 'metrics'],
-    // The Metrics tiles open these.
-    ['/philly/admin/history/approved', 'insights', 'metrics'],
-    ['/philly/admin/history/rejected', 'insights', 'metrics'],
-    ['/philly/admin/searches', 'insights', 'searches'],
+    ['/philly/admin/places', 'places', 'places'],
+    ['/philly/admin/categories', 'site', 'categories'],
+    ['/philly/admin/categories/cat:abc', 'site', 'categories'],
+    ['/philly/admin/campaigns', 'site', 'campaigns'],
+    ['/philly/admin/home', 'site', 'home'],
+    ['/philly/admin/forms', 'site', 'forms'],
+    ['/philly/admin/forms/form:abc', 'site', 'forms'],
+    ['/philly/admin/menus', 'site', 'menus'],
+    ['/philly/admin/pages', 'site', 'pages'],
+    ['/philly/admin/metrics', 'reports', 'metrics'],
+    ['/philly/admin/history/approved', 'reports', 'metrics'],
+    ['/philly/admin/history/rejected', 'reports', 'metrics'],
     ['/philly/admin/team', 'settings', 'team'],
+    ['/philly/admin/community', 'settings', 'community'],
     ['/philly/admin/communities', 'settings', 'communities'],
   ]
-  it.each(cases)('%s opens %s, with %s lit', (path, group, tab) => {
-    expect(adminNavPosition(path, 'philly', true)).toEqual({ group, tab })
+  it.each(cases)('%s opens %s, with %s lit', (path, area, tab) => {
+    expect(adminNavPosition(path, 'philly', true)).toEqual({ area, tab })
   })
 
-  it('opens Insights on What changed while it is switched on', () => {
+  it('opens Reports on What changed while it is switched on', () => {
     expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toBeNull()
     features.whatChanged = true
     try {
-      expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toEqual({ group: 'insights', tab: 'changes' })
+      expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toEqual({ area: 'reports', tab: 'changes' })
     } finally {
       features.whatChanged = false
     }
@@ -153,7 +155,7 @@ describe('adminNavPosition', () => {
     expect(adminNavPosition('/philly/admin/teams', 'philly', true)).toBeNull()
   })
 
-  it("opens no group on another community's console", () => {
+  it("opens no area on another community's console", () => {
     expect(adminNavPosition('/ues/admin/categories', 'philly', true)).toBeNull()
   })
 

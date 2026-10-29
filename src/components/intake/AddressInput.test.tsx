@@ -240,6 +240,28 @@ describe('AddressInput', () => {
     )
   })
 
+  // Picking a plain address in Add a place used to replace the name already
+  // typed with the street's ("Riverton Pretend Pizza" became "Cedar Lane").
+  it('passes no name to onPlaceSelect for a plain address, so a typed name stays', async () => {
+    const user = userEvent.setup()
+    mockFetchAddressSuggestions.mockResolvedValue([
+      makeSuggestion({
+        types: ['route', 'geocode'],
+        mainText: 'Cedar Lane',
+        placeOverrides: { displayName: 'Cedar Lane', formattedAddress: 'Cedar Lane, Riverton, NJ, USA' },
+      }),
+    ])
+    const onPlaceSelect = vi.fn()
+
+    render(<AddressInput value="" onChange={vi.fn()} onPlaceSelect={onPlaceSelect} />)
+    await user.type(screen.getByPlaceholderText('Address or location'), 'Cedar')
+    await waitOutDebounce()
+    await waitFor(() => expect(screen.getByText('Cedar Lane')).toBeInTheDocument())
+    await user.click(screen.getByText('Cedar Lane'))
+
+    await waitFor(() => expect(onPlaceSelect).toHaveBeenCalledWith(expect.objectContaining({ placeId: 'place-1', name: null })))
+  })
+
   it('shows a clear button only once there is a value, and clearing resets value/coords/dropdown', async () => {
     const onChange = vi.fn()
     const onCoords = vi.fn()

@@ -9,19 +9,16 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { HomeSection } from '@/lib/homeSections'
 import { writePreviewDraft } from '@/lib/previewDraft'
-import SiteSettingsEditor from './SiteSettingsEditor'
+import SiteSettingsEditor, { countChanges } from './SiteSettingsEditor'
 
 // SiteSettingsEditor loads its own draft over the network (settings +
-// sections, independent of ContentProvider's server-loaded content) rather
-// than reading useSiteSettings/useHomeSections — so this mocks fetchJson/
-// parseOkJson the same way ModerationQueue.test.tsx does, plus stubs
-// DevicePreviewFrame (an iframe/postMessage-heavy component with its own
-// separate concerns) and writePreviewDraft (a sessionStorage write, not
-// worth asserting on here).
+// sections), so this mocks fetchJson/parseOkJson the way ModerationQueue's
+// test does, and writePreviewDraft (a sessionStorage write the preview
+// reads).
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
-  usePathname: () => '/test-community',
+  usePathname: () => '/philly/admin/home',
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
@@ -30,16 +27,8 @@ vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 const features = vi.hoisted(() => ({ todayHome: true, whatChanged: true }))
 vi.mock('@/lib/features', () => ({ features }))
 vi.mock('@/lib/previewDraft', () => ({
-  previewUrl: () => 'https://example.com/preview',
+  previewUrl: (community: string) => `/${community}?preview=1`,
   writePreviewDraft: vi.fn(),
-}))
-vi.mock('./DevicePreviewFrame', () => ({
-  default: ({ onClose }: { onClose: () => void }) => (
-    <div>
-      <p>DevicePreviewFrame</p>
-      <button onClick={onClose}>Close preview</button>
-    </div>
-  ),
 }))
 
 function fakeResponse(): Response {
@@ -49,44 +38,32 @@ function fakeResponse(): Response {
 function mockLoad(settings: typeof SITE_SETTINGS_DEFAULTS, sections: HomeSection[] = []) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse()))
   vi.mocked(parseOkJson).mockImplementation(() => {
-    // The two calls race via Promise.all — settings first, sections second,
-    // in the order load() awaits them — but parseOkJson can't tell which
-    // response is which from the stubbed Response alone, so key off call order.
-    // A third call only happens on the Desktop tab, once a test opens the
-    // Subscribers section and mounts SubscriberManager, which does its own
-    // parseOkJson — give it an empty list rather than falling through to
-    // `sections` and crashing on `subscribers.length`.
+    // Settings first, sections second, in the order load() awaits them; a
+    // third call is the email sign-up card's list of who signed up.
     const call = vi.mocked(parseOkJson).mock.calls.length
     return Promise.resolve(call === 1 ? { settings } : call === 2 ? { sections } : { subscribers: [] })
   })
 }
 
-async function renderEditor(
-  section: 'site' | 'desktop' | 'mobile',
-  settings = SITE_SETTINGS_DEFAULTS,
-  sections: HomeSection[] = [],
-) {
+async function renderEditor(section: 'home' | 'menus', settings = SITE_SETTINGS_DEFAULTS, sections: HomeSection[] = []) {
   mockLoad(settings, sections)
   const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
   renderWithProviders(<SiteSettingsEditor token="tok" section={section} />, {
     content: { categories: [grocery] },
     community: makeCommunity({ slug: 'philly' }),
   })
-  // "Save changes" always renders once the draft has loaded, regardless of
-  // which tab — the Site tab's own name field (used as the loaded-signal
-  // everywhere else) doesn't exist on the other two tabs.
-  await screen.findByRole('button', { name: 'Save changes' })
+  await screen.findByRole('complementary', { name: 'Preview' })
 }
 
-// Every settings block is a CollapsibleSection now, collapsed by default
-// (same "Show ▸ / Hide ▾" pattern as the Metrics tab's Sync Coverage report)
-// — a field inside one isn't in the document at all until its own section
-// is opened. Tests that need to read/type into a field open everything
-// first, same as an admin clicking through every "Show" on the page.
-async function openAllSections(user: ReturnType<typeof userEvent.setup>) {
-  for (const button of screen.getAllByRole('button', { name: /^Show / })) {
-    await user.click(button)
-  }
+const saveBar = () => screen.queryByRole('region', { name: 'Save' })
+const sentBody = () => JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+
+async function saveWith(user: ReturnType<typeof userEvent.setup>, settings: typeof SITE_SETTINGS_DEFAULTS) {
+  // The PATCH echoes back the saved settings, which the draft is re-derived
+  // from.
+  vi.mocked(fetchJson).mockResolvedValue({ settings })
+  await user.click(within(saveBar()!).getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(within(saveBar()!).getByText('Saved.')).toBeInTheDocument())
 }
 
 beforeEach(() => {
@@ -99,284 +76,183 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('SiteSettingsEditor — the Site tab', () => {
-  // Regression test: the logo used to upload through a bare file input with
-  // no way to reposition/re-zoom it afterward, unlike every other image
-  // upload in the admin (category icons, listing photos), which already go
-  // through ImageUploadField/ImageCropModal. This just checks the field
-  // renders through that same shared component now — actually exercising
-  // the crop modal itself needs a real image load, out of scope here (see
-  // ImageCropModal's own lack of unit tests, canvas/Image geometry isn't
-  // practical to simulate in jsdom).
-  it('shows the reposition affordance once a logo is set, the same as a category icon or listing photo', async () => {
-    const user = userEvent.setup()
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, logoUrl: 'https://example.com/logo.png' })
-    await openAllSections(user)
-
-    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+describe('SiteSettingsEditor — Home page', () => {
+  it('sorts its settings by what they change on the home page', async () => {
+    await renderEditor('home')
+    const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(boxes).toEqual(['Top of the page', 'Below it, in this order', 'Category groups', 'Today home', 'In link previews and search results'])
+    // The header's settings are on their own tab.
+    expect(screen.queryByText('Tabs, on a phone')).toBeNull()
   })
 
-  it('loads and shows the current branding fields once its section is opened', async () => {
-    const user = userEvent.setup()
-    await renderEditor('site', {
+  it('names each field by what a visitor sees', async () => {
+    await renderEditor('home', {
       ...SITE_SETTINGS_DEFAULTS,
-      name: 'Test Directory',
-      searchPlaceholder: 'Search — find what you need',
+      desktopHeroHeadline: 'Your guide',
+      desktopHeroSubhead: 'Kept current by you',
+      searchPlaceholder: 'Ask: challah',
     })
-    await openAllSections(user)
-
-    expect(screen.getByDisplayValue('Test Directory')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Search — find what you need')).toBeInTheDocument()
+    expect(screen.getByLabelText('Big line')).toHaveValue('Your guide')
+    expect(screen.getByLabelText('Line under it')).toHaveValue('Kept current by you')
+    expect(screen.getByLabelText('Search box')).toHaveValue('Ask: challah')
+    expect(screen.getByLabelText('Title')).toHaveValue(SITE_SETTINGS_DEFAULTS.heroTitle)
+    expect(screen.getByLabelText('Description')).toHaveValue(SITE_SETTINGS_DEFAULTS.mission)
   })
 
-  // Every settings block starts collapsed — the Branding section title is
-  // the one thing that's always in the document.
-  it('every block starts collapsed, behind a "Show" button', async () => {
-    await renderEditor('site')
-    expect(screen.getByText('Branding')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue(SITE_SETTINGS_DEFAULTS.name)).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^Show / }).length).toBeGreaterThan(0)
+  // Regression: the photo uploads through ImageUploadField, the same as a
+  // category icon or listing photo, so it can be repositioned afterwards.
+  it('the photo can be repositioned, and described once there is one', async () => {
+    await renderEditor('home', { ...SITE_SETTINGS_DEFAULTS, desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: 'City Hall' } })
+    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+    expect(screen.getByLabelText('Photo, described')).toHaveValue('City Hall')
   })
 
-  it('Save/Cancel start disabled, and editing a field enables them', async () => {
+  it('has no Save bar until something changes, then says how much', async () => {
     const user = userEvent.setup()
-    await renderEditor('site')
-    await openAllSections(user)
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /^Cancel$/ })).toBeDisabled()
-
-    await user.type(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.searchPlaceholder), '!')
-
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    await renderEditor('home')
+    expect(saveBar()).toBeNull()
+    await user.type(screen.getByLabelText('Search box'), '!')
+    expect(within(saveBar()!).getByText('1 change')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Big line'), '!')
+    expect(within(saveBar()!).getByText('2 changes')).toBeInTheDocument()
   })
 
-  it('Cancel reverts an edited field back to the loaded value', async () => {
+  it('Undo puts every field back and takes the bar away', async () => {
     const user = userEvent.setup()
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Original Name' })
-    await openAllSections(user)
-
-    const nameInput = screen.getByDisplayValue('Original Name')
-    await user.clear(nameInput)
-    await user.type(nameInput, 'Changed Name')
-    await user.click(screen.getByRole('button', { name: /^Cancel$/ }))
-
-    expect(screen.getByDisplayValue('Original Name')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue('Changed Name')).not.toBeInTheDocument()
+    await renderEditor('home', { ...SITE_SETTINGS_DEFAULTS, desktopHeroHeadline: 'Original' })
+    const big = screen.getByLabelText('Big line')
+    await user.clear(big)
+    await user.type(big, 'Changed')
+    await user.click(within(saveBar()!).getByRole('button', { name: 'Undo' }))
+    expect(screen.getByLabelText('Big line')).toHaveValue('Original')
+    expect(saveBar()).toBeNull()
   })
 
-  it('Save sends only the settings PATCH when only settings changed, and shows a saved notice', async () => {
+  it('Save sends the settings and says it saved', async () => {
     const user = userEvent.setup()
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Original Name' })
-    await openAllSections(user)
-
-    const nameInput = screen.getByDisplayValue('Original Name')
-    await user.clear(nameInput)
-    await user.type(nameInput, 'New Name')
-    // The real PATCH endpoint echoes back the saved settings, which the
-    // component re-derives its draft from — a bare { ok: true } leaves
-    // `draft` undefined and the whole screen reverts to "Loading…".
-    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, name: 'New Name' } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
-
-    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    await renderEditor('home')
+    await user.type(screen.getByLabelText('Search box'), '!')
+    await saveWith(user, { ...SITE_SETTINGS_DEFAULTS, searchPlaceholder: `${SITE_SETTINGS_DEFAULTS.searchPlaceholder}!` })
     expect(fetchJson).toHaveBeenCalledWith(
       '/api/admin/site-settings?community=philly',
       expect.objectContaining({ method: 'PATCH', headers: expect.objectContaining({ Authorization: 'Bearer tok' }) }),
       'Save failed.',
     )
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.name).toBe('New Name')
+    expect(sentBody().searchPlaceholder).toBe(`${SITE_SETTINGS_DEFAULTS.searchPlaceholder}!`)
   })
 
-  // Held back (features.ts): nothing to choose, so the section isn't there.
-  it('while the Today home is held back, the Site tab has no Home page section', async () => {
+  // Regression: sectionsEqual once left `width` out, so flipping a card
+  // between Full and Half width never counted as a change.
+  it('a card’s width is a change', async () => {
     const user = userEvent.setup()
+    await renderEditor('home', SITE_SETTINGS_DEFAULTS, [
+      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 0, cardIds: [], width: 'full' },
+    ])
+    await user.click(screen.getByRole('button', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading }))
+    await user.click(screen.getByRole('button', { name: 'Half width' }))
+    expect(within(saveBar()!).getByText('1 change')).toBeInTheDocument()
+  })
+
+  it('shows the home page beside the settings, with what hasn’t been saved', async () => {
+    const user = userEvent.setup()
+    await renderEditor('home')
+    const frame = await screen.findByTitle('Preview', {}, { timeout: 2000 })
+    expect(frame).toHaveAttribute('src', '/philly?preview=1')
+    await user.type(screen.getByLabelText('Big line'), '!')
+    await waitFor(() => expect(vi.mocked(writePreviewDraft).mock.lastCall![0].settings.desktopHeroHeadline).toBe(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}!`), {
+      timeout: 2000,
+    })
+    await user.click(screen.getByRole('button', { name: 'Phone' }))
+    expect(screen.getByRole('button', { name: 'Phone' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // Held back (features.ts): nothing to choose, so the box isn't there.
+  it('while the Today home is held back, there is no Today home box', async () => {
     features.todayHome = false
     try {
-      await renderEditor('site')
-      await openAllSections(user)
+      await renderEditor('home')
       expect(screen.queryByTestId('home-style')).not.toBeInTheDocument()
       expect(screen.queryByTestId('today-blocks')).not.toBeInTheDocument()
-      expect(screen.queryByRole('textbox', { name: /^Before candles looks for/ })).not.toBeInTheDocument()
     } finally {
       features.todayHome = true
     }
   })
 
-  // The Today home (step 6) is chosen here, tried in Preview first, and
-  // switched on or back with one save.
-  it('choosing the Today home and saving sends it; Preview shows it before then', async () => {
+  it('choosing the Today home and saving sends it', async () => {
     const user = userEvent.setup()
-    await renderEditor('site')
-    await openAllSections(user)
-
+    await renderEditor('home')
     const choice = within(screen.getByTestId('home-style'))
     expect(choice.getByRole('radio', { name: /^Classic/ })).toBeChecked()
     await user.click(choice.getByRole('radio', { name: /^Today/ }))
-
-    await user.click(screen.getByRole('button', { name: 'Preview' }))
-    expect(vi.mocked(writePreviewDraft).mock.calls[0]![0].settings.homeStyle).toBe('today')
-    await user.click(screen.getByRole('button', { name: /close/i }))
-
-    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, homeStyle: 'today' } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.homeStyle).toBe('today')
+    await saveWith(user, { ...SITE_SETTINGS_DEFAULTS, homeStyle: 'today' })
+    expect(sentBody().homeStyle).toBe('today')
   })
 
   it('Before candles’ items are one line of names, saved as a list', async () => {
     const user = userEvent.setup()
-    await renderEditor('site')
-    await openAllSections(user)
+    await renderEditor('home')
     const input = screen.getByRole('textbox', { name: /^Before candles looks for/ })
     expect(input).toHaveValue('Challah, Wine, Chicken')
     await user.clear(input)
     await user.type(input, 'Challah, Grape juice, ')
     expect(input).toHaveValue('Challah, Grape juice, ')
-
-    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, beforeCandleItems: ['Challah', 'Grape juice'] } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.beforeCandleItems).toEqual(['Challah', 'Grape juice'])
+    await saveWith(user, { ...SITE_SETTINGS_DEFAULTS, beforeCandleItems: ['Challah', 'Grape juice'] })
+    expect(sentBody().beforeCandleItems).toEqual(['Challah', 'Grape juice'])
   })
 
   it('each Today block can be left off, and is saved as off', async () => {
     const user = userEvent.setup()
-    await renderEditor('site')
-    await openAllSections(user)
+    await renderEditor('home')
     const blocks = within(screen.getByTestId('today-blocks'))
     expect(blocks.getAllByRole('checkbox').map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, true, true, true, true])
     await user.click(blocks.getByRole('checkbox', { name: /^Open now/ }))
-
-    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, todayHidden: ['openNow'] } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
-    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.todayHidden).toEqual(['openNow'])
+    await saveWith(user, { ...SITE_SETTINGS_DEFAULTS, todayHidden: ['openNow'] })
+    expect(sentBody().todayHidden).toEqual(['openNow'])
     expect(blocks.getByRole('checkbox', { name: /^Open now/ })).not.toBeChecked()
   })
+})
 
-  it('toggling feedback off hides the feedback sub-fields', async () => {
-    const user = userEvent.setup()
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true })
-    await openAllSections(user)
-
-    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)).toBeInTheDocument()
-    await user.click(screen.getByRole('checkbox', { name: 'Enabled' }))
-
-    expect(screen.queryByDisplayValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)).not.toBeInTheDocument()
+describe('SiteSettingsEditor — Header and menus', () => {
+  // Feedback moved to the Forms tab (FeedbackEditor.test.tsx), and the name
+  // and logo to Settings (CommunityEditor.test.tsx).
+  it('holds the computer’s top of the page and the phone’s tabs', async () => {
+    await renderEditor('menus')
+    const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(boxes).toEqual(['Top of the page, on a computer', 'Tabs, on a phone'])
+    expect(screen.queryByLabelText('Name')).toBeNull()
+    expect(screen.queryByText('Below it, in this order')).toBeNull()
   })
 
-  it('opens and closes the device preview', async () => {
+  // Forms and Settings save the feedback form and the name on their own.
+  // This draft may hold what they were before, so sending it whole put
+  // them back.
+  it('saves only what changed here', async () => {
     const user = userEvent.setup()
-    await renderEditor('site')
-
-    await user.click(screen.getByRole('button', { name: 'Preview' }))
-    expect(screen.getByText('DevicePreviewFrame')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Close preview' }))
-    expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument()
+    await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Old name', feedbackHeading: 'Old heading' })
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    await saveWith(user, SITE_SETTINGS_DEFAULTS)
+    expect(Object.keys(sentBody())).toEqual(['desktopNavItems'])
   })
 
-  // Regression test: real trackpad/browser Back used to do nothing while the
-  // preview was open — opening it never pushed a history entry, so there was
-  // nothing for Back to land on. A popstate (what a real Back gesture fires)
-  // should now close the overlay, the same as clicking "Close preview".
-  it('closes the preview on a real browser/trackpad Back (a popstate event), not just the button', async () => {
+  // Regression: the editor showed the default items whenever the draft's list
+  // was empty, so removing the last item brought the defaults back on screen
+  // and Save then failed for a list the admin could see wasn't empty.
+  it('removing every top-of-the-page item leaves it empty, with the warning', async () => {
     const user = userEvent.setup()
-    await renderEditor('site')
-
-    await user.click(screen.getByRole('button', { name: 'Preview' }))
-    expect(screen.getByText('DevicePreviewFrame')).toBeInTheDocument()
-
-    window.dispatchEvent(new PopStateEvent('popstate'))
-
-    await waitFor(() => expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument())
-  })
-
-  it('a popstate before the preview is even open does nothing (no listener registered yet)', async () => {
-    await renderEditor('site')
-
-    expect(() => window.dispatchEvent(new PopStateEvent('popstate'))).not.toThrow()
-    expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument()
+    await renderEditor('menus')
+    const warning = /The nav needs at least one item/
+    for (let i = 0; i < 10 && !screen.queryByText(warning); i++) {
+      await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    }
+    expect(screen.getByText(warning)).toBeInTheDocument()
   })
 })
 
-describe('SiteSettingsEditor — the Desktop tab', () => {
-  // Same regression as the logo above, for the hero band's photo — same
-  // ImageUploadField, just a wider aspect ratio (see the field's own
-  // `aspect={4 / 3}`) since this one is a banner, not an avatar-shaped icon.
-  it('shows the reposition affordance once the hero photo is set', async () => {
-    const user = userEvent.setup()
-    await renderEditor('desktop', {
-      ...SITE_SETTINGS_DEFAULTS,
-      desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: '' },
-    })
-    await openAllSections(user)
-
-    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
-  })
-
-  it('shows the top nav editor, hero, and home screen cards sections — not Featured cards or Colors, which were removed', async () => {
-    await renderEditor('desktop')
-    expect(screen.getByText('Top nav bar')).toBeInTheDocument()
-    expect(screen.getByText('Hero')).toBeInTheDocument()
-    expect(screen.getByText('Home screen cards')).toBeInTheDocument()
-    expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
-    // The accent colour picker changed nothing on the site (never wired up),
-    // and the redesign's one look leaves nothing for it to change.
-    expect(screen.queryByText('Colors')).not.toBeInTheDocument()
-    // Mobile-only fields don't leak onto this tab.
-    expect(screen.queryByText('Mobile tab bar')).not.toBeInTheDocument()
-  })
-
-  it('orders Top nav bar, then Hero, then Home screen cards', async () => {
-    await renderEditor('desktop')
-    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    const order = ['Top nav bar', 'Hero', 'Home screen cards']
-    const indices = order.map((label) => headings.indexOf(label))
-    expect(indices).toEqual([...indices].sort((a, b) => a - b))
-    expect(indices.every((i) => i !== -1)).toBe(true)
-  })
-
-  it('shows the Browse card\'s eyebrow/heading fields once a Browse row exists', async () => {
-    const user = userEvent.setup()
-    await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
-      { id: 'browse', kind: 'browse', title: 'Browse & search', sortOrder: -400, cardIds: [], width: 'full' },
-    ])
-    await openAllSections(user)
-    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseEyebrow)).toBeInTheDocument()
-    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
-  })
-
-  // Regression: sectionsEqual's own strip() left `width` out of the fields
-  // it compares, so flipping a card between Full and Half width changed
-  // sectionsDraft but never made `dirty` true — Save stayed disabled and the
-  // toggle silently didn't persist.
-  it('toggling a card between Full and Half width enables Save', async () => {
-    const user = userEvent.setup()
-    await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
-      { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 0, cardIds: [], width: 'full' },
-    ])
-    await openAllSections(user)
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
-
-    await user.click(screen.getByRole('button', { name: 'Half width' }))
-
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
-  })
-})
-
-describe('SiteSettingsEditor — the Mobile tab', () => {
-  it('shows the mobile tab bar editor and the home screen heading, not desktop-only fields', async () => {
-    const user = userEvent.setup()
-    await renderEditor('mobile')
-    expect(screen.getByText('Mobile tab bar')).toBeInTheDocument()
-    await openAllSections(user)
-    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.heroTitle)).toBeInTheDocument()
-    expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
-    expect(screen.queryByText('Top nav bar')).not.toBeInTheDocument()
+describe('countChanges', () => {
+  it('counts each setting changed, and the sections as one', () => {
+    const sections = [{ id: 'a', kind: 'section' as const, title: 'A', cardIds: [], width: 'full' as const }]
+    expect(countChanges(SITE_SETTINGS_DEFAULTS, SITE_SETTINGS_DEFAULTS, sections, sections)).toBe(0)
+    expect(countChanges(SITE_SETTINGS_DEFAULTS, { ...SITE_SETTINGS_DEFAULTS, name: 'x', mission: 'y' }, sections, sections)).toBe(2)
+    expect(countChanges(SITE_SETTINGS_DEFAULTS, SITE_SETTINGS_DEFAULTS, sections, [{ ...sections[0], title: 'B' }])).toBe(1)
   })
 })

@@ -54,7 +54,7 @@ describe('SiteHeader — a single community', () => {
       <HeaderCollapseProvider>
         <SiteHeader onGoHome={onGoHome} location={location()} />
       </HeaderCollapseProvider>,
-      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', tagline: 'Find what you need' } } },
+      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory' } } },
     )
 
     expect(screen.getByText('Test Directory')).toBeInTheDocument()
@@ -62,22 +62,6 @@ describe('SiteHeader — a single community', () => {
 
     await user.click(screen.getByText('Test Directory'))
     expect(onGoHome).toHaveBeenCalledTimes(1)
-  })
-
-  // The tagline used to render as a second line under the name — it repeated
-  // roughly what the hero's mission line says a few pixels of scroll later.
-  // Dropped from the header for that reason (see SiteHeader's own comment);
-  // the field itself is untouched (still admin-editable, still set here),
-  // it just has no render site left.
-  it('no longer renders the tagline — that redundant second line is gone', () => {
-    renderWithProviders(
-      <HeaderCollapseProvider>
-        <SiteHeader onGoHome={vi.fn()} location={location()} />
-      </HeaderCollapseProvider>,
-      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', tagline: 'Find what you need' } } },
-    )
-
-    expect(screen.queryByText('Find what you need')).not.toBeInTheDocument()
   })
 })
 
@@ -138,7 +122,7 @@ describe('SiteHeader — several communities', () => {
         <SiteHeader
           onGoHome={vi.fn()}
           location={location()}
-          previewSettings={{ ...SITE_SETTINGS_DEFAULTS, name: 'Preview Name', tagline: 'Preview Tagline' }}
+          previewSettings={{ ...SITE_SETTINGS_DEFAULTS, name: 'Preview Name' }}
         />
       </HeaderCollapseProvider>,
       { community: philly, communities: [philly, baltimore] },

@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('[admin/missed-searches] POST failed:', err)
     return Response.json(
-      { ok: false, errors: ['Could not save. If this keeps happening, migration 058 may not be applied yet.'] },
+      { ok: false, errors: ['Could not save.'] },
       { status: 502 },
     )
   }

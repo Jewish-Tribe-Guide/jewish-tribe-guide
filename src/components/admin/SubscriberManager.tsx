@@ -8,7 +8,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import type { Subscriber } from '@/lib/subscriberStore'
 import { useCardOptions } from './HomeSectionManager'
 
-// ── A "Subscribers" section inside the Desktop settings tab: everyone who's
+// ── A "Subscribers" section inside the home page's email sign-up card: everyone who's
 // opted in to "Stay in the Loop" (SubscribeSection, desktop-only) — the one
 // piece of this feature that had no admin surface at all until now. View +
 // remove only, deliberately: a

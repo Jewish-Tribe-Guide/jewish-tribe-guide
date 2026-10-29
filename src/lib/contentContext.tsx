@@ -45,6 +45,12 @@ export function useContentFailures(): ContentKey[] {
   return useContent().failed
 }
 
+/** The categories, or null outside the site's content (an admin screen, a
+ *  test). For lookups that can do without them, like a glyph's kind. */
+export function useCategoriesIfAny(): readonly CategoryConfig[] | null {
+  return useContext(ContentContext)?.categories ?? null
+}
+
 export function useCategories() {
   // Memoized on the source array's reference (stable for the client tree's
   // whole lifetime — see ContentProvider), not recomputed fresh on every call.

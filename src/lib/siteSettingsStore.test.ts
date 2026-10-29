@@ -56,33 +56,51 @@ describe('getSiteSettingsUncached', () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
     mockResolveCommunity.mockResolvedValue({
       slug: 'philly',
+      isDefault: true,
       name: SITE_SETTINGS_DEFAULTS.name,
-      tagline: SITE_SETTINGS_DEFAULTS.tagline,
       mission: SITE_SETTINGS_DEFAULTS.mission,
     })
     expect(await getSiteSettingsUncached('philly')).toEqual(SITE_SETTINGS_DEFAULTS)
+  })
+
+  // Regression: the hero photo fell back to community.config.ts's photo
+  // (Philadelphia's City Hall) whenever a row had none, so clearing it
+  // brought City Hall back, on every community.
+  it('a cleared hero photo stays cleared', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_hero_image: null }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopHeroImage).toBeNull()
+  })
+
+  it("keeps a row's own hero photo", async () => {
+    const photo = { url: 'https://example.com/hero.jpg', alt: 'A street' }
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_hero_image: photo }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopHeroImage).toEqual(photo)
+  })
+
+  it("a second community with no row yet has no hero photo, not the bootstrap community's", async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    mockResolveCommunity.mockResolvedValue({ slug: 'ues', isDefault: false, name: 'UES', mission: 'M' })
+    expect((await getSiteSettingsUncached('ues')).desktopHeroImage).toBeNull()
   })
 
   // Regression: a second community with no site_settings row yet used to
   // fall back to SITE_SETTINGS_DEFAULTS unconditionally — a module-level
   // constant built once from community.config.ts (the bootstrap/Philly
   // community) — so an un-configured community rendered Philadelphia's own
-  // name/tagline/mission rather than its own. Reproduced live: visiting a
+  // name/mission rather than its own. Reproduced live: visiting a
   // freshly-seeded second community showed "Philadelphia Jewish Community"
   // in the header before this fell back to the resolved community row instead.
-  it("falls back to the resolved community's own name/tagline/mission, not the bootstrap community's", async () => {
+  it("falls back to the resolved community's own name/mission, not the bootstrap community's", async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
     mockResolveCommunity.mockResolvedValue({
       slug: 'ues',
       name: 'Upper East Side Jewish Community',
-      tagline: 'Guide for residents and visitors',
       mission: 'A guide to Jewish life on the Upper East Side.',
     })
 
     const settings = await getSiteSettingsUncached('ues')
 
     expect(settings.name).toBe('Upper East Side Jewish Community')
-    expect(settings.tagline).toBe('Guide for residents and visitors')
     expect(settings.mission).toBe('A guide to Jewish life on the Upper East Side.')
     expect(mockResolveCommunity).toHaveBeenCalledWith('ues')
     // Everything not community-specific still comes from the shared defaults.
@@ -91,9 +109,9 @@ describe('getSiteSettingsUncached', () => {
   })
 
   it('maps a full row, falling back to defaults for any per-card copy column not yet set', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_davening_eyebrow: null }, error: null }))
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_listings_eyebrow: null }, error: null }))
     const settings = await getSiteSettingsUncached('philly')
-    expect(settings.desktopDaveningEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopDaveningEyebrow)
+    expect(settings.desktopListingsEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopListingsEyebrow)
     expect(settings.name).toBe('My Community')
     expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
   })
@@ -149,24 +167,39 @@ describe('getSiteSettingsUncached', () => {
 describe('updateSiteSettings', () => {
   it('merges the patch onto the current settings before upserting, only changing given keys', async () => {
     const readBuilder = chainable({ data: rawRow, error: null })
-    const writeBuilder = chainable({ data: { ...rawRow, tagline: 'New Tagline' }, error: null })
+    const writeBuilder = chainable({ data: { ...rawRow, hero_title: 'New Hero' }, error: null })
     let call = 0
     mockFrom.mockImplementation(() => {
       call += 1
       return call === 1 ? readBuilder : writeBuilder
     })
 
-    await updateSiteSettings('philly', { tagline: 'New Tagline' })
+    await updateSiteSettings('philly', { heroTitle: 'New Hero' })
 
     expect(writeBuilder.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'default',
         community_id: 'philly',
         name: 'My Community', // unchanged field carried through from current
-        tagline: 'New Tagline', // patched field
+        hero_title: 'New Hero', // patched field
       }),
       { onConflict: 'community_id' },
     )
+  })
+
+  // Nothing reads the tagline any more, but its column is NOT NULL, so a
+  // save writes back what the row holds rather than blanking it.
+  it('writes back the stored tagline, or an empty one for a first save', async () => {
+    async function taglineWritten(row: unknown, community: string) {
+      const write = chainable({ data: rawRow, error: null })
+      let call = 0
+      mockFrom.mockImplementation(() => (++call === 1 ? chainable({ data: row, error: null }) : write))
+      await updateSiteSettings(community, { heroTitle: 'New Hero' })
+      return (write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].tagline
+    }
+    expect(await taglineWritten(rawRow, 'philly')).toBe('Tagline')
+    mockResolveCommunity.mockResolvedValue({ slug: 'ues', isDefault: false, name: 'UES', mission: 'M' })
+    expect(await taglineWritten(null, 'ues')).toBe('')
   })
 
 
@@ -179,7 +212,7 @@ describe('updateSiteSettings', () => {
       return call === 1 ? readBuilder : writeBuilder
     })
 
-    await expect(updateSiteSettings('philly', { tagline: 'X' })).rejects.toThrow(
+    await expect(updateSiteSettings('philly', { heroTitle: 'X' })).rejects.toThrow(
       'Failed to update site settings: boom',
     )
   })
@@ -233,7 +266,7 @@ describe('the Today home settings', () => {
 
   it('a save that doesn’t change them leaves both columns out', async () => {
     const write = saveWith(rawRow)
-    await updateSiteSettings('philly', { tagline: 'New Tagline', homeStyle: 'classic' })
+    await updateSiteSettings('philly', { heroTitle: 'New Hero', homeStyle: 'classic' })
     const written = (write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(written).not.toHaveProperty('home_style')
     expect(written).not.toHaveProperty('before_candle_items')
@@ -248,8 +281,8 @@ describe('the Today home settings', () => {
 
   it('changing them before 067 says what’s missing', async () => {
     saveWith(rawRow, { data: null, error: { message: 'column "home_style" of relation "site_settings" does not exist' } })
-    await expect(updateSiteSettings('philly', { homeStyle: 'today' })).rejects.toThrow('migration 067')
+    await expect(updateSiteSettings('philly', { homeStyle: 'today' })).rejects.toThrow('isn’t set up on this site yet')
     saveWith(rawRow, { data: null, error: { message: 'column "today_hidden" of relation "site_settings" does not exist' } })
-    await expect(updateSiteSettings('philly', { todayHidden: ['pinned'] })).rejects.toThrow('migration 067')
+    await expect(updateSiteSettings('philly', { todayHidden: ['pinned'] })).rejects.toThrow('isn’t set up on this site yet')
   })
 })

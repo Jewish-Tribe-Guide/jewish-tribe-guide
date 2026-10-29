@@ -111,10 +111,10 @@ describe('POST /api/admin/missed-searches', () => {
     })
   }
 
-  it('says migration 058 may be missing when the write fails', async () => {
+  it('says it couldn’t save, with no migration number, when the write fails', async () => {
     m.setSearchMissDismissed.mockRejectedValue(new Error('relation does not exist'))
     const res = await POST(req('POST', { term: 'dentist', dismissed: true }))
     expect(res.status).toBe(502)
-    expect((await res.json()).errors[0]).toMatch(/058/)
+    expect((await res.json()).errors[0]).toBe('Could not save.')
   })
 })

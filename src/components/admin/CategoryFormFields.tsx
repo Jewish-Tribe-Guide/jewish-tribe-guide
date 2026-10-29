@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
-import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import ImageUploadField from '@/components/ImageUploadField'
 import CategoryIcon from '@/components/CategoryIcon'
 import { CategoryGlyph } from '@/lib/categoryIcons'
@@ -170,72 +169,27 @@ export function IconField({
   )
 }
 
-// The image-URL + text-color fields + live preview — shared by the full
-// category editor and SingletonEditor.
+// The pasted photo URL — shared by the full category editor and
+// SingletonEditor. The home's photo tile is gone; what still reads this is
+// the desktop banner, when no banner photo of its own is set (bandImageFor).
 export function CardBackgroundField({
   cardImageUrl,
   onCardImageUrl,
-  cardTextColor,
-  onCardTextColor,
-  previewIcon,
-  previewTitle,
 }: {
   cardImageUrl: string
   onCardImageUrl: (value: string) => void
-  cardTextColor: string
-  onCardTextColor: (value: string) => void
-  previewIcon: string
-  previewTitle: string
 }) {
   return (
-    <div className="pt-1">
-      <span className="block text-xs font-medium text-slate-700 mb-1">Home-screen card background (optional)</span>
-      <div className="flex gap-3">
-        <div className="flex-1 space-y-2">
-          <input
-            value={cardImageUrl}
-            onChange={(e) => onCardImageUrl(e.target.value)}
-            className={inputClass}
-            placeholder="https://… (a photo instead of the flat tint)"
-          />
-          {cardImageUrl.trim() && (
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <span className="text-xs font-medium text-slate-700">Text color</span>
-              <input
-                type="color"
-                value={cardTextColor}
-                onChange={(e) => onCardTextColor(e.target.value)}
-                className="h-8 w-14 rounded border border-slate-300 cursor-pointer"
-              />
-            </label>
-          )}
-          <span className="block text-[11px] text-muted">
-            A pasted image URL, not an upload. A dark gradient is applied automatically so the
-            title stays readable — the icon above stops showing once a photo is set (an emoji over
-            a photo doesn&rsquo;t read as a clean icon). The color picker only affects the title
-            text, not the photo.
-          </span>
-        </div>
-        {/* A live preview using the exact same Card the home screen renders,
-            so what's shown here is what visitors will see. */}
-        <div className="w-32 shrink-0">
-          <HomeCard
-            card={{
-              title: previewTitle,
-              icon: previewIcon || undefined,
-              cardImageUrl: cardImageUrl.trim() || null,
-              cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
-              go: () => {},
-              // A same-page anchor, not a real route — this preview isn't
-              // meant to navigate anywhere (go is a no-op for the same
-              // reason), it's just showing what the tile will look like.
-              href: '#',
-            }}
-            tint={TINTS[0]}
-          />
-        </div>
-      </div>
-    </div>
+    <label className="block pt-1">
+      <span className="block text-xs font-medium text-slate-700 mb-1">Photo (optional)</span>
+      <input
+        value={cardImageUrl}
+        onChange={(e) => onCardImageUrl(e.target.value)}
+        className={inputClass}
+        placeholder="https://…"
+      />
+      <span className="block text-[11px] text-muted mt-1">The banner on a computer, when there&rsquo;s no banner photo.</span>
+    </label>
   )
 }
 

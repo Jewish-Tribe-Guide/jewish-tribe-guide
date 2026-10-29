@@ -56,18 +56,14 @@ function fieldKeyFor(rowKey: string, fields: CategoryField[]): string | null {
 export function SubmissionReview({
   submission: s,
   category,
-  waiting,
   busy,
   error,
-  onBack,
   onModerate,
 }: {
   submission: EnrichedSubmission
   category?: CategoryConfig
-  waiting: number
   busy?: boolean
   error?: string | null
-  onBack: () => void
   onModerate: (id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission) => void
 }) {
   const sent = s.payload as unknown as ResourceSubmission
@@ -102,6 +98,9 @@ export function SubmissionReview({
   const labelOf = (k: string) => (isCore(k) ? CORE.find((c) => c.key === k)!.label : fields.find((f) => f.key === k)?.label ?? k)
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(sent)
+  // As on the list's card: a new place goes live only once it has an
+  // address, here the one the admin may have typed or picked.
+  const needsAddress = s.operation === 'create' && hasAddress && !draft.address?.trim()
   const marked = source.readBy === 'ai' && source.original ? markTimes(source.original, draft.details) : null
   const hasOriginal = Boolean(source.original || source.photoUrl)
 
@@ -112,11 +111,14 @@ export function SubmissionReview({
   /** A place picked in the address fills the rest from Google, as it does
    *  in the listing's own editor (handlePlaceSelect): the name, phone, hours
    *  and website, and a description where there's none. Every row it
-   *  fills opens, so nothing changes out of sight. Google's place id isn't
-   *  taken: the server keeps a suggestion's own (reviewEdits.ts). */
+   *  fills opens, so nothing changes out of sight. Where Google keeps the
+   *  category current, the place goes too, with what it filled, so
+   *  approving links the listing and Google owns those rows (the user,
+   *  Oct 28; reviewEdits.ts). */
   function fillFromPlace(place: PlaceSelectResult) {
     if (!category) return
-    const { values } = placeSeed(category, place)
+    const { values, autofilled } = placeSeed(category, place)
+    const linked = 'placeId' in values
     const keep = (k: string) => (k === 'phone' ? hasPhone : k !== 'placeId' && k !== 'businessStatus')
     const keys = Object.keys(values).filter(keep)
     setDraft((d) => {
@@ -125,6 +127,12 @@ export function SubmissionReview({
         if (k === 'name' || k === 'phone') continue
         if (k === 'googleDescription' && String(details[k] ?? '').trim()) continue
         details[k] = values[k]
+      }
+      if (linked) {
+        details.placeId = values.placeId
+        if (values.businessStatus) details.businessStatus = values.businessStatus
+        else delete details.businessStatus
+        details.googleAutofill = JSON.parse(JSON.stringify(autofilled))
       }
       return {
         ...d,
@@ -303,9 +311,6 @@ export function SubmissionReview({
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4" data-testid="submission-review">
-      <button type="button" onClick={onBack} className="mb-3 text-sm text-primary hover:underline cursor-pointer">
-        ‹ Moderation · {waiting} waiting
-      </button>
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-lg font-semibold text-slate-900">{sent.name || s.current?.name || '(unknown listing)'}</h2>
         {s.categoryLabel && <span className="text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{s.categoryLabel}</span>}
@@ -355,14 +360,16 @@ export function SubmissionReview({
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onModerate(s.id, 'approved', undefined, dirty ? draft : undefined)}
-              className="text-sm font-medium bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60 cursor-pointer"
-            >
-              {busy ? 'Approving…' : dirty ? 'Approve with your changes' : 'Approve'}
-            </button>
+            {!needsAddress && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onModerate(s.id, 'approved', undefined, dirty ? draft : undefined)}
+                className="text-sm font-medium bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? 'Approving…' : dirty ? 'Approve with your changes' : 'Approve'}
+              </button>
+            )}
             <button type="button" disabled={busy} onClick={() => setRejecting(true)} className="text-sm font-medium border border-slate-300 text-slate-600 rounded px-4 py-2 hover:bg-slate-50 disabled:opacity-60 cursor-pointer">
               Reject
             </button>

@@ -1,7 +1,6 @@
 'use client'
 
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import WhatChangedAdmin from '@/components/admin/WhatChangedAdmin'
 import { notFound } from 'next/navigation'
 import { features } from '@/lib/features'
@@ -12,7 +11,6 @@ export default function AdminWhatChangedPage() {
   if (!features.whatChanged) notFound()
   return (
     <div>
-      <AdminNav />
       <WhatChangedAdmin token={session.access_token} />
     </div>
   )

@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 27, 2026.
+Last updated: Oct 29, 2026.
 
 ## The branch
 
@@ -92,6 +92,11 @@ for that exact change, in the same conversation. Show the dry run first.
    user's yes). Menu link changed from /shop to https://www.dotties.com/
    on live, nothing else (backup in that session's scratchpad). Its
    flavours get dated from that menu once PR 365 deploys.
+
+1j. **FINE WINE & GOOD SPIRITS (live, Oct 28):** has no Google place
+   (only the street address's, for Directions), so the nightly sync skips
+   it. Fix: set its place id to the store's, on live; needs a yes, after
+   looking the id up and showing it.
 
 ## For the user or the community
 
@@ -320,6 +325,307 @@ for that exact change, in the same conversation. Show the dry run first.
    anywhere the nav can read it, and the agreement was no new requests just
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
+   (Folds into the admin redesign below.)
+
+## Planned: the admin redesign (started Oct 28, brief agreed Oct 28)
+
+The user wants the whole admin console redesigned so a new community's
+admin finds it clear. The minimum: it looks good, it's organized, and every
+field is accurate and works. Lighter than the public site's process: a
+brief, one round of drawings, then the build in pieces.
+
+1. **Audit: DONE Oct 28.** `docs/admin-audit.md` has every field traced to
+   the site. About 20 settings are dead, about 25 are mislabelled, and seven
+   are clear bugs (top of that file). The same work is split across screens:
+   two search tabs, the queue vs Watches, two archives, two admin rosters.
+2. **The clear bugs: DONE Oct 28.** Six fixed on `redesign/oct18-fixes`:
+   the hero photo can be cleared (no more City Hall on other communities),
+   the top nav can go empty without defaults reappearing, the dead heading
+   fields no longer block Save, `/admin/dishes` goes to Watches, the opened
+   review hides Approve until there's an address, and Watches names any
+   job that didn't load. "Suggest a Listing" going with its row is
+   deliberate; the redesign shows it in the admin.
+3. **The brief: AGREED Oct 28.** The user took all nine recommendations.
+   Places is the content an admin looks after (every listing; edit one
+   directly, add one, bring one back); Site is how the site is set up, so a
+   category page there holds its settings and kind, not its listings.
+   https://claude.ai/artifact/K8CbQxbpQbLyxJeJ5EQ2ad. Who it's for, what
+   done means, design rules, the shape: To do, Places,
+   Site, Reports, and a gear menu for Team and Communities, with a table of
+   where each of today's screens goes. Nine questions, each with my
+   recommendation: category kinds instead of slugs, deleting the dead
+   settings, one Save bar, folding `/philly/inbox` into To do, where About
+   and Privacy live, phone support, a setup checklist, what Reports holds,
+   nav counts. Build order: clean-up, shell, To do, Places, Site, Reports
+   and gear, checklist.
+4. **Drawings: ALL DRAWN Oct 28, waiting on the user.**
+   https://claude.ai/artifact/9yEZYDSSXt88jyu38tFvWm, 21 boards: To do
+   (desktop, and phone with a search opened), deciding a change (The Kosher
+   Grill's hours), deciding a new place (Kosher Experience - Marlton Tpke),
+   Places, a category page (Food, and 6b with the Computer/Phone switch),
+   the home page, a new community's first visit with the setup checklist,
+   Reports, Settings · Team, Site on a phone, Header and menus, a form
+   opened, a new campaign, a field opened (Kosher certification), About and
+   Privacy, and adding a place (from the search "trader joe's").
+   One change from the brief on purpose: To do groups by what you decide
+   (New places, Changes), not by who sent it, so suggestions and watch
+   findings sit together.
+   Changed Oct 29 (the user: there will be too many searches for an admin
+   to keep up with): Searches nobody found is no longer a group beside New
+   places. It is a row at the bottom of To do, with Watches and Responses
+   ("37 different searches"), that opens in place, and it isn't counted in
+   "N to decide" or the nav's number. The full list is still under Reports.
+   Also Oct 29: every list cut short ("18 more", a form's questions,
+   Places' "Show all") now has "Show fewer" to fold it back.
+   What the drawings add that the site can't do today:
+   - Forms get a real "On the site" switch. Support and Volunteer are
+     still tied to a code flag. Both are live (tiles in the category list)
+     but production holds no responses to either.
+   - Oct 28 revision (boards 12b, 13b, 13c, beside the old 12 and 13):
+     Feedback moves from Header and menus to Forms. Forms is a short list
+     (Feedback, Patient & Family Support, Volunteer for Patients), each
+     opening to its wording and an on/off switch. No new-form builder.
+   - A campaign picks its own photo. The desktop banner always shows the
+     sukkah photo.
+   - Reports drops the approval-rate and time-to-approval tiles. It shows
+     views by day, most viewed places, and what was taken and left.
+   - Header items and phone tabs get an on/off switch and drag order.
+   `category.kind` already exists (listing, map, eruv, zmanim, medical), so
+   the agreed kinds extend it rather than adding a column.
+5. **Build, step 0 (clean-up): BUILT Oct 29** on `redesign/oct18-fixes`.
+   Gone from the admin and the code: the tagline (site and new-community),
+   the Browse, Davening and Map card headings, the width toggle on the two
+   cards that always share a row, the card text colour (categories and
+   forms), a form's card photo, the dead photo home tile, the "group at the
+   top of the form" checkbox, a tags field's "only when opened", and Read
+   questions' approve (old approvals still answer; prod has 2). Developer
+   text ("migration 0xx", "Supabase", model names) is now plain words.
+   `src/lib/settingsReaders.test.ts` fails on any setting nothing on the
+   site reads. The database columns are still there: dropping them needs
+   the user's yes on production (site_settings tagline and desktop_browse,
+   desktop_davening and desktop_map eyebrow/heading; card_text_color on
+   category and form; card_image_url on form).
+6. **Build, step 1 (shell): BUILT Oct 29.** A sidebar on a computer (To
+   do, Places, Site, Reports, then Settings, View the site and who's
+   signed in), a top bar with a gear and four tabs along the bottom on a
+   phone (`AdminFrame.tsx`, `adminAreas` in `adminNav.ts`). Every screen's
+   heading is its area's name, with the area's pages as tabs under it.
+   Site on a phone says "Open on a computer to edit the site". One look
+   for boxes, rows and empty screens (`AdminUI.tsx`); empty lists say
+   "Nothing to do." Intro paragraphs gone from every tab. History is in
+   the nav (Reports), with Approved/Rejected pills. Metrics is called
+   "Numbers" for now: it shows decisions, not visits, until step 5.
+   Still to come: the To do count (step 2, so it counts the one list).
+   Found on the way, for step 5: Metrics says 22 pending on dev while the
+   queue holds none, so its counts disagree with To do.
+7. **Build, step 2 (To do): BUILT Oct 29.** One list, grouped by what you
+   decide (boards 1 and 2): New places, Changes (edits, removals, new
+   categories, eruv fixes, each saying what it changes), Searches nobody
+   found, and new Responses. Four rows a box, the rest behind "N more"; on
+   a phone New places, Changes and Responses fold to one row each. The two
+   search lists are one: a missed search brings the AI's suggested words
+   along, and a reading with a word to teach and no search of its own is a
+   row too. A search opens in place to Add a place, Dismiss, or Teach.
+   Read questions is gone (`/admin/questions` goes to Searches, which now
+   holds Taught words). A suggestion opens to be decided, with "‹ To do",
+   "1 of 13" and Next; a removal, new category or eruv fix opens to its
+   card. The nav counts the same list (`src/lib/todo.ts`, one store in
+   `useTodo.ts`), in the sidebar and as "To do · N" on a phone. Watches
+   says how many pages are read and when they last ran.
+   Not as drawn: a Responses row (when none are new) sits under Watches,
+   since To do has no tabs and that page holds the handled responses. (A
+   Searches row sat there too until Oct 29; every search nobody found now
+   opens from Reports, under it like History, with "‹ Reports".)
+   **Drifted from the drawing, fixed Oct 29:** what a watch found (new
+   places off the kosher lists, a shul newsletter's changes, a website's
+   hours) is drawn in To do's New places and Changes, and the brief agreed
+   they sit with people's suggestions. The build left them out (the
+   queue's read dropped them, so they waited only on Watches' pages), and
+   the count did too: live had 16 waiting that To do didn't show. Now
+   they're in New places and Changes, counted, and open to be decided
+   like anything else ("1 of 22", "from Mekor Habracha's list"). They
+   still wait on their kind's page on Watches too, with Compare.
+   Small, seen on the way: on a new place with no hours, the deciding
+   screen draws every day as "Closed". Approving it unedited saves no
+   hours (only what's edited is sent), but it reads as if it says closed. The opened
+   suggestion's wording (boards 3 and 4: "Update the listing", "Edit, then
+   update", "Leave it") is still the old card's; its heading still says
+   To do.
+8. **Build, step 3 (Places): BUILT Oct 29.** Every listing in one list
+   (board 5): "N on the site" and Add a place, a name search, a category
+   menu, and pills On the site, No address and Archived (the old Archived
+   tab is gone; `/admin/archived` lands on `places?show=archived`). A row
+   says when it last changed, amber when the address is missing, with its
+   category on the right. A place opens in the whole-listing editor and
+   "Update the listing" saves it straight to the site, filed as an
+   approved submission so History still has it
+   (`/api/admin/listings/[id]`, PATCH). "Archive it" asks once. An
+   archived place opens to "Bring it back" or "Delete for good" (asks
+   once). Add a place uses the category picked, or asks which.
+   Not as drawn: nothing.
+9. **Build, step 4a (Site by screen): BUILT Oct 29.** Site's tabs are the
+   site's screens (boards 7 and Menus): Home page, Category pages, Forms,
+   Header and menus, Campaigns, and About and Privacy for the site owner.
+   The old Basics / On a computer / On a phone addresses land on Home page
+   or Header and menus. Each settings tab shows the real home page beside
+   it with what hasn't been saved, on a computer or a phone, and saves
+   through one bar along the bottom ("2 changes", Undo, Save); leaving with
+   changes asks first (`SaveBar.tsx`). Home page: Top of the page (big
+   line, line under it, search box, photo), the cards below it as rows that
+   open in place (Small line above, Heading, Width, Move, "Take it off",
+   which asks once), Category groups, and the link-preview words. Header
+   and menus: Name and logo, the computer header's links, the phone tabs,
+   and Feedback with a switch. Forms is its own tab with "+ Add a form".
+   Subscribers open inside the email sign-up card.
+   Not as drawn: the header links and phone tabs keep their old editors
+   (fields per item, not rows with switches and drag handles); the photo
+   keeps the shared picker with its address box; Davening and Listings are
+   two rows, not one; the link preview has Title and Description, not one
+   line; Name and logo sit here until step 5 moves them to the gear; the
+   Forms tab's list is still the old cards (step 4c); About and Privacy is
+   the old editor (step 4c).
+10. **Build, step 4b (a category's page, around kinds): BUILT Oct 29.**
+   Making a category starts with "What kind of places?": Shuls, Food,
+   Groceries, Mikvahs, Hotels, Hospitals or Plain. A kind brings its
+   template's name, fields and look; Plain starts empty. The icon, the
+   hidden search words and the link-preview type follow the kind
+   (`placeKinds.ts`), and every category saved before this takes its kind
+   from its address, so nothing changes for Philly. A category's page
+   (board 6b): its name, how many places (opens Places narrowed to it), an
+   "On the site" switch, its kind, Name and look, What each place shows as
+   rows that open a field's own screen, Map, and the "Not listed here?"
+   line, with the page itself beside on a computer (click it to try it full
+   size). One Save bar; after a save it says "Saved.".
+   Migration 088 (`category.place_kind`) is run on dev and live (Oct 29).
+   Not as drawn: a field's own screen still has the old field settings
+   inside (not The answer / Where it shows with switches); Icon, Banner
+   photo and Pin colour open the old pickers under "Change"; "Every place
+   has" (address, phone, hours, website, photo) is kept as checkboxes;
+   The list, Places within a walk, On each listing and What visitors can
+   do are kept below, not drawn; the web address can still be changed.
+   A kind can't be changed after it's made, as drawn.
+   Still going by address, not kind: the kosher watch, the hospital
+   watches and question reader, and the map's pins.
+11. **Build, step 4c (Forms, Campaigns, About and Privacy): BUILT Oct 29.**
+   Forms: a list with Feedback first, then each form, saying where it
+   shows and On/Off. Feedback has its own screen (footer button, heading,
+   after sending, "On the site", the form beside); it left Header and
+   menus. A form's screen: "On the site" (at once), Responses, its
+   questions as rows under their sections, saying what each takes and when
+   it's asked, each opening its own screen; After sending; the phone
+   preview beside. Every edit is kept as a draft by itself a moment later,
+   the bar says "Draft · N changes, not on the site yet", and only Publish
+   puts it on the site; Throw away goes back to what's on the site.
+   Campaigns: a list saying what each opens, when, and which is on now;
+   each its own screen with a preview card and Delete asking once. About
+   and Privacy: one note that it's one copy for every community, the two
+   pages as a switch, the Save bar.
+   Not as drawn: questions move with ↑ ↓ on their own screen, not by
+   dragging; a question's screen still has the old settings inside; the
+   form's name and icon are in a third box, "Its tile" (not drawn);
+   "+ Add a form" and "Delete this form" are kept (not drawn); a
+   campaign's photo is shown, not picked (it's fixed in code); the
+   campaign preview has no Computer/Phone switch; "Button first" is kept.
+12. **Build, step 5 (Reports and the gear): BUILT Oct 29.**
+   Reports (was Metrics): Week / Month / Year; listing views as a bar a
+   day (a month, for a year) with "N since …"; Most viewed places; Decided
+   this month as Taken / Left for New places, Changes and Removals,
+   grouped the way To do groups them; Searches nobody found (how many
+   different searches); History. History is no longer its own tab: it
+   opens from Reports, says Taken / Left, and a left-out card shows the
+   reason it was left out. The gear: Team lists every admin, adds one, and
+   removes one (asks once; nobody can remove themselves, your own row says
+   "You"), and has your two email switches; Community has Name and logo
+   (moved off Header and menus). Communities (site owner) no longer has
+   its own admin list: it links to that community's Team.
+   Migration 089 (`submission.review_reason`) is run on dev and live
+   (Oct 29).
+   Fixed on the way: saving a Site tab sent every setting, so a tab left
+   open could put back an older name or Feedback heading. It now sends
+   only what changed on that tab.
+   Not as drawn: nothing. Gone, as drawn: the Pending count (To do has
+   it), approval rate and time to approval.
+13. **Build, step 6 (Setup): BUILT Oct 29.**
+   To do starts with "Set up your guide · N of 4 done" and a bar: Name and
+   logo, A second admin, Your first category (made, with a place on the
+   site), The home page's words. Each row opens the screen that does it and
+   ticks itself from what's saved. It goes away for good once all four are
+   done, and the nav's count includes the ones left.
+   The home page's words count only once they differ from the starting
+   words (saving the name and logo writes the starting words too).
+   Walked through on dev with a pretend hidden community, "Riverton Jewish
+   Guide" (`/riverton`, dev only, safe to delete from Communities). It got
+   every step done but the kosher lists from the checklist alone. Fixed on the way:
+   - A hidden community's own admin saw "Not found." in every Site preview
+     and on "View the site". Its admin now gets the preview pass when it
+     opens.
+   - Picking a plain address in Add a place replaced the typed name with
+     the street's ("Cedar Lane").
+   - The browser tab said the first community's name on every community's
+     admin. It now says "Admin · <name>".
+   - Phone boxes showed a Philadelphia number as the example. Now
+     (555) 555-0100.
+   - Making a category with a kind, before migration 088, showed a raw
+     database error. It now says to use the kind's own name as the web
+     address (088 has since been run on both, so this no longer happens).
+   **Kosher lists to watch: dropped for now (your call, Oct 29).** A new
+   community couldn't finish it: only Keystone-K and Mekor lists can be
+   read, and Watches has no way to add one. It comes back if "add a kosher
+   agency's list" is ever built (each agency's list needs its own reader).
+   Still open, small: right after a community is made, its admin shows
+   "Not found." once (a reload fixes it); a category's preview map opens on
+   Philadelphia for any community; the nav's count updates when To do is
+   opened, not when a step is saved elsewhere.
+   Not as drawn: the kosher lists step (above).
+14. **Newsletters set up from the console: BUILT Oct 29** (drawings 18
+   and 18b). Watches → Newsletters (the Newsletters line on What's tracked
+   opens it) hands out the Gmail script with the site, the community and
+   that community's own key already in it: make a Gmail, Copy the script,
+   open script.google.com, Run install. Once it runs, the page says
+   "Checking <gmail> every hour · Last checked …" (or "Stopped checking"
+   after 3 hours quiet), with Set up again. Newsletters are listed there
+   with their shul and when the last one came in; "+ Add a newsletter"
+   takes the shul and its email. A sender with no shul is linked (or
+   skipped, Not a shul) here now, not on What's tracked.
+   Each community's key is in `newsletter_setup` (**migration 090, not run
+   anywhere yet: run it on dev and live**). Without it the page says
+   newsletters can't be set up yet, and everything else works as before.
+   `NEWSLETTER_SECRET` still works for every community, so Philly's script
+   carries on unchanged; a community's own key works for it alone.
+   Not as drawn: the unlinked-sender row and the "Stopped checking" line.
+   Not built: making a new key (if one leaks, delete the row and open the
+   page again).
+
+## Drawn Oct 28: the computer home and Before candles (waiting on the user)
+
+Canvas https://claude.ai/artifact/FtEAS6MWeWHynqJHzaRURu, 5 boards, with
+real prod numbers (Friday Oct 30, 1 PM; candles 5:44 PM).
+
+- **Before candles by item.** Today it shows the fewest open stores that
+  cover every item (`beforeCandles()` in `src/lib/todayHome.ts`), which
+  is usually one store (Trader Joe's on Arch has all three). Drawn instead:
+  one row per item, "Challah · 10 stores open · closest 0.2 mi". A tap
+  opens Grocery with "Has: Challah" and "Open now" on. Board 2 adds an
+  "All three in one stop" row on top, as the other option. Board 3 is the
+  Grocery page it lands on.
+- **The computer home doesn't need a redesign.** It catches up with the
+  phone: the trust line takes the subhead's place in the hero, and Right
+  now (candles card plus Before candles on Friday, Food and Grocery open
+  now on a weekday) sits beside Browse everything. Dropped: the Upcoming
+  Davening, Kept by the Community and Shabbat & Holiday Times cards (Right
+  now and the candles card answer them). The email signup becomes a thin
+  band above the footer.
+- **Decided Oct 28: per-item rows alone** (no one-stop row). **Built** on
+  `redesign/oct18-fixes`: `beforeCandles()` now gives a row per item (stores
+  open now with it, the nearest's distance), counted with the Grocery page's
+  own Has and Open now checks so the number is the list a tap opens
+  (`candleItemHref`: `?openNow=1&has_m=Challah`). "Other stores ›" is gone.
+  An item no store open now lists still gets its one line. One category
+  answers every row, the one whose open places carry the most of the items
+  (Grocery): Food's main dishes are an item list too, and on the test
+  project they answered "Challah" and "Chicken" with restaurants until this.
+- The computer home (boards 4 and 5) is drawn, not built: waiting on the
+  user.
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
@@ -1697,9 +2003,16 @@ queue didn't fill the other rows "like it normally does". It never had: the
 queue's form (SubmissionReview, Oct 5) had its own address box, wired for the
 address and map point only. Now a picked place fills the name, phone, hours
 and website, and a description where there's none, as Add and Edit listing
-do (`placeSeed`); each row it fills opens. Google's place id still isn't
-taken from the queue (reviewEdits.ts), so a pick there doesn't link the
-listing to Google's place for the nightly sync.
+do (`placeSeed`); each row it fills opens (PR 367).
+
+Then, the same evening: FINE WINE & GOOD SPIRITS, approved that way, went
+live with no Google place, since the queue sent only the values. Its
+submitter had picked the street address, so approval kept that place only
+for Directions (verifiedPlaceId), Google owned no rows, and the nightly sync
+skips it. Now the queue's pick sends its place too, with what Google filled
+and its status, and approval takes them (reviewEdits.ts: only with the fill
+record, so a bare place id still isn't a pick). The listing is linked,
+Google owns the rows it filled, and the sync right after approval runs.
 
 ## Done Oct 28, later: every dish a read found gets its date (on `redesign/oct18-fixes`)
 

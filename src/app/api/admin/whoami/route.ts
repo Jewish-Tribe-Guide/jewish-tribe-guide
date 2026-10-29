@@ -1,4 +1,7 @@
+import { NextResponse } from 'next/server'
 import { getAdminUser, getAdminUserForCommunity, isAllowedAdminEmail } from '@/lib/adminAuth'
+import { listCommunityVisibility } from '@/lib/communityStore'
+import { previewCookieName, previewCookieOptions } from '@/lib/previewCookie'
 
 // GET /api/admin/whoami?community=<slug> — is the Bearer token's email
 // allowed to administer this specific community (adminAuth.ts's
@@ -25,8 +28,17 @@ export async function GET(request: Request) {
 
   // Included even on the per-community branch — a community admin who
   // ALSO happens to be on the global superadmin list still needs to know
-  // that, so the console can show them the Communities tab (see AdminNav's
+  // that, so the console can show them the Communities tab (see AdminFrame's
   // own use of this). Cheap to compute either way: isAllowedAdminEmail is
   // just a comma-separated env var check, no extra request.
-  return Response.json({ ok: true, email: admin.email, isSuperAdmin: isAllowedAdminEmail(admin.email) })
+  const response = NextResponse.json({ ok: true, email: admin.email, isSuperAdmin: isAllowedAdminEmail(admin.email) })
+
+  // A hidden community's own admin gets its preview cookie (previewCookie.ts),
+  // or every preview on Site and "View the site" is the gate's "Not found."
+  // while they're building it.
+  if (community) {
+    const entry = (await listCommunityVisibility())[community]
+    if (entry && !entry.visible) response.cookies.set(previewCookieName(community), entry.previewToken, previewCookieOptions(community))
+  }
+  return response
 }

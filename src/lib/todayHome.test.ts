@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ZmanimData } from '@/types'
-import { beforeCandles, browseLine, dayLine, itemList, openNowTitle, shabbosMoment, shoppingTitle } from './todayHome'
+import { beforeCandles, browseLine, candleItemHref, candleItemLine, dayLine, itemList, openNowTitle, shabbosMoment, type CandleItemRow } from './todayHome'
+import { hrefFilters, withFilters } from './searchLands'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
 
@@ -112,7 +113,7 @@ describe('where the day stands', () => {
 
 describe('before candles', () => {
   const items: CategoryField = { key: 'm', label: 'Items', type: 'tags', showCountInHeader: true }
-  const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours' }
+  const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', filterable: true }
   const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, items] })
   // Open every day, 9 AM to 9 PM.
   const open = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '21:00' }]))
@@ -122,8 +123,11 @@ describe('before candles', () => {
   // Local time, as every hours test here: whether a place is open is read
   // off the device's clock (see getOpenStatus).
   const friday = new Date(2026, 9, 9, 13, 30)
+  const said = (rows: CandleItemRow[]) => rows.map((r) => [r.item, candleItemLine(r)])
 
-  it('one store that has them all, the nearest of those', () => {
+  // The user, Oct 28: it used to name the one store with all three, which
+  // is nearly always the same store.
+  it('one row per item: how many stores open now have it, and the nearest', () => {
     const { rows, missing } = beforeCandles(
       [store('Far', 0.02, ['Challah', 'Wine', 'Chicken']), store('Near', 0.003, ['challah', 'WINE', 'Chicken']), store('Nearer', 0.001, ['Challah'])],
       [grocery],
@@ -131,12 +135,15 @@ describe('before candles', () => {
       friday,
       from,
     )
-    expect(rows.map((r) => [r.store.name, r.has])).toEqual([['Near', ['Challah', 'Wine', 'Chicken']]])
+    expect(said(rows)).toEqual([
+      ['Challah', '3 stores open · closest 0.1 mi'],
+      ['Wine', '2 stores open · closest 0.2 mi'],
+      ['Chicken', '2 stores open · closest 0.2 mi'],
+    ])
     expect(missing).toEqual([])
-    expect(shoppingTitle(rows[0], 3)).toBe('Near, 0.2 mi, has all three')
   })
 
-  it('no one store: as few as it takes; an item no store open now lists is said', () => {
+  it('an item no store open now lists is said; "Chicken soup" isn’t Chicken', () => {
     const { rows, missing } = beforeCandles(
       [store('A', 0.001, ['Challah', 'Wine']), store('B', 0.002, ['Wine']), store('C', 0.003, ['Chicken soup'])],
       [grocery],
@@ -144,11 +151,11 @@ describe('before candles', () => {
       friday,
       from,
     )
-    expect(rows.map((r) => [r.store.name, r.has])).toEqual([['A', ['Challah', 'Wine']]])
+    expect(rows.map((r) => [r.item, r.stores])).toEqual([['Challah', 1], ['Wine', 2]])
     expect(missing).toEqual(['Chicken'])
   })
 
-  it('a store closed now, or with no hours, isn’t an answer; "sometimes" items count', () => {
+  it('a store closed now, or with no hours, isn’t counted; "sometimes" items are', () => {
     const closed = Object.fromEntries(['fri'].map((d) => [d, { open: '15:00', close: '21:00' }]))
     const { rows } = beforeCandles(
       [store('Closed', 0.001, ['Challah'], closed), store('NoHours', 0.001, ['Challah'], null), store('Sometimes', 0.01, [], open, ['Challah'])],
@@ -157,7 +164,50 @@ describe('before candles', () => {
       friday,
       from,
     )
-    expect(rows.map((r) => r.store.name)).toEqual(['Sometimes'])
+    expect(rows.map((r) => [r.item, r.stores])).toEqual([['Challah', 1]])
+  })
+
+  it('the count is the list its row opens: Grocery with Has and Open now on', () => {
+    const closed = Object.fromEntries(['fri'].map((d) => [d, { open: '15:00', close: '21:00' }]))
+    const listings = [
+      store('A', 0.001, ['Challah', 'Wine']),
+      store('B', 0.002, ['wine']),
+      store('C', 0.003, [], open, ['Challah']),
+      store('D', 0.004, ['Challah'], closed),
+      store('E', 0.005, ['Challah'], null),
+    ]
+    const { rows } = beforeCandles(listings, [grocery], ['Challah', 'Wine'], friday, from)
+    for (const row of rows) {
+      const href = candleItemHref('philly', row)
+      expect(href).toBe(`/philly/grocery?openNow=1&has_m=${row.item}`)
+      const { filters } = hrefFilters(href)
+      expect(withFilters(listings, grocery, filters, friday)).toHaveLength(row.stores)
+    }
+    expect(rows.map((r) => r.stores)).toEqual([2, 2])
+  })
+
+  // Found on the test project, Oct 28: Food came first and its dishes
+  // answered "Challah" and "Chicken" with restaurants.
+  it('the stores, not Food’s dishes: one category for every row, the one with most of them', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true }
+    const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [hours, dishes] })
+    const grill = makeListing({ id: 'grill', name: 'Grill', category: 'restaurant', geo: { lat: 0.001, lng: 0 }, hours: open, dishes: ['Chicken'] })
+    const { rows, missing } = beforeCandles([grill, store('A', 0.002, ['Challah']), store('B', 0.003, ['Challah'])], [food, grocery], ['Challah', 'Chicken'], friday, from)
+    expect(rows.map((r) => [r.item, r.category.id, r.stores])).toEqual([['Challah', 'grocery', 2]])
+    expect(missing).toEqual(['Chicken'])
+  })
+
+  it('a store list with no "Open now" to turn on isn’t asked', () => {
+    const unfiltered = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ ...hours, filterable: false }, items] })
+    const { rows, missing } = beforeCandles([store('A', 0.001, ['Challah'])], [unfiltered], ['Challah'], friday, from)
+    expect(rows).toEqual([])
+    expect(missing).toEqual(['Challah'])
+  })
+
+  it('one store says its distance plainly; no place, no distance', () => {
+    const row = { item: 'Wine', category: grocery, fieldKey: 'm', stores: 1, closest: 0.4 }
+    expect(candleItemLine(row)).toBe('1 store open · 0.4 mi')
+    expect(candleItemLine({ ...row, stores: 4, closest: null })).toBe('4 stores open')
   })
 
   it('the items read as a list', () => {

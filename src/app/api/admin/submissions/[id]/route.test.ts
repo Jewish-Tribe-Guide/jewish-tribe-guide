@@ -146,7 +146,7 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
 
   it('rejects within the community, as the signed-in admin', async () => {
     await patch({ status: 'rejected' })
-    expect(m.rejectSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co')
+    expect(m.rejectSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', undefined)
     expect(m.approveSubmission).not.toHaveBeenCalled()
   })
 
@@ -162,6 +162,8 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
     expect(m.sendDecisionEmail).not.toHaveBeenCalled() // not before the response
     await runAfter()
     expect(m.sendDecisionEmail).toHaveBeenCalledWith(expect.objectContaining({ id: 'sub1' }), 'rejected', 'duplicate')
+    // and keeps the same words for History
+    expect(m.rejectSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', 'duplicate')
     expect(m.sendReviewActionNotification).toHaveBeenCalledWith(expect.objectContaining({ id: 'sub1' }), 'rejected', 'admin@x.co')
   })
 

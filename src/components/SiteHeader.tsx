@@ -223,16 +223,8 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // pixels of scroll later ("Guide for residents, visitors, and
           // patients" next to the hero's own mission sentence), so the
           // header carried the message twice before a visitor had read
-          // either in full.
-          //
-          // This WAS tagline's only render site — its own type doc in
-          // siteSettings.ts says exactly that ("Shown under the site name in
-          // the header"). Left admin-editable rather than removed (still
-          // shows in the Site tab, still round-trips to the database) since
-          // deleting a field is a bigger, separate decision than deciding
-          // not to render it — but as of this change it has no surface
-          // anywhere on the live site. Worth knowing before spending more
-          // time writing good taglines into a field nothing shows.
+          // either in full. That was the tagline's only render site, so the
+          // setting itself is gone too.
           const title = (
             <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink">
               {settings.name}

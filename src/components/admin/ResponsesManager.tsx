@@ -9,6 +9,7 @@ import ResponseCard from '@/components/responses/ResponseCard'
 import { INBOX_BASE } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { AdminEmpty } from './AdminUI'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
 // excluded — those are hospital-facing and live in /inbox instead, see
@@ -25,7 +26,8 @@ export default function ResponsesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [formsError, setFormsError] = useState<string | null>(null)
-  const [activeKey, setActiveKey] = useState<string>(FEEDBACK_KEY)
+  // A form's own screen links here with ?form=<id>, to open on its tab.
+  const [activeKey, setActiveKey] = useState<string>(() => new URLSearchParams(window.location.search).get('form') ?? FEEDBACK_KEY)
 
   useEffect(() => {
     let cancelled = false
@@ -52,12 +54,11 @@ export default function ResponsesManager({ token }: { token: string }) {
   return (
     <div>
       <p className="text-sm text-muted mb-4">
-        Feedback and responses to any custom form you’ve created. Support, Volunteer, and Volunteer
-        changes are hospital-facing — those live in{' '}
+        Support and Volunteer responses are in{' '}
         <a href={INBOX_BASE} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-          {INBOX_BASE}
-        </a>{' '}
-        instead.
+          the inbox
+        </a>
+        .
       </p>
 
       {formsError && (
@@ -142,7 +143,7 @@ function ResponsesList({
       {items === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted">Nothing here yet.</p>
+        <AdminEmpty />
       ) : (
         <div className="space-y-3">
           {items.map((item) => (

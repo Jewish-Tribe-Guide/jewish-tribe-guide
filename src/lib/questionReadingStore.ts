@@ -7,8 +7,9 @@ import type { Reading } from './questionReader'
 // afresh, as it did before this existed.
 //
 // And the admin's "Read questions" tab: every reading, most asked first,
-// each approvable as a rule (used with no AI at all) or forgotten (read
-// afresh next time). Uncached, like the missed searches: an admin screen.
+// each of which can be forgotten (read afresh next time). Uncached, like the
+// missed searches: an admin screen. A reading approved back when the tab
+// could approve still counts as a rule (findReading, /api/ask/read).
 
 let warned = false
 function tableMissing(message: string | undefined): boolean {
@@ -58,8 +59,6 @@ export type StoredReading = {
   hits: number
   createdAt: string
   lastUsedAt: string
-  approvedAt: string | null
-  approvedBy: string | null
 }
 
 /** The most asked first, at most `limit`. `available` is false without
@@ -67,7 +66,7 @@ export type StoredReading = {
 export async function listReadings(community: string, limit = 300): Promise<{ readings: StoredReading[]; available: boolean }> {
   const { data, error } = await getAdminClient()
     .from('question_reading')
-    .select('key, question, reading, model, hits, created_at, last_used_at, approved_at, approved_by')
+    .select('key, question, reading, model, hits, created_at, last_used_at')
     .eq('community_id', community)
     .order('hits', { ascending: false })
     .order('last_used_at', { ascending: false })
@@ -86,20 +85,8 @@ export async function listReadings(community: string, limit = 300): Promise<{ re
       hits: r.hits as number,
       createdAt: r.created_at as string,
       lastUsedAt: r.last_used_at as string,
-      approvedAt: (r.approved_at as string | null) ?? null,
-      approvedBy: (r.approved_by as string | null) ?? null,
     })),
   }
-}
-
-/** Approve a reading as a rule, by whom, or take the approval back. */
-export async function setReadingApproved(community: string, key: string, approvedBy: string | null): Promise<void> {
-  const { error } = await getAdminClient()
-    .from('question_reading')
-    .update(approvedBy ? { approved_at: new Date().toISOString(), approved_by: approvedBy } : { approved_at: null, approved_by: null })
-    .eq('community_id', community)
-    .eq('key', key)
-  if (error) throw new Error(error.message)
 }
 
 /** Forget a reading: the question is read afresh the next time it's asked. */

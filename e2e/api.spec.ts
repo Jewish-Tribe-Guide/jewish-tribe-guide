@@ -38,7 +38,9 @@ const ADMIN_ROUTES: Guarded[] = [
   { method: 'get', path: '/api/admin/home-sections' },
   { method: 'get', path: '/api/admin/site-settings' },
   { method: 'get', path: '/api/admin/archived-listings' },
-  { method: 'get', path: '/api/admin/metrics' },
+  { method: 'get', path: '/api/admin/listings' },
+  { method: 'get', path: '/api/admin/reports' },
+  { method: 'get', path: '/api/admin/setup' },
   { method: 'post', path: '/api/admin/categories' },
   { method: 'post', path: '/api/admin/communities' },
   { method: 'post', path: '/api/admin/forms' },
@@ -63,6 +65,8 @@ const ADMIN_ROUTES: Guarded[] = [
   { method: 'delete', path: `/api/admin/home-sections/${NO_SUCH_ID}` },
   { method: 'patch', path: `/api/admin/archived-listings/${NO_SUCH_ID}` },
   { method: 'delete', path: `/api/admin/archived-listings/${NO_SUCH_ID}` },
+  { method: 'patch', path: `/api/admin/listings/${NO_SUCH_ID}` },
+  { method: 'delete', path: `/api/admin/listings/${NO_SUCH_ID}` },
 ]
 
 const INBOX_ROUTES: Guarded[] = [

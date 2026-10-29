@@ -57,12 +57,12 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // category (Sukkahs, ahead of Sukkot) is meant to sit in.
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category' })).click()
+  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
   await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(categoryName)
-  await visible(page.getByLabel('Visible on the site immediately')).uncheck()
+  await visible(page.getByRole('switch', { name: 'On the site', exact: true })).click()
   await visible(page.getByRole('button', { name: 'Create category' })).click()
-  await expect(page.locator('div.rounded-lg.shadow-sm:visible', { hasText: categoryName })).toBeVisible({
-    timeout: 10_000,
-  })
+  // Creating opens the new category's own page, saved.
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
 
   const supabase = getAdminClient()
   const { data: category } = await supabase.from('category').select('id, active').eq('plural_label', categoryName).maybeSingle()
@@ -72,7 +72,7 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // has no live campaign promoting it, so this is exactly the case the fix
   // covers: it must still be a selectable option, not filtered out.
   await page.goto('/philly/admin/campaigns')
-  await visible(page.getByRole('button', { name: '+ Add a campaign banner' })).click()
+  await visible(page.getByRole('button', { name: '+ Add a campaign' })).click()
 
   // Scoped to the form itself (data-testid="campaign-banner-form") and
   // located structurally, not via getByLabel: this form's <select>/<input>
@@ -84,14 +84,14 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // lookup by field order/type sidesteps it entirely.
   const form = visible(page.getByTestId('campaign-banner-form'))
   await form.getByPlaceholder('Sukkah Map').fill(bannerTitle)
-  await form.locator('select').first().selectOption({ label: `${categoryName} (hidden)` }) // Category, then destination
-  await form.locator('input[type="date"]').nth(0).fill(isoDate(30)) // Start date, then End date
+  await form.locator('select').first().selectOption({ label: `${categoryName} (hidden)` }) // Opens, then Button first
+  await form.locator('input[type="date"]').nth(0).fill(isoDate(30)) // Starts, then Ends
   await form.locator('input[type="date"]').nth(1).fill(isoDate(40))
-  await form.getByRole('button', { name: 'Save' }).click()
+  await visible(page.getByRole('region', { name: 'Save' }).getByRole('button', { name: 'Save' })).click()
 
   // Saved banner shows in the list, its category labeled hidden — proof the
   // link actually took, not just that the dropdown offered the option.
-  const row = page.locator('div.flex.items-center.justify-between.gap-3:visible', { hasText: bannerTitle })
+  const row = visible(page.getByRole('button', { name: new RegExp(bannerTitle) }))
   await expect(row).toBeVisible({ timeout: 10_000 })
   await expect(row).toContainText(`${categoryName} (hidden)`)
 

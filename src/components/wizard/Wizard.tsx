@@ -338,7 +338,7 @@ export default function Wizard({
                   inputMode="tel"
                   value={(answers.phone as string) ?? ''}
                   onChange={(e) => setAnswer('phone', formatPhone(e.target.value))}
-                  placeholder="(215) 555-0100"
+                  placeholder="(555) 555-0100"
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[18px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>

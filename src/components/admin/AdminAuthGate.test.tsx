@@ -23,6 +23,9 @@ const mockGetSession = vi.fn()
 const mockOnAuthStateChange = vi.fn()
 const mockSignOut = vi.fn()
 
+// The frame's nav reads the route and the site's content; this file is about
+// the gate, so the frame just passes its children through.
+vi.mock('./AdminFrame', () => ({ default: ({ children }: { children: React.ReactNode }) => children }))
 vi.mock('@/lib/supabase/client', () => ({
   getBrowserClient: () => ({
     auth: {

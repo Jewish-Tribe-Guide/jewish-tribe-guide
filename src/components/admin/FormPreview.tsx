@@ -13,7 +13,7 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 // help?") normally resolve against the live hospital list; the preview has no
 // such list to hand, so it substitutes a couple of placeholder options purely
 // so the step renders something instead of an empty list.
-function resolvePreviewSteps(steps: FormStep[]): Step[] {
+export function resolvePreviewSteps(steps: FormStep[]): Step[] {
   const resolved = steps.map((s) =>
     s.optionsSource === 'hospitals'
       ? {

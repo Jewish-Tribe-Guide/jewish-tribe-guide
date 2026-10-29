@@ -56,10 +56,15 @@ test('creating a category through the real editor makes it live, and deleting it
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category' })).click()
 
+  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
   await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(name)
   await visible(page.getByRole('button', { name: 'Create category' })).click()
 
-  // Saving navigates back to the list and reloads it.
+  // Creating opens the new category's own page, saved (its heading is the
+  // name typed, so it shows before the save lands); back to the list.
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(page).toHaveURL(/\/philly\/admin\/categories\/cat:e2e-admin-write-/)
+  await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: name })
   await expect(row).toBeVisible({ timeout: 30_000 })
 
@@ -95,6 +100,7 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category' })).click()
 
+  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
   await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(categoryName)
   // No address on this category — sidesteps the real Google Places
   // autocomplete AddressInput uses, which this suite doesn't drive anywhere
@@ -102,11 +108,14 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   await visible(page.getByLabel('An address')).uncheck()
   // The create-time visibility toggle this test exists to cover — see
   // AGENTS.md's testing conventions: this failed against the pre-fix
-  // CategoryEditor (no such checkbox existed; every category was created
-  // active) before the checkbox and its wiring were added.
-  await visible(page.getByLabel('Visible on the site immediately')).uncheck()
+  // CategoryEditor (no such control existed; every category was created
+  // active) before it and its wiring were added. A switch beside the
+  // name now.
+  await visible(page.getByRole('switch', { name: 'On the site', exact: true })).click()
   await visible(page.getByRole('button', { name: 'Create category' })).click()
 
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: categoryName })
   await expect(row).toBeVisible({ timeout: 30_000 })
   await expect(row.getByRole('button', { name: 'Hidden' })).toBeVisible()

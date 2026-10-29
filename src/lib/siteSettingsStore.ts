@@ -23,6 +23,10 @@ const ROW_ID = 'default'
 type Row = {
   id: string
   name: string
+  /** Nothing reads this or the Browse, Davening and Map eyebrow/heading
+   *  columns below: the header line and those cards' titles are gone. The
+   *  columns stay rather than dropping data with a migration; `tagline` is
+   *  NOT NULL, so a save writes back whatever the row already holds. */
   tagline: string
   hero_title: string
   mission: string
@@ -134,7 +138,6 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
   const heroSplit = defaultHeroSplit(mission)
   return {
     name: row.name,
-    tagline: row.tagline,
     heroTitle: row.hero_title,
     mission,
     logoUrl: row.logo_url,
@@ -145,14 +148,8 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     mobileTabs: toMobileTabs(row.mobile_tabs),
     searchPlaceholder: row.search_placeholder || fallback.searchPlaceholder,
     desktopNavItems: toDesktopNavItems(row.desktop_nav_items),
-    desktopBrowseEyebrow: row.desktop_browse_eyebrow || fallback.desktopBrowseEyebrow,
-    desktopBrowseHeading: row.desktop_browse_heading || row.hero_title,
-    desktopDaveningEyebrow: row.desktop_davening_eyebrow || fallback.desktopDaveningEyebrow,
-    desktopDaveningHeading: row.desktop_davening_heading || fallback.desktopDaveningHeading,
     desktopListingsEyebrow: row.desktop_listings_eyebrow || fallback.desktopListingsEyebrow,
     desktopListingsHeading: row.desktop_listings_heading || fallback.desktopListingsHeading,
-    desktopMapEyebrow: row.desktop_map_eyebrow || fallback.desktopMapEyebrow,
-    desktopMapHeading: row.desktop_map_heading || fallback.desktopMapHeading,
     desktopSubscribeEyebrow: row.desktop_subscribe_eyebrow || fallback.desktopSubscribeEyebrow,
     desktopSubscribeHeading: row.desktop_subscribe_heading || fallback.desktopSubscribeHeading,
     desktopJewishTimesHeading: row.desktop_jewish_times_heading || fallback.desktopJewishTimesHeading,
@@ -162,7 +159,10 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     // doesn't blank out until someone opens the new Desktop tab.
     desktopHeroHeadline: row.desktop_hero_headline || heroSplit.headline,
     desktopHeroSubhead: row.desktop_hero_subhead ?? heroSplit.subhead,
-    desktopHeroImage: toHeroImage(row.desktop_hero_image) ?? fallback.desktopHeroImage,
+    // A saved row's own photo, or none: an admin who cleared it gets the
+    // plain gradient, not the bootstrap community's photo from code (which
+    // put Philadelphia's City Hall on every other community's home).
+    desktopHeroImage: toHeroImage(row.desktop_hero_image),
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
     todayHidden: toTodayHidden(row.today_hidden),
@@ -186,6 +186,10 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
 // branding instead, so an un-configured community reads as itself, empty,
 // rather than as someone else's site.
 export async function getSiteSettingsUncached(community: string): Promise<SiteSettings> {
+  return settingsFrom(await readRow(community), community)
+}
+
+async function readRow(community: string): Promise<Row | null> {
   const { data, error } = await getAdminClient()
     .from('site_settings')
     .select('*')
@@ -193,17 +197,22 @@ export async function getSiteSettingsUncached(community: string): Promise<SiteSe
     .maybeSingle()
 
   if (error) throw new Error(`Failed to load site settings: ${error.message}`)
-  if (data) return toSettings(data as Row)
+  return data as Row | null
+}
+
+async function settingsFrom(row: Row | null, community: string): Promise<SiteSettings> {
+  if (row) return toSettings(row)
 
   const c = await resolveCommunity(community)
   const heroSplit = defaultHeroSplit(c.mission)
   return {
     ...SITE_SETTINGS_DEFAULTS,
     name: c.name,
-    tagline: c.tagline,
     mission: c.mission,
     desktopHeroHeadline: heroSplit.headline,
     desktopHeroSubhead: heroSplit.subhead,
+    // community.config.ts's photo is the bootstrap community's own.
+    desktopHeroImage: c.isDefault ? SITE_SETTINGS_DEFAULTS.desktopHeroImage : null,
   }
 }
 
@@ -221,7 +230,8 @@ export async function updateSiteSettings(
   community: string,
   patch: Partial<SiteSettings>,
 ): Promise<SiteSettings> {
-  const current = await getSiteSettingsUncached(community)
+  const row = await readRow(community)
+  const current = await settingsFrom(row, community)
   const merged: SiteSettings = { ...current, ...patch }
   // The Today home's columns (migration 067) are written only when they
   // change, so the rest of the settings still save on a database that
@@ -240,7 +250,7 @@ export async function updateSiteSettings(
         id: ROW_ID,
         community_id: community,
         name: merged.name,
-        tagline: merged.tagline,
+        tagline: row?.tagline ?? '',
         hero_title: merged.heroTitle,
         mission: merged.mission,
         logo_url: merged.logoUrl,
@@ -251,14 +261,8 @@ export async function updateSiteSettings(
         mobile_tabs: merged.mobileTabs,
         search_placeholder: merged.searchPlaceholder,
         desktop_nav_items: merged.desktopNavItems,
-        desktop_browse_eyebrow: merged.desktopBrowseEyebrow,
-        desktop_browse_heading: merged.desktopBrowseHeading,
-        desktop_davening_eyebrow: merged.desktopDaveningEyebrow,
-        desktop_davening_heading: merged.desktopDaveningHeading,
         desktop_listings_eyebrow: merged.desktopListingsEyebrow,
         desktop_listings_heading: merged.desktopListingsHeading,
-        desktop_map_eyebrow: merged.desktopMapEyebrow,
-        desktop_map_heading: merged.desktopMapHeading,
         desktop_subscribe_eyebrow: merged.desktopSubscribeEyebrow,
         desktop_subscribe_heading: merged.desktopSubscribeHeading,
         desktop_jewish_times_heading: merged.desktopJewishTimesHeading,
@@ -286,6 +290,6 @@ export async function updateSiteSettings(
  *  067 (supabase/migrations/20240101000067_today_home.sql). */
 export class MissingTodayColumnsError extends Error {
   constructor() {
-    super('The home page style needs the database update in migration 067 (today_home) first.')
+    super('The home page style isn’t set up on this site yet.')
   }
 }

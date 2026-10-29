@@ -48,6 +48,20 @@ describe('withReviewEdits', () => {
     expect(out).toBe(sent)
   })
 
+  // The user, Oct 28: a place picked in the queue's address links the
+  // listing, as an Add's pick does.
+  it('takes a place the admin picked in the address, with what Google filled and its status', () => {
+    const autofill = { name: 'Trader Joe’s', phone: '(215) 555-0100' }
+    const out = edit({ details: { placeId: 'store', businessStatus: 'CLOSED_TEMPORARILY', googleAutofill: autofill } })!
+    expect(out.details).toMatchObject({ placeId: 'store', businessStatus: 'CLOSED_TEMPORARILY', googleAutofill: autofill })
+    expect(out).toMatchObject({ reviewEdit: { fields: ['placeId'], asSent: { placeId: 'abc' } } })
+    // A status Google never gives isn't taken, and the sent one goes with the old place.
+    expect(edit({ details: { placeId: 'store', businessStatus: 'GONE', googleAutofill: autofill } })!.details.businessStatus).toBeUndefined()
+    // Nor is a fill record carrying anything but Google's strings.
+    expect(edit({ details: { placeId: 'store', googleAutofill: { name: 'x', secret: 'y' } } })).toBe(sent)
+    expect(edit({ details: { placeId: 'store', googleAutofill: { name: 1 } } })).toBe(sent)
+  })
+
   it('takes a field’s companion keys: a store’s “sometimes” items and a shul’s schedules', () => {
     expect(edit({ details: { items_sometimes: ['Wine'] } })!.details.items_sometimes).toEqual(['Wine'])
     expect(edit({ details: { minyanim_schedules: [{ name: 'Sukkos' }] } })!.details.minyanim_schedules).toEqual([{ name: 'Sukkos' }])

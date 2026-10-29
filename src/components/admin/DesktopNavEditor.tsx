@@ -96,14 +96,7 @@ export default function DesktopNavEditor({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-      <p className="text-[11px] text-muted">
-        The header&rsquo;s top nav, desktop only. Rename any item; add a link straight to a category
-        or page, or a dropdown that holds a few links of its own (like the default &ldquo;More&rdquo;
-        menu). The Categories item is the one fixed built-in — it always opens the mega-menu set by
-        Home page sections (Site tab), so it has no destination to pick.
-      </p>
-
+    <div className="p-4 space-y-3">
       {items.length === 0 && (
         <p className="text-xs text-red-600">The nav needs at least one item — add one below, or the header goes blank.</p>
       )}
@@ -165,7 +158,7 @@ export default function DesktopNavEditor({
                 )}
 
                 {item.kind === 'categories-menu' && (
-                  <p className="text-[11px] text-muted">Opens the category mega-menu (Home page sections, Site tab).</p>
+                  <p className="text-[11px] text-muted">A menu of every category</p>
                 )}
 
                 {item.kind === 'more-menu' && (

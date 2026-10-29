@@ -11,7 +11,7 @@ import SuperAdminNav from '@/components/admin/SuperAdminNav'
 // of any one community's admin_email — see AdminAuthGate's own doc and
 // /api/admin/whoami's community-omitted branch.
 //
-// SuperAdminNav (not AdminNav, the per-community tab bar) — this and
+// SuperAdminNav (not AdminFrame, the per-community console's nav) — this and
 // /admin/pages are the only two genuinely-cross-community screens. A third
 // one gets added to superAdminTabs() and gets its own sibling route here,
 // same pattern.

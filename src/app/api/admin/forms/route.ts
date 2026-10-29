@@ -49,8 +49,6 @@ export async function POST(request: Request) {
       successMessage: body.successMessage ?? 'Thanks — we’ll be in touch.',
       steps: body.steps ?? [],
       icon: body.icon,
-      cardImageUrl: body.cardImageUrl,
-      cardTextColor: body.cardTextColor,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

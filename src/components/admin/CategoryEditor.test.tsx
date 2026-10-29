@@ -19,6 +19,13 @@ import type { CategoryConfig } from '@/lib/categories'
 // does, out of scope here — see the memory note on the provider-harness gap.
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn() }))
+// The page beside the settings: the draft it's given, not the page itself
+// (that needs the whole site's providers).
+vi.mock('./CategoryPreview', () => ({
+  default: ({ category, inline }: { category: CategoryConfig; inline?: boolean }) => (
+    <p data-testid={inline ? 'preview-beside' : 'preview'}>{category.pluralLabel}</p>
+  ),
+}))
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/test-community',
@@ -42,16 +49,40 @@ beforeEach(() => {
   vi.mocked(fetchJson).mockResolvedValue({ ok: true })
 })
 
+/** Saves through the Save bar, which shows once something changed: when
+ *  nothing has, a word added to the link-preview line is the change. */
+async function saveNow(user: ReturnType<typeof userEvent.setup>) {
+  if (!screen.queryByRole('button', { name: 'Save' })) await user.type(screen.getByLabelText('In link previews'), ' x')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+}
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
 })
 
 describe('CategoryEditor — new category', () => {
-  it('shows "New category" and offers templates', () => {
+  it('shows "New category" and asks what kind of places it holds', () => {
     renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByText('New category')).toBeInTheDocument()
-    expect(screen.getByText(CATEGORY_TEMPLATES[0]!.label)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New category' })).toBeInTheDocument()
+    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual([
+      'ShulsDavening times, every weekday and Shabbos',
+      'FoodMenus, kosher lists and main dishes',
+      'GroceriesKosher items and hours',
+      'MikvahsHours, appointments and keilim',
+      'HotelsShabbos-friendly stays and shuttles',
+      'HospitalsChaplains, Shabbos rooms and kosher food',
+      'PlainA list of places, with the fields you choose',
+    ])
+  })
+
+  it('won’t create one until a kind is picked', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await user.type(screen.getByLabelText('Name'), 'Pharmacies')
+    await user.click(screen.getByRole('button', { name: /create category/i }))
+    expect(screen.getByText('Pick what kind of places it holds.')).toBeInTheDocument()
+    expect(fetchJson).not.toHaveBeenCalled()
   })
 
   it('blocks save without a name', async () => {
@@ -69,10 +100,13 @@ describe('CategoryEditor — new category', () => {
     const user = userEvent.setup()
     renderWithProviders(<CategoryEditor token="tok" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.type(screen.getByLabelText(/^name \*/i), 'Pharmacies')
+    await user.click(screen.getByRole('radio', { name: /^Plain/ }))
+    await user.type(screen.getByLabelText('Name'), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('pharmacies'))
+    // Plain is what the slug gives, so no kind is sent.
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)).not.toHaveProperty('placeKind')
     expect(fetchJson).toHaveBeenCalledWith(
       '/api/admin/categories?community=test-community',
       expect.objectContaining({
@@ -83,13 +117,32 @@ describe('CategoryEditor — new category', () => {
     )
   })
 
-  it('applies a template\'s fields and name when none are set yet', async () => {
+  it('brings a kind’s fields and name, and Plain puts them back', async () => {
     const user = userEvent.setup()
+    const shul = CATEGORY_TEMPLATES.find((t) => t.id === 'synagogue')!
     renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByText(CATEGORY_TEMPLATES[0]!.label))
+    await user.click(screen.getByRole('radio', { name: /^Shuls/ }))
 
-    expect(screen.getByLabelText(/^name \*/i)).toHaveValue(CATEGORY_TEMPLATES[0]!.pluralLabel)
+    expect(screen.getByRole('radio', { name: /^Shuls/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByLabelText('Name')).toHaveValue(shul.pluralLabel)
+    expect(screen.getByLabelText('Web address')).toHaveValue(shul.pluralLabel.toLowerCase())
+    expect(screen.getByRole('button', { name: /^Davening Times/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('radio', { name: /^Plain/ }))
+    expect(screen.getByLabelText('Name')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: /^Davening Times/ })).not.toBeInTheDocument()
+  })
+
+  it('sends a kind its web address doesn’t already give', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('radio', { name: /^Food/ }))
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'Eat')
+    await user.click(screen.getByRole('button', { name: /create category/i }))
+    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)).toMatchObject({ id: 'eat', placeKind: 'food' })
   })
 
   it('shows a save-failure error and does not call onSaved', async () => {
@@ -98,7 +151,8 @@ describe('CategoryEditor — new category', () => {
     const user = userEvent.setup()
     renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.type(screen.getByLabelText(/^name \*/i), 'Pharmacies')
+    await user.click(screen.getByRole('radio', { name: /^Plain/ }))
+    await user.type(screen.getByLabelText('Name'), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
     expect(await screen.findByText('Name already in use.')).toBeInTheDocument()
@@ -132,7 +186,72 @@ describe('CategoryEditor — editing an existing category', () => {
         onCancel={vi.fn()}
       />,
     )
-    expect(screen.getByText('Edit “Groceries”')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+    // Its kind, from its web address.
+    expect(within(screen.getByRole('region', { name: 'Kind' })).getByText('Groceries')).toBeInTheDocument()
+  })
+
+  it('has nothing to save until something changes, then counts it, and Undo puts it back', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Name'), ' and more')
+    await user.click(screen.getByLabelText('An address'))
+    expect(within(screen.getByRole('region', { name: 'Save' })).getByText('2 changes')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByLabelText('Name')).toHaveValue('Groceries')
+    expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
+  })
+
+  it('takes it off the site with the switch', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    const onSite = screen.getByRole('switch', { name: 'On the site' })
+    expect(onSite).toHaveAttribute('aria-checked', 'true')
+    await user.click(onSite)
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('grocery'))
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).active).toBe(false)
+  })
+
+  it('opens each field to its own screen, and back', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <CategoryEditor
+        token="t"
+        initial={baseCategory({ detailFields: [{ key: 'kosher', label: 'Kosher certification', type: 'select', renderAs: 'badge', options: [{ value: 'OU', label: 'OU' }] }] })}
+        siblings={null}
+        hasMapCategory={false}
+        onSaved={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+    const row = screen.getByRole('button', { name: /^Kosher certification/ })
+    expect(row).toHaveTextContent('Filter · on the row')
+    await user.click(row)
+    expect(screen.getByRole('heading', { name: 'Kosher certification' })).toBeInTheDocument()
+    expect(screen.getByText('A field on Groceries')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Name and look' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '‹ Groceries' }))
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Name and look' })).toBeInTheDocument())
+  })
+
+  it('shows the page beside the settings, as they are being typed', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const preview = screen.getByRole('complementary', { name: 'Preview' })
+    expect(within(preview).getByRole('button', { name: 'Computer' })).toHaveAttribute('aria-pressed', 'true')
+    await user.type(screen.getByLabelText('Name'), ' and more')
+    // Drawn into the preview's own frame.
+    const frame = preview.querySelector('iframe')!
+    await waitFor(() => expect(frame.contentDocument!.body).toHaveTextContent('Groceries and more'))
+    // The page opens full size; Computer and Phone stay buttons of their
+    // own, never inside it (a button in a button doesn't hydrate).
+    const open = within(preview).getByRole('button', { name: 'Open the preview' })
+    expect(within(open).queryAllByRole('button')).toEqual([])
+    await user.click(open)
+    expect(screen.getByTestId('preview')).toHaveTextContent('Groceries and more')
   })
 
   it('saves via PATCH with no confirmation step when nothing destructive changed', async () => {
@@ -142,7 +261,7 @@ describe('CategoryEditor — editing an existing category', () => {
       <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(fetchJson).toHaveBeenCalledWith(
@@ -166,7 +285,7 @@ describe('CategoryEditor — editing an existing category', () => {
       )
 
       await user.click(screen.getByLabelText('An address'))
-      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await saveNow(user)
 
       expect(await screen.findByText('This will permanently clear data from existing listings')).toBeInTheDocument()
       expect(screen.getByText(/Address — 3 listings/)).toBeInTheDocument()
@@ -187,7 +306,7 @@ describe('CategoryEditor — editing an existing category', () => {
       )
 
       await user.click(screen.getByLabelText('An address'))
-      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await saveNow(user)
 
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
       expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
@@ -204,7 +323,7 @@ describe('CategoryEditor — editing an existing category', () => {
       )
 
       await user.click(screen.getByLabelText('An address'))
-      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await saveNow(user)
       await screen.findByText('This will permanently clear data from existing listings')
 
       await user.click(screen.getByRole('button', { name: /clear and save/i }))
@@ -224,7 +343,7 @@ describe('CategoryEditor — editing an existing category', () => {
       )
 
       await user.click(screen.getByLabelText('An address'))
-      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await saveNow(user)
       await screen.findByText('This will permanently clear data from existing listings')
 
       await user.click(screen.getByRole('button', { name: /^cancel$/i }))
@@ -264,11 +383,12 @@ describe('CategoryEditor — editing an existing category', () => {
         />,
       )
 
+      await user.click(screen.getByRole('button', { name: /^Type/ }))
       const optionsBox = screen.getByLabelText(/choices/i)
       await user.clear(optionsBox)
       await user.type(optionsBox, 'Glatt Kosher')
       await user.tab()
-      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await saveNow(user)
 
       expect(await screen.findByText('Update existing listings to match this rename?')).toBeInTheDocument()
       expect(fetchJson).toHaveBeenCalledWith(
@@ -295,11 +415,12 @@ describe('CategoryEditor — editing an existing category', () => {
         />,
       )
 
+      await user.click(screen.getByRole('button', { name: /^Type/ }))
       const optionsBox = screen.getByLabelText(/choices/i)
       await user.clear(optionsBox)
       await user.type(optionsBox, 'Glatt Kosher')
       await user.tab()
-      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await saveNow(user)
       await screen.findByText('Update existing listings to match this rename?')
 
       await user.click(screen.getByRole('button', { name: /save without updating/i }))
@@ -325,8 +446,9 @@ describe('pin colour', () => {
       <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
+    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
     await user.click(screen.getByRole('button', { name: '#b63167' }))
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     const call = vi.mocked(fetchJson).mock.calls.at(-1)!
@@ -347,8 +469,9 @@ describe('pin colour', () => {
       />,
     )
 
+    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
     await user.click(screen.getByRole('button', { name: 'Automatic' }))
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     const call = vi.mocked(fetchJson).mock.calls.at(-1)!
@@ -365,16 +488,23 @@ describe('CategoryEditor — pin colour clashes', () => {
     baseCategory({ id: 'shul', label: 'Synagogue', pluralLabel: 'Synagogues', pinColor: '#2c8c47' }),
   ]
 
-  it('labels a swatch another category already holds', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+  /** Renders the editor with its pin colours open. */
+  async function withPins(ui: React.ReactElement) {
+    const user = userEvent.setup()
+    renderWithProviders(ui)
+    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
+    return user
+  }
+
+  it('labels a swatch another category already holds', async () => {
+    await withPins(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByRole('button', { name: '#2c8c47 — already used by Synagogues' })).toBeInTheDocument()
     // A free one keeps the bare hex, so "taken" is what stands out.
     expect(screen.getByRole('button', { name: '#7a36bf' })).toBeInTheDocument()
   })
 
   it('warns after picking a colour that is already taken, and stops once a free one is picked', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const user = await withPins(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /^#2c8c47 —/ }))
     expect(screen.getByText(/Same colour as Synagogues/)).toBeInTheDocument()
@@ -383,9 +513,9 @@ describe('CategoryEditor — pin colour clashes', () => {
     expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
   })
 
-  it('never reports the category being edited as clashing with itself', () => {
+  it('never reports the category being edited as clashing with itself', async () => {
     const self = baseCategory({ pinColor: '#2657bf' })
-    renderWithProviders(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await withPins(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '#2657bf' })).toBeInTheDocument()
   })
@@ -419,12 +549,12 @@ describe('CategoryEditor — grouping the list', () => {
     const user = userEvent.setup()
     renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload())).not.toHaveProperty('groupBy')
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Group the list' }), 'field:denomination')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
     expect(JSON.parse(payload()).groupBy).toEqual({ kind: 'field', key: 'denomination' })
   })
@@ -438,7 +568,7 @@ describe('CategoryEditor — grouping the list', () => {
     const select = screen.getByRole('combobox', { name: 'Group the list' })
     expect(select).toHaveValue('open')
     await user.selectOptions(select, '')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload()).groupBy).toBeNull()
   })
@@ -482,12 +612,12 @@ describe('CategoryEditor — the question card', () => {
     const user = userEvent.setup()
     renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload())).not.toHaveProperty('questionCard')
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Question card' }), 'field:t')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
     expect(JSON.parse(payload()).questionCard).toEqual({ kind: 'field', key: 't' })
   })
@@ -501,7 +631,7 @@ describe('CategoryEditor — the question card', () => {
     const select = screen.getByRole('combobox', { name: 'Question card' })
     expect(select).toHaveValue('confirm')
     await user.selectOptions(select, '')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload()).questionCard).toBeNull()
   })
@@ -527,7 +657,7 @@ describe('CategoryEditor — places within a walk', () => {
   const editor = (initial: typeof hotels | null, onSaved = vi.fn()) =>
     renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={siblings} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
   const save = async (user: ReturnType<typeof userEvent.setup>, onSaved: ReturnType<typeof vi.fn>, times: number) => {
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(times))
     return JSON.parse(payload())
   }
@@ -606,7 +736,7 @@ describe('CategoryEditor — on each listing', () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     editor(hospitals, onSaved)
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload())).not.toHaveProperty('listingParts')
 
@@ -624,7 +754,7 @@ describe('CategoryEditor — on each listing', () => {
     await user.click(shabbosFields.getByRole('checkbox', { name: 'Kosher food inside' }))
     // No Set as my location switch: every listing with an address has it (Oct 10).
     expect(within(section).queryByRole('checkbox', { name: /Set as my location/ })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
     expect(JSON.parse(payload()).listingParts).toEqual({
       main: { title: 'Who to call first', fields: ['who', 'who_phone'] },
@@ -664,7 +794,7 @@ describe('CategoryEditor — on each listing', () => {
     await user.click(within(section).getByRole('checkbox', { name: /This Shabbos/ }))
     await user.click(within(within(section).getByRole('group', { name: 'Fields on the Shabbos card' })).getByRole('checkbox', { name: 'Eruv' }))
     await user.selectOptions(within(section).getByRole('combobox', { name: 'Where it goes the rest of the week' }), 'After “Who to call”')
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload()).listingParts).toEqual({
       boxes: [
@@ -683,7 +813,7 @@ describe('CategoryEditor — on each listing', () => {
     const box = within(section).getByRole('checkbox', { name: /This Shabbos/ })
     expect(box).toBeChecked()
     await user.click(box)
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload()).listingParts).toBeNull()
   })

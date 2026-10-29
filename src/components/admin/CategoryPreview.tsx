@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
@@ -50,10 +50,18 @@ type Action =
 export default function CategoryPreview({
   category,
   onClose,
+  inline = false,
+  onListings,
 }: {
   /** The draft, packaged as a full CategoryConfig — never saved. */
   category: CategoryConfig
   onClose: () => void
+  /** Just the page, without the full-screen frame: the small preview
+   *  beside the category editor (board 6b) draws it into its own frame. */
+  inline?: boolean
+  /** How many places the category has, once loaded: the editor's
+   *  "N places". */
+  onListings?: (count: number) => void
 }) {
   const [realListings, setRealListings] = useState<DirectoryResource[] | null>(null)
   // Listings added/edited during this preview session — client-only, never
@@ -75,6 +83,12 @@ export default function CategoryPreview({
   // sessions never open it, and this is the whole site's listings, not just
   // this one category's.
   const [mapListings, setMapListings] = useState<DirectoryResource[] | null>(null)
+  // Read when the listings arrive, so a new callback each render doesn't
+  // fetch them again.
+  const onListingsRef = useRef(onListings)
+  useEffect(() => {
+    onListingsRef.current = onListings
+  })
 
   useEffect(() => {
     if (action?.mode !== 'map' || mapListings !== null) return
@@ -99,7 +113,11 @@ export default function CategoryPreview({
     fetch(`/api/resources?category=${encodeURIComponent(category.id)}`)
       .then(async (res) => {
         const body = await res.json()
-        if (!cancelled) setRealListings(res.ok && body.ok ? (body.resources as DirectoryResource[]) : [])
+        const listings = res.ok && body.ok ? (body.resources as DirectoryResource[]) : []
+        if (!cancelled) {
+          setRealListings(listings)
+          onListingsRef.current?.(listings.length)
+        }
       })
       .catch(() => {
         if (!cancelled) setRealListings([])
@@ -189,8 +207,8 @@ export default function CategoryPreview({
     )
   }
 
-  return (
-    <DevicePreviewFrame onClose={onClose}>
+  const page = (
+    <>
       {/* The draft category, standing in for its saved row for everything
           below. Colour and icon are resolved from the shared categories list
           (getCategoryColor) by the map's pins/chips and by every listing
@@ -224,8 +242,9 @@ export default function CategoryPreview({
           </PinnedProvider>
         </PreviewSendProvider>
       </PreviewCategoryProvider>
-    </DevicePreviewFrame>
+    </>
   )
+  return inline ? page : <DevicePreviewFrame onClose={onClose}>{page}</DevicePreviewFrame>
 }
 
 // Mirrors ResourceLoader's distance annotation — straight-line miles from the

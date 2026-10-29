@@ -98,11 +98,19 @@ describe('listCategoriesUncached', () => {
       capabilities: { add: false, edit: true, report: true, directorySearch: true, map: false },
       externalLink: { label: 'Website', url: 'https://example.com' },
       cardImageUrl: 'https://example.com/card.png',
-      cardTextColor: '#fff',
       iconImageUrl: null,
       mapZoomRadiusMiles: null,
       active: true,
+      // No place_kind saved: the kind comes from the slug.
+      placeKind: 'shuls',
     })
+  })
+
+  it('reads a saved kind over the one the slug implies', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, place_kind: 'plain' }], error: null }))
+    expect((await listCategoriesUncached('philly'))[0].placeKind).toBe('plain')
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, place_kind: 'nonsense' }], error: null }))
+    expect((await listCategoriesUncached('philly'))[0].placeKind).toBe('shuls')
   })
 
   it('defaults hasAddress/hasPhone to true and externalLink to null when their columns are missing/partial', async () => {
@@ -653,5 +661,33 @@ describe('renameCategoryId', () => {
       'Failed to rename category: category locked',
     )
     expect(resourceUpdateCalled).toBe(false)
+  })
+})
+
+// Before migration 088 a kind the web address doesn't say can't be stored;
+// the admin is told which address keeps it, not the database's words
+// (found walking a new community through its setup, Oct 29).
+describe('a kind before place_kind exists', () => {
+  const missing = { code: 'PGRST204', message: "Could not find the 'place_kind' column of 'category' in the schema cache" }
+
+  it('creating says which web address keeps the kind', async () => {
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? chainable({ data: null, error: null }) : chainable({ data: null, error: missing })
+    })
+    await expect(createCategory('riverton', { label: 'Food Establishments', placeKind: 'food' })).rejects.toThrow(
+      'Food can’t be saved with this web address yet. A web address of “food” keeps it.',
+    )
+  })
+
+  it('changing it says the same', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: missing }))
+    await expect(updateCategory('riverton', 'places-to-pray', { placeKind: 'shuls' })).rejects.toThrow('A web address of “shuls” keeps it.')
+  })
+
+  it('a kind’s own name is an address that says it', async () => {
+    const { placeKindFromSlug, PLACE_KIND_INFO } = await import('./placeKinds')
+    for (const kind of Object.keys(PLACE_KIND_INFO).filter((k) => k !== 'plain')) expect(placeKindFromSlug(kind)).toBe(kind)
   })
 })

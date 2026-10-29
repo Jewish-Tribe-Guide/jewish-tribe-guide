@@ -134,7 +134,7 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   if (process.env.VERCEL_ENV === 'production') {
     return Response.json(
-      { ok: false, errors: ['Deleting a community is not available in production.'] },
+      { ok: false, errors: ['Communities can’t be deleted on the live site.'] },
       { status: 403 },
     )
   }

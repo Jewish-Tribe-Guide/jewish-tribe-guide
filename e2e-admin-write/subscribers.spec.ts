@@ -45,8 +45,10 @@ test('the Subscribers section lists a real subscriber, and Remove deletes it for
   })
   expect(insertError).toBeNull()
 
-  await page.goto('/philly/admin/desktop')
-  await page.getByRole('button', { name: /^Show Subscribers$/ }).click()
+  // Subscribers open inside the home page's email sign-up card (admin
+  // redesign, board 7), whose row is named by its heading.
+  await page.goto('/philly/admin/home')
+  await page.getByRole('button').filter({ hasText: 'Email sign-up' }).click()
 
   // A table row now (see SubscriberManager.tsx's own comment — matches
   // CommunityManager's Admins roster shape), not a bare div.

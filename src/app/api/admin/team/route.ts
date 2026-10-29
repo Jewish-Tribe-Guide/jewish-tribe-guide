@@ -1,6 +1,7 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import {
   addCommunityAdminEmail,
+  removeCommunityAdminEmail,
   communitySlugFromRequest,
   getAdminNotifyPreference,
   getAdminReviewNotifyPreference,
@@ -76,11 +77,7 @@ export async function PATCH(request: Request) {
 
 // POST /api/admin/team  body: { email }
 // Adds one email to this community's admin allowlist. Same auth as GET —
-// any of this community's own admins can grow their own team — but this is
-// deliberately add-only (see addCommunityAdminEmail's own comment): there
-// is no DELETE here. Removing someone is a superadmin-only action, from the
-// full-list edit panel on /admin's Communities tab, so one admin can't lock
-// another out (or themselves) via this endpoint.
+// any of this community's own admins can grow their own team.
 export async function POST(request: Request) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const admin = await getAdminUserForCommunity(request, community.slug)
@@ -107,5 +104,37 @@ export async function POST(request: Request) {
     console.error('[admin/team] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not add that email.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
+  }
+}
+
+// DELETE /api/admin/team  body: { email }
+// Takes one email off this community's admin allowlist (the admin redesign's
+// step 5: Team has one list, add and remove, in place of the site owner's
+// Communities tab). Same auth as GET. Never the caller's own address: no one
+// can lock themselves out by mistake, and the last admin can't leave the
+// list empty.
+export async function DELETE(request: Request) {
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
+  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+
+  let body: { email?: unknown }
+  try {
+    body = (await request.json()) as { email?: unknown }
+  } catch {
+    return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
+  }
+  const email = typeof body.email === 'string' ? body.email.trim() : ''
+  if (!email) return Response.json({ ok: false, errors: ['An email is required.'] }, { status: 400 })
+  if (email.toLowerCase() === admin.email.trim().toLowerCase()) {
+    return Response.json({ ok: false, errors: ['You can’t remove yourself.'] }, { status: 400 })
+  }
+
+  try {
+    const adminEmails = await removeCommunityAdminEmail(community.slug, email)
+    return Response.json({ ok: true, adminEmails })
+  } catch (err) {
+    console.error('[admin/team] DELETE failed:', err)
+    return Response.json({ ok: false, errors: ['Could not remove that admin.'] }, { status: 502 })
   }
 }

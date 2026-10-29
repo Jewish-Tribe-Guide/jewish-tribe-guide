@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countGoogleKinds, countWatchKinds, kindBad, lastNight, lastNightLine, missedLastNight, nightKindOf, nightKinds, type GoogleLive, type NightKindView } from './nightKinds'
+import { countGoogleKinds, countWatchKinds, kindBad, lastNight, lastNightLine, missedLastNight, newsletterLines, nightKindOf, nightKinds, type GoogleLive, type NightKindView } from './nightKinds'
 import type { JobRun } from './jobRuns'
 import type { Watch } from './watches'
 import type { LinkStanding } from './linkCheck'
@@ -429,20 +429,35 @@ describe('Newsletters', () => {
       // Not a shul: its emails are skipped, nothing is tracked.
       news('e', { createdBy: 'shul newsletters: not a shul', resourceId: null }),
     ])
-    expect(v).toMatchObject({ when: null, count: '4 newsletters · last email Oct 24', trouble: '1 to link · 1 quiet for a month · 1 couldn’t be read', nights: [] })
+    expect(v).toMatchObject({ when: null, count: '4 newsletters · last in Oct 24', trouble: '1 to link · 1 quiet for a month · 1 couldn’t be read', nights: [] })
     expect(v.tracked).toEqual([
-      { name: 'BZBI', status: 'No email since Sep 20', bad: true, page: at('shul-b') },
+      { name: 'BZBI', status: 'Nothing in since Sep 20', bad: true, page: at('shul-b') },
       { name: 'd@shul.org', status: 'Not linked to a shul', bad: true, page: '' },
       { name: 'Kol Tzedek', status: 'Couldn’t read the last one', bad: true, page: at('shul-c') },
-      { name: 'Beth Am', status: 'Email Oct 24', bad: false, page: at('shul-a') },
+      { name: 'Beth Am', status: 'Last in Oct 24', bad: false, page: at('shul-a') },
     ])
-    expect(v.misses.find((m) => m.link)).toEqual({ name: 'd@shul.org', why: 'Not linked to a shul', page: '', link: 'd' })
+    expect(v.misses.find((m) => m.why === 'Not linked to a shul')).toEqual({ name: 'd@shul.org', why: 'Not linked to a shul', page: '' })
     expect(v.misses).toHaveLength(3)
+  })
+
+  // The Newsletters page (Oct 29, drawing 18b): each with its address,
+  // its watch for linking one to its shul.
+  it('lists each for the Newsletters page with its address and watch', () => {
+    const lines = newsletterLines([news('a', { pageChangedAt: night(WATCHES_AT, 1) }), news('d', { resourceId: null, active: false })], {
+      readsOf: () => null,
+      nameOf: (id) => (id === 'shul-a' ? 'Beth Am' : null),
+      siteGap: () => null,
+      placePage: at,
+    })
+    expect(lines).toEqual([
+      { watchId: 'd', email: 'd@shul.org', shul: null, status: 'Not linked to a shul', bad: true, page: '' },
+      { watchId: 'a', email: 'a@shul.org', shul: 'Beth Am', status: 'Last in Oct 24', bad: false, page: at('shul-a') },
+    ])
   })
 
   it('none yet, and all well', () => {
     expect(view([])).toMatchObject({ count: 'None yet', trouble: null, tracked: [] })
-    expect(view([news('a', { pageChangedAt: null })])).toMatchObject({ count: '1 newsletter', trouble: null, tracked: [{ status: 'No email yet' }] })
+    expect(view([news('a', { pageChangedAt: null })])).toMatchObject({ count: '1 newsletter', trouble: null, tracked: [{ status: 'Nothing in yet' }] })
   })
 })
 

@@ -337,4 +337,12 @@ test.describe('URLs', () => {
     expect(res.status()).toBe(307)
     expect(res.headers()['location']).toBe('/philly/admin/categories')
   })
+
+  // Read questions became part of To do's searches (Oct 29); what's left of
+  // it, the taught words, is on Searches.
+  test('the old admin Read questions tab goes to Searches', async ({ request }) => {
+    const res = await request.get('/philly/admin/questions', { maxRedirects: 0 })
+    expect(res.status()).toBe(307)
+    expect(res.headers()['location']).toBe('/philly/admin/searches')
+  })
 })

@@ -1,15 +1,9 @@
 'use client'
 
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
-import MetricsPanel from '@/components/admin/MetricsPanel'
+import ReportsPanel from '@/components/admin/ReportsPanel'
 
-export default function AdminMetricsPage() {
+export default function AdminReportsPage() {
   const session = useAdminSession()
-  return (
-    <div>
-      <AdminNav />
-      <MetricsPanel token={session.access_token} />
-    </div>
-  )
+  return <ReportsPanel token={session.access_token} />
 }

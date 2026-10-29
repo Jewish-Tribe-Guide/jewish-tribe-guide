@@ -1,7 +1,6 @@
 'use client'
 
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import ModerationQueue from '@/components/admin/ModerationQueue'
 
 // The default admin screen — moderation queue, mounted at /admin itself
@@ -13,7 +12,6 @@ export default function AdminPage() {
   const session = useAdminSession()
   return (
     <div>
-      <AdminNav />
       <ModerationQueue session={session} />
     </div>
   )

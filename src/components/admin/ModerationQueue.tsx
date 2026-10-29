@@ -1,25 +1,25 @@
 'use client'
 
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
-import type { EnrichedSubmission, ResourceSubmission } from '@/types'
+import { fetchJson } from '@/lib/fetchJson'
+import type { ResourceSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { splitSubmissions } from '@/lib/todo'
+import { updateTodo, useTodo } from '@/lib/useTodo'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
+import TodoList from './TodoList'
 
-// The admin's default screen (mounted at /admin itself) — review and
-// approve/reject every pending submission: new listings, edits to existing
-// ones, removal reports, and brand-new categories suggested from the public
-// "Suggest a category" flow.
-//
-// Clicking a card opens it (SubmissionReview): the original beside a form
-// the admin can fix before approving. The open card is in the address
-// (?open=<id>), so Back returns to the list and the link can be shared
-// with another admin.
+// The admin's front page, To do (mounted at /<community>/admin itself):
+// the one list of what's waiting (TodoList), and each suggestion opened to
+// be decided. New listings and edits open to the original beside a form
+// the admin can fix before approving (SubmissionReview); a removal, an
+// eruv fix or a new category opens to its card. The open one is in the
+// address (?open=<id>), so Back returns to the list and the link can be
+// shared with another admin.
 
 const OPENED = 'moderation-open'
 
@@ -60,37 +60,20 @@ function goTo(openId: string | null) {
 
 export default function ModerationQueue({ session }: { session: Session }) {
   const community = useCommunitySlug()
-  const [items, setItems] = useState<EnrichedSubmission[] | null>(null)
+  const token = session.access_token
+  // Loaded afresh each time To do opens; the nav's count reads the same copy.
+  const { data, error: loadError } = useTodo(token, community, session.user.email, true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const openId = useSyncExternalStore(subscribeToAddress, openIdNow, () => null)
   const [openError, setOpenError] = useState<string | null>(null)
-  const token = session.access_token
   // Same categories the public site and the category admin editor read —
   // loaded fresh per admin page request (see /admin/layout.tsx's
   // ContentProvider), so a field added a minute ago already has a `label`
   // here without this component needing its own fetch or any per-field code.
   const categoriesById = new Map(useCategories().map((c) => [c.id, c]))
-
-  const load = useCallback(async () => {
-    setError(null)
-    try {
-      const res = await fetch(withCommunity('/api/admin/submissions', community), {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.status === 401) {
-        setError(`Signed in as ${session.user.email}, but this account is not an authorized admin.`)
-        setItems([])
-        return
-      }
-      const body = await parseOkJson<{ submissions: EnrichedSubmission[] }>(res, 'Failed to load.')
-      setItems(body.submissions)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
-    }
-  }, [token, session.user.email, community])
-
-  useLoadOnMount(load)
+  // In the order the list shows them: new places, then changes.
+  const items = data ? Object.values(splitSubmissions(data.submissions)).flat() : null
 
   function open(id: string) {
     setOpenError(null)
@@ -115,7 +98,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
         },
         'Failed to update.',
       )
-      setItems((prev) => (prev ? prev.filter((s) => s.id !== id) : prev))
+      updateTodo((d) => ({ ...d, submissions: d.submissions.filter((s) => s.id !== id) }))
       if (openId === id) backToList()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.'
@@ -128,46 +111,55 @@ export default function ModerationQueue({ session }: { session: Session }) {
     }
   }
 
-  const opened = openId ? items?.find((s) => s.id === openId) : undefined
+  const at = openId && items ? items.findIndex((s) => s.id === openId) : -1
+  const opened = at >= 0 ? items![at] : undefined
   if (opened) {
+    const next = items![at + 1]
     const categoryId = (opened.payload as Partial<ResourceSubmission>).category ?? opened.current?.category
+    const reviewable = opened.target_type === 'listing' && opened.operation !== 'delete'
     return (
-      <SubmissionReview
-        key={opened.id}
-        submission={opened}
-        category={categoryId ? categoriesById.get(categoryId) : undefined}
-        waiting={items?.length ?? 0}
-        busy={busyId === opened.id}
-        error={openError}
-        onBack={backToList}
-        onModerate={moderate}
-      />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={backToList} className="flex-1 text-left min-h-11 text-sm font-semibold text-primary cursor-pointer">
+            ‹ To do
+          </button>
+          <span className="text-[13.5px] text-slate-600">
+            {at + 1} of {items!.length}
+          </span>
+          {next && (
+            <button type="button" onClick={() => open(next.id)} className="min-h-11 text-sm font-semibold text-primary cursor-pointer">
+              Next ›
+            </button>
+          )}
+        </div>
+        {reviewable ? (
+          <SubmissionReview
+            key={opened.id}
+            submission={opened}
+            category={categoryId ? categoriesById.get(categoryId) : undefined}
+            busy={busyId === opened.id}
+            error={openError}
+            onModerate={moderate}
+          />
+        ) : (
+          <>
+            <SubmissionCard key={opened.id} submission={opened} busy={busyId === opened.id} onModerate={moderate} categoriesById={categoriesById} />
+            {openError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{openError}</p>}
+          </>
+        )}
+      </div>
     )
   }
 
   return (
     <div>
-      {error && (
-        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
+      {(loadError || error) && (
+        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{loadError || error}</p>
       )}
-
-      {items === null ? (
+      {data === null ? (
         <p className="text-sm text-muted">Loading submissions…</p>
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted">🎉 Nothing pending — the queue is clear.</p>
       ) : (
-        <div className="space-y-3">
-          {items.map((s) => (
-            <SubmissionCard
-              key={s.id}
-              submission={s}
-              busy={busyId === s.id}
-              onModerate={moderate}
-              categoriesById={categoriesById}
-              onOpen={() => open(s.id)}
-            />
-          ))}
-        </div>
+        !loadError && <TodoList data={data} token={token} categoriesById={categoriesById} onOpen={open} />
       )}
     </div>
   )

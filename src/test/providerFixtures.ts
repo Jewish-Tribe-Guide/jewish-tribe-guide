@@ -27,7 +27,6 @@ export function makeCommunity(overrides: Partial<Community> = {}): Community {
     slug: 'test-community',
     name: 'Test Community',
     shortName: 'Test',
-    tagline: 'A test community',
     mission: '',
     manifestDescription: '',
     region: 'Test Region',

@@ -2,13 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The door the guide's Gmail script knocks on: its own secret, a real
 // community, and what became of the email in the answer.
-const m = vi.hoisted(() => ({ receiveNewsletter: vi.fn(), newsletterSenders: vi.fn(), listCommunities: vi.fn(), receiveEruvEmail: vi.fn() }))
+const m = vi.hoisted(() => ({
+  receiveNewsletter: vi.fn(),
+  newsletterSenders: vi.fn(),
+  listCommunities: vi.fn(),
+  receiveEruvEmail: vi.fn(),
+  communityOfNewsletterKey: vi.fn(),
+  recordNewsletterCheck: vi.fn(),
+}))
+vi.mock('@/lib/newsletterSetupStore', () => ({ communityOfNewsletterKey: m.communityOfNewsletterKey, recordNewsletterCheck: m.recordNewsletterCheck }))
 vi.mock('@/lib/eruvEmailRun', () => ({ receiveEruvEmail: m.receiveEruvEmail }))
 vi.mock('@/lib/newsletterRun', () => ({ receiveNewsletter: m.receiveNewsletter, newsletterSenders: m.newsletterSenders }))
 vi.mock('@/lib/communityStore', () => ({ listCommunities: m.listCommunities }))
 
 const { GET, POST } = await import('./route')
 const SECRET = 'a-long-test-secret'
+const RIVERTON_KEY = 'nl_riverton-own-key'
 const email = { community: 'philly', messageId: 'g1', from: 'Mekor <info@mekor.org>', subject: 'Shabbos', date: '2026-10-16T14:00:00Z', text: 'Mincha 6pm' }
 const req = (body: unknown, auth: string | null = `Bearer ${SECRET}`) =>
   new Request('http://x/api/inbound/newsletter', { method: 'POST', headers: auth ? { authorization: auth } : {}, body: JSON.stringify(body) })
@@ -17,24 +26,43 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv('NEWSLETTER_SECRET', SECRET)
   vi.stubEnv('OPENAI_API_KEY', 'k')
-  m.listCommunities.mockResolvedValue([{ slug: 'philly', name: 'Philadelphia', timezone: 'America/New_York' }])
   m.receiveEruvEmail.mockResolvedValue(null)
   m.receiveNewsletter.mockResolvedValue({ status: 'read', filed: 1 })
   m.newsletterSenders.mockResolvedValue(['info@mekor.org'])
+  m.listCommunities.mockResolvedValue([
+    { slug: 'philly', name: 'Philadelphia', timezone: 'America/New_York' },
+    { slug: 'riverton', name: 'Riverton', timezone: 'America/New_York' },
+  ])
+  // Each community's own key (migration 090): Riverton's alone here.
+  m.communityOfNewsletterKey.mockImplementation(async (key: string) => (key === RIVERTON_KEY ? 'riverton' : null))
+  m.recordNewsletterCheck.mockResolvedValue(undefined)
 })
 afterEach(() => vi.unstubAllEnvs())
 
 describe('POST /api/inbound/newsletter', () => {
-  it('is closed when no secret is set, and to anyone without it', async () => {
-    vi.stubEnv('NEWSLETTER_SECRET', '')
-    expect((await POST(req(email))).status).toBe(503)
-    vi.stubEnv('NEWSLETTER_SECRET', SECRET)
+  it('is closed to anyone without a key', async () => {
     expect((await POST(req(email, null))).status).toBe(401)
     expect((await POST(req(email, 'Bearer wrong'))).status).toBe(401)
     expect((await POST(req(email, `Bearer ${SECRET}x`))).status).toBe(401)
     // The same length, one letter off.
     expect((await POST(req(email, `Bearer ${SECRET.slice(0, -1)}X`))).status).toBe(401)
     expect(m.receiveNewsletter).not.toHaveBeenCalled()
+  })
+
+  // Oct 29: the console hands each community a script with its own key, so
+  // a community's admin never holds the key to every other community.
+  it('takes a community’s own key for that community alone', async () => {
+    expect((await POST(req({ ...email, community: 'riverton' }, `Bearer ${RIVERTON_KEY}`))).status).toBe(200)
+    expect(m.receiveNewsletter).toHaveBeenCalledWith('riverton', expect.anything(), expect.anything())
+    m.receiveNewsletter.mockClear()
+    expect((await POST(req(email, `Bearer ${RIVERTON_KEY}`))).status).toBe(401)
+    expect(m.receiveNewsletter).not.toHaveBeenCalled()
+  })
+
+  it('without NEWSLETTER_SECRET, only a community’s own key opens it', async () => {
+    vi.stubEnv('NEWSLETTER_SECRET', '')
+    expect((await POST(req(email))).status).toBe(401)
+    expect((await POST(req({ ...email, community: 'riverton' }, `Bearer ${RIVERTON_KEY}`))).status).toBe(200)
   })
 
   it('hands a real community’s email to the reader and says what became of it', async () => {
@@ -94,13 +122,24 @@ describe('GET /api/inbound/newsletter', () => {
   const get = (community: string, auth: string | null = `Bearer ${SECRET}`) =>
     new Request(`http://x/api/inbound/newsletter?community=${community}`, { headers: auth ? { authorization: auth } : {} })
 
-  it('is closed when no secret is set, and to anyone without it', async () => {
-    vi.stubEnv('NEWSLETTER_SECRET', '')
-    expect((await GET(get('philly'))).status).toBe(503)
-    vi.stubEnv('NEWSLETTER_SECRET', SECRET)
+  it('is closed to anyone without a key, and to another community’s', async () => {
     expect((await GET(get('philly', null))).status).toBe(401)
     expect((await GET(get('philly', 'Bearer wrong'))).status).toBe(401)
+    expect((await GET(get('philly', `Bearer ${RIVERTON_KEY}`))).status).toBe(401)
     expect(m.newsletterSenders).not.toHaveBeenCalled()
+    expect(m.recordNewsletterCheck).not.toHaveBeenCalled()
+  })
+
+  // Asked every hour, so the asking says the script is running: the
+  // Newsletters page's "Checking … every hour · Last checked 3:00 PM".
+  it('records that the script checked in, and the Gmail it runs in', async () => {
+    const withAccount = new Request('http://x/api/inbound/newsletter?community=riverton', {
+      headers: { authorization: `Bearer ${RIVERTON_KEY}`, 'x-guide-account': 'Riverton.Guide@gmail.com' },
+    })
+    expect(await (await GET(withAccount)).json()).toEqual({ ok: true, senders: ['info@mekor.org'] })
+    expect(m.recordNewsletterCheck).toHaveBeenCalledWith('riverton', 'riverton.guide@gmail.com')
+    await GET(get('philly'))
+    expect(m.recordNewsletterCheck).toHaveBeenLastCalledWith('philly', null)
   })
 
   it('names the community’s watched senders, uncached', async () => {

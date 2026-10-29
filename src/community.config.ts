@@ -26,8 +26,6 @@ export const community = {
    *  appleWebApp.title — and it is NOT the admin-editable site name, which is
    *  why renaming the site in the console left home screens still saying PJC. */
   shortName: 'Philly Guide',
-  /** Subtitle shown under the name in the header. */
-  tagline: 'Guide for residents, visitors, and patients',
   /** One-line mission — the hero subtitle, footer blurb, and <meta description>. */
   mission:
     'A guide to Jewish Philadelphia — community resources for residents, visitors, and hospital patients.',
@@ -125,7 +123,7 @@ export const community = {
 function validateCommunityConfig(c: typeof community): void {
   const errs: string[] = []
 
-  const required = ['name', 'shortName', 'tagline', 'mission', 'region', 'timezone'] as const
+  const required = ['name', 'shortName', 'mission', 'region', 'timezone'] as const
   for (const key of required) {
     if (!c[key] || !String(c[key]).trim()) errs.push(`\`${key}\` must be a non-empty string`)
   }

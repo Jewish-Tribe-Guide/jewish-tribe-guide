@@ -1,56 +1,62 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
-import DevicePreviewFrame from './DevicePreviewFrame'
-import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { adminBase } from '@/lib/adminNav'
 import HomeSectionManager from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
-import SubscriberManager from './SubscriberManager'
-import CollapsibleSection from './CollapsibleSection'
+import SitePreview from './SitePreview'
+import SaveBar, { useLeaveGuard } from './SaveBar'
+import { AdminBox, AdminField, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
-import {
-  DEFAULT_MOBILE_TABS,
-  DEFAULT_DESKTOP_NAV_ITEMS,
-  MAX_BEFORE_CANDLE_ITEMS,
-  TODAY_BLOCKS,
-} from '@/lib/siteSettings'
+import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/lib/siteSettings'
 
-// ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
-// single draft and Save button so switching tabs never silently drops a
-// half-finished edit (see SiteSettingsLayout, which mounts this once and
-// passes `section`). Site carries the branding shared by both devices (name,
-// mission, logo, search placeholder), the home-screen section grouping, and
-// the feedback form. Desktop carries the top nav, the home screen's cards
-// and their order, the Browse card's own eyebrow/heading, and the hero band.
-// Mobile carries the home screen heading, the tagline, and
-// the bottom tab bar. Nothing goes live until you save.
-
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+// Site's Home page and Header and menus tabs (the admin redesign's step 4,
+// boards 7 and 8): the settings sorted by the screen they change, not by
+// device, each named by what a visitor sees, with the screen itself in a
+// small preview beside them. Both tabs are one component instance sharing
+// one draft and one Save bar (see SiteSettingsLayout), so stepping between
+// them never drops a half-finished edit. Nothing goes live until Save.
 
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   // Every field saveHomeSections actually persists (see its own `changed()`)
-  // has to be listed here too — width was added to DraftHomeSection for the
-  // side-by-side card layout and left out of this strip, so flipping a
-  // card's Full/Half toggle never marked the form dirty and Save stayed
-  // disabled.
+  // has to be listed here too — width was once left out, so flipping a
+  // card's Full/Half toggle never marked the form dirty.
   const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds, width }) => ({ id, title, cardIds, width }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
 }
 
+/** How many things the Save bar says changed: each setting, and the
+ *  home page's sections as one. */
+export function countChanges(
+  saved: SiteSettings,
+  draft: SiteSettings,
+  sections: DraftHomeSection[],
+  sectionsDraft: DraftHomeSection[],
+): number {
+  const keys = Object.keys(draft) as (keyof SiteSettings)[]
+  const settings = keys.filter((k) => JSON.stringify(saved[k]) !== JSON.stringify(draft[k])).length
+  return settings + (sectionsEqual(sections, sectionsDraft) ? 0 : 1)
+}
+
+/** The settings the draft changes, and nothing else. */
+export function changedSettings(saved: SiteSettings, draft: SiteSettings): Partial<SiteSettings> {
+  const keys = Object.keys(draft) as (keyof SiteSettings)[]
+  return Object.fromEntries(keys.filter((k) => JSON.stringify(saved[k]) !== JSON.stringify(draft[k])).map((k) => [k, draft[k]]))
+}
+
 /** The items as one line, "Challah, Wine, Chicken". What was typed stays
  *  while it still says the same list, so a comma or a space isn't swallowed
- *  mid-word; after a Cancel or a save it's the list again. */
+ *  mid-word; after an Undo or a save it's the list again. */
 function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange: (items: string[]) => void }) {
   const [typed, setTyped] = useState(items.join(', '))
   const parsed = (t: string) => t.split(',').map((i) => i.trim()).filter(Boolean).slice(0, MAX_BEFORE_CANDLE_ITEMS)
@@ -62,7 +68,7 @@ function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange
         setTyped(e.target.value)
         onChange(parsed(e.target.value))
       }}
-      className={inputClass}
+      className={adminInputClass}
     />
   )
 }
@@ -72,13 +78,9 @@ export default function SiteSettingsEditor({
   section,
 }: {
   token: string
-  /** Which admin tab is rendering this. All three tabs share one component
-   *  instance (see AdminTabs) so the draft and the single Save button
-   *  survive switching between them — a half-finished edit on one tab isn't
-   *  silently dropped because you stepped over to another. */
-  section: 'site' | 'desktop' | 'mobile'
+  /** Which tab is showing: the Home page, or Header and menus. */
+  section: 'home' | 'menus'
 }) {
-  // Which community the preview should open — the one the console is editing.
   const { community } = useActiveCommunity()
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
@@ -86,85 +88,21 @@ export default function SiteSettingsEditor({
   const [sectionsDraft, setSectionsDraft] = useState<DraftHomeSection[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savedNotice, setSavedNotice] = useState(false)
-  const [previewing, setPreviewing] = useState(false)
-  // ImageUploadField's own memory of "the real original behind `value`"
-  // lives on ITS instance by default — fine for a field that only unmounts
-  // when the photo itself is done with, but not this component: switching
-  // Site/Desktop/Mobile tabs is a layout-level navigation that leaves this
-  // whole component mounted (see the doc above), but Preview (below) swaps
-  // this component's ENTIRE rendered output for an iframe and back, which
-  // unmounts the logo/hero fields same as a real remount would — wiping a
-  // plain internal ref exactly the way the fields' own doc warns about.
-  // Kept here instead, on the one component instance that's actually alive
-  // the whole time, and handed down via ImageUploadField's own
-  // originalSource/onOriginalSourceChange controlled-mode props. State, not
-  // a ref: both are read during render (`originalSource={...}` below) to
-  // pass through as a controlled prop, and a ref's mutations aren't
-  // guaranteed to be reflected in the next render the way this needs (React's
-  // own react-hooks/refs rule) — a File/string swap here is a real, if
-  // infrequent, admin action, so the extra re-render this costs over a ref
-  // is not a real concern the way it would be on a hot render path.
-  const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
+  const [saved, setSaved] = useState(false)
+  // ImageUploadField's memory of "the real original behind `value`", kept
+  // here so it survives the field unmounting when the tab switches (this
+  // component stays mounted across both tabs; the fields don't).
   const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
-
-  // The preview iframe is genuinely navigable (real `src` mode — see
-  // DevicePreviewFrame), so its own link clicks add entries to the tab's
-  // joint session history same as any other navigation. That's why the
-  // explicit "Back to editor" button below is plain state, not
-  // history.back(): once the visitor has clicked around inside the preview,
-  // history.back() steps the *iframe's* history instead of closing the
-  // overlay — visibly doing nothing. Deliberately left alone here; fixing
-  // that would need per-navigation bookkeeping this doesn't have.
-  //
-  // Real trackpad/browser Back is a different problem this DOES fix: it's
-  // not a call this component makes, so there's no "reroute it away from
-  // history" option — the only way to catch it is a pushState + popstate
-  // marker (below). One marker entry is pushed on open; any popstate while
-  // `previewing` closes the overlay unconditionally, without inspecting
-  // which entry actually got consumed — an iframe-internal nav quietly
-  // doesn't fire this window's popstate at all (nested browsing contexts
-  // don't), so by the time it does fire here, a top-level entry genuinely
-  // popped and closing is correct. The one tradeoff: closing via the button
-  // instead leaves the marker orphaned on the stack, so a much later,
-  // unrelated Back press silently consumes it once — acceptable next to the
-  // alternative of Back never closing the preview at all.
-  function openPreview() {
-    // Snapshot the draft BEFORE the frame mounts — the page inside reads it on
-    // load, so writing it afterwards would race the iframe and show saved
-    // settings instead. See previewDraft.ts.
-    if (draft && sectionsDraft) writePreviewDraft({ settings: draft, sections: sectionsDraft })
-    history.pushState({ ...(window.history.state ?? {}), sitePreview: true }, '')
-    setPreviewing(true)
-  }
-
-  function closePreview() {
-    setPreviewing(false)
-  }
-
-  useEffect(() => {
-    if (!previewing) return
-    function onPopState() {
-      setPreviewing(false)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [previewing])
 
   const load = useCallback(async () => {
     setError(null)
     try {
       const [settingsRes, sectionsRes] = await Promise.all([
-        fetch(withCommunity('/api/admin/site-settings', community.slug), {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(withCommunity('/api/admin/home-sections', community.slug), {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        fetch(withCommunity('/api/admin/site-settings', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(withCommunity('/api/admin/home-sections', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
       ])
       const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
       const sectionsBody = await parseOkJson<{ sections: HomeSection[] }>(sectionsRes, 'Failed to load.')
-
       setSettings(settingsBody.settings)
       setDraft(settingsBody.settings)
       setSections(sectionsBody.sections)
@@ -176,56 +114,55 @@ export default function SiteSettingsEditor({
 
   useLoadOnMount(load)
 
+  const changes = settings && draft && sections && sectionsDraft ? countChanges(settings, draft, sections, sectionsDraft) : 0
+  const base = adminBase(community.slug)
+  const stays = useCallback((path: string) => path === `${base}/home` || path === `${base}/menus`, [base])
+  useLeaveGuard(changes > 0, stays)
+
   function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d))
-    setSavedNotice(false)
+    setSaved(false)
   }
 
-  // Both the logo and the hero photo upload through ImageUploadField now
-  // (see its own render below) — it does the fetch, the reposition/re-zoom
-  // step (ImageCropModal), and its own loading/error state internally, so
-  // there's nothing bespoke left to do here beyond handing it `onChange`.
-
-  function setSectionsAndClearNotice(next: DraftHomeSection[]) {
+  function setHomeSections(next: DraftHomeSection[]) {
     setSectionsDraft(next)
-    setSavedNotice(false)
+    setSaved(false)
   }
 
-  // Discards every unsaved edit on this tab — text fields and sections alike
-  // — back to what's actually live.
-  function cancel() {
+  function undo() {
     setDraft(settings)
     setSectionsDraft(sections)
     setError(null)
-    setSavedNotice(false)
   }
 
   async function save() {
-    if (!draft || !sections || !sectionsDraft) return
+    if (!settings || !draft || !sections || !sectionsDraft) return
     setError(null)
     setSaving(true)
     try {
-      if (JSON.stringify(settings) !== JSON.stringify(draft)) {
+      // Only what changed here: Forms (the feedback form) and Settings (the
+      // name and logo) save their own settings, and this draft may hold
+      // what they had before they saved.
+      const changed = changedSettings(settings, draft)
+      if (Object.keys(changed).length > 0) {
         const body = await fetchJson<{ settings: SiteSettings }>(
           withCommunity('/api/admin/site-settings', community.slug),
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(draft),
+            body: JSON.stringify(changed),
           },
           'Save failed.',
         )
         setSettings(body.settings)
         setDraft(body.settings)
       }
-
       if (!sectionsEqual(sections, sectionsDraft)) {
-        const saved = await saveHomeSections(token, community.slug, sections, sectionsDraft)
-        setSections(saved)
-        setSectionsDraft(saved)
+        const next = await saveHomeSections(token, community.slug, sections, sectionsDraft)
+        setSections(next)
+        setSectionsDraft(next)
       }
-
-      setSavedNotice(true)
+      setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.')
     } finally {
@@ -240,413 +177,140 @@ export default function SiteSettingsEditor({
     return <p className="text-sm text-muted">Loading…</p>
   }
 
-  if (previewing) {
-    return (
-      <DevicePreviewFrame
-        src={previewUrl(community.slug)}
-        onClose={closePreview}
-        // Open on whichever device is being edited, so Preview answers the
-        // question actually being asked. Still switchable inside the preview.
-        initialDevice={section === 'mobile' ? 'mobile' : 'desktop'}
-      />
-    )
-  }
-
-  const dirty =
-    !settings || JSON.stringify(settings) !== JSON.stringify(draft) || !sections || !sectionsEqual(sections, sectionsDraft)
-
-  const isSite = section === 'site'
-  const isDesktop = section === 'desktop'
-  const isMobile = section === 'mobile'
-
   return (
     <div>
-      {isSite && (
-        <p className="text-sm text-muted mb-4">
-          Everything that feeds both desktop and mobile — the branding, the mission, the section
-          groups, the search placeholder, and the feedback form. The pieces that exist on only one
-          device are on the Desktop or Mobile tab. Nothing goes live until you click Save changes
-          below.
-        </p>
-      )}
-      {isDesktop && (
-        <p className="text-sm text-muted mb-4">
-          Everything that exists on desktop only — the top nav, the home screen&rsquo;s cards and
-          their order, and the hero band. Everything shared by both devices —
-          branding, sections, search placeholder — is on the Site tab. Nothing goes live until you
-          click Save changes below.
-        </p>
-      )}
-      {isMobile && (
-        <p className="text-sm text-muted mb-4">
-          Everything that exists on mobile only — the home screen heading, the tagline, and the
-          bottom tab bar. Everything shared by both devices is on the Site tab. Nothing goes live
-          until you click Save changes below.
-        </p>
-      )}
+      <div className="flex items-start gap-6">
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
+          {section === 'home' ? (
+            <>
+              <AdminBox title="Top of the page">
+                <div className="flex flex-col gap-4 p-4">
+                  <AdminField label="Big line">
+                    <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <AdminField label="Line under it">
+                    <input value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <AdminField label="Search box">
+                    <input value={draft.searchPlaceholder} onChange={(e) => set('searchPlaceholder', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <div>
+                    <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
+                    <ImageUploadField
+                      value={draft.desktopHeroImage?.url ?? ''}
+                      onChange={(url) => set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)}
+                      uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+                      token={token}
+                      shape="square"
+                      aspect={11 / 6}
+                      originalSource={heroOriginal}
+                      onOriginalSourceChange={setHeroOriginal}
+                    />
+                  </div>
+                  {draft.desktopHeroImage?.url && (
+                    <AdminField label="Photo, described">
+                      <input
+                        value={draft.desktopHeroImage.alt}
+                        onChange={(e) => draft.desktopHeroImage && set('desktopHeroImage', { ...draft.desktopHeroImage, alt: e.target.value })}
+                        className={adminInputClass}
+                      />
+                    </AdminField>
+                  )}
+                </div>
+              </AdminBox>
 
-      {error && (
-        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
-      )}
+              <AdminBox title="Below it, in this order">
+                <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onSettingChange={set} token={token} />
+              </AdminBox>
 
-      {/* Held back from the site for now (see features.ts): nothing to
-          choose until the Today home is back. */}
-      {isSite && features.todayHome && (
-      <div className="mb-6 max-w-2xl">
-      <CollapsibleSection title="Home page" description="Which home page visitors get." contentClassName="p-4">
-        <fieldset data-testid="home-style">
-          <legend className="sr-only">Home page</legend>
-          {(
-            [
-              ['classic', 'Classic', 'The home page as it has been: the search, then every category.'],
-              ['today', 'Today', 'Changes with the day: the next minyan, before candles on Friday, what’s open now, your pinned places, then the categories.'],
-            ] as const
-          ).map(([value, label, help]) => (
-            <label key={value} className="flex items-start gap-2.5 py-1.5">
-              <input
-                type="radio"
-                name="home-style"
-                value={value}
-                checked={draft.homeStyle === value}
-                onChange={() => set('homeStyle', value)}
-                className="mt-1"
-              />
-              <span>
-                <span className="block text-sm font-medium text-slate-900">{label}</span>
-                <span className="block text-[12px] text-muted">{help}</span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-        <p className="mt-2 text-[12px] text-muted">
-          To try it first, pick it and press Preview: it opens the site with this choice, and nothing changes for visitors until you save. Saving Classic switches back.
-        </p>
-        <label className="mt-4 block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Before candles looks for</span>
-          <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
-          <span className="block text-[11px] text-muted mt-1">
-            On the Today home, on Friday and Erev Yom Tov: the nearest store open now whose item list has these, separated by commas, at most {MAX_BEFORE_CANDLE_ITEMS}. Each is matched to a store&rsquo;s items by its exact name.
-          </span>
-        </label>
-        <fieldset data-testid="today-blocks" className="mt-4">
-          <legend className="block text-xs font-medium text-slate-700 mb-1">On the Today home</legend>
-          <p className="text-[11px] text-muted mb-1">Under the search, each on the days it&rsquo;s for, in the order the day calls for. Untick one to leave it off.</p>
-          {TODAY_BLOCKS.map((block) => (
-            <label key={block.id} className="flex items-start gap-2.5 py-1">
-              <input
-                type="checkbox"
-                checked={!draft.todayHidden.includes(block.id)}
-                onChange={(e) =>
-                  set('todayHidden', e.target.checked ? draft.todayHidden.filter((id) => id !== block.id) : [...draft.todayHidden, block.id])
-                }
-                className="mt-1"
-              />
-              <span>
-                <span className="block text-sm font-medium text-slate-900">{block.label}</span>
-                <span className="block text-[12px] text-muted">{block.when}</span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-      </CollapsibleSection>
-      </div>
-      )}
+              <AdminBox title="Category groups">
+                <div className="p-4">
+                  <HomeSectionManager sections={sectionsDraft} onChange={setHomeSections} />
+                </div>
+              </AdminBox>
 
-      {isSite && (
-      <div className="max-w-2xl">
-      <CollapsibleSection title="Branding" description="Site name, tagline, search placeholder, and logo." contentClassName="p-4 space-y-3">
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
-          <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">Shown in the header and footer.</span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
-          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">
-            Not currently shown anywhere on the site — kept here in case that changes.
-          </span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Search placeholder</span>
-          <input
-            value={draft.searchPlaceholder}
-            onChange={(e) => set('searchPlaceholder', e.target.value)}
-            className={inputClass}
-          />
-          <span className="block text-[11px] text-muted mt-1">
-            The example text inside the search box, on both devices — e.g. &ldquo;Search — kosher
-            food, mikvah, shuls, schools…&rdquo;. Worth updating when the category list changes.
-          </span>
-        </label>
-        <div className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
-          <ImageUploadField
-            value={draft.logoUrl ?? ''}
-            onChange={(url) => set('logoUrl', url || null)}
-            uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
-            token={token}
-            shape="square"
-            originalSource={logoOriginal}
-            onOriginalSourceChange={setLogoOriginal}
-            helpText="Shown in the header instead of the default mark. Leave blank to keep the default."
-          />
+              {/* Held back from the site for now (see features.ts). */}
+              {features.todayHome && (
+                <AdminBox title="Today home">
+                  <div className="flex flex-col gap-4 p-4">
+                    <fieldset data-testid="home-style">
+                      <legend className="sr-only">Home page</legend>
+                      {(
+                        [
+                          ['classic', 'Classic', 'The search, then every category.'],
+                          ['today', 'Today', 'Changes with the day: the next minyan, before candles on Friday, what’s open now.'],
+                        ] as const
+                      ).map(([value, label, help]) => (
+                        <label key={value} className="flex items-start gap-2.5 py-1.5">
+                          <input type="radio" name="home-style" value={value} checked={draft.homeStyle === value} onChange={() => set('homeStyle', value)} className="mt-1" />
+                          <span>
+                            <span className="block text-sm font-medium text-slate-900">{label}</span>
+                            <span className="block text-[12px] text-muted">{help}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    <AdminField label="Before candles looks for">
+                      <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
+                    </AdminField>
+                    <fieldset data-testid="today-blocks">
+                      <legend className="block text-[13px] font-semibold text-slate-700 mb-1">On the Today home</legend>
+                      {TODAY_BLOCKS.map((block) => (
+                        <label key={block.id} className="flex items-start gap-2.5 py-1">
+                          <input
+                            type="checkbox"
+                            checked={!draft.todayHidden.includes(block.id)}
+                            onChange={(e) =>
+                              set('todayHidden', e.target.checked ? draft.todayHidden.filter((id) => id !== block.id) : [...draft.todayHidden, block.id])
+                            }
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="block text-sm font-medium text-slate-900">{block.label}</span>
+                            <span className="block text-[12px] text-muted">{block.when}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  </div>
+                </AdminBox>
+              )}
+
+              <AdminBox title="In link previews and search results">
+                <div className="flex flex-col gap-4 p-4">
+                  <AdminField label="Title">
+                    <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <AdminField label="Description">
+                    <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                </div>
+              </AdminBox>
+            </>
+          ) : (
+            <>
+              <AdminBox title="Top of the page, on a computer">
+                <div className="p-4">
+                  <DesktopNavEditor items={draft.desktopNavItems} onChange={(items) => set('desktopNavItems', items)} />
+                </div>
+              </AdminBox>
+
+              <AdminBox title="Tabs, on a phone">
+                <div className="p-4">
+                  <MobileTabsEditor tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS} onChange={(tabs) => set('mobileTabs', tabs)} />
+                </div>
+              </AdminBox>
+
+            </>
+          )}
         </div>
-      </CollapsibleSection>
-      </div>
-      )}
 
-      {/* Sections are one set of groups rendered two different ways, so they
-          live here with the rest of the settings that feed both devices. */}
-      {isSite && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
-            title="Home page sections"
-            description="One set of groups, shown differently per device: on desktop they’re the categories mega-menu (see the Desktop tab’s Top Nav bar); on mobile they’re the labelled card grid running down the home screen. Renaming or regrouping changes both."
-            contentClassName="p-4"
-          >
-            <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
-            title="Top nav bar"
-            description="The header’s top-level items, desktop only — Categories, Map, and More by default."
-            contentClassName="p-4"
-          >
-            <DesktopNavEditor
-              items={draft.desktopNavItems.length > 0 ? draft.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS}
-              onChange={(items) => set('desktopNavItems', items)}
-            />
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
-            title="Hero"
-            description="The warm band at the top of the desktop home screen — its own headline/subhead, separate from mobile’s heading (Mobile tab), plus the photo beside it."
-            contentClassName="p-4 space-y-3"
-          >
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Headline</span>
-              <input
-                value={draft.desktopHeroHeadline}
-                onChange={(e) => set('desktopHeroHeadline', e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Subhead</span>
-              <textarea
-                rows={2}
-                value={draft.desktopHeroSubhead}
-                onChange={(e) => set('desktopHeroSubhead', e.target.value)}
-                className={inputClass}
-              />
-              <span className="block text-[11px] text-muted mt-1">Optional — leave blank to show the headline alone.</span>
-            </label>
-            <div className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Photo</span>
-              <ImageUploadField
-                value={draft.desktopHeroImage?.url ?? ''}
-                onChange={(url) =>
-                  set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)
-                }
-                uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
-                token={token}
-                shape="square"
-                // Measured live against the real page (HeroHeading.tsx's
-                // `min-h-[280px]` right-hand grid column), not guessed —
-                // an earlier 4/3 here was a genuine guess and came out
-                // visibly wrong. The column's own width tracks the fluid
-                // 1.15fr/1fr grid until the page's max-w-6xl container caps
-                // out, which happens by ~1280px viewport width — comfortably
-                // below ordinary laptop/desktop width, so the vast majority
-                // of real visitors land on the SAME shape: 512.5×280 at
-                // 1280px, 1440px, and 1920px alike (confirmed identical at
-                // all three). Narrower desktop widths (~900px) do shrink
-                // toward a squarer ~1.4, and the "desktop:" breakpoint floor
-                // (640px) toward ~1:1, but there's no single ratio that's
-                // exactly right at every width — this is the one that's
-                // right most often, not a compromise nobody actually sees.
-                aspect={11 / 6}
-                originalSource={heroOriginal}
-                onOriginalSourceChange={setHeroOriginal}
-              />
-              <label className="block mt-2">
-                <span className="block text-[11px] text-muted mb-1">Alt text (describe the photo)</span>
-                <input
-                  value={draft.desktopHeroImage?.alt ?? ''}
-                  onChange={(e) => {
-                    const alt = e.target.value
-                    if (draft.desktopHeroImage) set('desktopHeroImage', { ...draft.desktopHeroImage, alt })
-                  }}
-                  disabled={!draft.desktopHeroImage?.url}
-                  className={inputClass}
-                />
-              </label>
-              <span className="block text-[11px] text-muted mt-1">
-                Leave blank to show a plain gradient instead of a photo.
-              </span>
-            </div>
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
-            title="Home screen cards"
-            description="Categories & Search, Davening Times, Update Listings, Email Signup, and Jewish Times — the desktop home screen’s cards, in order. Rename each one’s eyebrow/heading, reorder, or remove it."
-            contentClassName="p-4"
-          >
-            <DesktopTopicsManager
-              sections={sectionsDraft}
-              onChange={setSectionsAndClearNotice}
-              settings={draft}
-              onSettingChange={set}
-            />
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection title="Subscribers" contentClassName="p-4">
-            <SubscriberManager token={token} />
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isMobile && (
-      <div className="max-w-2xl">
-      <CollapsibleSection title="Branding" description="Home screen heading and subhead." contentClassName="p-4 space-y-3">
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
-          <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">
-            The home page&rsquo;s title for screen readers and search engines. The phone home no longer
-            shows it: it opens with who keeps the guide up. Desktop has its own separate hero headline —
-            see the Desktop tab&rsquo;s Hero card.
-          </span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Subhead</span>
-          <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">
-            The footer blurb and the page&rsquo;s &lt;meta description&gt;. No longer shown on the phone
-            home. Desktop has its own separate headline/subhead — see the Desktop tab&rsquo;s Hero card.
-          </span>
-        </label>
-      </CollapsibleSection>
-      </div>
-      )}
-
-      {isMobile && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
-            title="Mobile tab bar"
-            description="Rename, reorder, add, or remove the tabs along the bottom of the screen. Desktop has no tab bar — it navigates by the top nav instead (Desktop tab)."
-            contentClassName="p-4"
-          >
-            <MobileTabsEditor
-              tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
-              onChange={(tabs) => set('mobileTabs', tabs)}
-            />
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isSite && (
-      <div className="max-w-2xl mt-6">
-      <CollapsibleSection
-        title="Feedback form"
-        description={`The “Send feedback” link and form shown in the footer. Currently ${draft.feedbackEnabled ? 'enabled' : 'disabled'}.`}
-        contentClassName="p-4 space-y-3"
-      >
-        <label className="inline-flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={draft.feedbackEnabled}
-            onChange={(e) => set('feedbackEnabled', e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-          />
-          <span className="text-xs font-medium text-slate-700">Enabled</span>
-        </label>
-
-        {draft.feedbackEnabled && (
-          <>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Button label</span>
-              <input
-                value={draft.feedbackButtonLabel}
-                onChange={(e) => set('feedbackButtonLabel', e.target.value)}
-                className={inputClass}
-              />
-              <span className="block text-[11px] text-muted mt-1">
-                The footer link text (an arrow is added automatically).
-              </span>
-            </label>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Form heading</span>
-              <input
-                value={draft.feedbackHeading}
-                onChange={(e) => set('feedbackHeading', e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Success message</span>
-              <textarea
-                rows={2}
-                value={draft.feedbackSuccessMessage}
-                onChange={(e) => set('feedbackSuccessMessage', e.target.value)}
-                className={inputClass}
-              />
-              <span className="block text-[11px] text-muted mt-1">Shown after someone submits feedback.</span>
-            </label>
-          </>
-        )}
-      </CollapsibleSection>
-      </div>
-      )}
-
-      <div className="flex items-center gap-3 mt-4">
-        <button
-          onClick={openPreview}
-          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-        >
-          Preview
-        </button>
-        <button
-          onClick={save}
-          disabled={saving || !dirty}
-          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
-        <button
-          onClick={cancel}
-          disabled={saving || !dirty}
-          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-        >
-          Cancel
-        </button>
-        {savedNotice && !dirty && <span className="text-sm text-green-700">Saved.</span>}
+        <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
+          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} />
+        </aside>
       </div>
 
-
-      {isSite && (
-        <p className="text-[11px] text-muted mt-5 max-w-xl">
-          These also drive the browser tab title, search-engine description, and “Add to Home
-          Screen” app name.
-        </p>
-      )}
+      <SaveBar changes={changes} saving={saving} saved={saved} error={draft ? error : null} onUndo={undo} onSave={save} />
     </div>
   )
 }

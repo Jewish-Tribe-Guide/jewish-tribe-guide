@@ -710,7 +710,7 @@ describe('ListingView — Still here and Not anymore, an item at a time', () => 
 })
 
 describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
-  const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'dish', expandedOnly: true }
+  const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'dish' }
   const withDishes = makeCategory({ ...food, detailFields: [...food.detailFields, dishes] })
   const served = makeListing({
     ...judah,

@@ -8,17 +8,15 @@ import { askWordKey, askWordLabel, proposeWords, type TaughtWord } from '@/lib/a
 import { listTaughtWords, teachWord, unteachWord } from '@/lib/askWordStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { describeReading } from '@/lib/readingSearch'
-import { forgetReading, listReadings, setReadingApproved } from '@/lib/questionReadingStore'
+import { forgetReading, listReadings } from '@/lib/questionReadingStore'
 
 // GET  /api/admin/read-questions — the "Read questions" tab: every question
 //      the AI reader has read (question_reading, migration 062), most asked
 //      first, each with its reading in words. Admin only.
 //      With each, the words it suggests teaching the search (askWords.ts),
 //      and every word taught so far.
-// POST /api/admin/read-questions   body: { key, action: 'approve' | 'unapprove' | 'forget' }
-//      Approve a reading as a rule (used with no AI at all, see
-//      /api/ask/read), take the approval back, or forget it so the question
-//      is read afresh next time.
+// POST /api/admin/read-questions   body: { key, action: 'forget' }
+//      Forget a reading so the question is read afresh next time.
 // POST /api/admin/read-questions   body: { action: 'teach', word: { word, categoryId, field?, value? }, question? }
 //                                       { action: 'unteach', word: 'ikc' }
 //      Teach the search a word (question_word, migration 063), or untaught
@@ -66,8 +64,6 @@ export async function GET(request: Request) {
         hits: r.hits,
         model: r.model,
         lastUsedAt: r.lastUsedAt,
-        approvedAt: r.approvedAt,
-        approvedBy: r.approvedBy,
       })),
     })
   } catch (err) {
@@ -75,8 +71,6 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, errors: ['Could not load read questions.'] }, { status: 502 })
   }
 }
-
-const ACTIONS = ['approve', 'unapprove', 'forget'] as const
 
 /** A word to teach, checked against the categories: one that exists, and
  *  a filter its page offers, with a pick it has. Null when it isn't. */
@@ -124,19 +118,17 @@ export async function POST(request: Request) {
       return Response.json({ ok: true })
     } catch (err) {
       console.error('[admin/read-questions] teach failed:', err)
-      return Response.json({ ok: false, errors: ['Could not save. If this keeps happening, migration 063 may not be applied yet.'] }, { status: 502 })
+      return Response.json({ ok: false, errors: ['Could not save.'] }, { status: 502 })
     }
   }
   const key = typeof body.key === 'string' ? body.key.trim() : ''
-  const action = ACTIONS.find((a) => a === body.action)
-  if (!key || key.length > 200 || !action) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
+  if (!key || key.length > 200 || body.action !== 'forget') return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
 
   try {
-    if (action === 'forget') await forgetReading(community.slug, key)
-    else await setReadingApproved(community.slug, key, action === 'approve' ? admin.email : null)
+    await forgetReading(community.slug, key)
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/read-questions] POST failed:', err)
-    return Response.json({ ok: false, errors: ['Could not save. If this keeps happening, migration 062 may not be applied yet.'] }, { status: 502 })
+    return Response.json({ ok: false, errors: ['Could not save.'] }, { status: 502 })
   }
 }

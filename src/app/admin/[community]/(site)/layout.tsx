@@ -2,37 +2,22 @@
 
 import { usePathname } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 
-// /admin/site, /admin/desktop, and /admin/mobile deliberately render the SAME
-// mounted SiteSettingsEditor instance — one draft, one Save button — so
-// switching between them doesn't silently drop a half-finished edit. A route
-// file per tab would break that (Next mounts/unmounts per route by default);
-// this route-group layout is the fix: it persists across exactly those three
-// sibling routes (the same way admin/layout.tsx persists across every
-// /admin/* route) and owns the one SiteSettingsEditor mount point itself,
-// deriving which section to show from the URL rather than from a prop a
-// per-route page file would have to pass down. site/page.tsx, desktop/page.tsx,
-// and mobile/page.tsx are empty on purpose — this layout renders the real
-// content for all three, ignoring `children`.
+// /admin/home and /admin/menus deliberately render the SAME mounted
+// SiteSettingsEditor instance — one draft, one Save bar — so stepping between
+// Site's Home page and Header and menus tabs doesn't silently drop a
+// half-finished edit. A route file per tab would break that (Next
+// mounts/unmounts per route by default); this route-group layout persists
+// across exactly those two sibling routes and owns the one mount point
+// itself, deriving which tab to show from the URL. home/page.tsx and
+// menus/page.tsx are empty on purpose — this layout ignores `children`.
 export default function SiteSettingsLayout() {
   const session = useAdminSession()
   const community = useCommunitySlug()
   const pathname = usePathname()
-  const base = adminBase(community)
-  const section = pathname.startsWith(`${base}/desktop`)
-    ? 'desktop'
-    : pathname.startsWith(`${base}/mobile`)
-      ? 'mobile'
-      : 'site'
-
-  return (
-    <div>
-      <AdminNav />
-      <SiteSettingsEditor token={session.access_token} section={section} />
-    </div>
-  )
+  const section = pathname.startsWith(`${adminBase(community)}/menus`) ? 'menus' : 'home'
+  return <SiteSettingsEditor token={session.access_token} section={section} />
 }

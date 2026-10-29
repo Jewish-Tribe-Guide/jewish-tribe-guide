@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
     ['/api/admin/main-dishes', '/api/admin/watches', '/api/cron/watches'].map((route) => [
       route,
       ['./node_modules/@sparticuz/chromium/**', './node_modules/playwright-core/**'],
+    ]).concat([
+      // The Gmail script, read at run time and handed out filled in for the
+      // community (newsletterScript.ts): a path tracing can't see.
+      ['/api/admin/watches/newsletters', ['./scripts/newsletter-apps-script.js']],
     ]),
   ),
   images: {
@@ -174,10 +178,22 @@ const nextConfig: NextConfig = {
       // Not 'api' as the community, as in rewrites() above: /api/admin/eruvim
       // is the Eruv row's own data, and this sent it to /api/admin/categories
       // (nextConfigRoutes.test.ts).
-      // Main dishes became the Watches tab's Dishes job (Oct 21).
-      { source: '/:community((?!api\\b).*)/admin/dishes', destination: '/:community/admin/watches/dishes', permanent: false },
+      // Main dishes became the Watches tab's Dishes job (Oct 21), and the
+      // job pages became the tab's kinds of place (Oct 25).
+      { source: '/:community((?!api\\b).*)/admin/dishes', destination: '/:community/admin/watches', permanent: false },
       // Eruvim became part of the Categories tab's Eruv row (Oct 22).
       { source: '/:community((?!api\\b).*)/admin/eruvim', destination: '/:community/admin/categories', permanent: false },
+      // Read questions joined the missed searches in one list (Oct 29):
+      // To do's searches, and the Searches page for the taught words.
+      { source: '/:community((?!api\\b).*)/admin/questions', destination: '/:community/admin/searches', permanent: false },
+      // Archived is a filter on Places now (the admin redesign's step 3).
+      { source: '/:community((?!api\\b).*)/admin/archived', destination: '/:community/admin/places?show=archived', permanent: false },
+      // Site by screen, not by device (the admin redesign's step 4): the old
+      // Basics and On a computer tabs held the home page's words, On a phone
+      // its tabs.
+      { source: '/:community((?!api\\b).*)/admin/site', destination: '/:community/admin/home', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/desktop', destination: '/:community/admin/home', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/mobile', destination: '/:community/admin/menus', permanent: false },
     ];
   },
 };

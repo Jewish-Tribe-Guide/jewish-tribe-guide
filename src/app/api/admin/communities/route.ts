@@ -51,7 +51,6 @@ export async function GET(request: Request) {
 type CreateBody = {
   slug?: string
   name?: string
-  tagline?: string
   mission?: string
   region?: string
   timezone?: string
@@ -81,7 +80,6 @@ export async function POST(request: Request) {
   const required: (keyof CreateBody)[] = [
     'slug',
     'name',
-    'tagline',
     'mission',
     'region',
     'timezone',
@@ -107,7 +105,6 @@ export async function POST(request: Request) {
     const community = await createCommunity({
       slug: body.slug!,
       name: body.name!,
-      tagline: body.tagline!,
       mission: body.mission!,
       region: body.region!,
       timezone: body.timezone!,

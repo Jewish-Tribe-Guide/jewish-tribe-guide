@@ -22,8 +22,8 @@ type FormRow = {
   steps: FormStep[]
   draft: FormContent | null
   icon: string | null
-  card_image_url: string | null
-  card_text_color: string | null
+  // card_image_url and card_text_color are still columns, but nothing reads
+  // them: the home's photo tile is gone.
   active: boolean
 }
 
@@ -37,8 +37,6 @@ function toConfig(row: FormRow): FormConfig {
     steps: row.steps ?? [],
     draft: row.draft ?? null,
     icon: row.icon ?? '',
-    cardImageUrl: row.card_image_url,
-    cardTextColor: row.card_text_color,
     active: row.active !== false,
   }
 }
@@ -113,8 +111,6 @@ export async function publishDraft(community: string, id: string): Promise<FormC
       success_message: form.draft.successMessage,
       steps: form.draft.steps,
       icon: form.draft.icon?.trim() || null,
-      card_image_url: form.draft.cardImageUrl?.trim() || null,
-      card_text_color: form.draft.cardImageUrl?.trim() ? form.draft.cardTextColor : null,
       draft: null,
       updated_at: new Date().toISOString(),
     })
@@ -196,8 +192,6 @@ export async function createForm(community: string, content: FormContent): Promi
     success_message: content.successMessage.trim() || 'Thanks — we’ll be in touch.',
     steps: content.steps.length > 0 ? content.steps : DEFAULT_CONTACT_STEPS,
     icon: content.icon?.trim() || null,
-    card_image_url: content.cardImageUrl?.trim() || null,
-    card_text_color: content.cardImageUrl?.trim() ? content.cardTextColor || null : null,
   }
 
   const { data, error } = await supabase.from('form').insert(row).select('*').single()

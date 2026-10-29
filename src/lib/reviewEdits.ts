@@ -5,8 +5,15 @@ import { companionKeys, type CategoryField } from './categories'
 // QOpen): a typo gets fixed instead of the suggestion being rejected and
 // redone. Only what a listing's form can edit comes from the admin's copy:
 // the name, address, phone and the category's own fields. Everything else
-// (the category, Google's place, the source) stays as it was sent, so an
-// edit can't move a listing to another category or graft on a place id.
+// (the category, the source) stays as it was sent, so an edit can't move a
+// listing to another category.
+//
+// Google's place comes from the admin's copy only as a place the admin
+// picked in its address (the user, Oct 28): its id, with the record of what
+// Google filled (googleAutofill) and its status. Approval then links the
+// listing to it and gives Google the rows it filled, as an Add's pick does
+// (submissionStore's withResolvedPlaceId, resolveGoogleFields). A place id
+// on its own isn't a pick, and isn't taken.
 //
 // What the admin changed is recorded with it, with the values as sent, so
 // the history says whose words went live.
@@ -14,7 +21,8 @@ import { companionKeys, type CategoryField } from './categories'
 export type ReviewEdit = {
   by: string
   at: string
-  /** The keys changed: 'name', 'address', 'phone', or a detail field's key. */
+  /** The keys changed: 'name', 'address', 'phone', 'placeId' (a place
+   *  picked in the address), or a detail field's key. */
   fields: string[]
   /** What the suggestion said for each of those, before the admin's fix. */
   asSent: Record<string, unknown>
@@ -23,6 +31,15 @@ export type ReviewEdit = {
 const CORE = ['name', 'address', 'phone'] as const
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+const STATUSES = new Set(['OPERATIONAL', 'CLOSED_TEMPORARILY', 'CLOSED_PERMANENTLY'])
+const AUTOFILL_KEYS = new Set(['name', 'phone', 'hours', 'website', 'description'])
+
+/** What a pick in the address filled: a string per Google field, no others. */
+function isAutofill(v: unknown): v is Record<string, string> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false
+  return Object.entries(v).every(([k, x]) => AUTOFILL_KEYS.has(k) && typeof x === 'string')
+}
 
 function isGeo(v: unknown): v is { lat: number; lng: number } {
   if (!v || typeof v !== 'object') return false
@@ -65,6 +82,17 @@ export function withReviewEdits(
     out.details[k] = eDetails[k]
     changed.push(k)
     asSent[k] = sent.details[k] ?? null
+  }
+
+  // A place picked in the address: a new one, or the same one filled again.
+  const placeId = eDetails.placeId
+  if (typeof placeId === 'string' && placeId && isAutofill(eDetails.googleAutofill) && !(same(placeId, sent.details.placeId) && same(eDetails.googleAutofill, sent.details.googleAutofill))) {
+    out.details.placeId = placeId
+    out.details.googleAutofill = { ...eDetails.googleAutofill }
+    if (typeof eDetails.businessStatus === 'string' && STATUSES.has(eDetails.businessStatus)) out.details.businessStatus = eDetails.businessStatus
+    else delete out.details.businessStatus
+    changed.push('placeId')
+    asSent.placeId = sent.details.placeId ?? null
   }
 
   if (changed.length === 0) return sent

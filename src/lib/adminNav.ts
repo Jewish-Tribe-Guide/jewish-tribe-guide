@@ -31,123 +31,107 @@ export type AdminTab =
   | 'changes'
   | 'categories'
   | 'responses'
-  | 'archived'
-  | 'site'
-  | 'desktop'
-  | 'mobile'
+  | 'places'
+  | 'home'
+  | 'forms'
+  | 'menus'
+  | 'pages'
   | 'campaigns'
   | 'metrics'
-  | 'searches'
-  | 'questions'
   | 'watches'
   | 'team'
+  | 'community'
   | 'communities'
 
 export type AdminTabLink = { tab: AdminTab; href: string; label: string }
 
-// Fifteen tabs in one row stopped being readable (Oct 22), so they sit in
-// five groups: the top row is the groups, the second row is the open
-// group's tabs. Every page keeps its own URL — the open group is whichever
-// one holds the tab the current path belongs to (adminNavPosition below).
-export type AdminGroup = 'todo' | 'listings' | 'look' | 'insights' | 'settings'
+// The console's four areas and a gear (the admin redesign, Oct 28): To do,
+// Places, Site and Reports, with Settings set apart at the bottom of the
+// sidebar and behind the gear on a phone. Every page keeps its own URL; the
+// open area is whichever one holds the tab the current path belongs to
+// (adminNavPosition below). An area with more than one page shows them as
+// tabs under its heading, until the later steps fold them together. To do
+// shows none: its other pages open from its list, with a way back.
+export type AdminArea = 'todo' | 'places' | 'site' | 'reports' | 'settings'
 
-export type AdminGroupLinks = { group: AdminGroup; label: string; href: string; tabs: AdminTabLink[] }
+export type AdminAreaLinks = { area: AdminArea; label: string; href: string; tabs: AdminTabLink[] }
 
-// `isSuperAdmin`: whether to include the Communities tab at all — its own
-// route (and the GET /api/admin/communities it reads) are already
-// superadmin-gated server-side (see CommunityManager's own comment), but
-// leaving the tab visible to every ordinary community admin just handed
-// them a click that always dead-ends in "Only the site owner can create or
-// browse other communities" instead of not offering it in the first place.
-export function adminGroups(community: string, isSuperAdmin: boolean): AdminGroupLinks[] {
+// `isSuperAdmin`: whether to include the Communities tab at all. Its route
+// and the GET /api/admin/communities it reads are superadmin-only
+// server-side, so for anyone else it would only ever dead-end.
+export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaLinks[] {
   const base = adminBase(community)
-  const groups: Omit<AdminGroupLinks, 'href'>[] = [
+  const areas: Omit<AdminAreaLinks, 'href'>[] = [
     {
-      group: 'todo',
+      area: 'todo',
       label: 'To do',
       tabs: [
-        { tab: 'queue', href: base, label: 'Moderation queue' },
-        // What the guide keeps current on its own, a row per job (Oct 21):
-        // Dishes (each food place's main dishes, read off its own menu, which
-        // was a tab of its own), Hospitals (from Refuah), and the pages it
-        // reads every morning (Keystone-K's list, shul times pages).
+        // One list (step 2), opened from its rows rather than tabs: the
+        // others are where its bottom rows lead.
+        { tab: 'queue', href: base, label: 'To do' },
         { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
-        // How the AI reader read what people asked, approvable as rules.
-        { tab: 'questions', href: `${base}/questions`, label: 'Read questions' },
         { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
       ],
     },
     {
-      group: 'listings',
-      label: 'Listings',
+      area: 'places',
+      label: 'Places',
+      // Every listing in one list; archived ones are a filter on it.
+      tabs: [{ tab: 'places', href: `${base}/places`, label: 'Places' }],
+    },
+    {
+      area: 'site',
+      label: 'Site',
+      // Screen by screen, each tab the screen it changes (step 4). Home page
+      // and Header and menus share one draft and one Save (see
+      // SiteSettingsLayout). About and Privacy is one copy for every
+      // community, so only the site owner has it.
       tabs: [
-        { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
-        // Seasonal promotions (a "Sukkah Map" every Sukkot, or whatever the next
-        // one-off is) — see CampaignBannerManager's own doc.
+        { tab: 'home', href: `${base}/home`, label: 'Home page' },
+        { tab: 'categories', href: `${base}/categories`, label: 'Category pages' },
+        { tab: 'forms', href: `${base}/forms`, label: 'Forms' },
+        { tab: 'menus', href: `${base}/menus`, label: 'Header and menus' },
         { tab: 'campaigns', href: `${base}/campaigns`, label: 'Campaigns' },
-        { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
+        ...(isSuperAdmin ? [{ tab: 'pages' as const, href: `${base}/pages`, label: 'About and Privacy' }] : []),
       ],
     },
     {
-      group: 'look',
-      label: 'Look',
-      // Split from one combined "Desktop & mobile" tab into two — the desktop
-      // redesign grew enough device-only settings (top nav, the hero band,
-      // the Browse card's own copy, the home-screen accent color) that a
-      // device toggle inside one tab stopped scaling; each device now gets
-      // its own tab, same as Site, all three sharing one draft/Save (see
-      // SiteSettingsLayout) — which is why they're one group.
+      area: 'reports',
+      label: 'Reports',
       tabs: [
-        { tab: 'site', href: `${base}/site`, label: 'Site' },
-        { tab: 'desktop', href: `${base}/desktop`, label: 'Desktop' },
-        { tab: 'mobile', href: `${base}/mobile`, label: 'Mobile' },
-      ],
-    },
-    {
-      group: 'insights',
-      label: 'Insights',
-      tabs: [
-        { tab: 'metrics', href: `${base}/metrics`, label: 'Metrics' },
-        // What visitors searched for and didn't find: the seeding to-do list.
-        { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },
+        // One page (step 5); History opens from its last row.
+        { tab: 'metrics', href: `${base}/metrics`, label: 'Reports' },
         // Held back from the site for now (see features.ts).
         ...(features.whatChanged ? [{ tab: 'changes' as const, href: `${base}/changes`, label: 'What changed' }] : []),
       ],
     },
     {
-      group: 'settings',
+      area: 'settings',
       label: 'Settings',
       tabs: [
-        // Every one of THIS community's own admins can reach this — see
-        // /api/admin/team's own comment — unlike Communities below, which is
-        // superadmin-only underneath.
         { tab: 'team', href: `${base}/team`, label: 'Team' },
-        // Cross-community: creating a new community isn't an action scoped to
-        // whichever one you're currently editing, but this tab still lives
-        // under the current community's console — there's no community-less
-        // admin route to put it on instead. Superadmin-only — see this
-        // function's own doc.
+        { tab: 'community', href: `${base}/community`, label: 'Community' },
         ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
       ],
     },
   ]
-  // A group's own link opens its first tab.
-  return groups.map((g) => ({ ...g, href: g.tabs[0].href }))
+  // An area's own link opens its first tab.
+  return areas.map((a) => ({ ...a, href: a.tabs[0].href }))
 }
 
-/** Every tab, in nav order — the groups above, flattened. */
+/** Every tab, in nav order — the areas above, flattened. */
 export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLink[] {
-  return adminGroups(community, isSuperAdmin).flatMap((g) => g.tabs)
+  return adminAreas(community, isSuperAdmin).flatMap((a) => a.tabs)
 }
 
-// Pages that are no tab of their own but are reached from one, so the nav
-// stays on that tab while you're there: /history/approved and
-// /history/rejected are what the Metrics tiles open.
+// Paths a tab covers besides its own: History (/history/approved and
+// /history/rejected) and every search nobody found (/searches) are part of
+// Reports, which opens them. To do shows only the searches still waiting.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
-  metrics: ['/history'],
+  metrics: ['/history', '/searches'],
 }
 
-/** Which group is open and which tab is lit, for the current path. The
+/** Which area is open and which tab is lit, for the current path. The
  *  queue (the console's own base URL) only matches exactly — every other
  *  href starts with it. Any other tab matches its own path and everything
  *  under it ('/philly/admin/categories' also covers the editor at
@@ -156,13 +140,13 @@ export function adminNavPosition(
   pathname: string,
   community: string,
   isSuperAdmin: boolean,
-): { group: AdminGroup; tab: AdminTab } | null {
+): { area: AdminArea; tab: AdminTab } | null {
   const base = adminBase(community)
   const under = (path: string) => pathname === path || pathname.startsWith(`${path}/`)
-  for (const g of adminGroups(community, isSuperAdmin)) {
-    for (const t of g.tabs) {
+  for (const a of adminAreas(community, isSuperAdmin)) {
+    for (const t of a.tabs) {
       const paths = t.href === base ? [] : [t.href, ...(TAB_ALSO_COVERS[t.tab] ?? []).map((p) => `${base}${p}`)]
-      if (t.href === base ? pathname === base : paths.some(under)) return { group: g.group, tab: t.tab }
+      if (t.href === base ? pathname === base : paths.some(under)) return { area: a.area, tab: t.tab }
     }
   }
   return null
