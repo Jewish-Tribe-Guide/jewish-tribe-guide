@@ -345,16 +345,17 @@ brief, one round of drawings, then the build in pieces.
    review hides Approve until there's an address, and Watches names any
    job that didn't load. "Suggest a Listing" going with its row is
    deliberate; the redesign shows it in the admin.
-   **Next:** the brief.
-3. **Proposed shape** (mine, not agreed):
-   - To do: one list with counts, replacing four tabs.
-   - Places: one page per listing.
-   - Site: settings beside the screen they change, by screen not device;
-     a category shows its listings first and its fields behind "Build".
-   - Reports.
-   - Team and Communities behind a settings icon.
-   - A setup checklist for a new community.
-   - The Watches pages by kind stay.
+3. **The brief: WRITTEN Oct 28, waiting on the user's reactions.**
+   https://claude.ai/artifact/K8CbQxbpQbLyxJeJ5EQ2ad. Who it's for, what
+   done means, design rules, the shape (mine, not agreed): To do, Places,
+   Site, Reports, and a gear menu for Team and Communities, with a table of
+   where each of today's screens goes. Nine questions, each with my
+   recommendation: category kinds instead of slugs, deleting the dead
+   settings, one Save bar, folding `/philly/inbox` into To do, where About
+   and Privacy live, phone support, a setup checklist, what Reports holds,
+   nav counts. Build order: clean-up, shell, To do, Places, Site, Reports
+   and gear, checklist.
+   **Next:** the user's reactions, then one canvas of drawings.
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
