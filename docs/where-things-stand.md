@@ -529,7 +529,38 @@ brief, one round of drawings, then the build in pieces.
    only what changed on that tab.
    Not as drawn: nothing. Gone, as drawn: the Pending count (To do has
    it), approval rate and time to approval.
-   Next: step 6 (Setup).
+13. **Build, step 6 (Setup): BUILT Oct 29.**
+   To do starts with "Set up your guide · N of 5 done" and a bar: Name and
+   logo, A second admin, Your first category (made, with a place on the
+   site), The home page's words, Kosher lists to watch. Each row opens the
+   screen that does it and ticks itself from what's saved. It goes away for
+   good once all five are done, and the nav's count includes the ones left.
+   The home page's words count only once they differ from the starting
+   words (saving the name and logo writes the starting words too).
+   Walked through on dev with a pretend hidden community, "Riverton Jewish
+   Guide" (`/riverton`, dev only, safe to delete from Communities). It got
+   to 4 of 5 from the checklist alone. Fixed on the way:
+   - A hidden community's own admin saw "Not found." in every Site preview
+     and on "View the site". Its admin now gets the preview pass when it
+     opens.
+   - Picking a plain address in Add a place replaced the typed name with
+     the street's ("Cedar Lane").
+   - The browser tab said the first community's name on every community's
+     admin. It now says "Admin · <name>".
+   - Phone boxes showed a Philadelphia number as the example. Now
+     (555) 555-0100.
+   - Making a category with a kind, before migration 088, showed a raw
+     database error. It now says to use the kind's own name as the web
+     address. **Migration 088 is still yours to run**, dev and live.
+   **Needs your decision: Kosher lists to watch can't be done** by a new
+   community. Only Keystone-K and Mekor lists can be read, and Watches has
+   no way to add one. Options: drop the step for now, or build "add a
+   kosher agency's list" (each agency's list needs its own reader).
+   Still open, small: right after a community is made, its admin shows
+   "Not found." once (a reload fixes it); a category's preview map opens on
+   Philadelphia for any community; the nav's count updates when To do is
+   opened, not when a step is saved elsewhere.
+   Not as drawn: nothing.
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

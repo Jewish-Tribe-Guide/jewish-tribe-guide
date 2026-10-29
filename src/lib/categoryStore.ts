@@ -1,5 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
-import { isPlaceKind, placeKindFromSlug, type PlaceKind } from './placeKinds'
+import { isPlaceKind, PLACE_KIND_INFO, placeKindFromSlug, type PlaceKind } from './placeKinds'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { withAskWords } from './askWordStore'
@@ -172,6 +172,20 @@ const KIND_LABELS: Record<CategoryKind, string> = {
   medical: 'Jewish Medical Resources category',
 }
 
+// Until migration 088 adds `place_kind`, a kind is only known from the web
+// address (placeKindFromSlug), so one the address doesn't say can't be kept.
+// Says so, and the address that keeps it (each kind's own name is one),
+// instead of the database's words.
+function kindNotSavedYet(error: { message: string }, kind: PlaceKind): void {
+  if (!/place_kind/.test(error.message)) return
+  const { label } = PLACE_KIND_INFO[kind]
+  throw new Error(
+    kind === 'plain'
+      ? `${label} can’t be saved with this web address yet. Change the web address.`
+      : `${label} can’t be saved with this web address yet. A web address of “${kind}” keeps it.`,
+  )
+}
+
 export async function createCategory(community: string, input: {
   label: string
   /** An admin-chosen URL slug (see CategoryEditor's id field) — validated and
@@ -270,6 +284,7 @@ export async function createCategory(community: string, input: {
     if (error.code === '23505' && kind !== 'listing') {
       throw new Error(`A ${KIND_LABELS[kind]} already exists.`)
     }
+    if (input.placeKind) kindNotSavedYet(error, input.placeKind)
     throw new Error(`Failed to create category: ${error.message}`)
   }
   return toConfig(data as CategoryRow)
@@ -357,7 +372,10 @@ export async function updateCategory(
     .select('*')
     .maybeSingle()
 
-  if (error) throw new Error(`Failed to update category: ${error.message}`)
+  if (error) {
+    if (patch.placeKind) kindNotSavedYet(error, patch.placeKind)
+    throw new Error(`Failed to update category: ${error.message}`)
+  }
   return data ? toConfig(data as CategoryRow) : null
 }
 

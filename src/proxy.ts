@@ -7,6 +7,7 @@ import {
 } from '@/lib/configCommunity'
 import { listCommunityVisibility } from '@/lib/communityStore'
 import { createVisibilityLoader } from '@/lib/visibilityLoader'
+import { previewCookieName, previewCookieOptions } from '@/lib/previewCookie'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Redirects "/" to a community.
@@ -111,10 +112,6 @@ async function getVisibility(slug: string) {
   return (await loadVisibility())[slug] ?? null
 }
 
-function previewCookieName(slug: string): string {
-  return `jpc_preview_${slug}`
-}
-
 // /admin and /inbox never reach here at all — the matcher below excludes
 // them outright, since a community slug can never collide with either
 // (assertUsableSlug's reserved-word list blocks that at creation time).
@@ -145,13 +142,7 @@ async function gateCommunityPath(request: NextRequest) {
 
   if (fromQuery === entry.previewToken && fromCookie !== entry.previewToken) {
     const response = NextResponse.next()
-    response.cookies.set(previewCookieName(segment), entry.previewToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: `/${segment}`,
-      maxAge: 60 * 60 * 24 * 30,
-    })
+    response.cookies.set(previewCookieName(segment), entry.previewToken, previewCookieOptions(segment))
     return response
   }
   return null

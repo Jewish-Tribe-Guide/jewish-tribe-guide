@@ -10,12 +10,15 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { shortDay, splitSubmissions, submissionLine, submissionName, teachable, todoCount, watchesLine, type TodoSearch, type TodoWord } from '@/lib/todo'
 import { updateTodo, type TodoData } from '@/lib/useTodo'
+import { setupLeft } from '@/lib/setup'
 import { AdminBox, AdminEmpty, AdminRow, AdminRows, Chevron } from './AdminUI'
+import SetupChecklist from './SetupChecklist'
 
 // To do's one list (the admin redesign's step 2, boards 1 and 2): what to
 // decide, grouped by what you decide. A suggestion opens to be decided; a
 // search opens in place, with Add a place, Teach and Dismiss. Watches and
-// Responses sit at the bottom.
+// Responses sit at the bottom. A guide not yet set up has its checklist
+// first (step 6, board "Setup").
 
 const button = 'inline-flex items-center justify-center min-h-11 px-3.5 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
@@ -173,6 +176,7 @@ export default function TodoList({
   const watches = useWatchesLine(token)
   const { newPlaces, changes } = splitSubmissions(data.submissions)
   const count = todoCount(data)
+  const setupToGo = setupLeft(data.setup)
   const categoryOf = (s: EnrichedSubmission) =>
     categoriesById.get((s.payload as Partial<ResourceSubmission>).category ?? s.current?.category ?? '')
 
@@ -192,7 +196,15 @@ export default function TodoList({
 
   return (
     <div className="flex flex-col gap-4">
-      {count > 0 ? <p className="m-0 -mt-2 text-sm text-slate-600">{count} to decide</p> : <AdminEmpty />}
+      {data.setup && <SetupChecklist setup={data.setup} />}
+
+      {count > 0 ? (
+        <p className={`m-0 text-sm text-slate-600 ${setupToGo > 0 ? '' : '-mt-2'}`}>{count} to decide</p>
+      ) : setupToGo > 0 ? (
+        <p className="m-0 text-[15px] text-slate-600">Nothing else to do.</p>
+      ) : (
+        <AdminEmpty />
+      )}
 
       {newPlaces.length > 0 && (
         <AdminBox title="New places" count={newPlaces.length} foldOnPhone>

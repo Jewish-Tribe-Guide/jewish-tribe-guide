@@ -581,7 +581,7 @@ export default function ListingEditor({
               <label htmlFor="edit-phone" className={fieldLabel}>
                 Phone
               </label>
-              <input id="edit-phone" type="tel" value={draft.phone} onChange={(e) => draft.setPhone(formatPhone(e.target.value))} placeholder="(215) 555-0100" className={inputClass} />
+              <input id="edit-phone" type="tel" value={draft.phone} onChange={(e) => draft.setPhone(formatPhone(e.target.value))} placeholder="(555) 555-0100" className={inputClass} />
             </div>
           )}
           {shown.map((f) => fieldInput(f))}

@@ -533,3 +533,56 @@ describe('ModerationQueue — an address picked from Google', () => {
     }
   })
 })
+
+// Step 6 (board "Setup"): a guide not yet set up has its checklist first,
+// each step ticked by what's saved, and the nav's number takes in the
+// steps left.
+describe('ModerationQueue — Set up your guide', () => {
+  const SETUP = { logo: true, admins: 2, categories: 0, places: 0, heroWords: false, kosherLists: 0 }
+
+  function renderWithSetup(setup: typeof SETUP, items: EnrichedSubmission[] = []) {
+    vi.mocked(fetch).mockImplementation(async (url) => ({ ...fakeResponse(200), url: String(url) }) as Response)
+    vi.mocked(parseOkJson).mockImplementation(async (res) => (String((res as Response).url).includes('/api/admin/setup') ? { setup } : { submissions: items }))
+    return renderWithProviders(<ModerationQueue session={session()} />, {
+      content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] },
+    })
+  }
+
+  it('lists the five, ticks the ones saved, and says nothing else is waiting', async () => {
+    renderWithSetup(SETUP)
+    const box = await screen.findByRole('region', { name: 'Set up your guide' })
+    expect(within(box).getByText('2 of 5 done')).toBeInTheDocument()
+    const rows = within(box).getAllByRole('link')
+    expect(rows.map((r) => [r.textContent, r.getAttribute('data-done')])).toEqual([
+      ['Name and logoDone', 'true'],
+      ['A second adminDone', 'true'],
+      ['Your first categoryPick a kind, then add its places', 'false'],
+      ['The home page’s wordsThe big line and the line under it', 'false'],
+      ['Kosher lists to watchNew places on them come here to decide', 'false'],
+    ])
+    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/community', '/team', '/categories/cat:new', '/home', '/watches'])
+    expect(screen.getByText('Nothing else to do.')).toBeInTheDocument()
+    expect(screen.queryByText('Nothing to do.')).toBeNull()
+  })
+
+  it('a category with no places yet sends you to add them', async () => {
+    renderWithSetup({ ...SETUP, categories: 1 })
+    const row = await screen.findByRole('link', { name: /Your first category/ })
+    expect(row).toHaveTextContent('Add its places')
+    expect(row.getAttribute('href')).toMatch(/\/admin\/places$/)
+  })
+
+  it('is gone once all five are done', async () => {
+    renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true, kosherLists: 1 })
+    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Set up your guide' })).toBeNull()
+  })
+
+  it('sits above what there is to decide', async () => {
+    renderWithSetup(SETUP, [submission()])
+    await screen.findByRole('region', { name: 'New places' })
+    const regions = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(regions.slice(0, 2)).toEqual(['Set up your guide', 'New places'])
+    expect(screen.getByText('1 to decide')).toBeInTheDocument()
+  })
+})

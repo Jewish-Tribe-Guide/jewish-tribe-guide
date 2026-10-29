@@ -6,6 +6,7 @@ import type { ClassifiedMiss } from './missedSearches'
 import { parseOkJson } from './fetchJson'
 import { withCommunity } from './useCommunityData'
 import { openSearches, todoCount, type TodoReading, type TodoResponse, type TodoSearch } from './todo'
+import { setupLeft, type SetupState } from './setup'
 
 // What To do holds, loaded once and shared: the To do page shows it and
 // the nav counts it, from the same copy, so a decision taken on the page
@@ -20,6 +21,9 @@ export type TodoData = {
   canDismiss: boolean
   canTeach: boolean
   responses: TodoResponse[]
+  /** What the setup checklist ticks off; null if it couldn't be read, so
+   *  no checklist shows rather than a wrong one. */
+  setup: SetupState | null
 }
 
 type State = { key: string; data: TodoData | null; error: string | null }
@@ -48,7 +52,7 @@ class Unauthorized extends Error {}
 
 async function load(key: string, token: string, community: string, email: string | undefined) {
   const at = (path: string) => withCommunity(path, community)
-  const [subs, misses, readings, responses] = await Promise.allSettled([
+  const [subs, misses, readings, responses, setup] = await Promise.allSettled([
     get<{ submissions: EnrichedSubmission[] }>(at('/api/admin/submissions'), token, 'Failed to load.'),
     get<{ searches: ClassifiedMiss[]; addable: { id: string; label: string }[]; dismissalsAvailable: boolean }>(
       at('/api/admin/missed-searches'),
@@ -61,6 +65,7 @@ async function load(key: string, token: string, community: string, email: string
       'Failed to load the searches.',
     ),
     get<{ responses: TodoResponse[] }>(at('/api/admin/responses?new=1'), token, 'Failed to load the responses.'),
+    get<{ setup: SetupState }>(at('/api/admin/setup'), token, 'Failed to load the setup.'),
   ])
   if (state.key !== key) return
   if (subs.status === 'rejected') {
@@ -70,7 +75,7 @@ async function load(key: string, token: string, community: string, email: string
         : subs.reason instanceof Error
           ? subs.reason.message
           : 'Something went wrong.'
-    set({ key, data: { submissions: [], searches: [], addable: [], canDismiss: false, canTeach: false, responses: [] }, error })
+    set({ key, data: { submissions: [], searches: [], addable: [], canDismiss: false, canTeach: false, responses: [], setup: null }, error })
     return
   }
   const m = misses.status === 'fulfilled' ? misses.value : null
@@ -85,6 +90,7 @@ async function load(key: string, token: string, community: string, email: string
       canDismiss: m?.dismissalsAvailable ?? false,
       canTeach: r?.wordsAvailable ?? false,
       responses: (responses.status === 'fulfilled' && responses.value.responses) || [],
+      setup: setup.status === 'fulfilled' ? setup.value.setup : null,
     },
   })
 }
@@ -117,10 +123,11 @@ export function useTodo(token: string, community: string, email?: string, fresh 
   return s.key === key ? s : { key, data: null, error: null }
 }
 
-/** The one number in the nav: what To do holds, or null until loaded. */
+/** The one number in the nav: what To do holds, setup steps left
+ *  included, or null until loaded. */
 export function useTodoCount(token: string, community: string): number | null {
   const { data } = useTodo(token, community)
-  return data ? todoCount(data) : null
+  return data ? todoCount(data) + setupLeft(data.setup) : null
 }
 
 /** For tests: forget what was loaded. */
