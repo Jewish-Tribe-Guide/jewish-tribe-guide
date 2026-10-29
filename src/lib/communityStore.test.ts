@@ -91,7 +91,6 @@ describe('listCommunities', () => {
         slug: 'philly',
         name: 'Philadelphia Jewish Community',
         shortName: 'PJC',
-        tagline: 'Tagline',
         mission: 'Mission',
         manifestDescription: 'Manifest',
         region: 'Philadelphia',
@@ -167,7 +166,6 @@ describe('createCommunity', () => {
   const validInput = {
     slug: 'baltimore',
     name: 'Baltimore Jewish Community',
-    tagline: 'Guide for residents & visitors',
     mission: 'A guide to Jewish Baltimore.',
     region: 'Baltimore',
     timezone: 'America/New_York',

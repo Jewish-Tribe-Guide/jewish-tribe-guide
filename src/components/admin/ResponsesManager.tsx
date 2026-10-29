@@ -55,7 +55,7 @@ export default function ResponsesManager({ token }: { token: string }) {
         Feedback and responses to any custom form you’ve created. Support, Volunteer, and Volunteer
         changes are hospital-facing — those live in{' '}
         <a href={INBOX_BASE} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-          {INBOX_BASE}
+          the inbox
         </a>{' '}
         instead.
       </p>

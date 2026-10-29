@@ -95,23 +95,12 @@ export type CategoryField = {
   /** For `type: 'tags'`: which tag vocabulary group to draw from / add to. The
    *  field's value is an array of tag labels stored on the listing's `details`. */
   tagGroup?: string
-  /** For `type: 'tags'`: keep this field's tags out of the collapsed card
-   *  header — they only show once the listing is expanded. Lets a category
-   *  have a small, prominent tag group visible right away (e.g. broad kosher
-   *  labels) plus a more niche one that's one tap away instead of crowding
-   *  the header. Still fully searchable and clickable, exactly like a header
-   *  tag — only where it displays differs. Defaults to shown in the header
-   *  (today's behavior for every existing tags field). */
-  expandedOnly?: boolean
   /** For `type: 'tags'`: restrict this field to the fixed list in `options`
    *  below — nobody filling out a listing can add a new tag on the fly, only
    *  pick from what the admin set. Typing still filters/searches that list.
    *  Defaults to the open, customizable vocabulary every tags field has had
    *  until now (anyone can add a new tag, which then joins the shared
-   *  vocabulary for that `tagGroup`). Independent of `expandedOnly` — a
-   *  "primary" tags field is typically fixedVocabulary + shown in the header;
-   *  a "secondary" one is typically open + expandedOnly, but any combination
-   *  works. */
+   *  vocabulary for that `tagGroup`). */
   fixedVocabulary?: boolean
   /** Only show this field (in the form and on cards) when another detail field
    *  has the given value, e.g. show "Kosher items" only when isKosher is true. */
@@ -203,7 +192,8 @@ export type CategoryField = {
    *  the expanded panel. The sectioned form that laid this out (ListingForm)
    *  is gone, and the listing editor places its rows by editorRows.ts, so
    *  today this only marks the category's own Website field (the admin's
-   *  Website checkbox sets it; /api/admin/main-dishes' websiteOf reads it). */
+   *  Website checkbox sets it, and nothing else edits it; menuWebsite and
+   *  /api/admin/main-dishes' websiteOf read it). */
   coreSection?: boolean
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the
@@ -383,14 +373,9 @@ export type CategoryConfig = {
    *  Map/Add — e.g. "Other Mikvahs" pointing at a broader directory the site
    *  doesn't curate itself. Not tied to any listing. */
   externalLink?: { label: string; url: string } | null
-  /** A photo shown as the home-screen card's background instead of the flat
-   *  tint — a pasted image URL, not an upload. Null/unset falls back to the
-   *  tint + icon look. */
+  /** A pasted photo URL. The home's photo tile that showed it is gone; it is
+   *  now only the desktop banner's fallback (see `bandImageFor`). */
   cardImageUrl?: string | null
-  /** Text color over `cardImageUrl` (a hex string) — kept separate from the
-   *  image so the title/icon stay legible regardless of the photo. Ignored
-   *  when there's no image. */
-  cardTextColor?: string | null
   /** A second photo, specifically for the desktop directory header's wide,
    *  short banner (CategoryBandFrame) — as distinct from `cardImageUrl`,
    *  the home-screen card's roughly-4:3 tile. The two need different crops

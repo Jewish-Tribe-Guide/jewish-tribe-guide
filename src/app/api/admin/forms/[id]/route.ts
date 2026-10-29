@@ -2,7 +2,6 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { saveDraft, deleteForm } from '@/lib/formStore'
-import { isHttpUrl } from '@/lib/validation'
 import type { FormStep } from '@/lib/forms'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -13,8 +12,6 @@ type PatchBody = {
   successMessage?: string
   steps?: FormStep[]
   icon?: string
-  cardImageUrl?: string | null
-  cardTextColor?: string | null
 }
 
 // PATCH /api/admin/forms/:id — save a full draft copy of the form's title,
@@ -40,9 +37,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   if (!Array.isArray(body.steps) || body.steps.length === 0) {
     return Response.json({ ok: false, errors: ['A form needs at least one step.'] }, { status: 400 })
   }
-  if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
-    return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
-  }
 
   try {
     const form = await saveDraft(community.slug, id, {
@@ -52,8 +46,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       successMessage: body.successMessage || '',
       steps: body.steps,
       icon: body.icon,
-      cardImageUrl: body.cardImageUrl,
-      cardTextColor: body.cardTextColor,
     })
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.

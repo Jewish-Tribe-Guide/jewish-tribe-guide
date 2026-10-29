@@ -63,7 +63,7 @@ Smaller problems:
 
 ## Look tabs (Site, Desktop, Mobile)
 
-### Dead
+### Dead (removed Oct 29, the redesign's step 0)
 
 | Admin field | Why |
 |---|---|
@@ -116,7 +116,7 @@ site name, campaigns, and the About and Privacy pages.
 
 ## Categories
 
-### Dead
+### Dead (removed Oct 29, except category order, which has no field)
 
 | Admin setting | Why |
 |---|---|

@@ -195,7 +195,7 @@ export async function POST(request: Request) {
     const hospital = (await hospitalsIn(slug)).find((h) => h.id === resourceId)
     if (!hospital) return Response.json({ ok: false, errors: ['That hospital isn’t in this guide.'] }, { status: 400 })
     const { watches, available } = await listWatches(slug)
-    if (!available) return Response.json({ ok: false, errors: ['This needs database migration 070.'] }, { status: 400 })
+    if (!available) return Response.json({ ok: false, errors: ['This isn’t set up on this site yet.'] }, { status: 400 })
     const { pages, stopped, watch, marker } = hospitalWatches(watches, resourceId)
 
     if (action === 'choose') {

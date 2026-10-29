@@ -300,7 +300,7 @@ export default function EruvimManager({ token }: { token: string }) {
 
   if (error) return <p className="text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading…</p>
-  if (!data.available) return <p className="text-sm text-slate-700">The eruv table isn’t there yet: run migration 074 in the Supabase SQL editor.</p>
+  if (!data.available) return <p className="text-sm text-slate-700">Eruvin aren’t set up on this site yet.</p>
 
   return (
     <div className="space-y-4">

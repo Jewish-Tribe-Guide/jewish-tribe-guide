@@ -131,7 +131,6 @@ export function CategoryEditor({
           ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
           : null,
       cardImageUrl: draft.cardImageUrl.trim() || null,
-      cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
       cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
       pinColor: draft.pinColor || null,
     }
@@ -241,10 +240,6 @@ export function CategoryEditor({
           <CardBackgroundField
             cardImageUrl={draft.cardImageUrl}
             onCardImageUrl={(v) => set('cardImageUrl', v)}
-            cardTextColor={draft.cardTextColor}
-            onCardTextColor={(v) => set('cardTextColor', v)}
-            previewIcon={draft.icon}
-            previewTitle={draft.pluralLabel || 'Category'}
           />
           <CardBandImageField
             cardBandImageUrl={draft.cardBandImageUrl}

@@ -98,7 +98,6 @@ describe('listCategoriesUncached', () => {
       capabilities: { add: false, edit: true, report: true, directorySearch: true, map: false },
       externalLink: { label: 'Website', url: 'https://example.com' },
       cardImageUrl: 'https://example.com/card.png',
-      cardTextColor: '#fff',
       iconImageUrl: null,
       mapZoomRadiusMiles: null,
       active: true,

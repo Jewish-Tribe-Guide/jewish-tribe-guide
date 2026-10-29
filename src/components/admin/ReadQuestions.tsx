@@ -73,7 +73,6 @@ function QuestionRow({ q, busy, onForget, onTeach }: { q: ReadQuestion; busy: bo
         <button type="button" disabled={busy} onClick={onForget} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
           Forget
         </button>
-        <span className="text-muted">Read by {q.model}</span>
       </div>
     </li>
   )
@@ -168,7 +167,7 @@ export default function ReadQuestions({ token }: { token: string }) {
       </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Nothing is kept until database migration 062 is applied.
+          Read questions aren&rsquo;t set up on this site yet.
         </p>
       )}
       {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
@@ -215,7 +214,7 @@ export default function ReadQuestions({ token }: { token: string }) {
         </CollapsibleSection>
       ) : (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Teaching the search words needs database migration 063.
+          Teaching the search words isn&rsquo;t set up on this site yet.
         </p>
       )}
     </div>

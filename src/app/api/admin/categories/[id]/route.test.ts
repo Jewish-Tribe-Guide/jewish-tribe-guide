@@ -52,11 +52,11 @@ describe('PATCH /api/admin/categories/:id — grouping the list', () => {
     expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ groupBy: { kind: 'open' } }))
   })
 
-  it('says the migration is missing when the database has no group_by column yet', async () => {
+  it('says it isn’t set up yet when the database has no group_by column yet', async () => {
     m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'group_by' column of 'category' in the schema cache"))
     const res = await patch({ groupBy: { kind: 'open' } })
     expect(res.status).toBe(502)
-    expect((await res.json()).errors[0]).toMatch(/migration 059/)
+    expect((await res.json()).errors[0]).toMatch(/n’t set up on this site yet/)
   })
 })
 
@@ -76,11 +76,11 @@ describe('PATCH /api/admin/categories/:id — the question card', () => {
     expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ questionCard: { kind: 'confirm' } }))
   })
 
-  it('says the migration is missing when the database has no question_card column yet', async () => {
+  it('says it isn’t set up yet when the database has no question_card column yet', async () => {
     m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'question_card' column of 'category' in the schema cache"))
     const res = await patch({ questionCard: { kind: 'confirm' } })
     expect(res.status).toBe(502)
-    expect((await res.json()).errors[0]).toMatch(/migration 060/)
+    expect((await res.json()).errors[0]).toMatch(/n’t set up on this site yet/)
   })
 })
 
@@ -108,11 +108,11 @@ describe('PATCH /api/admin/categories/:id — places within a walk', () => {
     expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: [{ categoryId: 'synagogue', maxMinutes: 15 }] }))
   })
 
-  it('says the migration is missing when the database has no walk_list column yet', async () => {
+  it('says it isn’t set up yet when the database has no walk_list column yet', async () => {
     m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'walk_list' column of 'category' in the schema cache"))
     const res = await patch({ walkList: lists })
     expect(res.status).toBe(502)
-    expect((await res.json()).errors[0]).toMatch(/migration 061/)
+    expect((await res.json()).errors[0]).toMatch(/n’t set up on this site yet/)
   })
 })
 
@@ -129,10 +129,10 @@ describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
     expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ listingParts: null }))
   })
 
-  it('says the migration is missing when the database has no listing_parts column yet', async () => {
+  it('says it isn’t set up yet when the database has no listing_parts column yet', async () => {
     m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'listing_parts' column of 'category' in the schema cache"))
     const res = await patch({ listingParts: { shabbos: { fields: ['eruv'] } } })
     expect(res.status).toBe(502)
-    expect((await res.json()).errors[0]).toMatch(/migration 066/)
+    expect((await res.json()).errors[0]).toMatch(/n’t set up on this site yet/)
   })
 })

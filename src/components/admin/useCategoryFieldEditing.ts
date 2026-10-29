@@ -108,9 +108,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
       cardImageUrl: lastAppliedTemplate
         ? (d.cardImageUrl === (lastAppliedTemplate.cardImageUrl ?? '') ? (template.cardImageUrl ?? '') : d.cardImageUrl)
         : (d.cardImageUrl || template.cardImageUrl || ''),
-      cardTextColor: lastAppliedTemplate
-        ? (d.cardTextColor === (lastAppliedTemplate.cardTextColor ?? '#ffffff') ? (template.cardTextColor ?? '#ffffff') : d.cardTextColor)
-        : (template.cardTextColor || d.cardTextColor),
       hasAddress: template.hasAddress ?? d.hasAddress,
       hasPhone: template.hasPhone ?? d.hasPhone,
       upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,

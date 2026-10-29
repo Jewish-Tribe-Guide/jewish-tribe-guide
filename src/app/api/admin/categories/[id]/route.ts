@@ -28,7 +28,6 @@ type PatchBody = {
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
-  cardTextColor?: string | null
   cardBandImageUrl?: string | null
   pinColor?: string | null
   iconImageUrl?: string | null
@@ -163,25 +162,25 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     // The columns a save can reach before the database has them.
     if (body.groupBy !== undefined && err instanceof Error && /group_by/.test(err.message)) {
       return Response.json(
-        { ok: false, errors: ['Could not save the grouping: database migration 059 (category group_by) isn’t applied yet.'] },
+        { ok: false, errors: ['Grouping isn’t set up on this site yet.'] },
         { status: 502 },
       )
     }
     if (body.questionCard !== undefined && err instanceof Error && /question_card/.test(err.message)) {
       return Response.json(
-        { ok: false, errors: ['Could not save the question: database migration 060 (category question_card) isn’t applied yet.'] },
+        { ok: false, errors: ['The question card isn’t set up on this site yet.'] },
         { status: 502 },
       )
     }
     if (body.walkList !== undefined && err instanceof Error && /walk_list/.test(err.message)) {
       return Response.json(
-        { ok: false, errors: ['Could not save the places within a walk: database migration 061 (category walk_list) isn’t applied yet.'] },
+        { ok: false, errors: ['Places within a walk aren’t set up on this site yet.'] },
         { status: 502 },
       )
     }
     if (body.listingParts !== undefined && err instanceof Error && /listing_parts/.test(err.message)) {
       return Response.json(
-        { ok: false, errors: ['Could not save what each listing shows: database migration 066 (category listing_parts) isn’t applied yet.'] },
+        { ok: false, errors: ['Choosing what each listing shows isn’t set up on this site yet.'] },
         { status: 502 },
       )
     }

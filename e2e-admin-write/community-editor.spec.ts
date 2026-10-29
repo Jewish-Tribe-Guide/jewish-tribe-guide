@@ -43,7 +43,7 @@ test.afterEach(async () => {
 
 const visible = (page: import('@playwright/test').Page, locator: Locator) => locator.and(page.locator(':visible'))
 
-// Tagline/mission/region/timezone/map center/colors live under a collapsed
+// Mission/region/timezone/map center/colors live under a collapsed
 // "More details" disclosure now (see CommunityManager.tsx's own comment on
 // why — none of it is required to create a community, since it starts
 // unpublished either way). This suite still fills them in by hand rather
@@ -66,7 +66,6 @@ test('creating a community through the real UI, starting empty, makes it live wi
   // randomUUID-based fixture, so overwrite it to keep cleanup exact.
   await page.getByLabel('URL slug').fill(slug)
   await openMoreDetails(page)
-  await page.getByLabel('Tagline').fill('Guide for residents & visitors')
   await page.getByLabel('Mission').fill('A guide to a brand-new disposable test community.')
   await page.getByLabel('Region').fill('Testville')
   await page.getByLabel('Map center latitude').fill('39.95')
@@ -135,7 +134,6 @@ test('cloning from an existing community carries its categories over', async ({ 
   await page.getByLabel('Name').fill(sourceName)
   await page.getByLabel('URL slug').fill(sourceSlug)
   await openMoreDetails(page)
-  await page.getByLabel('Tagline').fill('Source')
   await page.getByLabel('Mission').fill('Source community for a clone test.')
   await page.getByLabel('Region').fill('Testville')
   await page.getByLabel('Map center latitude').fill('39.95')
@@ -180,7 +178,6 @@ test('cloning from an existing community carries its categories over', async ({ 
   await page.getByLabel('Name').fill(name)
   await page.getByLabel('URL slug').fill(targetSlug)
   await openMoreDetails(page)
-  await page.getByLabel('Tagline').fill('Guide for residents & visitors')
   await page.getByLabel('Mission').fill('A guide to a cloned disposable test community.')
   await page.getByLabel('Region').fill('Testville')
   await page.getByLabel('Map center latitude').fill('39.95')
@@ -217,7 +214,6 @@ test('deleting a community through the real UI removes it and everything in it',
   await page.getByLabel('Name').fill(name)
   await page.getByLabel('URL slug').fill(slug)
   await openMoreDetails(page)
-  await page.getByLabel('Tagline').fill('Guide for residents & visitors')
   await page.getByLabel('Mission').fill('A guide to a disposable test community, about to be deleted.')
   await page.getByLabel('Region').fill('Testville')
   await page.getByLabel('Map center latitude').fill('39.95')

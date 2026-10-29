@@ -66,7 +66,6 @@ function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
     slug: 'philly',
     name: 'Philadelphia Jewish Community',
     shortName: 'PJC',
-    tagline: 'Guide for residents & visitors',
     mission: 'A guide to Jewish Philadelphia.',
     manifestDescription: 'A guide to Jewish Philadelphia.',
     region: 'Philadelphia',
@@ -102,8 +101,8 @@ async function renderAndWaitForList(communities: TestCommunity[] = [makeCommunit
 // can isolate exactly one validation branch. Region/lat/lng are filled by
 // hand (under "More details") rather than via the city picker, so this
 // stays independent of that auto-fill behavior — see the "city picker"
-// tests below for that. Deliberately leaves tagline/mission blank (no
-// longer required — they default at submit time) and theme/background
+// tests below for that. Deliberately leaves mission blank (no
+// longer required — it defaults at submit time) and theme/background
 // colors at their (valid) component defaults.
 async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^name$/i), 'Baltimore Jewish Community')
@@ -196,7 +195,7 @@ describe('CommunityManager — new community form', () => {
     expect(fetchJson).not.toHaveBeenCalled()
   })
 
-  it('leaving tagline and mission blank still creates the community, with generated defaults', async () => {
+  it('leaving mission blank still creates the community, with generated defaults', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
@@ -207,7 +206,7 @@ describe('CommunityManager — new community form', () => {
     await waitFor(() => expect(fetchJson).toHaveBeenCalled())
     const call = vi.mocked(fetchJson).mock.calls[0]!
     const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body.tagline).toBe('Guide for residents & visitors')
+    expect(body).not.toHaveProperty('tagline')
     expect(body.mission).toBe('A guide to the Baltimore Jewish community.')
   })
 
@@ -320,7 +319,6 @@ describe('CommunityManager — new community form', () => {
     expect(body).toMatchObject({
       slug: 'baltimore-jewish-community',
       name: 'Baltimore Jewish Community',
-      tagline: 'Guide for residents & visitors',
       mission: 'A guide to the Baltimore Jewish community.',
       region: 'Baltimore',
       mapCenter: { lat: 39.369, lng: -76.715 },
@@ -360,7 +358,7 @@ describe('CommunityManager — new community form', () => {
 })
 
 describe('CommunityManager — the city picker auto-fills the rest of the form', () => {
-  it('fills name, slug, region, map center, tagline and mission from a single city pick', async () => {
+  it('fills name, slug, region, map center and mission from a single city pick', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
@@ -377,7 +375,6 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
       region: 'Baltimore',
       mapCenter: { lat: 39.2904, lng: -76.6122 },
       timezone: 'America/New_York',
-      tagline: 'Guide for residents & visitors',
       mission: 'A guide to Jewish Baltimore — community resources for residents and visitors.',
     })
   })
@@ -396,14 +393,13 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
     expect(screen.getByLabelText(/url slug/i)).toHaveValue('my-custom-community-name')
   })
 
-  it('never overwrites region/tagline/mission already typed by hand', async () => {
+  it('never overwrites region/mission already typed by hand', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
     await user.click(screen.getByRole('button', { name: /show more details/i }))
 
     await user.type(screen.getByLabelText(/^region$/i), 'Custom Region')
-    await user.type(screen.getByLabelText(/^tagline$/i), 'Custom tagline')
     await user.type(screen.getByLabelText(/^mission$/i), 'Custom mission.')
 
     await user.click(screen.getByRole('button', { name: /simulate city select/i }))
@@ -413,7 +409,6 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
     const call = vi.mocked(fetchJson).mock.calls[0]!
     const body = JSON.parse((call[1] as RequestInit).body as string)
     expect(body.region).toBe('Custom Region')
-    expect(body.tagline).toBe('Custom tagline')
     expect(body.mission).toBe('Custom mission.')
     // Map center and timezone aren't hand-typed here, so the pick still sets them.
     expect(body.mapCenter).toEqual({ lat: 39.2904, lng: -76.6122 })
@@ -572,7 +567,7 @@ describe('CommunityManager — deleting a community', () => {
     await openCard(user, cardFor(/upper east side/i))
 
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/deleting a community isn.t available in production/i)).toBeInTheDocument()
+    expect(screen.getByText(/communities can.t be deleted on the live site/i)).toBeInTheDocument()
   })
 })
 
@@ -720,7 +715,7 @@ describe('CommunityManager — admin roster', () => {
     const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
     await renderAndWaitForList([empty])
     await openCard(user, cardFor(/empty community/i))
-    expect(screen.getByText(/no admins set — falls back to the superadmin list/i)).toBeInTheDocument()
+    expect(screen.getByText(/no admins set — only the site owner can sign in/i)).toBeInTheDocument()
   })
 
   it('adds a new admin', async () => {

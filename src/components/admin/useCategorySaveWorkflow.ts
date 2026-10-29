@@ -201,7 +201,6 @@ export function useCategorySaveWorkflow({
             ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
             : null,
         cardImageUrl: draft.cardImageUrl.trim() || null,
-        cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
         cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
         // '' from the picker means "Automatic" — stored as null so
         // getCategoryColor falls back to the positional palette.

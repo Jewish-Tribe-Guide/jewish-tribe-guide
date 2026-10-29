@@ -162,8 +162,6 @@ describe('saveDraft', () => {
       successMessage: 'ok',
       steps: [],
       icon: '',
-      cardImageUrl: null,
-      cardTextColor: null,
     }
     await saveDraft('philly', 'support', draft)
 
@@ -194,8 +192,6 @@ describe('publishDraft', () => {
       successMessage: 'ok',
       steps: [{ kind: 'text', key: 'note' }],
       icon: '  🎉  ',
-      cardImageUrl: 'https://example.com/card.png',
-      cardTextColor: '#123456',
     }
     const readBuilder = chainable({ data: { ...rawRow, draft }, error: null })
     const writeBuilder = chainable({ data: { ...rawRow, title: draft.title, draft: null }, error: null })
@@ -212,37 +208,13 @@ describe('publishDraft', () => {
         title: 'Updated Title',
         submit_label: 'Send it',
         icon: '🎉',
-        card_image_url: 'https://example.com/card.png',
-        card_text_color: '#123456',
         draft: null,
       }),
     )
-  })
-
-  it('drops the text color when there is no card image (color-without-image makes no sense)', async () => {
-    const draft = {
-      title: 'Updated Title',
-      submitLabel: 'Send it',
-      successTitle: 'Thanks!',
-      successMessage: 'ok',
-      steps: [],
-      icon: '',
-      cardImageUrl: null,
-      cardTextColor: '#123456', // set, but no image
-    }
-    const readBuilder = chainable({ data: { ...rawRow, draft }, error: null })
-    const writeBuilder = chainable({ data: rawRow, error: null })
-    let call = 0
-    mockFrom.mockImplementation(() => {
-      call += 1
-      return call === 1 ? readBuilder : writeBuilder
-    })
-
-    await publishDraft('philly', 'support')
-
-    expect(writeBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({ card_image_url: null, card_text_color: null }),
-    )
+    // The home's photo tile is gone, so publishing writes no photo or colour.
+    const written = (writeBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(written).not.toHaveProperty('card_image_url')
+    expect(written).not.toHaveProperty('card_text_color')
   })
 
   it('throws with the Supabase error message when the write fails', async () => {
@@ -253,8 +225,6 @@ describe('publishDraft', () => {
       successMessage: 'X',
       steps: [],
       icon: '',
-      cardImageUrl: null,
-      cardTextColor: null,
     }
     const readBuilder = chainable({ data: { ...rawRow, draft }, error: null })
     const writeBuilder = chainable({ data: null, error: { message: 'boom' } })
@@ -295,8 +265,6 @@ describe('createForm', () => {
       successMessage: '',
       steps: [{ kind: 'text', key: 'note' }],
       icon: null,
-      cardImageUrl: null,
-      cardTextColor: null,
     }
     await createForm('philly', content as never)
 
@@ -318,8 +286,6 @@ describe('createForm', () => {
       successMessage: '',
       steps: [],
       icon: null,
-      cardImageUrl: null,
-      cardTextColor: null,
     }
     await createForm('philly', content as never)
 
@@ -343,8 +309,6 @@ describe('createForm', () => {
       successMessage: '',
       steps: [{ kind: 'text', key: 'note' }],
       icon: null,
-      cardImageUrl: null,
-      cardTextColor: null,
     }
     await createForm('philly', content as never)
 
@@ -369,8 +333,6 @@ describe('createForm', () => {
       successMessage: '',
       steps: [],
       icon: null,
-      cardImageUrl: null,
-      cardTextColor: null,
     }
     await expect(createForm('philly', content as never)).rejects.toThrow('Failed to create form: boom')
   })

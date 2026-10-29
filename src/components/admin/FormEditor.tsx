@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
-import { IconField, CardBackgroundField } from './CategoryFormFields'
+import { IconField } from './CategoryFormFields'
 import { fetchJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -31,8 +31,6 @@ const NEW_FORM_DEFAULTS: FormContent = {
   successMessage: 'Thanks — we’ll be in touch.',
   steps: DEFAULT_CONTACT_STEPS,
   icon: '',
-  cardImageUrl: null,
-  cardTextColor: null,
 }
 
 function toContent(f: FormConfig | null): FormContent {
@@ -46,8 +44,6 @@ function toContent(f: FormConfig | null): FormContent {
     successMessage: f.successMessage,
     steps: f.steps,
     icon: f.icon,
-    cardImageUrl: f.cardImageUrl,
-    cardTextColor: f.cardTextColor,
   }
 }
 
@@ -235,8 +231,6 @@ export default function FormEditor({
         successMessage: form.successMessage,
         steps: form.steps,
         icon: form.icon,
-        cardImageUrl: form.cardImageUrl,
-        cardTextColor: form.cardTextColor,
       })
       setSavedNotice(false)
     } catch (err) {
@@ -292,14 +286,6 @@ export default function FormEditor({
             <span className="block text-xs font-medium text-slate-700 mb-1">Success screen message</span>
             <textarea rows={2} value={draft.successMessage} onChange={(e) => set('successMessage', e.target.value)} className={inputClass} />
           </label>
-          <CardBackgroundField
-            cardImageUrl={draft.cardImageUrl ?? ''}
-            onCardImageUrl={(v) => set('cardImageUrl', v)}
-            cardTextColor={draft.cardTextColor || '#ffffff'}
-            onCardTextColor={(v) => set('cardTextColor', v)}
-            previewIcon={draft.icon ?? ''}
-            previewTitle={draft.title || 'Form'}
-          />
         </section>
 
         {/* Steps */}

@@ -213,7 +213,7 @@ export async function POST(request: Request) {
     const place = places.find((p) => p.id === resourceId)
     if (!place) return Response.json({ ok: false, errors: [`That place isn’t one whose ${words.what} are read.`] }, { status: 400 })
     const { watches, available } = await listWatches(slug)
-    if (!available) return Response.json({ ok: false, errors: ['This needs database migration 070.'] }, { status: 400 })
+    if (!available) return Response.json({ ok: false, errors: ['This isn’t set up on this site yet.'] }, { status: 400 })
     const { pages, stopped, marker } = placeWatches(watches, resourceId)
     // One page after another: each read sees what the one before it
     // filed, so a shul's three pages can't each file the same part of its

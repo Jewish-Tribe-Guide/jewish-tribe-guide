@@ -14,7 +14,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
-const base = { hits: 1, model: 'gpt-6-luna', lastUsedAt: '2026-09-30T12:00:00Z', approvedAt: null, approvedBy: null, proposals: [] }
+const base = { hits: 1, model: 'gpt-6-luna', lastUsedAt: '2026-09-30T12:00:00Z', proposals: [] }
 const teachIkc = { word: 'ikc', categoryId: 'restaurant', field: 'kosherCert', value: 'IKC', label: 'Food · Kosher Cert: IKC' }
 const ikc = { ...base, key: 'ikc dairy', question: 'IKC dairy?', labels: ['Food', 'Kosher Cert: IKC', 'Dairy'], hits: 4, proposals: [teachIkc] }
 const bagels = { ...base, key: 'bagels', question: 'bagels', labels: ['Bagels'], approvedAt: '2026-09-29T12:00:00Z', approvedBy: 'me@x.co' }
@@ -87,14 +87,16 @@ describe('ReadQuestions', () => {
     expect(screen.queryByTestId('taught-word')).toBeNull()
   })
 
-  it('says when teaching needs its migration', async () => {
+  // Never a migration number or a model id: an admin can do nothing with either.
+  it('says when teaching isn’t set up', async () => {
     await renderList([ikc], true, [], false)
-    expect(screen.getByText(/migration 063/)).toBeTruthy()
+    expect(screen.getByText(/Teaching the search words isn.t set up on this site yet/)).toBeTruthy()
+    expect(screen.queryByText(/migration|gpt-6-luna/)).toBeNull()
   })
 
   it('says plainly when the table isn’t there yet', async () => {
     await renderList([], false)
-    expect(screen.getByText(/migration 062/)).toBeTruthy()
+    expect(screen.getByText(/Read questions aren.t set up on this site yet/)).toBeTruthy()
     expect(screen.queryByRole('heading', { name: /Questions/ })).toBeNull()
   })
 })

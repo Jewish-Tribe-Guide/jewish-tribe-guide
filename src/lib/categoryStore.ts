@@ -37,7 +37,8 @@ type CategoryRow = {
   external_link_label: string | null
   external_link_url: string | null
   card_image_url: string | null
-  card_text_color: string | null
+  // card_text_color is still a column, but nothing reads it: the home's
+  // photo tile it coloured is gone.
   card_band_image_url: string | null
   pin_color: string | null
   icon_image_url: string | null
@@ -74,7 +75,6 @@ function toConfig(row: CategoryRow): CategoryConfig {
         ? { label: row.external_link_label, url: row.external_link_url }
         : null,
     cardImageUrl: row.card_image_url,
-    cardTextColor: row.card_text_color,
     cardBandImageUrl: row.card_band_image_url,
     pinColor: row.pin_color,
     iconImageUrl: row.icon_image_url,
@@ -190,7 +190,6 @@ export async function createCategory(community: string, input: {
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
-  cardTextColor?: string | null
   cardBandImageUrl?: string | null
   pinColor?: string | null
   iconImageUrl?: string | null
@@ -250,7 +249,6 @@ export async function createCategory(community: string, input: {
     external_link_label: input.externalLink?.label ?? null,
     external_link_url: input.externalLink?.url ?? null,
     card_image_url: input.cardImageUrl?.trim() || null,
-    card_text_color: input.cardTextColor?.trim() || null,
     card_band_image_url: input.cardBandImageUrl?.trim() || null,
     pin_color: input.pinColor?.trim() || null,
     icon_image_url: input.iconImageUrl?.trim() || null,
@@ -289,7 +287,6 @@ export async function updateCategory(
     capabilities?: Partial<CategoryCapabilities>
     externalLink?: { label: string; url: string } | null
     cardImageUrl?: string | null
-    cardTextColor?: string | null
     cardBandImageUrl?: string | null
     pinColor?: string | null
     iconImageUrl?: string | null
@@ -321,7 +318,6 @@ export async function updateCategory(
     row.external_link_url = patch.externalLink?.url ?? null
   }
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
-  if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
   if (patch.cardBandImageUrl !== undefined) row.card_band_image_url = patch.cardBandImageUrl?.trim() || null
   if (patch.pinColor !== undefined) row.pin_color = patch.pinColor?.trim() || null
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null

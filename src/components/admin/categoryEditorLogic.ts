@@ -52,12 +52,8 @@ export type Draft = {
    *  mikvah.org. Both blank means none. */
   externalLinkLabel: string
   externalLinkUrl: string
-  /** Photo shown as the home-screen card's background instead of the flat
-   *  tint. Blank means none — the text color below is only used when this
-   *  is set. */
+  /** A pasted photo URL — the desktop banner's fallback. Blank means none. */
   cardImageUrl: string
-  /** Text color over the card image (a hex string). */
-  cardTextColor: string
   /** Photo for the desktop directory banner (CategoryBandFrame) — its own
    *  upload/crop, separate from cardImageUrl above. Blank falls back to
    *  cardImageUrl, then to the plain color wash — see bandImageFor. */
@@ -151,7 +147,6 @@ export function toDraft(c: CategoryConfig | null): Draft {
     externalLinkLabel: c?.externalLink?.label ?? '',
     externalLinkUrl: c?.externalLink?.url ?? '',
     cardImageUrl: c?.cardImageUrl ?? '',
-    cardTextColor: c?.cardTextColor || '#ffffff',
     cardBandImageUrl: c?.cardBandImageUrl ?? '',
     pinColor: c?.pinColor || '',
     active: c?.active ?? true,

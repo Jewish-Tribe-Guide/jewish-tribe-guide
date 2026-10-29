@@ -341,14 +341,14 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
     expect(indices.every((i) => i !== -1)).toBe(true)
   })
 
-  it('shows the Browse card\'s eyebrow/heading fields once a Browse row exists', async () => {
+  it('shows the Update Listings card\'s eyebrow/heading fields once its row exists', async () => {
     const user = userEvent.setup()
     await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
-      { id: 'browse', kind: 'browse', title: 'Browse & search', sortOrder: -400, cardIds: [], width: 'full' },
+      { id: 'listings', kind: 'listings', title: 'Update Listings', sortOrder: -300, cardIds: [], width: 'full' },
     ])
     await openAllSections(user)
-    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseEyebrow)).toBeInTheDocument()
-    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopListingsEyebrow)).toBeInTheDocument()
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)).toBeInTheDocument()
   })
 
   // Regression: the editor showed the default items whenever the draft's list
@@ -373,7 +373,7 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
   it('toggling a card between Full and Half width enables Save', async () => {
     const user = userEvent.setup()
     await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
-      { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 0, cardIds: [], width: 'full' },
+      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 0, cardIds: [], width: 'full' },
     ])
     await openAllSections(user)
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()

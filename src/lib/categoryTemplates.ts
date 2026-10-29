@@ -29,10 +29,8 @@ export type CategoryTemplate = {
    *  its directory page, not to be confused with this template's own
    *  `description` above (which only labels the template itself). */
   categoryDescription?: string
-  /** Pre-fills the home-screen card's photo background + text color — see
-   *  `cardImageUrl`/`cardTextColor` on CategoryConfig. */
+  /** Pre-fills `cardImageUrl` on CategoryConfig. */
   cardImageUrl?: string
-  cardTextColor?: string
   hasAddress?: boolean
   hasPhone?: boolean
   upvotesEnabled?: boolean
@@ -51,7 +49,6 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
     categoryDescription: 'Nearby shuls with davening times, contacts, and WhatsApp groups',
     cardImageUrl:
       'https://images.unsplash.com/photo-1612388839403-4d732790455b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    cardTextColor: '#ffffff',
     fields: [
       {
         key: 'denomination',
@@ -84,7 +81,6 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
     categoryDescription: 'Mikvah locations, hours, and contact information',
     cardImageUrl:
       'https://media.istockphoto.com/id/509170748/photo/purity-mikveh.webp?a=1&b=1&s=612x612&w=0&k=20&c=2fb7aMGs-sLLaBnA-d6eEAzUK75Me66jIr1dEeuTTao=',
-    cardTextColor: '#ffffff',
     fields: [
       { key: 'e', type: 'text', label: 'General Email', renderAs: 'row', filterable: false },
       { key: 'hours', type: 'hours', label: 'Hours', renderAs: 'row', filterable: true },
@@ -113,7 +109,6 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
     categoryDescription: 'Kosher and local grocery stores near the hospital',
     cardImageUrl:
       'https://plus.unsplash.com/premium_photo-1683121938935-118d0a16a469?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    cardTextColor: '#ffffff',
     upvotesEnabled: true,
     fields: [
       { key: 'hours', type: 'hours', label: 'Hours', renderAs: 'row', filterable: true },
@@ -139,7 +134,6 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
     categoryDescription: 'Kosher and nearby dining options',
     cardImageUrl:
       'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    cardTextColor: '#ffffff',
     upvotesEnabled: true,
     fields: [
       {
@@ -197,7 +191,6 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
     categoryDescription: 'Lodging with shuttle and Shabbat-friendly options',
     cardImageUrl:
       'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    cardTextColor: '#ffffff',
     upvotesEnabled: true,
     fields: [
       { key: 'shabbatFriendly', type: 'boolean', label: 'Shabbat friendly', renderAs: 'badge', filterable: true, filterLabel: 'Shabbat friendly' },

@@ -84,8 +84,6 @@ type Draft = {
   nameTouched: boolean
   slug: string
   slugTouched: boolean
-  tagline: string
-  taglineTouched: boolean
   mission: string
   missionTouched: boolean
   region: string
@@ -106,8 +104,6 @@ function emptyDraft(): Draft {
     nameTouched: false,
     slug: '',
     slugTouched: false,
-    tagline: '',
-    taglineTouched: false,
     mission: '',
     missionTouched: false,
     region: '',
@@ -126,7 +122,7 @@ function emptyDraft(): Draft {
 }
 
 // Google's `formattedAddress` for a locality reads "Baltimore, MD, USA" —
-// the part before the first comma is what a name/region/tagline actually
+// the part before the first comma is what a name/region actually
 // wants ("Baltimore"), not the full string. Good enough for the common case;
 // everything it feeds stays editable if a city's real name needs adjusting.
 function cityShortName(cityQuery: string): string {
@@ -161,9 +157,9 @@ export default function CommunityManager({ token }: { token: string }) {
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [draft, setDraft] = useState<Draft>(emptyDraft())
-  // Tagline/mission/region/timezone/map center/brand colors — everything
+  // Mission/region/timezone/map center/brand colors — everything
   // the city picker fills in, or that's editable later from the admin
-  // console (tagline/mission via Site Settings) and so isn't worth blocking
+  // console (mission via Site Settings) and so isn't worth blocking
   // creation on. Collapsed by default; opens on its own if lat/lng end up
   // missing at submit time (no city picked, e.g. Places unavailable) so the
   // manual fallback is never hidden from someone who actually needs it.
@@ -258,10 +254,6 @@ export default function CommunityManager({ token }: { token: string }) {
     setDraft((d) => ({ ...d, region, regionTouched: true }))
   }
 
-  function setTagline(tagline: string) {
-    setDraft((d) => ({ ...d, tagline, taglineTouched: true }))
-  }
-
   function setMission(mission: string) {
     setDraft((d) => ({ ...d, mission, missionTouched: true }))
   }
@@ -278,7 +270,7 @@ export default function CommunityManager({ token }: { token: string }) {
   // setCityQuery has already landed the chosen city's text — see that
   // function's own note on why reading d.cityQuery here is safe. Auto-fills
   // everything a real address would otherwise make an admin hunt down by
-  // hand (map center, timezone, region, a starting name/slug/tagline/
+  // hand (map center, timezone, region, a starting name/slug/
   // mission), without overwriting anything already edited by hand.
   function setCityCoords(coords: { lat: number; lng: number } | null) {
     setDraft((d) => {
@@ -297,7 +289,6 @@ export default function CommunityManager({ token }: { token: string }) {
         // suffix ends up baked into the URL (e.g. baltimore-jewish-guide).
         // A hand-typed name still drives the slug as before.
         slug: d.slugTouched ? d.slug : slugify(d.nameTouched ? name : city),
-        tagline: d.taglineTouched ? d.tagline : 'Guide for residents & visitors',
         mission: d.missionTouched
           ? d.mission
           : `A guide to Jewish ${city} — community resources for residents and visitors.`,
@@ -347,7 +338,6 @@ export default function CommunityManager({ token }: { token: string }) {
             // blank field (cleared by hand, or never auto-filled because no
             // city was picked) still needs something real to submit rather
             // than an empty string admin-visible copy would render as.
-            tagline: draft.tagline.trim() || 'Guide for residents & visitors',
             mission: draft.mission.trim() || `A guide to the ${draft.region.trim() || draft.name.trim()} Jewish community.`,
             region: draft.region.trim(),
             timezone: draft.timezone.trim(),
@@ -564,7 +554,7 @@ export default function CommunityManager({ token }: { token: string }) {
             />
           </label>
           <p className="text-xs text-muted mt-1">
-            Fills in the name, URL slug, region, timezone, map center, tagline and mission below — pick a suggestion
+            Fills in the name, URL slug, region, timezone, map center and mission below — pick a suggestion
             from the dropdown rather than just typing, so those actually get set.
           </p>
         </div>
@@ -626,27 +616,17 @@ export default function CommunityManager({ token }: { token: string }) {
             picker above, or safe to leave at its default — a new community
             starts unpublished (see the visibility migration), so none of
             this needs to be right, or even present, before creating it.
-            Tagline/mission are editable later from Site Settings too. */}
+            Mission is editable later from Site Settings too. */}
         <button
           type="button"
           onClick={() => setDetailsOpen((v) => !v)}
           className="text-sm font-medium text-primary hover:underline cursor-pointer"
         >
-          {detailsOpen ? '− Hide' : '+ Show'} more details (tagline, mission, region, timezone, map center, colors)
+          {detailsOpen ? '− Hide' : '+ Show'} more details (mission, region, timezone, map center, colors)
         </button>
 
         {detailsOpen && (
           <div className="space-y-4 border-t border-slate-200 pt-4">
-            <label className={labelClass}>
-              Tagline
-              <input
-                className={inputClass}
-                value={draft.tagline}
-                onChange={(e) => setTagline(e.target.value)}
-                placeholder="Guide for residents & visitors"
-              />
-            </label>
-
             <label className={labelClass}>
               Mission
               <textarea
@@ -739,7 +719,7 @@ export default function CommunityManager({ token }: { token: string }) {
       </div>
 
       {deletionDisabled && (
-        <p className="text-xs text-muted mb-3">Deleting a community isn&rsquo;t available in production.</p>
+        <p className="text-xs text-muted mb-3">Communities can&rsquo;t be deleted on the live site.</p>
       )}
       {toggleError && <p className="text-xs text-red-700 mb-3">{toggleError}</p>}
 
@@ -964,7 +944,7 @@ export default function CommunityManager({ token }: { token: string }) {
                 </div>
               ) : (
                 <p className="text-xs text-slate-500 italic">
-                  No admins set — falls back to the superadmin list (SUPERADMIN_EMAILS).
+                  No admins set — only the site owner can sign in.
                 </p>
               )}
 

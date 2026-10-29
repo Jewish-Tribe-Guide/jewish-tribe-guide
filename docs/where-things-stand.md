@@ -359,7 +359,7 @@ brief, one round of drawings, then the build in pieces.
    nav counts. Build order: clean-up, shell, To do, Places, Site, Reports
    and gear, checklist.
 4. **Drawings: ALL DRAWN Oct 28, waiting on the user.**
-   https://claude.ai/artifact/9yEZYDSSXt88jyu38tFvWm, 18 boards: To do
+   https://claude.ai/artifact/9yEZYDSSXt88jyu38tFvWm, 21 boards: To do
    (desktop, and phone with a search opened), deciding a change (The Kosher
    Grill's hours), deciding a new place (Kosher Experience - Marlton Tpke),
    Places, a category page (Food, and 6b with the Computer/Phone switch),
@@ -385,6 +385,19 @@ brief, one round of drawings, then the build in pieces.
    - Header items and phone tabs get an on/off switch and drag order.
    `category.kind` already exists (listing, map, eruv, zmanim, medical), so
    the agreed kinds extend it rather than adding a column.
+5. **Build, step 0 (clean-up): BUILT Oct 29** on `redesign/oct18-fixes`.
+   Gone from the admin and the code: the tagline (site and new-community),
+   the Browse, Davening and Map card headings, the width toggle on the two
+   cards that always share a row, the card text colour (categories and
+   forms), a form's card photo, the dead photo home tile, the "group at the
+   top of the form" checkbox, a tags field's "only when opened", and Read
+   questions' approve (old approvals still answer; prod has 2). Developer
+   text ("migration 0xx", "Supabase", model names) is now plain words.
+   `src/lib/settingsReaders.test.ts` fails on any setting nothing on the
+   site reads. The database columns are still there: dropping them needs
+   the user's yes on production (site_settings tagline and desktop_browse,
+   desktop_davening and desktop_map eyebrow/heading; card_text_color on
+   category and form; card_image_url on form). Next: step 1, the shell.
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

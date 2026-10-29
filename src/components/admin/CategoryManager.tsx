@@ -662,7 +662,6 @@ export function SingletonEditor({
   const [icon, setIcon] = useState(category.icon || '')
   const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
-  const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
   const [cardBandImageUrl, setCardBandImageUrl] = useState(category.cardBandImageUrl ?? '')
   // Map only — kept as a string (not number|null) so the field can sit blank
   // mid-edit rather than snapping to 0. Parsed back to number|null on save.
@@ -710,7 +709,6 @@ export function SingletonEditor({
       icon: icon.trim() || category.icon,
       iconImageUrl: iconImageUrl.trim() || null,
       cardImageUrl: cardImageUrl.trim() || null,
-      cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
       cardBandImageUrl: cardBandImageUrl.trim() || null,
     }
     return <CategoryPreview category={previewCategory} onClose={closePreview} />
@@ -735,7 +733,6 @@ export function SingletonEditor({
             icon,
             iconImageUrl: iconImageUrl.trim() || null,
             cardImageUrl: cardImageUrl.trim() || null,
-            cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
             cardBandImageUrl: cardBandImageUrl.trim() || null,
             ...(category.kind === 'map'
               ? { mapZoomRadiusMiles: mapZoomRadius.trim() === '' ? null : Number(mapZoomRadius) }
@@ -783,10 +780,6 @@ export function SingletonEditor({
         <CardBackgroundField
           cardImageUrl={cardImageUrl}
           onCardImageUrl={setCardImageUrl}
-          cardTextColor={cardTextColor}
-          onCardTextColor={setCardTextColor}
-          previewIcon={icon}
-          previewTitle={name || category.pluralLabel}
         />
         <CardBandImageField
           cardBandImageUrl={cardBandImageUrl}

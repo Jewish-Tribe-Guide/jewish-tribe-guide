@@ -88,6 +88,6 @@ describe('MissedSearches', () => {
   it('offers no Dismiss, and says why, before the dismissals table exists', async () => {
     await renderList([dentist], false)
     expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull()
-    expect(screen.getByText(/migration 058/)).toBeTruthy()
+    expect(screen.getByText(/Dismiss isn.t set up on this site yet/)).toBeTruthy()
   })
 })

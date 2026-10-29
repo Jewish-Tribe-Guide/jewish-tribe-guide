@@ -204,7 +204,7 @@ export default function MissedSearches({ token }: { token: string }) {
       </p>
       {!data.dismissalsAvailable && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Dismiss isn&rsquo;t available until database migration 058 is applied.
+          Dismiss isn&rsquo;t set up on this site yet.
         </p>
       )}
       {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}

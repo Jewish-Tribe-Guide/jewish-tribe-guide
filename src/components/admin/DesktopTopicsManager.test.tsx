@@ -100,21 +100,31 @@ describe('DesktopTopicsManager', () => {
 
   it('defaults to Full width selected, and clicking Half width calls onChange with the updated card', async () => {
     const user = userEvent.setup()
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([davening])
+    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
+    const { onChange } = renderManager([subscribe])
 
     expect(screen.getByRole('button', { name: 'Full width' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Half width' })).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(screen.getByRole('button', { name: 'Half width' }))
 
-    expect(onChange).toHaveBeenCalledWith([{ ...davening, width: 'half' }])
+    expect(onChange).toHaveBeenCalledWith([{ ...subscribe, width: 'half' }])
+  })
+
+  // Davening Times and Update Listings always share one row on the home with
+  // Suggest a Listing, which ignores their width (Landing.tsx).
+  it('offers no width for the two cards that always share a row', () => {
+    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
+    const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
+    renderManager([davening, listings])
+
+    expect(screen.queryByRole('button', { name: 'Full width' })).not.toBeInTheDocument()
   })
 
   it('shows a hint explaining pairing only once a card is set to Half width', async () => {
     const user = userEvent.setup()
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    render(<ManagerHarness initialSections={[davening]} />)
+    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
+    render(<ManagerHarness initialSections={[subscribe]} />)
 
     expect(screen.queryByText(/pairs with a neighboring half-width card/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Half width' }))
@@ -130,11 +140,21 @@ describe('DesktopTopicsManager', () => {
   })
 
   it('shows Eyebrow and Heading inputs for a card that has both, seeded from settings', () => {
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    renderManager([davening], vi.fn(), { ...SITE_SETTINGS_DEFAULTS, desktopDaveningEyebrow: 'Right now', desktopDaveningHeading: 'Next Minyan' })
+    const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
+    renderManager([listings], vi.fn(), { ...SITE_SETTINGS_DEFAULTS, desktopListingsEyebrow: 'Right now', desktopListingsHeading: 'Kept by you' })
 
     expect(screen.getByDisplayValue('Right now')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Next Minyan')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Kept by you')).toBeInTheDocument()
+  })
+
+  // Their titles are fixed on the site, so a field for them would change nothing.
+  it('shows no text fields for the Categories and Davening Times cards', () => {
+    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Browse', cardIds: [], width: 'full' }
+    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
+    renderManager([browse, davening])
+
+    expect(screen.queryByText('Heading')).not.toBeInTheDocument()
+    expect(screen.queryByText('Eyebrow')).not.toBeInTheDocument()
   })
 
   // Jewish Times has no eyebrow field at all — its real eyebrow is the
@@ -150,10 +170,10 @@ describe('DesktopTopicsManager', () => {
 
   it('editing a card\'s Heading input calls onSettingChange with the right key', async () => {
     const user = userEvent.setup()
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    render(<ManagerHarness initialSections={[davening]} />)
+    const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
+    render(<ManagerHarness initialSections={[listings]} />)
 
-    const headingInput = screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopDaveningHeading)
+    const headingInput = screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)
     await user.clear(headingInput)
     await user.type(headingInput, 'See the times')
 

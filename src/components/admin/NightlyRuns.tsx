@@ -161,7 +161,7 @@ export default function NightlyRuns({ runs, base, linkSender, onList }: { runs: 
       : runs === null
         ? { tone: 'text-slate-500', text: 'Couldn’t load what’s tracked' }
         : !line
-          ? { tone: 'text-amber-800', text: 'Keeping a record of the nightly runs needs database migration 086' }
+          ? { tone: 'text-amber-800', text: 'Nightly runs aren’t recorded on this site yet' }
           : { tone: line.good ? 'text-green-800' : 'text-amber-800', text: line.text }
   const warn = !!line && !line.good && !open
   return (

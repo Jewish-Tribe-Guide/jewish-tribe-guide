@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import HeroHeading from './HeroHeading'
-import { CardGrid, type CardDef } from './sections'
 
 // Spied, with the real implementation left in place, so what the hero asks the
 // browser to preload can be asserted directly.
@@ -31,21 +29,9 @@ afterEach(() => {
 // hides one with CSS. That makes image loading a correctness matter here, not
 // just a tuning one: an eager <img> or a <link rel="preload"> in a display:none
 // subtree is still fetched. Measured on a production build, a phone downloaded
-// the desktop-only hero photo, and a desktop downloaded ~10 mobile-grid tiles
-// it never showed — the first because of `priority` on the hero, the second
-// because every section's grid marked its own first four tiles `priority`.
+// the desktop-only hero photo, because of `priority` on the hero.
 
 const imgs = (root: ParentNode) => [...root.querySelectorAll('img')]
-const preloads = () => document.head.querySelectorAll('link[rel="preload"][as="image"]')
-
-function cards(n: number, prefix = 'c'): CardDef[] {
-  return Array.from({ length: n }, (_, i) => ({
-    title: `${prefix}${i}`,
-    href: `/x/${prefix}${i}`,
-    go: () => {},
-    cardImageUrl: `https://images.unsplash.com/photo-${prefix}${i}`,
-  }))
-}
 
 describe('desktop hero photo', () => {
   const settings = {
@@ -84,36 +70,5 @@ describe('desktop hero photo', () => {
   it('preloads nothing when there is no hero photo', () => {
     render(<HeroHeading settings={{ ...settings, desktopHeroImage: null }} query="" onQueryChange={vi.fn()} />)
     expect(preloadSpy).not.toHaveBeenCalled()
-  })
-})
-
-describe('CardGrid image loading', () => {
-  it('loads no tile eagerly unless asked to', () => {
-    const { container } = renderWithProviders(<CardGrid cards={cards(6)} />)
-    expect(imgs(container).filter((i) => i.getAttribute('loading') === 'eager')).toHaveLength(0)
-    expect(preloads()).toHaveLength(0)
-  })
-
-  it('loads exactly priorityCount leading tiles eagerly, at high priority, without a preload', () => {
-    const { container } = renderWithProviders(<CardGrid cards={cards(8)} priorityCount={4} />)
-    const all = imgs(container)
-
-    expect(all).toHaveLength(8)
-    expect(all.filter((i) => i.getAttribute('loading') === 'eager')).toHaveLength(4)
-    expect(all.slice(0, 4).every((i) => i.getAttribute('fetchpriority') === 'high')).toBe(true)
-    expect(all.slice(4).every((i) => i.getAttribute('loading') === 'lazy')).toBe(true)
-    expect(preloads()).toHaveLength(0)
-  })
-
-  it('counts per grid, so it is the caller that decides which grid is the first one', () => {
-    // Two sections, as the home screen renders them. Only the first passes a
-    // count, so the page as a whole has four eager tiles, not eight.
-    const { container } = renderWithProviders(
-      <>
-        <CardGrid cards={cards(4, 'a')} priorityCount={4} />
-        <CardGrid cards={cards(4, 'b')} />
-      </>,
-    )
-    expect(imgs(container).filter((i) => i.getAttribute('loading') === 'eager')).toHaveLength(4)
   })
 })

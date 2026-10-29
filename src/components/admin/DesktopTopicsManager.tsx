@@ -34,7 +34,11 @@ type CardMeta = {
   kind: CardKind
   description: string
   eyebrowKey?: keyof SiteSettings
-  headingKey: keyof SiteSettings
+  /** Absent when the card's title is fixed on the site. */
+  headingKey?: keyof SiteSettings
+  /** Davening Times and Update Listings always share one row with Suggest a
+   *  Listing, so their width does nothing. */
+  sharedRow?: true
 }
 
 // Order here is just documentation, same as BUILT_IN_BLOCKS — actual
@@ -43,20 +47,18 @@ const CARD_META: CardMeta[] = [
   {
     kind: 'browse',
     description: 'The always-first search box + flat category grid.',
-    eyebrowKey: 'desktopBrowseEyebrow',
-    headingKey: 'desktopBrowseHeading',
   },
   {
     kind: 'davening',
     description: 'Today’s next davening time, aggregated across every category with minyanim.',
-    eyebrowKey: 'desktopDaveningEyebrow',
-    headingKey: 'desktopDaveningHeading',
+    sharedRow: true,
   },
   {
     kind: 'listings',
     description: 'The Add/Edit/Report card — the actions that actually keep listings current.',
     eyebrowKey: 'desktopListingsEyebrow',
     headingKey: 'desktopListingsHeading',
+    sharedRow: true,
   },
   {
     kind: 'subscribe',
@@ -162,6 +164,7 @@ export default function DesktopTopicsManager({
                   </div>
                 </div>
                 {meta && <p className="text-xs text-muted mb-2">{meta.description}</p>}
+                {!meta?.sharedRow && (
                 <div className="mb-2 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
                   {(['full', 'half'] as const).map((w) => (
                     <button
@@ -177,13 +180,14 @@ export default function DesktopTopicsManager({
                     </button>
                   ))}
                 </div>
-                {c.width === 'half' && (
+                )}
+                {!meta?.sharedRow && c.width === 'half' && (
                   <p className="text-[11px] text-muted mb-2">
                     Pairs with a neighboring half-width card into one side-by-side row. On its own (no
                     half-width neighbor), it just renders full width.
                   </p>
                 )}
-                {meta && (
+                {meta?.headingKey && (
                   <div className={`grid grid-cols-1 gap-2 mt-2 ${meta.eyebrowKey ? 'sm:grid-cols-2' : ''}`}>
                     {meta.eyebrowKey && (
                       <label className="block">
@@ -198,8 +202,8 @@ export default function DesktopTopicsManager({
                     <label className="block">
                       <span className="block text-[11px] font-medium text-slate-600 mb-1">Heading</span>
                       <input
-                        value={settings[meta.headingKey] as string}
-                        onChange={(e) => onSettingChange(meta.headingKey, e.target.value as SiteSettings[typeof meta.headingKey])}
+                        value={settings[meta.headingKey!] as string}
+                        onChange={(e) => onSettingChange(meta.headingKey!, e.target.value as SiteSettings[NonNullable<typeof meta.headingKey>])}
                         className={inputClass}
                       />
                     </label>

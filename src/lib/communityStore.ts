@@ -24,7 +24,6 @@ export type Community = {
   slug: string
   name: string
   shortName: string
-  tagline: string
   mission: string
   manifestDescription: string
   region: string
@@ -50,7 +49,6 @@ type Row = {
   slug: string
   name: string
   short_name: string
-  tagline: string
   mission: string
   manifest_description: string
   region: string
@@ -70,7 +68,6 @@ function toCommunity(row: Row): Community {
     slug: row.slug,
     name: row.name,
     shortName: row.short_name,
-    tagline: row.tagline,
     mission: row.mission,
     manifestDescription: row.manifest_description,
     region: row.region,
@@ -95,7 +92,6 @@ function communityFromConfig(): Community {
     slug: CONFIG_COMMUNITY_SLUG,
     name: configCommunity.name,
     shortName: configCommunity.shortName,
-    tagline: configCommunity.tagline,
     mission: configCommunity.mission,
     manifestDescription: configCommunity.manifestDescription,
     region: configCommunity.region,
@@ -486,7 +482,6 @@ function isValidTimezone(timezone: string): boolean {
 export async function createCommunity(input: {
   slug: string
   name: string
-  tagline: string
   mission: string
   region: string
   timezone: string
@@ -519,7 +514,6 @@ export async function createCommunity(input: {
       slug,
       name: input.name.trim(),
       short_name: input.name.trim().slice(0, 20),
-      tagline: input.tagline.trim(),
       mission: input.mission.trim(),
       manifest_description: input.mission.trim(),
       region: input.region.trim(),

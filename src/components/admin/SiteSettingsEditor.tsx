@@ -353,18 +353,11 @@ export default function SiteSettingsEditor({
 
       {isSite && (
       <div className="max-w-2xl">
-      <CollapsibleSection title="Branding" description="Site name, tagline, search placeholder, and logo." contentClassName="p-4 space-y-3">
+      <CollapsibleSection title="Branding" description="Site name, search placeholder, and logo." contentClassName="p-4 space-y-3">
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">Shown in the header and footer.</span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
-          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">
-            Not currently shown anywhere on the site — kept here in case that changes.
-          </span>
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Search placeholder</span>

@@ -41,7 +41,6 @@ type CreateBody = {
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
-  cardTextColor?: string | null
   pinColor?: string | null
   active?: boolean
 }
@@ -91,7 +90,6 @@ export async function POST(request: Request) {
       capabilities: body.capabilities,
       externalLink: body.externalLink,
       cardImageUrl: body.cardImageUrl,
-      cardTextColor: body.cardTextColor,
       pinColor: body.pinColor,
       active: body.active,
     })

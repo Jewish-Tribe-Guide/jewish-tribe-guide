@@ -53,13 +53,11 @@ const card = (over: Partial<CardDef> = {}): CardDef =>
   }) as CardDef
 
 describe('CompactCard — the browse index row', () => {
-  it('draws the glyph, not the category photo, even when a photo is set', () => {
-    // The exact shape that used to win: a card whose cardImageUrl is set is
-    // precisely the case the old code rendered as a 32px <img>.
+  it('draws the glyph, never a photo', () => {
     const { container } = render(
       <CompactCardGrid
-        cards={[card({ cardImageUrl: 'https://images.unsplash.com/photo-123' })]}
-        categories={[category()]}
+        cards={[card()]}
+        categories={[category({ cardImageUrl: 'https://images.unsplash.com/photo-123' })]}
       />,
     )
 

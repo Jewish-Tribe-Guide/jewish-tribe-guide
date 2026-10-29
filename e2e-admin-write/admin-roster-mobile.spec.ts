@@ -54,7 +54,6 @@ test.describe('admin roster on a phone', () => {
     await page.getByLabel('Name').fill(`E2E Roster ${slug}`)
     await page.getByLabel('URL slug').fill(slug)
     await visible(page, page.getByRole('button', { name: /show more details/i })).click()
-    await page.getByLabel('Tagline').fill('Roster layout test')
     await page.getByLabel('Mission').fill('A disposable community for the roster layout test.')
     await page.getByLabel('Region').fill('Testville')
     await page.getByLabel('Map center latitude').fill('39.95')

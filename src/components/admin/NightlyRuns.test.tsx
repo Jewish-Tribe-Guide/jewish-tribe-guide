@@ -66,13 +66,13 @@ describe('What’s tracked on the Watches tab', () => {
     expect(within(screen.getByRole('list', { name: 'Google: last 14 nights' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Oct 25140 read', 'Oct 24Didn’t run'])
   })
 
-  it('while loading, when it couldn’t load, and before migration 086', () => {
+  it('while loading, when it couldn’t load, and before runs are recorded', () => {
     const { rerender } = render(<NightlyRuns runs={undefined} base="/philly/admin" />)
     expect(lastNight()).toHaveTextContent('Loading…')
     rerender(<NightlyRuns runs={null} base="/philly/admin" />)
     expect(lastNight()).toHaveTextContent('Couldn’t load what’s tracked')
     rerender(<NightlyRuns runs={{ available: false, kinds: [] }} base="/philly/admin" />)
-    expect(lastNight()).toHaveTextContent(/needs database migration 086/)
+    expect(lastNight()).toHaveTextContent(/Nightly runs aren’t recorded on this site yet/)
     expect(within(lastNight()).getByRole('button')).toBeDisabled()
   })
 

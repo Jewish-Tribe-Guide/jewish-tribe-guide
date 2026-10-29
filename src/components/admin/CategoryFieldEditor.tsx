@@ -135,7 +135,6 @@ export function FieldEditor({
     if (type !== 'select' && type !== 'tags') patch.options = undefined
     if (type !== 'select') patch.multiSelect = undefined
     if (type !== 'tags') {
-      patch.expandedOnly = undefined
       patch.fixedVocabulary = undefined
       patch.showCountInHeader = undefined
       patch.countLabel = undefined
@@ -518,22 +517,6 @@ export function FieldEditor({
             already says who it&rsquo;s for). The card still uses the full name above.
           </span>
         </label>
-      )}
-
-      <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={!!f.coreSection}
-          onChange={(e) => onChange({ coreSection: e.target.checked })}
-          className="rounded border-slate-300"
-        />
-        Group with Address / Name / Phone at the top of the form
-      </label>
-      {f.coreSection && (
-        <p className="text-[11px] text-muted ml-5 -mt-1">
-          For a field Google fills in the same way it does Name/Phone/Hours when someone picks an address — keeps
-          everything auto-filled together, above the line where the rest of this category&rsquo;s fields start.
-        </p>
       )}
 
       {canRequire && (

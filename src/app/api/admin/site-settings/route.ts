@@ -96,11 +96,8 @@ export async function PATCH(request: Request) {
   if (body.searchPlaceholder !== undefined && !body.searchPlaceholder.trim()) {
     return Response.json({ ok: false, errors: ['Search placeholder cannot be empty.'] }, { status: 400 })
   }
-  // The desktop card texts the site shows have nowhere sensible to fall back
-  // to if saved blank, so they're required. The Categories and Search and
-  // Davening Times cards hard-code their own headings and there is no Map
-  // card, so those six texts show nowhere and aren't required: blanking one
-  // used to refuse the whole save (docs/admin-audit.md).
+  // The desktop card texts have nowhere sensible to fall back to if saved
+  // blank, so they're required.
   const REQUIRED_CARD_TEXT_FIELDS: { key: keyof SiteSettings; label: string }[] = [
     { key: 'desktopListingsEyebrow', label: 'The Update Listings card’s eyebrow' },
     { key: 'desktopListingsHeading', label: 'The Update Listings card’s heading' },

@@ -38,9 +38,8 @@ import { routes } from '@/lib/routes'
 // in one row (see Landing.tsx's own community-row doc). The underlying
 // nextUpcomingDavening computation stays (still needed for
 // tomorrowHoliday/seeAllHref's `&day=` param — see below), it just isn't
-// rendered on the card face any more. Not admin-editable any more either
-// (settings.desktopDaveningEyebrow/Heading have no render site left) —
-// same call the user made for the Browse card's "Explore by Category".
+// rendered on the card face any more. Not admin-editable either — same
+// call the user made for the Browse card's "Explore by Category".
 export default function DaveningTimesCard({ coords }: { coords: LatLng | null }) {
   const timezone = useCommunityTimezone()
   const communitySlug = useCommunitySlug()
