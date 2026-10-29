@@ -180,6 +180,21 @@ describe('WatchesManager', () => {
     expect(screen.getByRole('region', { name: 'What the watches keep current' })).toBeInTheDocument()
   })
 
+  // Regression: a job that couldn't be loaded left its findings out of every
+  // count, and the rows looked complete.
+  it('names the jobs that couldn’t be loaded, under counts that leave them out', async () => {
+    await renderTab([], {
+      categories: [{ id: 'mikvah', pluralLabel: 'Mikvah', kind: 'listing', hasAddress: true }],
+      google: { counts: { checked: 1, toCheck: 0, cantRead: 0, didntLoad: 0 }, places: [{ id: 'm', name: 'm', street: null, address: null, category: 'mikvah', categoryLabel: 'Mikvah', href: '/philly/mikvah/m', matched: true, section: 'checked', fields: [], readAt: ago(0.5), failedAt: null, notOnGoogle: null, closure: null, compare: null }] },
+      hours: [],
+      times: [],
+    })
+    const note = screen.getByTestId('jobs-not-loaded')
+    expect(note).toHaveTextContent('Not loaded: Dishes')
+    expect(note).not.toHaveTextContent('Mikvah hours')
+    expect(note).not.toHaveTextContent('Shul times')
+  })
+
   // Oct 26: a kosher list is stopped, or read again, from What's tracked,
   // as its job page did.
   it('stops a kosher list from What’s tracked, and reads a stopped one again', async () => {

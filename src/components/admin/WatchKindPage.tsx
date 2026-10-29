@@ -7,7 +7,7 @@ import { adminBase } from '@/lib/adminNav'
 import { placeSourcesText, type WatchState } from '@/lib/watchPlaces'
 import { useWatchJobsAndReload } from './useWatchJobs'
 import OpenedPlace from './OpenedPlace'
-import { kindsOf } from './WatchKinds'
+import { JobsNotLoaded, kindsOf } from './WatchKinds'
 
 // One kind of place on the Watches tab (FinalChanges2, FinalPhoneShuls,
 // Oct 24): its places in three tabs, Waiting for you, Not checked and Up to
@@ -68,6 +68,7 @@ export default function WatchKindPage({ token, category, place }: { token: strin
     <div className="space-y-3.5">
       {back}
       <h1 className="text-xl font-bold text-slate-900 sm:text-[22px]">{kind.label}</h1>
+      <JobsNotLoaded jobs={jobs} />
       <div role="tablist" aria-label={`${kind.label} by state`} className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-slate-200 px-1 sm:gap-1">
         {TABS.map((t) => {
           const on = t.key === active

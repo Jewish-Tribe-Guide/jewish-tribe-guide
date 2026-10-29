@@ -451,6 +451,20 @@ describe('ModerationQueue — an opened card', () => {
     expect(screen.getByText(/needs its address/)).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Approve' })).toHaveLength(1)
   })
+
+  // Regression: the list hid Approve on a new place with no address, but the
+  // opened card offered it anyway, and approving failed "Address is required."
+  it('won’t approve a new place with no address from the opened card either, until one is typed', async () => {
+    const user = userEvent.setup()
+    renderShulQueue([submission({ id: 'new', payload: { category: 'grocery', name: 'Giant', address: '', phone: '', details: {} } })])
+    await user.click(await screen.findByRole('button', { name: 'Open Giant' }))
+    const opened = screen.getByTestId('submission-review')
+    expect(within(opened).queryByRole('button', { name: /^Approve/ })).not.toBeInTheDocument()
+    expect(within(opened).getByRole('button', { name: 'Reject' })).toBeInTheDocument()
+
+    await user.type(within(opened).getByLabelText('Address'), '1 Main St')
+    expect(within(opened).getByRole('button', { name: 'Approve with your changes' })).toBeInTheDocument()
+  })
 })
 
 // Picking a place in the address fills the rest from Google, as the

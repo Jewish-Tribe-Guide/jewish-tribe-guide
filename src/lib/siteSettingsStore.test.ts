@@ -56,11 +56,32 @@ describe('getSiteSettingsUncached', () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
     mockResolveCommunity.mockResolvedValue({
       slug: 'philly',
+      isDefault: true,
       name: SITE_SETTINGS_DEFAULTS.name,
       tagline: SITE_SETTINGS_DEFAULTS.tagline,
       mission: SITE_SETTINGS_DEFAULTS.mission,
     })
     expect(await getSiteSettingsUncached('philly')).toEqual(SITE_SETTINGS_DEFAULTS)
+  })
+
+  // Regression: the hero photo fell back to community.config.ts's photo
+  // (Philadelphia's City Hall) whenever a row had none, so clearing it
+  // brought City Hall back, on every community.
+  it('a cleared hero photo stays cleared', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_hero_image: null }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopHeroImage).toBeNull()
+  })
+
+  it("keeps a row's own hero photo", async () => {
+    const photo = { url: 'https://example.com/hero.jpg', alt: 'A street' }
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_hero_image: photo }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopHeroImage).toEqual(photo)
+  })
+
+  it("a second community with no row yet has no hero photo, not the bootstrap community's", async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    mockResolveCommunity.mockResolvedValue({ slug: 'ues', isDefault: false, name: 'UES', tagline: '', mission: 'M' })
+    expect((await getSiteSettingsUncached('ues')).desktopHeroImage).toBeNull()
   })
 
   // Regression: a second community with no site_settings row yet used to

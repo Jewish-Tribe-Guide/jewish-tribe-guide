@@ -30,7 +30,35 @@ function apiRoutes(dir = join(process.cwd(), 'src/app/api')): string[] {
   })
 }
 
+// Every redirect that lands in a community's admin console, as the path under
+// src/app/admin/[community] its destination has to be a page of.
+const adminRedirects = [...config.slice(config.indexOf('async redirects()')).matchAll(/destination:\s*'\/:community\/admin\/([^']*)'/g)].map((m) => m[1])
+
+/** Whether src/app/admin/[community]/<path> is a page, looking through route
+ *  groups ("(site)") and optional catch-alls ("[[...id]]") as Next does. */
+function isAdminPage(path: string, dir = join(process.cwd(), 'src/app/admin/[community]')): boolean {
+  const [head, ...rest] = path.split('/').filter(Boolean)
+  const entries = readdirSync(dir, { withFileTypes: true })
+  if (!head) {
+    return (
+      entries.some((e) => e.name === 'page.tsx') ||
+      entries.some((e) => e.isDirectory() && /^(\(.*\)|\[\[\.\.\..+\]\])$/.test(e.name) && isAdminPage('', join(dir, e.name)))
+    )
+  }
+  return entries.some(
+    (e) => e.isDirectory() && (e.name === head ? isAdminPage(rest.join('/'), join(dir, e.name)) : /^\(.*\)$/.test(e.name) && isAdminPage(path, join(dir, e.name))),
+  )
+}
+
 describe('next.config.ts redirects and rewrites', () => {
+  // /admin/dishes was sent to /admin/watches/dishes, which went when the job
+  // pages became the Watches tab's kinds (Oct 25), so the old link was a 404.
+  it("every admin redirect lands on a page that exists", () => {
+    expect(adminRedirects.length).toBeGreaterThan(0)
+    expect(adminRedirects.filter((path) => !isAdminPage(path))).toEqual([])
+  })
+
+
   it('finds the sources and the API routes', () => {
     expect(sources).toContain('/:community((?!api\\b).*)/admin/eruvim')
     expect(apiRoutes()).toContain('/api/admin/eruvim')

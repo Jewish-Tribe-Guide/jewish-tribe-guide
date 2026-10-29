@@ -23,9 +23,8 @@ redesign"). Line numbers are as of commit `08e7ee81`.
   Davening"), so they look real in the admin.
 - **About 25 more are mislabelled.** Most of their help text describes old
   layouts: a "collapsed card", a "footer blurb", a home card with a photo.
-- **Seven clear bugs**, listed below. The worst: a community with no hero
-  photo of its own gets Philadelphia's City Hall, and clearing the photo
-  brings it back.
+- **Seven clear bugs**, listed below; six were fixed the same day, and
+  one turned out to be deliberate.
 - **The same work is split across screens.** Both search tabs list searches
   that found nothing. The queue and Watches decide the same suggestions in
   different words. Listings get archived in two places. Each eruv has
@@ -39,17 +38,17 @@ redesign"). Line numbers are as of commit `08e7ee81`.
   also says "Resource Moderation / Review and approve submitted resources",
   even on Team and Metrics.
 
-## Clear bugs
+## Clear bugs (fixed Oct 28, except 4)
 
-| # | What happens | Where |
-|---|---|---|
-| 1 | The hero photo can't be cleared. Saving with no photo falls back to City Hall from `community.config.ts`, for **every** community, including non-Philly ones. The help text says "leave blank for a plain gradient". | `siteSettingsStore.ts:165` |
-| 2 | Removing every top-nav item makes the four defaults reappear on screen. Save then fails with "needs at least one item". | `SiteSettingsEditor.tsx:421`, `api/admin/site-settings/route.ts:107` |
-| 3 | The dead Browse and Davening heading fields are still required. Blanking one blocks the whole Save. | `api/admin/site-settings/route.ts:86-89` |
-| 4 | Removing both the Davening Times and Update Listings cards also removes "Suggest a Listing", which the admin never lists. | `Landing.tsx:787` |
-| 5 | `/<c>/admin/dishes` redirects to a page that no longer exists (404). | `next.config.ts:178` |
-| 6 | The opened review shows Approve even when the address is missing. The card hides it, but in the opened review clicking it fails with "Address is required." | `SubmissionReview.tsx:367` vs `SubmissionCard.tsx:227` |
-| 7 | If one watch job fails to load, the whole Watches tab and every kind page show only "Couldn't load". | `WatchKinds.tsx:16`, `WatchKindPage.tsx:53` |
+| # | What happened | Where | Now |
+|---|---|---|---|
+| 1 | The hero photo couldn't be cleared. Saving with no photo fell back to City Hall from `community.config.ts`, for **every** community. | `siteSettingsStore.ts` | Fixed. A cleared photo stays cleared, and only the bootstrap community gets the photo from code before its first save. |
+| 2 | Removing every top-nav item made the four defaults reappear on screen, then Save failed with "needs at least one item". | `SiteSettingsEditor.tsx` | Fixed. The list goes empty and the warning shows. |
+| 3 | The dead Browse, Davening and Map heading fields were required, so blanking one blocked the whole Save. | `api/admin/site-settings/route.ts` | Fixed. They are no longer required. The fields themselves go in the redesign. |
+| 4 | Removing both the Davening Times and Update Listings cards also removes "Suggest a Listing". | `Landing.tsx:787` | **Not a bug.** It's deliberate and tested (`b5dda46f`). The real problem is that the admin never shows the card, which is a redesign question. |
+| 5 | `/<c>/admin/dishes` redirected to a page that no longer exists (404). | `next.config.ts` | Fixed. It goes to the Watches tab, and a test fails on any admin redirect to a missing page. |
+| 6 | The opened review showed Approve on a new place with no address, and approving failed. | `SubmissionReview.tsx` | Fixed. Approve appears once an address is typed or picked. |
+| 7 | The audit said one failed job blanked Watches. In fact only the two the rows are built from (categories, Google's places) do, and the tab says so. The real bug was the reverse: any other job failing left its findings out of the counts with nothing said. | `WatchKinds.tsx` | Fixed. The tab and each kind page say "Not loaded: Dishes · …". |
 
 Smaller problems:
 

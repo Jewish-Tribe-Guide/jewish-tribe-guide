@@ -351,6 +351,21 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
   })
 
+  // Regression: the editor showed the default items whenever the draft's list
+  // was empty, so removing the last item brought the four defaults back on
+  // screen, the "needs at least one item" warning could never show, and Save
+  // then failed for a list the admin could see wasn't empty.
+  it('removing every top nav item leaves it empty, with the warning', async () => {
+    const user = userEvent.setup()
+    await renderEditor('desktop')
+    await openAllSections(user)
+    const warning = /The nav needs at least one item/
+    for (let i = 0; i < 10 && !screen.queryByText(warning); i++) {
+      await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    }
+    expect(screen.getByText(warning)).toBeInTheDocument()
+  })
+
   // Regression: sectionsEqual's own strip() left `width` out of the fields
   // it compares, so flipping a card between Full and Half width changed
   // sectionsDraft but never made `dirty` true — Save stayed disabled and the

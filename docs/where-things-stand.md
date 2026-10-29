@@ -338,8 +338,14 @@ brief, one round of drawings, then the build in pieces.
    the site. About 20 settings are dead, about 25 are mislabelled, and seven
    are clear bugs (top of that file). The same work is split across screens:
    two search tabs, the queue vs Watches, two archives, two admin rosters.
-2. **Next:** fix the seven clear bugs, or leave them for the build (the
-   user's call). Then write the brief.
+2. **The clear bugs: DONE Oct 28.** Six fixed on `redesign/oct18-fixes`:
+   the hero photo can be cleared (no more City Hall on other communities),
+   the top nav can go empty without defaults reappearing, the dead heading
+   fields no longer block Save, `/admin/dishes` goes to Watches, the opened
+   review hides Approve until there's an address, and Watches names any
+   job that didn't load. "Suggest a Listing" going with its row is
+   deliberate; the redesign shows it in the admin.
+   **Next:** the brief.
 3. **Proposed shape** (mine, not agreed):
    - To do: one list with counts, replacing four tabs.
    - Places: one page per listing.

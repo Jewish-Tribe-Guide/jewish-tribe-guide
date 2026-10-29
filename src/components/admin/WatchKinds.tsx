@@ -32,6 +32,37 @@ export function kindsOf(jobs: Jobs, base: string, now: number): { kinds: WatchKi
   return { kinds, notWatched: notWatched(jobs.categories).filter((l) => !rows.has(l)), settled: jobsSettled(jobs) }
 }
 
+// The jobs whose findings the counts take in, by the name each goes by.
+// Categories and Google's places are what the rows are built from, so those
+// failing shows no rows at all.
+const COUNTED_JOBS: [keyof Jobs, string][] = [
+  ['dishes', 'Dishes'],
+  ['hospitals', 'Hospitals'],
+  ['hours', 'Mikvah hours'],
+  ['times', 'Shul times'],
+  ['sites', 'Websites'],
+  ['eruvim', 'Eruv status'],
+  ['kosher', 'Kosher lists'],
+  ['links', 'Links'],
+]
+
+/** The jobs that couldn't be loaded: their findings are missing from every
+ *  count, so the counts aren't the whole story. */
+export function jobsNotLoaded(jobs: Jobs): string[] {
+  return COUNTED_JOBS.filter(([key]) => jobs[key] === null).map(([, name]) => name)
+}
+
+/** "Not loaded: Dishes · Shul times", or nothing when every job loaded. */
+export function JobsNotLoaded({ jobs }: { jobs: Jobs }) {
+  const names = jobsNotLoaded(jobs)
+  if (names.length === 0) return null
+  return (
+    <p className="text-[12.5px] font-medium text-amber-800 sm:text-[13px]" data-testid="jobs-not-loaded">
+      Not loaded: {names.join(' · ')}
+    </p>
+  )
+}
+
 function Stat({ n, label, flag }: { n: number; label: string; flag?: boolean }) {
   return (
     <span className="flex flex-col sm:min-w-[6.5rem]">
@@ -86,6 +117,11 @@ export default function WatchKinds({ jobs, base, now }: { jobs: Jobs; base: stri
             ))}
           </ul>
           {all.notWatched.length > 0 && <p className="border-t border-slate-100 px-3.5 py-3 text-[12.5px] text-muted sm:px-4 sm:text-[13px]">Not watched: {all.notWatched.join(' · ')}</p>}
+          {all.settled && jobsNotLoaded(jobs).length > 0 && (
+            <div className="border-t border-slate-100 px-3.5 py-3 sm:px-4">
+              <JobsNotLoaded jobs={jobs} />
+            </div>
+          )}
         </>
       )}
     </section>

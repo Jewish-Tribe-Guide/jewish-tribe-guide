@@ -102,6 +102,9 @@ export function SubmissionReview({
   const labelOf = (k: string) => (isCore(k) ? CORE.find((c) => c.key === k)!.label : fields.find((f) => f.key === k)?.label ?? k)
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(sent)
+  // As on the list's card: a new place goes live only once it has an
+  // address, here the one the admin may have typed or picked.
+  const needsAddress = s.operation === 'create' && hasAddress && !draft.address?.trim()
   const marked = source.readBy === 'ai' && source.original ? markTimes(source.original, draft.details) : null
   const hasOriginal = Boolean(source.original || source.photoUrl)
 
@@ -364,14 +367,16 @@ export function SubmissionReview({
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onModerate(s.id, 'approved', undefined, dirty ? draft : undefined)}
-              className="text-sm font-medium bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60 cursor-pointer"
-            >
-              {busy ? 'Approving…' : dirty ? 'Approve with your changes' : 'Approve'}
-            </button>
+            {!needsAddress && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onModerate(s.id, 'approved', undefined, dirty ? draft : undefined)}
+                className="text-sm font-medium bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700 disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? 'Approving…' : dirty ? 'Approve with your changes' : 'Approve'}
+              </button>
+            )}
             <button type="button" disabled={busy} onClick={() => setRejecting(true)} className="text-sm font-medium border border-slate-300 text-slate-600 rounded px-4 py-2 hover:bg-slate-50 disabled:opacity-60 cursor-pointer">
               Reject
             </button>

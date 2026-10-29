@@ -174,8 +174,9 @@ const nextConfig: NextConfig = {
       // Not 'api' as the community, as in rewrites() above: /api/admin/eruvim
       // is the Eruv row's own data, and this sent it to /api/admin/categories
       // (nextConfigRoutes.test.ts).
-      // Main dishes became the Watches tab's Dishes job (Oct 21).
-      { source: '/:community((?!api\\b).*)/admin/dishes', destination: '/:community/admin/watches/dishes', permanent: false },
+      // Main dishes became the Watches tab's Dishes job (Oct 21), and the
+      // job pages became the tab's kinds of place (Oct 25).
+      { source: '/:community((?!api\\b).*)/admin/dishes', destination: '/:community/admin/watches', permanent: false },
       // Eruvim became part of the Categories tab's Eruv row (Oct 22).
       { source: '/:community((?!api\\b).*)/admin/eruvim', destination: '/:community/admin/categories', permanent: false },
     ];

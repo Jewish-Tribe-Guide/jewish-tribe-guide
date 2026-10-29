@@ -162,7 +162,10 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     // doesn't blank out until someone opens the new Desktop tab.
     desktopHeroHeadline: row.desktop_hero_headline || heroSplit.headline,
     desktopHeroSubhead: row.desktop_hero_subhead ?? heroSplit.subhead,
-    desktopHeroImage: toHeroImage(row.desktop_hero_image) ?? fallback.desktopHeroImage,
+    // A saved row's own photo, or none: an admin who cleared it gets the
+    // plain gradient, not the bootstrap community's photo from code (which
+    // put Philadelphia's City Hall on every other community's home).
+    desktopHeroImage: toHeroImage(row.desktop_hero_image),
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
     todayHidden: toTodayHidden(row.today_hidden),
@@ -204,6 +207,8 @@ export async function getSiteSettingsUncached(community: string): Promise<SiteSe
     mission: c.mission,
     desktopHeroHeadline: heroSplit.headline,
     desktopHeroSubhead: heroSplit.subhead,
+    // community.config.ts's photo is the bootstrap community's own.
+    desktopHeroImage: c.isDefault ? SITE_SETTINGS_DEFAULTS.desktopHeroImage : null,
   }
 }
 

@@ -20,7 +20,6 @@ import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import {
   DEFAULT_MOBILE_TABS,
-  DEFAULT_DESKTOP_NAV_ITEMS,
   MAX_BEFORE_CANDLE_ITEMS,
   TODAY_BLOCKS,
 } from '@/lib/siteSettings'
@@ -418,7 +417,7 @@ export default function SiteSettingsEditor({
             contentClassName="p-4"
           >
             <DesktopNavEditor
-              items={draft.desktopNavItems.length > 0 ? draft.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS}
+              items={draft.desktopNavItems}
               onChange={(items) => set('desktopNavItems', items)}
             />
           </CollapsibleSection>
