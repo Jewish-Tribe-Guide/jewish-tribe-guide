@@ -4,9 +4,12 @@ import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
+import { useNow } from '@/lib/useNow'
 import type { CategoryConfig } from '@/lib/categories'
-import type { CampaignBanner } from '@/lib/campaignBanner'
+import { activeCampaignBanner, type CampaignBanner } from '@/lib/campaignBanner'
+import { AdminBox, AdminField, AdminRow, adminInputClass } from './AdminUI'
+import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 
 // ── The 'campaigns' tab: seasonal promotions (a "Sukkah Map" every Sukkot,
 // or whatever the next one-off is) — a title/subtitle, a link to an existing
@@ -23,12 +26,10 @@ import type { CampaignBanner } from '@/lib/campaignBanner'
 // meant to exist ONLY for this campaign (Sukkahs, say) can stay hidden the
 // rest of the year with nothing else to remember.
 //
-// Immediate save per action (create/edit/delete each its own request), not
-// the batched-draft style HomeSectionManager uses — this is its own
-// top-level tab, not folded into another tab's shared "Save changes".
-
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+// A list of campaigns, each opening a screen of its own (board "Campaigns"):
+// its fields, the banner beside, and one Save bar. The desktop banner's
+// photo is the sukkah (CampaignBannerCard), the same for every campaign, so
+// the screen shows it rather than offering a choice.
 
 type FormState = {
   categoryId: string
@@ -48,8 +49,21 @@ const EMPTY_FORM: FormState = {
   destination: 'map',
 }
 
-export default function CampaignBannerManager({ token }: { token: string }) {
+export default function CampaignBannerManager({
+  token,
+  openId,
+  onOpen,
+  onClose,
+}: {
+  token: string
+  /** The campaign open (its id, or 'new'), or null for the list. */
+  openId: string | null
+  onOpen: (id: string) => void
+  onClose: () => void
+}) {
   const community = useCommunitySlug()
+  const timezone = useCommunityTimezone()
+  const now = useNow()
   // Deliberately NOT useCategories()/ContentProvider — that reads the
   // public, filtered listCategories(), which hides an inactive category
   // unless a currently-LIVE campaign already promotes it (see
@@ -63,12 +77,6 @@ export default function CampaignBannerManager({ token }: { token: string }) {
 
   const [banners, setBanners] = useState<CampaignBanner[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
   const load = useCallback(async () => {
     setError(null)
     try {
@@ -95,277 +103,245 @@ export default function CampaignBannerManager({ token }: { token: string }) {
 
   useLoadOnMount(load)
 
-  function startCreate() {
-    setEditingId('new')
-    setForm({ ...EMPTY_FORM, categoryId: listingCategories[0]?.id ?? '' })
-    setFormError(null)
-  }
-
-  function startEdit(banner: CampaignBanner) {
-    setEditingId(banner.id)
-    setForm({
-      categoryId: banner.categoryId,
-      title: banner.title,
-      subtitle: banner.subtitle,
-      startDate: banner.startDate,
-      endDate: banner.endDate,
-      destination: banner.destination,
-    })
-    setFormError(null)
-  }
-
-  function cancelEdit() {
-    setEditingId(null)
-    setFormError(null)
-  }
-
-  async function save() {
-    setFormError(null)
-    if (!form.title.trim()) return setFormError('Title is required.')
-    if (!form.categoryId) return setFormError('Choose a category.')
-    if (!form.startDate || !form.endDate) return setFormError('Start and end date are required.')
-    if (form.startDate > form.endDate) return setFormError('Start date must be on or before the end date.')
-
-    setSaving(true)
-    try {
-      if (editingId === 'new') {
-        const body = await fetchJson<{ banner: CampaignBanner }>(
-          withCommunity('/api/admin/campaign-banners', community),
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(form),
-          },
-          'Could not create campaign banner.',
-        )
-        setBanners((prev) => [...(prev ?? []), body.banner])
-      } else if (editingId) {
-        const body = await fetchJson<{ banner: CampaignBanner }>(
-          withCommunity(`/api/admin/campaign-banners/${editingId}`, community),
-          {
-            method: 'PATCH',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(form),
-          },
-          'Could not update campaign banner.',
-        )
-        setBanners((prev) => prev?.map((b) => (b.id === editingId ? body.banner : b)) ?? prev)
-      }
-      setEditingId(null)
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save campaign banner.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function remove(banner: CampaignBanner) {
-    if (!confirm(`Delete "${banner.title}"? This can't be undone.`)) return
-    setDeletingId(banner.id)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/campaign-banners/${banner.id}`, community),
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Could not delete campaign banner.',
-      )
-      setBanners((prev) => prev?.filter((b) => b.id !== banner.id) ?? prev)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete campaign banner.')
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
   function categoryLabel(id: string): string {
     const c = listingCategories.find((c) => c.id === id)
     if (!c) return id
     return c.active === false ? `${c.pluralLabel} (hidden)` : c.pluralLabel
   }
 
+  if (error && !banners) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
+  if (!banners) return <p className="text-sm text-muted">Loading…</p>
+
+  const banner = openId && openId !== 'new' ? banners.find((b) => b.id === openId) : undefined
+  if (openId === 'new' || banner) {
+    return (
+      <CampaignScreen
+        key={openId}
+        token={token}
+        banner={banner ?? null}
+        listingCategories={listingCategories}
+        onDone={onClose}
+        onBack={onClose}
+      />
+    )
+  }
+
+  const live = now === null ? null : activeCampaignBanner(banners, now, timezone)
   return (
-    <div>
-      {error && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>}
-
-      {banners === null ? (
-        <p className="text-sm text-muted">Loading…</p>
+    <AdminBox
+      title="Campaigns"
+      action={
+        <button
+          type="button"
+          onClick={() => onOpen('new')}
+          disabled={listingCategories.length === 0}
+          className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer disabled:opacity-50 disabled:no-underline"
+        >
+          + Add a campaign
+        </button>
+      }
+    >
+      {banners.length === 0 ? (
+        <p className="m-0 px-4 py-4 text-[15px] text-slate-600">{listingCategories.length === 0 ? 'Make a category first.' : 'No campaigns yet.'}</p>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 max-w-2xl space-y-3">
-          {banners.length === 0 && editingId !== 'new' && (
-            <p className="text-sm text-muted">No campaign banners yet.</p>
-          )}
+        [...banners]
+          .sort((a, b) => b.startDate.localeCompare(a.startDate))
+          .map((b) => (
+            <AdminRow
+              key={b.id}
+              onClick={() => onOpen(b.id)}
+              name={b.title}
+              line={`${categoryLabel(b.categoryId)} · ${dateRange(b.startDate, b.endDate)}`}
+              aside={live?.id === b.id && <span className="rounded-full border border-green-200 bg-green-50 px-2 py-px text-xs font-semibold text-green-800">On now</span>}
+            />
+          ))
+      )}
+    </AdminBox>
+  )
+}
 
-          {banners.map((banner) =>
-            editingId === banner.id ? (
-              <CampaignBannerForm
-                key={banner.id}
-                form={form}
-                setForm={setForm}
-                listingCategories={listingCategories}
-                error={formError}
-                saving={saving}
-                onSave={save}
-                onCancel={cancelEdit}
-              />
-            ) : (
-              <div key={banner.id} className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{banner.title}</p>
-                  <p className="text-xs text-muted">
-                    {categoryLabel(banner.categoryId)} · {banner.startDate} – {banner.endDate} ·{' '}
-                    {banner.destination === 'list' ? 'Browse Listings leads' : 'Map View leads'}
-                  </p>
+function CampaignScreen({
+  token,
+  banner,
+  listingCategories,
+  onDone,
+  onBack,
+}: {
+  token: string
+  banner: CampaignBanner | null
+  listingCategories: CategoryConfig[]
+  /** Saved or deleted: back to the list, which reads them afresh. */
+  onDone: () => void
+  onBack: () => void
+}) {
+  const community = useCommunitySlug()
+  const isNew = banner === null
+  const start: FormState = banner
+    ? { categoryId: banner.categoryId, title: banner.title, subtitle: banner.subtitle, startDate: banner.startDate, endDate: banner.endDate, destination: banner.destination }
+    : EMPTY_FORM
+  const [form, setForm] = useState<FormState>(start)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [askingDelete, setAskingDelete] = useState(false)
+
+  const changes = (Object.keys(start) as (keyof FormState)[]).filter((k) => form[k] !== start[k]).length
+  const dirty = changes > 0
+  useLeaveGuard(dirty)
+
+  function leave() {
+    if (dirty && !window.confirm(LEAVE_QUESTION)) return
+    onBack()
+  }
+
+  async function save() {
+    setError(null)
+    if (!form.title.trim()) return setError('Give it a title.')
+    if (!form.categoryId) return setError('Pick the category it opens.')
+    if (!form.startDate || !form.endDate) return setError('Pick when it starts and ends.')
+    if (form.startDate > form.endDate) return setError('It has to end on or after the day it starts.')
+
+    setSaving(true)
+    try {
+      await fetchJson(
+        withCommunity(isNew ? '/api/admin/campaign-banners' : `/api/admin/campaign-banners/${banner.id}`, community),
+        {
+          method: isNew ? 'POST' : 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        },
+        'Could not save the campaign.',
+      )
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save the campaign.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove() {
+    if (!banner) return
+    setSaving(true)
+    try {
+      await fetchJson(
+        withCommunity(`/api/admin/campaign-banners/${banner.id}`, community),
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Could not delete the campaign.',
+      )
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the campaign.')
+      setSaving(false)
+    }
+  }
+
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
+
+  return (
+    <div className="flex flex-col gap-4">
+      <button type="button" onClick={leave} className="self-start inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary cursor-pointer">
+        ‹ Campaigns
+      </button>
+      <h2 className="m-0 text-[26px] font-bold text-slate-900">{isNew ? 'New campaign' : banner.title}</h2>
+      <div className="flex gap-6 items-start">
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
+          <AdminBox>
+            <div data-testid="campaign-banner-form" className="p-4 flex flex-col gap-4">
+              <AdminField label="Title">
+                <input value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="Sukkah Map" className={adminInputClass} />
+              </AdminField>
+              <AdminField label="Subtitle">
+                <input value={form.subtitle} onChange={(e) => set('subtitle', e.target.value)} placeholder="Find open sukkahs to visit this Sukkot" className={adminInputClass} />
+              </AdminField>
+              <AdminField label="Opens">
+                <select value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)} className={adminInputClass}>
+                  <option value="">Pick a category</option>
+                  {listingCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.active === false ? `${c.pluralLabel} (hidden)` : c.pluralLabel}
+                    </option>
+                  ))}
+                </select>
+              </AdminField>
+              <AdminField label="Button first">
+                <select value={form.destination} onChange={(e) => set('destination', e.target.value === 'list' ? 'list' : 'map')} className={adminInputClass}>
+                  <option value="map">Map View</option>
+                  <option value="list">Browse Listings</option>
+                </select>
+              </AdminField>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <AdminField label="Starts">
+                    <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className={adminInputClass} />
+                  </AdminField>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => startEdit(banner)} className="text-sm font-medium text-primary hover:underline cursor-pointer">
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => remove(banner)}
-                    disabled={deletingId === banner.id}
-                    className="text-sm font-medium text-red-600 hover:underline cursor-pointer disabled:opacity-50"
-                  >
-                    {deletingId === banner.id ? 'Deleting…' : 'Delete'}
-                  </button>
+                <div className="flex-1">
+                  <AdminField label="Ends">
+                    <input type="date" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} className={adminInputClass} />
+                  </AdminField>
                 </div>
               </div>
-            ),
-          )}
-
-          {editingId === 'new' && (
-            <CampaignBannerForm
-              form={form}
-              setForm={setForm}
-              listingCategories={listingCategories}
-              error={formError}
-              saving={saving}
-              onSave={save}
-              onCancel={cancelEdit}
-            />
-          )}
-
-          {editingId === null && (
-            <button
-              onClick={startCreate}
-              disabled={listingCategories.length === 0}
-              className="text-sm font-medium text-primary hover:underline cursor-pointer disabled:opacity-50 disabled:no-underline"
-            >
-              + Add a campaign banner
-            </button>
-          )}
-          {listingCategories.length === 0 && (
-            <p className="text-xs text-muted">Create a category first — a campaign banner always links to one.</p>
-          )}
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={BANNER_PHOTO} alt="" className="h-11 w-[72px] rounded-md object-cover" />
+                <span className="text-[13px] font-semibold text-slate-700">Photo</span>
+              </div>
+            </div>
+          </AdminBox>
+          {!isNew &&
+            (askingDelete ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-[15px] text-slate-900">Delete {banner.title}?</span>
+                <button type="button" onClick={remove} disabled={saving} className="min-h-11 px-4 rounded-lg bg-red-600 text-white text-[15px] font-semibold cursor-pointer disabled:opacity-60">
+                  Delete it
+                </button>
+                <button type="button" onClick={() => setAskingDelete(false)} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-slate-900 cursor-pointer">
+                  Leave it
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setAskingDelete(true)} className="self-start min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-red-700 cursor-pointer">
+                Delete this campaign
+              </button>
+            ))}
         </div>
-      )}
+        <aside aria-label="Preview" className="hidden lg:block w-[340px] shrink-0 sticky top-8">
+          <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
+            <div className="relative h-[140px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={BANNER_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/40 to-transparent" />
+              <div className="absolute inset-x-3 bottom-2.5">
+                <p className="m-0 text-[15px] font-bold text-slate-900">{form.title || 'Sukkah Map'}</p>
+                <p className="m-0 text-[12px] text-slate-700">{form.subtitle || 'Find open sukkahs to visit this Sukkot'}</p>
+              </div>
+            </div>
+            <p className="m-0 border-t border-slate-200 px-3 py-2.5 text-[12.5px] text-slate-600">Shows at the top of the home page between the two dates</p>
+          </div>
+        </aside>
+      </div>
+      {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <SaveBar
+        changes={isNew ? 1 : changes}
+        saving={saving}
+        onUndo={isNew ? leave : () => setForm(start)}
+        onSave={save}
+        {...(isNew && { status: 'Not saved', undoLabel: 'Throw away' })}
+      />
     </div>
   )
 }
 
-function CampaignBannerForm({
-  form,
-  setForm,
-  listingCategories,
-  error,
-  saving,
-  onSave,
-  onCancel,
-}: {
-  form: FormState
-  setForm: (f: FormState) => void
-  listingCategories: { id: string; pluralLabel: string; active?: boolean }[]
-  error: string | null
-  saving: boolean
-  onSave: () => void
-  onCancel: () => void
-}) {
-  return (
-    <div data-testid="campaign-banner-form" className="space-y-3 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
-      {error && <p className="text-sm text-red-700">{error}</p>}
-      <label className="block">
-        <span className="block text-[11px] font-medium text-slate-600 mb-1">Title</span>
-        <input
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          placeholder="Sukkah Map"
-          className={inputClass}
-        />
-      </label>
-      <label className="block">
-        <span className="block text-[11px] font-medium text-slate-600 mb-1">Subtitle</span>
-        <input
-          value={form.subtitle}
-          onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
-          placeholder="Find open sukkahs to visit this Sukkot"
-          className={inputClass}
-        />
-      </label>
-      <label className="block">
-        <span className="block text-[11px] font-medium text-slate-600 mb-1">Category</span>
-        <select
-          value={form.categoryId}
-          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-          className={inputClass}
-        >
-          {listingCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.active === false ? `${c.pluralLabel} (hidden)` : c.pluralLabel}
-            </option>
-          ))}
-        </select>
-        <span className="block text-[11px] text-muted mt-1">
-          A hidden category can be linked here ahead of time — it stays hidden until this
-          campaign&rsquo;s start date arrives, then shows up on its own. Nothing else to remember.
-        </span>
-      </label>
-      <label className="block">
-        <span className="block text-[11px] font-medium text-slate-600 mb-1">
-          Which button leads?
-        </span>
-        <select
-          value={form.destination}
-          onChange={(e) => setForm({ ...form, destination: e.target.value === 'list' ? 'list' : 'map' })}
-          className={inputClass}
-        >
-          <option value="map">Map View</option>
-          <option value="list">Browse Listings</option>
-        </select>
-        <span className="block text-[11px] text-muted mt-1">
-          Both always show on the banner &mdash; this just decides which one comes first and
-          stands out.
-        </span>
-      </label>
-      <div className="flex gap-3">
-        <label className="block flex-1">
-          <span className="block text-[11px] font-medium text-slate-600 mb-1">Start date</span>
-          <input
-            type="date"
-            value={form.startDate}
-            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-        <label className="block flex-1">
-          <span className="block text-[11px] font-medium text-slate-600 mb-1">End date</span>
-          <input
-            type="date"
-            value={form.endDate}
-            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-      </div>
-      <div className="flex gap-3">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 cursor-pointer disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button onClick={onCancel} className="text-sm font-medium text-muted hover:underline cursor-pointer">
-          Cancel
-        </button>
-      </div>
-    </div>
-  )
+/** The desktop banner's photo (CampaignBannerCard). */
+const BANNER_PHOTO = '/images/sukkah-banner.webp'
+
+/** "Oct 1 – Oct 10" from two 'YYYY-MM-DD' dates, the year added when it
+ *  isn't this one. */
+export function dateRange(from: string, to: string): string {
+  const thisYear = new Date().getFullYear()
+  const day = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(y === thisYear ? {} : { year: 'numeric' }) })
+  }
+  return `${day(from)} – ${day(to)}`
 }

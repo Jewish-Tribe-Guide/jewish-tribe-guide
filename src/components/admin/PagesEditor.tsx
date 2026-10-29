@@ -6,9 +6,8 @@ import { fetchJson } from '@/lib/fetchJson'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { pageBodyToHtml, sanitizeRichText } from '@/lib/richText'
 import type { PageSlug, StaticPage } from '@/lib/pagesStore'
-
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+import { AdminBox, AdminField, adminInputClass } from './AdminUI'
+import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 
 // The admin Pages tab: edit the title and body of the site's standalone
 // content pages (About, Privacy). The body is a small WYSIWYG (bold, italic,
@@ -23,16 +22,16 @@ const inputClass =
 // and `editorHtml` below compares the draft against that same converted form,
 // so merely opening a legacy page doesn't count as an edit.
 //
-// One page is open for editing at a time; switching pages discards an unsaved
-// edit on the one you're leaving, same as the rest of the admin console does
-// for unsaved drafts elsewhere.
+// One page is open for editing at a time (board "Pages"): a switch between
+// them, one Save bar, and leaving or switching with changes asks first. One
+// copy serves every community (pagesStore.ts), and the screen says so.
 export default function PagesEditor({ token }: { token: string }) {
   const [pages, setPages] = useState<StaticPage[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeSlug, setActiveSlug] = useState<PageSlug | null>(null)
   const [draft, setDraft] = useState<{ title: string; body: string } | null>(null)
   const [saving, setSaving] = useState(false)
-  const [savedNotice, setSavedNotice] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -51,10 +50,23 @@ export default function PagesEditor({ token }: { token: string }) {
 
   useLoadOnMount(load)
 
+  const active = pages?.find((p) => p.slug === activeSlug) ?? null
+  const savedBody = active ? pageBodyToHtml(active.body) : ''
+  const current = draft ?? (active ? { title: active.title, body: savedBody } : null)
+  const changes = active && draft ? Number(draft.title !== active.title) + Number(sanitizeRichText(draft.body) !== savedBody) : 0
+  useLeaveGuard(changes > 0)
+
+  function edit(next: { title: string; body: string }) {
+    setDraft(next)
+    setSaved(false)
+  }
+
   function selectPage(page: StaticPage) {
+    if (page.slug === activeSlug) return
+    if (changes > 0 && !window.confirm(LEAVE_QUESTION)) return
     setActiveSlug(page.slug)
-    setDraft({ title: page.title, body: pageBodyToHtml(page.body) })
-    setSavedNotice(false)
+    setDraft(null)
+    setSaved(false)
     setError(null)
   }
 
@@ -77,7 +89,8 @@ export default function PagesEditor({ token }: { token: string }) {
         'Save failed.',
       )
       setPages((all) => all?.map((p) => (p.slug === body.page.slug ? body.page : p)) ?? all)
-      setSavedNotice(true)
+      setDraft(null)
+      setSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.')
     } finally {
@@ -92,78 +105,48 @@ export default function PagesEditor({ token }: { token: string }) {
     return <p className="text-sm text-muted">Loading…</p>
   }
 
-  const active = pages.find((p) => p.slug === activeSlug) ?? null
-  const savedBody = active ? pageBodyToHtml(active.body) : ''
-  const current = draft ?? (active ? { title: active.title, body: savedBody } : null)
-  const dirty =
-    !!active && !!draft && (draft.title !== active.title || sanitizeRichText(draft.body) !== savedBody)
-
   return (
-    <div>
-      <p className="text-sm text-muted mb-4">
-        The site&rsquo;s standalone pages — About and Privacy — linked from the footer rather than the
-        main navigation. Formatting is limited to what the toolbar offers; pasted text comes in
-        unformatted on purpose.
-      </p>
+    <div className="flex flex-col gap-4">
+      <p className="m-0 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[15px] text-amber-900">One copy for every community</p>
 
-      {error && (
-        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
-      )}
-
-      <div className="mb-4 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
-        {pages.map((page) => (
-          <button
-            key={page.slug}
-            onClick={() => selectPage(page)}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer ${
-              activeSlug === page.slug ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {page.title}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div role="group" aria-label="Page" className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
+          {pages.map((page) => (
+            <button
+              key={page.slug}
+              type="button"
+              aria-pressed={activeSlug === page.slug}
+              onClick={() => selectPage(page)}
+              className={`min-h-10 px-3.5 rounded-md text-sm font-semibold cursor-pointer ${
+                activeSlug === page.slug ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {page.title}
+            </button>
+          ))}
+        </div>
+        {active && <span className="text-sm text-slate-500">Updated {updatedOn(active.updatedAt)}</span>}
       </div>
 
       {current && (
-        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
-          <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1">Title</span>
-            <input
-              value={current.title}
-              onChange={(e) => setDraft({ ...current, title: e.target.value })}
-              className={inputClass}
-            />
-          </label>
-          <div>
-            <span className="block text-xs font-medium text-slate-700 mb-1">Body</span>
-            <RichTextEditor
-              value={current.body}
-              onChange={(body) => setDraft({ ...current, body })}
-              ariaLabel="Page body"
-            />
+        <AdminBox>
+          <div className="p-4 flex flex-col gap-4">
+            <AdminField label="Title">
+              <input value={current.title} onChange={(e) => edit({ ...current, title: e.target.value })} className={adminInputClass} />
+            </AdminField>
+            <RichTextEditor value={current.body} onChange={(body) => edit({ ...current, body })} ariaLabel="Page body" />
           </div>
-        </div>
+        </AdminBox>
       )}
 
-      {current && (
-        <div className="flex items-center gap-3 mt-4">
-          <button
-            onClick={save}
-            disabled={saving || !dirty}
-            className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-          >
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
-          <button
-            onClick={() => active && selectPage(active)}
-            disabled={saving || !dirty}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-          >
-            Cancel
-          </button>
-          {savedNotice && !dirty && <span className="text-sm text-green-700">Saved.</span>}
-        </div>
-      )}
+      <SaveBar changes={changes} saving={saving} saved={saved} error={pages && error} onUndo={() => setDraft(null)} onSave={save} />
     </div>
   )
+}
+
+/** "Aug 28", or "Aug 28, 2025" from another year. */
+function updatedOn(iso: string): string {
+  const d = new Date(iso)
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
