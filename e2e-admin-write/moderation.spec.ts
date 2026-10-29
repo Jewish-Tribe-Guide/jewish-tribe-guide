@@ -177,14 +177,15 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
+  // To do lists it as a row; it's decided opened.
   await page.goto('/philly/admin')
-  const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
-  await expect(card).toBeVisible()
+  await page.getByRole('button', { name: `Open ${name}` }).click()
+  const review = page.getByTestId('submission-review')
+  await review.getByRole('button', { name: 'Approve', exact: true }).click()
 
-  await card.getByRole('button', { name: 'Approve' }).click()
-
-  // The real signal: the card leaves the queue once the PATCH resolves.
-  await expect(card).not.toBeVisible()
+  // The real signal: back on the list without it once the PATCH resolves.
+  await expect(review).not.toBeVisible()
+  await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('*').eq('name', name).maybeSingle()
   expect(resource, 'approving should have inserted a live resource row').not.toBeNull()
@@ -274,14 +275,14 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   pendingSubmissionIds.push(submission.id)
 
   await page.goto('/philly/admin')
-  const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
-  await expect(card).toBeVisible()
+  await page.getByRole('button', { name: `Open ${name}` }).click()
+  const review = page.getByTestId('submission-review')
+  await review.getByRole('button', { name: 'Reject' }).click()
+  await review.getByLabel(/Reason for rejection/).fill('Duplicate of an existing listing.')
+  await review.getByRole('button', { name: 'Confirm rejection' }).click()
 
-  await card.getByRole('button', { name: 'Reject' }).click()
-  await card.getByPlaceholder(/already listed/).fill('Duplicate of an existing listing.')
-  await card.getByRole('button', { name: 'Confirm rejection' }).click()
-
-  await expect(card).not.toBeVisible()
+  await expect(review).not.toBeVisible()
+  await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('id').eq('name', name).maybeSingle()
   expect(resource, 'rejecting should never create a live resource row').toBeNull()
@@ -311,11 +312,11 @@ test('a rejected submission shows up on the Metrics tab\'s Rejected history view
   pendingSubmissionIds.push(submission.id)
 
   await page.goto('/philly/admin')
-  const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
-  await expect(card).toBeVisible()
-  await card.getByRole('button', { name: 'Reject' }).click()
-  await card.getByRole('button', { name: 'Confirm rejection' }).click()
-  await expect(card).not.toBeVisible()
+  await page.getByRole('button', { name: `Open ${name}` }).click()
+  const review = page.getByTestId('submission-review')
+  await review.getByRole('button', { name: 'Reject' }).click()
+  await review.getByRole('button', { name: 'Confirm rejection' }).click()
+  await expect(review).not.toBeVisible()
 
   // The click-through this test actually exists to prove: Metrics' Rejected
   // tile links to /admin/history/rejected, and the just-rejected submission

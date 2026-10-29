@@ -56,18 +56,14 @@ function fieldKeyFor(rowKey: string, fields: CategoryField[]): string | null {
 export function SubmissionReview({
   submission: s,
   category,
-  waiting,
   busy,
   error,
-  onBack,
   onModerate,
 }: {
   submission: EnrichedSubmission
   category?: CategoryConfig
-  waiting: number
   busy?: boolean
   error?: string | null
-  onBack: () => void
   onModerate: (id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission) => void
 }) {
   const sent = s.payload as unknown as ResourceSubmission
@@ -315,9 +311,6 @@ export function SubmissionReview({
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4" data-testid="submission-review">
-      <button type="button" onClick={onBack} className="mb-3 text-sm text-primary hover:underline cursor-pointer">
-        ‹ Moderation · {waiting} waiting
-      </button>
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-lg font-semibold text-slate-900">{sent.name || s.current?.name || '(unknown listing)'}</h2>
         {s.categoryLabel && <span className="text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{s.categoryLabel}</span>}

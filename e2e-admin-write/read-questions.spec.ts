@@ -2,17 +2,18 @@ import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drives the Read questions tab for real: a reading the AI made is listed
-// with how it was read, with no Approve (since Oct 27 a reading never
-// answers on the site), and Forget deletes it so the question is read
-// afresh. The reading is inserted straight into
-// question_reading: no test server ever calls the reader (QUESTION_READER
-// =off). Needs migration 062 (question_reading) on the test project.
+// Drives the AI's readings on To do for real (the admin redesign's step 2:
+// the Read questions tab is gone, its readings are rows under "Searches
+// nobody found"). A reading that proposes a word is a row of its own;
+// Dismiss deletes the reading so the question is read afresh. The reading
+// is inserted straight into question_reading: no test server ever calls
+// the reader (QUESTION_READER=off). Needs migration 062 (question_reading)
+// on the test project.
 //
-// And teaching: a reading proposes a word, Teach stores it (question_word,
+// And teaching: the row's proposed word, Teach stores it (question_word,
 // migration 063) and it reaches the public site's categories (the cached
-// read every search box gets its taught words from), and Unteach takes it
-// away again.
+// read every search box gets its taught words from), and Unteach, on the
+// Searches page's Taught words, takes it away again.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAdminClient() {
@@ -23,49 +24,20 @@ function getAdminClient() {
 // --repeat-each runs copies at once, in workers that can start in the
 // same millisecond, and two copies sharing a row fail each other.
 const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.replace(/\d/g, (d) => 'ghijklmnop'[Number(d)])
-const key = `qqzv read ${suffix}`
-
 // Ends in x: the search reads a word ending in s as a plural and teaches
 // it without the s, which failed this one run in 26.
 const word = `qqzv${suffix}x`
 
 test.afterEach(async () => {
-  await getAdminClient().from('question_reading').delete().eq('community_id', 'philly').in('key', [key, word])
+  await getAdminClient().from('question_reading').delete().eq('community_id', 'philly').eq('key', word)
   await getAdminClient().from('question_word').delete().eq('community_id', 'philly').eq('word', word)
-})
-
-test('a read question is listed as read, has no Approve, and is forgotten for real', async ({ page }) => {
-  const supabase = getAdminClient()
-  const { data: cats } = await supabase.from('category').select('id, plural_label').eq('community_id', 'philly').limit(1)
-  const category = cats![0] as { id: string; plural_label: string }
-  const { error } = await supabase.from('question_reading').insert({
-    community_id: 'philly',
-    key,
-    question: key,
-    reading: { categories: [{ id: category.id }] },
-    model: 'test',
-    hits: 3,
-  })
-  expect(error).toBeNull()
-  const stored = async () => (await supabase.from('question_reading').select('key').eq('community_id', 'philly').eq('key', key)).data
-
-  await page.goto('/philly/admin/questions')
-  const list = page.locator('section', { has: page.getByRole('heading', { name: /^Questions/ }) })
-  const row = list.getByTestId('read-question').filter({ hasText: `“${key}”` })
-  await expect(row).toBeVisible({ timeout: 20_000 })
-  await expect(row).toContainText('3 times')
-  await expect(row).toContainText(category.plural_label)
-
-  await expect(row.getByRole('button', { name: 'Approve' })).toHaveCount(0)
-
-  await row.getByRole('button', { name: 'Forget' }).click()
-  await expect(row).not.toBeVisible()
-  await expect.poll(async () => (await stored())?.length).toBe(0)
 })
 
 type Field = { key: string; label: string; type: string; filterable?: boolean; filterLabel?: string; options?: { value: string; label: string }[] }
 
-test('a word a reading proposes is taught, reaches the site, and is untaught', async ({ page, request }) => {
+/** A reading of `word` as one option of a filterable pick-list, which the
+ *  console proposes teaching. Skips when the test project has none. */
+async function seedReading() {
   const supabase = getAdminClient()
   const { error: missing } = await supabase.from('question_word').select('word').limit(1)
   expect(missing?.message ?? null, 'needs migration 063 (question_word) on the test project').toBeNull()
@@ -83,15 +55,50 @@ test('a word a reading proposes is taught, reaches the site, and is untaught', a
     question: word,
     reading: { categories: [{ id: c.id, select: { [f.key]: [option.value] } }] },
     model: 'test',
+    hits: 3,
   })
   expect(error).toBeNull()
+  return { c, f, option }
+}
 
-  await page.goto('/philly/admin/questions')
-  const row = page.getByTestId('read-question').filter({ hasText: `“${word}”` })
-  const proposal = row.getByTestId('word-proposal')
-  await expect(proposal).toContainText(`“${word}” means ${c.plural_label} · ${f.filterLabel ?? f.label}: ${option.label}`, { timeout: 20_000 })
+/** The reading's row on To do, opened. */
+async function openRow(page: import('@playwright/test').Page) {
+  await page.goto('/philly/admin')
+  const searches = page.getByRole('region', { name: 'Searches nobody found' })
+  await expect(searches).toBeVisible({ timeout: 20_000 })
+  // Five show; the test project may hold more searches than that.
+  const more = searches.getByRole('button', { name: /^\d+ more$/ })
+  if (await more.count()) await more.click()
+  const row = searches.getByTestId('todo-search').filter({ hasText: `“${word}”` })
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('3 searches')
+  await row.getByRole('button', { expanded: false }).click()
+  return row
+}
+
+test('a reading with a word to teach is a To do row, and Dismiss forgets it for real', async ({ page }) => {
+  const supabase = getAdminClient()
+  await seedReading()
+  const stored = async () => (await supabase.from('question_reading').select('key').eq('community_id', 'philly').eq('key', word)).data
+
+  const row = await openRow(page)
+  // A reading never answers on the site, so there's nothing to approve.
+  await expect(row.getByRole('button', { name: 'Approve' })).toHaveCount(0)
+  await row.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(row).not.toBeVisible()
+  await expect.poll(async () => (await stored())?.length).toBe(0)
+})
+
+test('a word a reading proposes is taught, reaches the site, and is untaught', async ({ page, request }) => {
+  const supabase = getAdminClient()
+  const { c, f, option } = await seedReading()
+
+  const row = await openRow(page)
+  const proposal = row.getByTestId('todo-word')
+  await expect(proposal).toContainText(`“${word}” means ${c.plural_label} · ${f.filterLabel ?? f.label}: ${option.label}`)
   await proposal.getByRole('button', { name: 'Teach' }).click()
-  await expect(proposal).not.toBeVisible()
+  // Taught, the search is off the list.
+  await expect(row).not.toBeVisible()
 
   const stored = async () => (await supabase.from('question_word').select('category_id, field_key, value, from_question, taught_by').eq('community_id', 'philly').eq('word', word)).data
   await expect.poll(stored).toEqual([{ category_id: c.id, field_key: f.key, value: option.value, from_question: word, taught_by: expect.any(String) }])
@@ -102,6 +109,7 @@ test('a word a reading proposes is taught, reaches the site, and is untaught', a
   }
   await expect.poll(taughtOnSite, { timeout: 30_000 }).toBe(true)
 
+  await page.goto('/philly/admin/searches')
   await page.getByRole('button', { name: /Taught words/ }).click()
   const taught = page.getByTestId('taught-word').filter({ hasText: `“${word}”` })
   await taught.getByRole('button', { name: 'Unteach' }).click()

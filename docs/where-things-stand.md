@@ -411,6 +411,26 @@ brief, one round of drawings, then the build in pieces.
    Still to come: the To do count (step 2, so it counts the one list).
    Found on the way, for step 5: Metrics says 22 pending on dev while the
    queue holds none, so its counts disagree with To do.
+7. **Build, step 2 (To do): BUILT Oct 29.** One list, grouped by what you
+   decide (boards 1 and 2): New places, Changes (edits, removals, new
+   categories, eruv fixes, each saying what it changes), Searches nobody
+   found, and new Responses. Four rows a box, the rest behind "N more"; on
+   a phone New places, Changes and Responses fold to one row each. The two
+   search lists are one: a missed search brings the AI's suggested words
+   along, and a reading with a word to teach and no search of its own is a
+   row too. A search opens in place to Add a place, Dismiss, or Teach.
+   Read questions is gone (`/admin/questions` goes to Searches, which now
+   holds Taught words). A suggestion opens to be decided, with "‹ To do",
+   "1 of 13" and Next; a removal, new category or eruv fix opens to its
+   card. The nav counts the same list (`src/lib/todo.ts`, one store in
+   `useTodo.ts`), in the sidebar and as "To do · N" on a phone. Watches
+   says how many pages are read and when they last ran.
+   Not as drawn: a Searches row (and Responses when none are new) sits
+   under Watches, since To do has no tabs and those pages hold the
+   dismissed searches, taught words and handled responses. The opened
+   suggestion's wording (boards 3 and 4: "Update the listing", "Edit, then
+   update", "Leave it") is still the old card's; its heading still says
+   To do.
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

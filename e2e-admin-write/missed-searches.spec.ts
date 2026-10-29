@@ -8,6 +8,9 @@ import { createClient } from '@supabase/supabase-js'
 // the counter that normally writes it (/api/counts via countEvent) never
 // counts from an automated browser, by design. Needs migration 058
 // (search_miss_dismissal) on the test project.
+//
+// To do lists the same searches under "Searches nobody found", and its
+// Dismiss is the same dismissal (the admin redesign's step 2).
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAdminClient() {
@@ -51,4 +54,26 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', 'philly').eq('key', term)).data?.length)
     .toBe(0)
+})
+
+test('a missed search is on To do, and Dismiss there is the same dismissal', async ({ page }) => {
+  const supabase = getAdminClient()
+  const today = new Date().toISOString().slice(0, 10)
+  const { error } = await supabase.from('daily_count').insert({ community_id: 'philly', kind: 'search_miss', key: term, day: today, count: 3 })
+  expect(error).toBeNull()
+
+  await page.goto('/philly/admin')
+  const searches = page.getByRole('region', { name: 'Searches nobody found' })
+  await expect(searches).toBeVisible({ timeout: 20_000 })
+  // Five show; the test project may hold more searches than that.
+  const more = searches.getByRole('button', { name: /^\d+ more$/ })
+  if (await more.count()) await more.click()
+  const row = searches.getByTestId('todo-search').filter({ hasText: `“${term}”` })
+  await expect(row).toContainText('3 searches')
+  await row.getByRole('button', { expanded: false }).click()
+  await row.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(row).not.toBeVisible()
+  await expect
+    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', 'philly').eq('key', term)).data?.length)
+    .toBe(1)
 })

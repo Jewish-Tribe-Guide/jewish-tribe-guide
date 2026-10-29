@@ -3,18 +3,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import AdminFrame from './AdminFrame'
 
-const nav = vi.hoisted(() => ({ pathname: '/philly/admin' }))
+const nav = vi.hoisted(() => ({ pathname: '/philly/admin', count: null as number | null }))
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }))
 vi.mock('@/lib/communityContext', () => ({ useCommunitySlug: () => 'philly' }))
 vi.mock('@/lib/contentContext', () => ({ useSiteSettings: () => ({ name: 'Philly Jewish Guide' }) }))
 vi.mock('@/lib/features', () => ({ features: { todayHome: false, whatChanged: false } }))
+vi.mock('@/lib/useTodo', () => ({ useTodoCount: () => nav.count }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  nav.count = null
+})
 
 function show(pathname: string, isSuperAdmin = false) {
   nav.pathname = pathname
   render(
-    <AdminFrame isSuperAdmin={isSuperAdmin} email="admin@example.com" onSignOut={() => {}}>
+    <AdminFrame isSuperAdmin={isSuperAdmin} email="admin@example.com" token="tok" onSignOut={() => {}}>
       <p>the screen</p>
     </AdminFrame>,
   )
@@ -44,10 +48,34 @@ describe('AdminFrame', () => {
   })
 
   it("shows the open area's pages as tabs under the heading, the current one lit", () => {
-    show('/philly/admin/searches')
-    const tabs = within(screen.getByRole('navigation', { name: 'To do' })).getAllByRole('link')
-    expect(tabs.map((a) => a.textContent)).toEqual(['Suggestions', 'Watches', 'Searches', 'Read questions', 'Responses'])
-    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page', null, null])
+    show('/philly/admin/desktop')
+    const tabs = within(screen.getByRole('navigation', { name: 'Site' })).getAllByRole('link')
+    expect(tabs.map((a) => a.textContent)).toEqual(['Categories', 'Campaigns', 'Basics', 'On a computer', 'On a phone'])
+    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, null, 'page', null])
+  })
+
+  // Step 2: To do is one list. Its other pages open from it, headed by
+  // their own name, with the way back.
+  it('shows To do with no tabs, and its other pages with "‹ To do"', () => {
+    expect(show('/philly/admin').heading).toBe('To do')
+    expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '‹ To do' })).toBeNull()
+    cleanup()
+    const { heading, lit } = show('/philly/admin/searches')
+    expect(heading).toBe('Searches')
+    expect(lit).toEqual(['To do'])
+    expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
+    for (const back of screen.getAllByRole('link', { name: '‹ To do' })) expect(back).toHaveAttribute('href', '/philly/admin')
+  })
+
+  it("counts what To do holds on To do alone, in the sidebar and the phone's bar", () => {
+    nav.count = 18
+    const { sidebar, phoneBar } = show('/philly/admin/team')
+    expect(sidebar).toEqual(['To do18', 'Places', 'Site', 'Reports', 'Settings', 'View the site'])
+    expect(phoneBar).toEqual(['To do · 18', 'Places', 'Site', 'Reports'])
+    cleanup()
+    nav.count = 0
+    expect(show('/philly/admin').phoneBar[0]).toBe('To do')
   })
 
   it('names the one page of an area whose page is called something else', () => {
@@ -57,7 +85,7 @@ describe('AdminFrame', () => {
 
   it('shows no tabs for an area with one page of its own name, and a plain heading off the map', () => {
     expect(show('/philly/admin/nowhere').heading).toBe('Admin')
-    expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Site' })).toBeNull()
   })
 
   // Site is for a computer (brief, question 6): on a phone it says so.

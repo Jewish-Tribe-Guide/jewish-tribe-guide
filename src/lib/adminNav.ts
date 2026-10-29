@@ -39,7 +39,6 @@ export type AdminTab =
   | 'metrics'
   | 'history'
   | 'searches'
-  | 'questions'
   | 'watches'
   | 'team'
   | 'communities'
@@ -51,7 +50,8 @@ export type AdminTabLink = { tab: AdminTab; href: string; label: string }
 // sidebar and behind the gear on a phone. Every page keeps its own URL; the
 // open area is whichever one holds the tab the current path belongs to
 // (adminNavPosition below). An area with more than one page shows them as
-// tabs under its heading, until the later steps fold them together.
+// tabs under its heading, until the later steps fold them together. To do
+// shows none: its other pages open from its list, with a way back.
 export type AdminArea = 'todo' | 'places' | 'site' | 'reports' | 'settings'
 
 export type AdminAreaLinks = { area: AdminArea; label: string; href: string; tabs: AdminTabLink[] }
@@ -66,11 +66,11 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'todo',
       label: 'To do',
       tabs: [
-        { tab: 'queue', href: base, label: 'Suggestions' },
+        // One list (step 2), opened from its rows rather than tabs: the
+        // others are where its bottom rows lead.
+        { tab: 'queue', href: base, label: 'To do' },
         { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
         { tab: 'searches', href: `${base}/searches`, label: 'Searches' },
-        // How the AI reader read what people asked, and words to teach the search.
-        { tab: 'questions', href: `${base}/questions`, label: 'Read questions' },
         { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
       ],
     },

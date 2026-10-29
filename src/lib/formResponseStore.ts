@@ -80,6 +80,21 @@ export async function listFormResponses(
   return (data as FormResponseRow[]).map(toView)
 }
 
+// The responses waiting in a community's To do: Feedback and its own
+// forms' (never Support/Volunteer, which are the inbox's), not yet
+// handled, newest first.
+export async function listNewAdminResponses(community: string): Promise<InboxResponse[]> {
+  const { data, error } = await getAdminClient()
+    .from('form_response')
+    .select('*')
+    .eq('community_id', community)
+    .eq('status', 'new')
+    .or('request_type.eq.Feedback,form_id.not.is.null')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(`Failed to load responses: ${error.message}`)
+  return (data as FormResponseRow[]).map(toView)
+}
+
 // The same admin/inbox role split GET already enforces (see listFormResponses'
 // doc comment), applied to a single row by id — PATCH/DELETE have no formId/
 // feedback query param to scope by, so the caller's allowed request types (and,

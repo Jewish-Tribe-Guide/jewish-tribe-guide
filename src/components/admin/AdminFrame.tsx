@@ -5,13 +5,16 @@ import { usePathname } from 'next/navigation'
 import { adminAreas, adminNavPosition, type AdminArea } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSiteSettings } from '@/lib/contentContext'
+import { useTodoCount } from '@/lib/useTodo'
 
 // The console's frame (the admin redesign's step 1, boards 1, 2, 5, 10 and
 // 11): on a computer a sidebar with the four areas, then Settings and View
 // the site at the bottom; on a phone a bar at the top with the screen's name
 // and a gear, and the four areas along the bottom. Every screen gets the
 // open area's name as its heading, and the area's pages as tabs under it.
-// Site is for a computer, so on a phone it says so instead.
+// Site is for a computer, so on a phone it says so instead. To do is one
+// list (step 2): no tabs, its other pages say "‹ To do", and the nav's one
+// count is how much it holds.
 
 const ICONS: Record<AdminArea | 'view', React.ReactNode> = {
   todo: <path d="M3 8.5l3 3 7-7" />,
@@ -54,11 +57,13 @@ export default function AdminFrame({
   children,
   isSuperAdmin,
   email,
+  token,
   onSignOut,
 }: {
   children: React.ReactNode
   isSuperAdmin: boolean
   email: string | undefined
+  token: string
   onSignOut: () => void
 }) {
   const pathname = usePathname()
@@ -70,7 +75,10 @@ export default function AdminFrame({
   const main = areas.filter((a) => a.area !== 'settings')
   const settings = areas.find((a) => a.area === 'settings')!
   const siteHref = `/${community}`
-  const showTabs = open && (open.tabs.length > 1 || open.tabs[0].label !== open.label)
+  const showTabs = open && open.area !== 'todo' && (open.tabs.length > 1 || open.tabs[0].label !== open.label)
+  // One of To do's other pages: headed by its own name, with the way back.
+  const todoPage = open?.area === 'todo' && position?.tab !== 'queue' ? open.tabs.find((t) => t.tab === position?.tab) : undefined
+  const count = useTodoCount(token, community)
 
   const account = (
     <div className="flex flex-col gap-1 px-2.5 pt-3 text-[13px] text-slate-600">
@@ -97,6 +105,11 @@ export default function AdminFrame({
           <Link key={a.area} href={a.href} aria-current={a.area === open?.area ? 'page' : undefined} className={sideLink(a.area === open?.area)}>
             <Icon name={a.area} />
             <span className="flex-1">{a.label}</span>
+            {a.area === 'todo' && !!count && (
+              <span className="text-xs font-bold text-white bg-primary rounded-full px-2 py-px" aria-label={`${count} to decide`}>
+                {count}
+              </span>
+            )}
           </Link>
         ))}
         <div className="flex-1 min-h-6" />
@@ -115,8 +128,19 @@ export default function AdminFrame({
         <div className="max-w-[920px] flex flex-col gap-4">
           <header className="-mx-4 flex items-center gap-2.5 bg-white border-b border-slate-200 px-4 py-3 md:mx-0 md:p-0 md:bg-transparent md:border-0">
             <span className="flex-1 min-w-0 flex flex-col">
-              <span className="md:hidden text-[12.5px] text-slate-500">{siteName}</span>
-              <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">{open?.label ?? 'Admin'}</h1>
+              {todoPage ? (
+                <Link href={open!.href} className="md:hidden text-[12.5px] font-semibold text-primary">
+                  ‹ To do
+                </Link>
+              ) : (
+                <span className="md:hidden text-[12.5px] text-slate-500">{siteName}</span>
+              )}
+              {todoPage && (
+                <Link href={open!.href} className="hidden md:inline-flex self-start items-center min-h-11 -mt-3 text-sm font-semibold text-primary">
+                  ‹ To do
+                </Link>
+              )}
+              <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">{todoPage?.label ?? open?.label ?? 'Admin'}</h1>
             </span>
             <Link href={settings.href} aria-label="Settings" className="md:hidden inline-flex items-center justify-center w-11 h-11 text-slate-700">
               <Icon name="settings" size={20} />
@@ -175,7 +199,7 @@ export default function AdminFrame({
               className={`flex flex-col items-center gap-[3px] py-1.5 min-h-11 text-xs ${current ? 'text-primary font-bold' : 'text-slate-600 font-semibold'}`}
             >
               <Icon name={a.area} size={20} />
-              {a.label}
+              {a.area === 'todo' && count ? `${a.label} · ${count}` : a.label}
             </Link>
           )
         })}

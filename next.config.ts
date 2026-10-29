@@ -179,6 +179,9 @@ const nextConfig: NextConfig = {
       { source: '/:community((?!api\\b).*)/admin/dishes', destination: '/:community/admin/watches', permanent: false },
       // Eruvim became part of the Categories tab's Eruv row (Oct 22).
       { source: '/:community((?!api\\b).*)/admin/eruvim', destination: '/:community/admin/categories', permanent: false },
+      // Read questions joined the missed searches in one list (Oct 29):
+      // To do's searches, and the Searches page for the taught words.
+      { source: '/:community((?!api\\b).*)/admin/questions', destination: '/:community/admin/searches', permanent: false },
     ];
   },
 };

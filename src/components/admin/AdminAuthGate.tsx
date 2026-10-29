@@ -330,7 +330,7 @@ export default function AdminAuthGate({
   // superadmin console at /admin keeps the plain shell.
   if (community) {
     return (
-      <AdminFrame isSuperAdmin={isSuperAdmin} email={session.user.email} onSignOut={signOut}>
+      <AdminFrame isSuperAdmin={isSuperAdmin} email={session.user.email} token={session.access_token} onSignOut={signOut}>
         {content}
       </AdminFrame>
     )
