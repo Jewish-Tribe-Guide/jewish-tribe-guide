@@ -372,7 +372,12 @@ brief, one round of drawings, then the build in pieces.
    suggestions and watch findings sit together.
    What the drawings add that the site can't do today:
    - Forms get a real "On the site" switch. Support and Volunteer are
-     still tied to a code flag.
+     still tied to a code flag. Both are live (tiles in the category list)
+     but production holds no responses to either.
+   - Oct 28 revision (boards 12b, 13b, 13c, beside the old 12 and 13):
+     Feedback moves from Header and menus to Forms. Forms is a short list
+     (Feedback, Patient & Family Support, Volunteer for Patients), each
+     opening to its wording and an on/off switch. No new-form builder.
    - A campaign picks its own photo. The desktop banner always shows the
      sukkah photo.
    - Reports drops the approval-rate and time-to-approval tiles. It shows
