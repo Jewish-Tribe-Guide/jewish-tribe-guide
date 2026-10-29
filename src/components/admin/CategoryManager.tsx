@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CATEGORY_CAPABILITY_KEYS, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import type { FormConfig } from '@/lib/forms'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
 import ListingEditorScreen from './ListingEditorScreen'
 import CategoryPreview from './CategoryPreview'
@@ -17,13 +15,10 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
 import { AdminEmpty } from './AdminUI'
 
-// ── The categories manager: one list mixing the two kinds of thing a
-// community configures — Listing categories (Grocery Stores, Synagogues, …,
-// each with its own detail fields and capabilities) and Forms (Request
-// Support / Volunteer, plus any custom form an admin creates). Add/edit/
-// delete either kind; a custom form's responses live in /admin's Responses
-// tab (see ResponsesManager.tsx), not here. Mounted on /admin. Listing writes
-// go through /api/admin/categories; form writes through /api/admin/forms. ──
+// ── The categories manager: Site's Category pages tab — the listing
+// categories (Grocery Stores, Synagogues, …, each with its own detail fields
+// and capabilities) and the fixed screens (Map, Zmanim, …). Forms have their
+// own tab (FormsManager.tsx). Writes go through /api/admin/categories. ──
 
 // The singleton pseudo-categories an admin can add/remove but never edit —
 // there's nothing to configure, they just turn a fixed, code-driven screen on
@@ -45,18 +40,10 @@ const SINGLETON_ICONS: Record<SingletonKind, string> = {
   medical: '🏥',
 }
 
-type Entry =
-  | { kind: 'category'; data: CategoryConfig }
-  | { kind: 'form'; data: FormConfig }
-
-function entryLabel(e: Entry): string {
-  return e.kind === 'category' ? e.data.pluralLabel : e.data.title
-}
 
 // editingId is opaque to the admin page's history plumbing — encoded here as
-// 'cat:<id>', 'cat:new', or 'form:<id>' so one string covers both kinds.
+// 'cat:<id>', 'cat:new', or 'listing:<category id>' (adding a place).
 const CAT_PREFIX = 'cat:'
-const FORM_PREFIX = 'form:'
 const LISTING_PREFIX = 'listing:'
 
 /** The category a save just moved to: see `justSaved` below. */
@@ -64,22 +51,17 @@ let savedHandOff: string | null = null
 
 export default function CategoryManager({
   token,
-  show = 'categories',
   editingId,
   onOpenEditor,
   onCloseEditor,
 }: {
   token: string
-  /** Site's Category pages tab, or its Forms tab: one list each (the admin
-   *  redesign's step 4). */
-  show?: 'categories' | 'forms'
   editingId: string | null
   onOpenEditor: (id: string) => void
   onCloseEditor: () => void
 }) {
   const community = useCommunitySlug()
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
-  const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -104,14 +86,9 @@ export default function CategoryManager({
   const load = useCallback(async () => {
     setError(null)
     try {
-      const [catRes, formRes] = await Promise.all([
-        fetch(withCommunity('/api/admin/categories', community), { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(withCommunity('/api/admin/forms', community), { headers: { Authorization: `Bearer ${token}` } }),
-      ])
+      const catRes = await fetch(withCommunity('/api/admin/categories', community), { headers: { Authorization: `Bearer ${token}` } })
       const catBody = await parseOkJson<{ categories: CategoryConfig[] }>(catRes, 'Failed to load categories.')
-      const formBody = await parseOkJson<{ forms: FormConfig[] }>(formRes, 'Failed to load forms.')
       setCategories(catBody.categories)
-      setForms(formBody.forms)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -119,14 +96,10 @@ export default function CategoryManager({
 
   useLoadOnMount(load)
 
-  const entries = useMemo<Entry[] | null>(() => {
-    if (!categories || !forms) return null
-    const all: Entry[] =
-      show === 'forms'
-        ? forms.map((data): Entry => ({ kind: 'form', data }))
-        : categories.map((data): Entry => ({ kind: 'category', data }))
-    return all.sort((a, b) => entryLabel(a).localeCompare(entryLabel(b)))
-  }, [categories, forms, show])
+  const entries = useMemo(
+    () => (categories ? [...categories].sort((a, b) => a.pluralLabel.localeCompare(b.pluralLabel)) : null),
+    [categories],
+  )
 
   // Adds a singleton pseudo-category (Map, Zmanim, Eruv Information, Jewish
   // Medical Resources) directly — there's nothing to configure, so this skips
@@ -179,56 +152,12 @@ export default function CategoryManager({
     }
   }
 
-  // Same idea as toggleCategoryActive, but forms have their own dedicated
-  // endpoint (see /api/admin/forms/:id/active) since the main forms PATCH
-  // only ever writes a draft, never the published row directly.
-  async function toggleFormActive(id: string, active: boolean) {
-    setError(null)
-    setTogglingId(`${FORM_PREFIX}${id}`)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/forms/${id}/active`, community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ active }),
-        },
-        'Could not update visibility.',
-      )
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update visibility.')
-    } finally {
-      setTogglingId(null)
-    }
-  }
-
   async function deleteCategory(id: string) {
     setError(null)
     setDeletingId(id)
     try {
       await fetchJson(
         withCommunity(`/api/admin/categories/${id}`, community),
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Delete failed.',
-      )
-      setConfirmDeleteId(null)
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed.')
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  // Delete state is shared with categories' confirm/deleting state, keyed by
-  // `form:<id>` so a form and a category can never collide.
-  async function deleteFormEntry(id: string) {
-    setError(null)
-    setDeletingId(`${FORM_PREFIX}${id}`)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/forms/${id}`, community),
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Delete failed.',
       )
@@ -303,37 +232,6 @@ export default function CategoryManager({
     )
   }
 
-  if (editingId === `${FORM_PREFIX}new`) {
-    return (
-      <FormEditor
-        token={token}
-        form={null}
-        onDone={() => {
-          onCloseEditor()
-          load()
-        }}
-        onCancel={onCloseEditor}
-      />
-    )
-  }
-
-  if (editingId?.startsWith(FORM_PREFIX)) {
-    const id = editingId.slice(FORM_PREFIX.length)
-    const form = forms?.find((f) => f.id === id) ?? null
-    if (!form) return <p className="text-sm text-muted">Loading…</p>
-    return (
-      <FormEditor
-        token={token}
-        form={form}
-        onDone={() => {
-          onCloseEditor()
-          load()
-        }}
-        onCancel={onCloseEditor}
-      />
-    )
-  }
-
   if (editingId?.startsWith(LISTING_PREFIX)) {
     const id = editingId.slice(LISTING_PREFIX.length)
     const category = categories?.find((c) => c.id === id) ?? null
@@ -351,7 +249,7 @@ export default function CategoryManager({
     <div>
       <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
         <div className="flex shrink-0 gap-2 flex-wrap">
-          {show === 'categories' && missingSingletons.map((kind) => (
+          {missingSingletons.map((kind) => (
             <button
               key={kind}
               onClick={() => addSingleton(kind)}
@@ -361,21 +259,12 @@ export default function CategoryManager({
               {addingSingleton === kind ? 'Adding…' : `+ Add ${SINGLETON_KIND_LABELS[kind]}`}
             </button>
           ))}
-          {show === 'categories' ? (
-            <button
-              onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-              className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              + New category
-            </button>
-          ) : (
-            <button
-              onClick={() => onOpenEditor(`${FORM_PREFIX}new`)}
-              className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              + Add a form
-            </button>
-          )}
+          <button
+            onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
+            className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
+          >
+            + New category
+          </button>
         </div>
       </div>
 
@@ -389,46 +278,33 @@ export default function CategoryManager({
         <AdminEmpty>Nothing here yet.</AdminEmpty>
       ) : (
         <div className="space-y-2">
-          {entries.map((e) =>
-            e.kind === 'category' && e.data.kind === 'listing' ? (
+          {entries.map((c) =>
+            c.kind === 'listing' ? (
               <CategoryRow
-                key={`cat:${e.data.id}`}
-                category={e.data}
-                confirmingDelete={confirmDeleteId === e.data.id}
-                deleting={deletingId === e.data.id}
-                toggling={togglingId === e.data.id}
-                onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
-                onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${e.data.id}`)}
-                onAskDelete={() => setConfirmDeleteId(e.data.id)}
+                key={`cat:${c.id}`}
+                category={c}
+                confirmingDelete={confirmDeleteId === c.id}
+                deleting={deletingId === c.id}
+                toggling={togglingId === c.id}
+                onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
+                onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${c.id}`)}
+                onAskDelete={() => setConfirmDeleteId(c.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteCategory(e.data.id)}
-                onToggleActive={(active) => toggleCategoryActive(e.data.id, active)}
-              />
-            ) : e.kind === 'category' ? (
-              <SingletonRow
-                key={`cat:${e.data.id}`}
-                category={e.data}
-                confirmingDelete={confirmDeleteId === e.data.id}
-                deleting={deletingId === e.data.id}
-                toggling={togglingId === e.data.id}
-                onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
-                onAskDelete={() => setConfirmDeleteId(e.data.id)}
-                onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteCategory(e.data.id)}
-                onToggleActive={(active) => toggleCategoryActive(e.data.id, active)}
+                onConfirmDelete={() => deleteCategory(c.id)}
+                onToggleActive={(active) => toggleCategoryActive(c.id, active)}
               />
             ) : (
-              <FormRow
-                key={`form:${e.data.id}`}
-                form={e.data}
-                confirmingDelete={confirmDeleteId === `${FORM_PREFIX}${e.data.id}`}
-                deleting={deletingId === `${FORM_PREFIX}${e.data.id}`}
-                toggling={togglingId === `${FORM_PREFIX}${e.data.id}`}
-                onEdit={() => onOpenEditor(`${FORM_PREFIX}${e.data.id}`)}
-                onAskDelete={() => setConfirmDeleteId(`${FORM_PREFIX}${e.data.id}`)}
+              <SingletonRow
+                key={`cat:${c.id}`}
+                category={c}
+                confirmingDelete={confirmDeleteId === c.id}
+                deleting={deletingId === c.id}
+                toggling={togglingId === c.id}
+                onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
+                onAskDelete={() => setConfirmDeleteId(c.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteFormEntry(e.data.id)}
-                onToggleActive={(active) => toggleFormActive(e.data.id, active)}
+                onConfirmDelete={() => deleteCategory(c.id)}
+                onToggleActive={(active) => toggleCategoryActive(c.id, active)}
               />
             ),
           )}
@@ -443,8 +319,7 @@ export default function CategoryManager({
 const TYPE_BADGE = 'text-[10px] font-medium uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0'
 
 // Flips public visibility right from the list — no need to open the full
-// editor just to hide something. Shared by category, singleton, and form
-// rows alike, since they all patch the same `active` concept.
+// editor just to hide something. Shared by category and singleton rows.
 function VisibilityToggle({
   active,
   toggling,
@@ -891,99 +766,4 @@ export function SingletonEditor({
   )
 }
 
-// 'support'/'volunteer' are wired directly into their own wizard components —
-// deleting them is blocked server-side (see formStore.deleteForm) and the
-// Delete button is hidden here to match. They can still be hidden/shown like
-// any other form, via the normal VisibilityToggle below.
-const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
-
-function FormRow({
-  form: f,
-  confirmingDelete,
-  deleting,
-  toggling,
-  onEdit,
-  onAskDelete,
-  onCancelDelete,
-  onConfirmDelete,
-  onToggleActive,
-}: {
-  form: FormConfig
-  confirmingDelete: boolean
-  deleting: boolean
-  toggling: boolean
-  onEdit: () => void
-  onAskDelete: () => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
-  onToggleActive: (active: boolean) => void
-}) {
-  const canDelete = !PROTECTED_FORM_IDS.has(f.id)
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
-            <span className={`${TYPE_BADGE} bg-purple-50 text-purple-600`}>Form</span>
-            <span>{f.title}</span>
-            <span className="font-normal text-xs text-muted">{f.id}</span>
-            {f.draft && (
-              <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-                Unpublished draft
-              </span>
-            )}
-          </p>
-          <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <VisibilityToggle active={f.active !== false} toggling={toggling} onToggle={onToggleActive} />
-          <button
-            onClick={onEdit}
-            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Edit
-          </button>
-          {/* Rendered (but hidden) even when this form can't be deleted, so
-              every row's Edit button sits in the same spot — a row with no
-              Delete button shouldn't shift Edit over to fill the gap. */}
-          <button
-            onClick={onAskDelete}
-            className={`text-xs font-medium text-red-600 hover:underline cursor-pointer ${canDelete ? '' : 'invisible'}`}
-            aria-hidden={!canDelete}
-            tabIndex={canDelete ? 0 : -1}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {confirmingDelete && (
-        <div className="mt-3 border-t border-slate-200 pt-3">
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-            <p className="text-sm text-red-800">
-              Permanently delete <span className="font-semibold">{f.title}</span> and every response to
-              it? This can’t be undone.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={onConfirmDelete}
-                disabled={deleting}
-                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                {deleting ? 'Deleting…' : 'Delete form & responses'}
-              </button>
-              <button
-                onClick={onCancelDelete}
-                disabled={deleting}
-                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 

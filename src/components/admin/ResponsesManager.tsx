@@ -26,7 +26,8 @@ export default function ResponsesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [formsError, setFormsError] = useState<string | null>(null)
-  const [activeKey, setActiveKey] = useState<string>(FEEDBACK_KEY)
+  // A form's own screen links here with ?form=<id>, to open on its tab.
+  const [activeKey, setActiveKey] = useState<string>(() => new URLSearchParams(window.location.search).get('form') ?? FEEDBACK_KEY)
 
   useEffect(() => {
     let cancelled = false

@@ -213,10 +213,11 @@ describe('SiteSettingsEditor — Home page', () => {
 })
 
 describe('SiteSettingsEditor — Header and menus', () => {
-  it('holds the name and logo, the computer’s top of the page, the phone’s tabs and feedback', async () => {
+  // Feedback moved to the Forms tab (FeedbackEditor.test.tsx).
+  it('holds the name and logo, the computer’s top of the page and the phone’s tabs', async () => {
     await renderEditor('menus')
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(boxes).toEqual(['Name and logo', 'Top of the page, on a computer', 'Tabs, on a phone', 'Feedback'])
+    expect(boxes).toEqual(['Name and logo', 'Top of the page, on a computer', 'Tabs, on a phone'])
     expect(screen.queryByText('Below it, in this order')).toBeNull()
   })
 
@@ -224,15 +225,6 @@ describe('SiteSettingsEditor — Header and menus', () => {
     await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', logoUrl: 'https://example.com/logo.png' })
     expect(screen.getByLabelText('Name')).toHaveValue('Test Directory')
     expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
-  })
-
-  it('turning feedback off hides its words, and is a change', async () => {
-    const user = userEvent.setup()
-    await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true })
-    expect(screen.getByLabelText('Button')).toHaveValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)
-    await user.click(screen.getByRole('switch', { name: 'Feedback on the site' }))
-    expect(screen.queryByLabelText('Button')).toBeNull()
-    expect(within(saveBar()!).getByText('1 change')).toBeInTheDocument()
   })
 
   // Regression: the editor showed the default items whenever the draft's list

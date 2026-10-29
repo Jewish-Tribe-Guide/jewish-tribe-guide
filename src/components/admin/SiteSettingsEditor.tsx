@@ -15,7 +15,7 @@ import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SitePreview from './SitePreview'
 import SaveBar, { useLeaveGuard } from './SaveBar'
-import { AdminBox, AdminField, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBox, AdminField, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/lib/siteSettings'
@@ -312,25 +312,6 @@ export default function SiteSettingsEditor({
                 </div>
               </AdminBox>
 
-              <section aria-label="Feedback" className="bg-white border border-slate-200 rounded-[10px]">
-                <div className={`flex items-center gap-2.5 px-4 py-3.5 ${draft.feedbackEnabled ? 'border-b border-slate-100' : ''}`}>
-                  <h2 className="flex-1 m-0 text-base font-bold text-slate-900">Feedback</h2>
-                  <AdminSwitch checked={draft.feedbackEnabled} onChange={(on) => set('feedbackEnabled', on)} label="Feedback on the site" />
-                </div>
-                {draft.feedbackEnabled && (
-                  <div className="flex flex-col gap-4 p-4">
-                    <AdminField label="Button">
-                      <input value={draft.feedbackButtonLabel} onChange={(e) => set('feedbackButtonLabel', e.target.value)} className={adminInputClass} />
-                    </AdminField>
-                    <AdminField label="Heading">
-                      <input value={draft.feedbackHeading} onChange={(e) => set('feedbackHeading', e.target.value)} className={adminInputClass} />
-                    </AdminField>
-                    <AdminField label="After sending">
-                      <textarea rows={2} value={draft.feedbackSuccessMessage} onChange={(e) => set('feedbackSuccessMessage', e.target.value)} className={adminInputClass} />
-                    </AdminField>
-                  </div>
-                )}
-              </section>
             </>
           )}
         </div>

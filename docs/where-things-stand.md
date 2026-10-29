@@ -489,6 +489,27 @@ brief, one round of drawings, then the build in pieces.
    A kind can't be changed after it's made, as drawn.
    Still going by address, not kind: the kosher watch, the hospital
    watches and question reader, and the map's pins.
+11. **Build, step 4c (Forms, Campaigns, About and Privacy): BUILT Oct 29.**
+   Forms: a list with Feedback first, then each form, saying where it
+   shows and On/Off. Feedback has its own screen (footer button, heading,
+   after sending, "On the site", the form beside); it left Header and
+   menus. A form's screen: "On the site" (at once), Responses, its
+   questions as rows under their sections, saying what each takes and when
+   it's asked, each opening its own screen; After sending; the phone
+   preview beside. Every edit is kept as a draft by itself a moment later,
+   the bar says "Draft · N changes, not on the site yet", and only Publish
+   puts it on the site; Throw away goes back to what's on the site.
+   Campaigns: a list saying what each opens, when, and which is on now;
+   each its own screen with a preview card and Delete asking once. About
+   and Privacy: one note that it's one copy for every community, the two
+   pages as a switch, the Save bar.
+   Not as drawn: questions move with ↑ ↓ on their own screen, not by
+   dragging; a question's screen still has the old settings inside; the
+   form's name and icon are in a third box, "Its tile" (not drawn);
+   "+ Add a form" and "Delete this form" are kept (not drawn); a
+   campaign's photo is shown, not picked (it's fixed in code); the
+   campaign preview has no Computer/Phone switch; "Button first" is kept.
+   Next: step 5 (Reports and the gear), then step 6 (Setup).
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 
