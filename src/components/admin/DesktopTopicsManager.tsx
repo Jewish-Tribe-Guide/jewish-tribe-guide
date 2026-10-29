@@ -1,7 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { BUILT_IN_BLOCKS, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
+import SubscriberManager from './SubscriberManager'
+import { Chevron } from './AdminUI'
 
 // ── The desktop home screen's five singleton cards — Categories & Search,
 // Davening Times, Update Listings, Email Signup, and Jewish Times —
@@ -46,30 +49,29 @@ type CardMeta = {
 const CARD_META: CardMeta[] = [
   {
     kind: 'browse',
-    description: 'The always-first search box + flat category grid.',
+    description: 'A tile per category',
   },
   {
     kind: 'davening',
-    description: 'Today’s next davening time, aggregated across every category with minyanim.',
+    description: 'The next minyan, beside the listings card',
     sharedRow: true,
   },
   {
     kind: 'listings',
-    description: 'The Add/Edit/Report card — the actions that actually keep listings current.',
+    description: 'Add, edit or report a listing, beside the davening card',
     eyebrowKey: 'desktopListingsEyebrow',
     headingKey: 'desktopListingsHeading',
     sharedRow: true,
   },
   {
     kind: 'subscribe',
-    description: 'The email-subscribe form — new listings and closures, by category.',
+    description: 'Email sign-up',
     eyebrowKey: 'desktopSubscribeEyebrow',
     headingKey: 'desktopSubscribeHeading',
   },
   {
     kind: 'jewishTimes',
-    description:
-      'Candle lighting, havdalah, and upcoming Yom Tov. Renders only when a Zmanim category is configured. No eyebrow field — its own eyebrow is the computed Hebrew date + location, not static text.',
+    description: 'This week’s candle lighting, when there’s a Zmanim category',
     headingKey: 'desktopJewishTimesHeading',
   },
 ]
@@ -85,6 +87,7 @@ export default function DesktopTopicsManager({
   onChange,
   settings,
   onSettingChange,
+  token,
 }: {
   sections: DraftHomeSection[]
   onChange: (sections: DraftHomeSection[]) => void
@@ -94,22 +97,18 @@ export default function DesktopTopicsManager({
   /** SiteSettingsEditor's own `set` function — writes one field onto its
    *  draft, same as every other input on that page. */
   onSettingChange: <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) => void
+  /** For the email sign-up card's list of who signed up; without it the
+   *  list isn't shown. */
+  token?: string
 }) {
+  // The home page's cards, in order, as rows (board 7): a row opens in
+  // place to its words, width and order; taking one off asks once.
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
   const cardEntries = sections.filter(
     (s): s is DraftHomeSection & { kind: CardKind } => s.kind !== 'section' && CARD_KIND_SET.has(s.kind),
   )
-  // Left exactly as they are in every onChange call below — HomeSectionManager
-  // owns reordering/renaming/removing plain sections, not this component.
   const sectionEntries = sections.filter((s) => s.kind === 'section')
-  // A row whose kind predates the current six (e.g. the old 'zmanim'/
-  // 'shabbat'/'featured' — DDL here only ever widens the DB's allowed kinds,
-  // never narrows, so an existing row like that can still be sitting in a
-  // real community's data). CARD_META has nothing to show for it —
-  // BUILT_IN_BLOCKS[kind] would be undefined — so it's left alone,
-  // untouched by every onChange below, same as sectionEntries. It simply
-  // isn't rendered here (Landing.tsx's own ordered walk already has no
-  // branch for it either) until reseeded or removed by hand in the
-  // database.
   const legacyEntries = sections.filter((s) => s.kind !== 'section' && !CARD_KIND_SET.has(s.kind))
   const missingCards = CARD_KINDS.filter((k) => !cardEntries.some((c) => c.kind === k))
 
@@ -123,8 +122,9 @@ export default function DesktopTopicsManager({
     ])
   }
 
-  function removeCard(id: string, label: string) {
-    if (!confirm(`Remove "${label}" from the home page? You can add it back anytime with the button below.`)) return
+  function removeCard(id: string) {
+    setRemoving(null)
+    setOpenId(null)
     onChange(sections.filter((s) => s.id !== id))
   }
 
@@ -140,58 +140,39 @@ export default function DesktopTopicsManager({
     onChange([...sectionEntries, ...legacyEntries, ...reordered])
   }
 
+  const quiet = 'min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 cursor-pointer'
+
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        The desktop home screen&rsquo;s cards, in order — reorder or remove one entirely, and edit its
-        own eyebrow/heading right on its row. Mobile doesn&rsquo;t show these (it has its own tab bar
-        instead). Part of this tab&rsquo;s Save changes below — nothing here goes live until you save.
-      </p>
-
-      {cardEntries.length > 0 && (
-        <div className="space-y-3 max-w-2xl">
-          {cardEntries.map((c, i) => {
-            const meta = CARD_META_BY_KIND.get(c.kind)
-            const label = BUILT_IN_BLOCKS[c.kind].title
-            return (
-              <div key={c.id} className="bg-white border border-slate-200 rounded-lg p-4">
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <p className="pt-0.5 text-sm font-medium text-slate-800">{label}</p>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => moveCard(i, -1)} disabled={i === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label={`Move ${label} up`}>↑</button>
-                    <button onClick={() => moveCard(i, 1)} disabled={i === cardEntries.length - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label={`Move ${label} down`}>↓</button>
-                    <button onClick={() => removeCard(c.id, label)} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Remove</button>
-                  </div>
-                </div>
-                {meta && <p className="text-xs text-muted mb-2">{meta.description}</p>}
-                {!meta?.sharedRow && (
-                <div className="mb-2 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
-                  {(['full', 'half'] as const).map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => setWidth(c.id, w)}
-                      aria-pressed={c.width === w}
-                      className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors cursor-pointer ${
-                        c.width === w ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {w === 'full' ? 'Full width' : 'Half width'}
-                    </button>
-                  ))}
-                </div>
-                )}
-                {!meta?.sharedRow && c.width === 'half' && (
-                  <p className="text-[11px] text-muted mb-2">
-                    Pairs with a neighboring half-width card into one side-by-side row. On its own (no
-                    half-width neighbor), it just renders full width.
-                  </p>
-                )}
+      {cardEntries.map((c, i) => {
+        const meta = CARD_META_BY_KIND.get(c.kind)
+        // What a visitor sees it called: its heading, or the card's name.
+        const label = (meta?.headingKey && (settings[meta.headingKey] as string)) || BUILT_IN_BLOCKS[c.kind].title.replace(/ Card$/, '')
+        const open = openId === c.id
+        return (
+          <div key={c.id} className="border-b border-slate-100 last:border-b-0">
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-describedby={meta ? `${c.id}-line` : undefined}
+              onClick={() => setOpenId(open ? null : c.id)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] text-left hover:bg-slate-50 cursor-pointer"
+            >
+              <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <span className="text-[15px] font-semibold text-slate-900">{label}</span>
+                {meta && <span id={`${c.id}-line`} aria-hidden className="text-[13px] text-slate-600">{meta.description}</span>}
+              </span>
+              <span className={open ? 'rotate-90' : ''}>
+                <Chevron />
+              </span>
+            </button>
+            {open && (
+              <div className="flex flex-col gap-3 px-4 pb-4">
                 {meta?.headingKey && (
-                  <div className={`grid grid-cols-1 gap-2 mt-2 ${meta.eyebrowKey ? 'sm:grid-cols-2' : ''}`}>
+                  <div className={`grid grid-cols-1 gap-2 ${meta.eyebrowKey ? 'sm:grid-cols-2' : ''}`}>
                     {meta.eyebrowKey && (
                       <label className="block">
-                        <span className="block text-[11px] font-medium text-slate-600 mb-1">Eyebrow</span>
+                        <span className="block text-[13px] font-semibold text-slate-700 mb-1">Small line above</span>
                         <input
                           value={settings[meta.eyebrowKey] as string}
                           onChange={(e) => onSettingChange(meta.eyebrowKey!, e.target.value as SiteSettings[typeof meta.eyebrowKey])}
@@ -200,7 +181,7 @@ export default function DesktopTopicsManager({
                       </label>
                     )}
                     <label className="block">
-                      <span className="block text-[11px] font-medium text-slate-600 mb-1">Heading</span>
+                      <span className="block text-[13px] font-semibold text-slate-700 mb-1">Heading</span>
                       <input
                         value={settings[meta.headingKey!] as string}
                         onChange={(e) => onSettingChange(meta.headingKey!, e.target.value as SiteSettings[NonNullable<typeof meta.headingKey>])}
@@ -209,19 +190,64 @@ export default function DesktopTopicsManager({
                     </label>
                   </div>
                 )}
+                {!meta?.sharedRow && (
+                  <div role="group" aria-label="Width" className="self-start inline-flex gap-0.5 rounded-lg border border-slate-300 p-0.5">
+                    {(['full', 'half'] as const).map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setWidth(c.id, w)}
+                        aria-pressed={c.width === w}
+                        className={`min-h-9 px-3 text-[13px] font-semibold rounded-md cursor-pointer ${
+                          c.width === w ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {w === 'full' ? 'Full width' : 'Half width'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!meta?.sharedRow && c.width === 'half' && (
+                  <p className="m-0 text-[13px] text-slate-600">Sits beside the next half-width card.</p>
+                )}
+                {c.kind === 'subscribe' && token && <SubscriberManager token={token} />}
+                {removing === c.id ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="m-0 flex-1 text-sm font-semibold text-slate-900">Take {label} off the home page?</p>
+                    <button type="button" onClick={() => removeCard(c.id)} className="min-h-10 px-3 rounded-lg bg-red-600 text-white text-sm font-semibold cursor-pointer">
+                      Take it off
+                    </button>
+                    <button type="button" onClick={() => setRemoving(null)} className={quiet}>
+                      Leave it
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => moveCard(i, -1)} disabled={i === 0} className={quiet} aria-label={`Move ${label} up`}>
+                      Move up
+                    </button>
+                    <button type="button" onClick={() => moveCard(i, 1)} disabled={i === cardEntries.length - 1} className={quiet} aria-label={`Move ${label} down`}>
+                      Move down
+                    </button>
+                    <button type="button" onClick={() => setRemoving(c.id)} className={quiet}>
+                      Take it off
+                    </button>
+                  </div>
+                )}
               </div>
-            )
-          })}
-        </div>
-      )}
+            )}
+          </div>
+        )
+      })}
 
       {missingCards.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3 max-w-2xl">
+        <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-slate-100">
           {missingCards.map((k) => (
             <button
               key={k}
+              type="button"
               onClick={() => addCard(k)}
-              className="text-xs font-medium border border-slate-300 rounded-full px-3 py-1.5 text-slate-600 hover:bg-slate-50 cursor-pointer"
+              className="min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-primary hover:bg-slate-50 cursor-pointer"
             >
               + Add “{BUILT_IN_BLOCKS[k].title}”
             </button>

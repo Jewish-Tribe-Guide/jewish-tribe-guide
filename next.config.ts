@@ -184,6 +184,12 @@ const nextConfig: NextConfig = {
       { source: '/:community((?!api\\b).*)/admin/questions', destination: '/:community/admin/searches', permanent: false },
       // Archived is a filter on Places now (the admin redesign's step 3).
       { source: '/:community((?!api\\b).*)/admin/archived', destination: '/:community/admin/places?show=archived', permanent: false },
+      // Site by screen, not by device (the admin redesign's step 4): the old
+      // Basics and On a computer tabs held the home page's words, On a phone
+      // its tabs.
+      { source: '/:community((?!api\\b).*)/admin/site', destination: '/:community/admin/home', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/desktop', destination: '/:community/admin/home', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/mobile', destination: '/:community/admin/menus', permanent: false },
     ];
   },
 };

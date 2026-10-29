@@ -32,9 +32,10 @@ export type AdminTab =
   | 'categories'
   | 'responses'
   | 'places'
-  | 'site'
-  | 'desktop'
-  | 'mobile'
+  | 'home'
+  | 'forms'
+  | 'menus'
+  | 'pages'
   | 'campaigns'
   | 'metrics'
   | 'history'
@@ -83,14 +84,17 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
     {
       area: 'site',
       label: 'Site',
-      // Site, Desktop and Mobile share one draft and one Save (see
-      // SiteSettingsLayout), so they stay three tabs side by side.
+      // Screen by screen, each tab the screen it changes (step 4). Home page
+      // and Header and menus share one draft and one Save (see
+      // SiteSettingsLayout). About and Privacy is one copy for every
+      // community, so only the site owner has it.
       tabs: [
-        { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
+        { tab: 'home', href: `${base}/home`, label: 'Home page' },
+        { tab: 'categories', href: `${base}/categories`, label: 'Category pages' },
+        { tab: 'forms', href: `${base}/forms`, label: 'Forms' },
+        { tab: 'menus', href: `${base}/menus`, label: 'Header and menus' },
         { tab: 'campaigns', href: `${base}/campaigns`, label: 'Campaigns' },
-        { tab: 'site', href: `${base}/site`, label: 'Basics' },
-        { tab: 'desktop', href: `${base}/desktop`, label: 'On a computer' },
-        { tab: 'mobile', href: `${base}/mobile`, label: 'On a phone' },
+        ...(isSuperAdmin ? [{ tab: 'pages' as const, href: `${base}/pages`, label: 'About and Privacy' }] : []),
       ],
     },
     {

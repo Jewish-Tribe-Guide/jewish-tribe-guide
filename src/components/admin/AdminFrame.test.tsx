@@ -38,7 +38,11 @@ describe('AdminFrame', () => {
     const { sidebar, lit, heading } = show('/philly/admin/categories/cat:abc')
     expect(sidebar).toEqual(['To do', 'Places', 'Site', 'Reports', 'Settings', 'View the site'])
     expect(lit).toEqual(['Site'])
-    expect(heading).toBe('Site')
+    // Site's heading is the area on a phone, and the open tab on a computer,
+    // where the tabs above it already say Site (board 7).
+    expect(heading).toBe('SiteCategory pages')
+    expect(screen.getByText('Site', { selector: 'h1 span' })).toHaveClass('md:hidden')
+    expect(screen.getByText('Category pages', { selector: 'h1 span' })).toHaveClass('hidden', 'md:inline')
   })
 
   it('puts only the four areas in the phone bar, Settings behind the gear', () => {
@@ -48,9 +52,9 @@ describe('AdminFrame', () => {
   })
 
   it("shows the open area's pages as tabs under the heading, the current one lit", () => {
-    show('/philly/admin/desktop')
+    show('/philly/admin/menus')
     const tabs = within(screen.getByRole('navigation', { name: 'Site' })).getAllByRole('link')
-    expect(tabs.map((a) => a.textContent)).toEqual(['Categories', 'Campaigns', 'Basics', 'On a computer', 'On a phone'])
+    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns'])
     expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, null, 'page', null])
   })
 
@@ -94,7 +98,7 @@ describe('AdminFrame', () => {
 
   // Site is for a computer (brief, question 6): on a phone it says so.
   it('tells a phone to open Site on a computer, and keeps the screen for a computer', () => {
-    show('/philly/admin/site')
+    show('/philly/admin/home')
     expect(screen.getByText('Open on a computer to edit the site')).toBeInTheDocument()
     expect(screen.getByText('the screen').parentElement).toHaveClass('hidden', 'md:block')
     cleanup()

@@ -61,11 +61,15 @@ const LISTING_PREFIX = 'listing:'
 
 export default function CategoryManager({
   token,
+  show = 'categories',
   editingId,
   onOpenEditor,
   onCloseEditor,
 }: {
   token: string
+  /** Site's Category pages tab, or its Forms tab: one list each (the admin
+   *  redesign's step 4). */
+  show?: 'categories' | 'forms'
   editingId: string | null
   onOpenEditor: (id: string) => void
   onCloseEditor: () => void
@@ -99,12 +103,12 @@ export default function CategoryManager({
 
   const entries = useMemo<Entry[] | null>(() => {
     if (!categories || !forms) return null
-    const all: Entry[] = [
-      ...categories.map((data): Entry => ({ kind: 'category', data })),
-      ...forms.map((data): Entry => ({ kind: 'form', data })),
-    ]
+    const all: Entry[] =
+      show === 'forms'
+        ? forms.map((data): Entry => ({ kind: 'form', data }))
+        : categories.map((data): Entry => ({ kind: 'category', data }))
     return all.sort((a, b) => entryLabel(a).localeCompare(entryLabel(b)))
-  }, [categories, forms])
+  }, [categories, forms, show])
 
   // Adds a singleton pseudo-category (Map, Zmanim, Eruv Information, Jewish
   // Medical Resources) directly — there's nothing to configure, so this skips
@@ -319,7 +323,7 @@ export default function CategoryManager({
     <div>
       <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
         <div className="flex shrink-0 gap-2 flex-wrap">
-          {missingSingletons.map((kind) => (
+          {show === 'categories' && missingSingletons.map((kind) => (
             <button
               key={kind}
               onClick={() => addSingleton(kind)}
@@ -329,18 +333,21 @@ export default function CategoryManager({
               {addingSingleton === kind ? 'Adding…' : `+ Add ${SINGLETON_KIND_LABELS[kind]}`}
             </button>
           ))}
-          <button
-            onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-            className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-          >
-            + New category
-          </button>
-          <button
-            onClick={() => onOpenEditor(`${FORM_PREFIX}new`)}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            + Add Form
-          </button>
+          {show === 'categories' ? (
+            <button
+              onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
+              className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              + New category
+            </button>
+          ) : (
+            <button
+              onClick={() => onOpenEditor(`${FORM_PREFIX}new`)}
+              className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              + Add a form
+            </button>
+          )}
         </div>
       </div>
 

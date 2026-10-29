@@ -443,6 +443,27 @@ brief, one round of drawings, then the build in pieces.
    archived place opens to "Bring it back" or "Delete for good" (asks
    once). Add a place uses the category picked, or asks which.
    Not as drawn: nothing.
+9. **Build, step 4a (Site by screen): BUILT Oct 29.** Site's tabs are the
+   site's screens (boards 7 and Menus): Home page, Category pages, Forms,
+   Header and menus, Campaigns, and About and Privacy for the site owner.
+   The old Basics / On a computer / On a phone addresses land on Home page
+   or Header and menus. Each settings tab shows the real home page beside
+   it with what hasn't been saved, on a computer or a phone, and saves
+   through one bar along the bottom ("2 changes", Undo, Save); leaving with
+   changes asks first (`SaveBar.tsx`). Home page: Top of the page (big
+   line, line under it, search box, photo), the cards below it as rows that
+   open in place (Small line above, Heading, Width, Move, "Take it off",
+   which asks once), Category groups, and the link-preview words. Header
+   and menus: Name and logo, the computer header's links, the phone tabs,
+   and Feedback with a switch. Forms is its own tab with "+ Add a form".
+   Subscribers open inside the email sign-up card.
+   Not as drawn: the header links and phone tabs keep their old editors
+   (fields per item, not rows with switches and drag handles); the photo
+   keeps the shared picker with its address box; Davening and Listings are
+   two rows, not one; the link preview has Title and Description, not one
+   line; Name and logo sit here until step 5 moves them to the gear; the
+   Forms tab's list is still the old cards (step 4c); About and Privacy is
+   the old editor (step 4c).
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

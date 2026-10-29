@@ -49,23 +49,21 @@ describe('adminTabs', () => {
   it('every other tab is present regardless of superadmin status', () => {
     const nonSuperTabs = adminTabs('philly', false).map((t) => t.tab)
     const superTabs = adminTabs('philly', true).map((t) => t.tab)
-    expect(superTabs.filter((t) => t !== 'communities')).toEqual(nonSuperTabs)
+    expect(superTabs.filter((t) => t !== 'communities' && t !== 'pages')).toEqual(nonSuperTabs)
   })
 
-  // Real bug this replaced: Pages (About/Privacy — a site-wide singleton,
-  // not per-community) used to be a tab here too, gated by the same global
-  // SUPERADMIN_EMAILS check underneath as Communities — but with no
-  // isSuperAdmin guard on the tab itself, so every ordinary admin of a
-  // community saw a "Pages" tab that always dead-ended in "Not authorized".
-  // It moved to the standalone superadmin console instead (superAdminTabs
-  // below) rather than gaining the same guard Communities has, so there's
-  // exactly one Pages screen, not a per-community mirage of one.
-  it('has no Pages tab at all, for anyone', () => {
-    // Label, not `t.tab === 'pages'` — 'pages' isn't a valid AdminTab any
-    // more (see the type itself), so that comparison would be a compile
-    // error rather than a real runtime check.
-    expect(adminTabs('philly', false).find((t) => t.label === 'Pages')).toBeUndefined()
-    expect(adminTabs('philly', true).find((t) => t.label === 'Pages')).toBeUndefined()
+  // About and Privacy is one copy for every community, edited through
+  // /api/admin/pages, which only the site owner passes. It used to be a tab
+  // every admin saw and dead-ended in "Not authorized" for all but one;
+  // under Site now (brief question 5), it has the same guard Communities
+  // has, so nobody else sees it at all.
+  it('offers About and Privacy to the site owner only', () => {
+    expect(adminTabs('philly', false).find((t) => t.tab === 'pages')).toBeUndefined()
+    expect(adminTabs('philly', true).find((t) => t.tab === 'pages')).toEqual({
+      tab: 'pages',
+      href: '/philly/admin/pages',
+      label: 'About and Privacy',
+    })
   })
 })
 
@@ -80,11 +78,12 @@ describe('adminAreas', () => {
     expect(shape(true)).toEqual([
       ['To do', ['To do', 'Watches', 'Searches', 'Responses']],
       ['Places', ['Places']],
-      ['Site', ['Categories', 'Campaigns', 'Basics', 'On a computer', 'On a phone']],
+      ['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Numbers', 'History']],
       ['Settings', ['Team', 'Communities']],
     ])
     expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
+    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns']])
   })
 
   it('puts every tab in exactly one area, whatever is switched on', () => {
@@ -122,9 +121,11 @@ describe('adminNavPosition', () => {
     ['/philly/admin/categories', 'site', 'categories'],
     ['/philly/admin/categories/cat:abc', 'site', 'categories'],
     ['/philly/admin/campaigns', 'site', 'campaigns'],
-    ['/philly/admin/site', 'site', 'site'],
-    ['/philly/admin/desktop', 'site', 'desktop'],
-    ['/philly/admin/mobile', 'site', 'mobile'],
+    ['/philly/admin/home', 'site', 'home'],
+    ['/philly/admin/forms', 'site', 'forms'],
+    ['/philly/admin/forms/form:abc', 'site', 'forms'],
+    ['/philly/admin/menus', 'site', 'menus'],
+    ['/philly/admin/pages', 'site', 'pages'],
     ['/philly/admin/metrics', 'reports', 'metrics'],
     ['/philly/admin/history/approved', 'reports', 'history'],
     ['/philly/admin/history/rejected', 'reports', 'history'],

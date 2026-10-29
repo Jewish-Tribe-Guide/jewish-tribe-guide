@@ -88,46 +88,35 @@ test.describe('admin console', () => {
     await expect(page).toHaveURL(/\/philly\/admin\/categories$/)
   })
 
-  test('the Site tab shows the real saved site name and search placeholder', async ({ page, request }) => {
+  // Site is settings by screen (admin redesign, board 7): the home page's
+  // fields on one tab, the header's on another.
+  test('the Home page tab shows the real saved search placeholder and link-preview title', async ({ page, request }) => {
     const res = await request.get('/api/site-settings')
-    const body = await res.json()
-    const settings = body.settings as { name: string; searchPlaceholder: string }
+    const settings = (await res.json()).settings as { searchPlaceholder: string; heroTitle: string }
 
-    await page.goto('/philly/admin/site')
-    // Every settings block is a collapsed-by-default CollapsibleSection now
-    // (see CollapsibleSection.tsx) — the fields aren't in the document at
-    // all until "Show" is clicked.
-    await page.getByRole('button', { name: 'Show Branding' }).click()
-
-    // Not getByLabel, and not a plain hasText filter: each <label> also
-    // wraps its own trailing helper text, which folds into the computed
-    // accessible name — `{ exact: true }` pins it to the heading span alone.
-    const siteNameLabel = page.locator('label').filter({ has: page.getByText('Site name', { exact: true }) })
-    const placeholderLabel = page.locator('label').filter({ has: page.getByText('Search placeholder', { exact: true }) })
-    await expect(siteNameLabel.locator('input')).toHaveValue(settings.name)
-    await expect(placeholderLabel.locator('input')).toHaveValue(settings.searchPlaceholder)
-  })
-
-  test('the Desktop tab loads without error', async ({ page }) => {
-    await page.goto('/philly/admin/desktop')
-
-    await expect(page.getByText('Home screen cards')).toBeVisible()
-    await expect(page.getByText('Top nav bar')).toBeVisible()
+    await page.goto('/philly/admin/home')
+    await expect(page.getByRole('heading', { name: 'Top of the page' })).toBeVisible()
+    await expect(page.getByLabel('Search box')).toHaveValue(settings.searchPlaceholder)
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue(settings.heroTitle)
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
-  test('the Mobile tab loads without error', async ({ page, request }) => {
+  test('the Header and menus tab shows the real saved site name', async ({ page, request }) => {
     const res = await request.get('/api/site-settings')
-    const body = await res.json()
-    const settings = body.settings as { heroTitle: string }
+    const settings = (await res.json()).settings as { name: string }
 
-    await page.goto('/philly/admin/mobile')
-
-    await expect(page.getByText('Mobile tab bar')).toBeVisible()
-    await page.getByRole('button', { name: 'Show Branding' }).click()
-    const headingLabel = page.locator('label').filter({ has: page.getByText('Home screen heading', { exact: true }) })
-    await expect(headingLabel.locator('input')).toHaveValue(settings.heroTitle)
+    await page.goto('/philly/admin/menus')
+    await expect(page.getByRole('heading', { name: 'Name and logo' })).toBeVisible()
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue(settings.name)
+    await expect(page.getByRole('heading', { name: 'Tabs, on a phone' })).toBeVisible()
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
+  })
+
+  test('the old Site addresses land on the new tabs', async ({ page }) => {
+    for (const [from, to] of [['site', 'home'], ['desktop', 'home'], ['mobile', 'menus']]) {
+      await page.goto(`/philly/admin/${from}`)
+      await expect(page).toHaveURL(new RegExp(`/philly/admin/${to}$`))
+    }
   })
 
   test('the Metrics tab shows real submission stats, not stuck loading', async ({ page }) => {
@@ -142,17 +131,16 @@ test.describe('admin console', () => {
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
-  test('opening the Site tab’s preview shows the live home screen, and closes back to the editor untouched', async ({ page }) => {
-    await page.goto('/philly/admin/site')
-    await page.getByRole('button', { name: 'Preview' }).click()
+  test('the Home page tab shows the home page beside it, on a computer or a phone', async ({ page }) => {
+    await page.goto('/philly/admin/home')
+    const preview = page.getByRole('complementary', { name: 'Preview' })
 
-    // The preview is a real iframe of the live site — its own frame, not
-    // this page's DOM, so assert via Playwright's frame API rather than a
-    // page-level locator.
-    const frame = page.frameLocator('iframe')
-    await expect(frame.locator('body')).toBeVisible()
-
-    await page.getByRole('button', { name: /close|back to editor/i }).click()
-    await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible()
+    // The preview is a real iframe of the site — its own frame, not this
+    // page's DOM, so assert via Playwright's frame API.
+    await expect(preview.locator('iframe')).toHaveAttribute('src', '/philly?preview=1')
+    await expect(page.frameLocator('iframe[title="Preview"]').locator('header').first()).toBeVisible()
+    await preview.getByRole('button', { name: 'Phone' }).click()
+    await expect(preview.getByRole('button', { name: 'Phone' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.frameLocator('iframe[title="Preview"]').locator('body')).toBeVisible()
   })
 })

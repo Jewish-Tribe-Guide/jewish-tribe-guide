@@ -82,12 +82,7 @@ export default function MobileTabsEditor({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-      <p className="text-[11px] text-muted">
-        The bar pinned to the bottom of every screen on a phone. Desktop has no tab bar and ignores
-        this. Up to {MAX_MOBILE_TABS} tabs — past that the labels stop being readable.
-      </p>
-
+    <div className="p-4 space-y-3">
       {tabs.length === 0 && (
         <p className="text-xs text-red-600">
           The bar needs at least one tab — add one below, or visitors lose their way back.

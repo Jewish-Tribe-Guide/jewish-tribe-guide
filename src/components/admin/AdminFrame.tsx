@@ -79,6 +79,31 @@ export default function AdminFrame({
   // One of To do's other pages: headed by its own name, with the way back.
   const todoPage = open?.area === 'todo' && position?.tab !== 'queue' ? open.tabs.find((t) => t.tab === position?.tab) : undefined
   const count = useTodoCount(token, community)
+  // Site's tabs come first and the heading is the open tab's name (boards 6
+  // to 8); a screen opened from one (a category, a form) brings its own
+  // heading and way back, so the frame's is the phone's alone there.
+  const siteTab = open?.area === 'site' ? open.tabs.find((t) => t.tab === position?.tab) : undefined
+  const siteInner = !!siteTab && pathname !== siteTab.href
+
+  const tabsNav = open && (
+    <nav aria-label={open.label} className={`${siteTab ? 'hidden md:flex' : 'flex'} gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200`}>
+      {open.tabs.map((t) => {
+        const current = t.tab === position?.tab
+        return (
+          <Link
+            key={t.tab}
+            href={t.href}
+            aria-current={current ? 'page' : undefined}
+            className={`shrink-0 whitespace-nowrap text-sm font-semibold px-3 py-2.5 min-h-11 -mb-px border-b-2 ${
+              current ? 'border-primary text-primary' : 'border-transparent text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            {t.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
 
   const account = (
     <div className="flex flex-col gap-1 px-2.5 pt-3 text-[13px] text-slate-600">
@@ -126,7 +151,8 @@ export default function AdminFrame({
 
       <main className="flex-1 min-w-0 px-4 pb-28 md:px-10 md:pt-8 md:pb-12">
         <div className="max-w-[920px] flex flex-col gap-4">
-          <header className="-mx-4 flex items-center gap-2.5 bg-white border-b border-slate-200 px-4 py-3 md:mx-0 md:p-0 md:bg-transparent md:border-0">
+          {showTabs && siteTab && tabsNav}
+          <header className={`-mx-4 flex items-center gap-2.5 ${siteInner ? 'md:hidden ' : ''} bg-white border-b border-slate-200 px-4 py-3 md:mx-0 md:p-0 md:bg-transparent md:border-0`}>
             <span className="flex-1 min-w-0 flex flex-col">
               {todoPage ? (
                 <Link href={open!.href} className="md:hidden text-[12.5px] font-semibold text-primary">
@@ -140,32 +166,24 @@ export default function AdminFrame({
                   ‹ To do
                 </Link>
               )}
-              <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">{todoPage?.label ?? open?.label ?? 'Admin'}</h1>
+              <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">
+                {siteTab ? (
+                  <>
+                    <span className="md:hidden">{open!.label}</span>
+                    <span className="hidden md:inline">{siteTab.label}</span>
+                  </>
+                ) : (
+                  (todoPage?.label ?? open?.label ?? 'Admin')
+                )}
+              </h1>
             </span>
             <Link href={settings.href} aria-label="Settings" className="md:hidden inline-flex items-center justify-center w-11 h-11 text-slate-700">
               <Icon name="settings" size={20} />
             </Link>
           </header>
 
-          {showTabs && (
-            <nav aria-label={open.label} className="flex gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200">
-              {open.tabs.map((t) => {
-                const current = t.tab === position?.tab
-                return (
-                  <Link
-                    key={t.tab}
-                    href={t.href}
-                    aria-current={current ? 'page' : undefined}
-                    className={`shrink-0 whitespace-nowrap text-sm font-semibold px-3 py-2.5 min-h-11 -mb-px border-b-2 ${
-                      current ? 'border-primary text-primary' : 'border-transparent text-slate-600 hover:text-slate-800'
-                    }`}
-                  >
-                    {t.label}
-                  </Link>
-                )
-              })}
-            </nav>
-          )}
+          {showTabs && !siteTab && tabsNav}
+
 
           {open?.area === 'site' ? (
             <>
