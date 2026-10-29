@@ -26,7 +26,7 @@ function mockList(adminEmails: string[], myNotify = true, myReviewNotify = false
 async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com'], myNotify = true, myReviewNotify = false) {
   mockList(adminEmails, myNotify, myReviewNotify)
   const view = renderWithProviders(<TeamManager token="tok" />, { community: { slug: 'ues' } })
-  await screen.findByText('Team')
+  await waitFor(() => expect(screen.queryByText('Loading team…')).toBeNull())
   return view
 }
 

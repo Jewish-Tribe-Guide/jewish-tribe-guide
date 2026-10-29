@@ -85,7 +85,7 @@ describe('ModerationQueue — loading and empty states', () => {
   it('shows a clear-queue message once loaded with nothing pending', async () => {
     renderQueue([])
     expect(screen.getByText('Loading submissions…')).toBeInTheDocument()
-    expect(await screen.findByText('🎉 Nothing pending — the queue is clear.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
   })
 
   it('shows an unauthorized message on a 401, without treating it as an empty queue silently', async () => {

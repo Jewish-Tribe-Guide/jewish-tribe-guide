@@ -73,9 +73,6 @@ export default function MetricsPanel({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
-        The submission moderation queue, all time — how much is waiting, and how it&rsquo;s been handled.
-      </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatTile label="Pending" value={String(stats.pending)} href={adminBase(community)} />
         <StatTile label="Approved" value={String(stats.approved)} href={`${adminBase(community)}/history/approved`} />

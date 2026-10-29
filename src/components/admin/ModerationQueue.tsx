@@ -10,6 +10,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
+import { AdminEmpty } from './AdminUI'
 
 // The admin's default screen (mounted at /admin itself) — review and
 // approve/reject every pending submission: new listings, edits to existing
@@ -154,7 +155,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
       {items === null ? (
         <p className="text-sm text-muted">Loading submissions…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted">🎉 Nothing pending — the queue is clear.</p>
+        <AdminEmpty />
       ) : (
         <div className="space-y-3">
           {items.map((s) => (

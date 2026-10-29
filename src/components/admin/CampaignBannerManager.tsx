@@ -184,15 +184,6 @@ export default function CampaignBannerManager({ token }: { token: string }) {
 
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        A seasonal banner — a title, a link to an existing category, and a start/end date. It shows
-        up on the home screen and gets a highlighted chip on the map for exactly that date range,
-        then disappears completely once the range ends — and if the linked category is set
-        inactive, it becomes visible in the normal grid and nav for that same window too, so a
-        category that only exists for this campaign can stay hidden the rest of the year. Reuse
-        this for the next one-off promotion rather than building a new one.
-      </p>
-
       {error && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>}
 
       {banners === null ? (

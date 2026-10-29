@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import CategoryManager from '@/components/admin/CategoryManager'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -36,7 +35,6 @@ export default function AdminCategoriesPage() {
 
   return (
     <div>
-      <AdminNav />
       <CategoryManager
         token={session.access_token}
         editingId={editingId}

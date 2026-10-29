@@ -6,6 +6,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { AdminEmpty } from './AdminUI'
 
 // The 'archived' tab in /admin: listings soft-deleted by an approved removal
 // report (see submissionStore.ts) — hidden from the public site but kept in
@@ -75,11 +76,6 @@ export default function ArchivedListings({ token }: { token: string }) {
 
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        Listings removed via an approved report. They&rsquo;re hidden from the site but kept here,
-        recoverable, until you restore or permanently delete them.
-      </p>
-
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
@@ -87,7 +83,7 @@ export default function ArchivedListings({ token }: { token: string }) {
       {listings === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : listings.length === 0 ? (
-        <p className="text-sm text-muted">Nothing archived — no removed listings.</p>
+        <AdminEmpty>Nothing archived.</AdminEmpty>
       ) : (
         <div className="space-y-3">
           {listings.map((l) => (

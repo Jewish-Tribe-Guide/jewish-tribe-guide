@@ -47,7 +47,7 @@ test.describe('admin console', () => {
     await page.goto('/philly/admin')
 
     await expect(page.getByText('Loading submissions…')).not.toBeVisible({ timeout: 10_000 })
-    const empty = page.getByText('🎉 Nothing pending — the queue is clear.')
+    const empty = page.getByText('Nothing to do.')
     const anyCard = page.locator('button', { hasText: 'Approve' }).first()
     await expect(empty.or(anyCard)).toBeVisible()
   })

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   // Included even on the per-community branch — a community admin who
   // ALSO happens to be on the global superadmin list still needs to know
-  // that, so the console can show them the Communities tab (see AdminNav's
+  // that, so the console can show them the Communities tab (see AdminFrame's
   // own use of this). Cheap to compute either way: isAllowedAdminEmail is
   // just a comma-separated env var check, no extra request.
   return Response.json({ ok: true, email: admin.email, isSuperAdmin: isAllowedAdminEmail(admin.email) })

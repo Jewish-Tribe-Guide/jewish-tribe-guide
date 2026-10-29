@@ -15,6 +15,7 @@ import EruvimManager from './EruvimManager'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
+import { AdminEmpty } from './AdminUI'
 
 // ── The categories manager: one list mixing the two kinds of thing a
 // community configures — Listing categories (Grocery Stores, Synagogues, …,
@@ -316,12 +317,7 @@ export default function CategoryManager({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <p className="text-sm text-muted">
-          Listing categories (Grocery Stores, Synagogues, …), Forms (Request Support, Volunteer), and
-          the Map / Zmanim / Eruv Information / Jewish Medical Resources cards — choose what each
-          shows, and edit their fields or questions.
-        </p>
+      <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
         <div className="flex shrink-0 gap-2 flex-wrap">
           {missingSingletons.map((kind) => (
             <button
@@ -355,7 +351,7 @@ export default function CategoryManager({
       {entries === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-muted">Nothing here yet.</p>
+        <AdminEmpty>Nothing here yet.</AdminEmpty>
       ) : (
         <div className="space-y-2">
           {entries.map((e) =>

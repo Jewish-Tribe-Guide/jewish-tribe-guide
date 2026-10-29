@@ -117,11 +117,6 @@ export default function TeamManager({ token }: { token: string }) {
 
   return (
     <div className="max-w-lg space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">Team</h2>
-        <p className="text-sm text-muted">Everyone who can sign in to this admin console.</p>
-      </div>
-
       <div className="bg-white border border-slate-200 rounded-md px-3 py-2.5 space-y-3">
         <div>
           <label className="flex items-center gap-2 text-sm text-slate-900 cursor-pointer">

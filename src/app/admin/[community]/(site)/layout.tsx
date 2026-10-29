@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
 import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -31,7 +30,6 @@ export default function SiteSettingsLayout() {
 
   return (
     <div>
-      <AdminNav />
       <SiteSettingsEditor token={session.access_token} section={section} />
     </div>
   )

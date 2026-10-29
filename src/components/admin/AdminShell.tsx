@@ -1,18 +1,12 @@
 'use client'
 
-// The <main>/heading wrapper every admin screen renders inside — both the
-// loading/login states (see AdminAuthGate) and the authenticated route tree,
-// so every route file drops straight into the same chrome without repeating
-// it. `title`/`subtitle` default to the moderation-queue copy, which is
-// still literally right for most of /{community}/admin/* — every other tab
-// renders its own additional heading below this one rather than needing its
-// own AdminShell copy. Only overridden by the standalone superadmin console
-// (/admin itself, src/app/admin/page.tsx), where "Resource Moderation"
-// would be actively wrong — there's no moderation queue at that URL.
+// The <main>/heading wrapper for the loading and sign-in screens (see
+// AdminAuthGate) and the standalone superadmin console at /admin. A
+// community's signed-in console renders in AdminFrame instead.
 export default function AdminShell({
   children,
-  title = 'Resource Moderation',
-  subtitle = 'Review and approve submitted resources.',
+  title = 'Admin',
+  subtitle,
 }: {
   children: React.ReactNode
   title?: string
@@ -38,7 +32,7 @@ export default function AdminShell({
     // costs nothing alongside w-full.
     <main className="w-full min-w-0 max-w-3xl mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">{title}</h1>
-      <p className="text-sm text-muted mb-6">{subtitle}</p>
+      {subtitle ? <p className="text-sm text-muted mb-6">{subtitle}</p> : <div className="mb-6" />}
       {children}
     </main>
   )

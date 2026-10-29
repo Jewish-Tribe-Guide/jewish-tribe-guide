@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { adminGroups, adminNavPosition, adminTabs, superAdminTabs, type AdminGroup, type AdminTab } from './adminNav'
+import { adminAreas, adminNavPosition, adminTabs, superAdminTabs, type AdminArea, type AdminTab } from './adminNav'
 
 const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
 vi.mock('./features', () => ({ features }))
@@ -16,8 +16,8 @@ describe('adminTabs', () => {
     expect(adminTabs('philly', false).find((t) => t.tab === 'changes')).toBeUndefined()
     features.whatChanged = true
     try {
-      const insights = adminGroups('philly', false).find((g) => g.group === 'insights')!
-      expect(insights.tabs.at(-1)).toEqual({ tab: 'changes', href: '/philly/admin/changes', label: 'What changed' })
+      const reports = adminAreas('philly', false).find((a) => a.area === 'reports')!
+      expect(reports.tabs.at(-1)).toEqual({ tab: 'changes', href: '/philly/admin/changes', label: 'What changed' })
     } finally {
       features.whatChanged = false
     }
@@ -69,29 +69,30 @@ describe('adminTabs', () => {
   })
 })
 
-// Fifteen tabs in one row became five groups (Oct 22). The groups as agreed
-// with the user, in order, each with its tabs in order.
-describe('adminGroups', () => {
+// The admin redesign's four areas and a gear (brief agreed Oct 28), in
+// order, each with today's screens as its tabs until the later steps fold
+// them together.
+describe('adminAreas', () => {
   const shape = (superAdmin: boolean) =>
-    adminGroups('philly', superAdmin).map((g) => [g.label, g.tabs.map((t) => t.label)])
+    adminAreas('philly', superAdmin).map((a) => [a.label, a.tabs.map((t) => t.label)])
 
-  it('is the five agreed groups, Communities only for a superadmin', () => {
+  it('is To do, Places, Site, Reports and Settings, Communities only for a superadmin', () => {
     expect(shape(true)).toEqual([
-      ['To do', ['Moderation queue', 'Watches', 'Read questions', 'Responses']],
-      ['Listings', ['Categories', 'Campaigns', 'Archived']],
-      ['Look', ['Site', 'Desktop', 'Mobile']],
-      ['Insights', ['Metrics', 'Missed searches']],
+      ['To do', ['Suggestions', 'Watches', 'Searches', 'Read questions', 'Responses']],
+      ['Places', ['Archived']],
+      ['Site', ['Categories', 'Campaigns', 'Basics', 'On a computer', 'On a phone']],
+      ['Reports', ['Numbers', 'History']],
       ['Settings', ['Team', 'Communities']],
     ])
     expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
   })
 
-  it('puts every tab in exactly one group, whatever is switched on', () => {
+  it('puts every tab in exactly one area, whatever is switched on', () => {
     for (const whatChanged of [false, true]) {
       features.whatChanged = whatChanged
       try {
         for (const superAdmin of [false, true]) {
-          const grouped = adminGroups('philly', superAdmin).flatMap((g) => g.tabs.map((t) => t.tab))
+          const grouped = adminAreas('philly', superAdmin).flatMap((a) => a.tabs.map((t) => t.tab))
           expect(new Set(grouped).size).toBe(grouped.length)
           expect(grouped).toEqual(adminTabs('philly', superAdmin).map((t) => t.tab))
           expect(grouped.includes('changes')).toBe(whatChanged)
@@ -102,8 +103,8 @@ describe('adminGroups', () => {
     }
   })
 
-  it("links each group to its first tab, and every href is under the community's console", () => {
-    for (const g of adminGroups('ues', true)) {
+  it("links each area to its first tab, and every href is under the community's console", () => {
+    for (const g of adminAreas('ues', true)) {
       expect(g.href).toBe(g.tabs[0].href)
       for (const t of g.tabs) expect(t.href === '/ues/admin' || t.href.startsWith('/ues/admin/')).toBe(true)
     }
@@ -111,36 +112,35 @@ describe('adminGroups', () => {
 })
 
 describe('adminNavPosition', () => {
-  const cases: [string, AdminGroup, AdminTab][] = [
+  const cases: [string, AdminArea, AdminTab][] = [
     ['/philly/admin', 'todo', 'queue'],
     ['/philly/admin/watches', 'todo', 'watches'],
     ['/philly/admin/watches/kind/restaurant', 'todo', 'watches'],
+    ['/philly/admin/searches', 'todo', 'searches'],
     ['/philly/admin/questions', 'todo', 'questions'],
     ['/philly/admin/responses', 'todo', 'responses'],
-    ['/philly/admin/categories', 'listings', 'categories'],
-    ['/philly/admin/categories/cat:abc', 'listings', 'categories'],
-    ['/philly/admin/campaigns', 'listings', 'campaigns'],
-    ['/philly/admin/archived', 'listings', 'archived'],
-    ['/philly/admin/site', 'look', 'site'],
-    ['/philly/admin/desktop', 'look', 'desktop'],
-    ['/philly/admin/mobile', 'look', 'mobile'],
-    ['/philly/admin/metrics', 'insights', 'metrics'],
-    // The Metrics tiles open these.
-    ['/philly/admin/history/approved', 'insights', 'metrics'],
-    ['/philly/admin/history/rejected', 'insights', 'metrics'],
-    ['/philly/admin/searches', 'insights', 'searches'],
+    ['/philly/admin/archived', 'places', 'archived'],
+    ['/philly/admin/categories', 'site', 'categories'],
+    ['/philly/admin/categories/cat:abc', 'site', 'categories'],
+    ['/philly/admin/campaigns', 'site', 'campaigns'],
+    ['/philly/admin/site', 'site', 'site'],
+    ['/philly/admin/desktop', 'site', 'desktop'],
+    ['/philly/admin/mobile', 'site', 'mobile'],
+    ['/philly/admin/metrics', 'reports', 'metrics'],
+    ['/philly/admin/history/approved', 'reports', 'history'],
+    ['/philly/admin/history/rejected', 'reports', 'history'],
     ['/philly/admin/team', 'settings', 'team'],
     ['/philly/admin/communities', 'settings', 'communities'],
   ]
-  it.each(cases)('%s opens %s, with %s lit', (path, group, tab) => {
-    expect(adminNavPosition(path, 'philly', true)).toEqual({ group, tab })
+  it.each(cases)('%s opens %s, with %s lit', (path, area, tab) => {
+    expect(adminNavPosition(path, 'philly', true)).toEqual({ area, tab })
   })
 
-  it('opens Insights on What changed while it is switched on', () => {
+  it('opens Reports on What changed while it is switched on', () => {
     expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toBeNull()
     features.whatChanged = true
     try {
-      expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toEqual({ group: 'insights', tab: 'changes' })
+      expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toEqual({ area: 'reports', tab: 'changes' })
     } finally {
       features.whatChanged = false
     }
@@ -153,7 +153,7 @@ describe('adminNavPosition', () => {
     expect(adminNavPosition('/philly/admin/teams', 'philly', true)).toBeNull()
   })
 
-  it("opens no group on another community's console", () => {
+  it("opens no area on another community's console", () => {
     expect(adminNavPosition('/ues/admin/categories', 'philly', true)).toBeNull()
   })
 

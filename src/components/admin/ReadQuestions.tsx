@@ -6,6 +6,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import CollapsibleSection from './CollapsibleSection'
+import { AdminEmpty } from './AdminUI'
 
 // ── The "Read questions" tab: what the AI reader made of what people asked ──
 // Every question the site's own search found nothing for, which the AI read
@@ -161,10 +162,6 @@ export default function ReadQuestions({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
-        Searches that found nothing, as the AI read them, most asked first. Nothing here reaches the site until you{' '}
-        <strong>Teach</strong> a word: then the search reads it that way everywhere, so teach only what it always means.
-      </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
           Read questions aren&rsquo;t set up on this site yet.
@@ -172,7 +169,7 @@ export default function ReadQuestions({ token }: { token: string }) {
       )}
       {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
       {data.available && data.readings.length === 0 ? (
-        <p className="text-sm text-slate-600">No questions read yet.</p>
+        <AdminEmpty />
       ) : (
         data.available && (
           <>

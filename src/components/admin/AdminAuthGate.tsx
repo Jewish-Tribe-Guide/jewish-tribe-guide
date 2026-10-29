@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import AdminFrame from './AdminFrame'
 import AdminShell from './AdminShell'
 
 // The admin's session, established once here and read by every route below —
@@ -29,7 +30,7 @@ export function useAdminSession(): Session {
 // Session, not a wrapper object — don't all need updating for one new,
 // narrow need: whether the tabs under a per-community console should offer
 // the Communities tab, which is superadmin-only underneath regardless of
-// which community's console it's rendered inside (see AdminNav).
+// which community's console it's rendered inside (see AdminFrame).
 const IsSuperAdminContext = createContext(false)
 
 /** Whether the signed-in admin is ALSO on the global superadmin list
@@ -59,9 +60,8 @@ export function useIsSuperAdmin(): boolean {
  *  layout.tsx).
  *
  *  `shellTitle`/`shellSubtitle`: forwarded to every AdminShell this renders
- *  (loading, login form, and the authenticated content) — AdminShell's own
- *  defaults ("Resource Moderation…") are right for the per-community
- *  console but wrong for the superadmin one. */
+ *  (loading, the login form, and the superadmin console's content). A
+ *  community's signed-in console renders in AdminFrame instead. */
 export default function AdminAuthGate({
   children,
   community,
@@ -319,22 +319,34 @@ export default function AdminAuthGate({
     )
   }
 
+  const signOut = () => getBrowserClient().auth.signOut()
+  const content = (
+    <AdminSessionContext.Provider value={session}>
+      <IsSuperAdminContext.Provider value={isSuperAdmin}>{children}</IsSuperAdminContext.Provider>
+    </AdminSessionContext.Provider>
+  )
+
+  // A community's console gets the frame with its own nav (AdminFrame); the
+  // superadmin console at /admin keeps the plain shell.
+  if (community) {
+    return (
+      <AdminFrame isSuperAdmin={isSuperAdmin} email={session.user.email} onSignOut={signOut}>
+        {content}
+      </AdminFrame>
+    )
+  }
+
   return (
     <AdminShell title={shellTitle} subtitle={shellSubtitle}>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted">
           Signed in as <span className="font-medium text-slate-700">{session.user.email}</span>
         </p>
-        <button
-          onClick={() => getBrowserClient().auth.signOut()}
-          className="text-sm text-muted hover:text-slate-700 underline cursor-pointer"
-        >
+        <button onClick={signOut} className="text-sm text-muted hover:text-slate-700 underline cursor-pointer">
           Sign out
         </button>
       </div>
-      <AdminSessionContext.Provider value={session}>
-        <IsSuperAdminContext.Provider value={isSuperAdmin}>{children}</IsSuperAdminContext.Provider>
-      </AdminSessionContext.Provider>
+      {content}
     </AdminShell>
   )
 }

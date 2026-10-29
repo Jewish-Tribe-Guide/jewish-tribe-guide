@@ -397,7 +397,20 @@ brief, one round of drawings, then the build in pieces.
    site reads. The database columns are still there: dropping them needs
    the user's yes on production (site_settings tagline and desktop_browse,
    desktop_davening and desktop_map eyebrow/heading; card_text_color on
-   category and form; card_image_url on form). Next: step 1, the shell.
+   category and form; card_image_url on form).
+6. **Build, step 1 (shell): BUILT Oct 29.** A sidebar on a computer (To
+   do, Places, Site, Reports, then Settings, View the site and who's
+   signed in), a top bar with a gear and four tabs along the bottom on a
+   phone (`AdminFrame.tsx`, `adminAreas` in `adminNav.ts`). Every screen's
+   heading is its area's name, with the area's pages as tabs under it.
+   Site on a phone says "Open on a computer to edit the site". One look
+   for boxes, rows and empty screens (`AdminUI.tsx`); empty lists say
+   "Nothing to do." Intro paragraphs gone from every tab. History is in
+   the nav (Reports), with Approved/Rejected pills. Metrics is called
+   "Numbers" for now: it shows decisions, not visits, until step 5.
+   Still to come: the To do count (step 2, so it counts the one list).
+   Found on the way, for step 5: Metrics says 22 pending on dev while the
+   queue holds none, so its counts disagree with To do.
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

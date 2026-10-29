@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -22,7 +22,7 @@ const bagels = { ...base, key: 'bagels', question: 'bagels', labels: ['Bagels'],
 async function renderList(readings: unknown[], available = true, words: unknown[] = [], wordsAvailable = true) {
   vi.mocked(fetchJson).mockImplementation(async (_url, init) => (init.method === 'POST' ? { ok: true } : { ok: true, readings, available, words, wordsAvailable }))
   renderWithProviders(<ReadQuestions token="tok" />, { community: { slug: 'philly' } })
-  await screen.findByText(/most asked first/)
+  await waitFor(() => expect(screen.queryByText('Loading read questions…')).toBeNull())
 }
 
 const posted = () =>
