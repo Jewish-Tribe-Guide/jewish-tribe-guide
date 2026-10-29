@@ -476,10 +476,7 @@ brief, one round of drawings, then the build in pieces.
    rows that open a field's own screen, Map, and the "Not listed here?"
    line, with the page itself beside on a computer (click it to try it full
    size). One Save bar; after a save it says "Saved.".
-   **You run migration 088** (`category.place_kind`) in the SQL editor, dev
-   and live. Until then everything works, except picking a kind a
-   category's address doesn't already say (that save says kinds aren't
-   set up yet).
+   Migration 088 (`category.place_kind`) is run on dev and live (Oct 29).
    Not as drawn: a field's own screen still has the old field settings
    inside (not The answer / Where it shows with switches); Icon, Banner
    photo and Pin colour open the old pickers under "Change"; "Every place
@@ -521,9 +518,8 @@ brief, one round of drawings, then the build in pieces.
    "You"), and has your two email switches; Community has Name and logo
    (moved off Header and menus). Communities (site owner) no longer has
    its own admin list: it links to that community's Team.
-   **You run migration 089** (`submission.review_reason`) in the SQL
-   editor, dev and live. Until then leaving something out still works,
-   but its reason isn't kept, so History shows none.
+   Migration 089 (`submission.review_reason`) is run on dev and live
+   (Oct 29).
    Fixed on the way: saving a Site tab sent every setting, so a tab left
    open could put back an older name or Feedback heading. It now sends
    only what changed on that tab.
@@ -551,7 +547,7 @@ brief, one round of drawings, then the build in pieces.
      (555) 555-0100.
    - Making a category with a kind, before migration 088, showed a raw
      database error. It now says to use the kind's own name as the web
-     address. **Migration 088 is still yours to run**, dev and live.
+     address (088 has since been run on both, so this no longer happens).
    **Kosher lists to watch: dropped for now (your call, Oct 29).** A new
    community couldn't finish it: only Keystone-K and Mekor lists can be
    read, and Watches has no way to add one. It comes back if "add a kosher
