@@ -325,6 +325,30 @@ for that exact change, in the same conversation. Show the dry run first.
    anywhere the nav can read it, and the agreement was no new requests just
    for these. Showing them would mean the sign-in check (or one new small
    request) returning the four counts on every admin page load.
+   (Folds into the admin redesign below.)
+
+## Planned: the admin redesign (started Oct 28, nothing decided)
+
+The user wants the whole admin console redesigned so a new community's
+admin finds it clear. The minimum: it looks good, it's organized, and every
+field is accurate and works. Lighter than the public site's process: a
+brief, one round of drawings, then the build in pieces.
+
+1. **Audit: DONE Oct 28.** `docs/admin-audit.md` has every field traced to
+   the site. About 20 settings are dead, about 25 are mislabelled, and seven
+   are clear bugs (top of that file). The same work is split across screens:
+   two search tabs, the queue vs Watches, two archives, two admin rosters.
+2. **Next:** fix the seven clear bugs, or leave them for the build (the
+   user's call). Then write the brief.
+3. **Proposed shape** (mine, not agreed):
+   - To do: one list with counts, replacing four tabs.
+   - Places: one page per listing.
+   - Site: settings beside the screen they change, by screen not device;
+     a category shows its listings first and its fields behind "Build".
+   - Reports.
+   - Team and Communities behind a settings icon.
+   - A setup checklist for a new community.
+   - The Watches pages by kind stay.
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
