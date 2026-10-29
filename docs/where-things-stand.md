@@ -358,7 +358,18 @@ brief, one round of drawings, then the build in pieces.
    and Privacy live, phone support, a setup checklist, what Reports holds,
    nav counts. Build order: clean-up, shell, To do, Places, Site, Reports
    and gear, checklist.
-   **Next:** one canvas of drawings.
+4. **Drawings: DRAWN Oct 28, waiting on the user.**
+   https://claude.ai/artifact/9yEZYDSSXt88jyu38tFvWm, eight boards: To do
+   (desktop, and phone with a search opened), deciding a change (The Kosher
+   Grill's hours), deciding a new place (Kosher Experience - Marlton Tpke),
+   Places, a category page (Food), the home page, and a new community's
+   first visit with the setup checklist. One change from the brief on
+   purpose: To do groups by what you decide (New places, Changes, Searches
+   nobody found), not by who sent it, so suggestions and watch findings sit
+   together. Not drawn: Reports, Settings and Team, Forms, Header and menus,
+   Campaigns, About and Privacy, a field opened, Add a place.
+   `category.kind` already exists (listing, map, eruv, zmanim, medical), so
+   the agreed kinds extend it rather than adding a column.
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
