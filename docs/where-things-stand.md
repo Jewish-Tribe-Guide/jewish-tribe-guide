@@ -386,6 +386,27 @@ brief, one round of drawings, then the build in pieces.
    `category.kind` already exists (listing, map, eruv, zmanim, medical), so
    the agreed kinds extend it rather than adding a column.
 
+## Drawn Oct 28: the computer home and Before candles (waiting on the user)
+
+Canvas https://claude.ai/artifact/FtEAS6MWeWHynqJHzaRURu, 5 boards, with
+real prod numbers (Friday Oct 30, 1 PM; candles 5:44 PM).
+
+- **Before candles by item.** Today it shows the fewest open stores that
+  cover every item (`beforeCandles()` in `src/lib/todayHome.ts`), which
+  is usually one store (Trader Joe's on Arch has all three). Drawn instead:
+  one row per item, "Challah · 10 stores open · closest 0.2 mi". A tap
+  opens Grocery with "Has: Challah" and "Open now" on. Board 2 adds an
+  "All three in one stop" row on top, as the other option. Board 3 is the
+  Grocery page it lands on.
+- **The computer home doesn't need a redesign.** It catches up with the
+  phone: the trust line takes the subhead's place in the hero, and Right
+  now (candles card plus Before candles on Friday, Food and Grocery open
+  now on a weekday) sits beside Browse everything. Dropped: the Upcoming
+  Davening, Kept by the Community and Shabbat & Holiday Times cards (Right
+  now and the candles card answer them). The email signup becomes a thin
+  band above the footer.
+- To decide: per-item rows alone (recommended), or with the one-stop row.
+
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
 Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
