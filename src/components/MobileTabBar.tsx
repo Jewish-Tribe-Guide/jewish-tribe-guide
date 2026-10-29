@@ -4,6 +4,8 @@ import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
 import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
 import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
+import { useCategoriesIfAny } from '@/lib/contentContext'
+import { kindKeyById } from '@/lib/placeKinds'
 
 /** Which app screens each built-in target counts as "current" for. Card tabs
  *  don't appear here — they're matched on the open category instead (see
@@ -50,6 +52,7 @@ type Props = {
 // category/form exactly as tapping its home-screen tile would.
 export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconForTarget }: Props) {
   // With a Browse tab, the grid is Browse's, and the home tab is a house.
+  const categories = useCategoriesIfAny()
   const hasBrowse = tabs.some((t) => t.target === 'browse')
   return (
     <nav
@@ -72,7 +75,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
         // dims/tints it correctly, same as the built-in SVGs; grayscale-ing
         // an already-monochrome currentColor icon would just wash out its
         // active-state color for nothing.
-        const hasLineIcon = !builtIn && hasCategoryIcon(tab.target)
+        const hasLineIcon = !builtIn && hasCategoryIcon(kindKeyById(tab.target, categories))
 
         return (
           <button

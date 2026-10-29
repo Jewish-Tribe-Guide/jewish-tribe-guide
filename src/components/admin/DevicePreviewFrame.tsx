@@ -47,7 +47,7 @@ const HEIGHT: Record<Device, number> = { desktop: 800, mobile: 844 }
 // Renders `children` inside an <iframe> with its own real viewport, cloning
 // every stylesheet from the host document so Tailwind's compiled CSS (and
 // fonts) apply inside exactly as they do outside.
-function IframeViewport({
+export function IframeViewport({
   width,
   height,
   children,

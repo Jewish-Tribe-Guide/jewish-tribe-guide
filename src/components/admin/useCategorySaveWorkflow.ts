@@ -16,6 +16,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsToSave } from '@/lib/listingParts'
+import { placeKindFromSlug } from '@/lib/placeKinds'
 
 // ── The save workflow: validation, the two destructive-change confirmation
 // gates (option-rename migration, field-removal cleanup), and the actual
@@ -35,7 +36,8 @@ export function useCategorySaveWorkflow({
   isNew: boolean
   token: string
   community: string
-  onSaved: () => void
+  /** Given the id it was saved under (a renamed slug's new one). */
+  onSaved: (id: string) => void
 }) {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -186,7 +188,14 @@ export function useCategorySaveWorkflow({
     setSaving(true)
     try {
       const payload = {
-        ...(isNew && { id: draft.id, active: draft.active }),
+        ...(isNew && { id: draft.id }),
+        // The "On the site" switch: always on a create, and on an edit only
+        // when it changed.
+        ...((isNew || draft.active !== (initial!.active !== false)) && { active: draft.active }),
+        // Only when it isn't what the slug already implies: a database
+        // without migration 088 then still saves every category whose kind
+        // its slug gives (all of Philly's).
+        ...(draft.placeKind && draft.placeKind !== (isNew ? placeKindFromSlug(draft.id) : toDraft(initial).placeKind) && { placeKind: draft.placeKind }),
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         icon: draft.icon,
@@ -247,7 +256,7 @@ export function useCategorySaveWorkflow({
         },
         'Save failed.',
       )
-      onSaved()
+      onSaved(draft.id)
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Save failed.'])
     } finally {

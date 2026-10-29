@@ -329,3 +329,41 @@ describe('useCategorySaveWorkflow — save payload', () => {
     expect(body.fields.find((f: CategoryField) => f.key === 'hiddenNote')).toBeDefined()
   })
 })
+
+describe('useCategorySaveWorkflow — kind and On the site', () => {
+  async function payload(draft: Draft, initial: CategoryConfig | null) {
+    const { result } = renderHook(() =>
+      useCategorySaveWorkflow({ draft, initial, isNew: !initial, token: 't', community: 'philly', onSaved: vi.fn() }),
+    )
+    await act(async () => result.current.save())
+    const call = vi.mocked(fetchJson).mock.calls[0]!
+    return JSON.parse((call[1] as RequestInit).body as string)
+  }
+
+  it('sends a kind only when the slug doesn’t already give it, so Philly’s save without migration 088', async () => {
+    expect((await payload(baseDraft(), baseCategory())).placeKind).toBeUndefined()
+    vi.mocked(fetchJson).mockClear()
+    expect((await payload(baseDraft({ id: 'grocery', placeKind: 'groceries' }), null)).placeKind).toBeUndefined()
+    vi.mocked(fetchJson).mockClear()
+    expect((await payload(baseDraft({ id: 'shuls-ues', placeKind: 'shuls' }), null)).placeKind).toBe('shuls')
+    vi.mocked(fetchJson).mockClear()
+    expect((await payload(baseDraft({ placeKind: 'plain' }), baseCategory())).placeKind).toBe('plain')
+  })
+
+  it('sends On the site on an edit only when it changed', async () => {
+    expect((await payload(baseDraft(), baseCategory())).active).toBeUndefined()
+    vi.mocked(fetchJson).mockClear()
+    expect((await payload(baseDraft({ active: false }), baseCategory())).active).toBe(false)
+    vi.mocked(fetchJson).mockClear()
+    expect((await payload(baseDraft({ active: true }), baseCategory({ active: false }))).active).toBe(true)
+  })
+
+  it('tells the screen the id it was saved under', async () => {
+    const onSaved = vi.fn()
+    const { result } = renderHook(() =>
+      useCategorySaveWorkflow({ draft: baseDraft({ id: 'shuls-ues', placeKind: 'shuls' }), initial: null, isNew: true, token: 't', community: 'philly', onSaved }),
+    )
+    await act(async () => result.current.save())
+    expect(onSaved).toHaveBeenCalledWith('shuls-ues')
+  })
+})

@@ -100,6 +100,15 @@ describe('Places', () => {
     expect(screen.queryByRole('button', { name: 'Open Base Philadelphia' })).toBeNull()
     await user.selectOptions(screen.getByLabelText('Category'), 'networking')
     expect(screen.getByText('No places match.')).toBeInTheDocument()
+    expect(window.location.search).toBe('?category=networking')
+  })
+
+  it('opens narrowed to the category a category page’s count names', async () => {
+    window.history.replaceState(null, '', '/philly/admin/places?category=networking')
+    renderPlaces()
+    expect(await screen.findByRole('button', { name: 'Open Base Philadelphia' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open Goldie' })).toBeNull()
+    expect(screen.getByLabelText('Category')).toHaveValue('networking')
   })
 
   it('opens a place in its editor, which updates the listing directly', async () => {

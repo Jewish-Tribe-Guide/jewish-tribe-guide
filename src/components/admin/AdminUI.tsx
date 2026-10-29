@@ -11,11 +11,14 @@ import Link from 'next/link'
 export function AdminBox({
   title,
   count,
+  action,
   foldOnPhone = false,
   children,
 }: {
   title?: string
   count?: number
+  /** Something short on the right of the title, such as "+ Add a field". */
+  action?: React.ReactNode
   /** On a phone the box is one row, its title and count, and opens in
    *  place (board 2); on a computer it's always open. */
   foldOnPhone?: boolean
@@ -26,6 +29,7 @@ export function AdminBox({
     <>
       <h2 className="flex-1 m-0 text-base font-bold text-slate-900">{title}</h2>
       {count !== undefined && <AdminCount n={count} />}
+      {action}
     </>
   )
   return (
@@ -141,5 +145,34 @@ export function AdminEmpty({ children = 'Nothing to do.' }: { children?: React.R
     <p className="bg-white border border-slate-200 rounded-[10px] px-4 py-6 text-center text-[15px] text-slate-600">
       {children}
     </p>
+  )
+}
+
+export const adminInputClass =
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+
+/** A labelled input: the label above, the input under it. */
+export function AdminField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+/** An on/off switch, named by `label`. */
+export function AdminSwitch({ checked, onChange, label }: { checked: boolean; onChange: (on: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer ${checked ? 'bg-primary' : 'bg-slate-300'}`}
+    >
+      <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+    </button>
   )
 }

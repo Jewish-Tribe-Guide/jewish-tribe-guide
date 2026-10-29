@@ -464,6 +464,31 @@ brief, one round of drawings, then the build in pieces.
    line; Name and logo sit here until step 5 moves them to the gear; the
    Forms tab's list is still the old cards (step 4c); About and Privacy is
    the old editor (step 4c).
+10. **Build, step 4b (a category's page, around kinds): BUILT Oct 29.**
+   Making a category starts with "What kind of places?": Shuls, Food,
+   Groceries, Mikvahs, Hotels, Hospitals or Plain. A kind brings its
+   template's name, fields and look; Plain starts empty. The icon, the
+   hidden search words and the link-preview type follow the kind
+   (`placeKinds.ts`), and every category saved before this takes its kind
+   from its address, so nothing changes for Philly. A category's page
+   (board 6b): its name, how many places (opens Places narrowed to it), an
+   "On the site" switch, its kind, Name and look, What each place shows as
+   rows that open a field's own screen, Map, and the "Not listed here?"
+   line, with the page itself beside on a computer (click it to try it full
+   size). One Save bar; after a save it says "Saved.".
+   **You run migration 088** (`category.place_kind`) in the SQL editor, dev
+   and live. Until then everything works, except picking a kind a
+   category's address doesn't already say (that save says kinds aren't
+   set up yet).
+   Not as drawn: a field's own screen still has the old field settings
+   inside (not The answer / Where it shows with switches); Icon, Banner
+   photo and Pin colour open the old pickers under "Change"; "Every place
+   has" (address, phone, hours, website, photo) is kept as checkboxes;
+   The list, Places within a walk, On each listing and What visitors can
+   do are kept below, not drawn; the web address can still be changed.
+   A kind can't be changed after it's made, as drawn.
+   Still going by address, not kind: the kosher watch, the hospital
+   watches and question reader, and the map's pins.
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

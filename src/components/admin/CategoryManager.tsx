@@ -59,6 +59,9 @@ const CAT_PREFIX = 'cat:'
 const FORM_PREFIX = 'form:'
 const LISTING_PREFIX = 'listing:'
 
+/** The category a save just moved to: see `justSaved` below. */
+let savedHandOff: string | null = null
+
 export default function CategoryManager({
   token,
   show = 'categories',
@@ -82,6 +85,21 @@ export default function CategoryManager({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [addingSingleton, setAddingSingleton] = useState<SingletonKind | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  // The category just saved, and how many saves there have been: its screen
+  // starts again from the saved settings, and its Save bar says "Saved."
+  // A save that moves to another address (made, or a new web address) lands
+  // on that address's own page, a fresh one of these: it picks the id up.
+  const [justSaved, setJustSaved] = useState<string | null>(() => savedHandOff)
+  const [savedRound, setSavedRound] = useState(0)
+  useEffect(() => {
+    savedHandOff = null
+  }, [])
+  useEffect(() => {
+    // Leaving it ends the "Saved.", so it isn't still saying so next time.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (justSaved && editingId !== `${CAT_PREFIX}${justSaved}`) setJustSaved(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId])
 
   const load = useCallback(async () => {
     setError(null)
@@ -232,9 +250,11 @@ export default function CategoryManager({
         initial={null}
         siblings={categories}
         hasMapCategory={hasMap}
-        onSaved={() => {
-          onCloseEditor()
-          load()
+        onSaved={async (id) => {
+          // Made: open it, saying so.
+          await load()
+          savedHandOff = id
+          onOpenEditor(`${CAT_PREFIX}${id}`)
         }}
         onCancel={onCloseEditor}
       />
@@ -262,13 +282,21 @@ export default function CategoryManager({
     }
     return (
       <CategoryEditor
+        // Saved: start again from what's now saved, staying on the screen.
+        key={`${initial.id}:${savedRound}`}
         token={token}
         initial={initial}
         siblings={categories}
         hasMapCategory={hasMap}
-        onSaved={() => {
-          onCloseEditor()
-          load()
+        justSaved={justSaved === initial.id}
+        onSaved={async (savedId) => {
+          await load()
+          setJustSaved(savedId)
+          setSavedRound((r) => r + 1)
+          if (savedId !== initial.id) {
+            savedHandOff = savedId
+            onOpenEditor(`${CAT_PREFIX}${savedId}`)
+          }
         }}
         onCancel={onCloseEditor}
       />

@@ -13,6 +13,7 @@ import { groupByKey, parseGroupBy } from '@/lib/listGroups'
 import { parseQuestionCard, questionCardKey } from '@/lib/questionCards'
 import { parseWalkLists, walkListKey } from '@/lib/walkList'
 import { listingPartsKey, parseListingParts } from '@/lib/listingParts'
+import { placeKindFromSlug, type PlaceKind } from '@/lib/placeKinds'
 
 // ── Pure logic behind CategoryEditor — draft shape, template/field
 // normalization, and the two destructive-change detectors (option rename,
@@ -28,6 +29,10 @@ export type Draft = {
   id: string
   label: string
   pluralLabel: string
+  /** What kind of place it holds (placeKinds.ts); '' on a new category
+   *  until one is picked. Saved only when it differs from what the slug
+   *  implies, so a database without migration 088 still saves Philly's. */
+  placeKind: PlaceKind | ''
   /** One emoji shown on the card (home grid, map legend, admin list). */
   icon: string
   /** An uploaded picture shown instead of `icon` — see CategoryConfig's own
@@ -60,10 +65,8 @@ export type Draft = {
   cardBandImageUrl: string
   /** '' means "no colour chosen" — see getCategoryColor's positional fallback. */
   pinColor: string
-  /** Only settable at creation (see CategoryEditor's isNew-only checkbox) — an
-   *  existing category's visibility is changed from CategoryManager's own
-   *  per-row toggle instead, so this is read here but never re-shown/re-sent
-   *  on an edit save (see useCategorySaveWorkflow). */
+  /** Whether it's on the site: the "On the site" switch. Sent on an edit
+   *  only when it changed (see useCategorySaveWorkflow). */
   active: boolean
   /** How the category page groups its list, as groupByKey writes it ('' for
    *  one list). Saved only when changed — see useCategorySaveWorkflow. */
@@ -134,6 +137,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
     id: c?.id ?? '',
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
+    placeKind: c ? (c.placeKind ?? placeKindFromSlug(c.id)) : '',
     icon: c?.icon ?? '',
     iconImageUrl: c?.iconImageUrl ?? '',
     description: c?.description ?? '',
@@ -240,8 +244,19 @@ export function parseOptions(text: string): { value: string; label: string }[] {
     })
 }
 
+/** The line under a field's row in "What each place shows" (board 6b):
+ *  where it shows, in a few words. */
+export function fieldShows(f: CategoryField): string {
+  const n = normalizeField(f)
+  const renderAs = n.renderAs ?? (n.type === 'boolean' ? 'badge' : 'row')
+  const where = renderAs === 'hidden' ? 'Not shown' : renderAs === 'row' ? 'Opened listing' : 'On the row'
+  if (n.type === 'hours') return `${where} · “Open now” filter`
+  return n.filterable ? `Filter · ${where.toLowerCase()}` : where
+}
+
 export function validateDraft(draft: Draft): string[] {
   const errs: string[] = []
+  if (!draft.placeKind) errs.push('Pick what kind of places it holds.')
   if (!draft.pluralLabel.trim()) errs.push('Category name is required.')
   const slugError = slugRejectionReason(draft.id)
   if (slugError) errs.push(slugError)

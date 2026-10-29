@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
+import { isPlaceKind, placeKindFromSlug, type PlaceKind } from './placeKinds'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { withAskWords } from './askWordStore'
@@ -51,6 +52,7 @@ type CategoryRow = {
   // Optional the same way: undefined before migration 059, null once
   // migrated but never set. Either way, one ungrouped list.
   group_by?: unknown
+  place_kind?: string | null
   question_card?: unknown
   walk_list?: unknown
   listing_parts?: unknown
@@ -88,6 +90,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     questionCard: parseQuestionCard(row.question_card) ?? undefined,
     walkList: parseWalkLists(row.walk_list).length ? parseWalkLists(row.walk_list) : undefined,
     listingParts: hasListingParts(parseListingParts(row.listing_parts)) ? parseListingParts(row.listing_parts) : undefined,
+    placeKind: isPlaceKind(row.place_kind) ? row.place_kind : placeKindFromSlug(row.id),
   }
 }
 
@@ -194,6 +197,10 @@ export async function createCategory(community: string, input: {
   pinColor?: string | null
   iconImageUrl?: string | null
   active?: boolean
+  /** Saved only when given, which the editor does only when it differs from
+   *  what the slug implies, so creating a category works on a database
+   *  without migration 088. */
+  placeKind?: PlaceKind
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'listing'
@@ -253,6 +260,7 @@ export async function createCategory(community: string, input: {
     pin_color: input.pinColor?.trim() || null,
     icon_image_url: input.iconImageUrl?.trim() || null,
     active: input.active ?? true,
+    ...(input.placeKind && { place_kind: input.placeKind }),
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
@@ -297,6 +305,7 @@ export async function updateCategory(
     questionCard?: QuestionCard | null
     walkList?: WalkList[] | null
     listingParts?: ListingParts | null
+    placeKind?: PlaceKind
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -331,6 +340,8 @@ export async function updateCategory(
   // And for migration 061.
   if (patch.walkList !== undefined) row.walk_list = patch.walkList?.length ? patch.walkList : null
   // And for migration 066.
+  // And for migration 088.
+  if (patch.placeKind !== undefined) row.place_kind = patch.placeKind
   if (patch.listingParts !== undefined) row.listing_parts = patch.listingParts && hasListingParts(patch.listingParts) ? patch.listingParts : null
 
   // Scoped by community as well as id — the composite primary key means a

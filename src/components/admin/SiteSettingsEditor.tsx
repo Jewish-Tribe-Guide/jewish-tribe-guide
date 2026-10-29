@@ -15,7 +15,7 @@ import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SitePreview from './SitePreview'
 import SaveBar, { useLeaveGuard } from './SaveBar'
-import { AdminBox } from './AdminUI'
+import { AdminBox, AdminField, AdminSwitch, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/lib/siteSettings'
@@ -26,9 +26,6 @@ import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/li
 // small preview beside them. Both tabs are one component instance sharing
 // one draft and one Save bar (see SiteSettingsLayout), so stepping between
 // them never drops a half-finished edit. Nothing goes live until Save.
-
-const inputClass =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   // Every field saveHomeSections actually persists (see its own `changed()`)
@@ -65,32 +62,8 @@ function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange
         setTyped(e.target.value)
         onChange(parsed(e.target.value))
       }}
-      className={inputClass}
+      className={adminInputClass}
     />
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">{label}</span>
-      {children}
-    </label>
-  )
-}
-
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: (on: boolean) => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors cursor-pointer ${checked ? 'bg-primary' : 'bg-slate-300'}`}
-    >
-      <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
-    </button>
   )
 }
 
@@ -203,15 +176,15 @@ export default function SiteSettingsEditor({
             <>
               <AdminBox title="Top of the page">
                 <div className="flex flex-col gap-4 p-4">
-                  <Field label="Big line">
-                    <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={inputClass} />
-                  </Field>
-                  <Field label="Line under it">
-                    <input value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={inputClass} />
-                  </Field>
-                  <Field label="Search box">
-                    <input value={draft.searchPlaceholder} onChange={(e) => set('searchPlaceholder', e.target.value)} className={inputClass} />
-                  </Field>
+                  <AdminField label="Big line">
+                    <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <AdminField label="Line under it">
+                    <input value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <AdminField label="Search box">
+                    <input value={draft.searchPlaceholder} onChange={(e) => set('searchPlaceholder', e.target.value)} className={adminInputClass} />
+                  </AdminField>
                   <div>
                     <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
                     <ImageUploadField
@@ -226,13 +199,13 @@ export default function SiteSettingsEditor({
                     />
                   </div>
                   {draft.desktopHeroImage?.url && (
-                    <Field label="Photo, described">
+                    <AdminField label="Photo, described">
                       <input
                         value={draft.desktopHeroImage.alt}
                         onChange={(e) => draft.desktopHeroImage && set('desktopHeroImage', { ...draft.desktopHeroImage, alt: e.target.value })}
-                        className={inputClass}
+                        className={adminInputClass}
                       />
-                    </Field>
+                    </AdminField>
                   )}
                 </div>
               </AdminBox>
@@ -268,9 +241,9 @@ export default function SiteSettingsEditor({
                         </label>
                       ))}
                     </fieldset>
-                    <Field label="Before candles looks for">
+                    <AdminField label="Before candles looks for">
                       <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
-                    </Field>
+                    </AdminField>
                     <fieldset data-testid="today-blocks">
                       <legend className="block text-[13px] font-semibold text-slate-700 mb-1">On the Today home</legend>
                       {TODAY_BLOCKS.map((block) => (
@@ -296,12 +269,12 @@ export default function SiteSettingsEditor({
 
               <AdminBox title="In link previews and search results">
                 <div className="flex flex-col gap-4 p-4">
-                  <Field label="Title">
-                    <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
-                  </Field>
-                  <Field label="Description">
-                    <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
-                  </Field>
+                  <AdminField label="Title">
+                    <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={adminInputClass} />
+                  </AdminField>
+                  <AdminField label="Description">
+                    <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={adminInputClass} />
+                  </AdminField>
                 </div>
               </AdminBox>
             </>
@@ -309,9 +282,9 @@ export default function SiteSettingsEditor({
             <>
               <AdminBox title="Name and logo">
                 <div className="flex flex-col gap-4 p-4">
-                  <Field label="Name">
-                    <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
-                  </Field>
+                  <AdminField label="Name">
+                    <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={adminInputClass} />
+                  </AdminField>
                   <div>
                     <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Logo</span>
                     <ImageUploadField
@@ -342,19 +315,19 @@ export default function SiteSettingsEditor({
               <section aria-label="Feedback" className="bg-white border border-slate-200 rounded-[10px]">
                 <div className={`flex items-center gap-2.5 px-4 py-3.5 ${draft.feedbackEnabled ? 'border-b border-slate-100' : ''}`}>
                   <h2 className="flex-1 m-0 text-base font-bold text-slate-900">Feedback</h2>
-                  <Switch checked={draft.feedbackEnabled} onChange={(on) => set('feedbackEnabled', on)} label="Feedback on the site" />
+                  <AdminSwitch checked={draft.feedbackEnabled} onChange={(on) => set('feedbackEnabled', on)} label="Feedback on the site" />
                 </div>
                 {draft.feedbackEnabled && (
                   <div className="flex flex-col gap-4 p-4">
-                    <Field label="Button">
-                      <input value={draft.feedbackButtonLabel} onChange={(e) => set('feedbackButtonLabel', e.target.value)} className={inputClass} />
-                    </Field>
-                    <Field label="Heading">
-                      <input value={draft.feedbackHeading} onChange={(e) => set('feedbackHeading', e.target.value)} className={inputClass} />
-                    </Field>
-                    <Field label="After sending">
-                      <textarea rows={2} value={draft.feedbackSuccessMessage} onChange={(e) => set('feedbackSuccessMessage', e.target.value)} className={inputClass} />
-                    </Field>
+                    <AdminField label="Button">
+                      <input value={draft.feedbackButtonLabel} onChange={(e) => set('feedbackButtonLabel', e.target.value)} className={adminInputClass} />
+                    </AdminField>
+                    <AdminField label="Heading">
+                      <input value={draft.feedbackHeading} onChange={(e) => set('feedbackHeading', e.target.value)} className={adminInputClass} />
+                    </AdminField>
+                    <AdminField label="After sending">
+                      <textarea rows={2} value={draft.feedbackSuccessMessage} onChange={(e) => set('feedbackSuccessMessage', e.target.value)} className={adminInputClass} />
+                    </AdminField>
                   </div>
                 )}
               </section>

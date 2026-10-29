@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { AskWord } from './askWords'
+import type { PlaceKind } from './placeKinds'
 
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image' | 'contacts'
 
@@ -445,6 +446,10 @@ export type CategoryConfig = {
    *  category: listCategories adds them from question_word, so every
    *  search box has them. See askWords.ts. */
   askWords?: AskWord[]
+  /** What kind of place it holds (Shuls, Food, …, Plain): its icon, search
+   *  words and schema type follow this. Read from place_kind, or from the
+   *  slug when none is saved — see placeKinds.ts. */
+  placeKind?: PlaceKind
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

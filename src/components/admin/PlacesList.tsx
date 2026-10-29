@@ -35,6 +35,21 @@ function showFromAddress(): PlaceShow {
   return isPlaceShow(show) ? show : 'site'
 }
 
+/** The category an address narrows to: `?category=` (a category page's
+ *  "N places" lands there). */
+function categoryFromAddress(): string {
+  return new URLSearchParams(window.location.search).get('category') ?? ''
+}
+
+/** Writes one of the list's choices into the address, so a reload or Back
+ *  keeps it; `fallback` is the value that leaves it out. */
+function setAddressParam(name: string, value: string, fallback: string) {
+  const url = new URL(window.location.href)
+  if (value === fallback) url.searchParams.delete(name)
+  else url.searchParams.set(name, value)
+  window.history.replaceState(window.history.state, '', url)
+}
+
 function Plus() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -168,9 +183,11 @@ export default function PlacesList({ token }: { token: string }) {
   const load = useCallback(async () => {
     try {
       const next = await fetchJson<Data>(withCommunity('/api/admin/listings', community), { headers: { Authorization: `Bearer ${token}` } }, 'Could not load the places.')
-      // The pill the address names (the old Archived tab lands on ?show=archived);
-      // pick() keeps the two in step after that.
+      // The pill and category the address names (the old Archived tab lands
+      // on ?show=archived, a category page's count on ?category=); pick()
+      // and the category menu keep the two in step after that.
       setShow(showFromAddress())
+      setCategory(categoryFromAddress())
       setData(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the places.')
@@ -181,10 +198,7 @@ export default function PlacesList({ token }: { token: string }) {
   function pick(next: PlaceShow) {
     setShow(next)
     setAll(false)
-    const url = new URL(window.location.href)
-    if (next === 'site') url.searchParams.delete('show')
-    else url.searchParams.set('show', next)
-    window.history.replaceState(window.history.state, '', url)
+    setAddressParam('show', next, 'site')
   }
 
   function close() {
@@ -320,6 +334,7 @@ export default function PlacesList({ token }: { token: string }) {
           onChange={(e) => {
             setCategory(e.target.value)
             setAll(false)
+            setAddressParam('category', e.target.value, '')
           }}
           className={`${field} flex-[0_1_200px]`}
         >

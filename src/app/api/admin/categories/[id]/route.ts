@@ -1,4 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import type { NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory, renameCategoryId } from '@/lib/categoryStore'
@@ -39,6 +40,9 @@ type PatchBody = {
   /** How the category page groups its list, or null for one list — see
    *  listGroups.ts. Only sent when the admin changed it. */
   groupBy?: GroupBy | null
+  /** What kind of place it holds — see placeKinds.ts. Only sent when the
+   *  admin changed it. */
+  placeKind?: PlaceKind
   /** The one question the list asks, or null for none — see
    *  questionCards.ts. Only sent when the admin changed it. */
   questionCard?: QuestionCard | null
@@ -109,6 +113,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: false, errors: ['That way of grouping the list isn’t one the site knows.'] }, { status: 400 })
   }
   if (body.groupBy != null) body.groupBy = parseGroupBy(body.groupBy)
+  if (body.placeKind !== undefined && !isPlaceKind(body.placeKind)) {
+    return Response.json({ ok: false, errors: ['That kind of place isn’t one the site knows.'] }, { status: 400 })
+  }
   if (body.questionCard != null && !parseQuestionCard(body.questionCard)) {
     return Response.json({ ok: false, errors: ['That question isn’t one the site knows.'] }, { status: 400 })
   }
@@ -160,6 +167,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   } catch (err) {
     console.error('[admin/categories/:id] PATCH failed:', err)
     // The columns a save can reach before the database has them.
+    if (body.placeKind !== undefined && err instanceof Error && /place_kind/.test(err.message)) {
+      return Response.json(
+        { ok: false, errors: ['Kinds of place aren’t set up on this site yet.'] },
+        { status: 502 },
+      )
+    }
     if (body.groupBy !== undefined && err instanceof Error && /group_by/.test(err.message)) {
       return Response.json(
         { ok: false, errors: ['Grouping isn’t set up on this site yet.'] },

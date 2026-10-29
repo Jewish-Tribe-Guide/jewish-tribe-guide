@@ -81,10 +81,11 @@ test.describe('admin console', () => {
     const row = page.locator('div.rounded-lg.shadow-sm', { hasText: listingCategory!.pluralLabel }).first()
     await row.getByRole('button', { name: 'Edit' }).click()
 
-    await expect(page.locator('h2', { hasText: `Edit “${listingCategory!.pluralLabel}”` }).first()).toBeVisible()
-    // Read-only: navigate back out via the editor's own Cancel/Back control
-    // rather than Save, leaving nothing changed.
-    await page.getByRole('button', { name: /Back to categories/i }).click()
+    await expect(page.locator('h2', { hasText: listingCategory!.pluralLabel }).first()).toBeVisible()
+    await expect(page.getByLabel('Name', { exact: true }).first()).toHaveValue(listingCategory!.pluralLabel)
+    // Read-only: navigate back out via the editor's own back link rather
+    // than Save, leaving nothing changed.
+    await page.getByRole('button', { name: '‹ Category pages' }).click()
     await expect(page).toHaveURL(/\/philly\/admin\/categories$/)
   })
 

@@ -101,7 +101,16 @@ describe('listCategoriesUncached', () => {
       iconImageUrl: null,
       mapZoomRadiusMiles: null,
       active: true,
+      // No place_kind saved: the kind comes from the slug.
+      placeKind: 'shuls',
     })
+  })
+
+  it('reads a saved kind over the one the slug implies', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, place_kind: 'plain' }], error: null }))
+    expect((await listCategoriesUncached('philly'))[0].placeKind).toBe('plain')
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, place_kind: 'nonsense' }], error: null }))
+    expect((await listCategoriesUncached('philly'))[0].placeKind).toBe('shuls')
   })
 
   it('defaults hasAddress/hasPhone to true and externalLink to null when their columns are missing/partial', async () => {

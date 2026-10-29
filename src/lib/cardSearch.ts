@@ -1,4 +1,5 @@
 import { conceptCategories, parseAsk, termMatches, termsRequired, words } from './ask'
+import { kindKey } from './placeKinds'
 import type { CategoryConfig } from './categories'
 
 // ── What a home card answers to ──────────────────────────────────────────────
@@ -12,7 +13,8 @@ import type { CategoryConfig } from './categories'
 export type SearchableCard = { id?: string; title: string; keywords?: string[] }
 
 // Hidden synonyms for the well-known categories — the words people type that
-// won't appear in a category's label or description. Keyed by category id.
+// won't appear in a category's label or description. Keyed by kindKey: a
+// kind's Philly slug, or a Plain category's own id (see placeKinds.ts).
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   synagogue: ['shul', 'shuls', 'minyan', 'minyanim', 'davening', 'shtiebel', 'beis medrash'],
   mikvah: ['mikveh', 'mikvaos', 'immersion'],
@@ -72,7 +74,7 @@ export function categoryCards(categories: readonly CategoryConfig[]): CategoryCa
         view: c.id,
         title: c.pluralLabel,
         category: c,
-        keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
+        keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[kindKey(c)] ?? []), c.id.replaceAll('-', ' ')])],
       })),
     ...(zmanim ? [{ id: 'zmanim', view: 'zmanim', title: zmanim.pluralLabel, category: zmanim, keywords: ZMANIM_KEYWORDS }] : []),
     ...(eruv ? [{ id: 'eruv', view: 'eruv', title: eruv.pluralLabel, category: eruv, keywords: ERUV_KEYWORDS }] : []),

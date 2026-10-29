@@ -57,12 +57,12 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // category (Sukkahs, ahead of Sukkot) is meant to sit in.
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category' })).click()
+  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
   await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(categoryName)
-  await visible(page.getByLabel('Visible on the site immediately')).uncheck()
+  await visible(page.getByRole('switch', { name: 'On the site', exact: true })).click()
   await visible(page.getByRole('button', { name: 'Create category' })).click()
-  await expect(page.locator('div.rounded-lg.shadow-sm:visible', { hasText: categoryName })).toBeVisible({
-    timeout: 10_000,
-  })
+  // Creating opens the new category's own page, saved.
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
 
   const supabase = getAdminClient()
   const { data: category } = await supabase.from('category').select('id, active').eq('plural_label', categoryName).maybeSingle()

@@ -1,4 +1,5 @@
 import type { CategoryConfig } from './categories'
+import { kindKey, type PlaceKind } from './placeKinds'
 import { PHOTO_FIELD_KEY } from './categories'
 import { DAY_KEYS, businessClosure, type DayKey, type StructuredHours } from './hours'
 import { listingSlug } from './listingSlug'
@@ -44,8 +45,8 @@ const TYPE_BY_CATEGORY: Record<string, string> = {
   school: 'School',
 }
 
-export function schemaTypeForCategory(categoryId: string): string {
-  return TYPE_BY_CATEGORY[categoryId] ?? 'LocalBusiness'
+export function schemaTypeForCategory(category: { id: string; placeKind?: PlaceKind }): string {
+  return TYPE_BY_CATEGORY[kindKey(category)] ?? 'LocalBusiness'
 }
 
 const DAY_NAMES: Record<DayKey, string> = {
@@ -126,7 +127,7 @@ export function buildListingJsonLd(args: {
   const specs = businessClosure(item) === 'permanent' ? [] : openingHoursSpecification(item[fieldKey(category, 'hours', 'hours')])
 
   const place: JsonLd = {
-    '@type': schemaTypeForCategory(category.id),
+    '@type': schemaTypeForCategory(category),
     '@id': url,
     name: item.name,
     url,

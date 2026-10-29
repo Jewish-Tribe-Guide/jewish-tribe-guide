@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import {
   detectOptionRenames,
+  fieldShows,
   fieldsWithRenamedShowIf,
   mergeFieldsWithHidden,
   normalizeField,
@@ -92,6 +93,14 @@ describe('toDraft', () => {
     expect(draft.capabilities).toEqual({ add: true, edit: true, report: true, directorySearch: true, map: true })
     expect(draft.fields).toHaveLength(1)
     expect(draft.fields[0]!.type).toBe('image')
+    // No kind until one is picked.
+    expect(draft.placeKind).toBe('')
+  })
+
+  it('gives an existing category its saved kind, or the one its slug implies', () => {
+    expect(toDraft(baseCategory()).placeKind).toBe('groceries')
+    expect(toDraft(baseCategory({ id: 'eat', placeKind: 'food' })).placeKind).toBe('food')
+    expect(toDraft(baseCategory({ id: 'schools' })).placeKind).toBe('plain')
   })
 
   it('carries over an existing category’s fields, splitting out hidden ones', () => {
@@ -149,6 +158,18 @@ describe('normalizeField', () => {
   it('clears allowOther once the type is no longer select', () => {
     const out = normalizeField(field({ type: 'text', allowOther: true }))
     expect(out.allowOther).toBeUndefined()
+  })
+})
+
+describe('fieldShows', () => {
+  it('says where each field shows, in a few words', () => {
+    expect(fieldShows(field({ type: 'hours', renderAs: 'row' }))).toBe('Opened listing · “Open now” filter')
+    expect(fieldShows(field({ type: 'select', renderAs: 'badge', options: [] }))).toBe('Filter · on the row')
+    expect(fieldShows(field({ type: 'boolean', renderAs: undefined }))).toBe('Filter · on the row')
+    expect(fieldShows(field({ type: 'select', renderAs: 'row', options: [] }))).toBe('Opened listing')
+    expect(fieldShows(field({ type: 'url' }))).toBe('Opened listing')
+    expect(fieldShows(field({ type: 'text', renderAs: undefined }))).toBe('Opened listing')
+    expect(fieldShows(field({ type: 'tags' }))).toBe('On the row')
   })
 })
 
@@ -234,7 +255,11 @@ describe('validateDraft', () => {
   })
 
   it('passes for a valid draft', () => {
-    expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', fields: [] }))).toEqual([])
+    expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', placeKind: 'groceries', fields: [] }))).toEqual([])
+  })
+
+  it('asks for a kind on a new category', () => {
+    expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', fields: [] }))).toEqual(['Pick what kind of places it holds.'])
   })
 
   it('rejects a blank or invalid URL slug', () => {
