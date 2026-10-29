@@ -327,7 +327,7 @@ for that exact change, in the same conversation. Show the dry run first.
    request) returning the four counts on every admin page load.
    (Folds into the admin redesign below.)
 
-## Planned: the admin redesign (started Oct 28, nothing decided)
+## Planned: the admin redesign (started Oct 28, brief agreed Oct 28)
 
 The user wants the whole admin console redesigned so a new community's
 admin finds it clear. The minimum: it looks good, it's organized, and every
@@ -345,9 +345,12 @@ brief, one round of drawings, then the build in pieces.
    review hides Approve until there's an address, and Watches names any
    job that didn't load. "Suggest a Listing" going with its row is
    deliberate; the redesign shows it in the admin.
-3. **The brief: WRITTEN Oct 28, waiting on the user's reactions.**
+3. **The brief: AGREED Oct 28.** The user took all nine recommendations.
+   Places is the content an admin looks after (every listing; edit one
+   directly, add one, bring one back); Site is how the site is set up, so a
+   category page there holds its settings and kind, not its listings.
    https://claude.ai/artifact/K8CbQxbpQbLyxJeJ5EQ2ad. Who it's for, what
-   done means, design rules, the shape (mine, not agreed): To do, Places,
+   done means, design rules, the shape: To do, Places,
    Site, Reports, and a gear menu for Team and Communities, with a table of
    where each of today's screens goes. Nine questions, each with my
    recommendation: category kinds instead of slugs, deleting the dead
@@ -355,7 +358,7 @@ brief, one round of drawings, then the build in pieces.
    and Privacy live, phone support, a setup checklist, what Reports holds,
    nav counts. Build order: clean-up, shell, To do, Places, Site, Reports
    and gear, checklist.
-   **Next:** the user's reactions, then one canvas of drawings.
+   **Next:** one canvas of drawings.
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
