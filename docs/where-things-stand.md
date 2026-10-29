@@ -368,8 +368,15 @@ brief, one round of drawings, then the build in pieces.
    opened, a new campaign, a field opened (Kosher certification), About and
    Privacy, and adding a place (from the search "trader joe's").
    One change from the brief on purpose: To do groups by what you decide
-   (New places, Changes, Searches nobody found), not by who sent it, so
-   suggestions and watch findings sit together.
+   (New places, Changes), not by who sent it, so suggestions and watch
+   findings sit together.
+   Changed Oct 29 (the user: there will be too many searches for an admin
+   to keep up with): Searches nobody found is no longer a group beside New
+   places. It is a row at the bottom of To do, with Watches and Responses
+   ("37 different searches"), that opens in place, and it isn't counted in
+   "N to decide" or the nav's number. The full list is still under Reports.
+   Also Oct 29: every list cut short ("18 more", a form's questions,
+   Places' "Show all") now has "Show fewer" to fold it back.
    What the drawings add that the site can't do today:
    - Forms get a real "On the site" switch. Support and Volunteer are
      still tied to a code flag. Both are live (tiles in the category list)

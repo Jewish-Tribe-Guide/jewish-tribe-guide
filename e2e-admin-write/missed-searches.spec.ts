@@ -63,6 +63,8 @@ test('a missed search is on To do, and Dismiss there is the same dismissal', asy
   expect(error).toBeNull()
 
   await page.goto('/philly/admin')
+  // At the bottom of To do, folded: there when there's time.
+  await page.getByRole('button', { name: /^Searches nobody found/ }).click({ timeout: 20_000 })
   const searches = page.getByRole('region', { name: 'Searches nobody found' })
   await expect(searches).toBeVisible({ timeout: 20_000 })
   // Five show; the test project may hold more searches than that.

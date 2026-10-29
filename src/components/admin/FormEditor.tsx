@@ -11,7 +11,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useIsDesktop } from '@/lib/useIsMobile'
-import { AdminBox, AdminField, AdminRow, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBox, AdminField, AdminRow, AdminSwitch, MoreToggle, adminInputClass } from './AdminUI'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, changesLabel, useLeaveGuard } from './SaveBar'
 
@@ -336,7 +336,7 @@ export default function FormEditor({
     )
   } else {
     const shown = allQuestions ? draft.steps : draft.steps.slice(0, QUESTIONS_SHOWN)
-    const more = draft.steps.length - shown.length
+    const more = draft.steps.length - QUESTIONS_SHOWN
     screen = (
       <>
         {backLink('Forms', leave)}
@@ -375,18 +375,7 @@ export default function FormEditor({
               </div>
             )
           })}
-          {more > 0 && (
-            <button
-              type="button"
-              onClick={() => setAllQuestions(true)}
-              className="w-full flex items-center gap-1.5 px-4 py-3 min-h-11 text-left text-sm text-slate-600 hover:bg-slate-50 cursor-pointer"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                <path d="M4 6l4 4 4-4" />
-              </svg>
-              {more} more
-            </button>
-          )}
+          {more > 0 && <MoreToggle open={allQuestions} more={more} onToggle={() => setAllQuestions((a) => !a)} />}
         </AdminBox>
 
         <AdminBox title="After sending">

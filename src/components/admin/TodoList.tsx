@@ -15,10 +15,12 @@ import { AdminBox, AdminEmpty, AdminRow, AdminRows, Chevron } from './AdminUI'
 import SetupChecklist from './SetupChecklist'
 
 // To do's one list (the admin redesign's step 2, boards 1 and 2): what to
-// decide, grouped by what you decide. A suggestion opens to be decided; a
-// search opens in place, with Add a place, Teach and Dismiss. Watches and
-// Responses sit at the bottom. A guide not yet set up has its checklist
-// first (step 6, board "Setup").
+// decide, grouped by what you decide. A suggestion opens to be decided.
+// Watches, Responses and Searches nobody found sit at the bottom: searches
+// are there when there's time, not counted as something to do (the user,
+// Oct 29: there will be far too many to keep up with). Each search opens in
+// place, with Add a place, Teach and Dismiss. A guide not yet set up has
+// its checklist first (step 6, board "Setup").
 
 const button = 'inline-flex items-center justify-center min-h-11 px-3.5 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
@@ -173,6 +175,7 @@ export default function TodoList({
   const community = useCommunitySlug()
   const base = adminBase(community)
   const [openSearch, setOpenSearch] = useState<string | null>(null)
+  const [searchesOpen, setSearchesOpen] = useState(false)
   const watches = useWatchesLine(token)
   const { newPlaces, changes } = splitSubmissions(data.submissions)
   const count = todoCount(data)
@@ -218,23 +221,6 @@ export default function TodoList({
         </AdminBox>
       )}
 
-      {data.searches.length > 0 && (
-        <AdminBox title="Searches nobody found" count={data.searches.length}>
-          <AdminRows items={data.searches}>
-            {(s) => (
-              <SearchRow
-                key={s.term}
-                search={s}
-                data={data}
-                token={token}
-                open={openSearch === s.term}
-                onToggle={() => setOpenSearch((t) => (t === s.term ? null : s.term))}
-              />
-            )}
-          </AdminRows>
-        </AdminBox>
-      )}
-
       {data.responses.length > 0 && (
         <AdminBox title="Responses" count={data.responses.length} foldOnPhone>
           <AdminRows items={data.responses}>
@@ -246,6 +232,43 @@ export default function TodoList({
       <div className="bg-white border border-slate-200 rounded-[10px] overflow-hidden">
         <AdminRow href={`${base}/watches`} name="Watches" line={watches} />
         {data.responses.length === 0 && <AdminRow href={`${base}/responses`} name="Responses" />}
+        {data.searches.length > 0 && (
+          <>
+            <button
+              type="button"
+              aria-expanded={searchesOpen}
+              aria-controls="todo-searches"
+              onClick={() => setSearchesOpen((o) => !o)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-t border-slate-100 text-left text-slate-900 hover:bg-slate-50 cursor-pointer"
+            >
+              <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <span className="text-[15px] font-semibold">Searches nobody found</span>
+                <span className="text-[13px] text-slate-600">
+                  {data.searches.length} different {data.searches.length === 1 ? 'search' : 'searches'}
+                </span>
+              </span>
+              <span className={searchesOpen ? 'rotate-90' : ''}>
+                <Chevron />
+              </span>
+            </button>
+            {searchesOpen && (
+              <section id="todo-searches" aria-label="Searches nobody found" className="border-t border-slate-100">
+                <AdminRows items={data.searches}>
+                  {(s) => (
+                    <SearchRow
+                      key={s.term}
+                      search={s}
+                      data={data}
+                      token={token}
+                      open={openSearch === s.term}
+                      onToggle={() => setOpenSearch((t) => (t === s.term ? null : s.term))}
+                    />
+                  )}
+                </AdminRows>
+              </section>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

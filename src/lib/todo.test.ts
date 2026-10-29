@@ -113,8 +113,9 @@ describe('teachable', () => {
 })
 
 describe('todoCount', () => {
-  it('is everything waiting: suggestions, searches and responses', () => {
-    expect(todoCount({ submissions: [1, 2], searches: [1], responses: [1, 2, 3] })).toBe(6)
+  it('is suggestions and responses, never searches nobody found', () => {
+    const waiting = { submissions: [1, 2], searches: [1], responses: [1, 2, 3] }
+    expect(todoCount(waiting)).toBe(5)
   })
 })
 

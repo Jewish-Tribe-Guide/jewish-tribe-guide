@@ -115,6 +115,24 @@ export function AdminRow({
   )
 }
 
+/** Under a list cut short: "N more" opens the rest, and "Show fewer"
+ *  folds it back. */
+export function MoreToggle({ open, more, onToggle }: { open: boolean; more: number; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      className="w-full flex items-center gap-1.5 px-4 py-3 min-h-11 text-left text-sm text-slate-600 hover:bg-slate-50 cursor-pointer"
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d={open ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} />
+      </svg>
+      {open ? 'Show fewer' : `${more} more`}
+    </button>
+  )
+}
+
 /** The rows of a box, the first few shown and the rest behind "N more". */
 export function AdminRows<T>({ items, shown = 4, children }: { items: T[]; shown?: number; children: (item: T) => React.ReactNode }) {
   const [all, setAll] = useState(false)
@@ -122,18 +140,7 @@ export function AdminRows<T>({ items, shown = 4, children }: { items: T[]; shown
   return (
     <>
       {(all || rest <= 0 ? items : items.slice(0, shown)).map(children)}
-      {!all && rest > 0 && (
-        <button
-          type="button"
-          onClick={() => setAll(true)}
-          className="w-full flex items-center gap-1.5 px-4 py-3 min-h-11 text-left text-sm text-slate-600 hover:bg-slate-50 cursor-pointer"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <path d="M4 6l4 4 4-4" />
-          </svg>
-          {rest} more
-        </button>
-      )}
+      {rest > 0 && <MoreToggle open={all} more={rest} onToggle={() => setAll((a) => !a)} />}
     </>
   )
 }

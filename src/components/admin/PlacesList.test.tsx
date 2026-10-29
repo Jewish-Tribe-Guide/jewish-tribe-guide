@@ -73,6 +73,16 @@ describe('Places', () => {
     expect(screen.getByText('2 of 2')).toBeInTheDocument()
   })
 
+  it('shows the first 50, all of them, and folds back to 50', async () => {
+    const user = userEvent.setup()
+    renderPlaces(Array.from({ length: 52 }, (_, i) => place(`Place ${String(i).padStart(2, '0')}`)))
+    expect(await screen.findByText('50 of 52')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show all' }))
+    expect(screen.getByText('52 of 52')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show fewer' }))
+    expect(screen.getByText('50 of 52')).toBeInTheDocument()
+  })
+
   it('Archived is a pill with the others, and says so in the address', async () => {
     const user = userEvent.setup()
     renderPlaces()

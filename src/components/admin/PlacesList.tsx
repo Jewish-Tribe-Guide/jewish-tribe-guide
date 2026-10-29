@@ -384,9 +384,9 @@ export default function PlacesList({ token }: { token: string }) {
             <span className="flex-1">
               {shown.length} of {rows.length}
             </span>
-            {shown.length < rows.length && (
-              <button type="button" onClick={() => setAll(true)} className="min-h-11 font-semibold text-primary cursor-pointer">
-                Show all
+            {rows.length > SHOWN && (
+              <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 font-semibold text-primary cursor-pointer">
+                {all ? 'Show fewer' : 'Show all'}
               </button>
             )}
           </div>

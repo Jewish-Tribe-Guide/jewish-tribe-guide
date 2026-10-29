@@ -8,9 +8,10 @@ import { submissionSource } from './submissionSource'
 
 // To do, the console's front page (the admin redesign's step 2, boards 1
 // and 2): everything waiting on a decision in one list. New places and
-// changes from the queue, searches that found nothing (the missed searches
-// and the AI's read questions, one list), and new responses. The page and
-// the nav's count both count with todoCount, so the two can't disagree.
+// changes from the queue, and new responses; searches that found nothing
+// (the missed searches and the AI's read questions, one list) sit at the
+// bottom, uncounted. The page and the nav's count both count with
+// todoCount, so the two can't disagree.
 
 /** A word the AI suggests teaching the search, from its reading. */
 export type TodoWord = { word: string; categoryId: string; field?: string; value?: string; label: string }
@@ -71,8 +72,10 @@ export function teachable(term: string): boolean {
   return key.length > 0 && key.length <= 60 && key.split(' ').length <= 3
 }
 
-export function todoCount(t: { submissions: unknown[]; searches: unknown[]; responses: unknown[] }): number {
-  return t.submissions.length + t.searches.length + t.responses.length
+/** What's waiting on a decision. Not searches nobody found: there are too
+ *  many to keep up with, so they're there when there's time. */
+export function todoCount(t: { submissions: unknown[]; responses: unknown[] }): number {
+  return t.submissions.length + t.responses.length
 }
 
 /** A suggestion's name, as its row shows it. */

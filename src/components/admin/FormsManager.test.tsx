@@ -125,6 +125,8 @@ describe('A form', () => {
     expect(questions.queryByRole('button', { name: /Question 2/ })).toBeNull()
     await user.click(questions.getByRole('button', { name: '3 more' }))
     expect(questions.getByRole('button', { name: /Question 2/ })).toBeInTheDocument()
+    await user.click(questions.getByRole('button', { name: 'Show fewer' }))
+    expect(questions.queryByRole('button', { name: /Question 2/ })).toBeNull()
     expect(screen.getByRole('link', { name: 'Responses' })).toHaveAttribute('href', '/philly/inbox')
     // Support is wired into its own screen: it can be hidden, never deleted.
     expect(screen.getByRole('switch', { name: 'On the site' })).toBeChecked()

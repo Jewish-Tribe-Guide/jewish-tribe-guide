@@ -134,6 +134,29 @@ describe('ModerationQueue — the list', () => {
     expect(screen.getByText('3 to decide')).toBeInTheDocument()
   })
 
+  // Too many to keep up with (the user, Oct 29): not counted, not a box
+  // beside New places, but a row at the bottom that opens in place.
+  it('keeps searches nobody found at the bottom, uncounted, opening in place', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockImplementation(async (url) => ({ ...fakeResponse(200), url: String(url) }) as Response)
+    vi.mocked(parseOkJson).mockImplementation(async (res) => {
+      const url = String((res as Response).url)
+      if (url.includes('/api/admin/missed-searches'))
+        return { searches: [{ term: 'pizza', count: 3, lastDay: '2026-10-28', dismissedAt: null, verdict: { kind: 'missing' } }], addable: [], dismissalsAvailable: true }
+      return url.includes('/api/admin/submissions') ? { submissions: [submission()] } : {}
+    })
+    renderWithProviders(<ModerationQueue session={session()} />, { content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } })
+    const row = await screen.findByRole('button', { name: /^Searches nobody found/ })
+    expect(row).toHaveTextContent('1 different search')
+    expect(screen.getByText('1 to decide')).toBeInTheDocument()
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['New places'])
+    await user.click(row)
+    const searches = screen.getByRole('region', { name: 'Searches nobody found' })
+    expect(within(searches).getByTestId('todo-search')).toHaveTextContent('“pizza”')
+    await user.click(row)
+    expect(screen.queryByRole('region', { name: 'Searches nobody found' })).toBeNull()
+  })
+
   it('shows four of a group and the rest behind "N more"', async () => {
     const user = userEvent.setup()
     renderQueue(Array.from({ length: 7 }, (_, i) => submission({ id: `s${i}`, payload: { category: 'grocery', name: `Shop ${i}`, address: '1 Main St', details: {} } })))
@@ -141,6 +164,10 @@ describe('ModerationQueue — the list', () => {
     expect(queryRow('Shop 4')).toBeNull()
     await user.click(screen.getByRole('button', { name: '3 more' }))
     expect(row('Shop 6')).toBeInTheDocument()
+    // …and folds back.
+    await user.click(screen.getByRole('button', { name: 'Show fewer' }))
+    expect(queryRow('Shop 4')).toBeNull()
+    expect(screen.getByRole('button', { name: '3 more' })).toBeInTheDocument()
   })
 
   it('opens a removal to its card, with the note, decided there', async () => {

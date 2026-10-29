@@ -64,6 +64,8 @@ async function seedReading() {
 /** The reading's row on To do, opened. */
 async function openRow(page: import('@playwright/test').Page) {
   await page.goto('/philly/admin')
+  // At the bottom of To do, folded: there when there's time.
+  await page.getByRole('button', { name: /^Searches nobody found/ }).click({ timeout: 20_000 })
   const searches = page.getByRole('region', { name: 'Searches nobody found' })
   await expect(searches).toBeVisible({ timeout: 20_000 })
   // Five show; the test project may hold more searches than that.
