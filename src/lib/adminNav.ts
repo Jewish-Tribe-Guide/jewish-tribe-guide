@@ -31,7 +31,7 @@ export type AdminTab =
   | 'changes'
   | 'categories'
   | 'responses'
-  | 'archived'
+  | 'places'
   | 'site'
   | 'desktop'
   | 'mobile'
@@ -77,7 +77,8 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
     {
       area: 'places',
       label: 'Places',
-      tabs: [{ tab: 'archived', href: `${base}/archived`, label: 'Archived' }],
+      // Every listing in one list; archived ones are a filter on it.
+      tabs: [{ tab: 'places', href: `${base}/places`, label: 'Places' }],
     },
     {
       area: 'site',

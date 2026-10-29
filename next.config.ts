@@ -182,6 +182,8 @@ const nextConfig: NextConfig = {
       // Read questions joined the missed searches in one list (Oct 29):
       // To do's searches, and the Searches page for the taught words.
       { source: '/:community((?!api\\b).*)/admin/questions', destination: '/:community/admin/searches', permanent: false },
+      // Archived is a filter on Places now (the admin redesign's step 3).
+      { source: '/:community((?!api\\b).*)/admin/archived', destination: '/:community/admin/places?show=archived', permanent: false },
     ];
   },
 };

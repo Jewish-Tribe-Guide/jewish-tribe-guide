@@ -32,7 +32,7 @@ function apiRoutes(dir = join(process.cwd(), 'src/app/api')): string[] {
 
 // Every redirect that lands in a community's admin console, as the path under
 // src/app/admin/[community] its destination has to be a page of.
-const adminRedirects = [...config.slice(config.indexOf('async redirects()')).matchAll(/destination:\s*'\/:community\/admin\/([^']*)'/g)].map((m) => m[1])
+const adminRedirects = [...config.slice(config.indexOf('async redirects()')).matchAll(/destination:\s*'\/:community\/admin\/([^']*)'/g)].map((m) => m[1].split('?')[0])
 
 /** Whether src/app/admin/[community]/<path> is a page, looking through route
  *  groups ("(site)") and optional catch-alls ("[[...id]]") as Next does. */

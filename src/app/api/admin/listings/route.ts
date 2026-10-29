@@ -1,5 +1,5 @@
-import { validateSubmission, getResourceRowById, normalizeRow } from '@/lib/resourceStore'
-import { getCategoryById } from '@/lib/categoryStore'
+import { validateSubmission, getResourceRowById, normalizeRow, listResourcesForAdmin, toAdminPlace } from '@/lib/resourceStore'
+import { getCategoryById, listCategoriesUncached } from '@/lib/categoryStore'
 import { submitListingCreate, approveSubmission } from '@/lib/submissionStore'
 import { normalizeUrl } from '@/lib/validation'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
@@ -75,5 +75,24 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('[admin/listings] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not add listing.'] }, { status: 502 })
+  }
+}
+
+// GET /api/admin/listings — every listing, on the site or archived, for
+// Places (the admin redesign's step 3), with every category, hidden ones
+// too, so each one opens in its own editor.
+export async function GET(request: Request) {
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
+  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+
+  try {
+    const [rows, categories] = await Promise.all([listResourcesForAdmin(community.slug), listCategoriesUncached(community.slug)])
+    // A category that takes no address (a WhatsApp group) never lacks one.
+    const takesAddress = new Map(categories.map((c) => [c.id, c.hasAddress !== false]))
+    return Response.json({ ok: true, places: rows.map((r) => toAdminPlace(r, takesAddress.get(r.category) ?? true)), categories })
+  } catch (err) {
+    console.error('[admin/listings] GET failed:', err)
+    return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
 }

@@ -79,7 +79,7 @@ describe('adminAreas', () => {
   it('is To do, Places, Site, Reports and Settings, Communities only for a superadmin', () => {
     expect(shape(true)).toEqual([
       ['To do', ['To do', 'Watches', 'Searches', 'Responses']],
-      ['Places', ['Archived']],
+      ['Places', ['Places']],
       ['Site', ['Categories', 'Campaigns', 'Basics', 'On a computer', 'On a phone']],
       ['Reports', ['Numbers', 'History']],
       ['Settings', ['Team', 'Communities']],
@@ -118,7 +118,7 @@ describe('adminNavPosition', () => {
     ['/philly/admin/watches/kind/restaurant', 'todo', 'watches'],
     ['/philly/admin/searches', 'todo', 'searches'],
     ['/philly/admin/responses', 'todo', 'responses'],
-    ['/philly/admin/archived', 'places', 'archived'],
+    ['/philly/admin/places', 'places', 'places'],
     ['/philly/admin/categories', 'site', 'categories'],
     ['/philly/admin/categories/cat:abc', 'site', 'categories'],
     ['/philly/admin/campaigns', 'site', 'campaigns'],

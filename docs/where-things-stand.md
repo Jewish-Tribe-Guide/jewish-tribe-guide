@@ -431,6 +431,18 @@ brief, one round of drawings, then the build in pieces.
    suggestion's wording (boards 3 and 4: "Update the listing", "Edit, then
    update", "Leave it") is still the old card's; its heading still says
    To do.
+8. **Build, step 3 (Places): BUILT Oct 29.** Every listing in one list
+   (board 5): "N on the site" and Add a place, a name search, a category
+   menu, and pills On the site, No address and Archived (the old Archived
+   tab is gone; `/admin/archived` lands on `places?show=archived`). A row
+   says when it last changed, amber when the address is missing, with its
+   category on the right. A place opens in the whole-listing editor and
+   "Update the listing" saves it straight to the site, filed as an
+   approved submission so History still has it
+   (`/api/admin/listings/[id]`, PATCH). "Archive it" asks once. An
+   archived place opens to "Bring it back" or "Delete for good" (asks
+   once). Add a place uses the category picked, or asks which.
+   Not as drawn: nothing.
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

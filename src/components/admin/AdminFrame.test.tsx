@@ -79,11 +79,15 @@ describe('AdminFrame', () => {
   })
 
   it('names the one page of an area whose page is called something else', () => {
-    show('/philly/admin/archived')
-    expect(within(screen.getByRole('navigation', { name: 'Places' })).getByRole('link').textContent).toBe('Archived')
+    show('/philly/admin/team')
+    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getByRole('link').textContent).toBe('Team')
   })
 
   it('shows no tabs for an area with one page of its own name, and a plain heading off the map', () => {
+    // Places is one list (step 3): Archived is a filter on it, not a tab.
+    expect(show('/philly/admin/places').heading).toBe('Places')
+    expect(screen.queryByRole('navigation', { name: 'Places' })).toBeNull()
+    cleanup()
     expect(show('/philly/admin/nowhere').heading).toBe('Admin')
     expect(screen.queryByRole('navigation', { name: 'Site' })).toBeNull()
   })
