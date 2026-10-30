@@ -627,9 +627,9 @@ brief, one round of drawings, then the build in pieces.
    Not drawn, fixed in passing: the Category pages list's buttons go under
    the name on a phone (it was squeezed to one word a line); its look is
    otherwise the old cards.
-   **Gone from a change, waiting on the user:** the old review's "Keep …
-   as it was" per field and "Change another field". Edit, then update
-   covers both by hand. A new place still opens the old review (board 4
+   **Gone from a change, decided Oct 29 (the user: "leave it out"):** the
+   old review's "Keep … as it was" per field and "Change another field".
+   Edit, then update covers both by hand. A new place still opens the old review (board 4
    not built).
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
