@@ -134,9 +134,17 @@ describe('DELETE /api/admin/communities/:slug', () => {
     expect(m.deleteCommunity).not.toHaveBeenCalled()
   })
 
-  it('is refused outright on the real production deployment, even for a superadmin who confirms correctly', async () => {
+  // The live site used to refuse every delete; the user asked for it there
+  // too (Oct 29). The retyped slug below is still required.
+  it('deletes on the live site for a superadmin who confirms correctly', async () => {
     vi.stubEnv('VERCEL_ENV', 'production')
-    expect((await del({ confirmSlug: 'ues' })).status).toBe(403)
+    expect((await del({ confirmSlug: 'ues' })).status).toBe(200)
+    expect(m.deleteCommunity).toHaveBeenCalledWith('ues')
+  })
+
+  it('still needs the retyped slug on the live site', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production')
+    expect((await del({ confirmSlug: 'philly' })).status).toBe(400)
     expect(m.deleteCommunity).not.toHaveBeenCalled()
   })
 

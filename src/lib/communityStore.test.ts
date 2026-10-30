@@ -39,6 +39,7 @@ const {
   communitySlugFromRequest,
   createCommunity,
   deleteCommunity,
+  COMMUNITY_SCOPED_TABLES,
   getCommunityAdminEmails,
   getCommunityNotifyRecipients,
   getAdminNotifyPreference,
@@ -323,18 +324,7 @@ describe('deleteCommunity', () => {
     // community row must go last (deleting it first would leave nothing to
     // scope the content deletes against, were a real FK ever added later).
     expect(calls[0]).toBe('community')
-    expect(calls.slice(1)).toEqual([
-      'resource',
-      'category',
-      'form',
-      'home_section',
-      'site_settings',
-      'submission',
-      'form_response',
-      'hospital',
-      'tag',
-      'community',
-    ])
+    expect(calls.slice(1)).toEqual([...COMMUNITY_SCOPED_TABLES, 'community'])
   })
 
   it('scopes every table delete to the given community, and the final delete by slug', async () => {
@@ -349,11 +339,12 @@ describe('deleteCommunity', () => {
 
     await deleteCommunity('baltimore')
 
-    // builders[1..9] are the 9 community-scoped table deletes, builders[10] is the community row itself.
-    for (const builder of builders.slice(1, 10)) {
+    // builders[1..n] are the community-scoped table deletes, the last is the community row itself.
+    const n = COMMUNITY_SCOPED_TABLES.length
+    for (const builder of builders.slice(1, n + 1)) {
       expect(builder.eq).toHaveBeenCalledWith('community_id', 'baltimore')
     }
-    expect(builders[10]!.eq).toHaveBeenCalledWith('slug', 'baltimore')
+    expect(builders[n + 1]!.eq).toHaveBeenCalledWith('slug', 'baltimore')
   })
 
   it('throws with the Supabase error message when a content table fails to delete', async () => {
@@ -373,11 +364,38 @@ describe('deleteCommunity', () => {
     mockFrom.mockImplementation(() => {
       call += 1
       if (call === 1) return chainable({ data: [philly, baltimore], error: null })
-      if (call === 11) return chainable({ error: { message: 'boom' } }) // the final community-row delete
+      if (call === COMMUNITY_SCOPED_TABLES.length + 2) return chainable({ error: { message: 'boom' } }) // the final community-row delete
       return chainable({ error: null })
     })
 
     await expect(deleteCommunity('baltimore')).rejects.toThrow('Failed to delete community: boom')
+  })
+
+  it('skips a table whose migration has not been run yet, and still deletes the rest', async () => {
+    const calls: string[] = []
+    mockFrom.mockImplementation((table: string) => {
+      calls.push(table)
+      if (table === 'community' && calls.length === 1) return chainable({ data: [philly, baltimore], error: null })
+      if (table === 'newsletter_setup') {
+        return chainable({ error: { message: "Could not find the table 'public.newsletter_setup' in the schema cache" } })
+      }
+      return chainable({ error: null })
+    })
+
+    await deleteCommunity('baltimore')
+    expect(calls.at(-1)).toBe('community')
+  })
+
+  it('does not skip a missing-table error that names a different table', async () => {
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      if (call === 1) return chainable({ data: [philly, baltimore], error: null })
+      if (call === 2) return chainable({ error: { message: 'relation "public.something_else" does not exist' } })
+      return chainable({ error: null })
+    })
+
+    await expect(deleteCommunity('baltimore')).rejects.toThrow('Failed to delete resource rows')
   })
 })
 

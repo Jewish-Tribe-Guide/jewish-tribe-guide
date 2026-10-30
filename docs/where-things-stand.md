@@ -2032,6 +2032,23 @@ compare, and one it can't read, on desktop and phone.
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
 
+## Done Oct 29: deleting a community clears all of it, and works on the live site (on `redesign/oct18-fixes`)
+
+Deleting a community (Settings gear → Communities, superadmins only) swept
+the 9 tables it had when the delete was written, and none of the 12 added
+since. A deleted community's watches kept being checked every night, its
+subscribers' emails stayed, and a new community given the same short name
+would have inherited its counts, searches, eruvin and newsletter key. Now
+every table with a `community_id` is cleared (`COMMUNITY_SCOPED_TABLES`, 21),
+a table whose migration hasn't run (090 today) is skipped, and
+`communityScopedTables.test.ts` reads the migrations and fails if a new
+table is missed.
+
+The user asked for delete on the live site too: it was refused there
+outright. Now it works there, still superadmin only, still retyping the
+short name, still never the default community or the last one. Uploaded
+photos in storage are still left behind.
+
 ## Done Oct 28, evening: the queue's address fills the rest from Google (on `redesign/oct18-fixes`)
 
 The user: picking an address while fixing a suggestion in the moderation
