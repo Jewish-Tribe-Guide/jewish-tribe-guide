@@ -20,7 +20,7 @@ import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveCo
 import { CAPABILITY_LABELS, fieldShows, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
-import { AdminBox, AdminField, AdminRow, AdminRows, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminRows, AdminSwitch, adminInputClass } from './AdminUI'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -83,6 +83,22 @@ function CategoryEditorScreen({
   const [openField, setOpenField] = useState<number | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
   const wide = useIsDesktop('(max-width: 1023px)')
+  // Beside, the page's own preview counts its places; without it (a phone),
+  // count them here.
+  const countId = !wide && !isNew ? initial.id : null
+  useEffect(() => {
+    if (!countId) return
+    let cancelled = false
+    fetch(`/api/resources?category=${encodeURIComponent(countId)}`)
+      .then(async (res) => {
+        const body = await res.json()
+        if (!cancelled && res.ok && body.ok) setPlaceCount((body.resources as unknown[]).length)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [countId])
   // What the positional rule would give this category, previewed under
   // "Automatic". For a category being created there is no id in the list yet,
   // so it lands on the neutral fallback — accurate enough, since its real
@@ -204,23 +220,14 @@ function CategoryEditorScreen({
     </aside>
   )
 
-  const backLink = (label: string, onClick: () => void) => (
-    <button type="button" onClick={onClick} className="self-start inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary cursor-pointer">
-      ‹ {label}
-    </button>
-  )
-
   let screen: React.ReactNode
   if (field && openField !== null) {
     // A field's own screen (board "Field").
     const i = openField
     screen = (
       <>
-        {backLink(name, () => history.back())}
-        <header>
-          <h2 className="m-0 text-[26px] font-bold text-slate-900">{field.label || 'New field'}</h2>
-          <p className="m-0 text-[15px] text-slate-600">A field on {name}</p>
-        </header>
+        <AdminBack back={{ label: name, onClick: () => history.back() }} title={field.label || 'New field'} />
+        <p className="m-0 -mt-3 text-[15px] text-slate-600 max-md:mt-0">A field on {name}</p>
         <FieldEditor
           field={field}
           index={i}
@@ -273,21 +280,32 @@ function CategoryEditorScreen({
 
     screen = (
       <>
-        {backLink('Category pages', leave)}
-        <header className="flex items-start gap-4">
-          <span className="flex-1 min-w-0 flex flex-col">
-            <h2 className="m-0 text-[26px] font-bold text-slate-900">{name}</h2>
+        <AdminBack back={{ label: 'Category pages', onClick: leave }} title={name} />
+        {/* On a phone the page beside has no room: Preview opens it full
+            size (board 21b). */}
+        {!wide && (
+          <AdminPreviewButton onClick={openPreview} />
+        )}
+        <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
+          {/* A phone: "On the site" over the count, the switch on the right
+              (board 21b). A computer: the count, then the switch and its
+              words. */}
+          <span className="flex-1 min-w-0 flex flex-col gap-px">
+            <span aria-hidden="true" className="md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
             {!isNew && placeCount !== null && (
-              <Link href={`${adminBase(community)}/places?category=${encodeURIComponent(initial!.id)}`} className="self-start text-sm font-semibold text-primary hover:underline">
+              <Link
+                href={`${adminBase(community)}/places?category=${encodeURIComponent(initial!.id)}`}
+                className="self-start text-[13px] text-slate-600 md:text-sm md:font-semibold md:text-primary hover:underline"
+              >
                 {placeCount} {placeCount === 1 ? 'place' : 'places'}
               </Link>
             )}
           </span>
           <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+            <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
             <AdminSwitch checked={draft.active} onChange={(on) => set('active', on)} label="On the site" />
-            <span aria-hidden="true">On the site</span>
           </span>
-        </header>
+        </div>
 
         {isNew ? (
           <AdminBox title="What kind of places?">

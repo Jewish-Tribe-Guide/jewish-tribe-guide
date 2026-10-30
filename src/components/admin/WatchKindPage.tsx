@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { placeSourcesText, type WatchState } from '@/lib/watchPlaces'
 import { useWatchJobsAndReload } from './useWatchJobs'
 import OpenedPlace from './OpenedPlace'
+import { AdminBack } from './AdminUI'
 import { JobsNotLoaded, kindsOf } from './WatchKinds'
 
 // One kind of place on the Watches tab (FinalChanges2, FinalPhoneShuls,
@@ -45,11 +45,7 @@ export default function WatchKindPage({ token, category, place }: { token: strin
   const all = kindsOf(jobs, base, now)
   const kind = all?.kinds.find((k) => k.id === category)
 
-  const back = (
-    <Link href={`${base}/watches`} className="text-sm font-semibold text-primary hover:underline">
-      ‹ Watches
-    </Link>
-  )
+  const back = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title={kind?.label ?? ''} />
   if (jobs.categories === null || jobs.google === null) return <div className="space-y-4">{back}<p className="text-sm text-red-700">Couldn&rsquo;t load the places.</p></div>
   if (!all || !all.settled) return <div className="space-y-4">{back}<p className="text-sm text-muted">Loading…</p></div>
   if (!kind) return <div className="space-y-4">{back}<p className="text-sm text-slate-600">Nothing of this kind is watched.</p></div>
@@ -67,7 +63,6 @@ export default function WatchKindPage({ token, category, place }: { token: strin
   return (
     <div className="space-y-3.5">
       {back}
-      <h1 className="text-xl font-bold text-slate-900 sm:text-[22px]">{kind.label}</h1>
       <JobsNotLoaded jobs={jobs} />
       <div role="tablist" aria-label={`${kind.label} by state`} className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-slate-200 px-1 sm:gap-1">
         {TABS.map((t) => {

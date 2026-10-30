@@ -97,7 +97,6 @@ export default function MinyanBoxEditor({
   const [rows, setRows] = useState<Minyan[]>(initial ?? original)
   // The minyan open: an id, 'new' for one being added, or null for the list.
   const [open, setOpen] = useState<string | null>(null)
-  const { timeText, noteText, boxGroups } = writing
   const was = new Map(original.map((m) => [m.id, m]))
   const isChanged = (m: Minyan) => !was.has(m.id) || boxChangeCount([was.get(m.id)!], [m]) > 0
 
@@ -134,43 +133,7 @@ export default function MinyanBoxEditor({
   return (
     <div className="space-y-4" data-testid="minyan-box-list">
       {heading ? <p className="text-[15.5px] font-extrabold text-slate-900">{heading}</p> : <p className="-mt-1 text-[14px] text-muted">{place}</p>}
-      {boxGroups(rows, box).map((g) => (
-        <div key={g.label}>
-          <p className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>
-          <ul className="divide-y divide-slate-200/70">
-            {g.rows.map((m) => {
-              // The week's rows are under their tefillah already: the time
-              // and the days. Shabbos's say which tefillah.
-              const kind = kindOf(m, box)
-              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, m.joinLink ? 'Online' : null, noteText(m.notes)].filter(Boolean).join(' · ')
-              const changed = isChanged(m)
-              return (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onClick={() => setOpen(m.id)}
-                    className={`flex min-h-13 w-full cursor-pointer items-center gap-2.5 py-2 text-left ${changed ? '-mx-2.5 w-[calc(100%+20px)] rounded-xl bg-yellow-50 px-2.5' : ''}`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[15.5px] text-slate-900">
-                        {kind === 'shabbos' && (
-                          <>
-                            <b>{TEFILLAH_LABELS[m.tefillah]}</b>{' '}
-                          </>
-                        )}
-                        <span className={kind === 'weekday' ? 'font-bold' : 'text-slate-700'}>{timeText(m)}</span>
-                      </span>
-                      {sub && <span className="mt-0.5 block text-[13.5px] text-muted">{sub}</span>}
-                    </span>
-                    {changed && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">{was.has(m.id) ? 'Changed' : 'New'}</span>}
-                    <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      ))}
+      <MinyanBoxRows rows={rows} box={box} writing={writing} mark={(m) => (isChanged(m) ? (was.has(m.id) ? 'Changed' : 'New') : null)} onOpen={setOpen} />
       {rows.length === 0 && (empty ? <p className="text-[15.5px] font-bold text-slate-900">{empty}</p> : <p className="text-[15px] text-slate-600">No times listed yet.</p>)}
       <button
         type="button"
@@ -186,6 +149,72 @@ export default function MinyanBoxEditor({
 }
 
 /** One minyan: Add a minyan's screen, with Remove, and More for the rest. */
+/** A box's minyanim under their tefillah, as the listing has them: the
+ *  editor's list (each opens), and a change's before and after in To do
+ *  (board 20). `mark` says which are changed or new. */
+export function MinyanBoxRows({
+  rows,
+  box,
+  writing,
+  mark,
+  onOpen,
+}: {
+  rows: readonly Minyan[]
+  box: MinyanBox
+  writing: MinyanWriting
+  mark?: (m: Minyan) => 'Changed' | 'New' | null
+  onOpen?: (id: string) => void
+}) {
+  const { timeText, noteText, boxGroups } = writing
+  return (
+    <>
+      {boxGroups(rows, box).map((g) => (
+        <div key={g.label}>
+          <p className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>
+          <ul className="divide-y divide-slate-200/70">
+            {g.rows.map((m) => {
+              // The week's rows are under their tefillah already: the time
+              // and the days. Shabbos's say which tefillah.
+              const kind = kindOf(m, box)
+              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, m.joinLink ? 'Online' : null, noteText(m.notes)].filter(Boolean).join(' · ')
+              const marked = mark?.(m) ?? null
+              const inside = (
+                <>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15.5px] text-slate-900">
+                      {kind === 'shabbos' && (
+                        <>
+                          <b>{TEFILLAH_LABELS[m.tefillah]}</b>{' '}
+                        </>
+                      )}
+                      <span className={kind === 'weekday' ? 'font-bold' : 'text-slate-700'}>{timeText(m)}</span>
+                    </span>
+                    {sub && <span className="mt-0.5 block text-[13.5px] text-muted">{sub}</span>}
+                  </span>
+                  {marked && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">{marked}</span>}
+                  {onOpen && <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />}
+                </>
+              )
+              const look = `flex min-h-13 w-full items-center gap-2.5 py-2 text-left ${marked ? '-mx-2.5 w-[calc(100%+20px)] rounded-xl bg-yellow-50 px-2.5' : ''}`
+              return (
+                <li key={m.id}>
+                  {onOpen ? (
+                    <button type="button" onClick={() => onOpen(m.id)} className={`${look} cursor-pointer`}>
+                      {inside}
+                    </button>
+                  ) : (
+                    <div className={look}>{inside}</div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+    </>
+  )
+}
+
 function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Minyan; box: MinyanBox; choices: Minyan['days']; under: string; onDone: (m: Minyan) => void; onRemove?: () => void }) {
   const [row, setRow] = useState<Minyan>(start)
   const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter || start.signUp || start.joinLink))

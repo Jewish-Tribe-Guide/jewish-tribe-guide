@@ -12,6 +12,8 @@ import { updateTodo, useTodo } from '@/lib/useTodo'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
 import TodoList from './TodoList'
+import ChangeReview from './ChangeReview'
+import { AdminBack } from './AdminUI'
 
 // The admin's front page, To do (mounted at /<community>/admin itself):
 // the one list of what's waiting (TodoList), and each suggestion opened to
@@ -117,26 +119,52 @@ export default function ModerationQueue({ session }: { session: Session }) {
     const next = items![at + 1]
     const categoryId = (opened.payload as Partial<ResourceSubmission>).category ?? opened.current?.category
     const reviewable = opened.target_type === 'listing' && opened.operation !== 'delete'
+    const category = categoryId ? categoriesById.get(categoryId) : undefined
+    const position = { at, total: items!.length, back: backToList, next: next ? () => open(next.id) : undefined }
+    // A change to a listing (boards 3 and 20): the listing now beside what
+    // it would show, and three answers.
+    if (reviewable && opened.operation === 'update' && category && opened.current) {
+      return (
+        <ChangeReview
+          key={opened.id}
+          submission={opened}
+          category={category}
+          position={position}
+          busy={busyId === opened.id}
+          error={openError}
+          token={token}
+          onModerate={moderate}
+          onUpdated={(id) => {
+            updateTodo((d) => ({ ...d, submissions: d.submissions.filter((x) => x.id !== id) }))
+            backToList()
+          }}
+        />
+      )
+    }
+    const name = (opened.payload as Partial<ResourceSubmission>).name || opened.current?.name || 'To do'
     return (
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={backToList} className="flex-1 text-left min-h-11 text-sm font-semibold text-primary cursor-pointer">
-            ‹ To do
-          </button>
-          <span className="text-[13.5px] text-slate-600">
-            {at + 1} of {items!.length}
-          </span>
-          {next && (
-            <button type="button" onClick={() => open(next.id)} className="min-h-11 text-sm font-semibold text-primary cursor-pointer">
-              Next ›
-            </button>
-          )}
-        </div>
+        <AdminBack
+          back={{ label: 'To do', onClick: backToList }}
+          title={name}
+          right={
+            <span className="flex items-center gap-3 md:-mt-3">
+              <span className="text-[13.5px] text-slate-600 whitespace-nowrap">
+                {at + 1} of {items!.length}
+              </span>
+              {next && (
+                <button type="button" onClick={() => open(next.id)} className="max-md:hidden min-h-11 text-sm font-semibold text-primary cursor-pointer">
+                  Next ›
+                </button>
+              )}
+            </span>
+          }
+        />
         {reviewable ? (
           <SubmissionReview
             key={opened.id}
             submission={opened}
-            category={categoryId ? categoriesById.get(categoryId) : undefined}
+            category={category}
             busy={busyId === opened.id}
             error={openError}
             onModerate={moderate}

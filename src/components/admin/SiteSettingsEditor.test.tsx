@@ -166,6 +166,20 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(screen.getByRole('button', { name: 'Phone' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  // Narrower than the preview beside needs (a phone), a Preview button
+  // opens the page full size, with what hasn't been saved (board 21c).
+  it('Preview opens the home page full size, with what hasn’t been saved', async () => {
+    const user = userEvent.setup()
+    await renderEditor('home')
+    await user.type(screen.getByLabelText('Big line'), '?')
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(vi.mocked(writePreviewDraft).mock.lastCall![0].settings.desktopHeroHeadline).toBe(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}?`)
+    expect(screen.getByTitle('Site preview')).toHaveAttribute('src', '/philly?preview=1')
+    await user.click(screen.getByRole('button', { name: '← Back to editor' }))
+    expect(screen.queryByTitle('Site preview')).toBeNull()
+    expect(screen.getByLabelText('Big line')).toHaveValue(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}?`)
+  })
+
   // Held back (features.ts): nothing to choose, so the box isn't there.
   it('while the Today home is held back, there is no Today home box', async () => {
     features.todayHome = false

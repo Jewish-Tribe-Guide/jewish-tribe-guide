@@ -527,10 +527,18 @@ export default function OpenedPlace({
   const notChecked = place.state === 'not_checked' && opened.problems.length > 0
   const shell =
     'flex flex-col gap-3 border-b border-slate-100 px-4 pb-4 pt-3 [&>*]:shrink-0 max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overflow-y-auto max-sm:border-0 max-sm:bg-slate-100 max-sm:pb-8 max-sm:pt-[max(1rem,env(safe-area-inset-top))]'
+  // On a phone the place covers the screen: the chevron in a bar across the
+  // top, then its name, as every screen with a way back (board 19b).
   const phoneBack = (
-    <button type="button" onClick={onClose} className="self-start text-sm font-semibold text-primary hover:underline sm:hidden">
-      ‹ {kindLabel}
-    </button>
+    <div className="-mx-4 -mt-4 flex items-center gap-1 min-h-14 border-b border-slate-200 bg-white pl-1 pr-4 sm:hidden">
+      <button type="button" onClick={onClose} className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-primary">
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M10 3L5 8l5 5" />
+        </svg>
+        <span className="sr-only">‹ {kindLabel}</span>
+      </button>
+      <h2 className="m-0 min-w-0 flex-1 truncate text-lg font-bold text-slate-900">{place.name}</h2>
+    </div>
   )
   const listing = place.listing && (
     <a href={place.listing} target="_blank" rel="noopener noreferrer" className={`self-start py-1 text-[13.5px] ${LINK}`}>
@@ -594,7 +602,7 @@ export default function OpenedPlace({
           <span className="max-sm:hidden">
             <Down />
           </span>
-          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:text-[19px]">{place.name}</span>
+          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:sr-only">{place.name}</span>
           {place.pill && (
             <span className={`whitespace-nowrap rounded-full border px-2 py-px text-xs font-semibold ${place.red ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{place.pill}</span>
           )}
@@ -839,7 +847,7 @@ export default function OpenedPlace({
           <span className="max-sm:hidden">
             <Down />
           </span>
-          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:text-[19px]">{place.name}</span>
+          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:sr-only">{place.name}</span>
           {place.pill && <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-xs font-semibold text-amber-800">{place.pill}</span>}
         </button>
         <div className="flex flex-col rounded-[10px] border border-slate-200 bg-white px-3.5 pb-3.5 pt-1">
@@ -935,7 +943,7 @@ export default function OpenedPlace({
           <Down />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[15.5px] font-bold text-slate-900 max-sm:text-[19px]">{place.name}</span>
+          <span className="text-[15.5px] font-bold text-slate-900 max-sm:sr-only">{place.name}</span>
           {place.sources.length > 0 && <span className="text-[13px] text-muted">{placeSourcesText(place.sources)}</span>}
         </span>
       </button>

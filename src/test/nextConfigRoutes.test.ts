@@ -50,7 +50,18 @@ function isAdminPage(path: string, dir = join(process.cwd(), 'src/app/admin/[com
   )
 }
 
+// Every redirect out of a community's admin console, as the path it leaves.
+const adminRedirectSources = [...config.slice(config.indexOf('async redirects()')).matchAll(/source:\s*'[^']*\/admin\/([^':]+)'/g)].map((m) => m[1])
+
 describe('next.config.ts redirects and rewrites', () => {
+  // /admin/site was the old Basics tab, sent to the home page; when it
+  // became Site's list of screens (board 21, Oct 29) the redirect still
+  // went first, and the list could never be opened.
+  it('no admin redirect leaves a page that exists, which it would hide', () => {
+    expect(adminRedirectSources.length).toBeGreaterThan(0)
+    expect(adminRedirectSources.filter((path) => isAdminPage(path))).toEqual([])
+  })
+
   // /admin/dishes was sent to /admin/watches/dishes, which went when the job
   // pages became the Watches tab's kinds (Oct 25), so the old link was a 404.
   it("every admin redirect lands on a page that exists", () => {

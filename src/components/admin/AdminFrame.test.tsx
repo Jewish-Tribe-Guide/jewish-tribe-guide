@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import AdminFrame from './AdminFrame'
+import { AdminBack } from './AdminUI'
 
 const nav = vi.hoisted(() => ({ pathname: '/philly/admin', count: null as number | null }))
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }))
@@ -38,11 +39,13 @@ describe('AdminFrame', () => {
     const { sidebar, lit, heading } = show('/philly/admin/categories/cat:abc')
     expect(sidebar).toEqual(['To do', 'Places', 'Site', 'Reports', 'Settings', 'View the site'])
     expect(lit).toEqual(['Site'])
-    // Site's heading is the area on a phone, and the open tab on a computer,
-    // where the tabs above it already say Site (board 7).
-    expect(heading).toBe('SiteCategory pages')
-    expect(screen.getByText('Site', { selector: 'h1 span' })).toHaveClass('md:hidden')
-    expect(screen.getByText('Category pages', { selector: 'h1 span' })).toHaveClass('hidden', 'md:inline')
+    // The open tab is the heading, with the way back to Site's list on a
+    // phone, where Site's tabs don't fit (board 21).
+    expect(heading).toBe('Category pages')
+    const back = screen.getByRole('link', { name: '‹ Site' })
+    expect(back).toHaveAttribute('href', '/philly/admin/site')
+    expect(back).toHaveClass('md:hidden')
+    expect(screen.getByRole('navigation', { name: 'Site' })).toHaveClass('hidden', 'md:flex')
   })
 
   it('puts only the four areas in the phone bar, Settings behind the gear', () => {
@@ -103,14 +106,44 @@ describe('AdminFrame', () => {
     expect(screen.queryByRole('navigation', { name: 'Site' })).toBeNull()
   })
 
-  // Site is for a computer (brief, question 6): on a phone it says so.
-  it('tells a phone to open Site on a computer, and keeps the screen for a computer', () => {
+  // Site works on a phone too (board 21): its list of screens instead of
+  // the tabs, and no screen held back for a computer.
+  it('opens Site on a phone to its list of screens, and hides no screen', () => {
     show('/philly/admin/home')
-    expect(screen.getByText('Open on a computer to edit the site')).toBeInTheDocument()
-    expect(screen.getByText('the screen').parentElement).toHaveClass('hidden', 'md:block')
+    expect(screen.queryByText(/Open on a computer/)).toBeNull()
+    expect(screen.getByText('the screen').parentElement).not.toHaveClass('hidden')
+    expect(within(screen.getByRole('navigation', { name: 'Admin areas' })).getByRole('link', { name: 'Site' })).toHaveAttribute('href', '/philly/admin/site')
     cleanup()
+    // The list itself lights Site, and carries no tabs of its own.
+    const { lit } = show('/philly/admin/site')
+    expect(lit).toEqual(['Site'])
+    expect(screen.getByRole('navigation', { name: 'Site' })).toHaveClass('hidden')
+    expect(screen.getByRole('navigation', { name: 'Site' })).not.toHaveClass('md:flex')
+  })
+
+  // A screen with its own way back (an opened category, a watch) heads
+  // itself; the frame's heading steps aside so there aren't two (board 19c).
+  it('steps its heading aside for a screen that heads itself', () => {
+    nav.pathname = '/philly/admin/watches/kind/synagogue'
+    render(
+      <AdminFrame isSuperAdmin={false} email="admin@example.com" token="tok" onSignOut={() => {}}>
+        <AdminBack back={{ label: 'Watches', href: '/philly/admin/watches' }} title="Shul times" />
+      </AdminFrame>,
+    )
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual(['Shul times'])
+    expect(screen.getByRole('link', { name: '‹ Watches' })).toHaveAttribute('href', '/philly/admin/watches')
+  })
+
+  it('draws Settings as a gear, not a sun', () => {
     show('/philly/admin')
-    expect(screen.queryByText('Open on a computer to edit the site')).toBeNull()
+    const gear = screen.getByLabelText('Settings').querySelector('svg')!
+    // A toothed ring round a hole: one closed outline. A sun's rays are
+    // separate strokes, each its own move.
+    const outlines = [...gear.querySelectorAll('path')].map((p) => p.getAttribute('d') ?? '')
+    expect(outlines).toHaveLength(1)
+    expect(outlines[0].match(/M/gi)).toHaveLength(1)
+    expect(outlines[0].trim()).toMatch(/z$/i)
+    expect(gear.querySelectorAll('circle')).toHaveLength(1)
   })
 
   it('says who is signed in, with Sign out', () => {

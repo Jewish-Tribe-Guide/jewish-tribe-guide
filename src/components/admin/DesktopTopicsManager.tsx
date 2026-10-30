@@ -140,6 +140,7 @@ export default function DesktopTopicsManager({
     onChange([...sectionEntries, ...legacyEntries, ...reordered])
   }
 
+  const arrow = 'w-10 h-10 shrink-0 grid place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:text-slate-300 disabled:hover:bg-white cursor-pointer disabled:cursor-default'
   const quiet = 'min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 cursor-pointer'
 
   return (
@@ -151,21 +152,35 @@ export default function DesktopTopicsManager({
         const open = openId === c.id
         return (
           <div key={c.id} className="border-b border-slate-100 last:border-b-0">
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-describedby={meta ? `${c.id}-line` : undefined}
-              onClick={() => setOpenId(open ? null : c.id)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] text-left hover:bg-slate-50 cursor-pointer"
-            >
-              <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span className="text-[15px] font-semibold text-slate-900">{label}</span>
-                {meta && <span id={`${c.id}-line`} aria-hidden className="text-[13px] text-slate-600">{meta.description}</span>}
-              </span>
-              <span className={open ? 'rotate-90' : ''}>
-                <Chevron />
-              </span>
-            </button>
+            {/* Up and down on the row itself, rather than dragging, which a
+                phone does badly (board 21c). */}
+            <div className="flex items-center gap-2 pr-3">
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-describedby={meta ? `${c.id}-line` : undefined}
+                onClick={() => setOpenId(open ? null : c.id)}
+                className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-2.5 min-h-[56px] text-left hover:bg-slate-50 cursor-pointer"
+              >
+                <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold text-slate-900">{label}</span>
+                  {meta && <span id={`${c.id}-line`} aria-hidden className="text-[13px] text-slate-600">{meta.description}</span>}
+                </span>
+                <span className={open ? 'rotate-90' : ''}>
+                  <Chevron />
+                </span>
+              </button>
+              <button type="button" onClick={() => moveCard(i, -1)} disabled={i === 0} className={arrow} aria-label={`Move ${label} up`}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path d="M4 10l4-4 4 4" />
+                </svg>
+              </button>
+              <button type="button" onClick={() => moveCard(i, 1)} disabled={i === cardEntries.length - 1} className={arrow} aria-label={`Move ${label} down`}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path d="M4 6l4 4 4-4" />
+                </svg>
+              </button>
+            </div>
             {open && (
               <div className="flex flex-col gap-3 px-4 pb-4">
                 {meta?.headingKey && (
@@ -223,12 +238,6 @@ export default function DesktopTopicsManager({
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => moveCard(i, -1)} disabled={i === 0} className={quiet} aria-label={`Move ${label} up`}>
-                      Move up
-                    </button>
-                    <button type="button" onClick={() => moveCard(i, 1)} disabled={i === cardEntries.length - 1} className={quiet} aria-label={`Move ${label} down`}>
-                      Move down
-                    </button>
                     <button type="button" onClick={() => setRemoving(c.id)} className={quiet}>
                       Take it off
                     </button>

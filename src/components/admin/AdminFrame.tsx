@@ -1,20 +1,28 @@
 'use client'
 
+import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { adminAreas, adminNavPosition, type AdminArea } from '@/lib/adminNav'
+import { adminAreas, adminBase, adminNavPosition, type AdminArea } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSiteSettings } from '@/lib/contentContext'
 import { useTodoCount } from '@/lib/useTodo'
+import { AdminHead, AdminOwnHead } from './AdminUI'
 
 // The console's frame (the admin redesign's step 1, boards 1, 2, 5, 10 and
 // 11): on a computer a sidebar with the four areas, then Settings and View
 // the site at the bottom; on a phone a bar at the top with the screen's name
 // and a gear, and the four areas along the bottom. Every screen gets the
 // open area's name as its heading, and the area's pages as tabs under it.
-// Site is for a computer, so on a phone it says so instead. To do is one
-// list (step 2): no tabs, its other pages say "‹ To do", and the nav's one
-// count is how much it holds.
+// To do is one list (step 2): no tabs, and the nav's one count is how much
+// it holds.
+//
+// On a phone (boards 19 to 21c, Oct 29) the four areas' own screens have the
+// gear; anything with a way back has the chevron in the bar instead, and no
+// gear: To do's other pages, each of Site's screens (Site is a list of them
+// on a phone), and any screen that brings its own heading (AdminBack), when
+// the frame's heading steps aside. On a computer the sidebar shows where you
+// are, so To do's pages have no "‹ To do".
 
 const ICONS: Record<AdminArea | 'view', React.ReactNode> = {
   todo: <path d="M3 8.5l3 3 7-7" />,
@@ -31,11 +39,12 @@ const ICONS: Record<AdminArea | 'view', React.ReactNode> = {
     </>
   ),
   reports: <path d="M3 13.5V8.5M8 13.5V3M13 13.5V6" />,
+  // A gear: the rays it had read as brightness (the user, Oct 29).
   settings: (
-    <>
-      <circle cx="8" cy="8" r="2.2" />
-      <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" />
-    </>
+    <g transform="scale(0.6667)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </g>
   ),
   view: <path d="M9 3h4v4M13 3L7 9M11 9.5V13H3V5h3.5" />,
 }
@@ -83,10 +92,15 @@ export default function AdminFrame({
   // to 8); a screen opened from one (a category, a form) brings its own
   // heading and way back, so the frame's is the phone's alone there.
   const siteTab = open?.area === 'site' ? open.tabs.find((t) => t.tab === position?.tab) : undefined
-  const siteInner = !!siteTab && pathname !== siteTab.href
+  // Site on a phone: a list of its screens, each opening with a way back.
+  const siteList = `${adminBase(community)}/site`
+  const atSiteList = pathname === siteList
+  // A screen with its own heading and way back (AdminBack).
+  const [ownHeads, setOwnHeads] = useState(0)
+  const ownHead = useCallback((by: number) => setOwnHeads((n) => n + by), [])
 
   const tabsNav = open && (
-    <nav aria-label={open.label} className={`${siteTab ? 'hidden md:flex' : 'flex'} gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200`}>
+    <nav aria-label={open.label} className={`${siteTab && !atSiteList ? 'hidden md:flex' : atSiteList ? 'hidden' : 'flex'} gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200`}>
       {open.tabs.map((t) => {
         const current = t.tab === position?.tab
         return (
@@ -117,7 +131,10 @@ export default function AdminFrame({
   )
 
   return (
-    <div className="flex-1 flex w-full min-w-0">
+    // --admin-tabs: how tall the phone's tabs are (58px, measured, over
+    // their bottom padding), so a bar pinned to the bottom of a screen (Save,
+    // a change's answers) sits just above them.
+    <div className="flex-1 flex w-full min-w-0 [--admin-tabs:0px] max-md:[--admin-tabs:calc(58px_+_max(10px,env(safe-area-inset-bottom)))]">
       <nav
         aria-label="Admin"
         className="hidden md:flex w-60 shrink-0 flex-col gap-1 bg-white border-r border-slate-200 px-3 py-5 sticky top-0 h-dvh overflow-y-auto"
@@ -152,52 +169,28 @@ export default function AdminFrame({
       <main className="flex-1 min-w-0 px-4 pb-28 md:px-10 md:pt-8 md:pb-12">
         <div className="max-w-[920px] flex flex-col gap-4">
           {showTabs && siteTab && tabsNav}
-          <header className={`-mx-4 flex items-center gap-2.5 ${siteInner ? 'md:hidden ' : ''} bg-white border-b border-slate-200 px-4 py-3 md:mx-0 md:p-0 md:bg-transparent md:border-0`}>
-            <span className="flex-1 min-w-0 flex flex-col">
-              {todoPage ? (
-                <Link href={open!.href} className="md:hidden text-[12.5px] font-semibold text-primary">
-                  ‹ To do
-                </Link>
-              ) : (
+          {ownHeads > 0 ? null : (todoPage || (siteTab && !atSiteList)) ? (
+            // Opened from To do's list or Site's: the way back is the
+            // phone's alone, where the sidebar or the tabs already show it.
+            <AdminHead phoneOnly back={todoPage ? { label: 'To do', href: open!.href } : { label: 'Site', href: siteList }} title={(todoPage ?? siteTab)!.label} />
+          ) : (
+            <header className="-mx-4 flex items-center gap-2.5 bg-white border-b border-slate-200 px-4 py-3 md:mx-0 md:p-0 md:bg-transparent md:border-0">
+              <span className="flex-1 min-w-0 flex flex-col">
                 <span className="md:hidden text-[12.5px] text-slate-500">{siteName}</span>
-              )}
-              {todoPage && (
-                <Link href={open!.href} className="hidden md:inline-flex self-start items-center min-h-11 -mt-3 text-sm font-semibold text-primary">
-                  ‹ To do
-                </Link>
-              )}
-              <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">
-                {siteTab ? (
-                  <>
-                    <span className="md:hidden">{open!.label}</span>
-                    <span className="hidden md:inline">{siteTab.label}</span>
-                  </>
-                ) : (
-                  (todoPage?.label ?? open?.label ?? 'Admin')
-                )}
-              </h1>
-            </span>
-            <Link href={settings.href} aria-label="Settings" className="md:hidden inline-flex items-center justify-center w-11 h-11 text-slate-700">
-              <Icon name="settings" size={20} />
-            </Link>
-          </header>
+                <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">{open?.label ?? 'Admin'}</h1>
+              </span>
+              <Link href={settings.href} aria-label="Settings" className="md:hidden inline-flex items-center justify-center w-11 h-11 text-slate-700">
+                <Icon name="settings" size={22} />
+              </Link>
+            </header>
+          )}
 
           {showTabs && !siteTab && tabsNav}
 
 
-          {open?.area === 'site' ? (
-            <>
-              <div className="md:hidden bg-white border border-slate-200 rounded-[10px] px-4 py-5 flex flex-col items-start gap-3.5">
-                <p className="m-0 text-base font-bold text-slate-900">Open on a computer to edit the site</p>
-                <Link href={siteHref} className="inline-flex items-center min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[14.5px] font-semibold text-slate-900">
-                  View the site
-                </Link>
-              </div>
-              <div className="hidden md:block">{children}</div>
-            </>
-          ) : (
+          <AdminOwnHead.Provider value={ownHead}>
             <div>{children}</div>
-          )}
+          </AdminOwnHead.Provider>
 
           {open?.area === 'settings' && <div className="md:hidden">{account}</div>}
         </div>
@@ -212,7 +205,7 @@ export default function AdminFrame({
           return (
             <Link
               key={a.area}
-              href={a.href}
+              href={a.area === 'site' ? siteList : a.href}
               aria-current={current ? 'page' : undefined}
               className={`flex flex-col items-center gap-[3px] py-1.5 min-h-11 text-xs ${current ? 'text-primary font-bold' : 'text-slate-600 font-semibold'}`}
             >

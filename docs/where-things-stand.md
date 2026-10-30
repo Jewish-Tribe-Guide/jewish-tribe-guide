@@ -595,6 +595,42 @@ brief, one round of drawings, then the build in pieces.
    Not as drawn: the unlinked-sender row and the "Stopped checking" line.
    Not built: making a new key (if one leaks, delete the row and open the
    page again).
+15. **The admin on a phone: BUILT Oct 29** (boards 19 to 21c, drawn after
+   the user's phone notes: "more phone oriented… the back chevron", "editing
+   minyan times looks like the old version", "Setting icon looks like
+   brightness", "Why does site need to open on computer?").
+   - Settings is a gear (19).
+   - A screen one level down (Watches → a kind, Newsletters, a category,
+     a form, a campaign, History, Searches nobody found, an opened To do
+     item, a Site screen) has a bar with a back chevron and its name on a
+     phone, and "‹ Up one level" over one heading on a computer (19b, 19c).
+     The frame's own heading steps aside for a screen that heads itself
+     (`AdminBack`, `AdminOwnHead`).
+   - A change in To do opens what the listing says now beside what it
+     would show, the changed lines marked; a shul's times as the listing
+     lists them, by the box they changed in. Under it, where it came from
+     and the original, then Update the listing, Edit, then update, and
+     Leave it (asks why, for whoever sent it), pinned over the tabs on a
+     phone (20, `ChangeReview.tsx`). Edit, then update opens only the
+     rows the change touches in the site's own editor, from what was sent:
+     a shul's times in the minyan editor (20b, 20c).
+   - Site works on a phone: the Site tab opens a list of its screens
+     (`/admin/site`; its old redirect to Home page is gone), each with the
+     chevron back to it. A category's page and a form's have a Preview
+     button where the page beside doesn't fit, and "On the site" with the
+     place count over it (21b). The home page's cards move with up and
+     down on each row (21c), and Preview opens the page full size with
+     what isn't saved. Save bars sit over the phone's tabs.
+   Not as drawn: Site's list rows have no line under them; a home-page card
+   row keeps its open chevron (it opens in place); in Edit, then update the
+   button is under the list, not in a bar, and doesn't count the changes.
+   Not drawn, fixed in passing: the Category pages list's buttons go under
+   the name on a phone (it was squeezed to one word a line); its look is
+   otherwise the old cards.
+   **Gone from a change, waiting on the user:** the old review's "Keep …
+   as it was" per field and "Change another field". Edit, then update
+   covers both by hand. A new place still opens the old review (board 4
+   not built).
 
 ## Drawn Oct 28: the computer home and Before candles (waiting on the user)
 

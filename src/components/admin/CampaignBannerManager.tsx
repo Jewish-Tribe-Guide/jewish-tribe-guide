@@ -8,7 +8,7 @@ import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import type { CategoryConfig } from '@/lib/categories'
 import { activeCampaignBanner, type CampaignBanner } from '@/lib/campaignBanner'
-import { AdminBox, AdminField, AdminRow, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminRow, adminInputClass } from './AdminUI'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 
 // ── The 'campaigns' tab: seasonal promotions (a "Sukkah Map" every Sukkot,
@@ -239,10 +239,7 @@ function CampaignScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <button type="button" onClick={leave} className="self-start inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary cursor-pointer">
-        ‹ Campaigns
-      </button>
-      <h2 className="m-0 text-[26px] font-bold text-slate-900">{isNew ? 'New campaign' : banner.title}</h2>
+      <AdminBack back={{ label: 'Campaigns', onClick: leave }} title={isNew ? 'New campaign' : banner.title} />
       <div className="flex gap-6 items-start">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           <AdminBox>
