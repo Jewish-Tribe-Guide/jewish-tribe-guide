@@ -81,7 +81,8 @@ test.describe('admin console', () => {
     const row = page.locator('div.rounded-lg.shadow-sm', { hasText: listingCategory!.pluralLabel }).first()
     await row.getByRole('button', { name: 'Edit' }).click()
 
-    await expect(page.locator('h2', { hasText: listingCategory!.pluralLabel }).first()).toBeVisible()
+    // The editor's own heading (AdminBack's bar, an h1 since boards 19–21c).
+    await expect(page.getByRole('heading', { level: 1, name: listingCategory!.pluralLabel })).toBeVisible()
     await expect(page.getByLabel('Name', { exact: true }).first()).toHaveValue(listingCategory!.pluralLabel)
     // Read-only: navigate back out via the editor's own back link rather
     // than Save, leaving nothing changed.
@@ -120,10 +121,18 @@ test.describe('admin console', () => {
   })
 
   test('the old Site addresses land on the new tabs', async ({ page }) => {
-    for (const [from, to] of [['site', 'home'], ['desktop', 'home'], ['mobile', 'menus']]) {
+    for (const [from, to] of [['desktop', 'home'], ['mobile', 'menus']]) {
       await page.goto(`/philly/admin/${from}`)
       await expect(page).toHaveURL(new RegExp(`/philly/admin/${to}$`))
     }
+  })
+
+  // Site itself is a page now, its screens as rows (board 21), no longer a
+  // redirect to Home page.
+  test('Site opens its list of screens', async ({ page }) => {
+    await page.goto('/philly/admin/site')
+    await expect(page).toHaveURL(/\/philly\/admin\/site$/)
+    await expect(page.getByRole('main').getByRole('link', { name: 'View the site' })).toBeVisible()
   })
 
   test('Reports loads real numbers, not stuck loading', async ({ page }) => {
