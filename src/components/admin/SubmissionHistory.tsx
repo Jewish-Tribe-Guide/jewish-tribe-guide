@@ -10,7 +10,7 @@ import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
-import { AdminEmpty } from './AdminUI'
+import { AdminBack, AdminEmpty } from './AdminUI'
 
 // Taken and Left, the words Reports counts them in.
 const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = {
@@ -48,11 +48,8 @@ export default function SubmissionHistory({ token, status }: { token: string; st
 
   return (
     <div>
-      <Link href={`${adminBase(community)}/metrics`} className="inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary">
-        ‹ Reports
-      </Link>
-      <h2 className="mt-0 mb-3 text-[26px] font-bold text-slate-900">History</h2>
-      <div role="group" aria-label="Show" className="flex gap-2 mb-4">
+      <AdminBack back={{ label: 'Reports', href: `${adminBase(community)}/metrics` }} title="History" />
+      <div role="group" aria-label="Show" className="flex gap-2 my-4">
         {(['approved', 'rejected'] as const).map((s) => (
           <Link
             key={s}

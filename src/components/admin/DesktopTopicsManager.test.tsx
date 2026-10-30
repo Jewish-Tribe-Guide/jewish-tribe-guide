@@ -246,15 +246,19 @@ describe('DesktopTopicsManager', () => {
     expect(screen.getByRole('button', { name: 'Take it off' })).toBeInTheDocument()
   })
 
-  it('moving a card swaps its position with its neighbor', async () => {
+  // Up and down sit on each row, without opening it, and a phone's thumb
+  // can reach them (board 21c).
+  it('moves a card from its row, swapping it with its neighbour', async () => {
     const user = userEvent.setup()
     const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories and Search Card', cardIds: [], width: 'full' }
     const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([browse, davening])
-    await openRow(user, /^Categories and Search/)
 
-    const downButtons = screen.getAllByRole('button', { name: /Move .* down/ })
-    await user.click(downButtons[0]!)
+    const ups = screen.getAllByRole('button', { name: /^Move .* up$/ })
+    const downs = screen.getAllByRole('button', { name: /^Move .* down$/ })
+    expect(ups.map((b) => (b as HTMLButtonElement).disabled)).toEqual([true, false])
+    expect(downs.map((b) => (b as HTMLButtonElement).disabled)).toEqual([false, true])
+    await user.click(downs[0]!)
 
     expect(onChange).toHaveBeenCalledWith([davening, browse])
   })

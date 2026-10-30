@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { AdminBack } from '@/components/admin/AdminUI'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -15,12 +15,7 @@ export default function AdminMissedSearchesPage() {
   const community = useCommunitySlug()
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <Link href={`${adminBase(community)}/metrics`} className="inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary">
-          ‹ Reports
-        </Link>
-        <h2 className="m-0 text-[26px] font-bold text-slate-900">Searches nobody found</h2>
-      </div>
+      <AdminBack back={{ label: 'Reports', href: `${adminBase(community)}/metrics` }} title="Searches nobody found" />
       <MissedSearches token={session.access_token} />
       <TaughtWords token={session.access_token} />
     </div>

@@ -24,10 +24,7 @@ function asEmailList(value: unknown): string[] | undefined {
 // or one address at a time (addAdminEmail/removeAdminEmail — what the
 // superadmin console's per-community admin roster actually uses;
 // adminEmails' full replace stays for anything else that wants it).
-// Superadmin only, same as everything else in this file. Unlike DELETE
-// below, this IS available in production — publishing a
-// built-out-but-hidden community, or fixing who can sign in to it, are both
-// routine admin actions.
+// Superadmin only, same as everything else in this file.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
   const admin = await getAdminUser(request)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
@@ -115,29 +112,18 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 // same as creating one (see /api/admin/communities/route.ts's own note on
 // what that means now).
 //
-// Two things stand between a stray request and a real deletion, on top of
-// the auth check itself:
-//   1. Refused outright against real production (VERCEL_ENV === 'production'
-//      — same signal src/instrumentation.ts's Sentry gate and email.ts's
-//      adminAppUrl already use for "is this actually the live site"). This
-//      is genuinely destructive and irreversible, unlike everything else
-//      superadmin can do here — creating a community is easy to undo by
-//      deleting it again, but there's no undo for this. Local dev and
-//      preview deployments are unaffected.
-//   2. `confirmSlug` must equal the URL's own `:slug` — the client's
-//      "retype the community's slug" confirmation step round-tripped back
-//      here, so a delete can't go through on a stale UI state or a bare
-//      curl call that only got the URL right.
+// On top of the auth check, `confirmSlug` must equal the URL's own
+// `:slug` — the client's "retype the community's slug" confirmation step
+// round-tripped back here, so a delete can't go through on a stale UI state
+// or a bare curl call that only got the URL right. deleteCommunity itself
+// refuses the default community and the last one left.
+//
+// This works on the live site too (Oct 29, the user asked for it). It used
+// to be refused there outright; the retyped slug and superadmin-only are
+// what stand in for that now.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
   const admin = await getAdminUser(request)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
-  if (process.env.VERCEL_ENV === 'production') {
-    return Response.json(
-      { ok: false, errors: ['Communities can’t be deleted on the live site.'] },
-      { status: 403 },
-    )
-  }
 
   const { slug } = await ctx.params
 

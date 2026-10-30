@@ -41,7 +41,7 @@ export default function SaveBar({
     <div
       role="region"
       aria-label="Save"
-      className="sticky bottom-0 z-20 -mx-4 md:-mx-10 mt-2 flex flex-wrap items-center gap-3 bg-white border-t border-slate-200 px-4 md:px-10 py-3"
+      className="sticky bottom-[var(--admin-tabs,0px)] z-20 -mx-4 md:-mx-10 mt-2 flex flex-wrap items-center gap-3 bg-white border-t border-slate-200 px-4 md:px-10 py-3"
     >
       <p role="status" className="flex-1 m-0 text-[15px] font-semibold text-slate-900">
         {error ? <span className="text-red-700">{error}</span> : changes > 0 ? (status ?? changesLabel(changes)) : 'Saved.'}

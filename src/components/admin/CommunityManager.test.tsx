@@ -555,19 +555,17 @@ describe('CommunityManager — deleting a community', () => {
     expect(cardFor(/upper east side/i)).toBeInTheDocument()
   })
 
-  // The real production safety net — see /api/admin/communities/[slug]/route.ts's
-  // own VERCEL_ENV check. This proves the client-side half: the button
-  // doesn't even render against the real deployment, rather than existing
-  // only to fail with a 403 when clicked.
-  it('hides every delete button when NEXT_PUBLIC_VERCEL_ENV is production', async () => {
+  // The live site used to hide every delete button; the user asked for
+  // delete there too (Oct 29). Still never on the default community.
+  it('shows Delete on the live site, except on the default community', async () => {
     vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'production')
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
     await openCard(user, cardFor(/philadelphia/i))
     await openCard(user, cardFor(/upper east side/i))
 
-    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/communities can.t be deleted on the live site/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^delete$/i })).toHaveLength(1)
+    expect(screen.queryByText(/communities can.t be deleted on the live site/i)).not.toBeInTheDocument()
   })
 })
 

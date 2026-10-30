@@ -576,12 +576,14 @@ export async function setCommunityVisibility(
  *  for the same slug-collision reason), so nothing cascades on its own —
  *  deleting a community without this would leave every one of its listings,
  *  categories, forms, submissions, etc. orphaned in the database forever,
- *  invisible but never cleaned up. Kept in one place so a new
- *  community-scoped table added later doesn't get silently left behind by a
- *  delete. Rows within each table that reference `resource.id` (votes, the
- *  tag junction) are left to their own existing FK cascade — see
+ *  invisible but never cleaned up, and a community later created with the
+ *  same slug would inherit them. A missed `watch` row keeps being checked
+ *  every night. communityScopedTables.test.ts reads every migration and
+ *  fails if a table with a `community_id` column is missing here. Rows
+ *  within each table that reference `resource.id` (votes, the tag junction,
+ *  walk routes) are left to their own existing FK cascade — see
  *  resourceStore.ts's hardDeleteArchivedResource. */
-const COMMUNITY_SCOPED_TABLES = [
+export const COMMUNITY_SCOPED_TABLES = [
   'resource',
   'category',
   'form',
@@ -591,14 +593,34 @@ const COMMUNITY_SCOPED_TABLES = [
   'form_response',
   'hospital',
   'tag',
+  'subscriber',
+  'campaign_banner',
+  'activity',
+  'daily_count',
+  'search_miss_dismissal',
+  'question_reading',
+  'question_word',
+  'menu_reading',
+  'watch',
+  'eruv',
+  'walk_route',
+  'newsletter_setup',
 ] as const
+
+/** A table whose migration hasn't been run on this project yet has nothing
+ *  of the community's to delete, so a delete there is skipped rather than
+ *  stopping the whole delete half-way. */
+function tableMissing(table: string, message: string | undefined): boolean {
+  return !!message && new RegExp(`\\b${table}\\b`).test(message) && /(does not exist|schema cache)/.test(message)
+}
 
 /** Permanently deletes a community and every row that belongs to it —
  *  every listing, category, form, submission, site setting, tag, hospital,
- *  and form response. Irreversible, and there is no confirmation step
- *  in here — that belongs to the caller (see
+ *  form response, watch, subscriber and count. Irreversible, and there is
+ *  no confirmation step in here — that belongs to the caller (see
  *  /api/admin/communities/[slug]/route.ts, which requires the admin to
  *  retype the slug, and CommunityManager.tsx, which shows the warning).
+ *  Uploaded photos in storage are not removed.
  *
  *  Refuses on the default community — there must always be exactly one
  *  (community_single_default_idx), and there's no "make a different one
@@ -614,7 +636,7 @@ export async function deleteCommunity(slug: string): Promise<void> {
   const supabase = getAdminClient()
   for (const table of COMMUNITY_SCOPED_TABLES) {
     const { error } = await supabase.from(table).delete().eq('community_id', slug)
-    if (error) throw new Error(`Failed to delete ${table} rows: ${error.message}`)
+    if (error && !tableMissing(table, error.message)) throw new Error(`Failed to delete ${table} rows: ${error.message}`)
   }
 
   const { error } = await supabase.from('community').delete().eq('slug', slug)

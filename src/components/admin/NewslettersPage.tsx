@@ -1,14 +1,13 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import type { NewsletterLine } from '@/lib/nightKinds'
-import { AdminBox, AdminCount, AdminField, AdminRow, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminCount, AdminField, AdminRow, adminInputClass } from './AdminUI'
 
 // ── Watches → Newsletters (admin drawings 18 and 18b, Oct 29) ───────────────
 // Shul newsletters come in through a Google Apps Script in the guide's own
@@ -232,20 +231,14 @@ export default function NewslettersPage({ token }: { token: string }) {
     }
   }
 
-  const back = (
-    <Link href={`${base}/watches`} className="text-sm font-semibold text-primary hover:underline">
-      ‹ Watches
-    </Link>
-  )
-  const heading = <h1 className="text-xl font-bold text-slate-900 sm:text-[22px]">Newsletters</h1>
-  if (loadError) return <div className="space-y-3.5">{back}{heading}<p className="text-sm text-red-700">{loadError}</p></div>
-  if (!data) return <div className="space-y-3.5">{back}{heading}<p className="text-sm text-muted">Loading…</p></div>
+  const back = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title="Newsletters" />
+  if (loadError) return <div className="space-y-3.5">{back}<p className="text-sm text-red-700">{loadError}</p></div>
+  if (!data) return <div className="space-y-3.5">{back}<p className="text-sm text-muted">Loading…</p></div>
 
   const showSteps = data.script && (!data.checkedAt || setUpAgain)
   return (
     <div className="space-y-3.5">
       {back}
-      {heading}
       {data.available ? (
         <Status data={data} now={now} onSetUp={() => setSetUpAgain((s) => !s)} />
       ) : (

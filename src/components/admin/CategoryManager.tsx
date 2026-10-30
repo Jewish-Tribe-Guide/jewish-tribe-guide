@@ -375,7 +375,8 @@ function CategoryRow({
   ]
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-      <div className="flex items-start justify-between gap-3">
+      {/* On a phone the buttons go under the name, not squeezed beside it. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
             <span className={`${TYPE_BADGE} bg-blue-50 text-blue-600`}>Listing</span>
@@ -398,7 +399,7 @@ function CategoryRow({
             {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
           <button
             onClick={onAddListing}
@@ -491,7 +492,8 @@ function SingletonRow({
   const description = SINGLETON_DESCRIPTIONS[kind]
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-      <div className="flex items-start justify-between gap-3">
+      {/* On a phone the buttons go under the name, not squeezed beside it. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
             <span className={`${TYPE_BADGE} bg-emerald-50 text-emerald-600`}>{badgeLabel}</span>
@@ -499,7 +501,7 @@ function SingletonRow({
           </p>
           <p className="text-xs text-muted mt-1">{description}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
           {SINGLETON_EDITABLE_KINDS.has(kind) && (
             <button

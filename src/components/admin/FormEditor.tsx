@@ -11,7 +11,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useIsDesktop } from '@/lib/useIsMobile'
-import { AdminBox, AdminField, AdminRow, AdminSwitch, MoreToggle, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminSwitch, MoreToggle, adminInputClass } from './AdminUI'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, changesLabel, useLeaveGuard } from './SaveBar'
 
@@ -309,12 +309,6 @@ export default function FormEditor({
   if (previewing) return <FormPreview content={draft} onClose={() => history.back()} />
 
   const name = draft.title.trim() || (isNew ? 'New form' : live.title)
-  const backLink = (label: string, onClick: () => void) => (
-    <button type="button" onClick={onClick} className="self-start inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary cursor-pointer">
-      ‹ {label}
-    </button>
-  )
-
   const step = openStep !== null ? draft.steps[openStep] : undefined
   let screen: React.ReactNode
   if (step && openStep !== null) {
@@ -322,8 +316,7 @@ export default function FormEditor({
     const i = openStep
     screen = (
       <>
-        {backLink(name, () => history.back())}
-        <h2 className="m-0 text-[26px] font-bold text-slate-900">{step.question.trim() || 'New question'}</h2>
+        <AdminBack back={{ label: name, onClick: () => history.back() }} title={step.question.trim() || 'New question'} />
         <FormStepEditor
           step={step}
           index={i}
@@ -339,23 +332,28 @@ export default function FormEditor({
     const more = draft.steps.length - QUESTIONS_SHOWN
     screen = (
       <>
-        {backLink('Forms', leave)}
-        <header className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <h2 className="m-0 text-[26px] font-bold text-slate-900">{name}</h2>
-            {responsesHref && (
-              <Link href={responsesHref} className="text-sm font-semibold text-primary">
-                Responses
-              </Link>
+        <AdminBack back={{ label: 'Forms', onClick: leave }} title={name} />
+        {!wide && <AdminPreviewButton onClick={openPreview} />}
+        {(responsesHref || !isNew) && (
+          <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
+            {/* As a category's page (board 21b): on a phone, "On the site"
+                on the left, the switch on the right. */}
+            <span className="flex-1 min-w-0 flex flex-col gap-px">
+              {!isNew && <span aria-hidden="true" className="md:hidden text-[15px] font-semibold text-slate-900">On the site</span>}
+              {responsesHref && (
+                <Link href={responsesHref} className="self-start text-sm font-semibold text-primary">
+                  Responses
+                </Link>
+              )}
+            </span>
+            {!isNew && (
+              <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+                <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
+                <AdminSwitch checked={active} onChange={toggleActive} label="On the site" />
+              </span>
             )}
           </div>
-          {!isNew && (
-            <span className="flex items-center gap-2.5 pt-1.5 text-[15px] font-semibold text-slate-900">
-              <AdminSwitch checked={active} onChange={toggleActive} label="On the site" />
-              <span aria-hidden="true">On the site</span>
-            </span>
-          )}
-        </header>
+        )}
 
         <AdminBox
           title="Questions"

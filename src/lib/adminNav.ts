@@ -127,8 +127,11 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
 // Paths a tab covers besides its own: History (/history/approved and
 // /history/rejected) and every search nobody found (/searches) are part of
 // Reports, which opens them. To do shows only the searches still waiting.
+// /site is Site on a phone: a list of its screens (board 21), and Site's
+// own tab there.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
   metrics: ['/history', '/searches'],
+  home: ['/site'],
 }
 
 /** Which area is open and which tab is lit, for the current path. The

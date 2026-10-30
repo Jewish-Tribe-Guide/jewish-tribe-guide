@@ -346,24 +346,35 @@ describe('ModerationQueue — an opened card', () => {
     const user = userEvent.setup()
     renderShulQueue([aiEdit])
     await user.click(await findRow('Mekor Habracha'))
-    expect(screen.getByText('Read by AI')).toBeInTheDocument()
-    expect(screen.getByText(/1 time in the original isn’t used/)).toBeInTheDocument()
-    expect(screen.getByText(/from what they pasted/)).toBeInTheDocument()
+    const from = screen.getByRole('region', { name: 'Where it came from' })
+    expect(within(from).getByText('Read by AI')).toBeInTheDocument()
+    expect(within(from).getByText(/1 time in the original isn’t used/)).toBeInTheDocument()
+    expect(within(from).getByText(/from the shul’s card/)).toBeInTheDocument()
   })
 
-  it('clicking a card opens it, with the original marked beside the change, and Back returns to the list', async () => {
+  // A change opens to what the listing says now beside what it would show
+  // (boards 3 and 20, Oct 29).
+  it('clicking a change opens it, now beside would-show for each field it changes, and Back returns to the list', async () => {
     const user = userEvent.setup()
     renderShulQueue([aiEdit])
     await user.click(await findRow('Mekor Habracha'))
 
-    expect(screen.getByRole('button', { name: '‹ To do' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Mekor Habracha' })).toBeInTheDocument()
     expect(window.location.search).toBe('?open=sub-ai')
     const original = screen.getByRole('region', { name: 'The original' })
     expect(original.querySelector('[data-mark="used"]')?.textContent).toBe('6:20pm')
     expect(original.querySelector('[data-mark="unused"]')?.textContent).toBe('6:23pm')
-    // Only what changes is in the form; the rabbi didn't change.
-    expect(screen.getAllByTestId('review-field')).toHaveLength(1)
-    expect(screen.queryByLabelText('Rabbi')).not.toBeInTheDocument()
+    // Only what changes is shown, a shul's times by the box they changed
+    // in, as the listing lists them; the rabbi didn't change.
+    // Friday's mincha is with Shabbos.
+    expect(screen.getByText('Synagogues · a change to Usual Shabbos times')).toBeInTheDocument()
+    const times = screen.getByRole('region', { name: 'Usual Shabbos times' })
+    expect(within(times).getByText('On the site now').parentElement).toHaveTextContent('6:23 PM')
+    const would = within(times).getByText('Would show').parentElement!
+    expect(within(would).getByText('6:20 PM')).toBeInTheDocument()
+    expect(within(would).getByText('Changed')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Usual weekday times' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Rabbi' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '‹ To do' }))
     expect(await findRow('Mekor Habracha')).toBeInTheDocument()
@@ -381,9 +392,9 @@ describe('ModerationQueue — an opened card', () => {
     try {
       renderShulQueue([aiEdit])
       await user.click(await findRow('Mekor Habracha'))
-      expect(screen.getByTestId('submission-review')).toBeInTheDocument()
+      expect(screen.getByTestId('change-review')).toBeInTheDocument()
       await waitFor(() => expect(window.location.search).toBe('?open=sub-ai'))
-      expect(screen.getByTestId('submission-review')).toBeInTheDocument()
+      expect(screen.getByTestId('change-review')).toBeInTheDocument()
     } finally {
       spy.mockRestore()
     }
@@ -392,47 +403,56 @@ describe('ModerationQueue — an opened card', () => {
   it('opens the card a shared link names, and Back from it returns to the list', async () => {
     window.history.replaceState(null, '', '/?open=sub-ai')
     renderShulQueue([aiEdit])
-    expect(await screen.findByTestId('submission-review')).toBeInTheDocument()
+    expect(await screen.findByTestId('change-review')).toBeInTheDocument()
     window.history.replaceState(null, '', '/')
     window.dispatchEvent(new PopStateEvent('popstate'))
     expect(await findRow('Mekor Habracha')).toBeInTheDocument()
   })
 
-  it('approves with the admin’s fix, and sends no copy when nothing was changed', async () => {
+  it('“Update the listing” takes the change as it came, and the list no longer has it', async () => {
     const user = userEvent.setup()
     vi.mocked(fetchJson).mockResolvedValue({ ok: true })
     renderShulQueue([aiEdit, submission()])
     await user.click(await findRow('Mekor Habracha'))
-    await user.selectOptions(screen.getByLabelText('Change another field'), 'Rabbi')
-    await user.clear(screen.getByLabelText('Rabbi'))
-    await user.type(screen.getByLabelText('Rabbi'), 'Rabbi Why')
-    await user.click(screen.getByRole('button', { name: 'Approve with your changes' }))
-
+    await user.click(within(screen.getByRole('group', { name: 'Decide' })).getByRole('button', { name: 'Update the listing' }))
     await waitFor(() => expect(patches()).toHaveLength(1))
-    const body = patches()[0] as { status: string; payload: { details: { rabbi: string; minyanim: { time: string }[] } } }
-    expect(body.status).toBe('approved')
-    expect(body.payload.details.rabbi).toBe('Rabbi Why')
-    expect(body.payload.details.minyanim[0].time).toBe('6:20 PM')
-    // Back on the list, without it.
+    expect(patches()[0]).toEqual({ status: 'approved' })
     expect(await findRow('Acme Grocery')).toBeInTheDocument()
     expect(queryRow('Mekor Habracha')).not.toBeInTheDocument()
-
-    await user.click(row('Acme Grocery'))
-    await user.click(screen.getByRole('button', { name: 'Approve' }))
-    await waitFor(() => expect(patches()).toHaveLength(2))
-    expect(patches()[1]).toEqual({ status: 'approved' })
   })
 
-  it('“Keep as it was” puts a field back to the listing’s own value', async () => {
+  it('“Leave it” asks why, for whoever sent it, and sends that along', async () => {
     const user = userEvent.setup()
     vi.mocked(fetchJson).mockResolvedValue({ ok: true })
     renderShulQueue([aiEdit])
     await user.click(await findRow('Mekor Habracha'))
-    await user.click(screen.getByRole('button', { name: 'Keep davening times as it was' }))
-    await user.click(screen.getByRole('button', { name: 'Approve with your changes' }))
+    const decide = screen.getByRole('group', { name: 'Decide' })
+    await user.click(within(decide).getByRole('button', { name: 'Leave it' }))
+    await user.type(screen.getByLabelText('Why, for whoever sent it (optional)'), 'Those are last year’s')
+    await user.click(within(decide).getByRole('button', { name: 'Leave it' }))
     await waitFor(() => expect(patches()).toHaveLength(1))
-    const body = patches()[0] as { payload: { details: { minyanim: { time: string }[] } } }
-    expect(body.payload.details.minyanim[0].time).toBe('6:23 PM')
+    expect(patches()[0]).toMatchObject({ status: 'rejected', reason: 'Those are last year’s' })
+  })
+
+  // "Edit, then update" opens the rows the change touches in the site's
+  // own editor, starting from what was sent (boards 20b and 20c).
+  it('“Edit, then update” opens only the rows it changes, and updates with what the admin left', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+    renderShulQueue([aiEdit])
+    await user.click(await findRow('Mekor Habracha'))
+    await user.click(screen.getByRole('button', { name: 'Edit, then update' }))
+    expect(screen.queryByTestId('change-review')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rabbi')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Update the listing' }))
+    const body = await waitFor(() => {
+      const sent = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')
+      expect(sent).toBeTruthy()
+      return JSON.parse(String(sent![1]!.body)) as { status: string; payload: { details: { rabbi: string; minyanim: { time: string }[] } } }
+    })
+    expect(body.status).toBe('approved')
+    expect(body.payload.details.minyanim[0].time).toBe('6:20 PM')
+    expect(body.payload.details.rabbi).toBe('Rabbi Ex')
   })
 
   it('keeps the card open, with the fix and the reason, when approving fails', async () => {
@@ -452,9 +472,9 @@ describe('ModerationQueue — an opened card', () => {
     const user = userEvent.setup()
     renderShulQueue([submission({ note: 'Saw the sign on the door.', payload: { ...aiEdit.payload }, operation: 'update', target_id: 'shul-1', current: current as never, categoryLabel: 'Synagogues' })])
     await user.click(await findRow('Mekor Habracha'))
-    const opened = screen.getByTestId('submission-review')
     expect(screen.queryByRole('region', { name: 'The original' })).not.toBeInTheDocument()
-    expect(within(opened).getByRole('region', { name: 'What changes on the listing' })).toHaveTextContent('Their note: Saw the sign on the door.')
+    expect(screen.getByRole('region', { name: 'Where it came from' })).toHaveTextContent('From Jane Doe')
+    expect(screen.getByRole('region', { name: 'Where it came from' })).toHaveTextContent('Saw the sign on the door.')
   })
 
   // Regression: the opened card offered Approve on a new place with no
@@ -515,22 +535,27 @@ describe('ModerationQueue — an address picked from Google', () => {
     return renderWithProviders(<ModerationQueue session={session()} />, { content: { categories: [bakery] } })
   }
 
-  it('fills the name, phone, hours and website, opens each row, and approves with them', async () => {
+  /** What "Edit, then update" sent. */
+  async function updated() {
+    return waitFor(() => {
+      const sent = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PATCH')
+      expect(sent).toBeTruthy()
+      return JSON.parse(String(sent![1]!.body)) as { payload: { details: Record<string, unknown> } & Record<string, unknown> }
+    })
+  }
+
+  // A change's editor is the site's own (board 20b), so the pick fills
+  // what it fills there.
+  it('fills the name, phone, hours and website, and updates with them', async () => {
     const user = userEvent.setup()
     renderBakeryQueue()
     await user.click(await findRow('Bakery'))
-    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
-
+    await user.click(screen.getByRole('button', { name: 'Edit, then update' }))
     await user.click(screen.getByRole('button', { name: 'Pick the Google place' }))
-    expect(screen.getByLabelText('Name')).toHaveValue('Bakery on the Way')
     expect(screen.getByLabelText('Phone')).toHaveValue('(215) 555-0100')
-    const rows = screen.getAllByTestId('review-field').map((r) => r.textContent ?? '')
-    expect(rows.some((t) => t.includes('Hours'))).toBe(true)
-    expect(rows.some((t) => t.includes('Website'))).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Update the listing' }))
 
-    await user.click(screen.getByRole('button', { name: 'Approve with your changes' }))
-    await waitFor(() => expect(patches()).toHaveLength(1))
-    const body = patches()[0] as { payload: { details: Record<string, unknown> } & Record<string, unknown> }
+    const body = await updated()
     expect(body.payload).toMatchObject({ name: 'Bakery on the Way', phone: '(215) 555-0100', address: '1 Bakery Way, Philadelphia, PA 19103, USA', geo: { lat: 39.95, lng: -75.17 } })
     expect(body.payload.details).toMatchObject({ hours, w: 'https://bakery.example/', hechsher: 'KCL' })
     // A description already written is kept.
@@ -547,16 +572,18 @@ describe('ModerationQueue — an address picked from Google', () => {
   it('fills a description only where there is none', async () => {
     const user = userEvent.setup()
     edit.payload = { ...(edit.payload as object), details: { hechsher: 'KCL' } } as never
+    const had = current.details
+    current.details = { hechsher: 'KCL' } as never
     try {
       renderBakeryQueue()
       await user.click(await findRow('Bakery'))
+      await user.click(screen.getByRole('button', { name: 'Edit, then update' }))
       await user.click(screen.getByRole('button', { name: 'Pick the Google place' }))
-      await user.click(screen.getByRole('button', { name: 'Approve with your changes' }))
-      await waitFor(() => expect(patches()).toHaveLength(1))
-      const body = patches()[0] as { payload: { details: Record<string, unknown> } & Record<string, unknown> }
-      expect(body.payload.details.googleDescription).toBe('A bakery, said Google')
+      await user.click(screen.getByRole('button', { name: 'Update the listing' }))
+      expect((await updated()).payload.details.googleDescription).toBe('A bakery, said Google')
     } finally {
       edit.payload = { category: 'bakery', name: 'Bakery', address: '1 Bakery Way', phone: '', details: { hechsher: 'KCL', googleDescription: 'Our own words' } } as never
+      current.details = had
     }
   })
 })

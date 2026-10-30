@@ -46,7 +46,7 @@ export function sourceLine(s: EnrichedSubmission, source: SubmissionSource): str
 
 /** The field a diff row edits: a shul's special schedules are edited with
  *  its times. */
-function fieldKeyFor(rowKey: string, fields: CategoryField[]): string | null {
+export function fieldKeyFor(rowKey: string, fields: CategoryField[]): string | null {
   if (isCore(rowKey)) return rowKey
   if (fields.some((f) => f.key === rowKey)) return rowKey
   const shul = fields.find((f) => f.type === 'minyanim' && schedulesKey(f.key) === rowKey)
@@ -222,49 +222,7 @@ export function SubmissionReview({
     return <p className="mt-1 text-xs text-slate-500 whitespace-pre-line">Now: {text && text !== '—' ? text : 'nothing'}</p>
   }
 
-  const original = hasOriginal ? (
-    <section aria-label="The original" className="min-w-0">
-      <div className="flex items-center gap-2 flex-wrap mb-2">
-        <h3 className="text-sm font-semibold text-slate-900">The original</h3>
-        {marked && (
-          <span className="text-xs text-slate-500">
-            <span className="rounded bg-blue-100 text-blue-900 px-1">used</span>{' '}
-            <span className="rounded bg-amber-100 text-amber-900 px-1">not used</span>
-          </span>
-        )}
-      </div>
-      {marked && marked.unused > 0 && (
-        <p className="mb-2 text-xs font-medium text-amber-800">
-          {marked.unused === 1 ? '1 time in the original isn’t used.' : `${marked.unused} times in the original aren’t used.`} Check none was missed.
-        </p>
-      )}
-      {source.original && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 whitespace-pre-wrap break-words lg:max-h-[70vh] lg:overflow-auto">
-          {marked
-            ? marked.parts.map((p, i) =>
-                p.mark ? (
-                  <mark key={i} data-mark={p.mark} className={p.mark === 'used' ? 'rounded bg-blue-100 text-blue-900 px-0.5' : 'rounded bg-amber-100 text-amber-900 px-0.5'}>
-                    {p.text}
-                  </mark>
-                ) : (
-                  <span key={i}>{p.text}</span>
-                ),
-              )
-            : linkify(source.original)}
-        </div>
-      )}
-      {source.photoUrl && (
-        <a href={source.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-sm text-primary underline">
-          {/\.(png|jpe?g|webp|gif)$/i.test(source.photoUrl) ? (
-            // eslint-disable-next-line @next/next/no-img-element -- the guide's own storage, shown as sent
-            <img src={source.photoUrl} alt="The photo it was read from" className="max-h-[70vh] rounded-md border border-slate-200" />
-          ) : (
-            'Open the file it was read from'
-          )}
-        </a>
-      )}
-    </section>
-  ) : null
+  const original = hasOriginal ? <TheOriginal source={source} marked={marked} /> : null
 
   const changes = (
     <section aria-label="What changes on the listing" className="min-w-0">
@@ -312,7 +270,6 @@ export function SubmissionReview({
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4" data-testid="submission-review">
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-lg font-semibold text-slate-900">{sent.name || s.current?.name || '(unknown listing)'}</h2>
         {s.categoryLabel && <span className="text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{s.categoryLabel}</span>}
         {source.readBy === 'ai' && <span className="text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200 rounded-full px-2 py-0.5">Read by AI</span>}
       </div>
@@ -378,5 +335,53 @@ export function SubmissionReview({
         )}
       </div>
     </div>
+  )
+}
+
+/** What a suggestion was read from: the message (the times the reading used
+ *  and didn't, marked) or the photo. */
+export function TheOriginal({ source, marked }: { source: SubmissionSource; marked: ReturnType<typeof markTimes> | null }) {
+  return (
+  <section aria-label="The original" className="min-w-0">
+    <div className="flex items-center gap-2 flex-wrap mb-2">
+      <h3 className="text-sm font-semibold text-slate-900">The original</h3>
+      {marked && (
+        <span className="text-xs text-slate-500">
+          <span className="rounded bg-blue-100 text-blue-900 px-1">used</span>{' '}
+          <span className="rounded bg-amber-100 text-amber-900 px-1">not used</span>
+        </span>
+      )}
+    </div>
+    {marked && marked.unused > 0 && (
+      <p className="mb-2 text-xs font-medium text-amber-800">
+        {marked.unused === 1 ? '1 time in the original isn’t used.' : `${marked.unused} times in the original aren’t used.`} Check none was missed.
+      </p>
+    )}
+    {source.original && (
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 whitespace-pre-wrap break-words lg:max-h-[70vh] lg:overflow-auto">
+        {marked
+          ? marked.parts.map((p, i) =>
+              p.mark ? (
+                <mark key={i} data-mark={p.mark} className={p.mark === 'used' ? 'rounded bg-blue-100 text-blue-900 px-0.5' : 'rounded bg-amber-100 text-amber-900 px-0.5'}>
+                  {p.text}
+                </mark>
+              ) : (
+                <span key={i}>{p.text}</span>
+              ),
+            )
+          : linkify(source.original)}
+      </div>
+    )}
+    {source.photoUrl && (
+      <a href={source.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-sm text-primary underline">
+        {/\.(png|jpe?g|webp|gif)$/i.test(source.photoUrl) ? (
+          // eslint-disable-next-line @next/next/no-img-element -- the guide's own storage, shown as sent
+          <img src={source.photoUrl} alt="The photo it was read from" className="max-h-[70vh] rounded-md border border-slate-200" />
+        ) : (
+          'Open the file it was read from'
+        )}
+      </a>
+    )}
+  </section>
   )
 }

@@ -117,18 +117,6 @@ function cityShortName(cityQuery: string): string {
 
 export default function CommunityManager({ token }: { token: string }) {
   const router = useRouter()
-  // Same signal the DELETE route itself enforces (see
-  // /api/admin/communities/[slug]/route.ts) — checked here too so the
-  // button doesn't even appear against the real deployment, rather than
-  // existing only to fail with a 403 when clicked. NEXT_PUBLIC_VERCEL_ENV
-  // is the client-safe mirror of the server's VERCEL_ENV, same pattern
-  // instrumentation-client.ts's Sentry gate already uses. Unset locally
-  // (npm run dev, a local production build) and on preview deployments, so
-  // deletion stays available everywhere except the live site. Read inside
-  // the component (not module scope) purely so tests can toggle it with
-  // vi.stubEnv — Next.js inlines NEXT_PUBLIC_ vars at build time either way,
-  // so this makes no difference to the real deployed behavior.
-  const deletionDisabled = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
   const [communities, setCommunities] = useState<CommunityWithAdminEmail[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Managing every community (browsing the list, creating a new one) is a
@@ -629,9 +617,6 @@ export default function CommunityManager({ token }: { token: string }) {
         </button>
       </div>
 
-      {deletionDisabled && (
-        <p className="text-xs text-muted mb-3">Communities can&rsquo;t be deleted on the live site.</p>
-      )}
       {toggleError && <p className="text-xs text-red-700 mb-3">{toggleError}</p>}
 
       <div className="space-y-3">
@@ -718,7 +703,7 @@ export default function CommunityManager({ token }: { token: string }) {
                   {/* The default community can't be deleted at all (see
                       deleteCommunity's own doc) — no button rather than one
                       that always fails. */}
-                  {!c.isDefault && !deletionDisabled && (
+                  {!c.isDefault && (
                     <button
                       onClick={() => startDeleting(c.slug)}
                       className="text-xs font-medium text-red-600 hover:underline cursor-pointer"

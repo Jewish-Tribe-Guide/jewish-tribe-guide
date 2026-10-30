@@ -6,7 +6,7 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import { AdminBox, AdminField, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminSwitch, adminInputClass } from './AdminUI'
 import SaveBar, { useLeaveGuard } from './SaveBar'
 
 // Feedback, the first row of Site's Forms tab (the admin redesign's board
@@ -79,16 +79,13 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
 
   return (
     <div className="flex flex-col gap-5">
-      <button type="button" onClick={onBack} className="self-start inline-flex items-center min-h-11 -mt-3 text-sm font-semibold text-primary cursor-pointer">
-        ‹ Forms
-      </button>
+      <AdminBack back={{ label: 'Forms', onClick: onBack }} title="Feedback" />
       <div className="flex items-start gap-6">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
-          <header className="flex items-center gap-3">
-            <h2 className="flex-1 m-0 text-[26px] font-bold text-slate-900">Feedback</h2>
+          <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:bg-transparent md:border-0 md:p-0 md:min-h-0">
+            <span aria-hidden="true" className="flex-1 text-[15px] font-semibold text-slate-900 md:flex-none md:order-last">On the site</span>
             <AdminSwitch checked={draft.feedbackEnabled} onChange={(on) => set('feedbackEnabled', on)} label="On the site" />
-            <span aria-hidden="true" className="text-[15px] font-semibold text-slate-900">On the site</span>
-          </header>
+          </div>
           <AdminBox>
             <div className="flex flex-col gap-4 p-4">
               <AdminField label="Button in the footer">

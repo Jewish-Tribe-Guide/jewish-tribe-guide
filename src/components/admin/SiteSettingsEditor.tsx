@@ -14,8 +14,10 @@ import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SitePreview from './SitePreview'
+import DevicePreviewFrame from './DevicePreviewFrame'
+import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import SaveBar, { useLeaveGuard } from './SaveBar'
-import { AdminBox, AdminField, adminInputClass } from './AdminUI'
+import { AdminBox, AdminField, AdminPreviewButton, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/lib/siteSettings'
@@ -89,6 +91,7 @@ export default function SiteSettingsEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
   // ImageUploadField's memory of "the real original behind `value`", kept
   // here so it survives the field unmounting when the tab switches (this
   // component stays mounted across both tabs; the fields don't).
@@ -177,12 +180,24 @@ export default function SiteSettingsEditor({
     return <p className="text-sm text-muted">Loading…</p>
   }
 
+  // Narrower than the preview beside needs: the page full size, with what
+  // hasn't been saved (board 21c).
+  if (previewing) return <DevicePreviewFrame src={previewUrl(community.slug)} onClose={() => setPreviewing(false)} />
+
   return (
     <div>
       <div className="flex items-start gap-6">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {section === 'home' ? (
             <>
+              <div className="lg:hidden">
+                <AdminPreviewButton
+                  onClick={() => {
+                    writePreviewDraft({ settings: draft, sections: sectionsDraft })
+                    setPreviewing(true)
+                  }}
+                />
+              </div>
               <AdminBox title="Top of the page">
                 <div className="flex flex-col gap-4 p-4">
                   <AdminField label="Big line">

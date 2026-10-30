@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { createContext, useContext, useLayoutEffect, useState } from 'react'
 import Link from 'next/link'
 
 // The console's one look for boxes, rows and empty screens (the admin
@@ -58,6 +58,88 @@ export function AdminCount({ n }: { n: number }) {
     <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-full px-2 py-px">
       {n}
     </span>
+  )
+}
+
+/** Tells the frame a screen brings its own heading and way back, so the
+ *  frame's own heading steps aside (AdminFrame). */
+export const AdminOwnHead = createContext<((by: number) => void) | null>(null)
+
+const BACK_CHEVRON = (
+  <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="md:hidden">
+    <path d="M10 3L5 8l5 5" />
+  </svg>
+)
+
+/** A screen with a way back (boards 19b and 19c, Oct 29): on a phone the
+ *  chevron in a bar across the top, then the title; on a computer "‹ Name"
+ *  over the title. The way back goes one step up, to `back`. `phoneOnly`:
+ *  the way back is the phone's alone, where the computer's sidebar or tabs
+ *  already show it. */
+export function AdminHead({
+  back,
+  title,
+  right,
+  phoneOnly = false,
+}: {
+  back: { label: string; href?: string; onClick?: () => void }
+  title: React.ReactNode
+  right?: React.ReactNode
+  phoneOnly?: boolean
+}) {
+  const linkClass = `inline-flex items-center justify-center w-11 h-11 shrink-0 text-primary cursor-pointer md:mr-auto md:justify-start md:w-auto md:h-auto md:min-h-11 md:-mt-3 md:text-sm md:font-semibold ${
+    phoneOnly ? 'md:hidden' : ''
+  }`
+  const inner = (
+    <>
+      {BACK_CHEVRON}
+      <span className="sr-only md:not-sr-only">‹ {back.label}</span>
+    </>
+  )
+  return (
+    <header className="-mx-4 flex items-center gap-1 min-h-14 bg-white border-b border-slate-200 pl-1 pr-4 md:mx-0 md:flex-wrap md:gap-x-3 md:gap-y-0 md:min-h-0 md:bg-transparent md:border-0 md:p-0">
+      {back.href ? (
+        <Link href={back.href} className={linkClass}>
+          {inner}
+        </Link>
+      ) : (
+        <button type="button" onClick={back.onClick} className={linkClass}>
+          {inner}
+        </button>
+      )}
+      <h1 className="flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:order-last md:basis-full md:whitespace-normal md:text-[26px]">{title}</h1>
+      {right}
+    </header>
+  )
+}
+
+/** AdminHead, for a screen inside an area: the frame's own heading steps
+ *  aside while it shows. */
+export function AdminBack(props: React.ComponentProps<typeof AdminHead>) {
+  const own = useContext(AdminOwnHead)
+  useLayoutEffect(() => {
+    if (!own) return
+    own(1)
+    return () => own(-1)
+  }, [own])
+  return <AdminHead {...props} />
+}
+
+/** Where there's no room for the page beside (a phone, a narrow window):
+ *  the page full size (boards 21b and 21c). */
+export function AdminPreviewButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary cursor-pointer"
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+        <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+        <circle cx="8" cy="8" r="2" />
+      </svg>
+      Preview
+    </button>
   )
 }
 
