@@ -443,14 +443,20 @@ export function mergeSchedule(
   existing: readonly SpecialSchedule[],
   incoming: SpecialSchedule,
   expand: (day: ScheduleDay, s: SpecialSchedule) => string[] = (d) => [d],
+  keepBefore?: string,
 ): SpecialSchedule[] {
   const i = existing.findIndex((s) => s.name.toLowerCase() === incoming.name.toLowerCase() && (incoming.kind !== 'week' || s.kind !== 'week' || sameGuideWeek(s, incoming)))
   if (i === -1) return [...existing, incoming]
   const old = existing[i]
+  const ahead = (d: string) => !keepBefore || d >= keepBefore
+  const incomingAhead = incoming.minyanim.flatMap((m) => {
+    const on = m.on.filter(ahead)
+    return on.length ? [{ ...m, on }] : []
+  })
   // A week stands for every date in it: a day it has nothing for has
   // nothing, not what an earlier read of the same week had.
-  const whole = incoming.kind === 'week' ? datesBetween(incoming.from, incoming.to) : []
-  const covered = new Set([...coveredBy(incoming), ...whole].flatMap((d) => [d, ...expand(d, incoming)]))
+  const whole = incoming.kind === 'week' ? datesBetween(incoming.from, incoming.to).filter(ahead) : []
+  const covered = new Set([...coveredBy({ ...incoming, minyanim: incomingAhead }), ...whole].flatMap((d) => [d, ...expand(d, incoming)]))
   const kept = old.minyanim.flatMap((m) => {
     const on = m.on.flatMap((d) => {
       if (covered.has(d)) return []
@@ -464,7 +470,7 @@ export function mergeSchedule(
     id: old.id,
     from: old.from < incoming.from ? old.from : incoming.from,
     to: old.to > incoming.to ? old.to : incoming.to,
-    minyanim: [...kept, ...incoming.minyanim],
+    minyanim: [...kept, ...incomingAhead],
   }
   return existing.map((s, j) => (j === i ? merged : s))
 }
@@ -619,6 +625,7 @@ export function applyUpdate(
     evenIfSame = false,
     whole = false,
     onlyRead,
+    keepBefore,
   }: {
     newId?: () => string
     now?: number
@@ -636,11 +643,13 @@ export function applyUpdate(
      *  times at all, as no minyan that week. */
     whole?: boolean
     /** A week a shul's own page or newsletter gives, read with no one to
-     *  look it over first: it holds only the times read, never a usual one
-     *  it didn't mention, and goes into the listing's copy of that week,
-     *  days before `today` left alone (mergeReadWeek). A person's paste
-     *  sees every row it keeps, and is posted as they left it. */
+     *  look it over first: it goes into the listing's copy of that week,
+     *  days before `today` left alone (mergeReadWeek). */
     onlyRead?: { today: string }
+    /** A person's paste: the days before this are left as the listing has
+     *  them. Lower Merion's week, pasted on a Friday by weekday, lost
+     *  Thursday's Late Maariv (the user, Oct 31). */
+    keepBefore?: string
   } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
@@ -733,16 +742,15 @@ export function applyUpdate(
   // each of the guide's weeks it reaches on its own.
   for (const piece of update.kind === 'week' ? guideWeeks(update) : []) {
     if (!piece.from || !piece.to) continue
-    const posting = piece.rows.some((r) => r.status !== 'gone' || r.keep)
+    // What was read, or a person kept: never a usual time it left out, which
+    // would then read as confirmed for that date (the user, Oct 28 and 31).
+    const minyanimOn = piece.rows.filter((r) => r.status === 'same' || r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && r.keep)).map(onDate)
     const heading = weekKeepsHeading({ from: piece.from, to: piece.to }) ? piece.title?.trim() : null
     const name = (weekName || heading || `Times for ${dateText(piece.from)}${piece.to !== piece.from ? ` – ${dateText(piece.to)}` : ''}`).slice(0, 60)
     // A week the listing has already: what was read is compared with it,
     // whether or not it matches the usual times.
     const listed = onlyRead ? ownWeek(schedules, { name, from: piece.from, to: piece.to, postedBy }) : undefined
-    if (!changesAnything(piece) && !(evenIfSame && posting) && !whole && !listed) continue
-    // Read only: what the page or newsletter said, never a usual time it
-    // left out (status kept). A person's own week keeps what they kept.
-    const minyanimOn = piece.rows.filter((r) => (onlyRead ? r.status === 'same' || r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && r.keep) : r.status !== 'gone' || r.keep)).map(onDate)
+    if (!changesAnything(piece) && !(evenIfSame && minyanimOn.length) && !whole && !listed) continue
     // A week from the newsletter or a person wins over one read off the
     // website for the same days (the user, Oct 20): the website's come off.
     if (!postedBy) nextSchedules = withoutWebsiteDays(nextSchedules, new Set(datesBetween(piece.from, piece.to)))
@@ -764,7 +772,7 @@ export function applyUpdate(
       nextSchedules = mergeReadWeek(nextSchedules, week, onlyRead.today)
       changes.push(...readWeekLines(before, ownWeek(nextSchedules, week)))
     } else {
-      nextSchedules = mergeSchedule(nextSchedules, week)
+      nextSchedules = mergeSchedule(nextSchedules, week, undefined, keepBefore)
       if (whole && !minyanimOn.length) changes.push(`${name}: no minyan`)
       for (const r of piece.rows) {
         if (r.status === 'changed') changes.push(`${name}: ${rowText(r)}, usually ${r.was}`)

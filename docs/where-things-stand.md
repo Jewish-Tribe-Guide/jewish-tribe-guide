@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 29, 2026.
+Last updated: Oct 31, 2026.
 
 ## The branch
 
@@ -2031,6 +2031,37 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Building: admin for a newcomer, and watches that work (started Oct 31, on `redesign/oct18-fixes`)
+
+The user's 21-point braindump, agreed Oct 31. Goal for the week: admin simple
+and fully usable for a newcomer, and watches that work. Order: the week rule;
+back buttons and false "none" changes; the one-list change view; draw Watches
+and Places, then build them; category switches, home wording, hiding forms.
+
+**One rule for a week: it holds dated rows only, never a usual time.**
+
+- Done: one message can make two weeks. Mekor's Oct 30 newsletter gave this
+  Shabbos and "Weekday Services: November 1 to November 6". The dates were
+  only in a heading, so `weekdaysOnGuideWeek` moved the times onto the current
+  week (Nov 1 on Oct 25, Nov 6 on Oct 30), and they went into last week's post,
+  which shares the heading "Shabbat Schedule". A message that writes a read
+  date anywhere now stays on its dates, and `applyUpdate` posts one schedule
+  per guide week, from any source.
+- Done: a pasted week no longer takes the usual times it left out (Lower
+  Merion's 17 rows), and a paste leaves the days before today alone (its lost
+  Thursday Late Maariv). `keepBefore` on the shul card's route.
+- Not confirmed: why Mekor's 9:15 on Oct 31 was never filed. With the fix, a
+  read 9:15 on that date is posted (tested). There's no AI key in `.env.local`
+  to replay the real read, so if it happens again, the reader dropped it.
+
+**After this, once the user follows up, not before:** step back and assess
+whether the synagogue admin logic is patches on patches and can be rewritten
+simpler ("it really shouldn't be that complicated").
+
+**Waiting for a yes on the live site:** Mekor's Nov 1-6 times were never
+stored, so Mekor shows its usual times from Nov 1 until they are, or until a
+new newsletter. Its post "Times for Oct 23 – Oct 30" also runs to Oct 31.
 
 ## Done Oct 29: deleting a community clears all of it, and works on the live site (on `redesign/oct18-fixes`)
 

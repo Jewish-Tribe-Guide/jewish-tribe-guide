@@ -125,6 +125,16 @@ describe('Update their times', () => {
     expect(sent.update.rows.find((r) => r.status === 'changed')?.everyWeek).toBe(true)
   })
 
+  it('a week shows what it gave, not the usual times it left out', async () => {
+    const part: RegularReading = { ...BEREISHIS, complete: false, times: [BEREISHIS.times[1]] }
+    const { fetchMock } = setup(compareTimes(MEKOR, part, { season: 'summer', zmanim: ZMANIM }))
+    restore = () => fetchMock.mockRestore()
+    await paste()
+    expect(screen.getAllByTestId('result-day')).toHaveLength(1)
+    expect(within(screen.getByTestId('result-day')).getByText('9 AM')).toBeTruthy()
+    expect(screen.queryByText('12:20 PM')).toBeNull()
+  })
+
   it('tap a time to fix it: it shows as a change from what the shul had', async () => {
     const { fetchMock } = setup(compareTimes(MEKOR, WINTER, { season: 'summer' }))
     restore = () => fetchMock.mockRestore()

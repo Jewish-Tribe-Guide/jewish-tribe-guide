@@ -283,13 +283,10 @@ describe('one Shabbos’s times', () => {
     const { schedules, changes, minyanim } = applyUpdate(MEKOR, [], r, { newId, postedBy: 'website', evenIfSame: true, name: 'Times for Oct 4 – Oct 10' })
     expect(minyanim.map((m) => m.time).sort()).toEqual(MEKOR.map((m) => m.time).sort())
     expect(schedules).toEqual([expect.objectContaining({ name: 'Times for Oct 4 – Oct 10', from: '2026-10-09', to: '2026-10-10', kind: 'week', mode: 'replace', postedBy: 'website' })])
-    // The usual times it gave, and the ones it didn't mention, kept.
+    // The usual times it gave, and none it didn't mention.
     expect(schedules[0].minyanim.map((m) => `${m.on[0]} ${m.tefillah} ${m.time}`)).toEqual([
       '2026-10-09 mincha_maariv 6:12pm',
-      '2026-10-09 mincha_maariv 7:00pm',
       '2026-10-10 shacharis 9:15am',
-      '2026-10-10 mincha 12:20pm',
-      '2026-10-10 mincha_maariv 30 min before Sunset',
     ])
     expect(changes[0]).toBe('Times for Oct 4 – Oct 10: the same as their usual times, posted as this week’s schedule')
     // Nothing to post, nothing posted.
@@ -412,6 +409,45 @@ describe('one message, two of the guide’s weeks', () => {
   it('a week read again goes into its own copy', () => {
     const first = applyUpdate(MEKOR, [lastWeek], u, { newId, onlyRead: { today: '2026-10-30' } }).schedules
     expect(shown(applyUpdate(MEKOR, first, u, { newId, onlyRead: { today: '2026-10-30' } }).schedules)).toEqual(shown(first))
+  })
+})
+
+// Lower Merion, pasted Fri Oct 30: 17 of its usual times went into Sun–Fri,
+// and Thursday's Late Maariv, posted the day before, was lost.
+describe('a person’s paste of a week', () => {
+  const USUAL: Minyan[] = [
+    { id: 'u1', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+    { id: 'u2', tefillah: 'maariv', days: ['mon', 'thu'], time: '8:00pm' },
+    { id: 'u3', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+  ]
+  const PASTE: RegularReading = {
+    kind: 'week',
+    complete: false,
+    season: null,
+    title: null,
+    startsOn: null,
+    from: '2026-10-25',
+    to: '2026-10-31',
+    times: [t({ tefillah: 'maariv', date: '2026-10-26', time: '8:30pm' }), t({ tefillah: 'shacharis', date: '2026-10-31', time: '9:00am' })],
+  }
+  const u = compareTimes(USUAL, PASTE, { season: null, newId })
+  const at = (s: SpecialSchedule) => s.minyanim.map((m) => `${m.on.join(',')} ${m.tefillah} ${m.time}${m.notes ? ` ${m.notes}` : ''}`)
+
+  it('holds what it gave, a time at the usual time included, and no usual time it left out', () => {
+    expect(u.rows.some((r) => r.status === 'kept')).toBe(true)
+    expect(at(applyUpdate(USUAL, [], u, { newId }).schedules[0])).toEqual(['2026-10-26 maariv 8:30pm', '2026-10-31 shacharis 9:00am'])
+  })
+
+  it('with nothing read, posts nothing, even as this week’s schedule', () => {
+    const none = compareTimes(USUAL, { ...PASTE, times: [] }, { season: null, newId })
+    expect(applyUpdate(USUAL, [], none, { newId, evenIfSame: true }).schedules).toEqual([])
+  })
+
+  it('leaves the days before today as the listing has them', () => {
+    const listed: SpecialSchedule = { id: 'w', name: 'Times for Oct 25 – Oct 31', from: '2026-10-25', to: '2026-10-31', mode: 'replace', kind: 'week', minyanim: [{ id: 'l', tefillah: 'maariv', on: ['2026-10-29'], time: '9:00pm', notes: 'Late' }] }
+    const late = applyUpdate(USUAL, [listed], u, { newId, keepBefore: '2026-10-30' }).schedules
+    expect(late).toHaveLength(1)
+    expect(at(late[0])).toEqual(['2026-10-29 maariv 9:00pm Late', '2026-10-31 shacharis 9:00am'])
   })
 })
 
