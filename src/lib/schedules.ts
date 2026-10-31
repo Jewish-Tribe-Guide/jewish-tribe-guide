@@ -427,16 +427,21 @@ export function usualJoinLink(regular: readonly Minyan[], m: Pick<Minyan, 'tefil
 }
 
 /** A week post's minyanim as rows on weekdays, the way its box shows them
- *  and its Edit lists them. */
-export function weekPostRows(post: SpecialSchedule): Minyan[] {
+ *  and its Edit lists them. `within`: only its times on those dates, as a
+ *  post that runs across two of the guide's weeks can't say "Saturday" for
+ *  both (Mekor's Oct 24 9:15 came up as this Shabbos's, Oct 31). */
+export function weekPostRows(post: SpecialSchedule, within?: Pick<SpecialSchedule, 'from' | 'to'>): Minyan[] {
   return post.minyanim.flatMap((m) => {
-    const days = m.on.flatMap((d) => (isDate(d) ? [weekdayOfDate(d)] : (DAY_KEYS as readonly string[]).includes(d) ? [d as DayKey] : []))
+    const on = within ? m.on.filter((d) => isInside(d, within)) : m.on
+    const days = on.flatMap((d) => (isDate(d) ? [weekdayOfDate(d)] : (DAY_KEYS as readonly string[]).includes(d) ? [d as DayKey] : []))
     if (days.length === 0) return []
     const { on: _on, ...rest } = m
     void _on
     return [{ ...rest, days: [...new Set(days)] }]
   })
 }
+
+const isInside = (d: string, within: Pick<SpecialSchedule, 'from' | 'to'>) => !isDate(d) || (d >= within.from && d <= within.to)
 
 // Field by field, whatever order they were set in.
 const plainRow = (m: object) => JSON.stringify(Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== '').sort(([a], [b]) => a.localeCompare(b))))
@@ -447,22 +452,36 @@ const plainRow = (m: object) => JSON.stringify(Object.fromEntries(Object.entries
  * on the post's own dates for its weekdays; a row nobody changed stays
  * exactly as stored, so opening the editor and sending nothing changes
  * nothing.
+ *
+ * `within`: the rows are that week's, and go on its dates, one date for a
+ * weekday. What the post has outside it stays as stored, and the post grows
+ * to hold a day added inside it.
  */
-export function withWeekRows(schedules: readonly SpecialSchedule[], postId: string, rows: readonly Minyan[]): SpecialSchedule[] {
+export function withWeekRows(schedules: readonly SpecialSchedule[], postId: string, rows: readonly Minyan[], within?: Pick<SpecialSchedule, 'from' | 'to'>): SpecialSchedule[] {
   return schedules.map((post) => {
     if (post.id !== postId) return post
-    const dates = datesOf(post)
-    const stored = new Map(post.minyanim.map((m) => [m.id, m]))
-    const minyanim = rows.flatMap((row): ScheduleMinyan[] => {
-      const was = stored.get(row.id)
-      if (was && weekPostRows({ ...post, minyanim: [was] }).some((r) => plainRow(r) === plainRow(row))) return [was]
+    const dates = datesOf(within ?? post)
+    const onDates = (row: Minyan): ScheduleMinyan[] => {
       const on = dates.filter((d) => row.days.includes(weekdayOfDate(d)))
       if (on.length === 0) return []
       const { days: _days, ...rest } = row
       void _days
       return [{ ...rest, on }]
+    }
+    const rowById = new Map(rows.map((r) => [r.id, r]))
+    const kept = post.minyanim.flatMap((was): ScheduleMinyan[] => {
+      const row = rowById.get(was.id)
+      if (row && weekPostRows({ ...post, minyanim: [was] }, within).some((r) => plainRow(r) === plainRow(row))) return [was]
+      const outside = within ? was.on.filter((d) => !isInside(d, within)) : []
+      if (!row) return outside.length === 0 ? [] : [{ ...was, on: outside }]
+      // A time changed this week and not on the other week's date: two minyanim now.
+      return [...onDates(row), ...(outside.length > 0 ? [{ ...was, id: `${was.id}-${outside[0]}`, on: outside }] : [])]
     })
-    return { ...post, minyanim }
+    const stored = new Set(post.minyanim.map((m) => m.id))
+    const minyanim = [...kept, ...rows.filter((r) => !stored.has(r.id)).flatMap(onDates)]
+    if (!within) return { ...post, minyanim }
+    const held = minyanim.flatMap((m) => m.on.filter(isDate))
+    return { ...post, minyanim, from: [post.from, ...held].sort()[0], to: [post.to, ...held].sort().at(-1)! }
   })
 }
 

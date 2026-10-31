@@ -232,6 +232,22 @@ describe('a shul’s This week’s schedule row', () => {
     expect(rowSummary(row(times), values(times), timeText)).toBe('Oct 25 – Oct 31 · Shacharis 9:30 AM')
   })
 
+  // Mekor's post ran Oct 23 – Oct 31: its Oct 24 time isn't this week's.
+  it('goes by the times dated in the week, not all the post has', () => {
+    const across = { minyanim_schedules: [{ ...post({ minyanim: [{ id: 'y', tefillah: 'shacharis', on: ['2026-10-24'], time: '9:15am' }] }), from: '2026-10-23' }] }
+    expect(rowIsEmpty(row(across), values(across))).toBe(true)
+    expect(rowSummary(row(across), values(across), timeText)).toBe('')
+    const both = { minyanim_schedules: [{ ...post({ minyanim: [{ id: 'y', tefillah: 'shacharis', on: ['2026-10-24'], time: '9:15am' }, { id: 'x', tefillah: 'mincha', on: ['2026-10-26'], time: '4:45pm' }] }), from: '2026-10-23' }] }
+    expect(rowSummary(row(both), values(both), timeText)).toBe('Oct 25 – Oct 31 · Mincha 4:45 PM')
+  })
+
+  it('an admin also has next week’s', () => {
+    const next = { from: '2026-11-01', to: '2026-11-07' }
+    const got = editorRows(SHUL, {}, { week, nextWeek: next }).find((r) => r.id === 'minyans:next_week')!
+    expect(got).toMatchObject({ title: 'Next week’s schedule', box: 'this_week', week: next })
+    expect(editorRows(SHUL, {}, { week }).some((r) => r.id === 'minyans:next_week')).toBe(false)
+  })
+
   it('is Changed when the week is', () => {
     const was = { id: 'r', name: 'A place', category: 'synagogue' } as unknown as DirectoryResource
     expect(rowChanged(row({}), was, values({}))).toBe(false)

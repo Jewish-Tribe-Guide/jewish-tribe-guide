@@ -2051,6 +2051,15 @@ and Places, then build them; category switches, home wording, hiding forms.
 - Done: a pasted week no longer takes the usual times it left out (Lower
   Merion's 17 rows), and a paste leaves the days before today alone (its lost
   Thursday Late Maariv). `keepBefore` on the shul card's route.
+- Done: editing a week goes by its dates. The row shows only the times dated
+  in that guide week, so a post running across two weeks (Mekor's Oct 23 – 31)
+  no longer shows Oct 24's 9:15 as this Saturday's, and a time set there goes on
+  that one date. Nothing posted opens empty: this replaces the Oct 23 drawing's
+  "starts from the usual times". Admins now have the row in Places and in "Edit,
+  then update", plus "Next week's schedule". Not changed: when two posts cover a
+  week the row edits the one that wins, though the listing can show days from
+  the other, and the To do board's week Edit (`BoxEditSheet`) still edits a post
+  whole.
 - Not confirmed: why Mekor's 9:15 on Oct 31 was never filed. With the fix, a
   read 9:15 on that date is posted (tested). There's no AI key in `.env.local`
   to replay the real read, so if it happens again, the reader dropped it.

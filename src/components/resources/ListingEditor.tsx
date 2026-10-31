@@ -10,7 +10,7 @@ import { sameFieldValue } from '@/lib/listingDiff'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { mergeMinyanimBox, minyanimForBox } from '@/lib/minyanimBox'
 import { readSchedules, schedulesKey, weekPostDays } from '@/lib/schedules'
-import { isNoMinyan, usualWeekRows, weekDates, weekPostFor, weekRowsFor, withNoMinyan, withWeekTimes } from '@/lib/thisWeekEdit'
+import { isNoMinyan, weekDates, weekPostFor, weekRowsFor, withNoMinyan, withWeekTimes } from '@/lib/thisWeekEdit'
 import { useEditWeek } from '@/lib/useEditWeek'
 import { minyanWriting, timeText } from '@/lib/minyanText'
 import { routes } from '@/lib/routes'
@@ -208,6 +208,8 @@ const asButtons = (f: CategoryField) => f.type === 'select' && !f.allowOther && 
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 
+const noMinyanText = (r: EditorRow) => `No minyan ${r.id === 'minyans:next_week' ? 'next' : 'this'} week`
+
 export default function ListingEditor({
   item: itemProp,
   category,
@@ -297,10 +299,10 @@ export default function ListingEditor({
   })
 
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
-  // A shul's "This week's schedule" row, on a listing's own edit, not one
-  // box's or an admin's (thisWeekEdit.ts).
-  const thisWeek = useEditWeek(!creating && !onlyRows && !adminSave && category.detailFields.some((f) => f.type === 'minyanim'), item.geo)
-  const rows = editorRows(category, details, { week: thisWeek?.week })
+  // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
+  // next week's too. One box's own Edit has them only if it's that box.
+  const thisWeek = useEditWeek(!creating && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
+  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -619,26 +621,25 @@ export default function ListingEditor({
       )
     }
     if (r.kind === 'minyans' && r.week && thisWeek) {
-      // The week the guide has, else the usual times to start from; a new
-      // week only once they differ (withWeekTimes).
+      // The times the guide has dated in the week, never the usual ones; a
+      // new week only once it has one (withWeekTimes).
       const f = r.fields[0]
       const sk = schedulesKey(f.key)
       const week = r.week
-      const usual = usualWeekRows(draftMinyanim(f.key), thisWeek.season, thisWeek.anchors)
       const post = weekPostFor(readSchedules(details[sk]), week)
       return (
         <MinyanBoxEditor
-          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), usual)}
-          initial={weekRowsFor(post, usual)}
+          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), week)}
+          initial={weekRowsFor(post, week)}
           box="this_week"
           boxTitle={r.title}
           heading={weekDates(week)}
-          empty={isNoMinyan(post) ? 'No minyan this week' : undefined}
+          empty={isNoMinyan(post) ? noMinyanText(r) : undefined}
           place={item.name || draft.name}
           writing={minyanWriting}
           dayChoices={weekPostDays(week)}
           onStep={stepFor[f.key]}
-          onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { usual, id: crypto.randomUUID(), now: new Date().toISOString() }))}
+          onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { id: crypto.randomUUID(), now: new Date().toISOString() }))}
           send={() => null}
         />
       )
@@ -723,7 +724,7 @@ export default function ListingEditor({
         }}
         className="min-h-11 w-full cursor-pointer text-center text-[15px] font-bold text-primary hover:underline"
       >
-        No minyan this week
+        {noMinyanText(r)}
       </button>
     )
   }

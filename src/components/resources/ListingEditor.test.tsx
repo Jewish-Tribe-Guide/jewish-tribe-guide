@@ -461,7 +461,8 @@ describe('ListingEditor — boxes with their own editors', () => {
     renderWithProviders(<ListingEditor item={shul} category={SHUL} onClose={() => {}} />)
     await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'This week’s schedule' }))
     expect(screen.getByText('Oct 11 – Oct 17')).toBeInTheDocument()
-    expect(screen.getByTestId('minyan-box-list')).toHaveTextContent('9 AM')
+    // A week holds its own times, never the usual ones (the user, Oct 31).
+    expect(screen.getByTestId('minyan-box-list')).not.toHaveTextContent('9 AM')
     await u.click(done())
     expect(sendButton()).toHaveTextContent('No changes yet')
 
@@ -482,6 +483,32 @@ describe('ListingEditor — boxes with their own editors', () => {
     await waitFor(() => expect(sends()).toHaveLength(1))
     const [week] = JSON.parse(sends()[0][1].body).payload.details.minyanim_schedules
     expect(week).toMatchObject({ kind: 'week', from: '2026-10-11', to: '2026-10-17', whole: true, minyanim: [] })
+  })
+
+  // The user, Oct 31: "I can't actually click on this week's schedule."
+  it('an admin’s edit has the week’s row, and next week’s, and saves what’s put in them', async () => {
+    const u = user()
+    const via = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    const shul = makeListing({
+      id: 'mi',
+      category: 'synagogue',
+      name: 'Mekor',
+      minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }],
+      minyanim_schedules: [{ id: 'p', name: 'Times', from: '2026-10-09', to: '2026-10-17', mode: 'replace', kind: 'week', minyanim: [{ id: 'old', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:15am' }, { id: 'now', tefillah: 'mincha', on: ['2026-10-12'], time: '4:45pm' }] }],
+    })
+    renderWithProviders(<ListingEditor item={shul} category={SHUL} onClose={() => {}} adminSave={{ label: 'Update the listing', via, onSaved: () => {} }} />)
+    expect(screen.getAllByRole('button', { name: /Next week’s schedule/ }).length).toBeGreaterThan(0)
+    await u.click(row('minyans:this_week'))
+    // The Oct 10 time is last week's, though the post runs on into this one.
+    const list = screen.getByTestId('minyan-box-list')
+    expect(list).toHaveTextContent('4:45 PM')
+    expect(list).not.toHaveTextContent('9:15 AM')
+    await u.click(screen.getByRole('button', { name: 'No minyan this week' }))
+    await u.click(screen.getByRole('button', { name: 'Update the listing' }))
+    await waitFor(() => expect(via).toHaveBeenCalled())
+    const schedules = via.mock.calls[0][0].payload.details.minyanim_schedules
+    expect(schedules.find((x: { id: string }) => x.id === 'p').minyanim.map((m: { id: string }) => m.id)).toEqual(['old'])
+    expect(schedules.find((x: { id: string; whole?: boolean }) => x.whole)).toMatchObject({ from: '2026-10-11', to: '2026-10-17', minyanim: [] })
   })
 
   it('a mikvah’s section: its hours and note, and a phone only once someone adds one', async () => {

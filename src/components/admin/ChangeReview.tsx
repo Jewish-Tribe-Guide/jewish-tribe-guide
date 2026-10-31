@@ -8,7 +8,9 @@ import { editorRows } from '@/lib/editorRows'
 import { boxChangeCount, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
 import { minyanWriting } from '@/lib/minyanText'
 import { isMinyanim, type Minyan } from '@/lib/davening'
-import { schedulesKey } from '@/lib/schedules'
+import { readSchedules, schedulesKey } from '@/lib/schedules'
+import { weekDiffers } from '@/lib/thisWeekEdit'
+import { useEditWeek } from '@/lib/useEditWeek'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { normalizeRow } from '@/lib/resourceShape'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -79,14 +81,16 @@ export default function ChangeReview({
   // The editor's rows the change touches: a shul's times by the box they
   // changed in.
   const changedKeys = [...new Set(changed.map((r) => fieldKeyFor(r.key, fields)).filter((k): k is string => !!k))]
+  const weeks = useEditWeek(fields.some((f) => f.type === 'minyanim'))
   const onlyRows = (() => {
     const before = (s.current?.details ?? {}) as Record<string, unknown>
-    const rows = editorRows(category, sent.details).filter((r) => {
+    const rows = editorRows(category, sent.details, { week: weeks?.week, nextWeek: weeks?.next }).filter((r) => {
       if (r.kind === 'name' && changedKeys.includes('name')) return true
       if (r.id === 'contact' && (changedKeys.includes('address') || changedKeys.includes('phone'))) return true
       if (!r.fields.some((f) => changedKeys.includes(f.key))) return false
       if (r.kind !== 'minyans' || !r.box) return true
       const key = r.fields[0].key
+      if (r.week) return weekDiffers(readSchedules(before[schedulesKey(key)]), readSchedules(sent.details[schedulesKey(key)]), r.week)
       const was = isMinyanim(before[key]) ? (before[key] as Minyan[]) : []
       const now = isMinyanim(sent.details[key]) ? (sent.details[key] as Minyan[]) : []
       return boxChangeCount(minyanimForBox(was, r.box), minyanimForBox(now, r.box)) > 0
