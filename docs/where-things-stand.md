@@ -2105,9 +2105,9 @@ Support and Volunteer tiles off on Philly needs a yes on the live site.
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
 
-**Waiting for a yes on the live site:** Mekor's Nov 1-6 times were never
-stored, so Mekor shows its usual times from Nov 1 until they are, or until a
-new newsletter. Its post "Times for Oct 23 – Oct 30" also runs to Oct 31.
+**Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
+are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
+Oct 30" runs to Oct 31 and ends on its own.
 
 ## Done Oct 29: deleting a community clears all of it, and works on the live site (on `redesign/oct18-fixes`)
 
