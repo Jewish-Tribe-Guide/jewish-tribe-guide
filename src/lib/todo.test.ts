@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EnrichedSubmission } from '@/types'
 import type { ClassifiedMiss } from './missedSearches'
 import { makeCategory } from '@/test/providerFixtures'
-import { changeWhat, isNewPlace, openSearches, responseSummary, splitSubmissions, submissionLine, teachable, todoCount, watchesLine, type TodoReading } from './todo'
+import { changeWhat, isNewPlace, openSearches, responseSummary, splitSubmissions, submissionLine, teachable, todoCount, unmatchedPlaces, watchesLine, type TodoReading } from './todo'
 
 function sub(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmission {
   return {
@@ -147,5 +147,15 @@ describe('watchesLine', () => {
   })
   it('leaves the time off before anything has run', () => {
     expect(watchesLine([{ active: true, lastRunAt: null }])).toBe('1 page read each night')
+  })
+})
+
+describe('places to find on Google', () => {
+  const p = (id: string, matched: boolean, notOnGoogle: string | null) => ({ id, name: id, category: 'mikvah', matched, notOnGoogle })
+  it('only a place with no match that nobody has said is not on Google', () => {
+    expect(unmatchedPlaces([p('a', false, null), p('b', true, null), p('c', false, '2026-10-01')])).toEqual([{ id: 'a', name: 'a', category: 'mikvah' }])
+  })
+  it('counts as something to do', () => {
+    expect(todoCount({ submissions: [], responses: [], unmatched: [{}] })).toBe(1)
   })
 })

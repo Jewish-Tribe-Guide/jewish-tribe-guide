@@ -13,6 +13,8 @@ import { isIgnoredSender, isNewsletterWatch, NEWSLETTER_IGNORED_CREATOR, NEWSLET
 import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { jobPageFor } from '@/lib/watchFindings'
+import { JOB_OFF_CREATOR, isJobOff, jobOffUrl } from '@/lib/jobOff'
+import { NIGHT_KINDS } from '@/lib/nightKinds'
 
 // GET  /api/admin/watches — the "Watches" tab: every page this community's
 //      guide reads on its own (watch, migration 070), and the listings a
@@ -40,6 +42,8 @@ import { jobPageFor } from '@/lib/watchFindings'
 //      waiting in the guide's inbox are read within the hour.
 // POST /api/admin/watches  body: { action: 'ignore', id }
 //      A sender that isn't a shul: its emails are skipped. Remove undoes it.
+// POST /api/admin/watches  body: { action: 'job-off' | 'job-on', kind }
+//      Turns a whole job off or on for this community (jobOff.ts).
 
 export const maxDuration = 60
 
@@ -91,6 +95,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (action === 'job-off' || action === 'job-on') {
+      const kind = NIGHT_KINDS.find((k) => k.id === body?.kind)?.id
+      if (!kind) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
+      const { watches } = await listWatches(community.slug)
+      const marker = watches.find((w) => isJobOff(w) && w.url === jobOffUrl(kind))
+      if (action === 'job-off' && !marker) await addWatch(community.slug, { kind: 'website', url: jobOffUrl(kind), resourceId: null, label: `${kind} turned off`, createdBy: JOB_OFF_CREATOR, active: false })
+      if (action === 'job-on' && marker) await removeWatch(community.slug, marker.id)
+      return Response.json({ ok: true })
+    }
+
     const listingIn = async (resourceId: unknown) =>
       typeof resourceId === 'string' && UUID.test(resourceId) && (await listApprovedResources(community.slug)).some((l) => l.id === resourceId)
 

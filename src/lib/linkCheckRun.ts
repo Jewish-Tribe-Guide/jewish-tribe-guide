@@ -6,6 +6,7 @@ import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStor
 import { dnsLookup, isPrivateAddress, type Lookup } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { listingSlug } from '@/lib/listingSlug'
+import { jobsOff } from './jobOff'
 import { routes } from '@/lib/routes'
 import { answerOf, checkedRecord, isLinkCheck, LINK_CHECK_CREATOR, linkCheckUrl, linksToCheck, standingOf, type LinkAnswer, type LinkStanding, type ListingLink } from '@/lib/linkCheck'
 import type { Watch } from '@/lib/watches'
@@ -140,6 +141,8 @@ export async function checkAllLinks({ stopAt = Date.now() + 240_000, ...opts }: 
   for (const { slug } of (data ?? []) as { slug: string }[]) {
     const { links, records, available } = await communityLinks(slug)
     if (!available) continue
+    // Turned off here: nothing's opened (jobOff.ts).
+    if (jobsOff((await listWatches(slug)).watches).includes('links')) continue
     const shown = new Set(links.map((l) => linkCheckUrl(l.resourceId, l.key)))
     for (const r of records) if (!shown.has(r.url)) await removeWatch(slug, r.id)
     // Those checked longest ago first, so a run cut short gets to the rest next.

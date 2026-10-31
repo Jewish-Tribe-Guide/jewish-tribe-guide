@@ -16,7 +16,11 @@ import type { LinkStanding } from '@/lib/linkCheck'
 import type { Hospital } from './watchJobTypes'
 import type { HoursPlace } from './watchJobTypes'
 import type { KosherLoaded } from './watchJobTypes'
-import type { NightlyRunsLoaded } from './NightlyRuns'
+import type { AdminPlace } from '@/lib/adminPlaces'
+import type { NightKindId } from '@/lib/jobRuns'
+import { placeTroubles } from '@/lib/watchPlaces'
+import { placeCoverage, type CoverageIn, type PlaceCoverage } from '@/lib/fieldCoverage'
+import type { NightlyRunsLoaded } from './JobPage'
 
 // Every job's places, as the Watches tab and its pages by kind of place
 // read them (watchPlaces.ts). Each fills in as its own read comes back,
@@ -40,6 +44,50 @@ export type Jobs = {
   /** The weekly link check's: every link a listing shows that it opens. */
   links?: LinkStanding[] | null
   runs?: NightlyRunsLoaded | null
+  /** Every listing, for what checks each of its fields (fieldCoverage.ts). */
+  places?: AdminPlace[] | null
+}
+
+/** What's gone wrong with a check of each place; a job turned off has none. */
+export function troublesOf(jobs: Jobs, now: number): Map<string, string[]> {
+  const off = jobs.runs?.off ?? []
+  const unless = <T,>(kind: NightKindId, list: T | null | undefined) => (off.includes(kind) ? null : (list ?? null))
+  return placeTroubles(
+    {
+      google: unless('google', jobs.google?.places),
+      dishes: unless('menus', jobs.dishes),
+      hours: unless('hours', jobs.hours?.places),
+      times: unless('times', jobs.times?.places),
+      sites: unless('sites', jobs.sites),
+      hospitals: unless('hospitals', jobs.hospitals),
+      links: unless('links', jobs.links),
+    },
+    now,
+  )
+}
+
+/** What checks each listing on the site, once every job has answered; a job
+ *  that didn't load counts as checking nothing, so jobsNotLoaded says so. */
+export function coverageOf(jobs: Jobs): Map<string, PlaceCoverage> | null {
+  if (!jobs.categories || !jobs.places || !jobsSettled(jobs)) return null
+  const input: CoverageIn = {
+    google: jobs.google?.places ?? null,
+    times: jobs.times?.places ?? null,
+    hours: jobs.hours?.places ?? null,
+    sites: jobs.sites ?? null,
+    dishes: jobs.dishes ?? null,
+    hospitals: jobs.hospitals ?? null,
+    kosher: jobs.kosher?.places ?? null,
+    links: jobs.links ?? null,
+    off: jobs.runs?.off ?? [],
+  }
+  const categories = new Map(jobs.categories.map((c) => [c.id, c]))
+  const out = new Map<string, PlaceCoverage>()
+  for (const p of jobs.places) {
+    const category = categories.get(p.category)
+    if (p.status === 'approved' && category) out.set(p.id, placeCoverage(p.listing as unknown as Record<string, unknown> & { id: string }, category, input))
+  }
+  return out
 }
 
 const lastSeen = new Map<string, Jobs>()
@@ -78,6 +126,7 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
       get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
       get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
       get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
+      get<{ places: AdminPlace[] }>('/api/admin/listings').then((d) => (d ? fill('places', d.places ?? null) : failed('places'))),
     ])
   }, [token, community])
 

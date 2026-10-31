@@ -31,7 +31,7 @@ const Chevron = () => (
 
 /** `place`: the place a link opened it on (What's tracked's lines,
  *  ?place=), opened on its tab until another is picked. */
-export default function WatchKindPage({ token, category, place }: { token: string; category: string; place?: string | null }) {
+export default function WatchKindPage({ token, category, place, fromTodo = false }: { token: string; category: string; place?: string | null; fromTodo?: boolean }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
   const { jobs, reload } = useWatchJobsAndReload(token)
@@ -45,7 +45,7 @@ export default function WatchKindPage({ token, category, place }: { token: strin
   const all = kindsOf(jobs, base, now)
   const kind = all?.kinds.find((k) => k.id === category)
 
-  const back = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title={kind?.label ?? ''} />
+  const back = <AdminBack back={fromTodo ? { label: 'To do', href: base } : { label: 'Watches', href: `${base}/watches` }} title={kind?.label ?? ''} />
   if (jobs.categories === null || jobs.google === null) return <div className="space-y-4">{back}<p className="text-sm text-red-700">Couldn&rsquo;t load the places.</p></div>
   if (!all || !all.settled) return <div className="space-y-4">{back}<p className="text-sm text-muted">Loading…</p></div>
   if (!kind) return <div className="space-y-4">{back}<p className="text-sm text-slate-600">Nothing of this kind is watched.</p></div>

@@ -2081,6 +2081,26 @@ pick them (`changeLines.ts`). A new place still uses the old review.
   chevron; Settings has one to To do on a phone. Not changed: "Edit, then
   update" isn't a history entry, so swiping back from it leaves the change.
 
+**Watches and Places.** Done, to the approved boards (canvas VKdnqd5xkP37DP1DKcN5qy).
+
+- Watches: one sentence, Needs fixing, Jobs, Needs one step, + Add a watch. A
+  job has its own page: last night, schedule, Not read last night, All tracked,
+  Last 14 nights as a check or an X, + Add, Turn off this job. Off is a marker
+  row per community (`jobOff.ts`), no migration; every cron and run skips it.
+- Places: search and three menus, On the site, Category, Checked by. A place
+  stays in the list and says what isn't watched, the main thing first. Edit
+  listing shows what checks each row.
+- Find on Google is on To do now, and counts toward the To do number.
+- Differs from the boards: "+ Add a place" is on its own row, because the title
+  belongs to the admin layout and on a phone shares it with the Settings gear. WhatsApp isn't listed as Not watched. Contact is one
+  row in Edit listing. Setup, Add a watch and the turn-off confirm weren't drawn.
+
+**Next:** category switches, home wording, hiding forms. Map, Candle Lighting
+and Eruv become switches, default on; Jewish Medical Resources goes; home rows
+light up their spot in the preview; Responses becomes Feedback; the inbox
+sentence goes; searches only in Reports; Delete shows on the community card.
+Support and Volunteer tiles off on Philly needs a yes on the live site.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").

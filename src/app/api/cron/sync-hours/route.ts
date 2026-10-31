@@ -20,6 +20,8 @@
 // If CRON_SECRET is unset, the route runs unauthenticated — fine for local dev,
 // but set it in production so the endpoint can't be triggered by anyone.
 
+import { jobsOffByCommunity } from '@/lib/jobOff'
+import { listAllWatches } from '@/lib/watchStore'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendStatusChangeDigest, type StatusChange } from '@/lib/email'
@@ -75,7 +77,9 @@ async function runSync(): Promise<SyncHoursRun> {
     return { ok: false, error: error.message }
   }
 
-  const rows = (data ?? []) as SyncedRow[]
+  // A community that turned Google off isn't asked about, so it costs nothing.
+  const off = jobsOffByCommunity((await listAllWatches().catch(() => ({ watches: [] }))).watches)
+  const rows = ((data ?? []) as SyncedRow[]).filter((r) => !off.get(r.community_id)?.has('google'))
   let synced = 0
   let failed = 0
   let flaggedClosed = 0

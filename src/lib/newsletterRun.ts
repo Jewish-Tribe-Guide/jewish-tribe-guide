@@ -20,6 +20,7 @@ import { applyUpdate, changesAnything, type TimesUpdate } from '@/lib/scheduleUp
 import { TIMES_PART_LABELS, partLines, splitParts, type PartSource } from '@/lib/timesParts'
 import type { ScheduleSource } from '@/lib/scheduleReader'
 import type { SubmissionSource } from '@/lib/submissionSource'
+import { jobsOff } from '@/lib/jobOff'
 import { getWatchByUrl, listWatches, updateWatch } from '@/lib/watchStore'
 import { afterRun, type Watch } from '@/lib/watches'
 import { eruvSenders } from '@/lib/eruvEmailRun'
@@ -95,7 +96,9 @@ async function keepAttachment(a: NonNullable<NewsletterEmail['attachment']>): Pr
  *  (watchedSenders) and the eruvim whose status comes by email. */
 export async function newsletterSenders(community: string): Promise<string[]> {
   const [{ watches }, eruvim] = await Promise.all([listWatches(community), eruvSenders(community)])
-  return [...new Set([...watchedSenders(watches), ...eruvim])]
+  // Turned off here: the script stops sending its emails (jobOff.ts).
+  const shuls = jobsOff(watches).includes('newsletters') ? [] : watchedSenders(watches)
+  return [...new Set([...shuls, ...eruvim])]
 }
 
 /**

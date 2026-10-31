@@ -38,6 +38,8 @@ vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://kept/${p}` } }) }) } }),
 }))
 
+import { JOB_OFF_CREATOR, jobOffUrl } from './jobOff'
+
 const { receiveNewsletter, emailHash, newsletterSenders } = await import('./newsletterRun')
 
 const SHUL = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
@@ -115,6 +117,16 @@ beforeEach(() => {
   m.submitListingUpdate.mockResolvedValue({ id: 'sub' })
   m.sendWatchDigest.mockResolvedValue(undefined)
   m.upload.mockResolvedValue({ error: null })
+})
+
+describe('newsletterSenders', () => {
+  it('stops asking for a shul’s newsletters where the job is off, and still takes eruv emails', async () => {
+    m.eruvSenders.mockResolvedValue(['eruv@x.org'])
+    m.listWatches.mockResolvedValue({ available: true, watches: [watch] })
+    expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org', 'eruv@x.org'])
+    m.listWatches.mockResolvedValue({ available: true, watches: [watch, { ...watch, id: 'off', createdBy: JOB_OFF_CREATOR, url: jobOffUrl('newsletters'), active: false }] })
+    expect(await newsletterSenders('philly')).toEqual(['eruv@x.org'])
+  })
 })
 
 describe('receiveNewsletter: who it’s from', () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -8,14 +8,17 @@ import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
+import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, rowCheck, type CheckedBy, type RowCheck } from '@/lib/fieldCoverage'
+import type { EditorRow } from '@/lib/editorRows'
 import { shortDay } from '@/lib/todo'
 import ListingEditorScreen from './ListingEditorScreen'
-import { AdminBack, AdminBox, AdminEmpty, AdminRow } from './AdminUI'
+import { AdminBack, AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
+import { coverageOf, troublesOf, useWatchJobsAndReload } from './useWatchJobs'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
-// Find one by name, narrow by category or by what's wrong with it, open it
-// to edit it on the spot (no suggest-then-approve), archive it, or bring an
-// archived one back. Archived is a pill here, not a tab of its own.
+// Find one by name, narrow by three menus (what's on the site, its category,
+// what checks it), open it to edit it on the spot (no suggest-then-approve),
+// archive it, or bring an archived one back.
 
 const button = 'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
@@ -39,6 +42,13 @@ function showFromAddress(): PlaceShow {
  *  "N places" lands there). */
 function categoryFromAddress(): string {
   return new URLSearchParams(window.location.search).get('category') ?? ''
+}
+
+/** What the address narrows by what checks it: `?checked=` (Watches' "23
+ *  places" lands on not-watched). */
+function checkedFromAddress(): CheckedBy {
+  const checked = new URLSearchParams(window.location.search).get('checked')
+  return isCheckedBy(checked) ? checked : 'any'
 }
 
 /** Writes one of the list's choices into the address, so a reload or Back
@@ -124,6 +134,17 @@ function ArchivedPlace({
   )
 }
 
+/** On the right of an Edit listing row: what checks it, or Nothing. */
+function RowChecked({ check }: { check: RowCheck }) {
+  const missing = check.names.length === 0 ? 'Nothing' : check.nothing.length ? `Nothing: ${check.nothing.join(', ')}` : null
+  return (
+    <span className="shrink-0 max-w-[40%] text-right text-[13px] leading-snug" data-testid="row-checked">
+      {check.names.length > 0 && <span className="block text-slate-600">{check.names.join(', ')}</span>}
+      {missing && <span className="block text-amber-800">{missing}</span>}
+    </span>
+  )
+}
+
 /** Below an opened place's editor: take it off the site, asking once. */
 function ArchiveIt({ place, token, onDone }: { place: AdminPlace; token: string; onDone: () => void }) {
   const community = useCommunitySlug()
@@ -171,9 +192,14 @@ export default function PlacesList({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { jobs } = useWatchJobsAndReload(token)
+  const [now] = useState(() => Date.now())
+  const coverage = useMemo(() => coverageOf(jobs), [jobs])
+  const troubles = useMemo(() => troublesOf(jobs, now), [jobs, now])
   const [show, setShow] = useState<PlaceShow>('site')
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
+  const [checked, setChecked] = useState<CheckedBy>('any')
   const [all, setAll] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   // Adding: picking its category (''), then the editor for that category.
@@ -188,6 +214,7 @@ export default function PlacesList({ token }: { token: string }) {
       // and the category menu keep the two in step after that.
       setShow(showFromAddress())
       setCategory(categoryFromAddress())
+      setChecked(checkedFromAddress())
       setData(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the places.')
@@ -280,6 +307,11 @@ export default function PlacesList({ token }: { token: string }) {
           item={opened.listing}
           category={openedCategory}
           onClose={close}
+          rowAside={(row: EditorRow) => {
+            const c = coverage?.get(opened.id)
+            const check = c && rowCheck(row, c)
+            return check ? <RowChecked check={check} /> : null
+          }}
           adminSave={{
             label: 'Update the listing',
             via: ({ payload }) =>
@@ -297,13 +329,24 @@ export default function PlacesList({ token }: { token: string }) {
   }
 
   const counts = placeCounts(data.places, category || undefined)
-  const rows = filterPlaces(data.places, { show, category: category || undefined, query })
+  const narrowed = filterPlaces(data.places, { show, category: category || undefined, query })
+  const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), troubles.get(p.id), choice)
+  const checkedCount = (choice: CheckedBy) => narrowed.filter((p) => fits(p, choice)).length
+  // Not watched: its main thing first, then by name as they already are.
+  const rows = narrowed.filter((p) => fits(p, checked))
+  if (checked === 'not-watched') rows.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
+  const lineOf = (p: AdminPlace): { text: string; warn: boolean } => {
+    if (checked === 'broken') return { text: troubles.get(p.id)?.join(' · ') ?? '', warn: true }
+    const c = coverage?.get(p.id)
+    if (checked === 'not-watched' && c) return { text: notWatchedLine(c), warn: true }
+    return { text: placeLine(p), warn: p.status === 'approved' && !p.hasAddress }
+  }
   const shown = all ? rows : rows.slice(0, SHOWN)
 
   return (
     <div className="flex flex-col gap-4">
       <div className="-mt-2 flex flex-wrap items-center gap-3">
-        <p className="m-0 flex-1 text-sm text-slate-600">{counts.site} on the site</p>
+        <span className="flex-1" />
         {adding === null && (
           <button
             type="button"
@@ -344,61 +387,59 @@ export default function PlacesList({ token }: { token: string }) {
         </AdminBox>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <label className={`${field} flex flex-[1_1_320px] items-center gap-2`}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.5" />
-            <path d="M10.5 10.5L14 14" />
-          </svg>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value)
-              setAll(false)
-            }}
-            placeholder="Find a place by name"
-            aria-label="Find a place by name"
-            className="min-w-0 flex-1 border-0 bg-transparent outline-none"
-          />
-        </label>
-        <select
-          aria-label="Category"
-          value={category}
+      <label className={`${field} flex items-center gap-2`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M10.5 10.5L14 14" />
+        </svg>
+        <input
+          type="search"
+          value={query}
           onChange={(e) => {
-            setCategory(e.target.value)
+            setQuery(e.target.value)
             setAll(false)
-            setAddressParam('category', e.target.value, '')
           }}
-          className={`${field} flex-[0_1_200px]`}
-        >
-          <option value="">All categories</option>
-          {data.categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.pluralLabel}
-            </option>
-          ))}
-        </select>
+          placeholder="Find a place by name"
+          aria-label="Find a place by name"
+          className="min-w-0 flex-1 border-0 bg-transparent outline-none"
+        />
+      </label>
+
+      <div className="flex gap-1.5 sm:gap-2">
+        <AdminMenu name="On the site" value={show} options={PLACE_SHOWS.map((s) => ({ value: s.show, label: s.label, count: counts[s.show] }))} onChange={pick} />
+        <AdminMenu
+          name="Category"
+          value={category}
+          options={[{ value: '', label: 'All categories' }, ...listingCategories.map((c) => ({ value: c.id, label: c.pluralLabel }))]}
+          onChange={(v) => {
+            setCategory(v)
+            setAll(false)
+            setAddressParam('category', v, '')
+          }}
+        />
+        <AdminMenu
+          name="Checked by"
+          value={checked}
+          disabled={!coverage}
+          options={CHECKED_BY.filter((c) => c.key === 'any' || c.key === checked || c.key === 'not-watched' || c.key === 'broken' || checkedCount(c.key) > 0).map((c) => ({
+            value: c.key,
+            label: c.label,
+            count: c.key === 'any' ? undefined : checkedCount(c.key),
+          }))}
+          onChange={(v) => {
+            setChecked(v)
+            setAll(false)
+            setAddressParam('checked', v, 'any')
+          }}
+        />
       </div>
 
-      <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
-        {PLACE_SHOWS.map((s) => (
-          <button
-            key={s.show}
-            type="button"
-            aria-pressed={show === s.show}
-            onClick={() => pick(s.show)}
-            className={`min-h-9 rounded-full border px-3.5 py-1.5 text-sm font-semibold cursor-pointer ${
-              show === s.show ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-700'
-            }`}
-          >
-            {s.label} · {counts[s.show]}
-          </button>
-        ))}
-      </div>
+      <p className="-mb-2 m-0 text-sm font-semibold text-slate-600">
+        {rows.length} {rows.length === 1 ? 'place' : 'places'}
+      </p>
 
       {rows.length === 0 ? (
-        <AdminEmpty>{query || category ? 'No places match.' : show === 'site' ? 'No places yet.' : 'Nothing to do.'}</AdminEmpty>
+        <AdminEmpty>{query || category || checked !== 'any' ? 'No places match.' : show === 'site' ? 'No places yet.' : 'Nothing to do.'}</AdminEmpty>
       ) : (
         <section aria-label="Places" className="bg-white border border-slate-200 rounded-[10px]">
           {shown.map((p) => (
@@ -407,7 +448,7 @@ export default function PlacesList({ token }: { token: string }) {
               onClick={() => openPlace(p.id)}
               label={`Open ${p.name}`}
               name={p.name}
-              line={<span className={p.status === 'approved' && !p.hasAddress ? 'text-amber-700' : ''}>{placeLine(p)}</span>}
+              line={<span className={lineOf(p).warn ? 'text-amber-800' : ''}>{lineOf(p).text}</span>}
               aside={categoriesById.get(p.category)?.label}
             />
           ))}

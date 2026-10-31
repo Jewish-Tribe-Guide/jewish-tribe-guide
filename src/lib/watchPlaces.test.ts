@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kindSourcesText, notWatched, placeSourcesText, watchKinds, type PagesPlace, type SitePlace, type WatchJobsIn } from './watchPlaces'
+import { kindSourcesText, placeSourcesText, watchKinds, type PagesPlace, type SitePlace, type WatchJobsIn, placeTroubles } from './watchPlaces'
 import type { Checker, GoogleFieldRow, GooglePlace } from './googleJob'
 import type { Watch, WatchCheck } from './watches'
 import type { AdminEruv } from './eruvStore'
@@ -294,6 +294,14 @@ describe('watchKinds', () => {
   })
 })
 
+describe('placeTroubles', () => {
+  it('a link that doesn’t open is broken; a place not on Google isn’t', () => {
+    const notFound = { id: 'g', matched: false, notOnGoogle: null, fields: [], failedAt: null, readAt: null, compare: null, closure: null } as never
+    const broken = placeTroubles({ google: [notFound], dishes: null, hours: null, times: null, sites: null, hospitals: null, links: [{ resourceId: 'l', field: 'website', failingSince: '2026-10-01T00:00:00Z', lastError: 'x', dontOpen: true } as never] }, NOW)
+    expect(broken.has('g')).toBe(false)
+  })
+})
+
 describe('kindSourcesText', () => {
   it('says the sources of a kind as drawn', () => {
     expect(kindSourcesText(['google', 'keystone', 'mekor', 'menu', 'website'])).toBe('Google · Keystone-K · Mekor Habracha · menus · websites')
@@ -302,9 +310,3 @@ describe('kindSourcesText', () => {
   })
 })
 
-describe('notWatched', () => {
-  it('names the listing kinds with no address', () => {
-    expect(notWatched(CATEGORIES)).toEqual(['WhatsApp Groups'])
-    expect(notWatched([...CATEGORIES, { id: 'old', pluralLabel: 'Old', kind: 'listing', hasAddress: false, active: false }])).toEqual(['WhatsApp Groups'])
-  })
-})

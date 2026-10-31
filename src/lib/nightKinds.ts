@@ -6,6 +6,7 @@ import { isListingPageWatch } from './listingPageWatch'
 import { isEruvWebsiteWatch } from './eruvWebsite'
 import type { Watch } from './watches'
 import { linkBroken, linkStatus, type LinkStanding } from './linkCheck'
+import { isJobOff } from './jobOff'
 
 // ── Nightly runs, a line per kind of source (Oct 25) ────────────────────────
 // The Watches tab's "Last night" (FinalNightly): Google, Kosher
@@ -27,7 +28,7 @@ import { linkBroken, linkStatus, type LinkStanding } from './linkCheck'
 // Google doesn't have, each place saying why ("Not on Google").
 // Links (Oct 25): the weekly link check's, every link a listing shows
 // that nothing else reads, each saying whether it opened.
-// Pure: the runs route works it out, NightlyRuns.tsx draws it.
+// Pure: the runs route works it out, WatchesManager.tsx and JobPage.tsx draw it.
 
 export type NightKind = {
   id: NightKindId
@@ -64,7 +65,7 @@ type KindWatch = Pick<Watch, 'kind' | 'url' | 'createdBy' | 'label' | 'resourceI
  *  hours, not Mikvah hours (Oct 25: five food places were counted there). A page that
  *  is none of the kinds was added by hand: Other pages. */
 export function nightKindOf(w: KindWatch, readsOf?: ReadsOf, siteGap?: SiteGap): Exclude<NightKindId, 'google' | 'newsletters'> | null {
-  if (isNewsletterWatch(w) || isIgnoredSender(w)) return null
+  if (isNewsletterWatch(w) || isIgnoredSender(w) || isJobOff(w)) return null
   if (isEruvWebsiteWatch(w)) return 'eruvs'
   if (isListingPageWatch(w) && w.resourceId && siteGap?.(w.resourceId) != null) return 'sites'
   const group = watchGroupOf(w as Watch, readsOf)
@@ -121,7 +122,17 @@ export type NightKindView = {
   /** Everything it tracks, what needs a look first. */
   tracked: TrackedSource[]
   nights: KindNight[]
+  /** What goes under Needs fixing: a source wrong two nights running, or
+   *  the whole job not having run. One bad night only shows in `nights`. */
+  fixes: KindFix[]
+  /** Its last run, or a newsletter's last email; null, not yet. */
+  lastAt: string | null
+  /** "Runs every night at 3:00 AM". */
+  schedule: string
 }
+
+/** `whole`: the job itself, not one source. */
+export type KindFix = KindMiss & { whole?: boolean }
 
 const ZONE = 'America/New_York'
 const dayKey = (t: number) => new Date(t).toLocaleDateString('en-CA', { timeZone: ZONE })
@@ -358,6 +369,9 @@ function newsletterView(kind: NightKind, watches: readonly Watch[], listings?: L
     misses: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page })),
     tracked,
     nights: [],
+    fixes: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page })),
+    lastAt: latest ?? null,
+    schedule: scheduleLine(null, 0),
   }
 }
 
@@ -370,7 +384,7 @@ function linksView(kind: NightKind, job: NightlyJob, runs: readonly JobRun[], li
       return { name: `${l.place} · ${l.field}`, status: s.text, bad: s.bad, page: `kind/${l.category}?place=${l.resourceId}` }
     })
     .sort(byNeed)
-  const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: [] }
+  const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: [], schedule: scheduleLine(job, now) }
   const n = `${links.length} link${links.length === 1 ? '' : 's'}`
   const last = runs[0]
   const health = jobHealth(job, runs, now)
@@ -379,16 +393,19 @@ function linksView(kind: NightKind, job: NightlyJob, runs: readonly JobRun[], li
   // Not run yet: when it will (the user, Oct 27: the others say when).
   if (!last && !checkedAt) {
     const next = nextRunAt(job, now)
-    return { ...base, when: `${dayName(next)}, ${timeOf(new Date(next).toISOString())}`, count: links.length ? `${n} · first check ${weekdayOf(next)}` : 'Not run yet', trouble: null, misses: [] }
+    return { ...base, fixes: [], lastAt: null, when: `${dayName(next)}, ${timeOf(new Date(next).toISOString())}`, count: links.length ? `${n} · first check ${weekdayOf(next)}` : 'Not run yet', trouble: null, misses: [] }
   }
   const at = last?.startedAt ?? checkedAt!
   const when = `${dayName(Date.parse(at))}, ${timeOf(at)}`
-  if (health.state === 'late') return { ...base, when, count: `Didn’t run since ${dayName(Date.parse(health.since))}`, trouble: null, misses: [] }
-  if (health.state === 'running') return { ...base, when, count: 'Running now', trouble: null, misses: [] }
-  if (health.state === 'failed') return { ...base, when, count: 'Failed', trouble: health.error, misses: [] }
+  const whole = wholeFix(kind, health)
+  const dated = { ...base, lastAt: at, fixes: whole ? [whole] : [] }
+  if (health.state === 'late') return { ...dated, when, count: `Didn’t run since ${dayName(Date.parse(health.since))}`, trouble: null, misses: [] }
+  if (health.state === 'running') return { ...dated, when, count: 'Running now', trouble: null, misses: [] }
+  if (health.state === 'failed') return { ...dated, when, count: 'Failed', trouble: health.error, misses: [] }
   const bad = links.filter((l) => linkBroken(l)).length
   const trouble = [health.state === 'cut off' && 'stopped before it finished', health.state === 'warning' && 'ran out of time', bad && `${bad} ${bad === 1 ? 'doesn’t' : 'don’t'} open`].filter(Boolean).join(' · ') || null
-  return { ...base, when, count: links.length ? n : 'No links to check', trouble, misses: tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page })) }
+  const misses = tracked.filter((t) => t.bad).map((t) => ({ name: t.name, why: t.status, page: t.page }))
+  return { ...dated, fixes: [...dated.fixes, ...misses], when, count: links.length ? n : 'No links to check', trouble, misses }
 }
 
 /** Why a run left watches unread, from its warning (watchesOutcome):
@@ -434,6 +451,54 @@ function newMenusTrouble(runs: readonly JobRun[], now: number): string | null {
   return null
 }
 
+/** When a job runs, in the guide's time. */
+export function scheduleLine(job: NightlyJob | null, now: number): string {
+  if (!job) return 'Runs as each email comes in'
+  const at = timeOf(new Date(nextRunAt(job, now)).toISOString())
+  return job.everyDays === 7 ? `Runs every ${weekdayOf(nextRunAt(job, now))} at ${at}` : `Runs every night at ${at}`
+}
+
+const DAY_MS = 86_400_000
+const nightsSince = (from: string, to: number) => Math.round((to - Date.parse(from)) / DAY_MS) + 1
+
+/** The watches of a kind wrong two nights running (the user, Oct 31): a page
+ *  that didn't open, or one not read. A menu never read isn't one: a few
+ *  are read each night until they all have been. */
+function watchFixes(kind: NightKind, watches: readonly Watch[], start: number, listings?: ListingInfo): KindFix[] {
+  const own = watches.filter((w) => w.active && nightKindOf(w, listings?.readsOf, listings?.siteGap) === kind.id)
+  const fixes: KindFix[] = []
+  for (const w of own) {
+    if (w.failingSince) {
+      const nights = nightsSince(w.failingSince, start)
+      if (nights >= 2) fixes.push({ name: watchName(w), why: `Page didn’t open, ${nights} nights`, page: pageOf(kind, w, listings) })
+      continue
+    }
+    const last = w.lastRunAt ?? w.createdAt
+    if (start - Date.parse(last) < 1.5 * DAY_MS) continue
+    fixes.push({ name: watchName(w), why: `Not read for ${Math.round((start - Date.parse(last)) / DAY_MS)} nights`, page: pageOf(kind, w, listings) })
+  }
+  return onePerPlace(fixes)
+}
+
+function googleFixes(places: readonly GoogleLive[], now: number): KindFix[] {
+  return places
+    .filter((p) => p.matched && p.failedAt && now - Date.parse(p.failedAt) >= DAY_MS)
+    .map((p) => ({ name: p.name, why: `Google not answering since ${dayName(Date.parse(p.failedAt!))}`, page: googlePage(p) }))
+}
+
+/** The job's own trouble, at once: it failed, stopped or didn't run. */
+function wholeFix(kind: NightKind, health: ReturnType<typeof jobHealth>): KindFix | null {
+  const why =
+    health.state === 'late'
+      ? `Didn’t run since ${dayName(Date.parse(health.since))}`
+      : health.state === 'failed'
+        ? 'Last run failed'
+        : health.state === 'cut off'
+          ? 'Last run stopped before it finished'
+          : null
+  return why ? { name: kind.name, why, page: `job/${kind.id}`, whole: true } : null
+}
+
 /** Each kind's line for one community. `runs`: each job's, newest first.
  *  `unread`: the food places whose menu was never read. */
 export function nightKinds(
@@ -453,20 +518,23 @@ export function nightKinds(
     if (kind.id === 'links') return linksView(kind, job, own, links, now)
     const last = own[0]
     const tracked = kind.id === 'google' ? trackedGoogle(google) : trackedWatches(kind, watches, kind.id === 'menus' ? unread : [], listings)
-    const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: kindNights(kind, community, own, now, kind.id === 'menus' ? (runs['read-menus'] ?? []) : []) }
+    const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: kindNights(kind, community, own, now, kind.id === 'menus' ? (runs['read-menus'] ?? []) : []), schedule: scheduleLine(job, now) }
     const health = jobHealth(job, own, now)
-    if (!last || health.state === 'never') return { ...base, when: null, count: 'Not run yet', trouble: null, misses: [] }
+    if (!last || health.state === 'never') return { ...base, fixes: [], lastAt: null, when: null, count: 'Not run yet', trouble: null, misses: [] }
     const when = timeOf(last.startedAt)
-    if (health.state === 'late') return { ...base, when, count: `Didn’t run since ${dayName(Date.parse(health.since))}`, trouble: null, misses: [] }
-    if (health.state === 'running') return { ...base, when, count: 'Running now', trouble: null, misses: [] }
-    if (health.state === 'failed') return { ...base, when, count: 'Failed', trouble: health.error, misses: [] }
+    const whole = wholeFix(kind, health)
+    const dated = { ...base, lastAt: last.startedAt, fixes: whole ? [whole] : [] }
+    if (health.state === 'late') return { ...dated, when, count: `Didn’t run since ${dayName(Date.parse(health.since))}`, trouble: null, misses: [] }
+    if (health.state === 'running') return { ...dated, when, count: 'Running now', trouble: null, misses: [] }
+    if (health.state === 'failed') return { ...dated, when, count: 'Failed', trouble: health.error, misses: [] }
     const start = Date.parse(last.startedAt)
     const ranOut = ranOutText(last.warning)
     const live = kind.id === 'google' ? liveGoogle(google, start) : liveWatches(kind, watches, start, kind.id === 'menus' ? unread : [], listings, ranOut)
     const count = live.count.of ? countLine(kind, live.count) : 'Nothing to read'
     const also = kind.id === 'menus' ? newMenusTrouble(runs['read-menus'] ?? [], now) : null
     const trouble = [health.state === 'cut off' && 'stopped before it finished', troubleOf(live, ranOut), also].filter(Boolean).join(' · ') || null
-    return { ...base, when, count, trouble, misses: live.misses }
+    const fixes = kind.id === 'google' ? googleFixes(google, now) : watchFixes(kind, watches, start, listings)
+    return { ...dated, fixes: [...dated.fixes, ...fixes], when, count, trouble, misses: live.misses }
   })
   return views.filter((v) => (v.id !== 'other' && v.id !== 'sites' && v.id !== 'links') || v.tracked.length)
 }

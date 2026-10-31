@@ -1,5 +1,7 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { listCategoriesUncached } from '@/lib/categoryStore'
+import { jobsOff } from '@/lib/jobOff'
+import { listWatches } from '@/lib/watchStore'
 import { normalizeRow } from '@/lib/resourceStore'
 import { itemsField } from '@/lib/listingView'
 import { itemMarks, itemWording } from '@/lib/itemMarks'
@@ -182,6 +184,8 @@ export async function readUnreadMenus(
   const out = []
   let budget = perRun
   for (const { slug } of (communities ?? []) as { slug: string }[]) {
+    // Turned off here: nothing's read or paid for (jobOff.ts).
+    if (jobsOff((await listWatches(slug)).watches).includes('menus')) continue
     const unread = await unreadMenus(slug)
     if (!unread.length) continue
     let done = 0

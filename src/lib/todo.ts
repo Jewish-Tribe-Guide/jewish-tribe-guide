@@ -74,8 +74,17 @@ export function teachable(term: string): boolean {
 
 /** What's waiting on a decision. Not searches nobody found: there are too
  *  many to keep up with, so they're there when there's time. */
-export function todoCount(t: { submissions: unknown[]; responses: unknown[] }): number {
-  return t.submissions.length + t.responses.length
+export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[] }): number {
+  return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0)
+}
+
+/** A place Google has no match for and nobody has said why: pick the right
+ *  match or say Not on Google, once (the user, Oct 31). It's a decision, so
+ *  it's here and not under Watches' Needs fixing. */
+export type TodoUnmatched = { id: string; name: string; category: string }
+
+export function unmatchedPlaces(places: readonly { id: string; name: string; category: string; matched: boolean; notOnGoogle: unknown }[]): TodoUnmatched[] {
+  return places.filter((p) => !p.matched && !p.notOnGoogle).map(({ id, name, category }) => ({ id, name, category }))
 }
 
 /** A suggestion's name, as its row shows it. */

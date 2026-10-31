@@ -250,13 +250,29 @@ function kosherSays(p: KosherJob['places'][number]): Say {
   return { changes: open ? Math.max(1, waiting) : 0, unchecked: [], sources }
 }
 
-// ── All of it, by kind of place ─────────────────────────────────────────────
+// ── A check that's broken, per place (Places' Check broken) ─────────────────
 
-/** The categories whose places nothing reads: ones with no address, which
- *  Google doesn't look for, and no job takes up. */
-export function notWatched(categories: WatchJobsIn['categories']): string[] {
-  return categories.filter((c) => c.kind === 'listing' && c.hasAddress === false && c.active !== false).map((c) => c.pluralLabel)
+const BROKEN = /stopped answering|didn’t load|can’t be read|Not found on Refuah|doesn’t open/
+
+/** What's gone wrong with each place's checks: not what no job reads, or
+ *  what a job hasn't reached yet. */
+export function placeTroubles(jobs: Pick<WatchJobsIn, 'google' | 'dishes' | 'hours' | 'times' | 'sites' | 'hospitals' | 'links'>, now: number): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  const add = (id: string, things: readonly string[]) => {
+    const bad = things.filter((t) => BROKEN.test(t))
+    if (bad.length) out.set(id, [...new Set([...(out.get(id) ?? []), ...bad])])
+  }
+  for (const p of jobs.google ?? []) add(p.id, googleSays(p).unchecked)
+  for (const p of jobs.dishes ?? []) add(p.id, dishesSays(p, now).unchecked)
+  for (const p of jobs.hours ?? []) add(p.id, pagesSays(p, 'hours', now).unchecked)
+  for (const p of jobs.times ?? []) add(p.id, pagesSays(p, 'times', now).unchecked)
+  for (const p of jobs.sites ?? []) add(p.id, siteSays(p, now).unchecked)
+  for (const h of jobs.hospitals ?? []) add(h.id, hospitalSays(h, now).unchecked)
+  for (const l of jobs.links ?? []) if (linkBroken(l)) add(l.resourceId, ['Link doesn’t open'])
+  return out
 }
+
+// ── All of it, by kind of place ─────────────────────────────────────────────
 
 export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchKind[] {
   const says = new Map<string, Say[]>()

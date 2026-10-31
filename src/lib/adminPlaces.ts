@@ -17,7 +17,7 @@ export type AdminPlace = {
   listing: DirectoryResource
 }
 
-/** The pills: on the site, on the site with no address, archived. */
+/** The Show menu: on the site, on the site with no address, archived. */
 export type PlaceShow = 'site' | 'no-address' | 'archived'
 
 export const PLACE_SHOWS: { show: PlaceShow; label: string }[] = [

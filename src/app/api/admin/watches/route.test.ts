@@ -158,6 +158,33 @@ describe('/api/admin/watches', () => {
   // it: a shul's times from its page or its newsletter's address (one
   // choice since Oct 20), hours from a listing's own page, and an eruv's
   // status is set on the eruv.
+  describe('turning a job off', () => {
+    it('adds a marker row that’s never read, once', async () => {
+      m.listWatches.mockResolvedValue({ available: true, watches: [] })
+      m.addWatch.mockResolvedValue({ ok: true })
+      expect((await POST(req('POST', { action: 'job-off', kind: 'google' }))).status).toBe(200)
+      expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: 'https://guide.invalid/job-off/google', createdBy: 'job off', active: false }))
+    })
+
+    it('leaves a job already off alone', async () => {
+      m.listWatches.mockResolvedValue({ available: true, watches: [{ id: 'x', url: 'https://guide.invalid/job-off/google', createdBy: 'job off' }] })
+      await POST(req('POST', { action: 'job-off', kind: 'google' }))
+      expect(m.addWatch).not.toHaveBeenCalled()
+    })
+
+    it('turning it on removes the row', async () => {
+      m.listWatches.mockResolvedValue({ available: true, watches: [{ id: 'x', url: 'https://guide.invalid/job-off/google', createdBy: 'job off' }] })
+      await POST(req('POST', { action: 'job-on', kind: 'google' }))
+      expect(m.removeWatch).toHaveBeenCalledWith('philly', 'x')
+    })
+
+    it('refuses a job that doesn’t exist', async () => {
+      m.listWatches.mockResolvedValue({ available: true, watches: [] })
+      expect((await POST(req('POST', { action: 'job-off', kind: 'nope' }))).status).toBe(400)
+      expect(m.addWatch).not.toHaveBeenCalled()
+    })
+  })
+
   describe('by what it keeps current', () => {
     beforeEach(() => {
       m.listCategories.mockResolvedValue([

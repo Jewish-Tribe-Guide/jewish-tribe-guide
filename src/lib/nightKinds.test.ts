@@ -249,6 +249,37 @@ describe('last night, a line per kind', () => {
 
 // Oct 25: the read-menus job, which reads a few menus never read each
 // night, folded into Menus.
+describe('what goes under Needs fixing', () => {
+  const runs = { 'sync-hours': [run({ job: 'sync-hours', startedAt: GOOGLE_AT })], watches: [run({})] }
+  const fixes = (w: Watch[], google: Parameters<typeof nightKinds>[3] = []) => nightKinds('philly', runs, w, google, NOW).flatMap((v) => v.fixes)
+  const lower = (over: Partial<Watch>) => eruv('Lower Merion', { lastRunAt: WATCHES_AT, lastOkAt: WATCHES_AT, ...over })
+
+  // The user, Oct 31: one bad night shows in its history only.
+  it('a page that failed one night isn’t on it, and is after two', () => {
+    expect(fixes([lower({ failingSince: WATCHES_AT, lastError: 'down' })])).toEqual([])
+    const [two] = fixes([lower({ failingSince: night(WATCHES_AT, 2), lastError: 'down' })])
+    expect(two.why).toBe('Page didn’t open, 3 nights')
+  })
+
+  it('a page not read for two nights is on it', () => {
+    expect(fixes([lower({ lastRunAt: night(WATCHES_AT, 2) })])[0].why).toBe('Not read for 2 nights')
+    expect(fixes([lower({})])).toEqual([])
+  })
+
+  it('a job that didn’t run is on it at once, once', () => {
+    const late = { 'sync-hours': [run({ job: 'sync-hours', startedAt: night(GOOGLE_AT, 3) })], watches: [run({})] }
+    const views = nightKinds('philly', late, [], [], NOW)
+    expect(views.flatMap((v) => v.fixes)[0]).toMatchObject({ name: 'Google', page: 'job/google', whole: true })
+  })
+
+  it('Google: a match that stopped answering is on it after a day, and a place with no match never', () => {
+    const failed = (at: string) => [{ name: 'Hot Bagels', matched: true, failedAt: at, readAt: null }]
+    expect(fixes([], failed(WATCHES_AT))).toEqual([])
+    expect(fixes([], failed(night(WATCHES_AT, 2)))[0].why).toMatch(/^Google not answering since/)
+    expect(fixes([], [{ name: 'Mei Shalva', matched: false, failedAt: null }])).toEqual([])
+  })
+})
+
 describe('Menus, with the menus never read', () => {
   const runs = { watches: [run({})], 'read-menus': [run({ job: 'read-menus', startedAt: after(WATCHES_AT, 30) })] }
   const menu = (id: string, resourceId: string, over: Partial<Watch> = {}) => watch({ id, createdBy: 'menu links', resourceId, label: `Menu · ${id}`, ...over })

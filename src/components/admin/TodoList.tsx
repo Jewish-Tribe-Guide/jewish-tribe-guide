@@ -229,6 +229,14 @@ export default function TodoList({
         </AdminBox>
       )}
 
+      {data.unmatched.length > 0 && (
+        <AdminBox title="Find on Google" count={data.unmatched.length} foldOnPhone>
+          <AdminRows items={data.unmatched}>
+            {(p) => <AdminRow key={p.id} href={`${base}/watches/kind/${p.category}?place=${p.id}&from=todo`} name={p.name} line="Not found on Google" />}
+          </AdminRows>
+        </AdminBox>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-[10px] overflow-hidden">
         <AdminRow href={`${base}/watches`} name="Watches" line={watches} />
         {data.responses.length === 0 && <AdminRow href={`${base}/responses`} name="Responses" />}

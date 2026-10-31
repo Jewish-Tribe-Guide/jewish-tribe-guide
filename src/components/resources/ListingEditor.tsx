@@ -114,6 +114,8 @@ type Props = {
   /** An admin saving straight to the listing (the Dishes page's Edit): no
    *  challenge, this button, sent this way, and `onSaved` once it's in. */
   adminSave?: { label: string; via: SendVia; onSaved: () => void }
+  /** On the right of a row, for an admin: what checks it. */
+  rowAside?: (row: EditorRow) => ReactNode
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -230,6 +232,7 @@ export default function ListingEditor({
   onHasChanges,
   preset,
   adminSave,
+  rowAside,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -493,6 +496,7 @@ export default function ListingEditor({
                 title={rowTitle(r)}
                 summary={summary}
                 tags={tags(r)}
+                aside={rowAside?.(r)}
               />
             </li>
           )
