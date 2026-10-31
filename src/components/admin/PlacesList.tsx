@@ -1,16 +1,16 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { shortDay } from '@/lib/todo'
-import UpButton from '@/components/UpButton'
 import ListingEditorScreen from './ListingEditorScreen'
-import { AdminBox, AdminEmpty, AdminRow } from './AdminUI'
+import { AdminBack, AdminBox, AdminEmpty, AdminRow } from './AdminUI'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
 // Find one by name, narrow by category or by what's wrong with it, open it
@@ -201,7 +201,41 @@ export default function PlacesList({ token }: { token: string }) {
     setAddressParam('show', next, 'site')
   }
 
+  // A place or Add is an entry in the history, so swiping back from one
+  // lands on this list, not on the page before it (the user, Oct 31).
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = e.state as { placeOpen?: string; placeAdding?: string } | null
+      setOpenId(state?.placeOpen ?? null)
+      setAdding(state?.placeAdding ?? null)
+    }
+    const onTapped = () => {
+      setOpenId(null)
+      setAdding(null)
+    }
+    window.addEventListener('popstate', onPop)
+    window.addEventListener(ADMIN_AREA_TAPPED, onTapped)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      window.removeEventListener(ADMIN_AREA_TAPPED, onTapped)
+    }
+  }, [])
+
+  function openPlace(id: string) {
+    setOpenId(id)
+    history.pushState({ ...(window.history.state ?? {}), placeOpen: id }, '')
+    window.scrollTo?.(0, 0)
+  }
+
+  function startAdding(id: string) {
+    setAdding(id)
+    history.pushState({ ...(window.history.state ?? {}), placeAdding: id }, '')
+    window.scrollTo?.(0, 0)
+  }
+
   function close() {
+    const state = window.history.state as { placeOpen?: string; placeAdding?: string } | null
+    if (state?.placeOpen || state?.placeAdding) history.back()
     setOpenId(null)
     setAdding(null)
     window.scrollTo?.(0, 0)
@@ -229,7 +263,7 @@ export default function PlacesList({ token }: { token: string }) {
     if (opened.status === 'archived' || !openedCategory) {
       return (
         <div className="flex flex-col gap-3">
-          <UpButton label="Back" onClick={close} className="self-start" />
+          <AdminBack back={{ label: 'Back', onClick: close }} title={opened.name} />
           {opened.status === 'archived' ? (
             <ArchivedPlace place={opened} category={openedCategory} token={token} onDone={changed} />
           ) : (
@@ -275,7 +309,7 @@ export default function PlacesList({ token }: { token: string }) {
             type="button"
             onClick={() => {
               // A category picked above is the one it's added to.
-              if (category && categoriesById.get(category)?.kind === 'listing') setAdding(category)
+              if (category && categoriesById.get(category)?.kind === 'listing') startAdding(category)
               else setAdding('')
             }}
             className={primary}
@@ -300,7 +334,7 @@ export default function PlacesList({ token }: { token: string }) {
                 ))}
               </select>
             </label>
-            <button type="button" disabled={!addCategory} onClick={() => setAdding(addCategory)} className={primary}>
+            <button type="button" disabled={!addCategory} onClick={() => startAdding(addCategory)} className={primary}>
               Next
             </button>
             <button type="button" onClick={() => setAdding(null)} className={secondary}>
@@ -370,10 +404,7 @@ export default function PlacesList({ token }: { token: string }) {
           {shown.map((p) => (
             <AdminRow
               key={p.id}
-              onClick={() => {
-                setOpenId(p.id)
-                window.scrollTo?.(0, 0)
-              }}
+              onClick={() => openPlace(p.id)}
               label={`Open ${p.name}`}
               name={p.name}
               line={<span className={p.status === 'approved' && !p.hasAddress ? 'text-amber-700' : ''}>{placeLine(p)}</span>}

@@ -28,7 +28,7 @@ describe('ListingEditorScreen', () => {
     await u.click(screen.getByTestId('editor-row-name'))
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Back' }))
+    await u.click(screen.getByRole('button', { name: '‹ Back' }))
     expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
 
@@ -36,12 +36,12 @@ describe('ListingEditorScreen', () => {
     // heading says so.
     await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Main dishes' }))
     expect(screen.getByRole('heading', { name: 'Main dishes' })).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Back' }))
+    await u.click(screen.getByRole('button', { name: '‹ Back' }))
     expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByTestId('editor-list')).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
 
-    await u.click(screen.getByRole('button', { name: 'Back' }))
+    await u.click(screen.getByRole('button', { name: '‹ Back' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

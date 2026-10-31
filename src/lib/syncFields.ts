@@ -63,6 +63,10 @@ export const SYNC_INTERNAL_FIELDS = [
   // Which check gave a box its date (sourceConfirm.ts, Oct 23): a watch's,
   // never a submitter's.
   'sectionFrom',
+  // When the listing was last confirmed, set on approval (withConfirmedNow)
+  // or by a visitor's tap. Not a person's to send, and a change reading
+  // "Last confirmed Oct 12 → none" is one nobody proposed (the user, Oct 31).
+  'confirmedAt',
   // Which outside source dated the listing (Keystone-K's list, Refuah), set
   // on approval from the submission's server-set source. Never a
   // submitter's: an edit can't say it came from the agency.

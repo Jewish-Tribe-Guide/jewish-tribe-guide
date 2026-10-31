@@ -111,7 +111,10 @@ export function formatBusinessStatus(value: unknown): string {
   return BUSINESS_STATUS_WORDS[value as keyof typeof BUSINESS_STATUS_WORDS] ?? fmt(value)
 }
 
-const SKIP_WHEN_UNCONFIGURED = new Set<string>([SHOWN_WHEN_CONFIGURED])
+// `hours` too: the nightly Google sync stores them on a place whose category
+// has no hours field (10 of 16 live shuls), and the editor doesn't send them,
+// so every edit there read "hours … → none" (the user, Oct 31).
+const SKIP_WHEN_UNCONFIGURED = new Set<string>([SHOWN_WHEN_CONFIGURED, 'hours'])
 
 export type FlatField = { key: string; label: string; value: string }
 

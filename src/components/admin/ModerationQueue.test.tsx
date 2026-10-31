@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Session } from '@supabase/supabase-js'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { resetTodo } from '@/lib/useTodo'
 import { SubmissionCard } from './SubmissionCard'
@@ -646,5 +647,20 @@ describe('ModerationQueue — Set up your guide', () => {
     const regions = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
     expect(regions.slice(0, 2)).toEqual(['Set up your guide', 'New places'])
     expect(screen.getByText('1 to decide')).toBeInTheDocument()
+  })
+})
+
+// The user, Oct 31: "Hitting To do from a change does nothing."
+describe('ModerationQueue — To do tapped in the nav', () => {
+  it('closes the open card, back to the list', async () => {
+    const user = userEvent.setup()
+    renderQueue([submission()])
+    await user.click(await findRow('Acme Grocery'))
+    expect(queryRow('Acme Grocery')).not.toBeInTheDocument()
+    act(() => {
+      window.history.pushState(null, '', window.location.pathname)
+      window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
+    })
+    expect(row('Acme Grocery')).toBeInTheDocument()
   })
 })

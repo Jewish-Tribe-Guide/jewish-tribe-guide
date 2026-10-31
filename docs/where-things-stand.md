@@ -2064,6 +2064,18 @@ and Places, then build them; category switches, home wording, hiding forms.
   read 9:15 on that date is posted (tested). There's no AI key in `.env.local`
   to replay the real read, so if it happens again, the reader dropped it.
 
+**Ways back, and changes nobody proposed.**
+
+- Done: a change no longer says "last confirmed" or hidden Google `hours` went
+  to none. `confirmedAt` is an app-owned key now, so a submitter can't set it
+  and an edit keeps it; `hours` only shows where the category has an hours
+  field. Approving a shul's change can still drop its hidden `hours`, which
+  nothing reads.
+- Done: tapping To do or Places while one is open goes back to the list. A place
+  is a history entry, so swiping back lands on Places. Places and Add have the
+  chevron; Settings has one to To do on a phone. Not changed: "Edit, then
+  update" isn't a history entry, so swiping back from it leaves the change.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").

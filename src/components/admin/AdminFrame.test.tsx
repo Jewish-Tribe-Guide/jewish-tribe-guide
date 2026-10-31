@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import AdminFrame from './AdminFrame'
 import { AdminBack } from './AdminUI'
 
@@ -162,5 +163,26 @@ describe('AdminFrame', () => {
       'Community',
       'Communities',
     ])
+  })
+
+  // The user, Oct 31: no chevron back in Settings.
+  it('Settings has the way back to To do on a phone, in place of the gear', () => {
+    show('/philly/admin/team')
+    const back = screen.getByRole('link', { name: '‹ To do' })
+    expect(back).toHaveAttribute('href', '/philly/admin')
+    expect(back).toHaveClass('md:hidden')
+    expect(screen.queryByRole('link', { name: 'Settings' })?.closest('header')).toBeFalsy()
+  })
+
+  it('an area tapped while it’s open says so, and another area doesn’t', () => {
+    show('/philly/admin')
+    const heard = vi.fn()
+    window.addEventListener(ADMIN_AREA_TAPPED, heard)
+    const bar = within(screen.getByRole('navigation', { name: 'Admin areas' }))
+    fireEvent.click(bar.getByRole('link', { name: 'Places' }))
+    expect(heard).not.toHaveBeenCalled()
+    fireEvent.click(bar.getByRole('link', { name: 'To do' }))
+    expect(heard).toHaveBeenCalledTimes(1)
+    window.removeEventListener(ADMIN_AREA_TAPPED, heard)
   })
 })

@@ -13,6 +13,11 @@ import { features } from './features'
 // own community by the URL itself. `adminBase`/`adminTabs` take the
 // community explicitly rather than hardcoding one, so every caller reads its
 // community from context (useCommunitySlug()) instead of assuming 'philly'.
+/** An area in the nav tapped while it's already open: its own list again,
+ *  as the address alone doesn't tell a screen with one open (the user, Oct
+ *  31: tapping To do from a change did nothing). */
+export const ADMIN_AREA_TAPPED = 'admin-area-tapped'
+
 export function adminBase(community: string): string {
   return `/${community}/admin`
 }

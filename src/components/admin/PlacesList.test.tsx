@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { fetchJson } from '@/lib/fetchJson'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type ListingEditorScreen from './ListingEditorScreen'
@@ -176,5 +177,32 @@ describe('Places', () => {
     await user.selectOptions(await screen.findByLabelText('Category'), 'networking')
     await user.click(screen.getByRole('button', { name: 'Add a place' }))
     expect(editor.props?.category.id).toBe('networking')
+  })
+})
+
+// The user, Oct 31: "Swiping back from a place goes to To do."
+describe('Places, the way back from a place', () => {
+  it('swiping back lands on the list, as the place is an entry in the history', async () => {
+    const user = userEvent.setup()
+    renderPlaces()
+    const before = window.history.length
+    await user.click(await screen.findByRole('button', { name: 'Open Goldie' }))
+    expect(screen.getByRole('heading', { name: 'Goldie' })).toBeInTheDocument()
+    expect(window.history.length).toBe(before + 1)
+    expect(window.history.state.placeOpen).toBe('goldie')
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    })
+    expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
+  })
+
+  it('tapping Places in the nav goes back to the list', async () => {
+    const user = userEvent.setup()
+    renderPlaces()
+    await user.click(await screen.findByRole('button', { name: 'Open Goldie' }))
+    act(() => {
+      window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
+    })
+    expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
   })
 })
