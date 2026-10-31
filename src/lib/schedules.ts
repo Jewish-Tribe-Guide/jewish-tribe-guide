@@ -467,7 +467,7 @@ export function withWeekRows(schedules: readonly SpecialSchedule[], postId: stri
 }
 
 /** The Shabbos that ends the week `today` is in. */
-function saturdayOf(today: string): string {
+export function saturdayOf(today: string): string {
   const d = new Date(`${today}T12:00:00Z`)
   return new Date(d.getTime() + (6 - d.getUTCDay()) * DAY_MS).toISOString().slice(0, 10)
 }

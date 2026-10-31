@@ -297,6 +297,7 @@ First, what the message is:
 - "title": its heading, if it has one ("Winter Schedule", "Shabbos Bereishis"), else null.
 - "startsOn": for a schedule that says when it starts, that date (YYYY-MM-DD), else null.
 - "from", "to": for "week", the first and last dates it covers, from the days above. Else null.
+- "namesDates": for "week", true when the message itself writes calendar dates for these times, in a heading or beside them ("Friday, October 30", "Weekday Services: November 1 to November 6"), false when it gives only weekdays.
 
 Then "times", one entry per prayer time:
 - "tefillah" is one of: ${TEFILLOS}. A combined "Mincha/Maariv" is mincha_maariv, and so is one line naming several evening prayers held together ("Mincha / Kabbalat Shabbat / Ma'ariv 7:00 PM"): one entry, never one per prayer. Candle lighting, Shabbos ends, havdalah, a kiddush, a class or a shiur are not prayers: leave them out, or put them in "notes" of the nearest prayer.
@@ -314,7 +315,7 @@ Then "times", one entry per prayer time:
 - "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. Otherwise leave it out.
 - Only times the message gives. Never add one it doesn't.
 
-Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "signUp": true, "where": "...", "quote": "...", "unsure": "..."}]}`
+Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "namesDates": false, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "signUp": true, "where": "...", "quote": "...", "unsure": "..."}]}`
   const intro = `The shul: ${shulName}. Its message:`
   const content = messageContent(intro, source)
   return [
@@ -451,6 +452,7 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     from: kind === 'week' ? from : null,
     to: kind === 'week' ? to : null,
     times: weekTimes,
+    ...(kind === 'week' && body.namesDates === true ? { namesDates: true as const } : {}),
   }
 }
 

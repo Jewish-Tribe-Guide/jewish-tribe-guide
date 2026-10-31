@@ -24,7 +24,12 @@ vi.mock('@/lib/watchStore', () => ({ getWatchByUrl: m.getWatchByUrl, addWatch: m
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 // Nothing left out as another shul's, unless a test says.
-vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: async (...args: unknown[]) => ({ elsewhere: [], ...(await m.readShulWeek(...args)) }) }))
+vi.mock('@/lib/shulWeekReading', () => ({
+  readShulWeek: async (...args: unknown[]) => {
+    const got = await m.readShulWeek(...args)
+    return { elsewhere: [], updates: [got.update], ...got }
+  },
+}))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))

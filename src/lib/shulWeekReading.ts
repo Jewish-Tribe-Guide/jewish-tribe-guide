@@ -52,7 +52,7 @@ export async function readShulWeek(
   // "This week", given by weekday: the guide's week, Sunday to Shabbos,
   // the next once Shabbos is over, as Edit listing's (thisWeekEdit.ts).
   const shabbosOver = first === today && weekdayOf(today) === 'sat' && localMinutes(now) >= (ahead.zmanim[today]?.havdalah ?? Infinity)
-  const reading = week ? asCalendarWeek(read, week) : weekdaysOnGuideWeek(read, editWeek(first, shabbosOver))
+  const reading = week ? asCalendarWeek(read, week) : weekdaysOnGuideWeek(read, editWeek(first, shabbosOver), 'text' in source ? source.text : undefined)
   const compare = (r: RegularReading) => compareTimes(regularMinyanim(listing[minyanimKey]), r, { season: currentSeason(now, community.timezone), zmanim: ahead.zmanim })
   const update = compare(reading)
   // A website page's: its usual times, then each week it gives dates for,
@@ -97,14 +97,28 @@ function localMinutes(ms: number): number {
 // "Oct 24", "October 24th", "10/24", "the 24th": the message names a date.
 const NAMES_A_DATE = /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}\/\d{1,2}\b|\b\d{1,2}(?:st|nd|rd|th)\b/i
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/** Whether the message writes one of these dates anywhere, a heading above
+ *  its times included: "Weekday Services: November 1 to November 6". */
+function textNamesDate(text: string, dates: readonly string[]): boolean {
+  return dates.some((date) => {
+    const [, month, day] = date.split('-').map(Number)
+    return new RegExp(`\\b${MONTHS[month - 1]}[a-z]*\\.?\\s+0?${day}(?:st|nd|rd|th)?\\b|\\b0?${month}/0?${day}\\b`, 'i').test(text)
+  })
+}
+
 /** A week given by weekday ("this week's schedule: Sunday 9:00 AM…"), on
  *  the guide's week, Sunday to Shabbos (the user, Oct 23: BZBI's, pasted on
  *  a Friday, was dated Fri Oct 23 – Thu Oct 29 one read and Sun Oct 25 –
  *  Sat Oct 31 the next, the AI choosing). Each time keeps its weekday. A
  *  message that names its dates is left as read: a newsletter's "Shabbos
- *  Oct 24, weekdays Oct 25–29" really does run past Shabbos. */
-export function weekdaysOnGuideWeek(reading: RegularReading, week: EditWeek): RegularReading {
-  if (reading.kind !== 'week' || reading.times.some((t) => NAMES_A_DATE.test(t.quote))) return reading
+ *  Oct 24, weekdays Oct 25–29" really does run past Shabbos. So it is when
+ *  they are only in a heading: Mekor's "Weekday Services: November 1 to
+ *  November 6" went on Oct 25–30 (the user, Oct 31). */
+export function weekdaysOnGuideWeek(reading: RegularReading, week: EditWeek, text?: string): RegularReading {
+  if (reading.kind !== 'week' || reading.namesDates || reading.times.some((t) => NAMES_A_DATE.test(t.quote))) return reading
+  if (text && textNamesDate(text, reading.times.flatMap((t) => (t.date ? [t.date] : [])))) return reading
   const days = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(`${week.from}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10))
   const onWeek = (date: string) => days.find((d) => weekdayOf(d) === weekdayOf(date))!
   const seen = new Set<string>()

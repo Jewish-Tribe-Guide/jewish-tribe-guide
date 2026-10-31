@@ -208,18 +208,25 @@ async function readAndFile(
 
   // The shul's times: from the email's words, or from its PDF or picture
   // when the words had none.
-  const update: { u: TimesUpdate; file: boolean; elsewhere: string[] } | null =
+  const update: { u: TimesUpdate[]; file: boolean; elsewhere: string[] } | null =
     fromText && timesWereRead(fromText.update)
-      ? { u: fromText.update, file: false, elsewhere: fromText.elsewhere }
+      ? { u: fromText.updates, file: false, elsewhere: fromText.elsewhere }
       : fromFile && timesWereRead(fromFile.update)
-        ? { u: fromFile.update, file: true, elsewhere: fromFile.elsewhere }
+        ? { u: fromFile.updates, file: true, elsewhere: fromFile.elsewhere }
         : null
-  if (key && update && changesAnything(update.u)) {
+  if (key && update) {
     const sk = schedulesKey(key)
     // A newsletter's week holds what it gives, never the usual times it
-    // left out (the user, Oct 28).
+    // left out (the user, Oct 28). Dates past a week's length come back as
+    // their own weeks (datedAsWeeks).
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(new Date())
-    const applied = applyUpdate(regularMinyanim(shul[key]), readSchedules(shul[sk]), update.u, update.u.kind === 'week' ? { onlyRead: { today } } : {})
+    const applied = update.u.filter(changesAnything).reduce<ReturnType<typeof applyUpdate>>(
+      (sofar, u) => {
+        const next = applyUpdate(sofar.minyanim, sofar.schedules, u, u.kind === 'week' ? { onlyRead: { today } } : {})
+        return { ...next, changes: [...sofar.changes, ...next.changes] }
+      },
+      { minyanim: regularMinyanim(shul[key]), schedules: readSchedules(shul[sk]), changes: [] },
+    )
     if (applied.changes.length) {
       const photoUrl = update.file && email.attachment ? await keepAttachment(email.attachment) : null
       const whole = editSubmission(shulCategory, shul, {

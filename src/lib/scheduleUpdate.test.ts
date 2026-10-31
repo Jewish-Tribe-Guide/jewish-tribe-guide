@@ -358,6 +358,63 @@ describe('a week from the website, and the newsletter’s for the same days', ()
   })
 })
 
+// Mekor's Oct 30 newsletter, as it read: this Shabbos, then "Weekday
+// Services: November 1 to November 6". It all went into the post from the
+// week before, "Times for Oct 23 – Oct 30", and Nov 1–6 never got stored.
+describe('one message, two of the guide’s weeks', () => {
+  const OCT_30: RegularReading = {
+    kind: 'week',
+    complete: false,
+    season: null,
+    title: 'Shabbat Schedule',
+    startsOn: null,
+    from: '2026-10-30',
+    to: '2026-11-06',
+    times: [
+      t({ tefillah: 'mincha_maariv', date: '2026-10-30', time: '5:45pm' }),
+      t({ tefillah: 'shacharis', date: '2026-10-31', time: '9:15am' }),
+      t({ tefillah: 'mincha_maariv', date: '2026-10-31', time: '5:30pm' }),
+      t({ tefillah: 'mincha_maariv', date: '2026-11-01', time: '4:45pm' }),
+      t({ tefillah: 'mincha_maariv', date: '2026-11-06', time: '4:35pm' }),
+    ],
+  }
+  const lastWeek: SpecialSchedule = {
+    id: 'old',
+    name: 'Shabbat Schedule',
+    from: '2026-10-23',
+    to: '2026-10-24',
+    mode: 'replace',
+    kind: 'week',
+    minyanim: [{ id: 'o', tefillah: 'shacharis', on: ['2026-10-24'], time: '9:15am' }],
+  }
+  const shown = (s: SpecialSchedule[]) => s.map((w) => [w.name, w.from, w.to, w.minyanim.map((m) => `${m.on.join(',')} ${m.time}`)])
+  const u = compareTimes(MEKOR, OCT_30, { season: 'winter', newId })
+
+  it('a newsletter’s posts each week apart, and last week’s stays last week’s', () => {
+    const { schedules, changes } = applyUpdate(MEKOR, [lastWeek], u, { newId, onlyRead: { today: '2026-10-30' } })
+    expect(shown(schedules)).toEqual([
+      ['Shabbat Schedule', '2026-10-23', '2026-10-24', ['2026-10-24 9:15am']],
+      ['Shabbat Schedule', '2026-10-30', '2026-10-31', ['2026-10-30 5:45pm', '2026-10-31 9:15am', '2026-10-31 5:30pm']],
+      ['Times for Nov 1 – Nov 6', '2026-11-01', '2026-11-06', ['2026-11-01 4:45pm', '2026-11-06 4:35pm']],
+    ])
+    expect(changes).toContain('Times for Nov 1 – Nov 6: new, mincha maariv · Fri Nov 6 · 4:35pm')
+  })
+
+  it('so does a person’s paste', () => {
+    const { schedules } = applyUpdate(MEKOR, [lastWeek], u, { newId })
+    expect(schedules.map((s) => [s.from, s.to])).toEqual([
+      ['2026-10-23', '2026-10-24'],
+      ['2026-10-30', '2026-10-31'],
+      ['2026-11-01', '2026-11-06'],
+    ])
+  })
+
+  it('a week read again goes into its own copy', () => {
+    const first = applyUpdate(MEKOR, [lastWeek], u, { newId, onlyRead: { today: '2026-10-30' } }).schedules
+    expect(shown(applyUpdate(MEKOR, first, u, { newId, onlyRead: { today: '2026-10-30' } }).schedules)).toEqual(shown(first))
+  })
+})
+
 describe('a schedule of the same name merges day by day', () => {
   const sukkos: SpecialSchedule = {
     id: 's1',
