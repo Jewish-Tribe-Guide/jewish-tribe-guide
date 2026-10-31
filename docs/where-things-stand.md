@@ -2064,6 +2064,11 @@ and Places, then build them; category switches, home wording, hiding forms.
   read 9:15 on that date is posted (tested). There's no AI key in `.env.local`
   to replay the real read, so if it happens again, the reader dropped it.
 
+**One list for a change.** Done: "On the site now" and "Would show" are gone from
+`ChangeReview`. A change is one list, new highlighted and old crossed out. A
+dated schedule goes day by day, only the days that differ, as the listing would
+pick them (`changeLines.ts`). A new place still uses the old review.
+
 **Ways back, and changes nobody proposed.**
 
 - Done: a change no longer says "last confirmed" or hidden Google `hours` went

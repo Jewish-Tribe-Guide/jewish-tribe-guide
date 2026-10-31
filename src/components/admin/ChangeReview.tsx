@@ -4,9 +4,9 @@ import { useState } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
 import { companionKeys, type CategoryConfig } from '@/lib/categories'
 import { diffListing, diffLines } from '@/lib/submissionDiff'
+import { scheduleChange, usualBoxChange, type ChangeGroup, type ChangeLine } from '@/lib/changeLines'
 import { editorRows } from '@/lib/editorRows'
 import { boxChangeCount, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
-import { minyanWriting } from '@/lib/minyanText'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { readSchedules, schedulesKey } from '@/lib/schedules'
 import { weekDiffers } from '@/lib/thisWeekEdit'
@@ -16,13 +16,12 @@ import { normalizeRow } from '@/lib/resourceShape'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
-import { MinyanBoxRows } from '@/components/resources/MinyanBoxEditor'
 import { AdminBack } from './AdminUI'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 
-// A change opened from To do (boards 3 and 20, Oct 29): what the listing
-// says now beside what it would show, where the change came from, and
-// three answers. "Update the listing" takes it as it came; "Edit, then
+// A change opened from To do (boards 3 and 20, Oct 29; one list since Oct 31,
+// the user: "drop original vs now"): what's new highlighted and what's going
+// crossed out, where the change came from, and three answers. "Update the listing" takes it as it came; "Edit, then
 // update" opens the rows it changes in the site's own editor (a shul's
 // times in its minyan editor, boards 20b and 20c) and updating saves what
 // the admin left there; "Leave it" turns it down. On a phone the answers
@@ -74,7 +73,9 @@ export default function ChangeReview({
     const boxes = MINYAN_BOXES.map((b) => ({ ...b, was: minyanimForBox(was, b.box), now: minyanimForBox(now, b.box) })).filter((b) => boxChangeCount(b.was, b.now) > 0)
     return boxes.length > 0 ? boxes : null
   }
-  const what = changed.flatMap((r) => boxesFor(fieldKeyFor(r.key, fields))?.map((b) => b.title) ?? [r.label]).join(', ')
+  // A shul's dated schedule, by the days it changes.
+  const daysFor = (key: string) => (key.endsWith('_schedules') ? scheduleChange(readSchedules(before[key]), readSchedules(sent.details[key])) : [])
+  const what = changed.flatMap((r) => boxesFor(fieldKeyFor(r.key, fields) === r.key ? r.key : null)?.map((b) => b.title) ?? [daysFor(r.key).length > 0 ? 'the schedule' : r.label]).join(', ')
   const who = source.readBy === 'person' && (s.submitted_by?.name || s.submitted_by?.email) ? s.submitted_by.name || s.submitted_by.email : source.from
   const marked = source.readBy === 'ai' && source.original ? markTimes(source.original, sent.details) : null
 
@@ -163,50 +164,30 @@ export default function ChangeReview({
       </p>
 
       {changed.map((row) => {
-        const boxes = boxesFor(fieldKeyFor(row.key, fields))
+        // Its own key, not the field it's edited with: a schedule isn't the usual times.
+        const boxes = boxesFor(fieldKeyFor(row.key, fields) === row.key ? row.key : null)
         if (boxes) {
-          return boxes.map((b) => {
-            const was = new Map(b.was.map((m) => [m.id, m]))
-            return (
-              <section key={`${row.key}:${b.box}`} aria-label={b.title} className="flex flex-col gap-3">
-                {(changed.length > 1 || boxes.length > 1) && <h2 className="m-0 text-[15px] font-bold text-slate-900">{b.title}</h2>}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="bg-white border border-slate-200 rounded-[10px] px-4 py-3 flex flex-col gap-2">
-                    <p className="m-0 text-[13px] font-bold text-slate-900">On the site now</p>
-                    {b.was.length > 0 ? <MinyanBoxRows rows={b.was} box={b.box} writing={minyanWriting} /> : <p className="m-0 text-[15px] text-slate-500">Nothing</p>}
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-[10px] px-4 py-3 flex flex-col gap-2">
-                    <p className="m-0 text-[13px] font-bold text-green-800">Would show</p>
-                    {b.now.length > 0 ? (
-                      <MinyanBoxRows
-                        rows={b.now}
-                        box={b.box}
-                        writing={minyanWriting}
-                        mark={(m) => (!was.has(m.id) ? 'New' : boxChangeCount([was.get(m.id)!], [m]) > 0 ? 'Changed' : null)}
-                      />
-                    ) : (
-                      <p className="m-0 text-[15px] text-slate-500">Nothing</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )
-          })
+          return boxes.map((b) => (
+            <section key={`${row.key}:${b.box}`} aria-label={b.title} className="flex flex-col gap-3">
+              {(changed.length > 1 || boxes.length > 1) && <h2 className="m-0 text-[15px] font-bold text-slate-900">{b.title}</h2>}
+              <ChangeGroups groups={usualBoxChange(b.was, b.now, b.box)} />
+            </section>
+          ))
         }
-        const lines = diffLines(row.before, row.after)
-        const many = lines.length > 1
+        const days = daysFor(row.key)
+        if (days.length > 0) {
+          return (
+            <section key={row.key} aria-label="The schedule" className="flex flex-col gap-3">
+              {changed.length > 1 && <h2 className="m-0 text-[15px] font-bold text-slate-900">The schedule</h2>}
+              <ChangeGroups groups={days} />
+            </section>
+          )
+        }
         return (
           <section key={row.key} aria-label={row.label} className="flex flex-col gap-2">
             {changed.length > 1 && <h2 className="m-0 text-[15px] font-bold text-slate-900">{row.label}</h2>}
-            <div className="grid md:grid-cols-2 bg-white border border-slate-200 rounded-[10px] overflow-hidden">
-              <div className="p-4 flex flex-col gap-1 border-b border-slate-200 md:border-b-0 md:border-r">
-                <p className="m-0 text-[12.5px] font-semibold text-slate-600">On the site now</p>
-                <Lines lines={lines.filter((l) => l.kind !== 'added')} mark="removed" many={many} empty={row.before === '—'} />
-              </div>
-              <div className="p-4 flex flex-col gap-1 bg-green-50">
-                <p className="m-0 text-[12.5px] font-semibold text-green-800">Would show</p>
-                <Lines lines={lines.filter((l) => l.kind !== 'removed')} mark="added" many={many} empty={row.after === '—'} />
-              </div>
+            <div className="bg-white border border-slate-200 rounded-[10px] px-4 py-3">
+              <Lines lines={fieldLines(row.before, row.after)} />
             </div>
           </section>
         )
@@ -273,24 +254,49 @@ const MINYAN_BOXES: { box: MinyanBox; title: string }[] = [
 
 const BUTTON = 'min-h-11 px-5 rounded-lg border text-[15px] font-semibold disabled:opacity-60 cursor-pointer'
 
-/** A side of the comparison: a multi-line value (a shul's times, hours) a
- *  line each, the lines that differ marked. */
-function Lines({ lines, mark, many, empty }: { lines: { text: string; kind: string }[]; mark: 'added' | 'removed'; many: boolean; empty: boolean }) {
-  if (empty) return <p className="m-0 text-[15px] text-slate-500">Nothing</p>
-  if (!many) return <p className="m-0 text-[15px] text-slate-900 whitespace-pre-wrap break-words">{lines.map((l) => l.text).join('')}</p>
+/** A field's change as lines: a multi-line value (hours, say) a line each,
+ *  only the ones that differ marked. Nothing on a side ("—") isn't a line. */
+function fieldLines(before: string, after: string): ChangeLine[] {
+  return diffLines(before, after)
+    .filter((l) => l.text !== '—')
+    .map((l, i) => ({ key: String(i), text: l.text, kind: l.kind === 'added' ? 'new' : l.kind === 'removed' ? 'gone' : 'same' }))
+}
+
+function ChangeGroups({ groups }: { groups: ChangeGroup[] }) {
   return (
-    <ul className="m-0 p-0 list-none flex flex-col">
-      {lines.map((l, i) => (
-        <li
-          key={i}
-          className={`flex items-center gap-2 py-1 text-[15px] ${
-            l.kind === mark ? (mark === 'added' ? '-mx-2 px-2 rounded bg-amber-50 font-semibold text-slate-900' : '-mx-2 px-2 rounded text-slate-500 line-through') : 'text-slate-900'
-          }`}
-        >
-          <span className="flex-1 min-w-0 break-words">{l.text}</span>
-          {l.kind === 'added' && <span className="shrink-0 text-[12px] font-extrabold text-amber-800 bg-amber-100 rounded-full px-2 py-px no-underline">Changed</span>}
-        </li>
+    <div className="bg-white border border-slate-200 rounded-[10px] px-4 py-3 flex flex-col gap-3">
+      {groups.map((g) => (
+        <div key={g.label}>
+          <p className="m-0 mb-1 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-slate-600">{g.label}</p>
+          <Lines lines={g.lines} />
+        </div>
       ))}
+    </div>
+  )
+}
+
+function Lines({ lines }: { lines: ChangeLine[] }) {
+  return (
+    <ul className="m-0 p-0 list-none flex flex-col gap-0.5">
+      {lines.map((l) => {
+        const body = (
+          <>
+            <span className="block break-words whitespace-pre-wrap">{l.text}</span>
+            {l.sub && <span className="block text-[13.5px] font-normal">{l.sub}</span>}
+          </>
+        )
+        return (
+          <li key={l.key} className="text-[15.5px]">
+            {l.kind === 'new' ? (
+              <ins className="block -mx-2 px-2 py-1 rounded bg-green-100 font-semibold text-green-950 no-underline">{body}</ins>
+            ) : l.kind === 'gone' ? (
+              <del className="block py-1 text-slate-500">{body}</del>
+            ) : (
+              <span className="block py-1 text-slate-900">{body}</span>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }

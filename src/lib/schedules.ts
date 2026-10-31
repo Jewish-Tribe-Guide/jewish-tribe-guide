@@ -204,7 +204,7 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
  *  from the newsletter or a person over one read off the website (the
  *  user, Oct 20: the newsletter wins), then the latest-starting, so a
  *  "Shemini Atzeres" one posted inside a "Sukkos" one wins on its days. */
-function firstCovering(covers: readonly SpecialSchedule[]): SpecialSchedule | undefined {
+export function firstCovering(covers: readonly SpecialSchedule[]): SpecialSchedule | undefined {
   return [...covers].sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || b.from.localeCompare(a.from))[0]
 }
 
@@ -348,13 +348,13 @@ export function sendsWeekly(schedules: readonly SpecialSchedule[], today: string
 }
 
 /** The dates a schedule covers, in order. */
-function datesOf(s: Pick<SpecialSchedule, 'from' | 'to'>): string[] {
+export function datesOf(s: Pick<SpecialSchedule, 'from' | 'to'>): string[] {
   const out: string[] = []
   for (let t = Date.parse(`${s.from}T12:00:00Z`); t <= Date.parse(`${s.to}T12:00:00Z`); t += DAY_MS) out.push(new Date(t).toISOString().slice(0, 10))
   return out
 }
 
-const weekdayOfDate = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
+export const weekdayOfDate = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
 /** The weekdays a week post covers, Sunday first: the days its minyanim
  *  can be put on when it's edited. */

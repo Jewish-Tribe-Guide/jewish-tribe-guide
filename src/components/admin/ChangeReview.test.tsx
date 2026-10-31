@@ -61,3 +61,43 @@ describe('Edit, then update, on a change to a shul’s week', () => {
     expect(screen.queryByTestId('editor-open-minyans:this_week')).not.toBeInTheDocument()
   })
 })
+
+describe('a change as one list', () => {
+  const show = (details: Record<string, unknown>, was: Record<string, unknown>) =>
+    renderWithProviders(
+      <ChangeReview
+        submission={{ ...change({}), payload: { category: 'synagogue', name: 'Mekor', address: '', details }, current: { id: 'mi', category: 'synagogue', name: 'Mekor', address: '', details: was } } as unknown as EnrichedSubmission}
+        category={SHUL}
+        position={{ at: 0, total: 1, back: () => {} }}
+        token="t"
+        onModerate={() => {}}
+        onUpdated={() => {}}
+      />,
+    )
+
+  it('a week’s time, by its day: the old crossed out, the new highlighted, no two columns', () => {
+    const was = { minyanim: usual, minyanim_schedules: [post('2026-10-11', '2026-10-17', '2026-10-12')] }
+    const now = { minyanim: usual, minyanim_schedules: [{ ...post('2026-10-11', '2026-10-17', '2026-10-12'), minyanim: [{ id: 'x', tefillah: 'mincha', on: ['2026-10-12'], time: '5:00pm' }] }] }
+    show(now, was)
+    const list = screen.getByRole('region', { name: 'The schedule' })
+    expect(list).toHaveTextContent('Mon Oct 12')
+    expect(screen.getByRole('deletion')).toHaveTextContent('Mincha 4:45 PM')
+    expect(screen.getByRole('insertion')).toHaveTextContent('Mincha 5 PM')
+    expect(screen.queryByText('On the site now')).not.toBeInTheDocument()
+    expect(screen.queryByText('Would show')).not.toBeInTheDocument()
+  })
+
+  it('a usual time: the rest of the box stays plain', () => {
+    const more = [...usual, { id: 'b', tefillah: 'mincha', days: ['sat'], time: '1:00pm' }]
+    show({ minyanim: [{ ...more[0], time: '9:30am' }, more[1]] }, { minyanim: more })
+    expect(screen.getByRole('deletion')).toHaveTextContent('Shacharis 9 AM')
+    expect(screen.getByRole('insertion')).toHaveTextContent('Shacharis 9:30 AM')
+    expect(screen.getByRole('region', { name: 'Usual Shabbos times' })).toHaveTextContent('Mincha 1 PM')
+  })
+
+  it('a plain field: old and new in one place', () => {
+    show({ minyanim: usual, notes: 'Side door' }, { minyanim: usual, notes: 'Front door' })
+    expect(screen.getByRole('deletion')).toHaveTextContent('Front door')
+    expect(screen.getByRole('insertion')).toHaveTextContent('Side door')
+  })
+})

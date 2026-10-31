@@ -353,9 +353,9 @@ describe('ModerationQueue — an opened card', () => {
     expect(within(from).getByText(/from the shul’s card/)).toBeInTheDocument()
   })
 
-  // A change opens to what the listing says now beside what it would show
-  // (boards 3 and 20, Oct 29).
-  it('clicking a change opens it, now beside would-show for each field it changes, and Back returns to the list', async () => {
+  // A change opens to one list, new highlighted and old crossed out (boards
+  // 3 and 20, Oct 29; one list since Oct 31).
+  it('clicking a change opens it, one list for each field it changes, and Back returns to the list', async () => {
     const user = userEvent.setup()
     renderShulQueue([aiEdit])
     await user.click(await findRow('Mekor Habracha'))
@@ -370,10 +370,8 @@ describe('ModerationQueue — an opened card', () => {
     // Friday's mincha is with Shabbos.
     expect(screen.getByText('Synagogues · a change to Usual Shabbos times')).toBeInTheDocument()
     const times = screen.getByRole('region', { name: 'Usual Shabbos times' })
-    expect(within(times).getByText('On the site now').parentElement).toHaveTextContent('6:23 PM')
-    const would = within(times).getByText('Would show').parentElement!
-    expect(within(would).getByText('6:20 PM')).toBeInTheDocument()
-    expect(within(would).getByText('Changed')).toBeInTheDocument()
+    expect(within(times).getByRole('deletion')).toHaveTextContent('6:23 PM')
+    expect(within(times).getByRole('insertion')).toHaveTextContent('6:20 PM')
     expect(screen.queryByRole('region', { name: 'Usual weekday times' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Rabbi' })).not.toBeInTheDocument()
 
