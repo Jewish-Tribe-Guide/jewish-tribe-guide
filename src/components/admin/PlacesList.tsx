@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
+import { ADMIN_AREA_TAPPED, adminBase } from '@/lib/adminNav'
+import { watchesLine } from '@/lib/todo'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
@@ -67,12 +68,29 @@ function Plus() {
   )
 }
 
+/** "142 pages · read last night", for Watches at the foot of the list. */
+function useWatchesLine(token: string, community: string, now: number): string | undefined {
+  const [line, setLine] = useState<string>()
+  useEffect(() => {
+    let live = true
+    fetchJson<{ watches: { active: boolean; lastRunAt: string | null }[] }>(withCommunity('/api/admin/watches', community), { headers: { Authorization: `Bearer ${token}` } }, '')
+      .then((body) => live && setLine(watchesLine(body.watches, now)))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [token, community, now])
+  return line
+}
+
 export default function PlacesList({ token }: { token: string }) {
   const community = useCommunitySlug()
+  const base = adminBase(community)
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { jobs, reload } = useWatchJobsAndReload(token)
   const [now] = useState(() => Date.now())
+  const watches = useWatchesLine(token, community, now)
   const coverage = useMemo(() => coverageOf(jobs), [jobs])
   const troubles = useMemo(() => troublesOf(jobs, now), [jobs, now])
   const [show, setShow] = useState<PlaceShow>('site')
@@ -327,6 +345,9 @@ export default function PlacesList({ token }: { token: string }) {
           </div>
         </section>
       )}
+      <section aria-label="Watches" className="bg-white border border-slate-200 rounded-[10px] overflow-hidden">
+        <AdminRow href={`${base}/watches`} name="Watches" line={watches} />
+      </section>
     </div>
   )
 }

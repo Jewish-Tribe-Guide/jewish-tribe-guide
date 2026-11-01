@@ -78,8 +78,8 @@ export function teachable(term: string): boolean {
 
 /** What's waiting on a decision. Not searches nobody found: those are in
  *  Reports. */
-export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[]; waiting?: unknown[] }): number {
-  return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0) + (t.waiting?.length ?? 0)
+export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[]; waiting?: unknown[]; notRead?: unknown[] }): number {
+  return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0) + (t.waiting?.length ?? 0) + (t.notRead?.length ?? 0)
 }
 
 /** A place Google has no match for and nobody has said why: pick the right
@@ -118,12 +118,12 @@ export function changeWhat(s: EnrichedSubmission, category: CategoryConfig | und
 
 /** The Watches row's line: how many pages are read, and when they last
  *  were. "115 pages read each night · last run 4:00 AM". */
-export function watchesLine(watches: { active: boolean; lastRunAt: string | null }[]): string {
+export function watchesLine(watches: { active: boolean; lastRunAt: string | null }[], now: number): string {
   const active = watches.filter((w) => w.active)
-  const pages = `${active.length} ${active.length === 1 ? 'page' : 'pages'} read each night`
+  const pages = `${active.length} ${active.length === 1 ? 'page' : 'pages'}`
   const last = active.map((w) => w.lastRunAt).filter((t): t is string => !!t).sort().at(-1)
   if (!last) return pages
-  return `${pages} · last run ${new Date(last).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  return `${pages} · ${now - Date.parse(last) < 30 * 60 * 60 * 1000 ? 'read last night' : `read ${shortDay(last)}`}`
 }
 
 export function shortDay(iso: string): string {

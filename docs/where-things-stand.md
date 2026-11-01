@@ -2203,6 +2203,13 @@ to say. In admin's listing and eruv, an opened row's source line now sits on
 the gray under the white card, then a solid Done, as drawn (it was inside the
 card, tight above Done). The public editor keeps Done inside its card.
 
+**Building the Add a place and Watches boards (Nov 1, the user: "ready to build
+everything").** Built so far: rows name their source; Watches at the foot of
+Places, its jobs under Google, Websites, Email, Outside lists and Link check; To
+do's Not being read, with "No email has come in 3 weeks". The kosher job's Watches
+row says "Keystone-K and Mekor Habracha", as it reads both (the board says
+Keystone-K only).
+
 **Drawn Nov 1, not built (the *14 boards):** Read now for email, so an admin
 adding a place sees the answer then instead of coming back. The Gmail script
 becomes a web app the site can call: two more setup steps (Deploy it, Paste its

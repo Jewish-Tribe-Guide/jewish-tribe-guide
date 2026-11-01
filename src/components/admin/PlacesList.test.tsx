@@ -89,6 +89,12 @@ afterEach(() => {
 })
 
 describe('Places', () => {
+  it('has Watches at its foot, with how much it reads', async () => {
+    renderPlaces()
+    await screen.findByRole('region', { name: 'Places' })
+    expect(within(screen.getByRole('region', { name: 'Watches' })).getByRole('link', { name: /Watches/ })).toHaveAttribute('href', '/philly/admin/watches')
+  })
+
   it('lists what’s on the site, by name, with what’s wrong first and its category', async () => {
     renderPlaces()
     const list = await screen.findByRole('region', { name: 'Places' })

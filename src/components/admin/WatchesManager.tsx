@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { jobLists, lastRunWord, needsFixing, watchesSentence } from '@/lib/watchJobList'
+import type { NightKindId } from '@/lib/jobRuns'
 import type { NightKindView } from '@/lib/nightKinds'
-import { AdminBox, AdminRow, AdminRows } from './AdminUI'
+import { AdminBack, AdminBox, AdminRow, AdminRows } from './AdminUI'
 import { BadMark, GoodMark } from './JobPage'
 import { JobsNotLoaded } from './WatchKinds'
 import { coverageOf, forgetWatchJobs, useWatchJobsAndReload } from './useWatchJobs'
@@ -22,14 +23,31 @@ export function forgetWatchesTab() {
   forgetWatchJobs()
 }
 
+/** The jobs, under the source they read (WatchesInPlaces10). */
+const WATCH_SOURCES: { title: string; jobs: NightKindId[] }[] = [
+  { title: 'Google', jobs: ['google'] },
+  { title: 'Websites', jobs: ['times', 'hours', 'sites', 'menus', 'eruvs', 'other'] },
+  { title: 'Email', jobs: ['newsletters'] },
+  { title: 'Outside lists', jobs: ['kosher', 'hospitals'] },
+  { title: 'Link check', jobs: ['links'] },
+]
+
+/** A list goes by whose it is, with what it's read for under it. */
+const OUTSIDE: Partial<Record<NightKindId, { name: string; about: string }>> = {
+  kosher: { name: 'Keystone-K and Mekor Habracha', about: 'Kosher certification' },
+  hospitals: { name: 'Refuah', about: 'Hospitals' },
+}
+
 function JobRow({ job, base, now }: { job: NightKindView; base: string; now: number }) {
   const bad = job.fixes.length > 0
+  const outside = OUTSIDE[job.id]
+  const when = job.lastAt ? lastRunWord(job.lastAt, now, job.id !== 'newsletters' && job.id !== 'links') : undefined
   const href = job.id === 'newsletters' ? `${base}/watches/newsletters` : `${base}/watches/job/${job.id}`
   return (
     <AdminRow
       href={href}
-      name={job.name}
-      line={job.lastAt ? lastRunWord(job.lastAt, now, job.id !== 'newsletters' && job.id !== 'links') : undefined}
+      name={outside?.name ?? job.name}
+      line={[outside?.about, when].filter(Boolean).join(' · ') || undefined}
       aside={!job.lastAt ? 'Not run yet' : bad ? <BadMark /> : <GoodMark />}
     />
   )
@@ -54,6 +72,7 @@ export default function WatchesManager({ token }: { token: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <AdminBack back={{ label: 'Places', href: `${base}/places` }} title="Watches" />
       <div className="flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5" data-testid="watches-sentence">
         {sentence.tone === 'good' && <GoodMark label="" />}
         {sentence.tone === 'bad' && <BadMark label="" />}
@@ -67,13 +86,16 @@ export default function WatchesManager({ token }: { token: string }) {
           </AdminRows>
         </AdminBox>
       )}
-      {lists.jobs.length > 0 && (
-        <AdminBox title="Jobs">
-          {lists.jobs.map((j) => (
-            <JobRow key={j.id} job={j} base={base} now={now} />
-          ))}
-        </AdminBox>
-      )}
+      {WATCH_SOURCES.map((source) => {
+        const here = source.jobs.flatMap((id) => lists.jobs.filter((j) => j.id === id))
+        return here.length > 0 ? (
+          <AdminBox key={source.title} title={source.title}>
+            {here.map((j) => (
+              <JobRow key={j.id} job={j} base={base} now={now} />
+            ))}
+          </AdminBox>
+        ) : null
+      })}
       {lists.steps.length > 0 && (
         <AdminBox title="Needs one step">
           {lists.steps.map((s) => (
