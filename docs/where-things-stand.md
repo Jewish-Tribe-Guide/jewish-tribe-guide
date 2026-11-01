@@ -2172,8 +2172,13 @@ emails"). A row with both set up says "Website, Email", with one line each
 inside. The Website job is renamed "Phone, email and hours". A link the Sunday
 job checks says "Link check", WhatsApp included. A page that isn't being read
 waits in To do under "Not being read", since today it shows only on Watches.
-Watches lists the jobs under their source and leaves To do. **Waiting on the
-user:** a row in Places (recommended) or its own tab (both drawn).
+Watches lists the jobs under their source and leaves To do.
+
+**Drawn Nov 1, not built (the *11 boards):** no source word on "Not on the
+listing yet" lines; the line appears once one is opened. Agreed Watches isn't a
+tab. The row at the top of Places looked crowded on a phone, so it's drawn at
+the foot of Places, under Show all, with "+ Add a place" beside the title.
+**Waiting on the user:** that placement.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
