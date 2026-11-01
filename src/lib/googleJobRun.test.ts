@@ -250,7 +250,7 @@ describe('Use Google’s, on the listing’s line (GoogleStopped7)', () => {
   it('Google’s version of that field only, and Google keeps it again', async () => {
     await run.stopField('philly', 'a1', 'phone', NOW)
     m.fetchPlaceSync.mockResolvedValue({ ...google, phone: '215-000-0000' })
-    const p = await run.useGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)
+    const p = await run.takeGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)
     expect(m.filed).toHaveLength(1)
     expect(m.filed[0].by).toEqual({ name: 'Google Maps' })
     expect(m.rows[0].phone).toBe('215-000-0000')
@@ -263,7 +263,7 @@ describe('Use Google’s, on the listing’s line (GoogleStopped7)', () => {
 
   it('already the same: Google keeps it, with nothing filed', async () => {
     await run.stopField('philly', 'a1', 'phone', NOW)
-    const p = await run.useGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)
+    const p = await run.takeGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)
     expect(m.filed).toEqual([])
     expect(by(p).phone).toBe('google')
   })
@@ -271,7 +271,7 @@ describe('Use Google’s, on the listing’s line (GoogleStopped7)', () => {
   it('Google has none: says so, and changes nothing (GoogleNone7)', async () => {
     await run.stopField('philly', 'a1', 'phone', NOW)
     m.fetchPlaceSync.mockResolvedValue({ ...google, phone: null })
-    await expect(run.useGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)).rejects.toThrow('Google has no phone for this place')
+    await expect(run.takeGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)).rejects.toThrow('Google has no phone for this place')
     expect(m.filed).toEqual([])
     expect(m.rows[0].phone).toBe('(215) 735-5148')
     expect((m.rows[0].details as Record<string, unknown>).googleStopped).toEqual(['phone'])

@@ -497,7 +497,7 @@ export async function stopField(community: string, id: string, name: string, now
 
 /** Use Google's (the listing's line, Nov 1): one field back on Google's
  *  version, filed as Google Maps, and Google keeps it from then on. */
-export async function useGoogleField(community: string, id: string, name: string, admin: string, now = Date.now()): Promise<GooglePlace> {
+export async function takeGoogleField(community: string, id: string, name: string, admin: string, now = Date.now()): Promise<GooglePlace> {
   const loaded = await loadOne(community, id)
   const { category } = loaded
   const field = checkedField(category, name)

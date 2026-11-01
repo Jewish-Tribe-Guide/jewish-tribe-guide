@@ -17,7 +17,7 @@ import {
   pickGooglePlace,
   showAsOpen,
   stopField,
-  useGoogleField,
+  takeGoogleField,
   applyGoogles,
   wrongPlace,
 } from '@/lib/googleJobRun'
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     else if (action === 'open') place = await showAsOpen(slug, id, body?.open === true)
     else if (action === 'stop_field' || action === 'use_field') {
       const field = typeof body?.field === 'string' ? body.field : ''
-      place = action === 'stop_field' ? await stopField(slug, id, field) : await useGoogleField(slug, id, field, admin.email)
+      place = action === 'stop_field' ? await stopField(slug, id, field) : await takeGoogleField(slug, id, field, admin.email)
     }
     else {
       const values = body?.values
