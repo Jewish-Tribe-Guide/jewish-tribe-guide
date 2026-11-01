@@ -360,7 +360,7 @@ describe('PlacePage', () => {
       expect(screen.getByRole('button', { name: 'No changes yet' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Archive it' })).toBeTruthy()
       const jobs = screen.getAllByTestId('row-job').map((j) => j.textContent)
-      expect(jobs).toContain('Minyan times')
+      expect(jobs).toContain('Website')
       expect(jobs).toContain('Google')
       for (const job of jobs) expect(job).not.toMatch(/\d/)
     })
@@ -368,7 +368,7 @@ describe('PlacePage', () => {
     it('its row opened says where it’s read, and Change saves another page or stops it', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
-      const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!
+      const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!
       await user.click(minyans)
       expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Change`)
       expectLineUnderCard()
@@ -384,7 +384,7 @@ describe('PlacePage', () => {
     it('Stop reading it, on the Change screen: nothing asked first, it can be started again', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
-      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!)
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
@@ -557,7 +557,7 @@ describe('an eruv', () => {
     expect(rowOf('status')).toHaveTextContent('Status')
     expect(rowOf('map')).toHaveTextContent('On the map')
     expect(rowOf('hotline')).toHaveTextContent('(610) 664-5626')
-    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveTextContent('Eruvs')
+    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveTextContent('Website')
     expect(within(rowOf('website')).getByTestId('row-job')).toHaveTextContent('Nothing')
 
     await user.click(rowOf('status'))
@@ -702,7 +702,7 @@ describe('stopping a hospital’s or food place’s source', () => {
       if (url.includes('/api/admin/main-dishes')) return { places: [grill] }
     })
     const user = userEvent.setup()
-    await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Menus')!.closest('button')!)
+    await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
     expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Change`)
     expectLineUnderCard()
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))

@@ -288,6 +288,22 @@ export default function PlaceListing({
     </button>
   )
 
+  const changeControl = (c: NonNullable<SourceLine['change']>) => {
+    const stop: Stop | undefined = c.stop
+    return control('Change', () =>
+      open('Change', {
+        label: c.label,
+        value: c.value,
+        button: 'Save',
+        attempt: async (url) => {
+          await actions.change(c.act, url)
+          return { failed: false }
+        },
+        ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
+      }),
+    )
+  }
+
   function rowSource(row: EditorRow, changed: boolean): ReactNode {
     const source = sources?.(row)
     if (!source) return null
@@ -296,24 +312,7 @@ export default function PlaceListing({
     // Typed over or cleared, Google doesn't get it back on saving.
     if (line.googleStop && changed) return <SourceWords line={{ text: 'Google stops keeping this' }} />
     const controls: ReactNode[] = []
-    if (line.change) {
-      const c = line.change
-      const stop: Stop | undefined = c.stop
-      controls.push(
-        control('Change', () =>
-          open('Change', {
-            label: c.label,
-            value: c.value,
-            button: 'Save',
-            attempt: async (url) => {
-              await actions.change(c.act, url)
-              return { failed: false }
-            },
-            ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
-          }),
-        ),
-      )
-    }
+    if (line.change) controls.push(changeControl(line.change))
     if (line.start) {
       const s = line.start
       controls.push(control('Change', () => open('Change', { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) })))
@@ -331,10 +330,11 @@ export default function PlaceListing({
       controls.push(control('Use Google’s', () => void google(row, 'use_field', f)))
     }
     return (
-      <>
+      <div className="space-y-1">
         {error}
         <SourceWords line={line} controls={controls} />
-      </>
+        {source.also && <SourceWords line={source.also} controls={source.also.change ? [changeControl(source.also.change)] : undefined} />}
+      </div>
     )
   }
 

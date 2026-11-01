@@ -48,7 +48,7 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
 
   it('a website kept by the link check: Links, with no control', () => {
     const got = sourceOf(jobs({ google: google([fieldBy('website', 'links', { at })]) as never }), website)
-    expect(got).toMatchObject({ job: 'Links', line: { text: 'Link check', when: day(at) } })
+    expect(got).toMatchObject({ job: 'Link check', line: { text: 'Link check', when: day(at) } })
     expect(got?.line.change).toBeUndefined()
     expect(got?.line.googleStop).toBeUndefined()
   })
@@ -64,6 +64,21 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     expect(got?.line.add).toBeUndefined()
   })
 
+  it('a week read from both: Website, Email, one line each, the email first', () => {
+    const news = { id: 'n', url: 'mailto:office@a.example', active: true, pageChangedAt: at }
+    const times = { places: [{ id: 'a', pages: [{ watch: page }], newsletters: [news], stopped: [] }] }
+    const got = sourceOf(jobs({ times: times as never }), row({ id: 'minyans:this_week', kind: 'minyans' }))
+    expect(got).toMatchObject({ job: 'Website, Email', amber: false, line: { text: 'Its email', when: day(at) }, also: { url: page.url } })
+  })
+
+  it('a week read only from its email: Email', () => {
+    const news = { id: 'n', url: 'mailto:office@a.example', active: true, pageChangedAt: at }
+    const times = { places: [{ id: 'a', pages: [], newsletters: [news], stopped: [] }] }
+    const got = sourceOf(jobs({ times: times as never }), row({ id: 'minyans:this_week', kind: 'minyans' }))
+    expect(got).toMatchObject({ job: 'Email', line: { text: 'Its email' } })
+    expect(got?.also).toBeUndefined()
+  })
+
   it('a row like it no job reads has no job at all', () => {
     expect(sourceOf(jobs({}), row({ id: 'contact:address', kind: 'contact', part: 'address' }))).toBeNull()
   })
@@ -72,7 +87,7 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     const dishes = [{ id: 'a', dishes: [], menuUrl: 'https://a.example/menu', reading: { status: 'approved', readAt: at, sourceUrl: 'https://a.example/menu', dishes: [] } }]
     const items = row({ id: 'items', kind: 'items', fields: [{ key: 'd', label: 'd', type: 'tags', countLabel: 'dish' }] as never })
     const got = sourceOf(jobs({ dishes: dishes as never }), items)
-    expect(got?.job).toBe('Menus')
+    expect(got?.job).toBe('Website')
     expect(got?.line.change?.value).toBe('https://a.example/menu')
   })
 
@@ -90,7 +105,7 @@ describe('an eruv’s rows (EruvListing6)', () => {
 
   it('everything is the Eruvs job’s but its Website', () => {
     const got = eruvSources('lm', eruvJobs(), now)
-    expect([got.status.job, got.map.job, got.details.job, got.website.job]).toEqual(['Eruvs', 'Eruvs', 'Eruvs', 'Nothing'])
+    expect([got.status.job, got.map.job, got.details.job, got.website.job]).toEqual(['Website', 'Website', 'Website', 'Nothing'])
     expect(got.website.amber).toBe(true)
     expect(got.website.line.add).toBeUndefined()
     expect(got.status.line.text).toBe('Its status page')
