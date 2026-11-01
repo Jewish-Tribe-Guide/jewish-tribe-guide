@@ -2164,8 +2164,16 @@ only; kosher places and hospitals aren't traced yet.
 **Agreed Nov 1, drawn, not built (the *9 boards):** a row names where it's read
 from, not the job: Google, Website, Newsletter, Keystone, Refuah, Nothing or
 Stopped. This replaces the row words on the *8 boards and the built "Watches
-names" on listings. Jobs stay as how the system runs. Proposed, not agreed:
-Watches lists the jobs under their source (Watches9).
+names" on listings. Jobs stay as how the system runs.
+
+**Agreed Nov 1, drawn, not built (the *10 boards, which replace those words):**
+"Email", never "Newsletter" (row, line, Add a source's box, the job as "Shul
+emails"). A row with both set up says "Website, Email", with one line each
+inside. The Website job is renamed "Phone, email and hours". A link the Sunday
+job checks says "Link check", WhatsApp included. A page that isn't being read
+waits in To do under "Not being read", since today it shows only on Watches.
+Watches lists the jobs under their source and leaves To do. **Waiting on the
+user:** a row in Places (recommended) or its own tab (both drawn).
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
