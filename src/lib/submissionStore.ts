@@ -701,7 +701,11 @@ async function computeGoogleFields(
   for (const field of toDecide) {
     const current = currentOf(field)
     if (isEmptyValue(current)) {
-      result.add(field) // nothing there to protect — always fillable.
+      // A new listing's blank has nothing to protect, so Google may fill it.
+      // An edit that clears one is someone saying it's wrong: it stays blank
+      // rather than coming back next morning (GoogleBlank7, the user, Nov 1).
+      if (existing) result.delete(field)
+      else result.add(field)
       continue
     }
     const autofilledValue = autofill[field]

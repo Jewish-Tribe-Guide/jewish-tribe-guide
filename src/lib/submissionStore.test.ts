@@ -1035,6 +1035,22 @@ describe('approveSubmission: Google-sync field ownership', () => {
     return updateBuilder
   }
 
+  it('edit: clearing a field Google kept leaves it blank next morning, with no check (GoogleBlank7)', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ phone: '', details: { placeId: 'place-1' } }) as unknown as Record<string, unknown>,
+    })
+    const updateBuilder = mockUpdateFlow(sub, { id: 'res-1', name: 'Test Shul', phone: '215-555-0100', details: { placeId: 'place-1', googleFields: ['name', 'phone'] } })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(updateBuilder.update)
+    expect(written.details.googleFields).toEqual(['name'])
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
   // An edit's payload is built from the category's configured detailFields
   // only, and applying an update replaces `details` wholesale — so every
   // approved edit was wiping the listing's sync state along with it. The one

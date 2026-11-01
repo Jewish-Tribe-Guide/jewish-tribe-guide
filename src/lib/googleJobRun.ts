@@ -123,6 +123,8 @@ const storedCheck = (details: Record<string, unknown>): StoredCheck | null => {
   return c && typeof c.at === 'string' && c.values && typeof c.values === 'object' ? c : null
 }
 
+const stoppedOf = (details: Record<string, unknown>): string[] => (Array.isArray(details.googleStopped) ? (details.googleStopped as unknown[]).filter((x): x is string => typeof x === 'string') : [])
+
 const matchOf = (details: Record<string, unknown>) => (typeof details.placeId === 'string' && details.placeId ? details.placeId : null)
 
 /** Who checks each of the listing's fields. */
@@ -174,10 +176,11 @@ function closureOf(details: Record<string, unknown>): GoogleClosure | null {
 /** What a stored check left to decide, set against the listing as it is. */
 function compareOf(row: Row, category: CategoryConfig, fields: readonly GoogleFieldRow[], check: StoredCheck | null, now: number): GoogleCompare | null {
   if (!check || check.decided || now - Date.parse(check.at) > CHECK_KEEPS_MS) return null
+  const stopped = stoppedOf(row.details ?? {})
   const rows = fields.map((f) => {
     const google = check.values[f.field]
     const none = shown(f.field, google) === '—'
-    const changed = !none && f.by.kind !== 'google' && !same(f.field, google, valueOf(f.field, row, category))
+    const changed = !none && f.by.kind !== 'google' && !stopped.includes(f.field) && !same(f.field, google, valueOf(f.field, row, category))
     return { field: f.field, label: f.label, google: none ? '—' : shown(f.field, google), changed, ...(none ? { none: true } : changed ? { raw: google } : {}) }
   })
   return { at: check.at, rows }
@@ -282,7 +285,8 @@ async function compareWithGoogle(community: string, row: Row, category: Category
   if (!sync) throw new GoogleJobError('Google didn’t answer. Try again shortly.', 502)
   const values = googleValues(sync)
   const details = { ...(row.details ?? {}), ...extra }
-  const matches = fieldsOf(category).filter((f) => !syncMayWrite(details, f, valueOf(f, row, category)) && shown(f, values[f]) !== '—' && same(f, values[f], valueOf(f, row, category)))
+  const stopped = stoppedOf(details)
+  const matches = fieldsOf(category).filter((f) => !stopped.includes(f) && !syncMayWrite(details, f, valueOf(f, row, category)) && shown(f, values[f]) !== '—' && same(f, values[f], valueOf(f, row, category)))
   const at = new Date(now).toISOString()
   await writeDetails(community, row.id, {
     ...details,
@@ -370,7 +374,7 @@ export async function notOnGoogle(community: string, id: string, now = Date.now(
 /** What a Google match wrote about the place, and what was decided about
  *  it: all of it describes another place once the match is wrong. */
 const MATCH_KEYS = [
-  'placeId', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt', 'lastSyncError', 'lastSyncFailedAt', 'googleFields', 'googleCheck', 'googleKept',
+  'placeId', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt', 'lastSyncError', 'lastSyncFailedAt', 'googleFields', 'googleStopped', 'googleCheck', 'googleKept',
   'businessStatus', 'businessStatusBefore', 'businessStatusChangedAt', 'businessStatusOverride', 'businessStatusKeptAt', 'googleDescription',
 ]
 
@@ -462,6 +466,54 @@ export async function editFromGoogle(community: string, id: string, values: Part
     ...details,
     googleKept: keptNow(after, category, watches, now),
     ...(latest ? { googleCheck: { ...latest, decided: { what: 'used', at: new Date(now).toISOString() } } } : {}),
+  })
+  return onePlace(community, id, now)
+}
+
+/** The listing's field an admin named, if it's one Google can check here. */
+function checkedField(category: CategoryConfig, field: string): CheckedField {
+  const found = fieldsOf(category).find((f) => f === field)
+  if (!found) throw new GoogleJobError('Google doesn’t keep that field here.', 400)
+  return found
+}
+
+/** Stop (the listing's Google line, Nov 1): the value stays, Google no longer
+ *  keeps it, and its version isn't offered again. Whichever job reads the
+ *  field now checks it, and otherwise nothing does. */
+export async function stopField(community: string, id: string, name: string, now = Date.now()): Promise<GooglePlace> {
+  const { row, category } = await loadOne(community, id)
+  const field = checkedField(category, name)
+  const details = row.details ?? {}
+  // A listing with no provenance yet has Google filling its blanks: the
+  // list it would have had, so stopping one leaves the rest as they were.
+  const owned = Array.isArray(details.googleFields) ? (details.googleFields as string[]) : fieldsOf(category).filter((f) => syncMayWrite(details, f, valueOf(f, row, category)))
+  await writeDetails(community, id, {
+    ...details,
+    googleFields: owned.filter((f) => f !== field),
+    googleStopped: [...new Set([...stoppedOf(details), field])],
+  })
+  return onePlace(community, id, now)
+}
+
+/** Use Google's (the listing's line, Nov 1): one field back on Google's
+ *  version, filed as Google Maps, and Google keeps it from then on. */
+export async function useGoogleField(community: string, id: string, name: string, admin: string, now = Date.now()): Promise<GooglePlace> {
+  const loaded = await loadOne(community, id)
+  const { category } = loaded
+  const field = checkedField(category, name)
+  const { row, check } = await freshCheck(community, loaded.row, category, now)
+  const google = check.values[field]
+  if (shown(field, google) === '—') throw new GoogleJobError(`Google has no ${CHECKED_LABELS[field].toLowerCase()} for this place`, 400)
+  if (!same(field, google, valueOf(field, row, category))) await saveFields(community, row, category, { [field]: google }, check.values, admin, 'From Google Maps, used on the listing.')
+  const { row: after } = await loadOne(community, id)
+  const details = after.details ?? {}
+  const left = stoppedOf(details).filter((f) => f !== field)
+  const { googleStopped: _dropped, ...rest } = details
+  await writeDetails(community, id, {
+    ...rest,
+    // A name that shares nothing with Google's takes the match away.
+    ...(matchOf(details) ? { googleFields: nextGoogleFields(details, [field]) } : {}),
+    ...(left.length ? { googleStopped: left } : {}),
   })
   return onePlace(community, id, now)
 }

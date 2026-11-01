@@ -28,6 +28,10 @@ export const SYNC_INTERNAL_FIELDS = [
   // 26), never offered again.
   'googleWrong',
   'googleCheck',
+  // Fields an admin stopped Google keeping (Stop, on the listing, Nov 1):
+  // Google's version isn't offered for them again unless they say Use
+  // Google's.
+  'googleStopped',
   'googleStatusCheckedAt',
   'lastSyncError',
   'lastSyncFailedAt',
