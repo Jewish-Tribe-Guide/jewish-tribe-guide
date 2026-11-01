@@ -2180,6 +2180,15 @@ tab. The row at the top of Places looked crowded on a phone, so it's drawn at
 the foot of Places, under Show all, with "+ Add a place" beside the title.
 **Waiting on the user:** that placement.
 
+**Drawn Nov 1, not built (the *12 boards):** the other kinds of place on Add a
+place. A hospital's contact rows say "Refuah · tomorrow morning · Change". A food
+place's kosher row says both lists get checked, then names the one it was found
+on. A mikvah takes a page only. An eruv uses the same Add screen, with sources
+given before it goes live; today a name alone puts it on the site. After an email
+source, a line says to sign up with the guide's address, and "No email has come
+in 3 weeks" waits in To do under Not being read. The canvas now holds only
+current boards, in labelled rows. **Waiting on the user:** all of these.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
