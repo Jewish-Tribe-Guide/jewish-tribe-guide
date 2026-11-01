@@ -46,6 +46,15 @@ async function one(community: string, id: string): Promise<AdminEruv | null> {
   return (await listEruvimForAdmin(community)).eruvim.find((e) => e.id === id) ?? null
 }
 
+/** Its map read now, dated even when it's the same; seen here, so no email
+ *  about a missing part later. */
+async function readAndSaveMap(community: string, eruv: AdminEruv | null, now = new Date()): Promise<void> {
+  if (!eruv?.lineUrl) return
+  const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
+  await saveLineRead(community, eruv.id, read.save)
+  if (read.missing) await saveLineMissing(community, eruv.id, read.missing)
+}
+
 export async function POST(request: Request) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const admin = await getAdminUserForCommunity(request, community.slug)
@@ -72,6 +81,9 @@ export async function POST(request: Request) {
       const read = readEruvEdit(body?.edit)
       if (!read.ok) return bad(read.error)
       await updateEruv(community.slug, id, read.edit, eruv)
+      // A new map address is read at once: nothing else reads it till night,
+      // and the public route only serves what's saved.
+      if (read.edit.lineUrl && read.edit.lineUrl !== eruv.lineUrl) await readAndSaveMap(community.slug, await one(community.slug, id))
       return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
     if (action === 'remove') {
@@ -99,14 +111,7 @@ export async function POST(request: Request) {
       // Read now, it goes live and is put away; still unreadable, it waits.
       const reread = eruv.statusEmailKept && rereadKeptEmail(eruv.statusEmailKept, community.timezone)
       if (reread) await saveEmailRead(community.slug, id, reread, null)
-      if (eruv.lineUrl) {
-        const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
-        // Read now: dated even when the map is the same, so its "read" is today.
-        const save = read.save ?? (read.missing ? { ok: true as const, file: null, at: now.toISOString() } : undefined)
-        if (save) await saveLineRead(community.slug, id, save)
-        // Seen here, so no email about it later.
-        if (read.missing) await saveLineMissing(community.slug, id, read.missing)
-      }
+      await readAndSaveMap(community.slug, eruv, now)
       return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
     return bad('Unknown action.')

@@ -67,10 +67,33 @@ describe("POST /api/admin/eruvim { action: 'find' }", () => {
   })
 })
 
+describe("POST /api/admin/eruvim { action: 'save' }", () => {
+  const edit = (lineUrl: string) => ({ action: 'save', id: 'center-city', edit: { name: 'Center City', lineUrl } })
+  const save = { ok: true, file: { lines: [] }, at: '2026-10-22T12:00:00Z' }
+  beforeEach(() => {
+    m.readEruvMap.mockReset()
+    m.saveLineRead.mockReset()
+    m.readEruvMap.mockResolvedValue({ map: null, save, missing: [] })
+  })
+
+  it('a new map address is read at once: nothing else reads it till night', async () => {
+    m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ lineUrl: 'https://centercityeruv.com/old.geojson' })], available: true })
+    expect((await POST(req(edit('https://centercityeruv.com/new.geojson')))).status).toBe(200)
+    expect(m.readEruvMap).toHaveBeenCalledTimes(1)
+    expect(m.saveLineRead).toHaveBeenCalledWith('philly', 'center-city', save)
+  })
+
+  it('the same address isn’t read again', async () => {
+    m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ lineUrl: 'https://centercityeruv.com/old.geojson' })], available: true })
+    expect((await POST(req(edit('https://centercityeruv.com/old.geojson')))).status).toBe(200)
+    expect(m.readEruvMap).not.toHaveBeenCalled()
+  })
+})
+
 describe("POST /api/admin/eruvim { action: 'check' }", () => {
   it('Read them now dates its map’s read even when the map is the same', async () => {
     m.listEruvimForAdmin.mockResolvedValue({ eruvim: [eruv({ lineUrl: 'https://centercityeruv.com/map-data.geojson' })], available: true })
-    m.readEruvMap.mockResolvedValue({ map: null, save: undefined, missing: [] })
+    m.readEruvMap.mockResolvedValue({ map: null, save: { ok: true, file: null, at: '2026-10-22T12:00:00Z' }, missing: [] })
     expect((await POST(req({ action: 'check', id: 'center-city' }))).status).toBe(200)
     expect(m.saveLineRead).toHaveBeenCalledWith('philly', 'center-city', { ok: true, file: null, at: expect.any(String) })
   })

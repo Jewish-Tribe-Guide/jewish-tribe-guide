@@ -55,6 +55,13 @@ describe('a job, opened', () => {
     expect(screen.getByText('Runs every night at 3:00 AM')).toBeInTheDocument()
   })
 
+  it('Eruvs says what it doesn’t read at night (EruvJob6)', async () => {
+    serve([view({ id: 'eruvs', name: 'Eruvs', schedule: 'Maps, hotlines and alerts, every night at 3:00 AM', scheduleMore: 'Status, when someone looks' })])
+    show('eruvs')
+    expect(await screen.findByText('Maps, hotlines and alerts, every night at 3:00 AM')).toBeInTheDocument()
+    expect(screen.getByText('Status, when someone looks')).toBeInTheDocument()
+  })
+
   it('links what it didn’t read to the place, and marks each night with a check or an X', async () => {
     serve([TIMES])
     show('times')

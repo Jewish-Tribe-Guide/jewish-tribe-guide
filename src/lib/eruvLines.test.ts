@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { newlyMissing, readEruvMap } from './eruvLines'
+import { newlyMissing, readEruvMap, savedMap } from './eruvLines'
 import type { EruvLineFile } from './eruvLine'
 
 const NOW = new Date('2026-10-12T11:00:00Z')
@@ -11,15 +11,11 @@ const serving = (f: EruvLineFile) => vi.fn(async () => new Response(geo(f))) as 
 const source = (over = {}) => ({ lineUrl: 'https://example.org/line.geojson', rawLine: A, lineLeaveOut: ['Old border'], lineHidePoints: false, lineColor: null, ...over })
 
 describe('readEruvMap: the eruv’s own map, read now', () => {
-  it('shown without what was left out; nothing to save when it’s as it was', async () => {
+  it('shown without what was left out; as it was, it saves only the date it was read', async () => {
     const read = await readEruvMap(source(), NOW, serving(A))
     expect(read.map?.lines.map((l) => l.name)).toEqual(['Main'])
-    expect(read.save).toBeUndefined()
-    expect(read.missing).toEqual([])
-  })
-  it('the same map read fine clears why the last read failed (Oct 22: a week-old timeout still said)', async () => {
-    const read = await readEruvMap(source({ lineError: 'The operation was aborted due to timeout' }), NOW, serving(A))
     expect(read.save).toEqual({ ok: true, file: null, at: NOW.toISOString() })
+    expect(read.missing).toEqual([])
   })
   it('a changed map shows at once, with no one to approve it, and is kept', async () => {
     const read = await readEruvMap(source(), NOW, serving(B))
@@ -55,5 +51,14 @@ describe('newlyMissing: admins hear once', () => {
     expect(newlyMissing(['Old border'], [])).toEqual(['Old border'])
     expect(newlyMissing(['Old border'], ['old border'])).toEqual([])
     expect(newlyMissing(['Old border', 'Line 9'], ['Old border'])).toEqual(['Line 9'])
+  })
+})
+
+describe('savedMap', () => {
+  it('the saved copy, without what was left out', () => {
+    expect(savedMap(source(), A)?.lines.map((l) => l.name)).toEqual(['Main'])
+  })
+  it('nothing saved, nothing shown', () => {
+    expect(savedMap(source(), null)).toBeNull()
   })
 })

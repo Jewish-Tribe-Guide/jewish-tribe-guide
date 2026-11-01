@@ -45,11 +45,11 @@ export const NIGHT_KINDS: readonly NightKind[] = [
   { id: 'google', name: 'Google', job: 'sync-hours', about: 'Reads every place matched on Google for its name, hours, phone and website.', unit: 'places' },
   { id: 'kosher', name: 'Kosher certification', job: 'watches', about: 'Reads each certifier’s list for the places on it.', unit: 'lists' },
   { id: 'hospitals', name: 'Hospitals', job: 'watches', about: 'Reads each hospital’s page on Refuah.' },
-  { id: 'eruvs', name: 'Eruvs', job: 'watches', about: 'Reads each eruv’s website for its hotline and email alerts.' },
+  { id: 'eruvs', name: 'Eruvs', job: 'watches', about: 'Reads each eruv’s map, hotline and email alerts. Its status is read when someone looks.' },
   { id: 'times', name: 'Minyan times', job: 'watches', about: 'Reads each shul’s page of minyan times.' },
   { id: 'newsletters', name: 'Newsletters', job: null, about: 'Reads each shul’s newsletter as it comes in.' },
   { id: 'hours', name: 'Mikvah hours', job: 'watches', about: 'Reads each mikvah’s page of hours.' },
-  { id: 'sites', name: 'Phone, email and hours', job: 'watches', about: 'Reads a place’s own website when Google doesn’t have them.' },
+  { id: 'sites', name: 'Website', job: 'watches', about: 'Reads a place’s own website when Google doesn’t have them.' },
   { id: 'menus', name: 'Menus', job: 'watches', about: 'Reads each food place’s menu when it changes, and a few never read each night.' },
   { id: 'other', name: 'Other pages', job: 'watches', about: 'Pages added by hand. What they find goes to the moderation queue.' },
   { id: 'links', name: 'Links', job: 'check-links', about: 'Opens every link a listing shows that nothing else reads, every Sunday morning.' },
@@ -62,8 +62,8 @@ type KindWatch = Pick<Watch, 'kind' | 'url' | 'createdBy' | 'label' | 'resourceI
 /** `readsOf`, what each listing's page is read for (by its category, as
  *  the watch list sorts them): a mikvah's page whose label doesn't say
  *  "hours" is still Mikvah hours. `siteGap`: a place's own website, read
- *  for the phone, email and hours Google doesn't have, is Phone, email and
- *  hours, not Mikvah hours (Oct 25: five food places were counted there). A page that
+ *  for the phone, email and hours Google doesn't have, is Website, not
+ *  Mikvah hours (Oct 25: five food places were counted there). A page that
  *  is none of the kinds was added by hand: Other pages. */
 export function nightKindOf(w: KindWatch, readsOf?: ReadsOf, siteGap?: SiteGap): Exclude<NightKindId, 'google' | 'newsletters'> | null {
   if (isNewsletterWatch(w) || isIgnoredSender(w) || isJobOff(w)) return null
@@ -130,6 +130,8 @@ export type NightKindView = {
   lastAt: string | null
   /** "Runs every night at 3:00 AM". */
   schedule: string
+  /** A second line of it: the Eruvs job's status isn't read at night. */
+  scheduleMore?: string
 }
 
 /** `whole`: the job itself, not one source. */
@@ -519,7 +521,7 @@ export function nightKinds(
     if (kind.id === 'links') return linksView(kind, job, own, links, now)
     const last = own[0]
     const tracked = kind.id === 'google' ? trackedGoogle(google) : trackedWatches(kind, watches, kind.id === 'menus' ? unread : [], listings)
-    const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: kindNights(kind, community, own, now, kind.id === 'menus' ? (runs['read-menus'] ?? []) : []), schedule: scheduleLine(job, now) }
+    const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: kindNights(kind, community, own, now, kind.id === 'menus' ? (runs['read-menus'] ?? []) : []), schedule: kind.id === 'eruvs' ? scheduleLine(job, now).replace(/^Runs every night/, 'Maps, hotlines and alerts, every night') : scheduleLine(job, now), ...(kind.id === 'eruvs' ? { scheduleMore: 'Status, when someone looks' } : {}) }
     const health = jobHealth(job, own, now)
     if (!last || health.state === 'never') return { ...base, fixes: [], lastAt: null, when: null, count: 'Not run yet', trouble: null, misses: [] }
     const when = timeOf(last.startedAt)

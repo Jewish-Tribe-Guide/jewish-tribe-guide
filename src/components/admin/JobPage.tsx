@@ -235,6 +235,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       <div className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5">
         <p className="m-0 text-lg font-semibold text-slate-900">{statusLine(job)}</p>
         {job.schedule && <p className="m-0 mt-0.5 text-[13px] text-slate-600">{job.schedule}</p>}
+        {job.scheduleMore && <p className="m-0 text-[13px] text-slate-600">{job.scheduleMore}</p>}
       </div>
       {job.misses.length > 0 && (
         <AdminBox title={job.id === 'links' ? 'Needs a look' : 'Not read last night'}>

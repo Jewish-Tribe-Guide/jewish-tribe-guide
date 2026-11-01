@@ -9,7 +9,7 @@ import type { KeptEmail } from './eruvEmail'
 // where its map is. Uncached: the status changes through the day, and
 // /api/eruv reads it fresh. A missing table (the migration not run yet)
 // isn't an error: the page falls back to the old list. The maps themselves
-// are /api/eruv/maps (eruvMaps.ts), read from each eruv's own file
+// are /api/eruv/maps (eruvMaps.ts), the saved copy of each eruv's own file
 // (migration 076), its lines in an admin's colour if one is set (081).
 // An eruv with no status page can have its status emailed instead (084:
 // eruvEmail.ts).
@@ -221,8 +221,8 @@ export async function listEruvMapSources(community?: string): Promise<EruvMapSou
  *  their line colour. /api/eruv/maps is kept at the CDN for an hour, so the
  *  maps are asked for under this (Oct 15: a colour changed in the admin was
  *  still the old one on the map). An admin's change is a new address, read
- *  fresh; nothing else is. Not the eruv's own map changing: that's the
- *  hour. Null when it can't be read; the maps are then asked for as before. */
+ *  fresh; nothing else is. Not the eruv's own map changing: the nightly read
+ *  and then the hour. Null when it can't be read; the maps are then asked for as before. */
 export async function eruvMapsVersion(community: string): Promise<string | null> {
   const { data, error } = await selectWithLater<Record<string, unknown>>(
     (cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).order('id'),

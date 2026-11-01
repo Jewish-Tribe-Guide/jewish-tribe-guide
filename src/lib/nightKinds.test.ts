@@ -73,7 +73,7 @@ describe('each watch’s kind of source', () => {
 
   // Oct 25: five food places' own websites were counted as Mikvah hours,
   // a food place having an Hours field.
-  it('a food place’s own website is Phone, email and hours', () => {
+  it('a food place’s own website is Website', () => {
     const site = watch({ createdBy: 'listing pages (found)', resourceId: 'f1', label: 'Chalavita · its website' })
     const readsOf = () => 'hours' as const
     const gap = (why: string) => (id: string) => (id === 'f1' ? { why } : null)
@@ -135,6 +135,13 @@ describe('last night, a line per kind', () => {
     const views = nightKinds('philly', runs, [], google, NOW)
     expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Newsletters', 'Mikvah hours', 'Menus'])
     expect(views.map((v) => v.when)).toEqual(['2:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', null, '3:00 AM', '3:00 AM'])
+  })
+
+  // EruvJob6.
+  it('the Eruvs job says what it reads at night, and what it reads when someone looks', () => {
+    const view = kind(nightKinds('philly', runs, [], google, NOW), 'Eruvs')
+    expect(view.schedule).toMatch(/^Maps, hotlines and alerts, every night at /)
+    expect(view.scheduleMore).toBe('Status, when someone looks')
   })
 
   // FinalNightly's Eruvs.
@@ -410,7 +417,7 @@ describe('everything a kind tracks', () => {
   })
 
   // The user, Oct 25: make it clear it's what Google doesn't have.
-  it('Phone, email and hours: each place says why its website is read', () => {
+  it('Website: each place says why its website is read', () => {
     const watches = [
       watch({ id: 'a', createdBy: 'listing pages (found)', resourceId: 'f1', label: 'Chalavita · its website' }),
       watch({ id: 'b', createdBy: 'listing pages (found)', resourceId: 'f2', label: 'Sababa Falafel · its website', failingSince: night(WATCHES_AT, 2), lastOkAt: night(WATCHES_AT, 3) }),
@@ -424,7 +431,7 @@ describe('everything a kind tracks', () => {
       g1: { why: 'Google has no phone' },
     }
     const views = nightKinds('philly', runs, watches, [], NOW, [], { readsOf: () => 'hours', nameOf: () => null, siteGap: (id) => gaps[id] ?? null, placePage: at })
-    const sites = kind(views, 'Phone, email and hours')
+    const sites = kind(views, 'Website')
     expect(sites).toMatchObject({ about: 'Reads a place’s own website when Google doesn’t have them.', count: '2 of 3 read' })
     expect(sites.tracked).toEqual([
       { name: 'Sababa Falafel', status: 'Google has no hours · Not loading since Oct 23', bad: true, page: at('f2') },
@@ -433,7 +440,7 @@ describe('everything a kind tracks', () => {
     ])
     expect(sites.misses).toEqual([{ name: 'Sababa Falafel', why: 'Didn’t load', page: at('f2') }])
     expect(kind(views, 'Mikvah hours').tracked.map((t) => t.name)).toEqual(['Mikvah Ohr'])
-    expect(kind(nightKinds('philly', runs, [], [], NOW), 'Phone, email and hours')).toBeUndefined()
+    expect(kind(nightKinds('philly', runs, [], [], NOW), 'Website')).toBeUndefined()
   })
 
   it('Other pages only when there are any', () => {
