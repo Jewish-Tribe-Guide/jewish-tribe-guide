@@ -77,7 +77,7 @@ describe('/api/admin/watches', () => {
     ])
     const body = await (await GET(req('GET'))).json()
     expect(body.listings[0].reads).toBe('times')
-    // Step 6: and where what's read for it waits: its kind's page (Oct 26).
+    // Step 6: and where what's read for it waits (Oct 26).
     expect(body.listings[0].job).toBe('Synagogues')
   })
 

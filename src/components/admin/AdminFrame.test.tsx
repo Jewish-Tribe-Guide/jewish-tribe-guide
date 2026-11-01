@@ -125,7 +125,7 @@ describe('AdminFrame', () => {
   // A screen with its own way back (an opened category, a watch) heads
   // itself; the frame's heading steps aside so there aren't two (board 19c).
   it('steps its heading aside for a screen that heads itself', () => {
-    nav.pathname = '/philly/admin/watches/kind/synagogue'
+    nav.pathname = '/philly/admin/watches/place/x'
     render(
       <AdminFrame isSuperAdmin={false} email="admin@example.com" token="tok" onSignOut={() => {}}>
         <AdminBack back={{ label: 'Watches', href: '/philly/admin/watches' }} title="Shul times" />

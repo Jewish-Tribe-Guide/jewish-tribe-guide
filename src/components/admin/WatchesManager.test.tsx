@@ -162,12 +162,12 @@ describe('WatchesManager', () => {
   })
 
   it('what needs fixing is listed, and its job gets an X', async () => {
-    const fix = { name: 'Lower Merion Synagogue', why: 'Page didn’t open, 3 nights', page: 'kind/synagogue?place=l' }
+    const fix = { name: 'Lower Merion Synagogue', why: 'Page didn’t open, 3 nights', page: 'place/l' }
     await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ id: 'times', name: 'Minyan times', tracked: [{ name: 'x', status: '', bad: false, page: '' }], fixes: [fix] })] } })
     expect(screen.getByTestId('watches-sentence')).toHaveTextContent('1 thing needs fixing. The rest is fine.')
     const box = screen.getByRole('region', { name: 'Needs fixing' })
     expect(within(box).getByRole('link')).toHaveTextContent('Lower Merion SynagoguePage didn’t open, 3 nights')
-    expect(within(box).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/kind/synagogue?place=l')
+    expect(within(box).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/place/l')
     expect(within(row(/^Minyan times/)).getByRole('img', { name: 'Something wrong' })).toBeInTheDocument()
   })
 

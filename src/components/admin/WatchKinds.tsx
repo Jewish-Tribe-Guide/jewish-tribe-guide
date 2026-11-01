@@ -3,10 +3,8 @@
 import { watchKinds, type WatchJobsIn, type WatchKind } from '@/lib/watchPlaces'
 import { jobsSettled, type Jobs } from './useWatchJobs'
 
-// What the jobs say of each kind of place, for its page (WatchKindPage.tsx).
-// Since Oct 31 no row opens these from Watches: a place's own link does, from
-// Needs fixing, a job's list or To do. The page waits until every job has
-// answered, so its counts don't climb as each comes in.
+// What the jobs say of each place, put together by kind: for a place's own
+// screen (PlacePage.tsx) and To do's waiting rows (todoWaiting.ts).
 
 /** What the jobs say, put together; null until the categories and
  *  Google's places (every listing a job reads) are in. */

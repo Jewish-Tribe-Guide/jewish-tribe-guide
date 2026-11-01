@@ -4,6 +4,7 @@ import { isIgnoredSender, isNewsletterWatch } from './newsletter'
 import type { ListingInfo, SiteGap } from './listingReads'
 import { isListingPageWatch } from './listingPageWatch'
 import { isEruvWebsiteWatch } from './eruvWebsite'
+import { placePath } from './placeLink'
 import type { Watch } from './watches'
 import { linkBroken, linkStatus, type LinkStanding } from './linkCheck'
 import { isJobOff } from './jobOff'
@@ -195,11 +196,11 @@ function watchName(w: Pick<Watch, 'label' | 'url'>): string {
 
 type Live = { count: KindCount; misses: KindMiss[]; failed: number; never: number; notReached: number }
 
-/** Where a line opens, under the Watches tab: its place on its kind's
- *  page (kind/restaurant?place=…), an eruv's on the Eruvs', or nothing
- *  (a kosher list, a page added by hand). */
+/** Where a line opens, under the Watches tab: its place's own screen
+ *  (place/<id>), an eruv's too, or nothing (a kosher list, a page added by
+ *  hand). */
 const placePage = (id: string | null | undefined, listings?: ListingInfo) => (id && listings?.placePage?.(id)) || ''
-const pageOf = (kind: NightKind, w: Pick<Watch, 'resourceId'>, listings?: ListingInfo) => (kind.id === 'eruvs' ? (listings?.eruvPage ?? '') : placePage(w.resourceId, listings))
+const pageOf = (kind: NightKind, w: Pick<Watch, 'resourceId' | 'url'>, listings?: ListingInfo) => (kind.id === 'eruvs' ? (listings?.eruvPage?.(w) ?? '') : placePage(w.resourceId, listings))
 
 /** A food place whose menu was never read (menuPlaceRead.ts). */
 export type UnreadMenu = { id: string; name: string }
@@ -258,7 +259,7 @@ function onePerPlace(misses: readonly KindMiss[]): KindMiss[] {
 /** A listing Google is asked about, as the Google page has it. */
 export type GoogleLive = { name: string; matched: boolean; failedAt: string | null; readAt?: string | null; id?: string; category?: string }
 
-const googlePage = (p: GoogleLive) => (p.id && p.category ? `kind/${p.category}?place=${p.id}` : '')
+const googlePage = (p: GoogleLive) => (p.id ? placePath(p.id) : '')
 
 function liveGoogle(places: readonly GoogleLive[], start: number): Live {
   const matched = places.filter((p) => p.matched)
@@ -322,7 +323,7 @@ function trackedGoogle(places: readonly GoogleLive[]): TrackedSource[] {
 }
 
 /** One shul newsletter, as the Newsletters page lists it and What's
- *  tracked counts it. `page`: its shul on its kind's page, under the
+ *  tracked counts it. `page`: its shul's own screen, under the
  *  Watches tab; '' when it isn't linked to one. */
 export type NewsletterLine = { watchId: string; email: string; shul: string | null; status: string; bad: boolean; page: string }
 
@@ -376,12 +377,12 @@ function newsletterView(kind: NightKind, watches: readonly Watch[], listings?: L
 }
 
 /** Links: checked once a week, so no nights. "112 links · checked Oct
- *  19", and what didn't open, by its place, on its kind's page. */
+ *  19", and what didn't open, by its place's own screen. */
 function linksView(kind: NightKind, job: NightlyJob, runs: readonly JobRun[], links: readonly LinkStanding[], now: number): NightKindView {
   const tracked = links
     .map((l) => {
       const s = linkStatus(l)
-      return { name: `${l.place} · ${l.field}`, status: s.text, bad: s.bad, page: `kind/${l.category}?place=${l.resourceId}` }
+      return { name: `${l.place} · ${l.field}`, status: s.text, bad: s.bad, page: placePath(l.resourceId) }
     })
     .sort(byNeed)
   const base = { id: kind.id, name: kind.name, about: kind.about, tracked, nights: [], schedule: scheduleLine(job, now) }

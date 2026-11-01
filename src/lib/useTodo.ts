@@ -7,6 +7,8 @@ import { parseOkJson } from './fetchJson'
 import { withCommunity } from './useCommunityData'
 import { openSearches, todoCount, unmatchedPlaces, type TodoReading, type TodoResponse, type TodoSearch, type TodoUnmatched } from './todo'
 import { setupLeft, type SetupState } from './setup'
+import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
+import { waitingNotQueued, type TodoWaiting } from '@/components/admin/todoWaiting'
 
 // What To do holds, loaded once and shared: the To do page shows it and
 // the nav counts it, from the same copy, so a decision taken on the page
@@ -23,6 +25,9 @@ export type TodoData = {
   responses: TodoResponse[]
   /** Places waiting to be found on Google, or said not to be on it. */
   unmatched: TodoUnmatched[]
+  /** What a job read that waits on a decision but isn't in the queue: a
+   *  closure, a check against Google, a menu. Loaded after the rest. */
+  waiting?: TodoWaiting[]
   /** What the setup checklist ticks off; null if it couldn't be read, so
    *  no checklist shows rather than a wrong one. */
   setup: SetupState | null
@@ -95,8 +100,22 @@ async function load(key: string, token: string, community: string, email: string
       responses: (responses.status === 'fulfilled' && responses.value.responses) || [],
       unmatched: google.status === 'fulfilled' && google.value.places ? unmatchedPlaces(google.value.places) : [],
       setup: setup.status === 'fulfilled' ? setup.value.setup : null,
+      // Kept until the jobs answer again, so the count doesn't dip meanwhile.
+      waiting: state.data?.waiting,
     },
   })
+  void loadWaiting(key, token, community)
+}
+
+let waitingLoads = 0
+
+/** Every job's reading, after the rest so To do doesn't wait on them; what
+ *  couldn't load just isn't counted. Only the latest load's answer is kept. */
+async function loadWaiting(key: string, token: string, community: string) {
+  const load = ++waitingLoads
+  const jobs: Jobs = {}
+  await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
+  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()) }))
 }
 
 /** Loads To do (again, with `fresh`), sharing a load already under way. */

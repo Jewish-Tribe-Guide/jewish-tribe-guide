@@ -74,8 +74,8 @@ export function teachable(term: string): boolean {
 
 /** What's waiting on a decision. Not searches nobody found: there are too
  *  many to keep up with, so they're there when there's time. */
-export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[] }): number {
-  return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0)
+export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[]; waiting?: unknown[] }): number {
+  return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0) + (t.waiting?.length ?? 0)
 }
 
 /** A place Google has no match for and nobody has said why: pick the right

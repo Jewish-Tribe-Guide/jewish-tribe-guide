@@ -777,12 +777,15 @@ describe('sendWatchDigest — where the suggestions wait', () => {
   })
 
   it('names and links the job page they wait on', async () => {
-    await sendWatchDigest('philly', 'Refuah', [{ name: 'HUP', what: 'Kosher food: a new contact' }], { path: '/philly/admin/watches/kind/hospital', name: 'Hospitals' })
+    await sendWatchDigest('philly', 'Refuah', [{ name: 'HUP', what: 'Kosher food: a new contact' }], { path: '/philly/admin/watches/place/h1?from=todo', name: 'Hospitals' })
     const { html } = h.last()
-    expect(html).toContain('waiting on the Watches tab’s Hospitals page')
-    expect(html).toContain('href="https://guide.example/philly/admin/watches/kind/hospital"')
-    expect(html).toContain('Open Hospitals')
+    expect(html).toContain('waiting on To do')
+    expect(html).toContain('href="https://guide.example/philly/admin/watches/place/h1?from=todo"')
+    expect(html).toContain('Open it')
     expect(html).not.toContain('moderation queue')
+    // A list's findings span places: To do itself.
+    await sendWatchDigest('philly', 'Keystone', [{ name: 'HUP', what: 'Hechsher' }], { path: '/philly/admin', name: '' })
+    expect(h.last().html).toContain('Open To do')
   })
 
   it('without a job page, says the moderation queue', async () => {

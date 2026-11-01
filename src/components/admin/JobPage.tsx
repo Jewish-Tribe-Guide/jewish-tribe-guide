@@ -8,7 +8,8 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { fetchJson } from '@/lib/fetchJson'
 import { hoursJobCategories } from '@/lib/hoursJob'
 import type { NightKindId } from '@/lib/jobRuns'
-import { NIGHT_KINDS, type KindNight, type NightKindView } from '@/lib/nightKinds'
+import { NIGHT_KINDS, type KindNight, type NightKindView, type TrackedSource } from '@/lib/nightKinds'
+import { pageFrom, placePath } from '@/lib/placeLink'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
 import { withCommunity } from '@/lib/useCommunityData'
 import { JOB_STEPS } from '@/lib/watchJobList'
@@ -198,7 +199,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       {add.label}
     </button>
   ) : eruvKind ? (
-    <Link href={page(`kind/${eruvKind.id}`)} className={`${primary} whitespace-nowrap`}>
+    <Link href={`${base}/categories/cat:${eruvKind.id}`} className={`${primary} whitespace-nowrap`}>
       + Add an eruv
     </Link>
   ) : undefined
@@ -221,7 +222,11 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       setError(err instanceof Error ? err.message : 'Could not do that.')
     }
   }
-  const tracked = all ? job.tracked : job.tracked.slice(0, TRACKED_SHOWN)
+  // Every eruv, not only those with a website being read: each opens on its
+  // own, so its status and map can be set up there too.
+  const everything: TrackedSource[] = job.id === 'eruvs' && jobs.eruvim ? jobs.eruvim.eruvim.map((e) => ({ name: e.name, status: '', bad: false, page: placePath(e.id) })) : job.tracked
+  const tracked = all ? everything : everything.slice(0, TRACKED_SHOWN)
+  const opens = (p: string) => page(pageFrom(p, `job/${job.id}`))
 
   return (
     <div className="flex flex-col gap-3">
@@ -233,7 +238,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       </div>
       {job.misses.length > 0 && (
         <AdminBox title={job.id === 'links' ? 'Needs a look' : 'Not read last night'}>
-          {job.misses.map((m, i) => (m.page ? <AdminRow key={i} href={page(m.page)} name={m.name} line={<span className="text-amber-800">{m.why}</span>} /> : (
+          {job.misses.map((m, i) => (m.page ? <AdminRow key={i} href={opens(m.page)} name={m.name} line={<span className="text-amber-800">{m.why}</span>} /> : (
             <div key={i} className="px-4 py-2.5">
               <p className="m-0 text-[15px] font-semibold text-slate-900">{m.name}</p>
               <p className="m-0 text-[13px] text-amber-800">{m.why}</p>
@@ -241,9 +246,9 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
           )))}
         </AdminBox>
       )}
-      {job.tracked.length > 0 && (
-        <AdminBox title={`All ${job.tracked.length} tracked`}>
-          {tracked.map((t, i) => (t.page ? <AdminRow key={i} href={page(t.page)} name={t.name} /> : (
+      {everything.length > 0 && (
+        <AdminBox title={`All ${everything.length} tracked`}>
+          {tracked.map((t, i) => (t.page ? <AdminRow key={i} href={opens(t.page)} name={t.name} /> : (
             <div key={i} className="flex min-h-11 items-center gap-2 px-4 py-2">
               <span className="flex-1 text-[15px] font-semibold text-slate-900">{t.name}</span>
               <span className={`text-[13px] ${t.bad ? 'text-amber-800' : 'text-slate-500'}`}>{t.status}</span>
@@ -254,9 +259,9 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
               )}
             </div>
           )))}
-          {job.tracked.length > TRACKED_SHOWN && (
+          {everything.length > TRACKED_SHOWN && (
             <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 w-full cursor-pointer px-4 text-left text-[15px] font-semibold text-slate-900">
-              {all ? 'Show fewer' : `Show all ${job.tracked.length}`}
+              {all ? 'Show fewer' : `Show all ${everything.length}`}
             </button>
           )}
         </AdminBox>

@@ -114,7 +114,7 @@ describe('adminNavPosition', () => {
   const cases: [string, AdminArea, AdminTab][] = [
     ['/philly/admin', 'todo', 'queue'],
     ['/philly/admin/watches', 'todo', 'watches'],
-    ['/philly/admin/watches/kind/restaurant', 'todo', 'watches'],
+    ['/philly/admin/watches/place/x', 'todo', 'watches'],
     // Opened from Reports, like History; To do shows only what's waiting.
     ['/philly/admin/searches', 'reports', 'metrics'],
     ['/philly/admin/responses', 'todo', 'responses'],

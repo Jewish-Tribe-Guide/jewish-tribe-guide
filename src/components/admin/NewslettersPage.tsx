@@ -7,6 +7,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import type { NewsletterLine } from '@/lib/nightKinds'
+import { pageFrom } from '@/lib/placeLink'
 import { AdminBack, AdminBox, AdminCount, AdminField, AdminRow, adminInputClass } from './AdminUI'
 
 // ── Watches → Newsletters (admin drawings 18 and 18b, Oct 29) ───────────────
@@ -281,7 +282,7 @@ export default function NewslettersPage({ token }: { token: string }) {
             return (
               <li key={n.watchId} className="border-b border-slate-100 last:border-b-0">
                 {n.shul && n.page ? (
-                  <AdminRow href={`${base}/watches/${n.page}`} name={n.shul} line={line} />
+                  <AdminRow href={`${base}/watches/${pageFrom(n.page, 'job/newsletters')}`} name={n.shul} line={line} />
                 ) : (
                   <div className="flex flex-col gap-0.5 px-4 py-2.5">
                     <span className="text-[15px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{n.shul ?? n.email}</span>

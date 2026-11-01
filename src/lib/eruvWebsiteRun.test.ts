@@ -66,7 +66,7 @@ describe('reading an eruv’s website', () => {
       'Read from its website, https://lowermerioneruv.org/',
       { name: ERUV_WEBSITE_WATCH_NAME },
     )
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Eruv websites', [{ name: 'Lower Merion Eruv', what: 'Hotline' }], { path: '/philly/admin/watches/kind/eruvin', name: 'Eruvin' })
+    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Eruv websites', [{ name: 'Lower Merion Eruv', what: 'Hotline' }], { path: '/philly/admin', name: 'Eruvin' })
   })
 
   it('agrees, and files nothing, when the page has its number', async () => {

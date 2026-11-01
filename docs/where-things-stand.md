@@ -2095,6 +2095,20 @@ pick them (`changeLines.ts`). A new place still uses the old review.
   belongs to the admin layout and on a phone shares it with the Settings gear. WhatsApp isn't listed as Not watched. Contact is one
   row in Edit listing. Setup, Add a watch and the turn-off confirm weren't drawn.
 
+**One place at a time.** The user, Oct 31: the three-tab page of a whole kind
+(Waiting for you, Not checked, Up to date) is gone.
+
+- A place opens on its own screen, `watches/place/<id>`, from a job's row, Find
+  on Google, To do or an email. Back goes where it was opened from. Once nothing
+  is left to do for it, the screen goes back by itself.
+- To do now holds everything waiting on a decision: a closure Google reports, a
+  change from Google or a menu, an eruv's. They're in Changes and count in the
+  number, which comes in a moment after the rest because every job has to answer.
+- The Eruvs job lists every eruv, with a website or not. + Add an eruv opens the
+  Eruv category's editor.
+- Already-sent emails still work: `kind/…?place=` goes to the place, `kind/…` to
+  To do. A list's digest (Keystone, Mekor) opens To do.
+
 **Next:** category switches, home wording, hiding forms. Map, Candle Lighting
 and Eruv become switches, default on; Jewish Medical Resources goes; home rows
 light up their spot in the preview; Responses becomes Feedback; the inbox

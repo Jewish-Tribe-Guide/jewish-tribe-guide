@@ -67,35 +67,31 @@ async function noAiReads(page: Page) {
   })
 }
 
-/** Opens the fixture on its kind's page (?place=, as What's tracked links
- *  it), on the tab it's in, once it `shows` its menu's part. The listing went straight into the database, so
+/** Opens the fixture on its own screen, as a job's line links it, once it
+ *  `shows` its menu's part. The listing went straight into the database, so
  *  the cached list of listings the page reads (listApprovedResources,
  *  cacheLife hours) knows nothing about it until an invalidation, as a
  *  direct write must (AGENTS.md): the admin's own token, then reload until
  *  it shows. */
-async function openPlace(page: Page, category: string, tab: RegExp, shows: string) {
+async function openPlace(page: Page, shows: string) {
   await noAiReads(page)
-  await page.goto(`/philly/admin/watches/kind/${category}?place=${id}`)
+  await page.goto(`/philly/admin/watches/place/${id}`)
   const revalidated = await page.evaluate(async () => {
     const key = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k))
     const token = key ? (JSON.parse(localStorage.getItem(key)!) as { access_token?: string }).access_token : undefined
     return (await fetch('/api/admin/revalidate', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })).status
   })
   expect(revalidated, 'POST /api/admin/revalidate with the signed-in admin’s token').toBe(200)
-  const open = page.getByTestId('kind-place-open')
+  const open = page.getByTestId('place-open')
   await expect(async () => {
     await page.reload()
-    await expect(open).toHaveAttribute('aria-label', name, { timeout: 3_000 })
-    // On its tab, saying its menu's part, once the menu's job has it too:
-    // before, it's a place nothing reads.
-    await expect(page.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true', { timeout: 3_000 })
+    await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 3_000 })
+    // Saying its menu's part, once the menu's job has it too: before, it's a
+    // place nothing reads.
     await expect(open).toContainText(shows, { timeout: 3_000 })
   }).toPass({ timeout: 20_000 })
   return open
 }
-
-/** Its row on a tab, once it's moved there. */
-const placeRow = (page: Page) => page.getByTestId('kind-place').filter({ hasText: name })
 
 test('Use this: the dish the menu no longer names comes off, the new one goes on, one added by hand stays', async ({ page }) => {
   const supabase = getAdminClient()
@@ -124,7 +120,7 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
     ).error,
   ).toBeNull()
 
-  const open = await openPlace(page, c.id, /^Waiting for you/, 'From menu.example.invalid/menu')
+  const open = await openPlace(page, 'From menu.example.invalid/menu')
   // What the menu changes, from the menu: Laffa, added by hand, isn't one.
   const group = open.getByTestId('waiting-group')
   await expect(group).toHaveCount(1)
@@ -137,15 +133,13 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   await expect(row('same')).toHaveText([/^Shawarma“Chicken Shawarma Plate”/, /^Laffa/])
 
   await group.getByRole('button', { name: 'Accept' }).click()
-  // Nothing left to decide: it's off Waiting straight away, on Not
-  // checked (it's on no Google, so nothing reads its hours or phone).
+  // Nothing left to decide, straight away; it stays open, since nothing
+  // reads its hours or phone (it's on no Google).
   await expect(open.getByTestId('waiting-group')).toHaveCount(0)
-  await page.getByRole('tab', { name: /^Not checked/ }).click()
-  await expect(placeRow(page)).toBeVisible()
   // Its Dishes, with what the menu read made of the one added by hand (the
   // user, Oct 26: "see or know if the AI reader is picking things up").
   await expect(async () => {
-    await page.goto(`/philly/admin/watches/kind/${c.id}?place=${id}`)
+    await page.goto(`/philly/admin/watches/place/${id}`)
     await open.getByRole('button', { name: /more checked$/ }).click({ timeout: 3_000 })
     await expect(open.getByTestId('checked-mark')).toHaveText(['Laffa · Not found on its menu'], { timeout: 3_000 })
   }).toPass({ timeout: 20_000 })
@@ -191,7 +185,7 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
     ).error,
   ).toBeNull()
 
-  const open = await openPlace(page, c.id, /^Waiting for you/, 'From menu.example.invalid/menu')
+  const open = await openPlace(page, 'From menu.example.invalid/menu')
   await open.getByTestId('waiting-group').getByRole('button', { name: 'Edit' }).click()
   // The menu's list, in the listing's editor: take the drink off, add one.
   const sheet = page.getByRole('dialog')
@@ -202,8 +196,6 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   await sheet.getByRole('button', { name: 'Save to the listing' }).click()
   await expect(sheet).not.toBeVisible()
   await expect(open.getByTestId('waiting-group')).toHaveCount(0)
-  await page.getByRole('tab', { name: /^Not checked/ }).click()
-  await expect(placeRow(page)).toBeVisible()
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
   await expect.poll(async () => (await stored())[f.key]).toEqual(['Shawarma', 'Laffa Wraps'])
@@ -236,7 +228,7 @@ test('a menu that can’t be read: No menu online, read again, then its menu lin
     ).error,
   ).toBeNull()
 
-  const open = await openPlace(page, c.id, /^Not checked/, 'can’t be read')
+  const open = await openPlace(page, 'can’t be read')
   const problem = open.getByTestId('problem').filter({ hasText: 'can’t be read' })
   await expect(problem).toBeVisible()
 
@@ -246,7 +238,7 @@ test('a menu that can’t be read: No menu online, read again, then its menu lin
   expect((await reading())?.decided_by).toBeTruthy()
 
   // Kept: after a reload it isn't read, and Read it again undoes it.
-  const off = await openPlace(page, c.id, /^Not checked/, 'Not read · its menu')
+  const off = await openPlace(page, 'Not read · its menu')
   const notRead = off.getByRole('region', { name: 'Not read' })
   await expect(notRead).toContainText('Not read · its menu')
   await notRead.getByRole('button', { name: 'Read it again' }).click()
@@ -254,7 +246,7 @@ test('a menu that can’t be read: No menu online, read again, then its menu lin
 
   // Fail it again for the link.
   await supabase.from('menu_reading').insert({ community_id: 'philly', resource_id: id, status: 'failed', source_url: null, note: 'Couldn’t read a menu on its website.', dishes: [] })
-  const again = await openPlace(page, c.id, /^Not checked/, 'can’t be read')
+  const again = await openPlace(page, 'can’t be read')
   await again.getByTestId('problem').getByRole('button', { name: 'Give its menu page' }).click()
   await again.getByLabel('Its menu page').fill('menu.example.invalid/our-menu')
   await again.getByRole('button', { name: 'Use this' }).click()

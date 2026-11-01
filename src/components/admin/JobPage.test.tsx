@@ -19,8 +19,8 @@ vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
 const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: 'Minyan times', about: '', when: '3:00 AM', count: '15 of 16 read', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: '2026-10-31T07:00:00Z', schedule: 'Runs every night at 3:00 AM', ...over })
 const TIMES = view({
-  misses: [{ name: 'Lower Merion Synagogue', why: 'Page didn’t open, 3 nights', page: 'kind/s?place=l' }],
-  tracked: ['Bnai Abraham', 'Kesher Israel', 'Mekor Habracha'].map((name) => ({ name, status: 'Read', bad: false, page: `kind/s?place=${name}` })),
+  misses: [{ name: 'Lower Merion Synagogue', why: 'Page didn’t open, 3 nights', page: 'place/l' }],
+  tracked: ['Bnai Abraham', 'Kesher Israel', 'Mekor Habracha'].map((name) => ({ name, status: 'Read', bad: false, page: `place/${name}` })),
   nights: [{ date: 'Oct 30', result: '15 of 16 read', tone: 'bad' }, { date: 'Oct 27', result: '16 of 16 read', tone: 'good' }],
 })
 
@@ -59,7 +59,7 @@ describe('a job, opened', () => {
     serve([TIMES])
     show('times')
     const missed = await screen.findByRole('region', { name: 'Not read last night' })
-    expect(within(missed).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/kind/s?place=l')
+    expect(within(missed).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/place/l?from=job/times')
     const nights = screen.getByRole('region', { name: 'Last 14 nights' })
     expect(within(nights).getByRole('img', { name: '15 of 16 read' })).toBeInTheDocument()
     expect(within(nights).getByRole('img', { name: '16 of 16 read' })).toBeInTheDocument()
@@ -72,6 +72,24 @@ describe('a job, opened', () => {
     expect(within(all).queryByText('Mekor Habracha')).toBeNull()
     await userEvent.click(within(all).getByRole('button', { name: 'Show all 3' }))
     expect(within(all).getByText('Mekor Habracha')).toBeInTheDocument()
+  })
+
+  // The Eruvs job's button opened the kind page, which listed them all; an
+  // eruv with no website is on no watch, so only this reaches it now.
+  it('Eruvs lists every eruv, with or without a website, each opening on its own', async () => {
+    const kinds = [view({ id: 'eruvs', name: 'Eruvs', tracked: [{ name: 'Lower Merion', status: 'Read', bad: false, page: 'place/lm' }] })]
+    vi.mocked(fetchJson).mockImplementation(async (url) => {
+      if (String(url).includes('/api/admin/watches/runs')) return { available: true, kinds, off: [] }
+      if (String(url).includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [{ id: 'lm', name: 'Lower Merion' }, { id: 'ne', name: 'Northeast' }], findings: [], watches: [] }
+      if (String(url).includes('/api/admin/categories')) return { categories: [{ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv Information' }] }
+      if (String(url).includes('/api/admin/listings')) return { places: [] }
+      throw new Error('down')
+    })
+    show('eruvs')
+    expect(await screen.findByRole('link', { name: /Northeast/ })).toHaveAttribute('href', '/philly/admin/watches/place/ne?from=job/eruvs')
+    expect(screen.getByRole('link', { name: /Lower Merion/ })).toHaveAttribute('href', '/philly/admin/watches/place/lm?from=job/eruvs')
+    // Eruvs are added in their category's editor; a bare id opens the list.
+    expect(screen.getByRole('link', { name: '+ Add an eruv' })).toHaveAttribute('href', '/philly/admin/categories/cat:eruv-information')
   })
 
   it('a job not yet set up says its step, and adds from its header', async () => {

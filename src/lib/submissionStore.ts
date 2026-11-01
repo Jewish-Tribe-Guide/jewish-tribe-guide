@@ -62,7 +62,7 @@ export async function listSubmissionsByStatus(
   const categories = await listCategories(community)
   // What a watch found is here too, beside what people send in: To do
   // groups by what's decided, not by who sent it (the admin redesign's
-  // brief). It also waits on its kind's page on Watches, with Compare.
+  // brief). It also waits on its place's own screen, with Compare.
   const submissions = all
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {

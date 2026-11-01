@@ -15,7 +15,7 @@ import { coverageOf, forgetWatchJobs, useWatchJobsAndReload } from './useWatchJo
 // anything needs fixing, what does, each job with when it last ran and a check
 // or an X, the jobs that need one step, and how many places have something no
 // job checks. What a watch finds waits in To do, not here. A place's own page
-// still opens from Needs fixing and from a job (WatchKindPage.tsx).
+// opens on its own from Needs fixing and from a job (PlacePage.tsx).
 
 /** For tests: start from nothing. */
 export function forgetWatchesTab() {

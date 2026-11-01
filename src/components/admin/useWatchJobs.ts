@@ -102,6 +102,27 @@ export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['catego
   return keys.every((k) => jobs[k] !== undefined)
 }
 
+/** Every job's places, each handed over as it comes in. */
+export async function loadJobs(token: string, community: string, fill: <K extends keyof Jobs>(key: K, value: Jobs[K]) => void, failed: (key: keyof Jobs) => void) {
+  const headers = { Authorization: `Bearer ${token}` }
+  const get = <T,>(path: string) => fetchJson<T>(withCommunity(path, community), { headers }, '').catch(() => null)
+  const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
+  await Promise.all([
+    get<{ categories: CategoryConfig[] }>('/api/admin/categories').then((d) => (d ? fill('categories', d.categories ?? null) : failed('categories'))),
+    get<{ places: Jobs['dishes'] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes'))),
+    get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals'))),
+    get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours'))),
+    get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times'))),
+    get<{ places: Jobs['sites'] }>('/api/admin/watches/sites').then((d) => (d ? fill('sites', d.places ?? null) : failed('sites'))),
+    get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
+    get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
+    get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
+    get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
+    get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
+    get<{ places: AdminPlace[] }>('/api/admin/listings').then((d) => (d ? fill('places', d.places ?? null) : failed('places'))),
+  ])
+}
+
 /** And `reload`, for a page that acts on a place: every job read again,
  *  done when they all are. */
 export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () => Promise<void> } {
@@ -109,25 +130,9 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
   const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community) ?? {})
 
   const load = useCallback(async () => {
-    const headers = { Authorization: `Bearer ${token}` }
-    const get = <T,>(path: string) => fetchJson<T>(withCommunity(path, community), { headers }, '').catch(() => null)
     const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => setJobs((j) => ({ ...j, [key]: value }))
     const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
-    const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
-    await Promise.all([
-      get<{ categories: CategoryConfig[] }>('/api/admin/categories').then((d) => (d ? fill('categories', d.categories ?? null) : failed('categories'))),
-      get<{ places: Jobs['dishes'] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes'))),
-      get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals'))),
-      get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours'))),
-      get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times'))),
-      get<{ places: Jobs['sites'] }>('/api/admin/watches/sites').then((d) => (d ? fill('sites', d.places ?? null) : failed('sites'))),
-      get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
-      get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
-      get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
-      get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
-      get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
-      get<{ places: AdminPlace[] }>('/api/admin/listings').then((d) => (d ? fill('places', d.places ?? null) : failed('places'))),
-    ])
+    await loadJobs(token, community, fill, failed)
   }, [token, community])
 
   useEffect(() => {

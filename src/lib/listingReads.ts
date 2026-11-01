@@ -3,17 +3,20 @@ import { listCategories } from './categoryStore'
 import { pageReadsFor } from './listingPageWatch'
 import type { ReadsOf } from './watchGroups'
 import { ownSiteCategories, siteGap } from './hoursJob'
+import { listEruvimForAdmin } from './eruvStore'
+import { websiteWatchOf } from './eruvJob'
+import { placePath } from './placeLink'
 
 /** Each listing's name, and what its own page is read for by its category:
  *  the server's copy of the Watches tab's `readsOf`, so What's tracked
  *  counts a mikvah's page as Mikvah hours whatever its label says, and
  *  names a newsletter by its shul. `siteGap`: for a place whose own
  *  website is read for what Google doesn't have (ownSiteCategories), why
- *  ("Not on Google"); null for any other. `placePage`: the place on its
- *  kind's page under the Watches tab (kind/hotel?place=…), and
- *  `eruvPage` the Eruvs', for What's tracked's lines. */
+ *  ("Not on Google"); null for any other. `placePage`: the place's own
+ *  screen under the Watches tab (place/<id>), and `eruvPage` an eruv's, by
+ *  the watch on its website, for a job's lines. */
 export type SiteGap = (resourceId: string) => { why: string } | null
-export type ListingInfo = { readsOf: ReadsOf; nameOf: (resourceId: string) => string | null; siteGap: SiteGap; placePage?: (resourceId: string) => string | null; eruvPage?: string | null }
+export type ListingInfo = { readsOf: ReadsOf; nameOf: (resourceId: string) => string | null; siteGap: SiteGap; placePage?: (resourceId: string) => string | null; eruvPage?: (watch: { url: string }) => string | null }
 
 /** In each of `communities`. */
 export async function loadListings(communities: Iterable<string>): Promise<ListingInfo> {
@@ -21,17 +24,16 @@ export async function loadListings(communities: Iterable<string>): Promise<Listi
   const names = new Map<string, string>()
   const gaps = new Map<string, { why: string }>()
   const pages = new Map<string, string>()
-  let eruvPage: string | null = null
+  const eruvs: { id: string; website: string | null }[] = []
   await Promise.all(
     [...new Set(communities)].map(async (community) => {
-      const [listings, categories] = await Promise.all([listApprovedResources(community), listCategories(community)])
+      const [listings, categories, eruvim] = await Promise.all([listApprovedResources(community), listCategories(community), listEruvimForAdmin(community)])
+      eruvs.push(...eruvim.eruvim)
       const categoryOf = new Map(categories.map((c) => [c.id, c]))
       const own = new Set(ownSiteCategories(categories).map((c) => c.id))
-      const eruv = categories.find((c) => c.kind === 'eruv')
-      if (eruv) eruvPage ??= `kind/${eruv.id}`
       for (const l of listings) {
         names.set(l.id, l.name)
-        pages.set(l.id, `kind/${l.category}?place=${l.id}`)
+        pages.set(l.id, placePath(l.id))
         const category = categoryOf.get(l.category)
         const kind = category && pageReadsFor(category)?.kind
         if (kind) reads.set(l.id, kind)
@@ -39,5 +41,5 @@ export async function loadListings(communities: Iterable<string>): Promise<Listi
       }
     }),
   )
-  return { readsOf: (id) => reads.get(id) ?? null, nameOf: (id) => names.get(id) ?? null, siteGap: (id) => gaps.get(id) ?? null, placePage: (id) => pages.get(id) ?? null, eruvPage }
+  return { readsOf: (id) => reads.get(id) ?? null, nameOf: (id) => names.get(id) ?? null, siteGap: (id) => gaps.get(id) ?? null, placePage: (id) => pages.get(id) ?? null, eruvPage: (watch) => { const e = eruvs.find((x) => websiteWatchOf(x, [watch])); return e ? placePath(e.id) : null } }
 }

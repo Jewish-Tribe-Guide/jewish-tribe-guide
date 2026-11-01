@@ -121,7 +121,7 @@ describe('what a run saves', () => {
 
 // Oct 26: the job pages are gone; a line opens its place on its kind's
 // page (ListingInfo.placePage), the Eruvs' page, or nothing.
-const at = (id: string) => `kind/k?place=${id}`
+const at = (id: string) => `place/${id}`
 
 describe('last night, a line per kind', () => {
   const google: GoogleLive[] = [
@@ -140,13 +140,13 @@ describe('last night, a line per kind', () => {
   // FinalNightly's Eruvs.
   it('what wasn’t read, and why', () => {
     const watches = [eruv('Lower Merion', never), eruv('Northeast', never), eruv('Elkins Park', { lastRunAt: after(WATCHES_AT, 2), lastOkAt: night(WATCHES_AT, 3), lastError: 'The page answered 500' }), eruv('Center City')]
-    const view = kind(nightKinds('philly', runs, watches, google, NOW, [], { readsOf: () => null, nameOf: () => null, siteGap: () => null, eruvPage: 'kind/eruvin' }), 'Eruvs')
+    const view = kind(nightKinds('philly', runs, watches, google, NOW, [], { readsOf: () => null, nameOf: () => null, siteGap: () => null, eruvPage: () => 'place/eruvin' }), 'Eruvs')
     expect(view.count).toBe('1 of 4 read')
     expect(view.trouble).toBe('1 didn’t load · 2 never read')
     expect(view.misses).toEqual([
-      { name: 'Lower Merion Eruv', why: 'Never read', page: 'kind/eruvin' },
-      { name: 'Northeast Eruv', why: 'Never read', page: 'kind/eruvin' },
-      { name: 'Elkins Park Eruv', why: 'Didn’t load', page: 'kind/eruvin' },
+      { name: 'Lower Merion Eruv', why: 'Never read', page: 'place/eruvin' },
+      { name: 'Northeast Eruv', why: 'Never read', page: 'place/eruvin' },
+      { name: 'Elkins Park Eruv', why: 'Didn’t load', page: 'place/eruvin' },
     ])
   })
 
@@ -228,7 +228,7 @@ describe('last night, a line per kind', () => {
     expect(kind(nightKinds('philly', runs, [], failing, NOW), 'Google')).toMatchObject({
       count: '2 of 3 places read',
       trouble: '1 didn’t load',
-      misses: [{ name: 'Closed Deli', why: 'Didn’t load', page: 'kind/restaurant?place=d1' }],
+      misses: [{ name: 'Closed Deli', why: 'Didn’t load', page: 'place/d1' }],
     })
   })
 
@@ -404,8 +404,8 @@ describe('everything a kind tracks', () => {
       { name: 'Not matched', matched: false, failedAt: null },
     ]
     expect(kind(views([], google), 'Google').tracked).toEqual([
-      { name: 'Closed Deli', status: 'Not answering since Oct 23', bad: true, page: 'kind/restaurant?place=d1' },
-      { name: 'Kosher Corner', status: 'Read Oct 25', bad: false, page: 'kind/restaurant?place=k1' },
+      { name: 'Closed Deli', status: 'Not answering since Oct 23', bad: true, page: 'place/d1' },
+      { name: 'Kosher Corner', status: 'Read Oct 25', bad: false, page: 'place/k1' },
     ])
   })
 
@@ -519,12 +519,12 @@ describe('Links', () => {
       link({ resourceId: 'p3', place: 'Kosher Corner', key: 'whatsapp', field: 'Join group', error: 'Didn’t answer', failingSince: after(RUN_AT, 1) }),
     ])
     expect(v).toMatchObject({ when: 'Oct 18, 5:00 AM', count: '3 links', trouble: '1 doesn’t open', nights: [] })
-    expect(v.misses).toEqual([{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 18', page: 'kind/restaurant?place=p2' }])
+    expect(v.misses).toEqual([{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 18', page: 'place/p2' }])
     expect(v.tracked).toEqual([
-      { name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 18', bad: true, page: 'kind/restaurant?place=p2' },
+      { name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 18', bad: true, page: 'place/p2' },
       // Not answering once isn't a problem yet: the next week's check says.
-      { name: 'Kosher Corner · Join group', status: 'Didn’t answer since Oct 18', bad: false, page: 'kind/restaurant?place=p3' },
-      { name: 'Sababa · Kosher Certification URL', status: 'Opens · checked Oct 18', bad: false, page: 'kind/restaurant?place=p1' },
+      { name: 'Kosher Corner · Join group', status: 'Didn’t answer since Oct 18', bad: false, page: 'place/p3' },
+      { name: 'Sababa · Kosher Certification URL', status: 'Opens · checked Oct 18', bad: false, page: 'place/p1' },
     ])
     expect(kindBad(v)).toBe(true)
   })

@@ -157,5 +157,7 @@ describe('places to find on Google', () => {
   })
   it('counts as something to do', () => {
     expect(todoCount({ submissions: [], responses: [], unmatched: [{}] })).toBe(1)
+    // What a job read that waits on the place, not in the queue.
+    expect(todoCount({ submissions: [{}], responses: [], waiting: [{}, {}] })).toBe(3)
   })
 })

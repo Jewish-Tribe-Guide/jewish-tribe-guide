@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 
-// ── A place's boxes, opened on its kind's page (OpenedPlace.tsx) ────────────
+// ── A place's boxes, opened on its own screen (OpenedPlace.tsx) ────────────
 // The pieces the Watches job pages shared (agreed Oct 21), kept for the
 // kind pages when those went (Oct 26): a box per part of the listing a
 // source reads, and in it the listing's rows, marked by what the source

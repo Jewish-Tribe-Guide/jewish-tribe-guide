@@ -10,12 +10,14 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { shortDay, splitSubmissions, submissionLine, submissionName, teachable, todoCount, watchesLine, type TodoSearch, type TodoWord } from '@/lib/todo'
 import { updateTodo, type TodoData } from '@/lib/useTodo'
+import { placePath } from '@/lib/placeLink'
 import { setupLeft } from '@/lib/setup'
 import { AdminBox, AdminEmpty, AdminRow, AdminRows, Chevron } from './AdminUI'
 import SetupChecklist from './SetupChecklist'
 
 // To do's one list (the admin redesign's step 2, boards 1 and 2): what to
-// decide, grouped by what you decide. A suggestion opens to be decided.
+// decide, grouped by what you decide. A suggestion opens to be decided here;
+// what a job read about a place opens on that place's own screen.
 // Watches, Responses and Searches nobody found sit at the bottom: searches
 // are there when there's time, not counted as something to do (the user,
 // Oct 29: there will be far too many to keep up with). Each search opens in
@@ -178,6 +180,7 @@ export default function TodoList({
   const [searchesOpen, setSearchesOpen] = useState(false)
   const watches = useWatchesLine(token)
   const { newPlaces, changes } = splitSubmissions(data.submissions)
+  const waiting = data.waiting ?? []
   const count = todoCount(data)
   const setupToGo = setupLeft(data.setup)
   const categoryOf = (s: EnrichedSubmission) =>
@@ -215,9 +218,11 @@ export default function TodoList({
         </AdminBox>
       )}
 
-      {changes.length > 0 && (
-        <AdminBox title="Changes" count={changes.length} foldOnPhone>
-          <AdminRows items={changes}>{suggestionRow}</AdminRows>
+      {changes.length + waiting.length > 0 && (
+        <AdminBox title="Changes" count={changes.length + waiting.length} foldOnPhone>
+          <AdminRows items={[...changes, ...waiting]}>
+            {(x) => ('payload' in x ? suggestionRow(x) : <AdminRow key={x.id} href={`${base}/watches/${placePath(x.id, 'todo')}`} name={x.name} line={x.line} aside={x.kind} />)}
+          </AdminRows>
         </AdminBox>
       )}
 
@@ -232,7 +237,7 @@ export default function TodoList({
       {data.unmatched.length > 0 && (
         <AdminBox title="Find on Google" count={data.unmatched.length} foldOnPhone>
           <AdminRows items={data.unmatched}>
-            {(p) => <AdminRow key={p.id} href={`${base}/watches/kind/${p.category}?place=${p.id}&from=todo`} name={p.name} line="Not found on Google" />}
+            {(p) => <AdminRow key={p.id} href={`${base}/watches/${placePath(p.id, 'todo')}`} name={p.name} line="Not found on Google" />}
           </AdminRows>
         </AdminBox>
       )}

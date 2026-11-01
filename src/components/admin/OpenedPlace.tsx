@@ -29,9 +29,8 @@ import type { EruvFinding } from '@/lib/eruvJob'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
-// A place opened in place on its kind's page (openedPlaceBoxes.ts says what
-// goes in it). Under its row on a computer, its own screen on a phone
-// (FinalPhoneShul3), as PlaceRow opens a job page's.
+// A place opened on its own screen, PlacePage.tsx (openedPlaceBoxes.ts says
+// what goes in it).
 //   Up to date (piece 2, Oct 25)   its boxes, each footed with its source.
 //   Not checked (piece 3)          a group per problem, lit, with its own
 //                                  button (FinalFood3, FinalPhonePlace3,
@@ -325,21 +324,17 @@ const readFor = (c: Change | null) => (c?.kind === 'eruv-status' ? 'status' : 't
 
 export default function OpenedPlace({
   place,
-  kindLabel,
   jobs,
   token,
   community,
   now,
-  onClose,
   onChanged,
 }: {
   place: WatchedPlace
-  kindLabel: string
   jobs: Jobs
   token: string
   community: string
   now: number
-  onClose: () => void
   /** After a read or a new source: every job read again. */
   onChanged: () => Promise<void>
 }) {
@@ -525,21 +520,7 @@ export default function OpenedPlace({
 
   const reading = busy === 'read'
   const notChecked = place.state === 'not_checked' && opened.problems.length > 0
-  const shell =
-    'flex flex-col gap-3 border-b border-slate-100 px-4 pb-4 pt-3 [&>*]:shrink-0 max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overflow-y-auto max-sm:border-0 max-sm:bg-slate-100 max-sm:pb-8 max-sm:pt-[max(1rem,env(safe-area-inset-top))]'
-  // On a phone the place covers the screen: the chevron in a bar across the
-  // top, then its name, as every screen with a way back (board 19b).
-  const phoneBack = (
-    <div className="-mx-4 -mt-4 flex items-center gap-1 min-h-14 border-b border-slate-200 bg-white pl-1 pr-4 sm:hidden">
-      <button type="button" onClick={onClose} className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-primary">
-        <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M10 3L5 8l5 5" />
-        </svg>
-        <span className="sr-only">‹ {kindLabel}</span>
-      </button>
-      <h2 className="m-0 min-w-0 flex-1 truncate text-lg font-bold text-slate-900">{place.name}</h2>
-    </div>
-  )
+  const shell = 'flex flex-col gap-3 [&>*]:shrink-0'
   const listing = place.listing && (
     <a href={place.listing} target="_blank" rel="noopener noreferrer" className={`self-start py-1 text-[13.5px] ${LINK}`}>
       Open its listing
@@ -596,17 +577,10 @@ export default function OpenedPlace({
         </button>
       )
     return (
-      <li role="region" aria-label={place.name} data-testid="kind-place-open" className={shell}>
-        {phoneBack}
-        <button type="button" aria-expanded="true" onClick={onClose} className="flex items-center gap-2.5 text-left max-sm:pointer-events-none">
-          <span className="max-sm:hidden">
-            <Down />
-          </span>
-          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:sr-only">{place.name}</span>
-          {place.pill && (
-            <span className={`whitespace-nowrap rounded-full border px-2 py-px text-xs font-semibold ${place.red ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{place.pill}</span>
-          )}
-        </button>
+      <section aria-label={place.name} data-testid="place-open" className={shell}>
+        {place.pill && (
+          <span className={`self-start rounded-full border px-2 py-px text-xs font-semibold ${place.red ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{place.pill}</span>
+        )}
         <div className="flex flex-col rounded-[10px] border border-slate-200 bg-white px-3.5 pb-3.5 pt-1">
           {w.groups.map((g) => {
             const [main, ...rest] = buttons(g)
@@ -684,7 +658,7 @@ export default function OpenedPlace({
           {listing && <span className="pt-1">{listing}</span>}
         </div>
         {editSheets}
-      </li>
+      </section>
     )
   }
 
@@ -841,15 +815,8 @@ export default function OpenedPlace({
       )
     }
     return (
-      <li role="region" aria-label={place.name} data-testid="kind-place-open" className={shell}>
-        {phoneBack}
-        <button type="button" aria-expanded="true" onClick={onClose} className="flex items-center gap-2.5 text-left max-sm:pointer-events-none">
-          <span className="max-sm:hidden">
-            <Down />
-          </span>
-          <span className="min-w-0 flex-1 text-[15.5px] font-bold text-slate-900 max-sm:sr-only">{place.name}</span>
-          {place.pill && <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-xs font-semibold text-amber-800">{place.pill}</span>}
-        </button>
+      <section aria-label={place.name} data-testid="place-open" className={shell}>
+        {place.pill && <span className="self-start rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-xs font-semibold text-amber-800">{place.pill}</span>}
         <div className="flex flex-col rounded-[10px] border border-slate-200 bg-white px-3.5 pb-3.5 pt-1">
           {opened.problems.map((p) => (
             <div key={p.key} className="flex flex-col border-b border-slate-100 pb-3 pt-2.5" data-testid="problem">
@@ -931,22 +898,13 @@ export default function OpenedPlace({
             }}
           />
         )}
-      </li>
+      </section>
     )
   }
 
   return (
-    <li role="region" aria-label={place.name} data-testid="kind-place-open" className={shell}>
-      {phoneBack}
-      <button type="button" aria-expanded="true" onClick={onClose} className="flex items-center gap-2.5 text-left max-sm:pointer-events-none">
-        <span className="max-sm:hidden">
-          <Down />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[15.5px] font-bold text-slate-900 max-sm:sr-only">{place.name}</span>
-          {place.sources.length > 0 && <span className="text-[13px] text-muted">{placeSourcesText(place.sources)}</span>}
-        </span>
-      </button>
+    <section aria-label={place.name} data-testid="place-open" className={shell}>
+      {place.sources.length > 0 && <span className="text-[13px] text-muted">{placeSourcesText(place.sources)}</span>}
       {opened.boxes.map((b) => (
         <Box key={b.key} name={b.title} defaultOpen>
           <BoxBody box={b} />
@@ -1024,6 +982,6 @@ export default function OpenedPlace({
           </a>
         )}
       </span>
-    </li>
+    </section>
   )
 }

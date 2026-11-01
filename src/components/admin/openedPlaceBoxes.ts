@@ -16,7 +16,7 @@ import type { Jobs } from './useWatchJobs'
 import type { GoogleFieldRow } from '@/lib/googleJob'
 import { linkBroken, linkStatus } from '@/lib/linkCheck'
 
-// ── A place up to date, opened on its kind's page (piece 2, Oct 25) ─────────
+// ── A place up to date, opened on its own screen (piece 2, Oct 25) ─────────
 // Drawn on FinalShuls3, FinalPhoneShul3, FinalAddSource3 and
 // FinalFoodMenus3 (settled Oct 24): a box per part of the listing a watch
 // keeps, each with the listing's values and, at its foot, where they're

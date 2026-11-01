@@ -193,17 +193,17 @@ it('a website’s findings wait on Main dishes, or the place’s kind, and its e
   const grocery = { id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', kind: 'listing', detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags', showCountInHeader: true }] as CategoryField[] } as const
   const cemetery = { id: 'cemetery', label: 'Cemetery', pluralLabel: 'Cemeteries', kind: 'listing', hasPhone: false, detailFields: [] as CategoryField[] } as const
   expect(siteCategories([restaurant, grocery, cemetery]).map((c) => c.id)).toEqual(['grocery'])
-  expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin/watches/kind/restaurant', name: 'Food' })
-  expect(jobPageFor('philly', grocery, 'g1')).toEqual({ path: '/philly/admin/watches/kind/grocery?place=g1', name: 'Grocery' })
+  expect(jobPageFor('philly', restaurant)).toEqual({ path: '/philly/admin', name: 'Food' })
+  expect(jobPageFor('philly', grocery, 'g1')).toEqual({ path: '/philly/admin/watches/place/g1?from=todo', name: 'Grocery' })
   expect(jobPageFor('philly', cemetery)).toBeUndefined()
 })
 
 // Oct 26: the job pages are gone, so an alert's link opens the place on
-// its kind's page, or the Watches tab for a list's findings.
-it('findingPage: the place on its kind’s page, or the Watches tab', () => {
-  expect(findingPage('philly', { id: 'mikvah', pluralLabel: 'Mikvaos' }, 'm1')).toEqual({ path: '/philly/admin/watches/kind/mikvah?place=m1', name: 'Mikvaos' })
-  expect(findingPage('philly', { id: 'eruv', pluralLabel: 'Eruvin' })).toEqual({ path: '/philly/admin/watches/kind/eruv', name: 'Eruvin' })
-  expect(findingPage('philly')).toEqual({ path: '/philly/admin/watches', name: '' })
+// its own screen, or To do for a list's findings.
+it('findingPage: the place’s own screen, or To do', () => {
+  expect(findingPage('philly', { id: 'mikvah', pluralLabel: 'Mikvaos' }, 'm1')).toEqual({ path: '/philly/admin/watches/place/m1?from=todo', name: 'Mikvaos' })
+  expect(findingPage('philly', { id: 'eruv', pluralLabel: 'Eruvin' })).toEqual({ path: '/philly/admin', name: 'Eruvin' })
+  expect(findingPage('philly')).toEqual({ path: '/philly/admin', name: '' })
 })
 
 describe('pageOf', () => {
