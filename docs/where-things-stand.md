@@ -2189,6 +2189,14 @@ source, a line says to sign up with the guide's address, and "No email has come
 in 3 weeks" waits in To do under Not being read. The canvas now holds only
 current boards, in labelled rows. **Waiting on the user:** all of these.
 
+**Drawn Nov 1, not built (the *13 boards):** Read now while adding. A website or
+Refuah line says "Read now" and fills in the form before the place goes live,
+which needs a read that saves nothing. Without it, Add listing reads afterward
+and shows what it found, to add in one tap. Kosher shows at once from the lists'
+morning copy ("On Keystone-K’s list · Use it"). An email says "within the hour",
+as the Gmail script looks back 14 days each hour. A shul's minyan rows get a
+second link, Add a source, so an email can sit beside a website.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
