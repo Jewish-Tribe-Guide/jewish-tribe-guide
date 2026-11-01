@@ -2130,6 +2130,11 @@ pick them (`changeLines.ts`). A new place still uses the old review.
 **To do for the user:** Washington has no Map, Candle Lighting or Eruv rows, so
 after this deploys its switches show off. Flip them in its Category pages.
 
+**Drawn, not built, waiting on the user's OK (Nov 1, the *4 boards on canvas
+VKdnqd5xkP37DP1DKcN5qy):** a job's row opens the Places listing unless a change
+or a failed read waits; the listing gains the source line with Change and Stop,
+Read it again and Add a source; eruvs join Places.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
