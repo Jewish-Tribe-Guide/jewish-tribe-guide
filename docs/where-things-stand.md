@@ -2132,8 +2132,9 @@ after this deploys its switches show off. Flip them in its Category pages.
 
 **Drawn, not built, waiting on the user's OK (Nov 1, the *4 boards on canvas
 VKdnqd5xkP37DP1DKcN5qy):** a job's row opens the Places listing unless a change
-or a failed read waits; the listing gains the source line with Change and Stop,
-Read it again and Add a source; eruvs join Places.
+or a failed read waits; each row names its job, and its bubble holds one line ("Its menu · Oct 20 ·
+Change", Stop inside Change); Archive is a red bin beside Update the listing;
+eruvs join Places. The *5 boards replace *4 for the listing and bubble.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
