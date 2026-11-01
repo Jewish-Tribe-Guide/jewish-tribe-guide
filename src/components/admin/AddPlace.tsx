@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import type { EditorRow, EditorValues } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { samePage } from '@/lib/hoursJob'
+import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
 import { pageReadsFor } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -18,7 +19,7 @@ import { useListingDraft } from '@/components/resources/useListingDraft'
 import { formatPhone } from '@/lib/validation'
 import type { DirectoryResource } from '@/types'
 import { AdminBack } from './AdminUI'
-import { addRowSources, foundLines, type AddLine, type AddSlot, type GivenSources } from './addSources'
+import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, type GivenSources, type KosherLookup } from './addSources'
 import ListingEditorScreen from './ListingEditorScreen'
 import { RowJob, SourceScreen, SourceWords, type SourceScreenProps } from './PlaceListing'
 import { sourceActions } from './sourceActions'
@@ -29,6 +30,7 @@ import { sourceActions } from './sourceActions'
 // saved once the listing is: nothing is searched or watched for a place that
 // doesn't exist yet.
 
+type ReadNowReply = { state: 'done' | 'none' | 'failed' | 'not-found'; phone?: string; details?: Record<string, unknown> }
 type Found = { id: string; payload: unknown }
 type PageReply = { pages?: { watch: { id: string; url: string; lastError?: string | null } }[] }
 /** Added: being read, a page that couldn't be, or what's found. */
@@ -46,10 +48,31 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [stopped, setStopped] = useState<ReadonlySet<CheckedField>>(new Set())
   const [screen, setScreen] = useState<{ title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
   const [addedAs, setAddedAs] = useState<AddedAs | null>(null)
+  const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
+  const [kosher, setKosher] = useState<KosherLookup | null>(null)
+  const [kosherUsed, setKosherUsed] = useState<string | null>(null)
   const [taking, setTaking] = useState(false)
   const inGuide = useMemo(() => new Set(listings.map((l) => l.placeId).filter((id): id is string => typeof id === 'string' && !!id)), [listings])
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  // On the kosher lists? From their kept copy, so as soon as it has a name.
+  const asksKosher = step === 'finish' && KOSHER_JOB_CATEGORIES.includes(category.id) && !!draft.name.trim()
+  useEffect(() => {
+    if (!asksKosher) return
+    let live = true
+    const wait = setTimeout(() => {
+      post<{ kosher?: KosherLookup | null }>('/api/admin/read-now', { category: category.id, slot: 'kosher', draft: { name: draft.name, address: draft.address, phone: draft.phone, details: draft.details } })
+        .then((r) => {
+          if (live) setKosher(r.kosher ?? null)
+        })
+        .catch(() => {})
+    }, 500)
+    return () => {
+      live = false
+      clearTimeout(wait)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- by its name and where it is, not every keystroke elsewhere
+  }, [asksKosher, draft.name, draft.address])
 
   const back = googleFirst ? () => setStep('find') : onClose
   useSetScreenHeader(step === 'find', 'Add a place', onClose)
@@ -104,7 +127,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const websiteKey = websiteKeyOf(category)
   const website = websiteKey && typeof draft.details[websiteKey] === 'string' ? (draft.details[websiteKey] as string).trim() : ''
   const values: EditorValues = { name: draft.name, address: draft.hasAddress ? draft.address : '', phone: draft.hasPhone ? draft.phone : '', details: draft.details }
-  const sources = addRowSources({ category, picked, hasPlace: !!draft.coords, values, given, stopped, reads: {} })
+  const sources = addRowSources({ category, picked, hasPlace: !!draft.coords, values, given, stopped, reads, kosher, kosherUsed })
 
   /** A source chosen: kept till the listing's saved. An email given for a
    *  shul's page is its email, and takes the place of nothing else. */
@@ -114,6 +137,30 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     if (problem) throw new Error(problem)
     const to = (slot === 'page' || slot === 'email') && sourceKind(url) === 'email' ? 'email' : slot === 'email' ? 'page' : slot
     setGiven((g) => ({ ...g, [to]: url }))
+    setReads((r) => {
+      const next = { ...r }
+      delete next[to]
+      return next
+    })
+  }
+
+  const readDraft = () => ({ name: draft.name, address: values.address, phone: values.phone, details: draft.details, coords: draft.coords })
+
+  /** Read now (ReadNow13): it fills in the rows, and the listing's not saved. */
+  async function readNow(slot: AddSlot) {
+    setReads((r) => ({ ...r, [slot]: { state: 'reading' } }))
+    const url = slot === 'site' ? undefined : given[slot]
+    const reply = await post<ReadNowReply>('/api/admin/read-now', { category: category.id, slot, url, draft: readDraft() }).catch(() => null)
+    if (reply?.state === 'done') {
+      if (reply.phone) draft.setPhone(reply.phone)
+      for (const [key, value] of Object.entries(reply.details ?? {})) draft.setDetail(key, value)
+    }
+    setReads((r) => ({ ...r, [slot]: { state: reply?.state ?? 'failed' } as AddRead }))
+  }
+
+  function takeList(on: KosherLookup['lists'][number]) {
+    for (const [key, value] of Object.entries(on.values)) draft.setDetail(key, value)
+    setKosherUsed(on.name)
   }
 
   const openScreen = (title: string, label: string, slot: AddSlot, placeholder?: string) =>
@@ -139,6 +186,14 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   function lineControls(line: AddLine): ReactNode[] {
     const out: ReactNode[] = []
+    if (line.readNow) {
+      const slot = line.readNow
+      out.push(control('Read now', () => void readNow(slot)))
+    }
+    if (line.useList) {
+      const on = line.useList
+      out.push(control('Use it', () => takeList(on)))
+    }
     if (line.change) {
       const c = line.change
       out.push(control('Change', () => openScreen('Change', c.label, c.slot, c.placeholder)))

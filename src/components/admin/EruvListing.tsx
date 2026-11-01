@@ -279,12 +279,24 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
   const [screen, setScreen] = useState<{ title: string; label: string; key: 'status' | 'map'; kind: WatchPurpose } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [statusRead, setStatusRead] = useState<{ state: 'reading' | 'failed' } | { state: 'done'; words: string } | null>(null)
   const title = screen?.title ?? 'Add a place'
   const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onBack
   useSetScreenHeader(true, title, back)
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(body: Record<string, unknown>) => fetchJson<T>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not add it.')
+
+  /** Read now (EruvRead13): what its page says, and nothing's saved. */
+  async function readStatusNow() {
+    setStatusRead({ state: 'reading' })
+    const reply = await fetchJson<{ state?: string; status?: string; words?: string | null }>(
+      withCommunity('/api/admin/read-now', community),
+      { method: 'POST', headers, body: JSON.stringify({ slot: 'eruv', url: draft.status.trim() }) },
+      'Could not read that.',
+    ).catch(() => null)
+    setStatusRead(reply?.state === 'done' ? { state: 'done', words: reply.words || (reply.status === 'up' ? 'Up' : 'Down') } : { state: 'failed' })
+  }
 
   async function add() {
     setBusy(true)
@@ -334,6 +346,30 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
     </div>
   )
   const status = given(draft.status, 'status', 'Its status page, or the address its emails come from', 'eruv', 'No status yet')
+  if (draft.status.trim() && sourceKind(draft.status) !== 'email') {
+    const page = shortUrl(draft.status.trim())
+    const link = (words: string, onClick: () => void) => (
+      <button type="button" onClick={onClick} className={LINE_LINK}>
+        {words}
+      </button>
+    )
+    const change = link('Change', () => setScreen({ title: 'Change', label: 'Its status page, or the address its emails come from', key: 'status', kind: 'eruv' }))
+    const idle = <SourceWords line={{ text: page }} controls={[link('Read now', () => void readStatusNow()), change]} />
+    if (statusRead?.state === 'done') status.word = statusRead.words
+    status.line =
+      statusRead?.state === 'reading' ? (
+        <SourceWords line={{ text: `Reading ${page}…` }} />
+      ) : statusRead?.state === 'done' ? (
+        <SourceWords line={{ text: page, when: 'just now' }} controls={[change]} />
+      ) : statusRead?.state === 'failed' ? (
+        <>
+          <SourceWords line={{ text: 'Couldn’t read that page', red: true }} />
+          {idle}
+        </>
+      ) : (
+        idle
+      )
+  }
   const map = given(draft.map, 'map', WHERE_ITS_MAP, 'hours', 'No map yet')
   const read = (job: string, line: ReactNode) => ({ source: { job, amber: job === 'Nothing' }, line })
   const websiteRead = draft.website.trim() ? read('Website', <SourceWords line={{ text: 'Its website' }} />) : read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />)
@@ -364,6 +400,7 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
             const problem = sourceProblem(screen.kind, url)
             if (problem) throw new Error(problem)
             setDraft((d) => ({ ...d, [screen.key]: url }))
+            if (screen.key === 'status') setStatusRead(null)
             return { failed: false }
           }}
           onTried={() => {}}

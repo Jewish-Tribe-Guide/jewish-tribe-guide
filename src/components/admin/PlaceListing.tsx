@@ -113,9 +113,9 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
 }
 
 /** "Its menu · Oct 20 · Change": a row's one line, its controls drawn in by the caller. */
-export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'>; controls?: ReactNode[] }) {
+export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
   return (
-    <p className="m-0 text-[13px] text-slate-500 [overflow-wrap:anywhere]" data-testid="row-source">
+    <p className={`m-0 text-[13px] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
       {line.url ? (
         <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
           {line.text}

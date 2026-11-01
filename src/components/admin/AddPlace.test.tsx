@@ -182,4 +182,45 @@ describe('Add a place', () => {
       expect(onClose).not.toHaveBeenCalled()
     })
   })
+
+  describe('Read now', () => {
+    const sourceWords = () => screen.getAllByTestId('row-source').map((p) => p.textContent).join('\n')
+    function reading(reply: unknown) {
+      vi.mocked(fetchJson).mockImplementation(async (url) => (String(url).includes('/read-now') ? reply : {}))
+    }
+    async function openTimes(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+    }
+
+    it('fills in the rows from its website, saving nothing (ReadDone13, ReadRows13)', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'done', details: { email: 'office@ohev.org', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] } })
+      renderAdd()
+      await openTimes(user)
+      await user.click(screen.getByRole('button', { name: 'Read now' }))
+      await waitFor(() => expect(sourceWords()).toContain('just now'))
+      const [[path, body]] = posts()
+      expect(path).toContain('/api/admin/read-now')
+      expect(body).toMatchObject({ slot: 'page', category: 'synagogue', draft: { name: 'Ohev Shalom' } })
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(screen.getByTestId('editor-row-minyans:weekday')).toHaveTextContent('Shacharis 7 AM')
+    })
+
+    it('says when the website has none, or couldn’t be read (ReadNothing13, ReadFailed13)', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'none' })
+      renderAdd()
+      await openTimes(user)
+      await user.click(screen.getByRole('button', { name: 'Read now' }))
+      await waitFor(() => expect(sourceWords()).toContain('No minyan times on its website'))
+      cleanup()
+      reading({ state: 'failed' })
+      renderAdd()
+      await openTimes(user)
+      await user.click(screen.getByRole('button', { name: 'Read now' }))
+      await waitFor(() => expect(sourceWords()).toContain('Couldn’t read its website'))
+      expect(screen.getByRole('button', { name: 'Read now' })).toBeInTheDocument()
+    })
+  })
 })
