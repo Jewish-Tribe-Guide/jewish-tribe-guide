@@ -2161,6 +2161,12 @@ job's name on the "Not on the listing yet" lines; "Find it on Google" on a place
 filled in by hand; "when one comes" for a newsletter's email. Drawn for a shul
 only; kosher places and hospitals aren't traced yet.
 
+**Agreed Nov 1, drawn, not built (the *9 boards):** a row names where it's read
+from, not the job: Google, Website, Newsletter, Keystone, Refuah, Nothing or
+Stopped. This replaces the row words on the *8 boards and the built "Watches
+names" on listings. Jobs stay as how the system runs. Proposed, not agreed:
+Watches lists the jobs under their source (Watches9).
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
