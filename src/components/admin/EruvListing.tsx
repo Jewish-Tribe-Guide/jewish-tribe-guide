@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { fetchJson } from '@/lib/fetchJson'
 import { statusPill } from '@/lib/eruvJob'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -9,7 +9,8 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { withCommunity } from '@/lib/useCommunityData'
 import type { CategoryConfig } from '@/lib/categories'
-import { EditorOpenCard, EditorRowCard, editorFieldLabel, editorInputClass } from '@/components/resources/editorParts'
+import { sourceKind, sourceProblem, type WatchPurpose } from '@/lib/watchPurposes'
+import { EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, editorFieldLabel, editorInputClass } from '@/components/resources/editorParts'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import { AdminBack } from './AdminUI'
 import { Pill } from './JobBoxes'
@@ -28,6 +29,8 @@ const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline dis
 
 type Draft = { name: string; covers: string; hotline: string; alertsUrl: string; website: string }
 type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website'
+type AddEruvRow = RowId
+const WHERE_ITS_MAP = 'Where its map is'
 const draftOf = (e: AdminEruv): Draft => ({ name: e.name, covers: e.covers ?? '', hotline: e.hotline ?? '', alertsUrl: e.alertsUrl ?? '', website: e.website ?? '' })
 
 export default function EruvListing({
@@ -267,42 +270,134 @@ export default function EruvListing({
   )
 }
 
-/** Add a place, an eruv: its name, then it opens like any other. */
-export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () => void; onAdded: (id: string) => Promise<void> | void }) {
+/** Add a place, an eruv (boards AddEruv12, EruvStatusField12, AddEruvFilled12):
+ *  the same Add screen, with no Google step. What's given goes on as it's added. */
+export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () => void; onAdded: () => Promise<void> | void }) {
   const community = useCommunitySlug()
-  const [name, setName] = useState('')
+  const [draft, setDraft] = useState({ name: '', covers: '', status: '', map: '', hotline: '', alertsUrl: '', website: '' })
+  const [openRow, setOpenRow] = useState<AddEruvRow | null>(null)
+  const [screen, setScreen] = useState<{ title: string; label: string; key: 'status' | 'map'; kind: WatchPurpose } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  useSetScreenHeader(true, 'Add a place', onBack)
+  const title = screen?.title ?? 'Add a place'
+  const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onBack
+  useSetScreenHeader(true, title, back)
 
-  async function add(e: FormEvent) {
-    e.preventDefault()
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const post = <T,>(body: Record<string, unknown>) => fetchJson<T>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not add it.')
+
+  async function add() {
     setBusy(true)
     setError(null)
     try {
-      const { eruv } = await fetchJson<{ eruv: AdminEruv }>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add', name }) }, 'Could not add it.')
-      await onAdded(eruv.id)
+      const { eruv } = await post<{ eruv: AdminEruv }>({ action: 'add', name: draft.name.trim() })
+      const statusAt = draft.status.trim() ? (sourceKind(draft.status) === 'email' ? { statusEmail: draft.status.trim() } : { statusUrl: draft.status.trim() }) : {}
+      const edit = {
+        ...statusAt,
+        ...(draft.map.trim() ? { lineUrl: draft.map.trim() } : {}),
+        ...Object.fromEntries((['covers', 'hotline', 'alertsUrl', 'website'] as const).filter((k) => draft[k].trim()).map((k) => [k, draft[k].trim()])),
+      }
+      if (Object.keys(edit).length) await post({ action: 'save', id: eruv.id, edit })
+      // A page or a map is read as it's added.
+      if ('statusUrl' in statusAt || draft.map.trim()) await post({ action: 'check', id: eruv.id })
+      await onAdded()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add it.')
       setBusy(false)
     }
   }
 
+  const given = (v: string, key: 'status' | 'map', label: string, kind: WatchPurpose, none: string) => {
+    const open = (t: string) => () => setScreen({ title: t, label, key, kind })
+    const link = (words: string, onClick: () => void) => (
+      <button type="button" onClick={onClick} className={LINE_LINK}>
+        {words}
+      </button>
+    )
+    return {
+      word: v.trim() ? 'Read when it’s added' : '',
+      job: v.trim() ? (sourceKind(v) === 'email' ? 'Email' : 'Website') : 'Nothing',
+      none,
+      line: v.trim() ? <SourceWords line={{ text: shortUrl(v.trim()) }} controls={[link('Change', open('Change'))]} /> : <SourceWords line={{ text: 'Nothing reads this' }} controls={[link('Add a source', open('Add a source'))]} />,
+    }
+  }
+  const input = (key: 'name' | 'covers' | 'hotline' | 'alertsUrl' | 'website', label: string, long = false) => (
+    <div>
+      <label htmlFor={`eruv-new-${key}`} className={editorFieldLabel}>
+        {label}
+      </label>
+      {long ? (
+        <textarea id={`eruv-new-${key}`} rows={3} value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} className={`${editorInputClass} h-auto py-2.5`} />
+      ) : (
+        <input id={`eruv-new-${key}`} autoFocus={key === 'name' && !draft.name} type="text" value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} className={editorInputClass} />
+      )}
+    </div>
+  )
+  const status = given(draft.status, 'status', 'Its status page, or the address its emails come from', 'eruv', 'No status yet')
+  const map = given(draft.map, 'map', WHERE_ITS_MAP, 'hours', 'No map yet')
+  const read = (job: string, line: ReactNode) => ({ source: { job, amber: job === 'Nothing' }, line })
+  const websiteRead = draft.website.trim() ? read('Website', <SourceWords line={{ text: 'Its website' }} />) : read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />)
+  const rows: { id: AddEruvRow; title: string; summary: string; filled: boolean; source?: { job: string; amber: boolean }; line?: ReactNode; body: ReactNode }[] = [
+    { id: 'name', title: draft.name.trim() || 'Name', summary: draft.covers.trim(), filled: true, body: <>{input('name', 'Name')}{input('covers', 'What it covers', true)}</> },
+    { id: 'status', title: 'Status', summary: status.word, filled: !!draft.status.trim(), ...read(status.job, status.line), body: <p className="m-0 text-[15px] text-slate-500">{status.none}</p> },
+    { id: 'map', title: 'Map', summary: map.word, filled: !!draft.map.trim(), ...read(map.job, map.line), body: <p className="m-0 text-[15px] text-slate-500">{map.none}</p> },
+    { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim(), filled: !!draft.hotline.trim(), ...websiteRead, body: input('hotline', 'Hotline') },
+    { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() && shortUrl(draft.alertsUrl.trim()), filled: !!draft.alertsUrl.trim(), ...websiteRead, body: input('alertsUrl', 'Alerts') },
+    { id: 'website', title: 'Website', summary: draft.website.trim() && shortUrl(draft.website.trim()), filled: !!draft.website.trim(), ...read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />), body: input('website', 'Website') },
+  ]
+  const opened = (r: (typeof rows)[number]) => (
+    <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
+      {r.body}
+    </EditorOpenCard>
+  )
+  const empty = rows.filter((r) => !r.filled)
+
   return (
     <div className="flex flex-col gap-4">
-      <AdminBack back={{ label: 'Back', onClick: onBack }} title="Add a place" />
-      <form onSubmit={(e) => void add(e)} className="flex flex-col gap-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <label htmlFor="eruv-new-name" className={editorFieldLabel}>
-            Name
-          </label>
-          <input id="eruv-new-name" value={name} onChange={(e) => setName(e.target.value)} className={editorInputClass} autoFocus />
+      <AdminBack back={{ label: 'Back', onClick: back }} title={title} />
+      {screen ? (
+        <SourceScreen
+          label={screen.label}
+          value={draft[screen.key]}
+          button="Save"
+          attempt={async (url) => {
+            const problem = sourceProblem(screen.kind, url)
+            if (problem) throw new Error(problem)
+            setDraft((d) => ({ ...d, [screen.key]: url }))
+            return { failed: false }
+          }}
+          onTried={() => {}}
+          onDone={() => setScreen(null)}
+        />
+      ) : (
+        <div className="space-y-4" data-testid="editor-list">
+          <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>
+          <ul className="space-y-2">
+            {rows
+              .filter((r) => r.filled)
+              .map((r) => (
+                <li key={r.id}>
+                  {openRow === r.id ? (
+                    opened(r)
+                  ) : (
+                    <EditorRowCard onOpen={() => setOpenRow(r.id)} testId={`editor-row-${r.id}`} opens="here" title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
+                  )}
+                </li>
+              ))}
+          </ul>
+          {empty.length > 0 && (
+            <EditorEmptyRows>
+              {empty.map((r) => (
+                <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine onOpen={() => setOpenRow(r.id)} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
+              ))}
+            </EditorEmptyRows>
+          )}
+          {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{error}</p>}
+          <button type="button" disabled={busy || !draft.name.trim()} onClick={() => void add()} className={SUBMIT_PILL}>
+            {busy ? 'Adding…' : draft.name.trim() ? 'Add listing' : 'Still needed: Name'}
+          </button>
         </div>
-        {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{error}</p>}
-        <button type="submit" disabled={busy || !name.trim()} className={SUBMIT_PILL}>
-          {busy ? 'Adding…' : 'Add it'}
-        </button>
-      </form>
+      )}
     </div>
   )
 }

@@ -31,8 +31,8 @@ type Options = {
   /** See ListingEditor's own prop of the same name. */
   adminSubmit?: { token: string }
   /** Admin mode only: the listing is already live, so there's no "Thank you,
-   *  it's being reviewed" screen to show — this runs instead. */
-  onAdminSubmitted?: () => void
+   *  it's being reviewed" screen to show — this runs instead, with the answer. */
+  onAdminSubmitted?: (body: unknown) => void
   /** Sends somewhere other than /api/submissions, with the same body and the
    *  same `{ ok, code, errors }` answer: the "+ Add" box, filing a new place
    *  read from a message with what it was read from. */
@@ -169,7 +169,7 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
       setRetriedVerification(false)
       // Admin mode: the listing is already live — nothing to review, so skip
       // the "Thank you!" pending screen and just close back out.
-      if (adminSubmit) onAdminSubmitted?.()
+      if (adminSubmit) onAdminSubmitted?.(body)
       else if (onSent) onSent(body)
       else setDone(true)
     } catch {

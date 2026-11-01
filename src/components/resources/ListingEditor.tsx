@@ -99,8 +99,8 @@ type Props = {
   onSent?: (body: unknown) => void
   /** The admin console's "+ Add listing": Send puts it live straight away
    *  (/api/admin/listings, see useListingSubmit), with no challenge, and
-   *  closes the editor once it's in. */
-  adminSubmit?: { token: string }
+   *  closes the editor once it's in, or hands `onAdded` the new listing. */
+  adminSubmit?: { token: string; onAdded?: (listing: DirectoryResource) => void }
   /** Just these rows (editorRows ids), open, with Send under them: one
    *  box's own Edit (BoxEditSheet, Oct 15), the listing's other boxes
    *  left out. */
@@ -279,7 +279,11 @@ export default function ListingEditor({
     via: adminSave?.via ?? via,
     onSent: adminSave ? () => adminSave.onSaved() : onSent,
     adminSubmit,
-    onAdminSubmitted: onClose,
+    onAdminSubmitted: (body) => {
+      const added = (body as { listing?: DirectoryResource } | null)?.listing
+      if (adminSubmit?.onAdded && added) adminSubmit.onAdded(added)
+      else onClose()
+    },
   })
   // The category editor's Preview (previewSend.tsx): Send puts the listing
   // in the preview's list instead of sending it, and the address box
@@ -322,7 +326,7 @@ export default function ListingEditor({
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
   // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
   // next week's too. One box's own Edit has them only if it's that box.
-  const thisWeek = useEditWeek(!creating && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
+  const thisWeek = useEditWeek((!creating || !!rowSource) && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
   const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
@@ -418,7 +422,7 @@ export default function ListingEditor({
     : []
   const needed = (r: EditorRow) =>
     creating &&
-    ((r.kind === 'name' && !draft.name.trim()) || (r.kind === 'contact' && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
+    ((r.kind === 'name' && !draft.name.trim()) || (r.kind === 'contact' && r.part !== 'phone' && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
   const nothingToSend = creating ? missing.length > 0 : changed.size === 0
 
   async function send() {
@@ -483,7 +487,7 @@ export default function ListingEditor({
   const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
   const listScreen = (
     <div className="space-y-4" data-testid="editor-list">
-      {creating && fromGoogle && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
+      {creating && fromGoogle && !adminSubmit && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
       {adminSubmit && <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>}
       {creating && existingListings && <Lookalike existing={existingListings} draft={draft} category={category} />}
       <ul className="space-y-2">

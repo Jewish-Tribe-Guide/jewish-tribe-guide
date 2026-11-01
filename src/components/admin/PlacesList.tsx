@@ -10,7 +10,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, type CheckedBy } from '@/lib/fieldCoverage'
-import ListingEditorScreen from './ListingEditorScreen'
+import AddPlace from './AddPlace'
 import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
@@ -190,18 +190,16 @@ export default function PlacesList({ token }: { token: string }) {
       <AddEruv
         token={token}
         onBack={close}
-        onAdded={async (id) => {
+        onAdded={async () => {
           await reload()
-          setAdding(null)
-          setOpenId(id)
-          history.replaceState({ ...(window.history.state ?? {}), placeAdding: undefined, placeOpen: id }, '')
+          close()
         }}
       />
     )
   }
   if (adding) {
     const addTo = categoriesById.get(adding)!
-    return <ListingEditorScreen heading="Add a place" category={addTo} adminSubmit={{ token }} onClose={changed} />
+    return <AddPlace category={addTo} listings={places.filter((p) => p.category === adding && p.status === 'approved').map((p) => p.listing)} token={token} onClose={changed} />
   }
 
   const opened = openId ? places.find((p) => p.id === openId) : undefined

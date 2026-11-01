@@ -142,6 +142,7 @@ export type SourceScreenProps = {
   stop?: () => Promise<void>
   /** Under the address: an eruv's "Its page dates each week's post". */
   extra?: ReactNode
+  placeholder?: string
   onDone: () => Promise<void> | void
   /** After a try that didn't read: the source is in by then. */
   onTried: () => Promise<void> | void
@@ -149,7 +150,7 @@ export type SourceScreenProps = {
 
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
-export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, onDone, onTried }: SourceScreenProps) {
+export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, onDone, onTried }: SourceScreenProps) {
   const [value, setValue] = useState(first)
   const [attempt, setAttempt] = useState<{ run: Attempt }>({ run: firstAttempt })
   const [busy, setBusy] = useState(false)
@@ -187,7 +188,7 @@ export function SourceScreen({ label, value: first, button: words, attempt: firs
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <label className="flex flex-col gap-1.5 text-[13px] text-slate-600">
           {label}
-          <input value={value} onChange={(e) => setValue(e.target.value)} className={INPUT} autoFocus />
+          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} className={INPUT} autoFocus />
         </label>
         {extra}
       </div>
