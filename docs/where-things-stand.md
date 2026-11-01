@@ -2134,7 +2134,9 @@ after this deploys its switches show off. Flip them in its Category pages.
 VKdnqd5xkP37DP1DKcN5qy):** a job's row opens the Places listing unless a change
 or a failed read waits; each row names its job, and its bubble holds one line ("Its menu · Oct 20 ·
 Change", Stop inside Change); Archive is a red bin beside Update the listing;
-eruvs join Places. The *5 boards replace *4 for the listing and bubble.
+eruvs join Places. Latest listing boards are *6: rows use the Watches job names,
+Stopped opens Change with one Start reading button. Undecided: eruv maps read
+only by the nightly job, served from the saved copy.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
