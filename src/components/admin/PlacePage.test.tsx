@@ -396,7 +396,7 @@ describe('PlacePage', () => {
         if (init?.method === 'POST') {
           const body = JSON.parse(String(init.body))
           posts.push([url.replace(/[?&]community=philly/, ''), body])
-          if (body.action === 'check') return body.id ? { pages: [{ id: 'w1', url: page.url, lastError: 'It wouldn’t open' }] } : { read: ['w1'] }
+          if (body.action === 'check') return body.id ? { pages: [{ watch: { id: 'w1', url: page.url, lastError: 'It wouldn’t open' }, source: '' }] } : { read: ['w1'] }
           return { ok: true }
         }
         if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }

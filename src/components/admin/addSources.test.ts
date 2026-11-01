@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { editorRows } from '@/lib/editorRows'
 import { makeCategory } from '@/test/providerFixtures'
-import { addRowSources, type AddState } from './addSources'
+import { addRowSources, foundLines, type AddState } from './addSources'
 
 const shul = makeCategory({
   id: 'shul',
@@ -120,5 +120,35 @@ describe('Add a place: what a row is read from', () => {
     expect(addRowSources(s)(row)).toMatchObject({ job: 'Refuah', lines: [{ text: 'Refuah', readNow: 'refuah' }] })
     expect(addRowSources({ ...s, reads: { refuah: { state: 'not-found' } } })(row)?.lines[0]).toMatchObject({ text: 'Not found on Refuah', add: { words: 'Add its page' } })
     expect(addRowSources({ ...s, hasPlace: false })(row)?.lines[0].text).toBe('Nothing reads this')
+  })
+
+  describe('foundLines (AddFound13)', () => {
+    const shul = makeCategory({
+      id: 'synagogue',
+      detailFields: [
+        { key: 'website', label: 'Website', type: 'url' },
+        { key: 'email', label: 'Email', type: 'email' as never },
+        { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+      ],
+    })
+    const place = { id: 'n', name: 'Ohev Shalom', phone: '2155550142', website: 'https://ohev.org' }
+    const week = { id: 'w', kind: 'week', name: 'This week', mode: 'add', from: '2026-11-01', to: '2026-11-07', minyanim: [] }
+
+    it('names each row found, and a week by its dates', () => {
+      const lines = foundLines(
+        shul,
+        place,
+        [{ payload: { details: { email: 'office@ohev.org', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '07:00' }, { id: 'b', tefillah: 'mincha', days: ['tue'], time: '17:00' }], minyanim_schedules: [week] } } }],
+        '2026-11-03',
+      )
+      expect(lines).toContain('Usual weekday times: 2 times')
+      expect(lines).toContain('Email: office@ohev.org')
+      expect(lines).toContain('This week’s schedule: Nov 1 – Nov 7')
+    })
+
+    it('says nothing of what is already so', () => {
+      expect(foundLines(shul, place, [{ payload: { phone: '2155550142', details: { website: 'https://ohev.org' } } }], '2026-11-03')).toEqual([])
+      expect(foundLines(shul, place, [], '2026-11-03')).toEqual([])
+    })
   })
 })

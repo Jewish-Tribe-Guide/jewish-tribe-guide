@@ -12,11 +12,17 @@ vi.mock('next/navigation', () => ({ useRouter: () => mockRouter, usePathname: ()
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(async () => ({})), parseOkJson: vi.fn() }))
 vi.mock('@/lib/useEditWeek', () => ({ useEditWeek: () => null }))
 vi.mock('@/components/intake/AddressInput', () => ({
-  default: ({ id, onPlaceSelect, suggestionNote }: { id: string; onPlaceSelect: (r: unknown) => void; suggestionNote?: (id: string) => string | null }) => (
+  default: ({ id, onChange, onPlaceSelect, suggestionNote }: { id: string; onChange: (v: string) => void; onPlaceSelect: (r: unknown) => void; suggestionNote?: (id: string) => string | null }) => (
     <div>
       <input id={id} aria-label="Find the place" />
       <span>{suggestionNote?.('in-guide')}</span>
-      <button type="button" onClick={() => onPlaceSelect({ placeId: 'p1', name: 'Ohev Shalom', phone: '2155550142', website: 'https://ohev.org', businessStatus: 'OPERATIONAL', address: '2 Chester Rd' })}>
+      <button
+        type="button"
+        onClick={() => {
+          onChange('2 Chester Rd')
+          onPlaceSelect({ placeId: 'p1', name: 'Ohev Shalom', phone: '2155550142', website: 'https://ohev.org', businessStatus: 'OPERATIONAL', address: '2 Chester Rd' })
+        }}
+      >
         Pick it
       </button>
     </div>
@@ -34,7 +40,9 @@ const shul = makeCategory({
 
 afterEach(() => {
   cleanup()
-  vi.mocked(fetchJson).mockClear()
+  vi.mocked(fetchJson).mockReset()
+  vi.mocked(fetchJson).mockImplementation(async () => ({}))
+  vi.unstubAllGlobals()
 })
 
 const posts = () => vi.mocked(fetchJson).mock.calls.filter(([, init]) => init?.method === 'POST').map(([url, init]) => [String(url).split('?')[0], JSON.parse(String(init?.body))])
@@ -99,5 +107,79 @@ describe('Add a place', () => {
     await user.click(screen.getByRole('button', { name: 'Stop' }))
     expect(posts()).toEqual([])
     await waitFor(() => expect(screen.getByTestId('row-source')).toHaveTextContent('Nothing reads this · Use Google’s'))
+  })
+
+  describe('after Add listing', () => {
+    const added = { id: 'new', category: 'synagogue', name: 'Ohev Shalom', phone: '2155550142', address: '', website: 'https://ohev.org' }
+    /** The site, as far as this screen goes: `found` is what's waiting. */
+    function site({ found = [] as unknown[], lastError = null as string | null } = {}) {
+      vi.mocked(fetchJson).mockImplementation(async (url, init) => {
+        const u = String(url)
+        const body = init?.body ? JSON.parse(String(init.body)) : {}
+        if (u.includes('/found') && init?.method !== 'POST') return { found }
+        if (u.includes('/watches/hours') && body.action === 'give') return { pages: [{ watch: { id: 'w1', url: body.url, lastError } }] }
+        if (u.includes('/watches/hours') && body.action === 'check' && !body.id) return { read: ['w2'] }
+        return {}
+      })
+    }
+    async function addIt(user: ReturnType<typeof userEvent.setup>) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, listing: added }), { status: 200 })))
+      await user.click(screen.getByRole('button', { name: 'Add listing' }))
+    }
+    const sent = () => posts().map(([u, b]) => `${String(u).replace(/\?.*/, '')} ${(b as { action?: string } | undefined)?.action ?? ''}`.trim())
+
+    it('reads it and offers what it found: one tap adds it all (AddFound13)', async () => {
+      const user = userEvent.setup()
+      site({ found: [{ id: 's1', payload: { details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '07:00' }] } } }] })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await addIt(user)
+      expect(await screen.findByText('Ohev Shalom is added')).toBeInTheDocument()
+      expect(screen.getByText('Found on its website')).toBeInTheDocument()
+      expect(screen.getByTestId('found-lines')).toHaveTextContent('Usual weekday times: 1 time')
+      expect(sent()).toEqual(['/api/admin/listings/new/found google', '/api/admin/watches/hours check', '/api/admin/watches/hours check'])
+      await user.click(screen.getByRole('button', { name: 'Add to the listing' }))
+      expect(sent()).toContain('/api/admin/listings/new/found take')
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    it('Decide later leaves it all on To do', async () => {
+      const user = userEvent.setup()
+      site({ found: [{ id: 's1', payload: { details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '07:00' }] } } }] })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await addIt(user)
+      await user.click(await screen.findByRole('button', { name: 'Decide later in To do' }))
+      expect(onClose).toHaveBeenCalled()
+      expect(sent()).not.toContain('/api/admin/listings/new/found take')
+    })
+
+    it('nothing found: straight back to Places', async () => {
+      const user = userEvent.setup()
+      site()
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await addIt(user)
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    it('a page given is saved and read; if it can’t be, it’s said there (AddFailed8)', async () => {
+      const user = userEvent.setup()
+      site({ lastError: 'It wouldn’t open' })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+      await user.click(screen.getByRole('button', { name: 'Change' }))
+      await user.type(screen.getByLabelText('A web page, or the email it comes from'), 'https://ohev.org/davening')
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await screen.findByText('ohev.org/davening')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await addIt(user)
+      expect(await screen.findByText('Ohev Shalom is added')).toBeInTheDocument()
+      expect(screen.getByText('Couldn’t read that page')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Start reading' })).toBeInTheDocument()
+      expect(sent()).toContain('/api/admin/watches/hours give')
+      expect(onClose).not.toHaveBeenCalled()
+    })
   })
 })

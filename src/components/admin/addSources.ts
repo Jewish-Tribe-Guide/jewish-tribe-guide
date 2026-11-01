@@ -1,11 +1,14 @@
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { contactFields } from '@/lib/contactRead'
-import type { EditorRow, EditorValues } from '@/lib/editorRows'
+import { editorRows, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { itemWording } from '@/lib/itemMarks'
 import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
 import { pageReadsFor } from '@/lib/listingPageWatch'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
+import { minyanimForBox } from '@/lib/minyanimBox'
+import { timeText } from '@/lib/minyanText'
+import { dateText, readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
 import { shortUrl } from './watchText'
 
 // ── Add a place: what each row will be read from (boards *11, *13, *14) ──────
@@ -211,4 +214,34 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     }
     return f.type === 'url' ? linkCheck : null
   }
+}
+
+/** "Usual weekday times: 9 times", a line for each row what was found would
+ *  fill or change on a place just added (AddFound13). */
+export function foundLines(category: CategoryConfig, listing: Record<string, unknown>, found: readonly { payload: unknown }[], today: string): string[] {
+  const before: EditorValues = { name: String(listing.name ?? ''), address: String(listing.address ?? ''), phone: String(listing.phone ?? ''), details: listing }
+  const merged = found.reduce<EditorValues>((v, f) => {
+    const p = f.payload as { phone?: unknown; details?: Record<string, unknown> } | null
+    return { ...v, phone: typeof p?.phone === 'string' ? p.phone : v.phone, details: { ...v.details, ...p?.details } }
+  }, before)
+  const lines: string[] = []
+  for (const row of editorRows(category, merged.details, { splitContact: true })) {
+    if (row.kind === 'name') continue
+    const now = rowSummary(row, merged, timeText)
+    if (!now || now === rowSummary(row, before, timeText)) continue
+    if (row.kind === 'minyans') {
+      const n = minyanimForBox(regularMinyanim(merged.details[row.fields[0].key]), row.box!).length
+      lines.push(`${row.title}: ${n} ${n === 1 ? 'time' : 'times'}`)
+    } else lines.push(`${row.title}: ${now}`)
+  }
+  const minyanim = category.detailFields.find((f) => f.type === 'minyanim')
+  if (minyanim) {
+    const was = new Set(readSchedules(before.details[schedulesKey(minyanim.key)]).map((s) => s.id))
+    for (const s of readSchedules(merged.details[schedulesKey(minyanim.key)])) {
+      if (s.kind !== 'week' || was.has(s.id)) continue
+      const dates = `${dateText(s.from)} – ${dateText(s.to)}`
+      lines.push(s.from <= today && today <= s.to ? `This week’s schedule: ${dates}` : `Schedule: ${dates}`)
+    }
+  }
+  return lines
 }

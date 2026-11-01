@@ -2208,7 +2208,10 @@ everything").** Built so far: rows name their source; Watches at the foot of
 Places, its jobs under Google, Websites, Email, Outside lists and Link check; To
 do's Not being read, with "No email has come in 3 weeks". The kosher job's Watches
 row says "Keystone-K and Mekor Habracha", as it reads both (the board says
-Keystone-K only).
+Keystone-K only). Add a place starts at Find the place and its rows say what reads
+them. Add listing saves the choices, reads the place at once, and offers what it
+found in one tap, or Decide later in To do. A food place's dishes go to its Dishes
+page, not this screen.
 
 **Drawn Nov 1, not built (the *14 boards):** Read now for email, so an admin
 adding a place sees the answer then instead of coming back. The Gmail script

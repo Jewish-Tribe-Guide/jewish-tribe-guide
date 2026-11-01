@@ -143,6 +143,8 @@ export type SourceScreenProps = {
   /** Under the address: an eruv's "Its page dates each week's post". */
   extra?: ReactNode
   placeholder?: string
+  /** It's been tried already, and couldn't be read. */
+  failedAtFirst?: boolean
   onDone: () => Promise<void> | void
   /** After a try that didn't read: the source is in by then. */
   onTried: () => Promise<void> | void
@@ -150,11 +152,11 @@ export type SourceScreenProps = {
 
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
-export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, onDone, onTried }: SourceScreenProps) {
+export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, failedAtFirst = false, onDone, onTried }: SourceScreenProps) {
   const [value, setValue] = useState(first)
   const [attempt, setAttempt] = useState<{ run: Attempt }>({ run: firstAttempt })
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState(failedAtFirst)
   const [error, setError] = useState<string | null>(null)
 
   async function go(work: () => Promise<void>) {
