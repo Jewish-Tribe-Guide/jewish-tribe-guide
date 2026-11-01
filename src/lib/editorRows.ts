@@ -37,6 +37,8 @@ export type EditorRow = {
   /** A section's own yes/no ("Women’s Tevillah"): the row is there while
    *  it's on. */
   flag?: string
+  /** An admin's listing: the contact box a row each (`splitContact`). */
+  part?: 'address' | 'phone'
 }
 
 /** What a draft holds: the three core values and the details. */
@@ -80,8 +82,9 @@ export function opensInPlace(row: EditorRow): boolean {
 const BROUGHT_UP: Partial<Record<FieldType, true>> = { url: true, text: true, textarea: true, tel: true, number: true, select: true, boolean: true }
 
 /** `week`: a shul's "This week's schedule" row is offered for it, on a
- *  listing's own edit only (thisWeekEdit.ts). */
-export function editorRows(category: CategoryConfig, details: Record<string, unknown>, { week, nextWeek }: { week?: EditWeek | null; nextWeek?: EditWeek | null } = {}): EditorRow[] {
+ *  listing's own edit only (thisWeekEdit.ts). `splitContact`: the contact box
+ *  a row each, since a job keeps each one (the Places listing, Nov 1). */
+export function editorRows(category: CategoryConfig, details: Record<string, unknown>, { week, nextWeek, splitContact }: { week?: EditWeek | null; nextWeek?: EditWeek | null; splitContact?: boolean } = {}): EditorRow[] {
   const fields = category.detailFields
   const placed = new Set<string>()
   const take = (list: CategoryField[]) => {
@@ -190,7 +193,11 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   )
   const hasAddress = category.hasAddress !== false
   const hasPhone = category.hasPhone !== false
-  if (hasAddress || hasPhone || contact.length > 0) {
+  if (splitContact) {
+    if (hasAddress) rows.push({ id: 'contact:address', title: 'Address', kind: 'contact', fields: [], part: 'address' })
+    if (hasPhone) rows.push({ id: 'contact:phone', title: 'Phone', kind: 'contact', fields: [], part: 'phone' })
+    for (const f of take(contact)) if (fieldIsVisible(f, details)) rows.push({ id: `field:${f.key}`, title: f.label, kind: 'fields', fields: [f] })
+  } else if (hasAddress || hasPhone || contact.length > 0) {
     rows.push({ id: 'contact', title: contactTitle(hasAddress, hasPhone, contact), kind: 'contact', fields: take(contact) })
   }
 
@@ -281,7 +288,9 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
     return [items, hasMenuLink(row, d) && MENU_LINK_LABEL].filter(Boolean).join(' · ')
   }
   const parts: string[] = []
-  if (row.kind === 'contact') {
+  if (row.part === 'address') parts.push(values.address.trim())
+  else if (row.part === 'phone') parts.push(values.phone.trim())
+  else if (row.kind === 'contact') {
     if (values.address.trim()) parts.push(values.address.split(',')[0].trim())
     if (values.phone.trim()) parts.push(values.phone.trim())
   }
@@ -324,6 +333,7 @@ export function rowIsEmpty(row: EditorRow, values: EditorValues): boolean {
   if (row.kind === 'minyans' && row.week) return weekRowEmpty(row, d)
   if (row.kind === 'minyans') return minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!).length === 0
   if (row.kind === 'items') return blank(row.fields[0], d[row.fields[0].key]) && selectValues(d[`${row.fields[0].key}_sometimes`]).length === 0 && !hasMenuLink(row, d)
+  if (row.part) return !(row.part === 'address' ? values.address : values.phone).trim()
   if (row.kind === 'contact' && (values.address.trim() || values.phone.trim())) return false
   return row.fields.every((f) => (f.invertDisplay ? true : blank(f, d[f.key])))
 }
@@ -335,6 +345,8 @@ export function rowIsEmpty(row: EditorRow, values: EditorValues): boolean {
 export function rowChanged(row: EditorRow, item: DirectoryResource, values: EditorValues): boolean {
   const d = values.details
   if (row.kind === 'name' && !sameFieldValue('name', item.name, values.name)) return true
+  if (row.part === 'address') return !sameFieldValue('address', item.address, values.address)
+  if (row.part === 'phone') return !sameFieldValue('phone', item.phone, values.phone)
   if (row.kind === 'contact' && (!sameFieldValue('address', item.address, values.address) || !sameFieldValue('phone', item.phone, values.phone))) return true
   if (row.kind === 'minyans' && row.week) {
     const sk = schedulesKey(row.fields[0].key)

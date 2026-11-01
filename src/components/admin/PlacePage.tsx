@@ -9,14 +9,18 @@ import { placeBack } from '@/lib/placeLink'
 import type { WatchState } from '@/lib/watchPlaces'
 import { AdminBack } from './AdminUI'
 import OpenedPlace from './OpenedPlace'
+import { eruvPlace } from '@/lib/adminPlaces'
+import EruvListing from './EruvListing'
+import { openedPlace } from './openedPlaceBoxes'
+import PlaceListing from './PlaceListing'
 import { JobsNotLoaded, kindsOf } from './WatchKinds'
 import { useWatchJobsAndReload } from './useWatchJobs'
 
-// One place under Watches, on a screen of its own (Oct 31): what a job read of
-// it, what's waiting, what isn't checked, with their buttons. It replaces the
-// page of a whole kind with its three tabs: what waits is on To do, what wasn't
-// read is on its job, and every place is on Places. Back goes to the screen
-// that linked it; once there's nothing left to do for it, so does the page.
+// One place under Watches (Oct 31; boards Rule4, Waiting4, NotRead4, Nov 1): a
+// change waiting or a read that failed opens the screen To do has for it;
+// anything else opens its listing, the same as in Places. Back goes to the
+// screen that linked it; once there's nothing left to do for it, so does the
+// page.
 
 export default function PlacePage({ token, id, from }: { token: string; id: string; from?: string | null }) {
   const community = useCommunitySlug()
@@ -38,9 +42,39 @@ export default function PlacePage({ token, id, from }: { token: string; id: stri
   }, [state, back.href, router])
 
   const head = <AdminBack back={back} title={place?.name ?? ''} />
+  // Something to do for it, as it was first seen: a read that fails from the
+  // listing stays on the listing, which says so.
+  const toDo = !!place && (state === 'waiting' || (state === 'not_checked' && openedPlace(id, jobs, now).problems.length > 0))
+  const eruv = jobs.eruvim?.eruvim.find((e) => e.id === id)
+  const eruvCategory = jobs.categories?.find((c) => c.kind === 'eruv')
+  const listed = eruv ? eruvPlace(eruv, eruvCategory?.id ?? 'eruv') : jobs.places?.find((p) => p.id === id)
+  const settled = !!all?.settled && jobs.places !== undefined
+  const [onListing, setOnListing] = useState(false)
+  if (settled && !toDo && listed && !onListing) setOnListing(true)
+
   if (jobs.categories === null || jobs.google === null) return <div className="space-y-4">{head}<p className="text-sm text-red-700">Couldn&rsquo;t load this place.</p></div>
-  if (!all || !all.settled) return <div className="space-y-4">{head}<p className="text-sm text-muted">Loading…</p></div>
-  if (!place) return <div className="space-y-4">{head}<p className="text-sm text-slate-600">Nothing is watching this place now.</p></div>
+  if (!settled) return <div className="space-y-4">{head}<p className="text-sm text-muted">Loading…</p></div>
+  if (listed && eruv && (onListing || !toDo)) {
+    return <EruvListing key={eruv.id} place={listed} eruv={eruv} category={eruvCategory} token={token} jobs={jobs} reload={reload} now={now} backLabel={back.label} onClose={() => router.push(back.href)} onSaved={() => router.push(back.href)} />
+  }
+  if (listed && (onListing || !toDo)) {
+    return (
+      <PlaceListing
+        key={listed.id}
+        place={listed}
+        category={jobs.categories?.find((c) => c.id === listed.category)}
+        token={token}
+        jobs={jobs}
+        reload={reload}
+        now={now}
+        backLabel={back.label}
+        onClose={() => router.push(back.href)}
+        onSaved={() => router.push(back.href)}
+      />
+    )
+  }
+  if (!toDo && jobs.places === null) return <div className="space-y-4">{head}<p className="text-sm text-red-700">Couldn&rsquo;t load this place.</p></div>
+  if (!place || !toDo) return <div className="space-y-4">{head}<p className="text-sm text-slate-600">Nothing is watching this place now.</p></div>
 
   return (
     <div className="space-y-3.5">

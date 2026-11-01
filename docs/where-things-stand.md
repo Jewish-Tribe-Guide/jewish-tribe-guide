@@ -2130,15 +2130,23 @@ pick them (`changeLines.ts`). A new place still uses the old review.
 **To do for the user:** Washington has no Map, Candle Lighting or Eruv rows, so
 after this deploys its switches show off. Flip them in its Category pages.
 
-**Drawn, not built, waiting on the user's OK (Nov 1, the *4 boards on canvas
-VKdnqd5xkP37DP1DKcN5qy):** a job's row opens the Places listing unless a change
-or a failed read waits; each row names its job, and its bubble holds one line ("Its menu · Oct 20 ·
-Change", Stop inside Change); Archive is a red bin beside Update the listing;
-eruvs join Places. Latest listing boards are *6: rows use the Watches job names,
-Stopped opens Change with one Start reading button. The *7 boards replace
-Phone5 for fields Google keeps: "Google · Oct 19 · Stop", then Use Google's to
-go back, and a cleared field stays blank (today Google refills it). Undecided:
-eruv maps read only by the nightly job, served from the saved copy.
+**Built Nov 1 (the *4, *5, *6 and *7 boards on canvas VKdnqd5xkP37DP1DKcN5qy):**
+a job's row opens the Places listing, with Back to the job, unless a change or a
+failed read waits, which opens the same place screen as To do. Each listing row
+names only its job ("Stopped" and "Nothing" in amber); its bubble holds one line
+("Its menu · Oct 20 · Change"), with Stop reading it and Start reading inside
+Change. Fields Google keeps say "Google · Oct 19 · Stop", then Use Google's, and
+a cleared field stays blank. Archive is a red bin beside Update the listing.
+Eruvs are places: a category in Places, opened as a listing, and offered by Add
+a place. Their map colour and left-out parts stay on the category page. Eruv maps
+are read only by the nightly job.
+
+Differences from the drawing, decided while building: the button says "No changes
+yet" until something is typed, as every listing's does. Stop reading it asks
+nothing first, since Start reading undoes it. Save on Change doesn't report a
+failed read; only Start reading does. The "Checked by" filter doesn't cover eruvs.
+Gone with the old screen, as drawn: "Read it now" and "Open its listing" for a
+place with nothing waiting.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten

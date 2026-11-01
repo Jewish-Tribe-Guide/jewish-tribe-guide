@@ -16,7 +16,7 @@ import type { KeptEmail } from './eruvEmail'
 
 const PUBLIC_COLUMNS =
   'id, name, covers, website, hotline, alerts_url, status_url, status_dated, status, status_words, status_posted_on, status_checked_at, status_error_at, status_error'
-const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, line_url, sort_order, active, line, line_read_at, line_error, line_leave_out`
+const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, line_url, sort_order, active, line, line_read_at, line_error, line_leave_out, updated_at`
 const SOURCE_COLUMNS = 'community_id, id, name, line_url, line, line_leave_out, line_error'
 // Columns later migrations add (076, 081, 084). Until one is run, what it
 // adds isn't there (no markers hidden, nothing remembered as missing, the
@@ -61,6 +61,7 @@ type Row = {
   status_email?: string | null
 }
 type AdminRow = Row & {
+  updated_at?: string | null
   line_url: string | null
   sort_order: number
   active: boolean
@@ -93,6 +94,8 @@ export type AdminEruv = Eruv & {
   statusEmail: string | null
   /** The last email from it the guide couldn't read, for an admin. */
   statusEmailKept: KeptEmail | null
+  /** When it last changed, or was last read: Places' "Changed Oct 31". */
+  updatedAt?: string | null
 }
 
 /** Where an eruv's map is, and what an admin chose to show of it. */
@@ -170,6 +173,7 @@ function fromAdminRow(r: AdminRow): AdminEruv {
     lineColor: r.line_color ?? null,
     statusEmail: r.status_email ?? null,
     statusEmailKept: r.status_email_kept ?? null,
+    updatedAt: r.updated_at ?? null,
   }
 }
 

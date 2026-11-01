@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryConfig } from './categories'
-import { fitsCheckedBy, notWatchedLine, placeCoverage, rowCheck, type CoverageIn } from './fieldCoverage'
+import { fitsCheckedBy, notWatchedLine, placeCoverage, type CoverageIn } from './fieldCoverage'
 
 const NONE: CoverageIn = { google: [], times: [], hours: [], sites: [], dishes: [], hospitals: [], kosher: [], links: [], off: [] }
 const on = { watch: { active: true } }
@@ -81,30 +81,5 @@ describe('the Checked by menu', () => {
     const only = { fields: [], notWatched: [], mainMissing: false, nameBy: [], sources: ['links' as const] }
     expect(fitsCheckedBy(only, undefined, 'links-only')).toBe(true)
     expect(fitsCheckedBy({ ...only, sources: ['links', 'google'] }, undefined, 'links-only')).toBe(false)
-  })
-})
-
-describe('what an Edit listing row says', () => {
-  const both = placeCoverage(listing, shul, { ...NONE, times: [{ id: 'a', pages: [on], newsletters: [{ active: true }] }], google: google('a', { name: 'google', phone: 'google', website: 'google' }) })
-  const minyans = (box: 'weekday' | 'this_week') => ({ kind: 'minyans' as const, box, fields: [] })
-  it('usual times are the website’s and a week’s the newsletter’s', () => {
-    expect(rowCheck(minyans('weekday'), both)).toEqual({ names: ['Their website'], nothing: [] })
-    expect(rowCheck(minyans('this_week'), both)).toEqual({ names: ['Newsletter'], nothing: [] })
-  })
-  it('with one source, every box says that one', () => {
-    const c = placeCoverage(listing, shul, { ...NONE, times: [{ id: 'a', pages: [on] }] })
-    expect(rowCheck(minyans('this_week'), c)?.names).toEqual(['Their website'])
-  })
-  it('the contact row says who checks what, and what nothing does', () => {
-    const c = placeCoverage({ id: 'a', phone: '215', email: 'a@x.org' }, shul, { ...NONE, google: google('a', { phone: 'google' }) })
-    const row = { kind: 'contact' as const, fields: shul.detailFields.filter((f) => f.key === 'email') }
-    expect(rowCheck(row, c)).toEqual({ names: ['Google'], nothing: ['email'] })
-  })
-  it('a row with nothing that goes out of date says nothing', () => {
-    expect(rowCheck({ kind: 'fields', fields: shul.detailFields.filter((f) => f.key === 'about') }, both)).toBeNull()
-  })
-  it('the name row says Google only when Google keeps it', () => {
-    expect(rowCheck({ kind: 'name', fields: [] }, both)).toEqual({ names: ['Google'], nothing: [] })
-    expect(rowCheck({ kind: 'name', fields: [] }, placeCoverage(listing, shul, NONE))).toBeNull()
   })
 })

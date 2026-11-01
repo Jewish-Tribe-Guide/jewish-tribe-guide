@@ -3,9 +3,7 @@ import { contactFields } from './contactRead'
 import { websiteKeyOf, type GooglePlace } from './googleJob'
 import { hoursJobCategories } from './hoursJob'
 import type { NightKindId } from './jobRuns'
-import type { EditorRow } from './editorRows'
 import { KOSHER_JOB_CATEGORIES } from './kosherJob'
-import { MENU_LINK_KEY } from './menuLink'
 import { pageReadsFor } from './listingPageWatch'
 import type { LinkStanding } from './linkCheck'
 import { HOSPITAL_CATEGORY } from './refuahMatch'
@@ -22,15 +20,6 @@ import type { Watch } from './watches'
 // checks nothing. Pure: Places and Watches both draw from it.
 
 export type CoverageBy = 'google' | 'website' | 'newsletter' | 'certifier' | 'refuah' | 'links'
-
-export const COVERAGE_NAMES: Record<CoverageBy, string> = {
-  google: 'Google',
-  website: 'Their website',
-  newsletter: 'Newsletter',
-  certifier: 'Certifier’s list',
-  refuah: 'Refuah',
-  links: 'Link check',
-}
 
 export type FieldCoverage = { key: string; label: string; by: CoverageBy[]; main: boolean }
 
@@ -122,48 +111,6 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
     sources: [...new Set(fields.flatMap((f) => f.by))],
     nameBy: on('google') && google?.fields.find((f) => f.field === 'name')?.by.kind === 'google' ? ['google'] : [],
   }
-}
-
-// ── Edit listing's rows, for an admin ───────────────────────────────────────
-
-export type RowCheck = { names: string[]; nothing: string[] }
-
-/** What checks an Edit listing row: "Their website", or `nothing` for what no
- *  job does. Null: nothing on the row goes out of date (About, a photo). The
- *  usual times are the website's and a week's the newsletter's, when a shul
- *  has both. */
-export function rowCheck(row: Pick<EditorRow, 'kind' | 'fields' | 'box'>, c: PlaceCoverage): RowCheck | null {
-  if (row.kind === 'name') return c.nameBy.length ? { names: c.nameBy.map((b) => COVERAGE_NAMES[b]), nothing: [] } : null
-  const has = (test: (f: EditorRow['fields'][number]) => boolean) => row.fields.some(test)
-  const onRow = (f: FieldCoverage) => {
-    switch (f.key) {
-      case 'times':
-        return row.kind === 'minyans'
-      case 'hours':
-        return row.kind === 'audience' || has((x) => x.type === 'hours')
-      case 'hospital':
-        return has((x) => x.type === 'contacts')
-      case 'hechsher':
-        return has((x) => x.key === 'kosherCert')
-      case 'menu':
-        return has((x) => x.key === MENU_LINK_KEY)
-      case 'phone':
-      case 'website':
-        return row.kind === 'contact'
-      default:
-        return has((x) => x.key === f.key)
-    }
-  }
-  const mine = c.fields.filter(onRow)
-  if (mine.length === 0) return null
-  const names = new Set<string>()
-  const nothing: string[] = []
-  for (const f of mine) {
-    if (f.by.length === 0) nothing.push(f.label)
-    const pick: CoverageBy | null = f.key === 'times' ? (row.box === 'this_week' ? 'newsletter' : 'website') : null
-    for (const b of pick && f.by.includes(pick) ? [pick] : f.by) names.add(COVERAGE_NAMES[b])
-  }
-  return { names: [...names], nothing }
 }
 
 // ── Places' Checked by menu ─────────────────────────────────────────────────

@@ -7,12 +7,12 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import { filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
-import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, rowCheck, type CheckedBy, type RowCheck } from '@/lib/fieldCoverage'
-import type { EditorRow } from '@/lib/editorRows'
-import { shortDay } from '@/lib/todo'
+import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
+import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import ListingEditorScreen from './ListingEditorScreen'
-import { AdminBack, AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
+import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
+import EruvListing, { AddEruv } from './EruvListing'
+import PlaceListing from './PlaceListing'
 import { coverageOf, troublesOf, useWatchJobsAndReload } from './useWatchJobs'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
@@ -23,7 +23,6 @@ import { coverageOf, troublesOf, useWatchJobsAndReload } from './useWatchJobs'
 const button = 'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
 const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
-const danger = `${button} border border-red-600 bg-red-600 text-white`
 const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900'
 
 /** How many rows show before "Show all". */
@@ -68,131 +67,11 @@ function Plus() {
   )
 }
 
-function ArchivedPlace({
-  place,
-  category,
-  token,
-  onDone,
-}: {
-  place: AdminPlace
-  category: CategoryConfig | undefined
-  token: string
-  onDone: () => void
-}) {
-  const community = useCommunitySlug()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
-
-  async function send(method: 'PATCH' | 'DELETE', fallback: string) {
-    setBusy(true)
-    setError(null)
-    try {
-      await fetchJson(withCommunity(`/api/admin/archived-listings/${place.id}`, community), { method, headers: { Authorization: `Bearer ${token}` } }, fallback)
-      onDone()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : fallback)
-      setBusy(false)
-    }
-  }
-
-  return (
-    <AdminBox>
-      <div className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="m-0 text-lg font-bold text-slate-900">{place.name}</h2>
-          <span className="text-[13px] text-slate-600">
-            {[category?.label, `Archived ${shortDay(place.changedAt)}`].filter(Boolean).join(' · ')}
-          </span>
-          {place.listing.address && <span className="text-sm text-slate-700">{place.listing.address}</span>}
-        </div>
-        {confirming ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="m-0 text-sm text-red-800">Delete {place.name} for good? This can’t be undone.</p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={busy} onClick={() => void send('DELETE', 'Could not delete it.')} className={danger}>
-                {busy ? 'Deleting…' : 'Delete it'}
-              </button>
-              <button type="button" disabled={busy} onClick={() => setConfirming(false)} className={secondary}>
-                Leave it
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => void send('PATCH', 'Could not bring it back.')} className={primary}>
-              {busy ? 'Bringing it back…' : 'Bring it back'}
-            </button>
-            <button type="button" disabled={busy} onClick={() => setConfirming(true)} className={secondary}>
-              Delete for good
-            </button>
-          </div>
-        )}
-        {error && <p className="m-0 text-sm text-red-700">{error}</p>}
-      </div>
-    </AdminBox>
-  )
-}
-
-/** On the right of an Edit listing row: what checks it, or Nothing. */
-function RowChecked({ check }: { check: RowCheck }) {
-  const missing = check.names.length === 0 ? 'Nothing' : check.nothing.length ? `Nothing: ${check.nothing.join(', ')}` : null
-  return (
-    <span className="shrink-0 max-w-[40%] text-right text-[13px] leading-snug" data-testid="row-checked">
-      {check.names.length > 0 && <span className="block text-slate-600">{check.names.join(', ')}</span>}
-      {missing && <span className="block text-amber-800">{missing}</span>}
-    </span>
-  )
-}
-
-/** Below an opened place's editor: take it off the site, asking once. */
-function ArchiveIt({ place, token, onDone }: { place: AdminPlace; token: string; onDone: () => void }) {
-  const community = useCommunitySlug()
-  const [confirming, setConfirming] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function archive() {
-    setBusy(true)
-    setError(null)
-    try {
-      await fetchJson(withCommunity(`/api/admin/listings/${place.id}`, community), { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }, 'Could not archive it.')
-      onDone()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not archive it.')
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="mt-6 flex flex-col gap-2 border-t border-slate-200 pt-4">
-      {confirming ? (
-        <>
-          <p className="m-0 text-sm text-slate-800">Take {place.name} off the site? It stays under Archived.</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => void archive()} className={danger}>
-              {busy ? 'Archiving…' : 'Archive it'}
-            </button>
-            <button type="button" disabled={busy} onClick={() => setConfirming(false)} className={secondary}>
-              Leave it
-            </button>
-          </div>
-        </>
-      ) : (
-        <button type="button" onClick={() => setConfirming(true)} className={`${secondary} self-start text-red-700`}>
-          Archive it
-        </button>
-      )}
-      {error && <p className="m-0 text-sm text-red-700">{error}</p>}
-    </div>
-  )
-}
-
 export default function PlacesList({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { jobs } = useWatchJobsAndReload(token)
+  const { jobs, reload } = useWatchJobsAndReload(token)
   const [now] = useState(() => Date.now())
   const coverage = useMemo(() => coverageOf(jobs), [jobs])
   const troubles = useMemo(() => troublesOf(jobs, now), [jobs, now])
@@ -273,63 +152,47 @@ export default function PlacesList({ token }: { token: string }) {
     void load()
   }
 
+  function changedEruv() {
+    close()
+    void reload()
+  }
+
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading…</p>
 
   const categoriesById = new Map(data.categories.map((c) => [c.id, c]))
-  const listingCategories = data.categories.filter((c) => c.kind === 'listing')
+  // Eruvs live in their own table, and join the list as a category of it.
+  const eruvCategory = data.categories.find((c) => c.kind === 'eruv')
+  const listingCategories = data.categories.filter((c) => c.kind === 'listing' || c === eruvCategory)
+  const eruvs = eruvCategory ? (jobs.eruvim?.eruvim ?? []) : []
+  const places = eruvCategory ? [...data.places, ...eruvs.map((e) => eruvPlace(e, eruvCategory.id))].sort((a, b) => a.name.localeCompare(b.name)) : data.places
 
+  if (adding && adding === eruvCategory?.id) {
+    return (
+      <AddEruv
+        token={token}
+        onBack={close}
+        onAdded={async (id) => {
+          await reload()
+          setAdding(null)
+          setOpenId(id)
+          history.replaceState({ ...(window.history.state ?? {}), placeAdding: undefined, placeOpen: id }, '')
+        }}
+      />
+    )
+  }
   if (adding) {
     const addTo = categoriesById.get(adding)!
     return <ListingEditorScreen heading="Add a place" category={addTo} adminSubmit={{ token }} onClose={changed} />
   }
 
-  const opened = openId ? data.places.find((p) => p.id === openId) : undefined
-  if (opened) {
-    const openedCategory = categoriesById.get(opened.category)
-    if (opened.status === 'archived' || !openedCategory) {
-      return (
-        <div className="flex flex-col gap-3">
-          <AdminBack back={{ label: 'Back', onClick: close }} title={opened.name} />
-          {opened.status === 'archived' ? (
-            <ArchivedPlace place={opened} category={openedCategory} token={token} onDone={changed} />
-          ) : (
-            <AdminEmpty>Its category is gone, so it can’t be edited here.</AdminEmpty>
-          )}
-        </div>
-      )
-    }
-    return (
-      <div>
-        <ListingEditorScreen
-          key={opened.id}
-          heading={opened.name}
-          item={opened.listing}
-          category={openedCategory}
-          onClose={close}
-          rowAside={(row: EditorRow) => {
-            const c = coverage?.get(opened.id)
-            const check = c && rowCheck(row, c)
-            return check ? <RowChecked check={check} /> : null
-          }}
-          adminSave={{
-            label: 'Update the listing',
-            via: ({ payload }) =>
-              fetch(withCommunity(`/api/admin/listings/${opened.id}`, community), {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payload }),
-              }),
-            onSaved: changed,
-          }}
-        />
-        <ArchiveIt place={opened} token={token} onDone={changed} />
-      </div>
-    )
-  }
+  const opened = openId ? places.find((p) => p.id === openId) : undefined
+  const openedEruv = opened && eruvs.find((e) => e.id === opened.id)
+  if (opened && openedEruv) return <EruvListing key={opened.id} place={opened} eruv={openedEruv} category={categoriesById.get(opened.category)} token={token} jobs={jobs} reload={reload} now={now} onClose={close} onSaved={changedEruv} />
+  if (opened) return <PlaceListing key={opened.id} place={opened} category={categoriesById.get(opened.category)} token={token} jobs={jobs} reload={reload} now={now} onClose={close} onSaved={changed} />
 
-  const counts = placeCounts(data.places, category || undefined)
-  const narrowed = filterPlaces(data.places, { show, category: category || undefined, query })
+  const counts = placeCounts(places, category || undefined)
+  const narrowed = filterPlaces(places, { show, category: category || undefined, query })
   const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), troubles.get(p.id), choice)
   const checkedCount = (choice: CheckedBy) => narrowed.filter((p) => fits(p, choice)).length
   // Not watched: its main thing first, then by name as they already are.
@@ -352,7 +215,7 @@ export default function PlacesList({ token }: { token: string }) {
             type="button"
             onClick={() => {
               // A category picked above is the one it's added to.
-              if (category && categoriesById.get(category)?.kind === 'listing') startAdding(category)
+              if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
               else setAdding('')
             }}
             className={primary}

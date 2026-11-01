@@ -113,9 +113,16 @@ type Props = {
   preset?: Record<string, unknown>
   /** An admin saving straight to the listing (the Dishes page's Edit): no
    *  challenge, this button, sent this way, and `onSaved` once it's in. */
-  adminSave?: { label: string; via: SendVia; onSaved: () => void }
-  /** On the right of a row, for an admin: what checks it. */
+  adminSave?: { label: string; via: SendVia; onSaved: () => void; beside?: ReactNode }
+  /** On the right of a row, for an admin: the job that keeps it. */
   rowAside?: (row: EditorRow) => ReactNode
+  /** In a row, opened, above Done: where it's read from. `changed`: the
+   *  draft has changed it. */
+  rowSource?: (row: EditorRow, changed: boolean) => ReactNode
+  /** The contact box a row each (editorRows). */
+  splitContact?: boolean
+  /** Values to put in as if typed, each new object once: Use Google's. */
+  patch?: Record<string, unknown>
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -233,6 +240,9 @@ export default function ListingEditor({
   preset,
   adminSave,
   rowAside,
+  rowSource,
+  splitContact,
+  patch,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -244,15 +254,23 @@ export default function ListingEditor({
   const { hasAddress, hasPhone, details, setDetail } = draft
   // A preset goes in once, as if typed (as BoxEditor's).
   const [presetDone, setPresetDone] = useState(false)
-  if (!presetDone && preset) {
-    setPresetDone(true)
+  const [patched, setPatched] = useState<Record<string, unknown> | undefined>(undefined)
+  const typeIn = (values: Record<string, unknown>) => {
     // The phone is the listing's own, not a detail (a website's, Oct 22).
-    for (const [k, v] of Object.entries(preset)) {
+    for (const [k, v] of Object.entries(values)) {
       if (k === 'phone') draft.setPhone(formatPhone(typeof v === 'string' ? v : ''))
       // A new place a list has, added from Kosher certification (Oct 22).
       else if (k === 'name' || k === 'address') (k === 'name' ? draft.setName : draft.setAddress)(typeof v === 'string' ? v : '')
       else setDetail(k, v)
     }
+  }
+  if (!presetDone && preset) {
+    setPresetDone(true)
+    typeIn(preset)
+  }
+  if (patch && patch !== patched) {
+    setPatched(patch)
+    typeIn(patch)
   }
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({
     mode: creating ? 'create' : 'edit',
@@ -305,7 +323,7 @@ export default function ListingEditor({
   // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
   // next week's too. One box's own Edit has them only if it's that box.
   const thisWeek = useEditWeek(!creating && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
-  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null })
+  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -459,6 +477,7 @@ export default function ListingEditor({
   const openInPlace = (r: EditorRow) => (
     <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow}>
       {rowBody(r)}
+      {rowSource?.(r, changed.has(r.id))}
     </EditorOpenCard>
   )
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
@@ -517,9 +536,18 @@ export default function ListingEditor({
       )}
       {errors}
       {foot(
-        <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
-          {sendLabel}
-        </button>,
+        adminSave?.beside ? (
+          <div className="flex items-center gap-2.5">
+            <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+              {sendLabel}
+            </button>
+            {adminSave.beside}
+          </div>
+        ) : (
+          <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
+            {sendLabel}
+          </button>
+        ),
       )}
     </div>
   )
@@ -566,7 +594,7 @@ export default function ListingEditor({
     if (r.kind === 'contact') {
       return (
         <>
-          {hasAddress && (
+          {hasAddress && r.part !== 'phone' && (
             <div>
               <label htmlFor="edit-address" className={fieldLabel}>
                 Address
@@ -582,7 +610,7 @@ export default function ListingEditor({
               />
             </div>
           )}
-          {hasPhone && (
+          {hasPhone && r.part !== 'address' && (
             <div>
               <label htmlFor="edit-phone" className={fieldLabel}>
                 Phone
@@ -704,6 +732,7 @@ export default function ListingEditor({
       {!child &&
         foot(
           <div className="space-y-1">
+            {rowSource && <div className="pb-2">{rowSource(row, changed.has(row.id))}</div>}
             <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
               Done
             </button>

@@ -25,7 +25,12 @@ const editor = vi.hoisted(() => ({ props: null as null | ComponentProps<typeof L
 vi.mock('./ListingEditorScreen', () => ({
   default: (props: ComponentProps<typeof ListingEditorScreen>) => {
     editor.props = props
-    return <h2>{props.heading}</h2>
+    return (
+      <>
+        <h2>{props.heading}</h2>
+        {props.adminSave?.beside}
+      </>
+    )
   },
 }))
 
@@ -174,13 +179,13 @@ describe('Places', () => {
       expect(window.location.search).toBe('?checked=website')
     })
 
-    it('an opened place’s editor says what checks each row', async () => {
+    it('an opened place’s rows name only the job that reads them', async () => {
       const user = userEvent.setup()
       renderShuls()
       await waitFor(() => expect(menu(/^Checked by/)).toBeEnabled())
       await user.click(screen.getByRole('button', { name: 'Open Bravo' }))
       renderWithProviders(editor.props!.rowAside!({ id: 'minyans:weekday', title: 'x', kind: 'minyans', fields: [], box: 'weekday' }) as React.ReactElement)
-      expect(screen.getByTestId('row-checked')).toHaveTextContent('Nothing')
+      expect(screen.getByTestId('row-job')).toHaveTextContent(/^Nothing$/)
     })
   })
 
@@ -235,6 +240,53 @@ describe('Places', () => {
     await waitFor(() => expect(sent('DELETE')).toEqual(['/api/admin/listings/goldie?community=philly']))
     // Back on the list, read afresh.
     expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
+  })
+
+  // Nov 1, board PlacesEruv4: eruvs live in their own table, and are places.
+  describe('eruvs', () => {
+    const eruvCategory = makeCategory({ id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', kind: 'eruv' } as never)
+    const eruv = { id: 'cc', name: 'Center City Eruv', covers: 'Center City', website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, statusEmail: null, statusEmailKept: null, updatedAt: day }
+    const posted: unknown[] = []
+    function renderEruvs() {
+      vi.mocked(fetchJson).mockImplementation(async (url, init) => {
+        if (init?.method) {
+          const body = JSON.parse(String(init.body))
+          posted.push(body)
+          return { ok: true, eruv: { ...eruv, id: 'new-eruv', name: body.name } }
+        }
+        if (String(url).includes('/api/admin/listings')) return { ok: true, places, categories: [...categories, eruvCategory] }
+        if (String(url).includes('/api/admin/categories')) return { ok: true, categories: [...categories, eruvCategory] }
+        if (String(url).includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [eruv], findings: [], watches: [] }
+        throw new Error('down')
+      })
+      renderWithProviders(<PlacesList token="tok" />, { community: { slug: 'philly' } })
+    }
+    afterEach(() => {
+      posted.length = 0
+    })
+
+    it('are listed under their category, and open as an eruv', async () => {
+      const user = userEvent.setup()
+      renderEruvs()
+      await screen.findByRole('button', { name: 'Open Center City Eruv' })
+      await choose(/^Category/, /^Eruv/)
+      expect(screen.getByRole('button', { name: 'Open Center City Eruv' })).toHaveTextContent('Changed Oct 17')
+      expect(screen.queryByRole('button', { name: 'Open Goldie' })).toBeNull()
+      expect(screen.getByText('1 place')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Open Center City Eruv' }))
+      expect(await screen.findByTestId('editor-row-status')).toBeInTheDocument()
+    })
+
+    it('Add a place offers Eruv, and asks only its name', async () => {
+      const user = userEvent.setup()
+      renderEruvs()
+      await screen.findByRole('button', { name: 'Open Center City Eruv' })
+      await choose(/^Category/, /^Eruv/)
+      await user.click(screen.getByRole('button', { name: /Add a place/ }))
+      await user.type(await screen.findByLabelText('Name'), 'New Eruv')
+      await user.click(screen.getByRole('button', { name: 'Add it' }))
+      expect(posted).toEqual([{ action: 'add', name: 'New Eruv' }])
+    })
   })
 
   it('brings an archived place back, or deletes it for good after asking', async () => {

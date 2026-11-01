@@ -36,6 +36,7 @@ export type Change =
   | { kind: 'refuah' }
   | { kind: 'eruv-status'; id: string }
   | { kind: 'eruv-map'; id: string }
+  | { kind: 'eruv-website'; id: string }
   | { kind: 'keystone' }
 
 /** A source no longer read: an eruv's status or map emptied, or a watch
@@ -386,7 +387,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
         key: 'eruv-map',
         kind: 'rows',
         title: 'Map',
-        groups: [{ head: '', rows: [{ name: 'Map', right: eruv.lineError ? 'As last read' : 'Live' }] }],
+        groups: [{ head: '', rows: [{ name: 'Map', right: eruv.lineError ? 'As last read' : 'On the map' }] }],
         foot: { lead: 'Same as', links: [{ text: 'its map', url: eruv.lineUrl }], when: read(eruv.lineReadAt), change: { kind: 'eruv-map', id }, stop: { kind: 'eruv-map', id, what: 'its map' } },
       })
     }
