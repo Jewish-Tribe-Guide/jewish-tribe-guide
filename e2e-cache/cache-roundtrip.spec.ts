@@ -523,8 +523,8 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   // The location prompt overlays everything and swallows clicks (AGENTS.md
   // says the same about the mobile suite).
   const notNow = page.getByRole('button', { name: 'Not now' })
-  await notNow.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
-  await notNow.click().catch(() => {})
+  // Clicked only if it came: a click on nothing waits out the whole test.
+  if (await notNow.waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false)) await notNow.click()
   await page.locator('header').first().waitFor({ state: 'visible' })
 
   // A dedicated fixture (scripts/run-test-project-server.mjs), not borrowed
