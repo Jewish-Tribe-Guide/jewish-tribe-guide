@@ -215,6 +215,69 @@ describe('Use Google’s', () => {
   })
 })
 
+describe('Stop, on the listing’s Google line (GooglePhone7)', () => {
+  it('the value stays and nothing keeps it, or whichever job reads it', async () => {
+    const p = await run.stopField('philly', 'a1', 'phone', NOW)
+    expect(m.rows[0].phone).toBe('(215) 735-5148')
+    expect((m.rows[0].details as Record<string, unknown>).googleFields).toEqual([])
+    expect(by(p).phone).toBe('nothing')
+    m.rows = [listing()]
+    m.watches = [watch({})]
+    expect(by(await run.stopField('philly', 'a1', 'phone', NOW)).phone).toBe('website')
+  })
+
+  it('a later check doesn’t hand it back, or offer Google’s', async () => {
+    await run.stopField('philly', 'a1', 'phone', NOW)
+    const same = await run.checkAgainstGoogle('philly', 'a1', NOW)
+    expect(by(same).phone).toBe('nothing')
+    m.fetchPlaceSync.mockResolvedValue({ ...google, phone: '215-000-0000' })
+    const other = await run.checkAgainstGoogle('philly', 'a1', NOW)
+    expect(other.compare!.rows.find((r) => r.field === 'phone')!.changed).toBe(false)
+  })
+
+  it('a listing with no provenance keeps Google on its other blanks', async () => {
+    m.rows = [listing({ phone: null, details: { googleFields: undefined, website: '' } })]
+    await run.stopField('philly', 'a1', 'phone', NOW)
+    expect((m.rows[0].details as Record<string, unknown>).googleFields).toEqual(['hours', 'website'])
+  })
+
+  it('not for a field Google can’t check here', async () => {
+    await expect(run.stopField('philly', 'a1', 'address', NOW)).rejects.toThrow(/doesn’t keep/)
+  })
+})
+
+describe('Use Google’s, on the listing’s line (GoogleStopped7)', () => {
+  it('Google’s version of that field only, and Google keeps it again', async () => {
+    await run.stopField('philly', 'a1', 'phone', NOW)
+    m.fetchPlaceSync.mockResolvedValue({ ...google, phone: '215-000-0000' })
+    const p = await run.takeGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)
+    expect(m.filed).toHaveLength(1)
+    expect(m.filed[0].by).toEqual({ name: 'Google Maps' })
+    expect(m.rows[0].phone).toBe('215-000-0000')
+    expect(m.rows[0].name).toBe(listing().name)
+    const details = m.rows[0].details as Record<string, unknown>
+    expect(details.googleStopped).toBeUndefined()
+    expect(details.googleFields).toContain('phone')
+    expect(by(p).phone).toBe('google')
+  })
+
+  it('already the same: Google keeps it, with nothing filed', async () => {
+    await run.stopField('philly', 'a1', 'phone', NOW)
+    const p = await run.takeGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)
+    expect(m.filed).toEqual([])
+    expect(by(p).phone).toBe('google')
+  })
+
+  it('Google has none: says so, and changes nothing (GoogleNone7)', async () => {
+    await run.stopField('philly', 'a1', 'phone', NOW)
+    m.fetchPlaceSync.mockResolvedValue({ ...google, phone: null })
+    await expect(run.takeGoogleField('philly', 'a1', 'phone', 'admin@x.org', NOW)).rejects.toThrow('Google has no phone for this place')
+    expect(m.filed).toEqual([])
+    expect(m.rows[0].phone).toBe('(215) 735-5148')
+    expect((m.rows[0].details as Record<string, unknown>).googleStopped).toEqual(['phone'])
+  })
+})
+
 describe('Keep the listing', () => {
   it('changes nothing on it, and makes you the checker of what nothing checks, for a year', async () => {
     await run.checkAgainstGoogle('philly', 'a1', NOW)

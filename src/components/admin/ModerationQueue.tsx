@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import { fetchJson } from '@/lib/fetchJson'
 import type { ResourceSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { splitSubmissions } from '@/lib/todo'
@@ -41,11 +42,18 @@ function subscribeToAddress(onChange: () => void) {
     openedHere = undefined
     onChange()
   }
+  // To do tapped in the nav, with a card open: back to the list.
+  const onTapped = () => {
+    openedHere = null
+    onChange()
+  }
   window.addEventListener('popstate', onPop)
   window.addEventListener(OPENED, onChange)
+  window.addEventListener(ADMIN_AREA_TAPPED, onTapped)
   return () => {
     window.removeEventListener('popstate', onPop)
     window.removeEventListener(OPENED, onChange)
+    window.removeEventListener(ADMIN_AREA_TAPPED, onTapped)
     // Coming back to the queue later reads the address afresh.
     openedHere = undefined
   }

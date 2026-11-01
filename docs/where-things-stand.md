@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 29, 2026.
+Last updated: Oct 31, 2026.
 
 ## The branch
 
@@ -2031,6 +2031,130 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Building: admin for a newcomer, and watches that work (started Oct 31, on `redesign/oct18-fixes`)
+
+The user's 21-point braindump, agreed Oct 31. Goal for the week: admin simple
+and fully usable for a newcomer, and watches that work. Order: the week rule;
+back buttons and false "none" changes; the one-list change view; draw Watches
+and Places, then build them; category switches, home wording, hiding forms.
+
+**One rule for a week: it holds dated rows only, never a usual time.**
+
+- Done: one message can make two weeks. Mekor's Oct 30 newsletter gave this
+  Shabbos and "Weekday Services: November 1 to November 6". The dates were
+  only in a heading, so `weekdaysOnGuideWeek` moved the times onto the current
+  week (Nov 1 on Oct 25, Nov 6 on Oct 30), and they went into last week's post,
+  which shares the heading "Shabbat Schedule". A message that writes a read
+  date anywhere now stays on its dates, and `applyUpdate` posts one schedule
+  per guide week, from any source.
+- Done: a pasted week no longer takes the usual times it left out (Lower
+  Merion's 17 rows), and a paste leaves the days before today alone (its lost
+  Thursday Late Maariv). `keepBefore` on the shul card's route.
+- Done: editing a week goes by its dates. The row shows only the times dated
+  in that guide week, so a post running across two weeks (Mekor's Oct 23 – 31)
+  no longer shows Oct 24's 9:15 as this Saturday's, and a time set there goes on
+  that one date. Nothing posted opens empty: this replaces the Oct 23 drawing's
+  "starts from the usual times". Admins now have the row in Places and in "Edit,
+  then update", plus "Next week's schedule". Not changed: when two posts cover a
+  week the row edits the one that wins, though the listing can show days from
+  the other, and the To do board's week Edit (`BoxEditSheet`) still edits a post
+  whole.
+- Not confirmed: why Mekor's 9:15 on Oct 31 was never filed. With the fix, a
+  read 9:15 on that date is posted (tested). There's no AI key in `.env.local`
+  to replay the real read, so if it happens again, the reader dropped it.
+
+**One list for a change.** Done: "On the site now" and "Would show" are gone from
+`ChangeReview`. A change is one list, new highlighted and old crossed out. A
+dated schedule goes day by day, only the days that differ, as the listing would
+pick them (`changeLines.ts`). A new place still uses the old review.
+
+**Ways back, and changes nobody proposed.**
+
+- Done: a change no longer says "last confirmed" or hidden Google `hours` went
+  to none. `confirmedAt` is an app-owned key now, so a submitter can't set it
+  and an edit keeps it; `hours` only shows where the category has an hours
+  field. Approving a shul's change can still drop its hidden `hours`, which
+  nothing reads.
+- Done: tapping To do or Places while one is open goes back to the list. A place
+  is a history entry, so swiping back lands on Places. Places and Add have the
+  chevron; Settings has one to To do on a phone. Not changed: "Edit, then
+  update" isn't a history entry, so swiping back from it leaves the change.
+
+**Watches and Places.** Done, to the approved boards (canvas VKdnqd5xkP37DP1DKcN5qy).
+
+- Watches: one sentence, Needs fixing, Jobs, Needs one step, + Add a watch. A
+  job has its own page: last night, schedule, Not read last night, All tracked,
+  Last 14 nights as a check or an X, + Add, Turn off this job. Off is a marker
+  row per community (`jobOff.ts`), no migration; every cron and run skips it.
+- Places: search and three menus, On the site, Category, Checked by. A place
+  stays in the list and says what isn't watched, the main thing first. Edit
+  listing shows what checks each row.
+- Find on Google is on To do now, and counts toward the To do number.
+- Differs from the boards: "+ Add a place" is on its own row, because the title
+  belongs to the admin layout and on a phone shares it with the Settings gear. WhatsApp isn't listed as Not watched. Contact is one
+  row in Edit listing. Setup, Add a watch and the turn-off confirm weren't drawn.
+
+**One place at a time.** The user, Oct 31: the three-tab page of a whole kind
+(Waiting for you, Not checked, Up to date) is gone.
+
+- A place opens on its own screen, `watches/place/<id>`, from a job's row, Find
+  on Google, To do or an email. Back goes where it was opened from. Once nothing
+  is left to do for it, the screen goes back by itself.
+- To do now holds everything waiting on a decision: a closure Google reports, a
+  change from Google or a menu, an eruv's. They're in Changes and count in the
+  number, which comes in a moment after the rest because every job has to answer.
+- The Eruvs job lists every eruv, with a website or not. + Add an eruv opens the
+  Eruv category's editor.
+- Already-sent emails still work: `kind/…?place=` goes to the place, `kind/…` to
+  To do. A list's digest (Keystone, Mekor) opens To do.
+
+**Built Nov 1 (the rest of the newcomer batch):**
+
+- Category pages hold places only. Map, Candle Lighting and Eruv are switches
+  under "On the site", on by default for a new community, empty or cloned. A
+  community with no row yet shows the switch off; the first on creates the row.
+- Jewish Medical Resources is gone from admin and isn't cloned. Its public code
+  stays, unreachable; Philly's row stays hidden. Deleting that row needs a yes.
+- Forms are hidden (`features.formsTab`). Responses is now Feedback, without the
+  inbox sentence. The forms page still answers at its address. Nothing needed
+  changing on the live site: Support and Volunteer were already off on Philly.
+- Searches are off To do. Reports shows "Asked more than once"; every search
+  folds under it.
+- Home page: boxes renamed, hovering or tabbing into one lights its part of the
+  preview beside it (computer-width admin only, a phone has no preview beside),
+  "Not on the phone version." when it isn't there, a sample link-preview card,
+  one line on what a campaign is for.
+- Delete shows on the community card, except the default community's.
+
+**To do for the user:** Washington has no Map, Candle Lighting or Eruv rows, so
+after this deploys its switches show off. Flip them in its Category pages.
+
+**Built Nov 1 (the *4, *5, *6 and *7 boards on canvas VKdnqd5xkP37DP1DKcN5qy):**
+a job's row opens the Places listing, with Back to the job, unless a change or a
+failed read waits, which opens the same place screen as To do. Each listing row
+names only its job ("Stopped" and "Nothing" in amber); its bubble holds one line
+("Its menu · Oct 20 · Change"), with Stop reading it and Start reading inside
+Change. Fields Google keeps say "Google · Oct 19 · Stop", then Use Google's, and
+a cleared field stays blank. Archive is a red bin beside Update the listing.
+Eruvs are places: a category in Places, opened as a listing, and offered by Add
+a place. Their map colour and left-out parts stay on the category page. Eruv maps
+are read only by the nightly job.
+
+Differences from the drawing, decided while building: the button says "No changes
+yet" until something is typed, as every listing's does. Stop reading it asks
+nothing first, since Start reading undoes it. Save on Change doesn't report a
+failed read; only Start reading does. The "Checked by" filter doesn't cover eruvs.
+Gone with the old screen, as drawn: "Read it now" and "Open its listing" for a
+place with nothing waiting.
+
+**After this, once the user follows up, not before:** step back and assess
+whether the synagogue admin logic is patches on patches and can be rewritten
+simpler ("it really shouldn't be that complicated").
+
+**Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
+are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
+Oct 30" runs to Oct 31 and ends on its own.
 
 ## Done Oct 29: deleting a community clears all of it, and works on the live site (on `redesign/oct18-fixes`)
 

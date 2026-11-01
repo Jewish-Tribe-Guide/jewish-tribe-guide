@@ -429,8 +429,8 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
   })
 })
 
-// The whole card — name/badges/link on top, everything else (Publish/
-// Unpublish, Delete, the preview link, the Admins roster) behind one
+// The whole card — name/badges/link and Delete on top, everything else
+// (Publish/Unpublish, the preview link, the Admins roster) behind one
 // "Show"/"Hide" toggle. Shared by every describe below that needs to reach
 // past that toggle, since it replaced what used to be two separate
 // disclosures (the row's own always-visible actions, and Admins' own nested
@@ -460,11 +460,10 @@ describe('CommunityManager — deleting a community', () => {
     expect(within(cardFor(/philadelphia/i)).queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
   })
 
-  it('offers a delete option for a non-default community', async () => {
-    const user = userEvent.setup()
+  // On the card itself: behind Show, nobody could find it (the user, Oct 31).
+  it('offers a delete option for a non-default community, without opening its card', async () => {
     await renderAndWaitForList([philly, ues])
     const card = cardFor(/upper east side/i)
-    await openCard(user, card)
     expect(within(card).getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
   })
 

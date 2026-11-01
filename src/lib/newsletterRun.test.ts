@@ -24,7 +24,12 @@ vi.mock('@/lib/watchStore', () => ({ getWatchByUrl: m.getWatchByUrl, addWatch: m
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 // Nothing left out as another shul's, unless a test says.
-vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: async (...args: unknown[]) => ({ elsewhere: [], ...(await m.readShulWeek(...args)) }) }))
+vi.mock('@/lib/shulWeekReading', () => ({
+  readShulWeek: async (...args: unknown[]) => {
+    const got = await m.readShulWeek(...args)
+    return { elsewhere: [], updates: [got.update], ...got }
+  },
+}))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
@@ -32,6 +37,8 @@ vi.mock('@/lib/eruvEmailRun', () => ({ eruvSenders: m.eruvSenders }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://kept/${p}` } }) }) } }),
 }))
+
+import { JOB_OFF_CREATOR, jobOffUrl } from './jobOff'
 
 const { receiveNewsletter, emailHash, newsletterSenders } = await import('./newsletterRun')
 
@@ -112,6 +119,16 @@ beforeEach(() => {
   m.upload.mockResolvedValue({ error: null })
 })
 
+describe('newsletterSenders', () => {
+  it('stops asking for a shul’s newsletters where the job is off, and still takes eruv emails', async () => {
+    m.eruvSenders.mockResolvedValue(['eruv@x.org'])
+    m.listWatches.mockResolvedValue({ available: true, watches: [watch] })
+    expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org', 'eruv@x.org'])
+    m.listWatches.mockResolvedValue({ available: true, watches: [watch, { ...watch, id: 'off', createdBy: JOB_OFF_CREATOR, url: jobOffUrl('newsletters'), active: false }] })
+    expect(await newsletterSenders('philly')).toEqual(['eruv@x.org'])
+  })
+})
+
 describe('receiveNewsletter: who it’s from', () => {
   // Only the Watches tab's senders are sent (newsletterSenders), so a
   // stranger's email is a slip, not a new newsletter: it adds no row.
@@ -180,7 +197,7 @@ describe('receiveNewsletter: what it changes', () => {
     expect(payload.source).toMatchObject({ readBy: 'ai', from: 'Mekor Habracha’s newsletter', named: 'Mekor Habracha', original: email.text, note: email.subject })
     expect(note).toContain('From Mekor Habracha’s newsletter: “This Shabbos at Mekor” (Oct 16).')
     expect(note).toContain('9:00am')
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Mekor Habracha’s newsletter', [expect.objectContaining({ name: 'Mekor Habracha' })], { path: `/philly/admin/watches/kind/synagogue?place=${SHUL}`, name: 'Grocery Stores' })
+    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Mekor Habracha’s newsletter', [expect.objectContaining({ name: 'Mekor Habracha' })], { path: `/philly/admin/watches/place/${SHUL}?from=todo`, name: 'Grocery Stores' })
     expect(m.updateWatch).toHaveBeenCalledWith(
       'philly',
       'w1',

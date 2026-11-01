@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diffLines, flatListing, isMultiline } from './submissionDiff'
+import { diffListing, diffLines, flatListing, isMultiline } from './submissionDiff'
 
 // The moderation card struck through all ten of a shul's minyanim in red and
 // repeated all ten in green because one Kabbalas Shabbos time gained a
@@ -76,5 +76,22 @@ describe('flatListing', () => {
     const rows = flatListing({ name: 'Trader Joe’s', details: { m: ['Chicken'], m_sometimes: ['Steak', 'Turkey'] } } as never, fields)
     expect(rows.map((r) => [r.label, r.value])).toContainEqual(['Kosher items available: sometimes', 'Steak, Turkey'])
     expect(rows.map((r) => r.label)).not.toContain('m_sometimes')
+  })
+})
+
+// The user, Oct 31: every change to a shul said hours and last confirmed went
+// to none. Nobody proposed that: the editor doesn't send either.
+describe('diffListing, what nobody proposed', () => {
+  const fields = [{ key: 'notes', label: 'Notes', type: 'text' as const }]
+  const current = { name: 'Mekor', details: { notes: 'a', confirmedAt: '2026-10-12T00:00:00Z', hours: { mon: { open: '09:00', close: '17:00' } } } } as never
+  const proposed = { name: 'Mekor', details: { notes: 'b' } } as never
+  const changed = (f: typeof fields) => diffListing(current, proposed, f).filter((r) => r.changed).map((r) => r.key)
+
+  it('a change doesn’t say last confirmed or hidden hours went to none', () => {
+    expect(changed(fields)).toEqual(['notes'])
+  })
+
+  it('hours are still a change where the category has them', () => {
+    expect(changed([...fields, { key: 'hours', label: 'Hours', type: 'hours' as never }])).toContain('hours')
   })
 })

@@ -84,6 +84,18 @@ afterEach(() => {
 })
 
 describe('/api/cron/watches', () => {
+  // The user, Oct 31: off means nothing is read and nothing is paid for, in
+  // that community only.
+  it('reads nothing a community turned off, and another community’s pages still', async () => {
+    const marker = watch({ id: 'off', createdBy: 'job off', url: 'https://guide.invalid/job-off/other', active: false })
+    mockList.mockResolvedValue({
+      available: true,
+      watches: [marker, watch({ id: 'here', url: 'https://a.org/here' }), watch({ id: 'there', communityId: 'ues', url: 'https://a.org/there' })],
+    })
+    await GET(request())
+    expect(mockWebsite.mock.calls.map(([url]) => url)).toEqual(['https://a.org/there'])
+  })
+
   // Oct 17: each food place's menu link has a watch, made by the run itself.
   it('gives the menu links their watches first, then runs them on one shared AI budget', async () => {
     const order: string[] = []

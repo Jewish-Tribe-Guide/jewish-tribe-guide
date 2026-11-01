@@ -2,11 +2,12 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import type { EnrichedSubmission } from '@/types'
-import type { ClassifiedMiss } from './missedSearches'
 import { parseOkJson } from './fetchJson'
 import { withCommunity } from './useCommunityData'
-import { openSearches, todoCount, type TodoReading, type TodoResponse, type TodoSearch } from './todo'
+import { todoCount, unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { setupLeft, type SetupState } from './setup'
+import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
+import { waitingNotQueued, type TodoWaiting } from '@/components/admin/todoWaiting'
 
 // What To do holds, loaded once and shared: the To do page shows it and
 // the nav counts it, from the same copy, so a decision taken on the page
@@ -15,12 +16,12 @@ import { setupLeft, type SetupState } from './setup'
 
 export type TodoData = {
   submissions: EnrichedSubmission[]
-  searches: TodoSearch[]
-  /** Categories a search can be added to or taught as. */
-  addable: { id: string; label: string }[]
-  canDismiss: boolean
-  canTeach: boolean
   responses: TodoResponse[]
+  /** Places waiting to be found on Google, or said not to be on it. */
+  unmatched: TodoUnmatched[]
+  /** What a job read that waits on a decision but isn't in the queue: a
+   *  closure, a check against Google, a menu. Loaded after the rest. */
+  waiting?: TodoWaiting[]
   /** What the setup checklist ticks off; null if it couldn't be read, so
    *  no checklist shows rather than a wrong one. */
   setup: SetupState | null
@@ -52,20 +53,11 @@ class Unauthorized extends Error {}
 
 async function load(key: string, token: string, community: string, email: string | undefined) {
   const at = (path: string) => withCommunity(path, community)
-  const [subs, misses, readings, responses, setup] = await Promise.allSettled([
+  const [subs, responses, setup, google] = await Promise.allSettled([
     get<{ submissions: EnrichedSubmission[] }>(at('/api/admin/submissions'), token, 'Failed to load.'),
-    get<{ searches: ClassifiedMiss[]; addable: { id: string; label: string }[]; dismissalsAvailable: boolean }>(
-      at('/api/admin/missed-searches'),
-      token,
-      'Failed to load the searches.',
-    ),
-    get<{ readings: TodoReading[]; wordsAvailable: boolean }>(
-      at('/api/admin/read-questions'),
-      token,
-      'Failed to load the searches.',
-    ),
     get<{ responses: TodoResponse[] }>(at('/api/admin/responses?new=1'), token, 'Failed to load the responses.'),
     get<{ setup: SetupState }>(at('/api/admin/setup'), token, 'Failed to load the setup.'),
+    get<{ places: Parameters<typeof unmatchedPlaces>[0] }>(at('/api/admin/watches/google'), token, 'Failed to load Google’s places.'),
   ])
   if (state.key !== key) return
   if (subs.status === 'rejected') {
@@ -75,24 +67,33 @@ async function load(key: string, token: string, community: string, email: string
         : subs.reason instanceof Error
           ? subs.reason.message
           : 'Something went wrong.'
-    set({ key, data: { submissions: [], searches: [], addable: [], canDismiss: false, canTeach: false, responses: [], setup: null }, error })
+    set({ key, data: { submissions: [], responses: [], unmatched: [], setup: null }, error })
     return
   }
-  const m = misses.status === 'fulfilled' ? misses.value : null
-  const r = readings.status === 'fulfilled' ? readings.value : null
   set({
     key,
     error: null,
     data: {
       submissions: subs.value.submissions,
-      searches: openSearches(m?.searches ?? [], r?.readings ?? []),
-      addable: m?.addable ?? [],
-      canDismiss: m?.dismissalsAvailable ?? false,
-      canTeach: r?.wordsAvailable ?? false,
       responses: (responses.status === 'fulfilled' && responses.value.responses) || [],
+      unmatched: google.status === 'fulfilled' && google.value.places ? unmatchedPlaces(google.value.places) : [],
       setup: setup.status === 'fulfilled' ? setup.value.setup : null,
+      // Kept until the jobs answer again, so the count doesn't dip meanwhile.
+      waiting: state.data?.waiting,
     },
   })
+  void loadWaiting(key, token, community)
+}
+
+let waitingLoads = 0
+
+/** Every job's reading, after the rest so To do doesn't wait on them; what
+ *  couldn't load just isn't counted. Only the latest load's answer is kept. */
+async function loadWaiting(key: string, token: string, community: string) {
+  const load = ++waitingLoads
+  const jobs: Jobs = {}
+  await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
+  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()) }))
 }
 
 /** Loads To do (again, with `fresh`), sharing a load already under way. */

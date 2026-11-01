@@ -41,8 +41,8 @@ export type PreviewDraft = {
  *  Points straight at the community rather than at "/" so the flag survives:
  *  "/" is a redirect now, and a redirect that dropped the query string would
  *  land the frame on the normal site with the draft silently ignored. */
-export function previewUrl(community: string): string {
-  return `/${community}?${PREVIEW_PARAM}=1`
+export function previewUrl(community: string, page = ''): string {
+  return `/${community}${page}?${PREVIEW_PARAM}=1`
 }
 
 /** True when this page was opened as an admin preview. Always false on the

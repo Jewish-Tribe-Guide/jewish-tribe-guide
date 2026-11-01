@@ -91,6 +91,15 @@ describe('weekdaysOnGuideWeek', () => {
     expect(got.times.map((t) => t.date)).toEqual(['2026-10-24'])
   })
 
+  // Mekor's Oct 30 newsletter: "Weekday Services: November 1 to November 6"
+  // heading times that say only "Sunday". Sunday's 4:45pm went on Oct 25.
+  it('leaves a message whose heading names the dates as read, though no time’s own words do', () => {
+    const october = read([time({ date: '2026-10-31', quote: '9:15am Morning Services' }), time({ date: '2026-11-01', time: '4:45pm', quote: 'Sunday 4:45pm' }), time({ date: '2026-11-06', time: '4:35pm', quote: 'Friday 4:35pm' })])
+    expect(weekdaysOnGuideWeek(october, { from: '2026-10-25', to: '2026-10-31' }, 'Shabbat, October 31: 9:15am Morning Services. Weekday Services: November 1 to November 6. Sunday 4:45pm Friday 4:35pm')).toBe(october)
+    expect(weekdaysOnGuideWeek(october, { from: '2026-10-25', to: '2026-10-31' }, 'Sunday 4:45pm Friday 4:35pm. Our eruv campaign is December 1.').times.map((t) => t.date)).toEqual(['2026-10-31', '2026-10-25', '2026-10-30'])
+    expect(weekdaysOnGuideWeek({ ...october, namesDates: true }, { from: '2026-10-25', to: '2026-10-31' }).times.map((t) => t.date)).toEqual(['2026-10-31', '2026-11-01', '2026-11-06'])
+  })
+
   it('leaves a message that names its dates, and a usual schedule, as read', () => {
     const dated = read([time({ date: '2026-10-24', quote: 'Shabbos Oct 24: 9:30' }), time({ date: '2026-10-26', quote: 'Monday 7:45' })])
     expect(weekdaysOnGuideWeek(dated, WEEK)).toBe(dated)

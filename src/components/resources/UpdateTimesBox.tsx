@@ -312,7 +312,8 @@ function TimesResult({
 
   // Days in order: the week's dates, or Sunday to Shabbos then one-offs.
   const days = week && u.from && u.to ? datesBetween(u.from, u.to) : [...DAY_KEYS, ...[...new Set(rows.map((r) => r.day).filter((d) => !isWeekday(d)))].sort()]
-  const byDay = days.map((day) => ({ day, rows: rows.filter((r) => r.day === day) })).filter((d) => d.rows.length > 0)
+  // A week holds what was read: a usual time it left out isn't in it.
+  const byDay = days.map((day) => ({ day, rows: rows.filter((r) => r.day === day && !(week && r.status === 'kept')) })).filter((d) => d.rows.length > 0)
 
   const title = week
     ? `${name}, ${dateText(u.from!, { weekday: true })}${u.to !== u.from ? ` – ${dateText(u.to!, { weekday: true })}` : ''}`
@@ -443,7 +444,7 @@ function edited(before: UpdateRow, next: UpdateRow): UpdateRow {
   const was = before.status === 'changed' ? before.was : before.time
   const unchanged = before.status === 'changed' ? false : next.tefillah === before.tefillah && next.time === before.time && next.notes === before.notes
   if (unchanged) return { ...next, status: before.status }
-  if (next.time === was && next.tefillah === before.tefillah) return { ...next, status: 'kept', was: undefined }
+  if (next.time === was && next.tefillah === before.tefillah) return { ...next, status: 'same', was: undefined }
   return { ...next, status: 'changed', was, keep: undefined }
 }
 

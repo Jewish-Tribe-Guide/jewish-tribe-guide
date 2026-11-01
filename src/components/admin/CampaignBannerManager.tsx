@@ -141,6 +141,7 @@ export default function CampaignBannerManager({
         </button>
       }
     >
+      <p className="m-0 px-4 pt-3 text-[13px] text-slate-600">A banner on the home page between two dates, leading to one category, like a Sukkah map.</p>
       {banners.length === 0 ? (
         <p className="m-0 px-4 py-4 text-[15px] text-slate-600">{listingCategories.length === 0 ? 'Make a category first.' : 'No campaigns yet.'}</p>
       ) : (

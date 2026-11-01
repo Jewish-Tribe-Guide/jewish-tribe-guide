@@ -101,12 +101,12 @@ describe('NewslettersPage', () => {
         checkedAt: new Date().toISOString(),
         newsletters: [
           { watchId: 'n', email: 'x@y.org', shul: null, status: 'Not linked to a shul', bad: true, page: '' },
-          { watchId: 'a', email: 'news@bi.org', shul: 'Beth Israel', status: 'Last in Oct 27', bad: false, page: 'kind/synagogue?place=shul-1' },
+          { watchId: 'a', email: 'news@bi.org', shul: 'Beth Israel', status: 'Last in Oct 27', bad: false, page: 'place/shul-1' },
         ],
       }),
     )
     const row = await screen.findByRole('link', { name: /Beth Israel/ })
-    expect(row).toHaveAttribute('href', '/test-community/admin/watches/kind/synagogue?place=shul-1')
+    expect(row).toHaveAttribute('href', '/test-community/admin/watches/place/shul-1?from=job/newsletters')
     expect(row).toHaveTextContent('news@bi.org · Last in Oct 27')
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('The shul it’s from'), 'Beth Israel')

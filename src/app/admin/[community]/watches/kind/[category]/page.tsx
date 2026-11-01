@@ -1,28 +1,27 @@
 'use client'
 
-import { Suspense } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
-import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import WatchKindPage from '@/components/admin/WatchKindPage'
+import { Suspense, useEffect } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { adminBase } from '@/lib/adminNav'
+import { placePath } from '@/lib/placeLink'
 
-// One kind of place on the Watches tab, by its category's id
-// (/philly/admin/watches/kind/restaurant). 'use client', so the category
-// comes from useParams(), as on /admin/[community]/history/[status].
-// ?place=<id> opens it on that place (What's tracked's lines link there);
-// useSearchParams() needs its Suspense boundary.
-export default function AdminWatchKindPage() {
+// The page of a whole kind, gone since Oct 31. Emails already sent still link
+// here: one with ?place= goes to that place, the rest to To do, where it waits.
+export default function AdminWatchKindRedirect() {
   return (
-    <div>
-      <Suspense fallback={null}>
-        <Kind />
-      </Suspense>
-    </div>
+    <Suspense fallback={null}>
+      <Redirect />
+    </Suspense>
   )
 }
 
-function Kind() {
-  const session = useAdminSession()
-  const params = useParams<{ category: string }>()
+function Redirect() {
+  const router = useRouter()
+  const params = useParams<{ community: string }>()
   const place = useSearchParams().get('place')
-  return <WatchKindPage token={session.access_token} category={params.category} place={place} />
+  const base = adminBase(params.community)
+  useEffect(() => {
+    router.replace(place ? `${base}/watches/${placePath(place, 'todo')}` : base)
+  }, [router, base, place])
+  return null
 }

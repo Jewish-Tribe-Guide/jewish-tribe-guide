@@ -7,6 +7,7 @@ import { nightKinds } from '@/lib/nightKinds'
 import { listUnreadMenus } from '@/lib/menuPlaceRead'
 import { loadListings } from '@/lib/listingReads'
 import { linkStandings } from '@/lib/linkCheckRun'
+import { jobsOff } from '@/lib/jobOff'
 
 // GET /api/admin/watches/runs — the Watches tab's What's tracked (Oct 25): a
 //     line per kind of source, its run's time, what was read, what wasn't
@@ -15,7 +16,7 @@ import { linkStandings } from '@/lib/linkCheckRun'
 //     page counts by its category (listingReads.ts); Links are the weekly
 //     link check's (linkCheck.ts). The jobs run for the whole
 //     site; the counts and misses are this community's. `available` is
-//     false before migration 086.
+//     false before migration 086. `off`: the jobs this community turned off.
 
 export async function GET(request: Request) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
       loadListings([community.slug]),
       linkStandings(community.slug),
     ])
-    return Response.json({ ok: true, available, kinds: nightKinds(community.slug, runs, watches, google, now, unread, listings, links) })
+    return Response.json({ ok: true, available, off: jobsOff(watches), kinds: nightKinds(community.slug, runs, watches, google, now, unread, listings, links) })
   } catch (err) {
     console.error('[admin/watches/runs] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the nightly runs.'] }, { status: 502 })

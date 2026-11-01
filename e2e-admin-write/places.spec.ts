@@ -66,7 +66,8 @@ test('a place is found by name, archived after asking, and brought back', async 
   // Back on the list: no longer on the site, under Archived instead.
   await page.getByLabel('Find a place by name').fill(name)
   await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
-  await page.getByRole('button', { name: /^Archived · / }).click()
+  await page.getByRole('button', { name: /^On the site/ }).click()
+  await page.getByRole('menuitemradio', { name: /^Archived/ }).click()
   await expect(page).toHaveURL(/show=archived/)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   await page.getByRole('button', { name: 'Bring it back' }).click()
@@ -76,5 +77,5 @@ test('a place is found by name, archived after asking, and brought back', async 
 test('the old Archived tab opens Places on Archived', async ({ page }) => {
   await page.goto('/philly/admin/archived')
   await expect(page).toHaveURL(/\/philly\/admin\/places\?show=archived$/)
-  await expect(page.getByRole('button', { name: /^Archived · / })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'On the site: Archived' })).toBeVisible()
 })

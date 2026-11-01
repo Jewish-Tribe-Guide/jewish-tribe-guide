@@ -73,7 +73,7 @@ describe('each watch’s kind of source', () => {
 
   // Oct 25: five food places' own websites were counted as Mikvah hours,
   // a food place having an Hours field.
-  it('a food place’s own website is Phone, email and hours', () => {
+  it('a food place’s own website is Website', () => {
     const site = watch({ createdBy: 'listing pages (found)', resourceId: 'f1', label: 'Chalavita · its website' })
     const readsOf = () => 'hours' as const
     const gap = (why: string) => (id: string) => (id === 'f1' ? { why } : null)
@@ -121,7 +121,7 @@ describe('what a run saves', () => {
 
 // Oct 26: the job pages are gone; a line opens its place on its kind's
 // page (ListingInfo.placePage), the Eruvs' page, or nothing.
-const at = (id: string) => `kind/k?place=${id}`
+const at = (id: string) => `place/${id}`
 
 describe('last night, a line per kind', () => {
   const google: GoogleLive[] = [
@@ -137,16 +137,23 @@ describe('last night, a line per kind', () => {
     expect(views.map((v) => v.when)).toEqual(['2:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', null, '3:00 AM', '3:00 AM'])
   })
 
+  // EruvJob6.
+  it('the Eruvs job says what it reads at night, and what it reads when someone looks', () => {
+    const view = kind(nightKinds('philly', runs, [], google, NOW), 'Eruvs')
+    expect(view.schedule).toMatch(/^Maps, hotlines and alerts, every night at /)
+    expect(view.scheduleMore).toBe('Status, when someone looks')
+  })
+
   // FinalNightly's Eruvs.
   it('what wasn’t read, and why', () => {
     const watches = [eruv('Lower Merion', never), eruv('Northeast', never), eruv('Elkins Park', { lastRunAt: after(WATCHES_AT, 2), lastOkAt: night(WATCHES_AT, 3), lastError: 'The page answered 500' }), eruv('Center City')]
-    const view = kind(nightKinds('philly', runs, watches, google, NOW, [], { readsOf: () => null, nameOf: () => null, siteGap: () => null, eruvPage: 'kind/eruvin' }), 'Eruvs')
+    const view = kind(nightKinds('philly', runs, watches, google, NOW, [], { readsOf: () => null, nameOf: () => null, siteGap: () => null, eruvPage: () => 'place/eruvin' }), 'Eruvs')
     expect(view.count).toBe('1 of 4 read')
     expect(view.trouble).toBe('1 didn’t load · 2 never read')
     expect(view.misses).toEqual([
-      { name: 'Lower Merion Eruv', why: 'Never read', page: 'kind/eruvin' },
-      { name: 'Northeast Eruv', why: 'Never read', page: 'kind/eruvin' },
-      { name: 'Elkins Park Eruv', why: 'Didn’t load', page: 'kind/eruvin' },
+      { name: 'Lower Merion Eruv', why: 'Never read', page: 'place/eruvin' },
+      { name: 'Northeast Eruv', why: 'Never read', page: 'place/eruvin' },
+      { name: 'Elkins Park Eruv', why: 'Didn’t load', page: 'place/eruvin' },
     ])
   })
 
@@ -228,7 +235,7 @@ describe('last night, a line per kind', () => {
     expect(kind(nightKinds('philly', runs, [], failing, NOW), 'Google')).toMatchObject({
       count: '2 of 3 places read',
       trouble: '1 didn’t load',
-      misses: [{ name: 'Closed Deli', why: 'Didn’t load', page: 'kind/restaurant?place=d1' }],
+      misses: [{ name: 'Closed Deli', why: 'Didn’t load', page: 'place/d1' }],
     })
   })
 
@@ -249,6 +256,37 @@ describe('last night, a line per kind', () => {
 
 // Oct 25: the read-menus job, which reads a few menus never read each
 // night, folded into Menus.
+describe('what goes under Needs fixing', () => {
+  const runs = { 'sync-hours': [run({ job: 'sync-hours', startedAt: GOOGLE_AT })], watches: [run({})] }
+  const fixes = (w: Watch[], google: Parameters<typeof nightKinds>[3] = []) => nightKinds('philly', runs, w, google, NOW).flatMap((v) => v.fixes)
+  const lower = (over: Partial<Watch>) => eruv('Lower Merion', { lastRunAt: WATCHES_AT, lastOkAt: WATCHES_AT, ...over })
+
+  // The user, Oct 31: one bad night shows in its history only.
+  it('a page that failed one night isn’t on it, and is after two', () => {
+    expect(fixes([lower({ failingSince: WATCHES_AT, lastError: 'down' })])).toEqual([])
+    const [two] = fixes([lower({ failingSince: night(WATCHES_AT, 2), lastError: 'down' })])
+    expect(two.why).toBe('Page didn’t open, 3 nights')
+  })
+
+  it('a page not read for two nights is on it', () => {
+    expect(fixes([lower({ lastRunAt: night(WATCHES_AT, 2) })])[0].why).toBe('Not read for 2 nights')
+    expect(fixes([lower({})])).toEqual([])
+  })
+
+  it('a job that didn’t run is on it at once, once', () => {
+    const late = { 'sync-hours': [run({ job: 'sync-hours', startedAt: night(GOOGLE_AT, 3) })], watches: [run({})] }
+    const views = nightKinds('philly', late, [], [], NOW)
+    expect(views.flatMap((v) => v.fixes)[0]).toMatchObject({ name: 'Google', page: 'job/google', whole: true })
+  })
+
+  it('Google: a match that stopped answering is on it after a day, and a place with no match never', () => {
+    const failed = (at: string) => [{ name: 'Hot Bagels', matched: true, failedAt: at, readAt: null }]
+    expect(fixes([], failed(WATCHES_AT))).toEqual([])
+    expect(fixes([], failed(night(WATCHES_AT, 2)))[0].why).toMatch(/^Google not answering since/)
+    expect(fixes([], [{ name: 'Mei Shalva', matched: false, failedAt: null }])).toEqual([])
+  })
+})
+
 describe('Menus, with the menus never read', () => {
   const runs = { watches: [run({})], 'read-menus': [run({ job: 'read-menus', startedAt: after(WATCHES_AT, 30) })] }
   const menu = (id: string, resourceId: string, over: Partial<Watch> = {}) => watch({ id, createdBy: 'menu links', resourceId, label: `Menu · ${id}`, ...over })
@@ -373,13 +411,13 @@ describe('everything a kind tracks', () => {
       { name: 'Not matched', matched: false, failedAt: null },
     ]
     expect(kind(views([], google), 'Google').tracked).toEqual([
-      { name: 'Closed Deli', status: 'Not answering since Oct 23', bad: true, page: 'kind/restaurant?place=d1' },
-      { name: 'Kosher Corner', status: 'Read Oct 25', bad: false, page: 'kind/restaurant?place=k1' },
+      { name: 'Closed Deli', status: 'Not answering since Oct 23', bad: true, page: 'place/d1' },
+      { name: 'Kosher Corner', status: 'Read Oct 25', bad: false, page: 'place/k1' },
     ])
   })
 
   // The user, Oct 25: make it clear it's what Google doesn't have.
-  it('Phone, email and hours: each place says why its website is read', () => {
+  it('Website: each place says why its website is read', () => {
     const watches = [
       watch({ id: 'a', createdBy: 'listing pages (found)', resourceId: 'f1', label: 'Chalavita · its website' }),
       watch({ id: 'b', createdBy: 'listing pages (found)', resourceId: 'f2', label: 'Sababa Falafel · its website', failingSince: night(WATCHES_AT, 2), lastOkAt: night(WATCHES_AT, 3) }),
@@ -393,7 +431,7 @@ describe('everything a kind tracks', () => {
       g1: { why: 'Google has no phone' },
     }
     const views = nightKinds('philly', runs, watches, [], NOW, [], { readsOf: () => 'hours', nameOf: () => null, siteGap: (id) => gaps[id] ?? null, placePage: at })
-    const sites = kind(views, 'Phone, email and hours')
+    const sites = kind(views, 'Website')
     expect(sites).toMatchObject({ about: 'Reads a place’s own website when Google doesn’t have them.', count: '2 of 3 read' })
     expect(sites.tracked).toEqual([
       { name: 'Sababa Falafel', status: 'Google has no hours · Not loading since Oct 23', bad: true, page: at('f2') },
@@ -402,7 +440,7 @@ describe('everything a kind tracks', () => {
     ])
     expect(sites.misses).toEqual([{ name: 'Sababa Falafel', why: 'Didn’t load', page: at('f2') }])
     expect(kind(views, 'Mikvah hours').tracked.map((t) => t.name)).toEqual(['Mikvah Ohr'])
-    expect(kind(nightKinds('philly', runs, [], [], NOW), 'Phone, email and hours')).toBeUndefined()
+    expect(kind(nightKinds('philly', runs, [], [], NOW), 'Website')).toBeUndefined()
   })
 
   it('Other pages only when there are any', () => {
@@ -488,12 +526,12 @@ describe('Links', () => {
       link({ resourceId: 'p3', place: 'Kosher Corner', key: 'whatsapp', field: 'Join group', error: 'Didn’t answer', failingSince: after(RUN_AT, 1) }),
     ])
     expect(v).toMatchObject({ when: 'Oct 18, 5:00 AM', count: '3 links', trouble: '1 doesn’t open', nights: [] })
-    expect(v.misses).toEqual([{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 18', page: 'kind/restaurant?place=p2' }])
+    expect(v.misses).toEqual([{ name: 'House of Kosher · Kosher Certification URL', why: 'Not found since Oct 18', page: 'place/p2' }])
     expect(v.tracked).toEqual([
-      { name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 18', bad: true, page: 'kind/restaurant?place=p2' },
+      { name: 'House of Kosher · Kosher Certification URL', status: 'Not found since Oct 18', bad: true, page: 'place/p2' },
       // Not answering once isn't a problem yet: the next week's check says.
-      { name: 'Kosher Corner · Join group', status: 'Didn’t answer since Oct 18', bad: false, page: 'kind/restaurant?place=p3' },
-      { name: 'Sababa · Kosher Certification URL', status: 'Opens · checked Oct 18', bad: false, page: 'kind/restaurant?place=p1' },
+      { name: 'Kosher Corner · Join group', status: 'Didn’t answer since Oct 18', bad: false, page: 'place/p3' },
+      { name: 'Sababa · Kosher Certification URL', status: 'Opens · checked Oct 18', bad: false, page: 'place/p1' },
     ])
     expect(kindBad(v)).toBe(true)
   })

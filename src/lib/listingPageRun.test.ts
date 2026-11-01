@@ -148,8 +148,8 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     const out = await runListingPageWatch(found, newMenuReadBudget(), { apiKey: 'k', now: NOW })
     expect(out).toMatchObject({ ok: true, filed: 1, pageHash: await hashOfPage(), check: { result: 'differs', read: ['Mincha Sun 6:05 PM'] } })
     expect(m.submitListingUpdate.mock.calls[0][3]).toBe(`From their website, read Oct 20: ${URL_}\n\nChanged: mincha · Sun · 6:05pm, was 6:15pm`)
-    // It waits on its kind's page, opened on the shul, and its email says so.
-    expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/kind/synagogue?place=s1', name: 'Grocery Stores' })
+    // It waits on the shul's own screen, and its email says so.
+    expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/place/s1?from=todo', name: 'Grocery Stores' })
     // Its reads spent: left for a later morning, its fingerprint unset.
     m.readShulWeek.mockClear()
     expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
@@ -807,7 +807,7 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     expect(payload.details.women_s_hours).toEqual({ sun: { open: '19:30', close: '22:00' } })
     expect(payload.details.e).toBeUndefined()
     expect(note).toContain('Women’s Hours, Sunday: 7:00 PM–10:00 PM → 7:30 PM–10:00 PM')
-    expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/kind/mikvah?place=mk1', name: mikvahCategory.pluralLabel })
+    expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/place/mk1?from=todo', name: mikvahCategory.pluralLabel })
   })
 
   it('a check says which hours it read', async () => {

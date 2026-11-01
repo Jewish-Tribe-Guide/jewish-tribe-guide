@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import AdminFrame from './AdminFrame'
 import { AdminBack } from './AdminUI'
 
@@ -57,8 +58,8 @@ describe('AdminFrame', () => {
   it("shows the open area's pages as tabs under the heading, the current one lit", () => {
     show('/philly/admin/menus')
     const tabs = within(screen.getByRole('navigation', { name: 'Site' })).getAllByRole('link')
-    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns'])
-    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, null, 'page', null])
+    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Header and menus', 'Campaigns'])
+    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page', null])
   })
 
   // Step 2: To do is one list. Its other pages open from it, headed by
@@ -69,7 +70,7 @@ describe('AdminFrame', () => {
     expect(screen.queryByRole('link', { name: '‹ To do' })).toBeNull()
     cleanup()
     const { heading, lit } = show('/philly/admin/responses')
-    expect(heading).toBe('Responses')
+    expect(heading).toBe('Feedback')
     expect(lit).toEqual(['To do'])
     expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
     for (const back of screen.getAllByRole('link', { name: '‹ To do' })) expect(back).toHaveAttribute('href', '/philly/admin')
@@ -124,7 +125,7 @@ describe('AdminFrame', () => {
   // A screen with its own way back (an opened category, a watch) heads
   // itself; the frame's heading steps aside so there aren't two (board 19c).
   it('steps its heading aside for a screen that heads itself', () => {
-    nav.pathname = '/philly/admin/watches/kind/synagogue'
+    nav.pathname = '/philly/admin/watches/place/x'
     render(
       <AdminFrame isSuperAdmin={false} email="admin@example.com" token="tok" onSignOut={() => {}}>
         <AdminBack back={{ label: 'Watches', href: '/philly/admin/watches' }} title="Shul times" />
@@ -162,5 +163,26 @@ describe('AdminFrame', () => {
       'Community',
       'Communities',
     ])
+  })
+
+  // The user, Oct 31: no chevron back in Settings.
+  it('Settings has the way back to To do on a phone, in place of the gear', () => {
+    show('/philly/admin/team')
+    const back = screen.getByRole('link', { name: '‹ To do' })
+    expect(back).toHaveAttribute('href', '/philly/admin')
+    expect(back).toHaveClass('md:hidden')
+    expect(screen.queryByRole('link', { name: 'Settings' })?.closest('header')).toBeFalsy()
+  })
+
+  it('an area tapped while it’s open says so, and another area doesn’t', () => {
+    show('/philly/admin')
+    const heard = vi.fn()
+    window.addEventListener(ADMIN_AREA_TAPPED, heard)
+    const bar = within(screen.getByRole('navigation', { name: 'Admin areas' }))
+    fireEvent.click(bar.getByRole('link', { name: 'Places' }))
+    expect(heard).not.toHaveBeenCalled()
+    fireEvent.click(bar.getByRole('link', { name: 'To do' }))
+    expect(heard).toHaveBeenCalledTimes(1)
+    window.removeEventListener(ADMIN_AREA_TAPPED, heard)
   })
 })

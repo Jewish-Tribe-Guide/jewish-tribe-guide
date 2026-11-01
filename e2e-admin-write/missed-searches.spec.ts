@@ -9,8 +9,8 @@ import { createClient } from '@supabase/supabase-js'
 // counts from an automated browser, by design. Needs migration 058
 // (search_miss_dismissal) on the test project.
 //
-// To do lists the same searches under "Searches nobody found", and its
-// Dismiss is the same dismissal (the admin redesign's step 2).
+// The page's "Asked more than once" lists the same searches, and its Dismiss
+// is the same dismissal.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAdminClient() {
@@ -36,6 +36,7 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   expect(error).toBeNull()
 
   await page.goto('/philly/admin/searches')
+  await page.getByRole('button', { name: 'Show Every search' }).click({ timeout: 20_000 })
   const missing = page.locator('section', { has: page.getByRole('heading', { name: /^Not in the guide/ }) })
   const row = missing.getByTestId('missed-search').filter({ hasText: `“${term}”` })
   await expect(row).toBeVisible({ timeout: 20_000 })
@@ -56,16 +57,14 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
     .toBe(0)
 })
 
-test('a missed search is on To do, and Dismiss there is the same dismissal', async ({ page }) => {
+test('a search asked more than once leads the page, and Dismiss there is the same dismissal', async ({ page }) => {
   const supabase = getAdminClient()
   const today = new Date().toISOString().slice(0, 10)
   const { error } = await supabase.from('daily_count').insert({ community_id: 'philly', kind: 'search_miss', key: term, day: today, count: 3 })
   expect(error).toBeNull()
 
-  await page.goto('/philly/admin')
-  // At the bottom of To do, folded: there when there's time.
-  await page.getByRole('button', { name: /^Searches nobody found/ }).click({ timeout: 20_000 })
-  const searches = page.getByRole('region', { name: 'Searches nobody found' })
+  await page.goto('/philly/admin/searches')
+  const searches = page.getByRole('region', { name: 'Asked more than once' })
   await expect(searches).toBeVisible({ timeout: 20_000 })
   // Five show; the test project may hold more searches than that.
   const more = searches.getByRole('button', { name: /^\d+ more$/ })

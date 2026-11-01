@@ -15,7 +15,7 @@ import type { BoxEdit } from '@/components/resources/BoxEditSheet'
 // ── Edit, on a finding: the listing's own box, filled in with it ────────────
 // Each job page's Edit opens the box the finding changes, filled in with
 // what was read, and saves straight to the listing. Built here once, so a
-// place opened on its kind's page (OpenedPlace.tsx) opens the same box its
+// place opened on its own screen (OpenedPlace.tsx) opens the same box its
 // job page does, right there (Oct 25).
 
 /** The box to open, and where Save sends what the admin left in it. */

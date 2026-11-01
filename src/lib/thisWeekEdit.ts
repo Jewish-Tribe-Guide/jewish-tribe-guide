@@ -1,25 +1,27 @@
-import { DAY_KEYS, type DayKey } from './hours'
 import type { Minyan } from './davening'
-import type { Season } from './season'
-import { outOfSeason } from './seasonPairs'
 import { dateText, weekPostRows, withWeekRows, type SpecialSchedule } from './schedules'
-import type { AnchorTimes } from './useZmanAnchors'
 
 // ── This week's schedule, added in Edit listing (agreed Oct 23) ─────────────
 // Drawing SwWk3BLEYTtVu2k3w2UJ5s v3. Any shul's Edit listing has a "This
-// week's schedule" row: the week's times, starting from the shul's usual
-// ones, and under its Done a "No minyan this week" (the user: "You should
-// also be able to add that there's no minyan this week as this week's
-// schedule"). On the listing itself only a shul that sends one out each
-// week has an Add button (sendsWeekly); No minyan isn't offered there, as
-// it would weigh too much beside it (the user, Oct 23).
+// week's schedule" row: the times the guide has dated in that week, and under
+// its Done a "No minyan this week" (the user: "You should also be able to add
+// that there's no minyan this week as this week's schedule"). On the listing
+// itself only a shul that sends one out each week has an Add button
+// (sendsWeekly); No minyan isn't offered there, as it would weigh too much
+// beside it (the user, Oct 23).
+//
+// A week holds only its own dated times (the user, Oct 31: "we keep pulling
+// in minyan times from usual to this week and vice versa"). It no longer
+// starts from the usual times, as the drawing had it: those stay in their own
+// rows, and a week with nothing posted opens empty.
 //
 // The week is the box's week: Sunday to Shabbos, the next one once Shabbos
 // is over (thisWeeksDays). It's one week post (SpecialSchedule, kind
 // 'week'), the one the guide already has for the week if there is one,
-// else a new one, made only once its times differ from where they started:
-// opening the row and pressing Done changes nothing. It replaces the usual
-// times on each day it has times; No minyan is a whole week with none.
+// else a new one, made once it has a time: opening the row and pressing
+// Done changes nothing. It replaces the usual times on each day it has
+// times; No minyan is a whole week with none. An admin also gets the week
+// after, as a newsletter sent before Shabbos is about next week.
 
 export type EditWeek = { from: string; to: string }
 
@@ -33,6 +35,9 @@ export function editWeek(today: string, shabbosOver: boolean): EditWeek {
   return { from: sunday, to: shift(sunday, 6) }
 }
 
+/** The week after. */
+export const weekAfter = (w: EditWeek): EditWeek => ({ from: shift(w.from, 7), to: shift(w.to, 7) })
+
 /** "Oct 25 – Oct 31". */
 export const weekDates = (w: EditWeek) => `${dateText(w.from)} – ${dateText(w.to)}`
 
@@ -41,55 +46,45 @@ export const weekDates = (w: EditWeek) => `${dateText(w.from)} – ${dateText(w.
 export const weekTitle = (w: EditWeek) => `Times for ${weekDates(w)}`
 
 /** The week post the row edits: one covering the week, a person's or the
- *  newsletter's before the website's, as the box shows them. */
+ *  newsletter's before the website's, then the latest-starting, as the box
+ *  shows them (firstCovering). */
 export function weekPostFor(schedules: readonly SpecialSchedule[], w: EditWeek): SpecialSchedule | null {
   const covering = schedules.filter((s) => s.kind === 'week' && s.from <= w.to && s.to >= w.from)
-  return covering.sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || a.from.localeCompare(b.from))[0] ?? null
+  return covering.sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || b.from.localeCompare(a.from))[0] ?? null
 }
 
 /** Whether a week post says there's no minyan that week. */
 export const isNoMinyan = (post: SpecialSchedule | null) => !!post?.whole && post.minyanim.length === 0
 
-/** The usual times a new week starts from: this season's (its summer/winter
- *  pair deciding, seasonPairs.ts), on the days of the week. A row's Rosh
- *  Chodesh or holiday days aren't dates in the week, so they're left off.
- *  Its note is kept: this is only where the week starts (the user, Oct 23). */
-export function usualWeekRows(regular: readonly Minyan[], season: Season | null, anchors?: AnchorTimes): Minyan[] {
-  return regular.flatMap((m) => {
-    if (outOfSeason(m, regular, season, anchors)) return []
-    const days = m.days.filter((d): d is DayKey => (DAY_KEYS as readonly string[]).includes(d))
-    if (days.length === 0) return []
-    const { season: _season, ...rest } = m
-    void _season
-    return [{ ...rest, days }]
-  })
+/** The rows the row's list shows: the post's times dated in the week. */
+export function weekRowsFor(post: SpecialSchedule | null, w: EditWeek): Minyan[] {
+  return post ? weekPostRows(post, w) : []
 }
 
-/** The rows the row's list shows: the week's own, else the usual ones. */
-export function weekRowsFor(post: SpecialSchedule | null, usual: readonly Minyan[]): Minyan[] {
-  return post ? weekPostRows(post) : [...usual]
+/** Whether two sets of schedules say something different about the week. */
+export function weekDiffers(a: readonly SpecialSchedule[], b: readonly SpecialSchedule[], w: EditWeek): boolean {
+  const [was, now] = [weekPostFor(a, w), weekPostFor(b, w)]
+  return isNoMinyan(was) !== isNoMinyan(now) || !sameRows(weekRowsFor(was, w), weekRowsFor(now, w))
 }
 
 /**
  * The schedules with the week's times set to `rows`. The week the guide
- * has is changed; with none, a new one is added, unless `rows` are just
- * where it started (`usual`). A new one put back to the usual times goes
- * again, so nothing is sent.
+ * has is changed; with none, a new one is added once it has a time. A new
+ * one emptied goes again, so nothing is sent.
  */
 export function withWeekTimes(
   schedules: readonly SpecialSchedule[],
   stored: readonly SpecialSchedule[],
   w: EditWeek,
   rows: readonly Minyan[],
-  { usual, id, now }: { usual: readonly Minyan[]; id: string; now: string },
+  { id, now }: { id: string; now: string },
 ): SpecialSchedule[] {
   const post = weekPostFor(schedules, w)
   const isNew = !!post && !stored.some((s) => s.id === post.id)
-  const asUsual = sameRows(rows, usual)
-  if (isNew && asUsual && !post.whole) return schedules.filter((s) => s.id !== post.id)
-  if (post) return withWeekRows(schedules, post.id, rows)
-  if (asUsual) return [...schedules]
-  return withWeekRows([...schedules, newWeek(w, id, now)], id, rows)
+  if (isNew && rows.length === 0 && !post.whole) return schedules.filter((s) => s.id !== post.id)
+  if (post) return withWeekRows(schedules, post.id, rows, w)
+  if (rows.length === 0) return [...schedules]
+  return withWeekRows([...schedules, newWeek(w, id, now)], id, rows, w)
 }
 
 /** The schedules with the week set to no minyan: the week the guide has,
@@ -97,6 +92,8 @@ export function withWeekTimes(
 export function withNoMinyan(schedules: readonly SpecialSchedule[], w: EditWeek, { id, now }: { id: string; now: string }): SpecialSchedule[] {
   const post = weekPostFor(schedules, w)
   if (!post) return [...schedules, { ...newWeek(w, id, now), whole: true }]
+  // One running past the week keeps its other dates; this week goes on its own.
+  if (post.from < w.from || post.to > w.to) return [...withWeekRows(schedules, post.id, [], w), { ...newWeek(w, id, now), whole: true }]
   return schedules.map((s) => (s.id === post.id ? { ...s, minyanim: [], whole: true as const } : s))
 }
 

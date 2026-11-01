@@ -147,7 +147,7 @@ export function BoxEditor({
   // Edit), a list each, one opened at a time, one Save for both.
   const sk = minyanimField ? schedulesKey(minyanimField.key) : ''
   const [weekPosts] = useState(() => (edit.weeks?.length && minyanimField ? readSchedules(base(sk)).filter((s) => edit.weeks!.includes(s.id)) : []))
-  const [weekOriginals] = useState(() => weekPosts.map(weekPostRows))
+  const [weekOriginals] = useState(() => weekPosts.map((w) => weekPostRows(w)))
   const [boxRows] = useState(() => (edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : []))
   // The schedules as edited so far, every week's changes in them.
   const schedulesNow = () => readSchedules(sk in details ? details[sk] : base(sk))

@@ -15,9 +15,9 @@ export async function runEruvLines(now = new Date()): Promise<LineRun[]> {
   for (const source of sources) {
     try {
       const read = await readEruvMap(source, now)
-      if (read.save) await saveLineRead(source.communityId, source.id, read.save)
+      await saveLineRead(source.communityId, source.id, read.save)
       if (!read.missing) {
-        runs.push({ id: source.id, result: 'failed', error: read.save && !read.save.ok ? read.save.error : undefined })
+        runs.push({ id: source.id, result: 'failed', error: read.save.ok ? undefined : read.save.error })
         continue
       }
       const fresh = newlyMissing(read.missing, source.lineMissing)

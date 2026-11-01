@@ -159,7 +159,7 @@ export default function CommunityManager({ token }: { token: string }) {
   // Which community cards are expanded — each one collapsed by default,
   // independently toggleable (not one-at-a-time). Everything but identity
   // (name/badges/slug/region/admin count) lives behind this: Publish/
-  // Unpublish, Delete, the preview link, and the way to its Team tab.
+  // Unpublish, the preview link, and the way to its Team tab.
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
 
   function toggleExpanded(slug: string) {
@@ -667,12 +667,23 @@ export default function CommunityManager({ token }: { token: string }) {
                   <button>, and the Link above needs to stay a real, separate
                   link (a button can't nest an <a>; axe's nested-interactive
                   rule would flag exactly that). Everything but identity
-                  (name/badges/slug/region/admin count above) lives behind
-                  this single toggle: Publish/Unpublish, Delete, the preview
+                  (name/badges/slug/region/admin count above) and Delete lives
+                  behind this single toggle: Publish/Unpublish, the preview
                   link, and the whole Admins roster — that used to be two
                   separate disclosures (this card's own always-visible
                   actions, plus Admins' own nested Show/Hide), which meant an
                   admin had to open a second box just to see who has access. */}
+              {/* The default community can't be deleted at all (see
+                  deleteCommunity's own doc) — no button rather than one that
+                  always fails. */}
+              {!c.isDefault && (
+                <button
+                  onClick={() => startDeleting(c.slug)}
+                  className="text-xs font-medium text-red-600 hover:underline cursor-pointer shrink-0"
+                >
+                  Delete
+                </button>
+              )}
               <button
                 onClick={() => toggleExpanded(c.slug)}
                 aria-expanded={expandedSlugs.has(c.slug)}
@@ -700,17 +711,6 @@ export default function CommunityManager({ token }: { token: string }) {
                   >
                     {togglingSlug === c.slug ? 'Saving…' : c.visible ? 'Unpublish' : 'Publish'}
                   </button>
-                  {/* The default community can't be deleted at all (see
-                      deleteCommunity's own doc) — no button rather than one
-                      that always fails. */}
-                  {!c.isDefault && (
-                    <button
-                      onClick={() => startDeleting(c.slug)}
-                      className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  )}
                 </div>
 
                 {!c.visible && c.previewToken && (
@@ -738,8 +738,10 @@ export default function CommunityManager({ token }: { token: string }) {
                   </Link>
                 </div>
 
+              </div>
+            )}
                 {deletingSlug === c.slug && (
-                  <div className="border-t border-slate-100 pt-3">
+                  <div className="mt-3 border-t border-slate-200 pt-3">
                     <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
                       <p className="text-sm text-red-800">
                         This permanently deletes <span className="font-semibold">{c.name}</span> and everything in
@@ -774,8 +776,6 @@ export default function CommunityManager({ token }: { token: string }) {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
           </div>
         ))}
       </div>

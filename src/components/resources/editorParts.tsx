@@ -27,6 +27,7 @@ export function EditorRowCard({
   changed = false,
   tags,
   leading,
+  aside,
   onOpen,
   testId,
   opens,
@@ -38,6 +39,8 @@ export function EditorRowCard({
   tags?: ReactNode
   /** The listing's picture, on its name row. */
   leading?: ReactNode
+  /** On the right, for an admin: what checks the row. */
+  aside?: ReactNode
   onOpen: () => void
   testId: string
   /** Where it opens, for tests; nothing on screen says (the user, Oct 11). */
@@ -57,6 +60,7 @@ export function EditorRowCard({
         {summary && <span className="mt-0.5 line-clamp-2 block text-[14px] leading-snug text-muted">{summary}</span>}
       </span>
       {tags}
+      {aside}
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
     </button>
   )

@@ -17,7 +17,21 @@ export type AdminPlace = {
   listing: DirectoryResource
 }
 
-/** The pills: on the site, on the site with no address, archived. */
+/** An eruv as Places lists it (board PlacesEruv4), under its category. It has
+ *  no address of its own, and none is asked of it. */
+export function eruvPlace(e: { id: string; name: string; active: boolean; updatedAt?: string | null }, category: string): AdminPlace {
+  return {
+    id: e.id,
+    name: e.name,
+    category,
+    status: e.active ? 'approved' : 'archived',
+    hasAddress: true,
+    changedAt: e.updatedAt ?? new Date(0).toISOString(),
+    listing: { id: e.id, category, name: e.name, anchorId: 'all', distance: 0, address: '' },
+  }
+}
+
+/** The Show menu: on the site, on the site with no address, archived. */
 export type PlaceShow = 'site' | 'no-address' | 'archived'
 
 export const PLACE_SHOWS: { show: PlaceShow; label: string }[] = [

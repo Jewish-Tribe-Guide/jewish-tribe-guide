@@ -5,9 +5,10 @@ import type { EruvMapSource } from './eruvStore'
 // The guide shows each eruv's own map, read from its file and shown as the
 // eruv draws it, without what an admin chose to leave out (the user: "copy
 // the lines that we care about and that way we can always stay updated").
-// /api/eruv/maps reads them, and the CDN keeps that for an hour, so a
-// change to an eruv's map shows within the hour with nobody checking it.
-// The last good read is kept, and shown while their site can't be reached.
+// The nightly job reads them (eruvLineRun.ts), and an admin's save or Read
+// it now; /api/eruv/maps only serves the saved copy (the user, Nov 1), so a
+// visitor never sets off a read and every read has a true date. The last
+// good read is kept, and shown while their site can't be reached.
 //
 // The one thing an admin hears about (the daily check, eruvLineRun.ts): a
 // part they left out that the file no longer has. The eruv renamed or
@@ -29,30 +30,31 @@ export type MapRead = {
   /** What the guide shows: the eruv's map without what was left out; null
    *  when it has never been read. */
   map: EruvLineFile | null
-  /** What to save: a new copy (file), or why the read failed. Nothing when
-   *  the map is as it was. */
-  save?: { ok: true; file: EruvLineFile | null; at: string } | { ok: false; error: string; at: string }
+  /** What to save, on every read, for its date: a new copy (file) if it
+   *  changed, or why the read failed. */
+  save: { ok: true; file: EruvLineFile | null; at: string } | { ok: false; error: string; at: string }
   /** Left-out names the file no longer has (only from a good read). */
   missing: string[] | null
+}
+
+/** What the guide shows of a saved map. The colour an admin chose is only
+ *  shown: what's kept is their file. */
+export function savedMap(source: Pick<EruvMapSource, 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>, file: EruvLineFile | null): EruvLineFile | null {
+  return file ? shownMap(withLineColor(file, source.lineColor), source.lineLeaveOut, source.lineHidePoints) : null
 }
 
 /** One eruv's map, read now: shown from the read, or from the last good
  *  one when the read fails. */
 export async function readEruvMap(
-  source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'> & { lineError?: string | null },
+  source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>,
   now: Date,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MapRead> {
   const at = now.toISOString()
   const read = await readLineFile(source.lineUrl, fetchImpl)
-  // The colour an admin chose is only shown: what's kept is their file.
-  const show = (file: EruvLineFile | null) => (file ? shownMap(withLineColor(file, source.lineColor), source.lineLeaveOut, source.lineHidePoints) : null)
-  if (!read.ok) return { map: show(source.rawLine), save: { ok: false, error: read.error, at }, missing: null }
+  if (!read.ok) return { map: savedMap(source, source.rawLine), save: { ok: false, error: read.error, at }, missing: null }
   const changed = !sameLine(read.file, source.rawLine)
-  // Unchanged, it's saved only to clear why the last read failed (Oct 22:
-  // a timeout from a week before was still said after every good read).
-  const save = changed ? { ok: true as const, file: read.file, at } : source.lineError ? { ok: true as const, file: null, at } : undefined
-  return { map: show(read.file), save, missing: missingNames(read.file, source.lineLeaveOut) }
+  return { map: savedMap(source, read.file), save: { ok: true, file: changed ? read.file : null, at }, missing: missingNames(read.file, source.lineLeaveOut) }
 }
 
 /** Whether the admins should hear of these missing names: some they

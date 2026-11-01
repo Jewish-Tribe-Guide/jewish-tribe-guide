@@ -90,7 +90,7 @@ describe('runRefuahWatch', () => {
     expect(payload.details.r).toBe(URL_)
     expect(payload.source).toMatchObject({ readBy: 'automatic', from: 'Refuah', named: 'Refuah' })
     expect(note).toContain('phone +1 215-805-8668 → +1 215-805-9000')
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Refuah', [expect.objectContaining({ name: 'Hospital of the University of Pennsylvania' })], { path: `/philly/admin/watches/kind/hospital?place=${HOSPITAL}`, name: 'Hospitals' })
+    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Refuah', [expect.objectContaining({ name: 'Hospital of the University of Pennsylvania' })], { path: `/philly/admin/watches/place/${HOSPITAL}?from=todo`, name: 'Hospitals' })
   })
 
   it('doesn’t file the same suggestion twice, whatever became of the first', async () => {

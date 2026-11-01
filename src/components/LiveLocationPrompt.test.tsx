@@ -23,6 +23,13 @@ describe('LiveLocationPrompt', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('never shows in the admin’s preview, where it would cover the page', () => {
+    window.history.pushState({}, '', '/philly?preview=1')
+    render(<LiveLocationPrompt enabled={true} onShare={vi.fn()} />)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    window.history.pushState({}, '', '/')
+  })
+
   it('shows the prompt on first visit when enabled', () => {
     render(<LiveLocationPrompt enabled={true} onShare={vi.fn()} />)
     expect(screen.getByRole('dialog', { name: /share your live location/i })).toBeInTheDocument()

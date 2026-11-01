@@ -62,7 +62,7 @@ export async function listSubmissionsByStatus(
   const categories = await listCategories(community)
   // What a watch found is here too, beside what people send in: To do
   // groups by what's decided, not by who sent it (the admin redesign's
-  // brief). It also waits on its kind's page on Watches, with Compare.
+  // brief). It also waits on its place's own screen, with Compare.
   const submissions = all
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
@@ -701,7 +701,11 @@ async function computeGoogleFields(
   for (const field of toDecide) {
     const current = currentOf(field)
     if (isEmptyValue(current)) {
-      result.add(field) // nothing there to protect — always fillable.
+      // A new listing's blank has nothing to protect, so Google may fill it.
+      // An edit that clears one is someone saying it's wrong: it stays blank
+      // rather than coming back next morning (GoogleBlank7, the user, Nov 1).
+      if (existing) result.delete(field)
+      else result.add(field)
       continue
     }
     const autofilledValue = autofill[field]

@@ -27,7 +27,7 @@ export type EruvJobTab = 'to_check' | 'cant_read' | 'checked'
 export type EruvPill = { text: string; tone: EruvTone }
 
 /** The website's watch for this eruv, by its address. */
-export function websiteWatchOf(e: Pick<AdminEruv, 'website'>, watches: readonly Watch[]): Watch | null {
+export function websiteWatchOf<W extends { url: string } = Watch>(e: Pick<AdminEruv, 'website'>, watches: readonly W[]): W | null {
   const bare = (u: string) => u.toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/#.*$/, '').replace(/\/+$/, '')
   return e.website ? watches.find((w) => bare(w.url) === bare(e.website!)) ?? null : null
 }

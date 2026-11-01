@@ -2,9 +2,8 @@ import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drives the AI's readings on To do for real (the admin redesign's step 2:
-// the Read questions tab is gone, its readings are rows under "Searches
-// nobody found"). A reading that proposes a word is a row of its own;
+// Drives the AI's readings on the Searches page for real: its readings are
+// rows under "Asked more than once". A reading that proposes a word is a row of its own;
 // Dismiss deletes the reading so the question is read afresh. The reading
 // is inserted straight into question_reading: no test server ever calls
 // the reader (QUESTION_READER=off). Needs migration 062 (question_reading)
@@ -61,12 +60,10 @@ async function seedReading() {
   return { c, f, option }
 }
 
-/** The reading's row on To do, opened. */
+/** The reading's row, opened. */
 async function openRow(page: import('@playwright/test').Page) {
-  await page.goto('/philly/admin')
-  // At the bottom of To do, folded: there when there's time.
-  await page.getByRole('button', { name: /^Searches nobody found/ }).click({ timeout: 20_000 })
-  const searches = page.getByRole('region', { name: 'Searches nobody found' })
+  await page.goto('/philly/admin/searches')
+  const searches = page.getByRole('region', { name: 'Asked more than once' })
   await expect(searches).toBeVisible({ timeout: 20_000 })
   // Five show; the test project may hold more searches than that.
   const more = searches.getByRole('button', { name: /^\d+ more$/ })
@@ -78,7 +75,7 @@ async function openRow(page: import('@playwright/test').Page) {
   return row
 }
 
-test('a reading with a word to teach is a To do row, and Dismiss forgets it for real', async ({ page }) => {
+test('a reading with a word to teach is a row, and Dismiss forgets it for real', async ({ page }) => {
   const supabase = getAdminClient()
   await seedReading()
   const stored = async () => (await supabase.from('question_reading').select('key').eq('community_id', 'philly').eq('key', word)).data

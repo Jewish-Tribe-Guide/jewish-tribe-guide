@@ -10,7 +10,7 @@ import { sameFieldValue } from '@/lib/listingDiff'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { mergeMinyanimBox, minyanimForBox } from '@/lib/minyanimBox'
 import { readSchedules, schedulesKey, weekPostDays } from '@/lib/schedules'
-import { isNoMinyan, usualWeekRows, weekDates, weekPostFor, weekRowsFor, withNoMinyan, withWeekTimes } from '@/lib/thisWeekEdit'
+import { isNoMinyan, weekDates, weekPostFor, weekRowsFor, withNoMinyan, withWeekTimes } from '@/lib/thisWeekEdit'
 import { useEditWeek } from '@/lib/useEditWeek'
 import { minyanWriting, timeText } from '@/lib/minyanText'
 import { routes } from '@/lib/routes'
@@ -113,7 +113,16 @@ type Props = {
   preset?: Record<string, unknown>
   /** An admin saving straight to the listing (the Dishes page's Edit): no
    *  challenge, this button, sent this way, and `onSaved` once it's in. */
-  adminSave?: { label: string; via: SendVia; onSaved: () => void }
+  adminSave?: { label: string; via: SendVia; onSaved: () => void; beside?: ReactNode }
+  /** On the right of a row, for an admin: the job that keeps it. */
+  rowAside?: (row: EditorRow) => ReactNode
+  /** In a row, opened, above Done: where it's read from. `changed`: the
+   *  draft has changed it. */
+  rowSource?: (row: EditorRow, changed: boolean) => ReactNode
+  /** The contact box a row each (editorRows). */
+  splitContact?: boolean
+  /** Values to put in as if typed, each new object once: Use Google's. */
+  patch?: Record<string, unknown>
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -208,6 +217,8 @@ const asButtons = (f: CategoryField) => f.type === 'select' && !f.allowOther && 
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 
+const noMinyanText = (r: EditorRow) => `No minyan ${r.id === 'minyans:next_week' ? 'next' : 'this'} week`
+
 export default function ListingEditor({
   item: itemProp,
   category,
@@ -228,6 +239,10 @@ export default function ListingEditor({
   onHasChanges,
   preset,
   adminSave,
+  rowAside,
+  rowSource,
+  splitContact,
+  patch,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -239,15 +254,23 @@ export default function ListingEditor({
   const { hasAddress, hasPhone, details, setDetail } = draft
   // A preset goes in once, as if typed (as BoxEditor's).
   const [presetDone, setPresetDone] = useState(false)
-  if (!presetDone && preset) {
-    setPresetDone(true)
+  const [patched, setPatched] = useState<Record<string, unknown> | undefined>(undefined)
+  const typeIn = (values: Record<string, unknown>) => {
     // The phone is the listing's own, not a detail (a website's, Oct 22).
-    for (const [k, v] of Object.entries(preset)) {
+    for (const [k, v] of Object.entries(values)) {
       if (k === 'phone') draft.setPhone(formatPhone(typeof v === 'string' ? v : ''))
       // A new place a list has, added from Kosher certification (Oct 22).
       else if (k === 'name' || k === 'address') (k === 'name' ? draft.setName : draft.setAddress)(typeof v === 'string' ? v : '')
       else setDetail(k, v)
     }
+  }
+  if (!presetDone && preset) {
+    setPresetDone(true)
+    typeIn(preset)
+  }
+  if (patch && patch !== patched) {
+    setPatched(patch)
+    typeIn(patch)
   }
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({
     mode: creating ? 'create' : 'edit',
@@ -297,10 +320,10 @@ export default function ListingEditor({
   })
 
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
-  // A shul's "This week's schedule" row, on a listing's own edit, not one
-  // box's or an admin's (thisWeekEdit.ts).
-  const thisWeek = useEditWeek(!creating && !onlyRows && !adminSave && category.detailFields.some((f) => f.type === 'minyanim'), item.geo)
-  const rows = editorRows(category, details, { week: thisWeek?.week })
+  // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
+  // next week's too. One box's own Edit has them only if it's that box.
+  const thisWeek = useEditWeek(!creating && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
+  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -454,6 +477,7 @@ export default function ListingEditor({
   const openInPlace = (r: EditorRow) => (
     <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow}>
       {rowBody(r)}
+      {rowSource?.(r, changed.has(r.id))}
     </EditorOpenCard>
   )
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
@@ -491,6 +515,7 @@ export default function ListingEditor({
                 title={rowTitle(r)}
                 summary={summary}
                 tags={tags(r)}
+                aside={rowAside?.(r)}
               />
             </li>
           )
@@ -511,9 +536,18 @@ export default function ListingEditor({
       )}
       {errors}
       {foot(
-        <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
-          {sendLabel}
-        </button>,
+        adminSave?.beside ? (
+          <div className="flex items-center gap-2.5">
+            <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+              {sendLabel}
+            </button>
+            {adminSave.beside}
+          </div>
+        ) : (
+          <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
+            {sendLabel}
+          </button>
+        ),
       )}
     </div>
   )
@@ -560,7 +594,7 @@ export default function ListingEditor({
     if (r.kind === 'contact') {
       return (
         <>
-          {hasAddress && (
+          {hasAddress && r.part !== 'phone' && (
             <div>
               <label htmlFor="edit-address" className={fieldLabel}>
                 Address
@@ -576,7 +610,7 @@ export default function ListingEditor({
               />
             </div>
           )}
-          {hasPhone && (
+          {hasPhone && r.part !== 'address' && (
             <div>
               <label htmlFor="edit-phone" className={fieldLabel}>
                 Phone
@@ -619,26 +653,25 @@ export default function ListingEditor({
       )
     }
     if (r.kind === 'minyans' && r.week && thisWeek) {
-      // The week the guide has, else the usual times to start from; a new
-      // week only once they differ (withWeekTimes).
+      // The times the guide has dated in the week, never the usual ones; a
+      // new week only once it has one (withWeekTimes).
       const f = r.fields[0]
       const sk = schedulesKey(f.key)
       const week = r.week
-      const usual = usualWeekRows(draftMinyanim(f.key), thisWeek.season, thisWeek.anchors)
       const post = weekPostFor(readSchedules(details[sk]), week)
       return (
         <MinyanBoxEditor
-          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), usual)}
-          initial={weekRowsFor(post, usual)}
+          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), week)}
+          initial={weekRowsFor(post, week)}
           box="this_week"
           boxTitle={r.title}
           heading={weekDates(week)}
-          empty={isNoMinyan(post) ? 'No minyan this week' : undefined}
+          empty={isNoMinyan(post) ? noMinyanText(r) : undefined}
           place={item.name || draft.name}
           writing={minyanWriting}
           dayChoices={weekPostDays(week)}
           onStep={stepFor[f.key]}
-          onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { usual, id: crypto.randomUUID(), now: new Date().toISOString() }))}
+          onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { id: crypto.randomUUID(), now: new Date().toISOString() }))}
           send={() => null}
         />
       )
@@ -699,6 +732,7 @@ export default function ListingEditor({
       {!child &&
         foot(
           <div className="space-y-1">
+            {rowSource && <div className="pb-2">{rowSource(row, changed.has(row.id))}</div>}
             <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
               Done
             </button>
@@ -723,7 +757,7 @@ export default function ListingEditor({
         }}
         className="min-h-11 w-full cursor-pointer text-center text-[15px] font-bold text-primary hover:underline"
       >
-        No minyan this week
+        {noMinyanText(r)}
       </button>
     )
   }

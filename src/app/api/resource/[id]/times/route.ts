@@ -1,3 +1,4 @@
+import { community } from '@/community.config'
 import { after } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
@@ -70,7 +71,10 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     }
 
     const key = schedulesKey(field.key)
-    const applied = applyUpdate(regularMinyanim(listing[field.key]), readSchedules(listing[key]), update, { evenIfSame: true })
+    const applied = applyUpdate(regularMinyanim(listing[field.key]), readSchedules(listing[key]), update, {
+      evenIfSame: true,
+      keepBefore: new Intl.DateTimeFormat('en-CA', { timeZone: community.timezone }).format(new Date()),
+    })
     const note = [
       update.kind === 'week' ? 'Times for particular days, sent from the shul’s card.' : `${update.season ? `Their ${update.season} schedule` : 'Their schedule'}, sent from the shul’s card.`,
       applied.changes.join('\n'),

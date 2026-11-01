@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { DraftHomeSection } from '@/lib/homeSections'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
+import { lightSpot } from '@/lib/previewSpot'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { IframeViewport } from './DevicePreviewFrame'
 
@@ -25,12 +26,17 @@ const SHOWN_WIDTH = { computer: 340, phone: 240 }
 
 export const PREVIEW_PAUSE_MS = 700
 
+/** The page draws after it loads: how long to look for a part of it. */
+const SPOT_LOOK_MS = 200
+const SPOT_LOOKS = 15
+
 export function PreviewBeside({
   src,
   reload = 0,
   children,
   initialDevice = 'computer',
   onOpen,
+  spot = null,
 }: {
   /** A page of the site to show. */
   src?: string
@@ -41,7 +47,27 @@ export function PreviewBeside({
   initialDevice?: PreviewDevice
   /** Given, the shrunk page is a button that opens it full size. */
   onOpen?: () => void
+  /** The part of the page to light up (see previewSpot.ts). */
+  spot?: string | null
 }) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const [loads, setLoads] = useState(0)
+  // Which spot this page turned out not to have.
+  const [missing, setMissing] = useState<string | null>(null)
+  useEffect(() => {
+    const doc = frame.current?.contentDocument
+    if (!doc) return
+    // Goes on looking after finding it: on a phone the computer's parts can
+    // show for a moment while the page draws, then go.
+    let looks = 0
+    const t = setInterval(() => {
+      const found = lightSpot(doc, spot)
+      if (++looks < SPOT_LOOKS) return
+      clearInterval(t)
+      setMissing(found ? null : spot)
+    }, SPOT_LOOK_MS)
+    return () => clearInterval(t)
+  }, [spot, loads])
   const [device, setDevice] = useState<PreviewDevice>(initialDevice)
   const { width, height } = DEVICES[device]
   const scale = SHOWN_WIDTH[device] / width
@@ -75,7 +101,7 @@ export function PreviewBeside({
           inert
         >
           {src ? (
-            <iframe key={`${device}:${reload}`} src={src} title="Preview" tabIndex={-1} loading="lazy" className="block border-0" style={{ width, height }} />
+            <iframe ref={frame} key={`${device}:${reload}:${src}`} src={src} title="Preview" tabIndex={-1} loading="lazy" onLoad={() => setLoads((n) => n + 1)} className="block border-0" style={{ width, height }} />
           ) : children ? (
             <IframeViewport key={device} width={width} height={height}>
               <ForcedViewport isMobile={device === 'phone'}>{children(device)}</ForcedViewport>
@@ -83,6 +109,7 @@ export function PreviewBeside({
           ) : null}
         </div>
       </Frame>
+      {spot && missing === spot && <p className="m-0 text-[13px] text-slate-600" style={{ width: SHOWN_WIDTH[device] }}>Not on the {DEVICES[device].label.toLowerCase()} version.</p>}
     </div>
   )
 }
@@ -93,11 +120,16 @@ export default function SitePreview({
   settings,
   sections,
   initialDevice = 'computer',
+  spot = null,
+  page = '',
 }: {
   community: string
   settings: SiteSettings
   sections: DraftHomeSection[]
   initialDevice?: PreviewDevice
+  spot?: string | null
+  /** A page other than the home page, for what shows only there. */
+  page?: string
 }) {
   // Which draft the frame shows; 0 until the first one is written, so the
   // frame never loads ahead of it and shows the saved site instead. A pause
@@ -112,5 +144,5 @@ export default function SitePreview({
     return () => clearTimeout(t)
   }, [settings, sections])
 
-  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} initialDevice={initialDevice} />
+  return <PreviewBeside src={version > 0 ? previewUrl(community, page) : undefined} reload={version} initialDevice={initialDevice} spot={spot} />
 }

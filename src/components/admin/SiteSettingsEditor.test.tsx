@@ -80,7 +80,7 @@ describe('SiteSettingsEditor — Home page', () => {
   it('sorts its settings by what they change on the home page', async () => {
     await renderEditor('home')
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(boxes).toEqual(['Top of the page', 'Below it, in this order', 'Category groups', 'Today home', 'In link previews and search results'])
+    expect(boxes).toEqual(['Top of the page', 'Cards under the search, on a computer', 'Groups on the Browse page', 'Today home', 'When the link is shared'])
     // The header's settings are on their own tab.
     expect(screen.queryByText('Tabs, on a phone')).toBeNull()
   })
@@ -234,7 +234,7 @@ describe('SiteSettingsEditor — Header and menus', () => {
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
     expect(boxes).toEqual(['Top of the page, on a computer', 'Tabs, on a phone'])
     expect(screen.queryByLabelText('Name')).toBeNull()
-    expect(screen.queryByText('Below it, in this order')).toBeNull()
+    expect(screen.queryByText('Cards under the search, on a computer')).toBeNull()
   })
 
   // Forms and Settings save the feedback form and the name on their own.

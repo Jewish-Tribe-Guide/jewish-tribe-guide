@@ -16,7 +16,6 @@ describe('SiteScreens', () => {
     expect(rows.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
       ['Home page', '/philly/admin/home'],
       ['Category pages', '/philly/admin/categories'],
-      ['Forms', '/philly/admin/forms'],
       ['Header and menus', '/philly/admin/menus'],
       ['Campaigns', '/philly/admin/campaigns'],
       ['View the site', '/philly'],

@@ -1,6 +1,6 @@
 import { DAY_KEYS, type DayKey } from './hours'
 import { formatAnchorRule, parseTimeToMinutes, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah, type ZmanAnchor } from './davening'
-import { dateText, signUpGroup, weekKeepsHeading, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
+import { dateText, saturdayOf, signUpGroup, weekKeepsHeading, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Season } from './season'
 
 // ── Updating a shul's times from what it sent (agreed Oct 1) ────────────────
@@ -75,6 +75,8 @@ export type RegularReading = {
   from: string | null
   to: string | null
   times: ReadRegularTime[]
+  /** It writes calendar dates for its times, rather than only weekdays. */
+  namesDates?: true
 }
 
 export type RowStatus = 'same' | 'changed' | 'new' | 'gone' | 'kept'
@@ -441,14 +443,20 @@ export function mergeSchedule(
   existing: readonly SpecialSchedule[],
   incoming: SpecialSchedule,
   expand: (day: ScheduleDay, s: SpecialSchedule) => string[] = (d) => [d],
+  keepBefore?: string,
 ): SpecialSchedule[] {
-  const i = existing.findIndex((s) => s.name.toLowerCase() === incoming.name.toLowerCase())
+  const i = existing.findIndex((s) => s.name.toLowerCase() === incoming.name.toLowerCase() && (incoming.kind !== 'week' || s.kind !== 'week' || sameGuideWeek(s, incoming)))
   if (i === -1) return [...existing, incoming]
   const old = existing[i]
+  const ahead = (d: string) => !keepBefore || d >= keepBefore
+  const incomingAhead = incoming.minyanim.flatMap((m) => {
+    const on = m.on.filter(ahead)
+    return on.length ? [{ ...m, on }] : []
+  })
   // A week stands for every date in it: a day it has nothing for has
   // nothing, not what an earlier read of the same week had.
-  const whole = incoming.kind === 'week' ? datesBetween(incoming.from, incoming.to) : []
-  const covered = new Set([...coveredBy(incoming), ...whole].flatMap((d) => [d, ...expand(d, incoming)]))
+  const whole = incoming.kind === 'week' ? datesBetween(incoming.from, incoming.to).filter(ahead) : []
+  const covered = new Set([...coveredBy({ ...incoming, minyanim: incomingAhead }), ...whole].flatMap((d) => [d, ...expand(d, incoming)]))
   const kept = old.minyanim.flatMap((m) => {
     const on = m.on.flatMap((d) => {
       if (covered.has(d)) return []
@@ -462,7 +470,7 @@ export function mergeSchedule(
     id: old.id,
     from: old.from < incoming.from ? old.from : incoming.from,
     to: old.to > incoming.to ? old.to : incoming.to,
-    minyanim: [...kept, ...incoming.minyanim],
+    minyanim: [...kept, ...incomingAhead],
   }
   return existing.map((s, j) => (j === i ? merged : s))
 }
@@ -473,16 +481,37 @@ const EVENING: readonly Tefillah[] = ['mincha', 'maariv', 'mincha_maariv', 'kabb
  *  Shabbat" is the listing's Mincha/Maariv, and "other" is anything. */
 const sameName = (a: Tefillah, b: Tefillah) => a === b || a === 'other' || b === 'other' || (EVENING.includes(a) && EVENING.includes(b))
 
+/** Whether two weeks start in the same one of the guide's weeks, Sunday to
+ *  Shabbos. Mekor heads every Shabbos "Shabbat Schedule", and its Oct 30
+ *  newsletter went into the week before's post (the user, Oct 31). */
+const sameGuideWeek = (a: Pick<SpecialSchedule, 'from'>, b: Pick<SpecialSchedule, 'from'>) => saturdayOf(a.from) === saturdayOf(b.from)
+
 /** The listing's copy of a week: the one of its name, or a week from the
- *  same place (the website, or a newsletter) over any of its days. Mikveh
- *  Israel's page gave "Shabbat Vayera" beside the calendar's "Times for
- *  Oct 25 – Oct 31", and the same two times came back as a new week (the
- *  user, Oct 28: "already has that exact Shabbos schedule"). */
+ *  same place (the website, or a newsletter) over any of its days, and
+ *  never another week's. Mikveh Israel's page gave "Shabbat Vayera" beside
+ *  the calendar's "Times for Oct 25 – Oct 31", and the same two times came
+ *  back as a new week (the user, Oct 28: "already has that exact Shabbos
+ *  schedule"). */
 export function ownWeek(existing: readonly SpecialSchedule[], w: Pick<SpecialSchedule, 'name' | 'from' | 'to' | 'postedBy'>): SpecialSchedule | undefined {
+  const inWeek = existing.filter((s) => s.kind !== 'week' || sameGuideWeek(s, w))
   return (
-    existing.find((s) => s.name.toLowerCase() === w.name.toLowerCase()) ??
-    existing.find((s) => s.kind === 'week' && s.postedBy === w.postedBy && s.from <= w.to && s.to >= w.from)
+    inWeek.find((s) => s.name.toLowerCase() === w.name.toLowerCase()) ??
+    inWeek.find((s) => s.kind === 'week' && s.postedBy === w.postedBy && s.from <= w.to && s.to >= w.from)
   )
+}
+
+/** A week's result as the guide's weeks it reaches, Sunday to Shabbos: one
+ *  message can give this Shabbos and the weekdays after it, and each is
+ *  that week's schedule (the user, Oct 31, on Mekor's "Weekday Services:
+ *  November 1 to November 6"). */
+export function guideWeeks<U extends Pick<TimesUpdate, 'from' | 'to' | 'rows'>>(update: U): U[] {
+  if (!update.from || !update.to) return [update]
+  const out: U[] = []
+  for (let from = update.from; from <= update.to; from = addDays(saturdayOf(from), 1)) {
+    const to = saturdayOf(from) < update.to ? saturdayOf(from) : update.to
+    out.push({ ...update, from, to, rows: update.rows.filter((r) => r.day >= from && r.day <= to) })
+  }
+  return out
 }
 
 /**
@@ -596,6 +625,7 @@ export function applyUpdate(
     evenIfSame = false,
     whole = false,
     onlyRead,
+    keepBefore,
   }: {
     newId?: () => string
     now?: number
@@ -613,11 +643,13 @@ export function applyUpdate(
      *  times at all, as no minyan that week. */
     whole?: boolean
     /** A week a shul's own page or newsletter gives, read with no one to
-     *  look it over first: it holds only the times read, never a usual one
-     *  it didn't mention, and goes into the listing's copy of that week,
-     *  days before `today` left alone (mergeReadWeek). A person's paste
-     *  sees every row it keeps, and is posted as they left it. */
+     *  look it over first: it goes into the listing's copy of that week,
+     *  days before `today` left alone (mergeReadWeek). */
     onlyRead?: { today: string }
+    /** A person's paste: the days before this are left as the listing has
+     *  them. Lower Merion's week, pasted on a Friday by weekday, lost
+     *  Thursday's Late Maariv (the user, Oct 31). */
+    keepBefore?: string
   } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
@@ -659,7 +691,10 @@ export function applyUpdate(
     const usual = r.rowId ? current.find((m) => m.id === r.rowId && m.tefillah === r.tefillah && m.days.includes(weekday)) : undefined
     const signUp = signUpOf(r, weekday, usual)
     const joinLink = usual?.joinLink?.trim()
-    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
+    // A date isn't a season: Mekor's Friday 4:35pm in November paired with
+    // its usual Friday time, and came out "Summer only".
+    const notes = r.notes?.replace(SEASON_NOTE, '').trim()
+    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(notes ? { notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
   }
 
   const weekly = (r: UpdateRow) => (DAY_KEYS as readonly string[]).includes(r.day)
@@ -703,25 +738,27 @@ export function applyUpdate(
   const minyanim = regroup(slots.map((s) => seasonFromNotes(s)), current, newId)
   let nextSchedules = [...schedules]
 
-  // …and the week itself, dated, in place of the regular times those days.
-  const posting = update.rows.some((r) => r.status !== 'gone' || r.keep)
-  const heading = update.from && update.to && weekKeepsHeading({ from: update.from, to: update.to }) ? update.title?.trim() : null
-  const name = (weekName || heading || (update.from ? `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to!)}` : ''}` : '')).slice(0, 60)
-  // A week the listing has already: what was read is compared with it,
-  // whether or not it matches the usual times.
-  const listed = onlyRead && update.from && update.to ? ownWeek(schedules, { name, from: update.from, to: update.to, postedBy }) : undefined
-  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting) || whole || listed)) {
-    // Read only: what the page or newsletter said, never a usual time it
-    // left out (status kept). A person's own week keeps what they kept.
-    const minyanimOn = update.rows.filter((r) => (onlyRead ? r.status === 'same' || r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && r.keep) : r.status !== 'gone' || r.keep)).map(onDate)
+  // …and the week itself, dated, in place of the regular times those days:
+  // each of the guide's weeks it reaches on its own.
+  for (const piece of update.kind === 'week' ? guideWeeks(update) : []) {
+    if (!piece.from || !piece.to) continue
+    // What was read, or a person kept: never a usual time it left out, which
+    // would then read as confirmed for that date (the user, Oct 28 and 31).
+    const minyanimOn = piece.rows.filter((r) => r.status === 'same' || r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && r.keep)).map(onDate)
+    const heading = weekKeepsHeading({ from: piece.from, to: piece.to }) ? piece.title?.trim() : null
+    const name = (weekName || heading || `Times for ${dateText(piece.from)}${piece.to !== piece.from ? ` – ${dateText(piece.to)}` : ''}`).slice(0, 60)
+    // A week the listing has already: what was read is compared with it,
+    // whether or not it matches the usual times.
+    const listed = onlyRead ? ownWeek(schedules, { name, from: piece.from, to: piece.to, postedBy }) : undefined
+    if (!changesAnything(piece) && !(evenIfSame && minyanimOn.length) && !whole && !listed) continue
     // A week from the newsletter or a person wins over one read off the
     // website for the same days (the user, Oct 20): the website's come off.
-    if (!postedBy) nextSchedules = withoutWebsiteDays(nextSchedules, new Set(datesBetween(update.from, update.to)))
+    if (!postedBy) nextSchedules = withoutWebsiteDays(nextSchedules, new Set(datesBetween(piece.from, piece.to)))
     const week: SpecialSchedule = {
       id: newId(),
       name,
-      from: update.from,
-      to: update.to,
+      from: piece.from,
+      to: piece.to,
       mode: 'replace',
       minyanim: minyanimOn,
       // A week the shul sent out, and when: “This week's schedule” (Oct 6).
@@ -735,14 +772,14 @@ export function applyUpdate(
       nextSchedules = mergeReadWeek(nextSchedules, week, onlyRead.today)
       changes.push(...readWeekLines(before, ownWeek(nextSchedules, week)))
     } else {
-      nextSchedules = mergeSchedule(nextSchedules, week)
+      nextSchedules = mergeSchedule(nextSchedules, week, undefined, keepBefore)
       if (whole && !minyanimOn.length) changes.push(`${name}: no minyan`)
-      for (const r of update.rows) {
+      for (const r of piece.rows) {
         if (r.status === 'changed') changes.push(`${name}: ${rowText(r)}, usually ${r.was}`)
         if (r.status === 'new') changes.push(`${name}: new, ${rowText(r)}`)
         if (r.status === 'gone' && !r.keep) changes.push(`${name}: not held, ${rowText(r)}`)
       }
-      if (!changesAnything(update) && minyanimOn.length) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
+      if (!changesAnything(piece) && minyanimOn.length) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
     }
   }
 

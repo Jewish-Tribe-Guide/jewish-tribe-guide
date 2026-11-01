@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
 
+vi.mock('./eruvStore', () => ({ listEruvimForAdmin: async () => ({ eruvim: [{ id: 'e1', website: 'https://eruv.example/' }] }) }))
 vi.mock('./resourceStore', () => ({
   listApprovedResources: async (c: string) =>
     c === 'philly'
@@ -44,9 +45,10 @@ it('why each place’s own website is read', async () => {
   ])
 })
 
-// Oct 26: the job pages are gone; a line opens its place on its kind's page.
-it('each place’s line opens it on its kind’s page', async () => {
+// A line opens its place, and an eruv's page by the eruv with that website.
+it('each place’s line opens it on its own screen', async () => {
   const { placePage, eruvPage } = await loadListings(['philly'])
-  expect(['f1', 'm1', 'gone'].map((id) => placePage!(id))).toEqual(['kind/food?place=f1', 'kind/mikvah?place=m1', null])
-  expect(eruvPage).toBeNull()
+  expect(['f1', 'm1', 'gone'].map((id) => placePage!(id))).toEqual(['place/f1', 'place/m1', null])
+  expect(eruvPage!({ url: 'https://eruv.example/' })).toBe('place/e1')
+  expect(eruvPage!({ url: 'https://other.example/' })).toBeNull()
 })

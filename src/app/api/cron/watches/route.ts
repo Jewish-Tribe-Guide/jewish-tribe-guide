@@ -47,6 +47,9 @@ import { recordJobRun } from '@/lib/jobRunStore'
 import { watchesOutcome, type WatchesRun } from '@/lib/jobRuns'
 import { countWatchKinds } from '@/lib/nightKinds'
 import { loadListings } from '@/lib/listingReads'
+import { jobsOffByCommunity } from '@/lib/jobOff'
+import { isNewsletterWatch } from '@/lib/newsletter'
+import { nightKindOf } from '@/lib/nightKinds'
 
 export const maxDuration = 300
 
@@ -101,7 +104,20 @@ async function runAll(started = Date.now()): Promise<Body> {
 
   const alerts = new Map<string, WatchHealthAlert[]>()
   const budget = newMenuReadBudget()
-  const queue = orderForRun(watches, started)
+  // Without them, a listing's page goes by its label (watchGroupOf).
+  const listings = await loadListings(watches.map((w) => w.communityId)).catch((err) => {
+    console.error('[cron/watches] listing reads failed:', err)
+    return undefined
+  })
+  // What a community turned off isn't read, so it costs nothing (jobOff.ts).
+  const off = jobsOffByCommunity(watches)
+  const wanted = watches.filter((w) => {
+    const kinds = off.get(w.communityId)
+    if (!kinds) return true
+    const kind = isNewsletterWatch(w) ? 'newsletters' : nightKindOf(w, listings?.readsOf, listings?.siteGap)
+    return !kind || !kinds.has(kind)
+  })
+  const queue = orderForRun(wanted, started)
   const { results, left } = await runSideBySide(queue, {
     keysOf: sideBySideKeys,
     mayStart: () => Date.now() - started <= START_NO_WATCH_AFTER_MS,
@@ -126,11 +142,6 @@ async function runAll(started = Date.now()): Promise<Body> {
   // as checked, and its kind's line says Not reached.
   const skipped = results.filter((r) => r.ok && r.skipped).length
   const read = new Set(results.filter((r) => r.ok && !r.skipped).map((r) => r.id))
-  // Without them, a listing's page goes by its label (watchGroupOf).
-  const listings = await loadListings(queue.map((w) => w.communityId)).catch((err) => {
-    console.error('[cron/watches] listing reads failed:', err)
-    return undefined
-  })
   const run = { active: queue.length, ran: results.length - skipped, notWorking: results.filter((r) => !r.ok).length, left, skipped, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }

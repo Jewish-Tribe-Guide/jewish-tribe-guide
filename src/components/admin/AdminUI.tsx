@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useLayoutEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 // The console's one look for boxes, rows and empty screens (the admin
@@ -263,5 +263,81 @@ export function AdminSwitch({ checked, onChange, label }: { checked: boolean; on
     >
       <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
+  )
+}
+
+/** A dropdown of one choice (Places' three menus). Blue once it's off its
+ *  first option, so what's narrowing the list shows at a glance. */
+export function AdminMenu<V extends string>({
+  name,
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: {
+  name: string
+  value: V
+  options: { value: V; label: string; count?: number }[]
+  onChange: (value: V) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+  const narrowed = value !== options[0]?.value
+  const current = options.find((o) => o.value === value)?.label
+  return (
+    <div ref={box} className="relative min-w-0 flex-auto sm:flex-[0_1_170px]">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={`${name}: ${current ?? name}`}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-2 pr-1.5 text-[13px] font-semibold disabled:opacity-60 ${
+          narrowed ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-900'
+        }`}
+      >
+        <span className="truncate">{narrowed ? current : name}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" aria-label={name} className="absolute left-0 z-30 mt-1 max-h-80 min-w-[232px] overflow-auto rounded-[10px] border border-slate-200 bg-white py-1 shadow-lg">
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={o.value === value}
+              onClick={() => {
+                onChange(o.value)
+                setOpen(false)
+              }}
+              className={`block min-h-11 w-full cursor-pointer px-3.5 py-2 text-left text-[15px] font-medium ${o.value === value ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'}`}
+            >
+              {o.label}
+              {o.count !== undefined && ` (${o.count})`}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

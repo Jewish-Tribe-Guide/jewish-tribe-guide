@@ -96,7 +96,7 @@ describe('runMekorWatch', () => {
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
     expect(mockDigest).toHaveBeenCalledTimes(1)
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
-    expect(mockDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches', name: '' })
+    expect(mockDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin', name: '' })
   })
 
   it('never files a removal', async () => {

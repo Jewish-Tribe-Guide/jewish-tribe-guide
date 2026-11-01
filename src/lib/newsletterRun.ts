@@ -20,6 +20,7 @@ import { applyUpdate, changesAnything, type TimesUpdate } from '@/lib/scheduleUp
 import { TIMES_PART_LABELS, partLines, splitParts, type PartSource } from '@/lib/timesParts'
 import type { ScheduleSource } from '@/lib/scheduleReader'
 import type { SubmissionSource } from '@/lib/submissionSource'
+import { jobsOff } from '@/lib/jobOff'
 import { getWatchByUrl, listWatches, updateWatch } from '@/lib/watchStore'
 import { afterRun, type Watch } from '@/lib/watches'
 import { eruvSenders } from '@/lib/eruvEmailRun'
@@ -95,7 +96,9 @@ async function keepAttachment(a: NonNullable<NewsletterEmail['attachment']>): Pr
  *  (watchedSenders) and the eruvim whose status comes by email. */
 export async function newsletterSenders(community: string): Promise<string[]> {
   const [{ watches }, eruvim] = await Promise.all([listWatches(community), eruvSenders(community)])
-  return [...new Set([...watchedSenders(watches), ...eruvim])]
+  // Turned off here: the script stops sending its emails (jobOff.ts).
+  const shuls = jobsOff(watches).includes('newsletters') ? [] : watchedSenders(watches)
+  return [...new Set([...shuls, ...eruvim])]
 }
 
 /**
@@ -208,18 +211,25 @@ async function readAndFile(
 
   // The shul's times: from the email's words, or from its PDF or picture
   // when the words had none.
-  const update: { u: TimesUpdate; file: boolean; elsewhere: string[] } | null =
+  const update: { u: TimesUpdate[]; file: boolean; elsewhere: string[] } | null =
     fromText && timesWereRead(fromText.update)
-      ? { u: fromText.update, file: false, elsewhere: fromText.elsewhere }
+      ? { u: fromText.updates, file: false, elsewhere: fromText.elsewhere }
       : fromFile && timesWereRead(fromFile.update)
-        ? { u: fromFile.update, file: true, elsewhere: fromFile.elsewhere }
+        ? { u: fromFile.updates, file: true, elsewhere: fromFile.elsewhere }
         : null
-  if (key && update && changesAnything(update.u)) {
+  if (key && update) {
     const sk = schedulesKey(key)
     // A newsletter's week holds what it gives, never the usual times it
-    // left out (the user, Oct 28).
+    // left out (the user, Oct 28). Dates past a week's length come back as
+    // their own weeks (datedAsWeeks).
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(new Date())
-    const applied = applyUpdate(regularMinyanim(shul[key]), readSchedules(shul[sk]), update.u, update.u.kind === 'week' ? { onlyRead: { today } } : {})
+    const applied = update.u.filter(changesAnything).reduce<ReturnType<typeof applyUpdate>>(
+      (sofar, u) => {
+        const next = applyUpdate(sofar.minyanim, sofar.schedules, u, u.kind === 'week' ? { onlyRead: { today } } : {})
+        return { ...next, changes: [...sofar.changes, ...next.changes] }
+      },
+      { minyanim: regularMinyanim(shul[key]), schedules: readSchedules(shul[sk]), changes: [] },
+    )
     if (applied.changes.length) {
       const photoUrl = update.file && email.attachment ? await keepAttachment(email.attachment) : null
       const whole = editSubmission(shulCategory, shul, {

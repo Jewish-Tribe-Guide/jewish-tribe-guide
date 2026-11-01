@@ -135,12 +135,6 @@ export default function HomeSectionManager({
 
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        Groups of cards shown on the home screen, in order. A card not placed in any section falls into a
-        trailing &ldquo;More&rdquo; section instead of disappearing. Part of this tab&rsquo;s Save changes
-        below — nothing here goes live until you save.
-      </p>
-
       <div className="space-y-4 max-w-2xl">
         {sectionEntries.map((s, i) => (
           <div key={s.id} className="bg-white border border-slate-200 rounded-lg p-4">

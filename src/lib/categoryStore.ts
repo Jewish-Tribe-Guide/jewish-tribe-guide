@@ -220,8 +220,7 @@ export async function createCategory(community: string, input: {
   const kind = input.kind ?? 'listing'
 
   // Only a listing category's slug comes from an admin freely typing a label —
-  // Map/Zmanim/Eruv Information/Jewish Medical Resources are created with a
-  // fixed label from CategoryManager's SINGLETON_KIND_LABELS (addSingleton),
+  // Map/Zmanim/Eruv are created with a fixed label from siteScreens.ts,
   // and one of those, 'Zmanim', legitimately slugifies to the reserved word
   // 'zmanim' (it IS the category that reserved word exists for — see
   // FIXED_VIEW_KINDS in routes.ts). Guarding every kind here would block that

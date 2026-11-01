@@ -1,26 +1,28 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import { filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
-import { shortDay } from '@/lib/todo'
-import UpButton from '@/components/UpButton'
+import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
+import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import ListingEditorScreen from './ListingEditorScreen'
-import { AdminBox, AdminEmpty, AdminRow } from './AdminUI'
+import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
+import EruvListing, { AddEruv } from './EruvListing'
+import PlaceListing from './PlaceListing'
+import { coverageOf, troublesOf, useWatchJobsAndReload } from './useWatchJobs'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
-// Find one by name, narrow by category or by what's wrong with it, open it
-// to edit it on the spot (no suggest-then-approve), archive it, or bring an
-// archived one back. Archived is a pill here, not a tab of its own.
+// Find one by name, narrow by three menus (what's on the site, its category,
+// what checks it), open it to edit it on the spot (no suggest-then-approve),
+// archive it, or bring an archived one back.
 
 const button = 'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
 const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
-const danger = `${button} border border-red-600 bg-red-600 text-white`
 const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900'
 
 /** How many rows show before "Show all". */
@@ -41,6 +43,13 @@ function categoryFromAddress(): string {
   return new URLSearchParams(window.location.search).get('category') ?? ''
 }
 
+/** What the address narrows by what checks it: `?checked=` (Watches' "23
+ *  places" lands on not-watched). */
+function checkedFromAddress(): CheckedBy {
+  const checked = new URLSearchParams(window.location.search).get('checked')
+  return isCheckedBy(checked) ? checked : 'any'
+}
+
 /** Writes one of the list's choices into the address, so a reload or Back
  *  keeps it; `fallback` is the value that leaves it out. */
 function setAddressParam(name: string, value: string, fallback: string) {
@@ -58,122 +67,18 @@ function Plus() {
   )
 }
 
-function ArchivedPlace({
-  place,
-  category,
-  token,
-  onDone,
-}: {
-  place: AdminPlace
-  category: CategoryConfig | undefined
-  token: string
-  onDone: () => void
-}) {
-  const community = useCommunitySlug()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
-
-  async function send(method: 'PATCH' | 'DELETE', fallback: string) {
-    setBusy(true)
-    setError(null)
-    try {
-      await fetchJson(withCommunity(`/api/admin/archived-listings/${place.id}`, community), { method, headers: { Authorization: `Bearer ${token}` } }, fallback)
-      onDone()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : fallback)
-      setBusy(false)
-    }
-  }
-
-  return (
-    <AdminBox>
-      <div className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="m-0 text-lg font-bold text-slate-900">{place.name}</h2>
-          <span className="text-[13px] text-slate-600">
-            {[category?.label, `Archived ${shortDay(place.changedAt)}`].filter(Boolean).join(' · ')}
-          </span>
-          {place.listing.address && <span className="text-sm text-slate-700">{place.listing.address}</span>}
-        </div>
-        {confirming ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="m-0 text-sm text-red-800">Delete {place.name} for good? This can’t be undone.</p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={busy} onClick={() => void send('DELETE', 'Could not delete it.')} className={danger}>
-                {busy ? 'Deleting…' : 'Delete it'}
-              </button>
-              <button type="button" disabled={busy} onClick={() => setConfirming(false)} className={secondary}>
-                Leave it
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => void send('PATCH', 'Could not bring it back.')} className={primary}>
-              {busy ? 'Bringing it back…' : 'Bring it back'}
-            </button>
-            <button type="button" disabled={busy} onClick={() => setConfirming(true)} className={secondary}>
-              Delete for good
-            </button>
-          </div>
-        )}
-        {error && <p className="m-0 text-sm text-red-700">{error}</p>}
-      </div>
-    </AdminBox>
-  )
-}
-
-/** Below an opened place's editor: take it off the site, asking once. */
-function ArchiveIt({ place, token, onDone }: { place: AdminPlace; token: string; onDone: () => void }) {
-  const community = useCommunitySlug()
-  const [confirming, setConfirming] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function archive() {
-    setBusy(true)
-    setError(null)
-    try {
-      await fetchJson(withCommunity(`/api/admin/listings/${place.id}`, community), { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }, 'Could not archive it.')
-      onDone()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not archive it.')
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="mt-6 flex flex-col gap-2 border-t border-slate-200 pt-4">
-      {confirming ? (
-        <>
-          <p className="m-0 text-sm text-slate-800">Take {place.name} off the site? It stays under Archived.</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => void archive()} className={danger}>
-              {busy ? 'Archiving…' : 'Archive it'}
-            </button>
-            <button type="button" disabled={busy} onClick={() => setConfirming(false)} className={secondary}>
-              Leave it
-            </button>
-          </div>
-        </>
-      ) : (
-        <button type="button" onClick={() => setConfirming(true)} className={`${secondary} self-start text-red-700`}>
-          Archive it
-        </button>
-      )}
-      {error && <p className="m-0 text-sm text-red-700">{error}</p>}
-    </div>
-  )
-}
-
 export default function PlacesList({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { jobs, reload } = useWatchJobsAndReload(token)
+  const [now] = useState(() => Date.now())
+  const coverage = useMemo(() => coverageOf(jobs), [jobs])
+  const troubles = useMemo(() => troublesOf(jobs, now), [jobs, now])
   const [show, setShow] = useState<PlaceShow>('site')
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
+  const [checked, setChecked] = useState<CheckedBy>('any')
   const [all, setAll] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   // Adding: picking its category (''), then the editor for that category.
@@ -188,6 +93,7 @@ export default function PlacesList({ token }: { token: string }) {
       // and the category menu keep the two in step after that.
       setShow(showFromAddress())
       setCategory(categoryFromAddress())
+      setChecked(checkedFromAddress())
       setData(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the places.')
@@ -201,7 +107,41 @@ export default function PlacesList({ token }: { token: string }) {
     setAddressParam('show', next, 'site')
   }
 
+  // A place or Add is an entry in the history, so swiping back from one
+  // lands on this list, not on the page before it (the user, Oct 31).
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = e.state as { placeOpen?: string; placeAdding?: string } | null
+      setOpenId(state?.placeOpen ?? null)
+      setAdding(state?.placeAdding ?? null)
+    }
+    const onTapped = () => {
+      setOpenId(null)
+      setAdding(null)
+    }
+    window.addEventListener('popstate', onPop)
+    window.addEventListener(ADMIN_AREA_TAPPED, onTapped)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      window.removeEventListener(ADMIN_AREA_TAPPED, onTapped)
+    }
+  }, [])
+
+  function openPlace(id: string) {
+    setOpenId(id)
+    history.pushState({ ...(window.history.state ?? {}), placeOpen: id }, '')
+    window.scrollTo?.(0, 0)
+  }
+
+  function startAdding(id: string) {
+    setAdding(id)
+    history.pushState({ ...(window.history.state ?? {}), placeAdding: id }, '')
+    window.scrollTo?.(0, 0)
+  }
+
   function close() {
+    const state = window.history.state as { placeOpen?: string; placeAdding?: string } | null
+    if (state?.placeOpen || state?.placeAdding) history.back()
     setOpenId(null)
     setAdding(null)
     window.scrollTo?.(0, 0)
@@ -212,70 +152,70 @@ export default function PlacesList({ token }: { token: string }) {
     void load()
   }
 
+  function changedEruv() {
+    close()
+    void reload()
+  }
+
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading…</p>
 
   const categoriesById = new Map(data.categories.map((c) => [c.id, c]))
-  const listingCategories = data.categories.filter((c) => c.kind === 'listing')
+  // Eruvs live in their own table, and join the list as a category of it.
+  const eruvCategory = data.categories.find((c) => c.kind === 'eruv')
+  const listingCategories = data.categories.filter((c) => c.kind === 'listing' || c === eruvCategory)
+  const eruvs = eruvCategory ? (jobs.eruvim?.eruvim ?? []) : []
+  const places = eruvCategory ? [...data.places, ...eruvs.map((e) => eruvPlace(e, eruvCategory.id))].sort((a, b) => a.name.localeCompare(b.name)) : data.places
 
+  if (adding && adding === eruvCategory?.id) {
+    return (
+      <AddEruv
+        token={token}
+        onBack={close}
+        onAdded={async (id) => {
+          await reload()
+          setAdding(null)
+          setOpenId(id)
+          history.replaceState({ ...(window.history.state ?? {}), placeAdding: undefined, placeOpen: id }, '')
+        }}
+      />
+    )
+  }
   if (adding) {
     const addTo = categoriesById.get(adding)!
     return <ListingEditorScreen heading="Add a place" category={addTo} adminSubmit={{ token }} onClose={changed} />
   }
 
-  const opened = openId ? data.places.find((p) => p.id === openId) : undefined
-  if (opened) {
-    const openedCategory = categoriesById.get(opened.category)
-    if (opened.status === 'archived' || !openedCategory) {
-      return (
-        <div className="flex flex-col gap-3">
-          <UpButton label="Back" onClick={close} className="self-start" />
-          {opened.status === 'archived' ? (
-            <ArchivedPlace place={opened} category={openedCategory} token={token} onDone={changed} />
-          ) : (
-            <AdminEmpty>Its category is gone, so it can’t be edited here.</AdminEmpty>
-          )}
-        </div>
-      )
-    }
-    return (
-      <div>
-        <ListingEditorScreen
-          key={opened.id}
-          heading={opened.name}
-          item={opened.listing}
-          category={openedCategory}
-          onClose={close}
-          adminSave={{
-            label: 'Update the listing',
-            via: ({ payload }) =>
-              fetch(withCommunity(`/api/admin/listings/${opened.id}`, community), {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payload }),
-              }),
-            onSaved: changed,
-          }}
-        />
-        <ArchiveIt place={opened} token={token} onDone={changed} />
-      </div>
-    )
-  }
+  const opened = openId ? places.find((p) => p.id === openId) : undefined
+  const openedEruv = opened && eruvs.find((e) => e.id === opened.id)
+  if (opened && openedEruv) return <EruvListing key={opened.id} place={opened} eruv={openedEruv} category={categoriesById.get(opened.category)} token={token} jobs={jobs} reload={reload} now={now} onClose={close} onSaved={changedEruv} />
+  if (opened) return <PlaceListing key={opened.id} place={opened} category={categoriesById.get(opened.category)} token={token} jobs={jobs} reload={reload} now={now} onClose={close} onSaved={changed} />
 
-  const counts = placeCounts(data.places, category || undefined)
-  const rows = filterPlaces(data.places, { show, category: category || undefined, query })
+  const counts = placeCounts(places, category || undefined)
+  const narrowed = filterPlaces(places, { show, category: category || undefined, query })
+  const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), troubles.get(p.id), choice)
+  const checkedCount = (choice: CheckedBy) => narrowed.filter((p) => fits(p, choice)).length
+  // Not watched: its main thing first, then by name as they already are.
+  const rows = narrowed.filter((p) => fits(p, checked))
+  if (checked === 'not-watched') rows.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
+  const lineOf = (p: AdminPlace): { text: string; warn: boolean } => {
+    if (checked === 'broken') return { text: troubles.get(p.id)?.join(' · ') ?? '', warn: true }
+    const c = coverage?.get(p.id)
+    if (checked === 'not-watched' && c) return { text: notWatchedLine(c), warn: true }
+    return { text: placeLine(p), warn: p.status === 'approved' && !p.hasAddress }
+  }
   const shown = all ? rows : rows.slice(0, SHOWN)
 
   return (
     <div className="flex flex-col gap-4">
       <div className="-mt-2 flex flex-wrap items-center gap-3">
-        <p className="m-0 flex-1 text-sm text-slate-600">{counts.site} on the site</p>
+        <span className="flex-1" />
         {adding === null && (
           <button
             type="button"
             onClick={() => {
               // A category picked above is the one it's added to.
-              if (category && categoriesById.get(category)?.kind === 'listing') setAdding(category)
+              if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
               else setAdding('')
             }}
             className={primary}
@@ -300,7 +240,7 @@ export default function PlacesList({ token }: { token: string }) {
                 ))}
               </select>
             </label>
-            <button type="button" disabled={!addCategory} onClick={() => setAdding(addCategory)} className={primary}>
+            <button type="button" disabled={!addCategory} onClick={() => startAdding(addCategory)} className={primary}>
               Next
             </button>
             <button type="button" onClick={() => setAdding(null)} className={secondary}>
@@ -310,73 +250,68 @@ export default function PlacesList({ token }: { token: string }) {
         </AdminBox>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <label className={`${field} flex flex-[1_1_320px] items-center gap-2`}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.5" />
-            <path d="M10.5 10.5L14 14" />
-          </svg>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value)
-              setAll(false)
-            }}
-            placeholder="Find a place by name"
-            aria-label="Find a place by name"
-            className="min-w-0 flex-1 border-0 bg-transparent outline-none"
-          />
-        </label>
-        <select
-          aria-label="Category"
-          value={category}
+      <label className={`${field} flex items-center gap-2`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M10.5 10.5L14 14" />
+        </svg>
+        <input
+          type="search"
+          value={query}
           onChange={(e) => {
-            setCategory(e.target.value)
+            setQuery(e.target.value)
             setAll(false)
-            setAddressParam('category', e.target.value, '')
           }}
-          className={`${field} flex-[0_1_200px]`}
-        >
-          <option value="">All categories</option>
-          {data.categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.pluralLabel}
-            </option>
-          ))}
-        </select>
+          placeholder="Find a place by name"
+          aria-label="Find a place by name"
+          className="min-w-0 flex-1 border-0 bg-transparent outline-none"
+        />
+      </label>
+
+      <div className="flex gap-1.5 sm:gap-2">
+        <AdminMenu name="On the site" value={show} options={PLACE_SHOWS.map((s) => ({ value: s.show, label: s.label, count: counts[s.show] }))} onChange={pick} />
+        <AdminMenu
+          name="Category"
+          value={category}
+          options={[{ value: '', label: 'All categories' }, ...listingCategories.map((c) => ({ value: c.id, label: c.pluralLabel }))]}
+          onChange={(v) => {
+            setCategory(v)
+            setAll(false)
+            setAddressParam('category', v, '')
+          }}
+        />
+        <AdminMenu
+          name="Checked by"
+          value={checked}
+          disabled={!coverage}
+          options={CHECKED_BY.filter((c) => c.key === 'any' || c.key === checked || c.key === 'not-watched' || c.key === 'broken' || checkedCount(c.key) > 0).map((c) => ({
+            value: c.key,
+            label: c.label,
+            count: c.key === 'any' ? undefined : checkedCount(c.key),
+          }))}
+          onChange={(v) => {
+            setChecked(v)
+            setAll(false)
+            setAddressParam('checked', v, 'any')
+          }}
+        />
       </div>
 
-      <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
-        {PLACE_SHOWS.map((s) => (
-          <button
-            key={s.show}
-            type="button"
-            aria-pressed={show === s.show}
-            onClick={() => pick(s.show)}
-            className={`min-h-9 rounded-full border px-3.5 py-1.5 text-sm font-semibold cursor-pointer ${
-              show === s.show ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-700'
-            }`}
-          >
-            {s.label} · {counts[s.show]}
-          </button>
-        ))}
-      </div>
+      <p className="-mb-2 m-0 text-sm font-semibold text-slate-600">
+        {rows.length} {rows.length === 1 ? 'place' : 'places'}
+      </p>
 
       {rows.length === 0 ? (
-        <AdminEmpty>{query || category ? 'No places match.' : show === 'site' ? 'No places yet.' : 'Nothing to do.'}</AdminEmpty>
+        <AdminEmpty>{query || category || checked !== 'any' ? 'No places match.' : show === 'site' ? 'No places yet.' : 'Nothing to do.'}</AdminEmpty>
       ) : (
         <section aria-label="Places" className="bg-white border border-slate-200 rounded-[10px]">
           {shown.map((p) => (
             <AdminRow
               key={p.id}
-              onClick={() => {
-                setOpenId(p.id)
-                window.scrollTo?.(0, 0)
-              }}
+              onClick={() => openPlace(p.id)}
               label={`Open ${p.name}`}
               name={p.name}
-              line={<span className={p.status === 'approved' && !p.hasAddress ? 'text-amber-700' : ''}>{placeLine(p)}</span>}
+              line={<span className={lineOf(p).warn ? 'text-amber-800' : ''}>{lineOf(p).text}</span>}
               aside={categoriesById.get(p.category)?.label}
             />
           ))}

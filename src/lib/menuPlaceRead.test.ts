@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   dateMenuDishes: vi.fn(),
   findMenus: vi.fn(),
   readMenus: vi.fn(),
+  listWatches: vi.fn(async () => ({ available: true, watches: [] as unknown[] })),
 }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -33,9 +34,12 @@ const food = makeCategory({
   ],
 })
 vi.mock('@/lib/categoryStore', () => ({ listCategoriesUncached: async () => [food] }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
 vi.mock('@/lib/menuReadingStore', () => ({ listMenuReadings: async () => ({ readings: m.readings, available: true }), saveMenuReading: m.saveMenuReading, dateMenuDishes: m.dateMenuDishes }))
 vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('@/lib/menuReader')>()), findMenus: m.findMenus, readMenus: m.readMenus }))
 vi.mock('@/lib/renderPage', () => ({ pageRenderer: () => ({ render: null, close: async () => {} }) }))
+
+import { JOB_OFF_CREATOR, jobOffUrl } from './jobOff'
 
 const { listUnreadMenus, readUnreadMenus } = await import('./menuPlaceRead')
 
@@ -72,6 +76,13 @@ describe('listUnreadMenus', () => {
 })
 
 describe('readUnreadMenus', () => {
+  // The user, Oct 31: off means nothing is read and nothing is paid for.
+  it('reads nothing where Menus is turned off', async () => {
+    m.listWatches.mockResolvedValueOnce({ available: true, watches: [{ createdBy: JOB_OFF_CREATOR, url: jobOffUrl('menus') }] })
+    expect(await readUnreadMenus('key', { perRun: 2 })).toEqual([])
+    expect(m.readMenus).not.toHaveBeenCalled()
+  })
+
   it('reads only the places never read, with something to read, a few a run', async () => {
     expect(await readUnreadMenus('key', { perRun: 2 })).toEqual([{ community: 'philly', read: 2, failed: 0, left: 2 }])
     expect(m.saveMenuReading.mock.calls.map(([, id]) => id)).toEqual(['a', 'b'])

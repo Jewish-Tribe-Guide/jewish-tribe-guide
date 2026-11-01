@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { adminAreas, adminBase, adminNavPosition, type AdminArea } from '@/lib/adminNav'
+import { ADMIN_AREA_TAPPED, adminAreas, adminBase, adminNavPosition, type AdminArea } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSiteSettings } from '@/lib/contentContext'
 import { useTodoCount } from '@/lib/useTodo'
@@ -22,7 +22,8 @@ import { AdminHead, AdminOwnHead } from './AdminUI'
 // gear: To do's other pages, each of Site's screens (Site is a list of them
 // on a phone), and any screen that brings its own heading (AdminBack), when
 // the frame's heading steps aside. On a computer the sidebar shows where you
-// are, so To do's pages have no "‹ To do".
+// are, so To do's pages have no "‹ To do". Settings, opened by the gear from
+// anywhere, goes back to To do.
 
 const ICONS: Record<AdminArea | 'view', React.ReactNode> = {
   todo: <path d="M3 8.5l3 3 7-7" />,
@@ -98,6 +99,9 @@ export default function AdminFrame({
   // A screen with its own heading and way back (AdminBack).
   const [ownHeads, setOwnHeads] = useState(0)
   const ownHead = useCallback((by: number) => setOwnHeads((n) => n + by), [])
+  const tapped = (area: AdminArea) => () => {
+    if (area === open?.area) window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
+  }
 
   const tabsNav = open && (
     <nav aria-label={open.label} className={`${siteTab && !atSiteList ? 'hidden md:flex' : atSiteList ? 'hidden' : 'flex'} gap-1 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200`}>
@@ -144,7 +148,7 @@ export default function AdminFrame({
           <span className="text-[12.5px] text-slate-500">Admin</span>
         </div>
         {main.map((a) => (
-          <Link key={a.area} href={a.href} aria-current={a.area === open?.area ? 'page' : undefined} className={sideLink(a.area === open?.area)}>
+          <Link key={a.area} href={a.href} onClick={tapped(a.area)} aria-current={a.area === open?.area ? 'page' : undefined} className={sideLink(a.area === open?.area)}>
             <Icon name={a.area} />
             <span className="flex-1">{a.label}</span>
             {a.area === 'todo' && !!count && (
@@ -169,7 +173,9 @@ export default function AdminFrame({
       <main className="flex-1 min-w-0 px-4 pb-28 md:px-10 md:pt-8 md:pb-12">
         <div className="max-w-[920px] flex flex-col gap-4">
           {showTabs && siteTab && tabsNav}
-          {ownHeads > 0 ? null : (todoPage || (siteTab && !atSiteList)) ? (
+          {ownHeads > 0 ? null : open?.area === 'settings' ? (
+            <AdminHead phoneOnly back={{ label: 'To do', href: areas.find((a) => a.area === 'todo')!.href }} title={open.label} />
+          ) : (todoPage || (siteTab && !atSiteList)) ? (
             // Opened from To do's list or Site's: the way back is the
             // phone's alone, where the sidebar or the tabs already show it.
             <AdminHead phoneOnly back={todoPage ? { label: 'To do', href: open!.href } : { label: 'Site', href: siteList }} title={(todoPage ?? siteTab)!.label} />
@@ -206,6 +212,7 @@ export default function AdminFrame({
             <Link
               key={a.area}
               href={a.area === 'site' ? siteList : a.href}
+              onClick={tapped(a.area)}
               aria-current={current ? 'page' : undefined}
               className={`flex flex-col items-center gap-[3px] py-1.5 min-h-11 text-xs ${current ? 'text-primary font-bold' : 'text-slate-600 font-semibold'}`}
             >

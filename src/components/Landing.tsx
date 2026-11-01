@@ -846,7 +846,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           }
 
           return rows.map((row) => (
-            <div key={row.key} className="my-8">
+            <div key={row.key} data-spot={`cards ${row.key.replace('community', 'davening-listings').split('-').map((k) => `card-${k}`).join(' ')}`} className="my-8">
               {row.node}
             </div>
           ))

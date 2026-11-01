@@ -1,3 +1,4 @@
+import { placePath } from './placeLink'
 import type { ResourceRow, ResourceSubmission, SubmissionRow } from '@/types'
 import { companionKeys, type CategoryConfig, type CategoryField } from './categories'
 import { hoursJobCategories, ownSiteCategories } from './hoursJob'
@@ -240,15 +241,15 @@ export function dishCategories<C extends Pick<CategoryConfig, 'detailFields'>>(c
   })
 }
 
-/** Where a watch's findings wait, for its email: a place's kind's page on
- *  the Watches tab, opened on it when `placeId` is given; the tab itself
- *  (no name) for a list's, which span kinds. */
+/** Where a watch's findings wait, for its email: a place's own screen when
+ *  `placeId` is given, Back to To do; To do itself otherwise, for a list's,
+ *  which span kinds. `name`: the kind, for the Watches tab's rows. */
 export function findingPage(community: string, category?: Pick<CategoryConfig, 'id' | 'pluralLabel'> | null, placeId?: string): { path: string; name: string } {
-  if (!category) return { path: `/${community}/admin/watches`, name: '' }
-  return { path: `/${community}/admin/watches/kind/${category.id}${placeId ? `?place=${placeId}` : ''}`, name: category.pluralLabel }
+  const name = category?.pluralLabel ?? ''
+  return { path: placeId ? `/${community}/admin/watches/${placePath(placeId, 'todo')}` : `/${community}/admin`, name }
 }
 
-/** Where a place's findings wait: its kind's page, for a category Shul
+/** Where a place's findings wait: its own screen, for a category Shul
  *  times, the hours job, Main dishes or its own website reads; none
  *  otherwise, and they wait in the moderation queue. */
 export function jobPageFor(community: string, category: Pick<CategoryConfig, 'id' | 'label' | 'pluralLabel' | 'kind' | 'hasPhone' | 'detailFields'>, placeId?: string): { path: string; name: string } | undefined {

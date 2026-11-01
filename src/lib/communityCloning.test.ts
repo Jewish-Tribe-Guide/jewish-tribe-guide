@@ -22,7 +22,11 @@ vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
 }))
 
-const { cloneCommunityContent } = await import('./communityCloning')
+const mockList = vi.hoisted(() => vi.fn())
+const mockCreate = vi.hoisted(() => vi.fn())
+vi.mock('./categoryStore', () => ({ listCategoriesUncached: mockList, createCategory: mockCreate }))
+
+const { addMissingSiteScreens, cloneCommunityContent } = await import('./communityCloning')
 
 afterEach(() => {
   mockFrom.mockReset()
@@ -128,5 +132,44 @@ describe('cloneCommunityContent', () => {
     mockFrom.mockReturnValueOnce(selectCategories).mockReturnValueOnce(selectSections).mockReturnValueOnce(insertSections)
 
     await expect(cloneCommunityContent('ues', 'philly')).rejects.toThrow('Failed to clone home sections: conflict')
+  })
+})
+
+describe('addMissingSiteScreens', () => {
+  afterEach(() => {
+    mockList.mockReset()
+    mockCreate.mockReset()
+  })
+
+  it('starts an empty community with the Map, Candle Lighting and Eruv on', async () => {
+    mockList.mockResolvedValue([])
+    await addMissingSiteScreens('baltimore')
+    expect(mockCreate.mock.calls.map(([c, input]) => [c, input.kind, input.active])).toEqual([
+      ['baltimore', 'map', undefined],
+      ['baltimore', 'zmanim', undefined],
+      ['baltimore', 'eruv', undefined],
+    ])
+  })
+
+  // A singleton's second row is refused by the database, which would fail
+  // creating a community cloned from one that has them.
+  it('adds only what a clone didn’t bring, leaving a hidden one hidden', async () => {
+    mockList.mockResolvedValue([{ kind: 'map', active: false }, { kind: 'eruv', active: true }, { kind: 'listing' }])
+    await addMissingSiteScreens('baltimore')
+    expect(mockCreate.mock.calls.map(([, input]) => input.kind)).toEqual(['zmanim'])
+  })
+})
+
+describe('cloneCommunityContent, Jewish Medical Resources', () => {
+  it('doesn’t carry its row into a new community', async () => {
+    const categories = chainable({ data: [groceryRow, { ...groceryRow, id: 'jewish-medical-resources', kind: 'medical' }], error: null })
+    const inserted = chainable({ error: null })
+    mockFrom
+      .mockReturnValueOnce(categories)
+      .mockReturnValueOnce(inserted)
+      .mockReturnValueOnce(chainable({ data: [], error: null }))
+    await cloneCommunityContent('baltimore', 'philly')
+    const rows = (inserted.insert as ReturnType<typeof vi.fn>).mock.calls[0][0] as { id: string }[]
+    expect(rows.map((r) => r.id)).toEqual(['grocery'])
   })
 })

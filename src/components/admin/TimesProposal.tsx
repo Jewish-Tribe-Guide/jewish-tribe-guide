@@ -16,7 +16,7 @@ import type { HoursPlace } from './watchJobTypes'
 // reading is one of three updates, each in a box named for the part of the
 // listing it changes: Usual weekday times, Usual Shabbos times, This week's
 // schedule (timesParts.ts). Its rows marked, a changed time beside the
-// listing's old one. A shul opened on its kind's page (OpenedPlace.tsx)
+// listing's old one. A shul opened on its own screen (OpenedPlace.tsx)
 // draws its boxes with these.
 
 type Listed = { key: string; minyanim: Minyan[]; schedules: SpecialSchedule[] }

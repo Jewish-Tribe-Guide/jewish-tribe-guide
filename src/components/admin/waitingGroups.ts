@@ -21,7 +21,7 @@ import type { AdminEruv } from '@/lib/eruvStore'
 import type { EruvFinding } from '@/lib/eruvJob'
 import type { DirectoryResource } from '@/types'
 
-// ── A place waiting for you, opened on its kind's page (piece 4, Oct 25) ────
+// ── A place waiting for you, opened on its own screen (piece 4, Oct 25) ────
 // Drawn on FinalChanges2, FinalNewsletter, FinalClosed, FinalDropped and
 // FinalNewPlace (settled Oct 24): a group per source, "From chalavita.com ·
 // Oct 25", what it would change lit ("Hours  Sun–Thu 11 AM–10 PM, was Sun–

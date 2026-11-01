@@ -45,6 +45,9 @@ vi.mock('@/lib/categoryStore', () => ({ listCategories: vi.fn().mockResolvedValu
 // The run's own record is jobRunStore.test.ts's.
 vi.mock('@/lib/jobRunStore', () => ({ recordJobRun: (_job: string, run: () => Promise<unknown>) => run() }))
 
+const mockWatches = vi.hoisted(() => vi.fn(async () => ({ available: true, watches: [] as unknown[] })))
+vi.mock('@/lib/watchStore', () => ({ listAllWatches: mockWatches }))
+
 const { GET } = await import('./route')
 const { refreshNight } = await import('@/lib/syncListing')
 
@@ -107,6 +110,16 @@ async function runGet() {
 }
 
 describe('GET /api/cron/sync-hours', () => {
+  // The user, Oct 31: off means Google isn't asked, and isn't paid.
+  it('asks Google nothing about a community that turned it off', async () => {
+    mockFetchPlaceSync.mockResolvedValue(null)
+    mockFrom.mockImplementation(() => chainable({ data: [row], error: null }))
+    mockWatches.mockResolvedValueOnce({ available: true, watches: [{ createdBy: 'job off', url: 'https://guide.invalid/job-off/google', communityId: row.community_id }] })
+    const body = await (await runGet()).json()
+    expect(body).toMatchObject({ total: 0 })
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
   it('persists a per-listing error when the Google fetch fails', async () => {
     mockFetchPlaceSync.mockResolvedValue(null)
     const readBuilder = chainable({ data: [row], error: null })

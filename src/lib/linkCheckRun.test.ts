@@ -36,6 +36,8 @@ vi.mock('@/lib/categoryStore', () => ({
   ],
 }))
 
+import { JOB_OFF_CREATOR, jobOffUrl } from './jobOff'
+
 const { checkAllLinks, checkLink, checkOneLink } = await import('./linkCheckRun')
 const { LINK_CHECK_CREATOR, linkCheckUrl } = await import('./linkCheck')
 
@@ -111,6 +113,13 @@ describe('the weekly run', () => {
     vi.clearAllMocks()
     m.rows = [row('p1', 'House of Kosher', { website: 'https://hok.com', kosher_url: 'https://hok.com/cert', googleFields: ['website'] }), row('p2', 'Sababa', { kosher_url: 'https://k.org/sababa' })]
     m.addWatch.mockImplementation(async (_c: string, w: Record<string, unknown>) => ({ ...record({}), ...w, id: `new-${w.url}` }))
+  })
+
+  it('opens nothing where Links is turned off', async () => {
+    const fetchImpl = vi.fn()
+    m.listWatches.mockResolvedValue({ available: true, watches: [record({ id: 'off', createdBy: JOB_OFF_CREATOR, url: jobOffUrl('links') })] })
+    expect(await checkAllLinks({ fetchImpl: fetchImpl as unknown as typeof fetch, resolve: publicDns })).toEqual([])
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('checks each link, keeping how it answered on a record that never runs; one no listing shows loses its record', async () => {

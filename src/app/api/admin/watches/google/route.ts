@@ -16,6 +16,8 @@ import {
   notOnGoogle,
   pickGooglePlace,
   showAsOpen,
+  stopField,
+  takeGoogleField,
   applyGoogles,
   wrongPlace,
 } from '@/lib/googleJobRun'
@@ -40,6 +42,11 @@ import {
 //      not_on_google  said once; you check what nothing else does.
 //      open         `open: true` Show as open over Google's closure;
 //                   false, Google's answer again.
+//      stop_field   `field`, the listing's Stop: it stays as it is and Google
+//                   no longer keeps it.
+//      use_field    `field`, the listing's Use Google's: Google's version of
+//                   that one field, and Google keeps it. A paid call when no
+//                   recent check is kept.
 //      Admin only.
 
 export const maxDuration = 60
@@ -70,7 +77,7 @@ export async function GET(request: Request) {
   }
 }
 
-const ACTIONS = ['check', 'find', 'pick', 'use', 'keep', 'edit', 'not_on_google', 'wrong_place', 'open'] as const
+const ACTIONS = ['check', 'find', 'pick', 'use', 'keep', 'edit', 'not_on_google', 'wrong_place', 'open', 'stop_field', 'use_field'] as const
 type Action = (typeof ACTIONS)[number]
 
 export async function POST(request: Request) {
@@ -82,7 +89,7 @@ export async function POST(request: Request) {
   const action = body?.action as Action
   const id = typeof body?.id === 'string' ? body.id : ''
   if (!ACTIONS.includes(action) || !UUID.test(id)) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
-  if (action === 'check' || action === 'find' || action === 'pick') {
+  if (action === 'check' || action === 'find' || action === 'pick' || action === 'use_field') {
     const limited = await enforceRateLimit(request, 'admin-google-check', PAID_LIMIT)
     if (limited) return limited
   }
@@ -104,13 +111,17 @@ export async function POST(request: Request) {
     else if (action === 'not_on_google') place = await notOnGoogle(slug, id)
     else if (action === 'wrong_place') place = await wrongPlace(slug, id)
     else if (action === 'open') place = await showAsOpen(slug, id, body?.open === true)
+    else if (action === 'stop_field' || action === 'use_field') {
+      const field = typeof body?.field === 'string' ? body.field : ''
+      place = action === 'stop_field' ? await stopField(slug, id, field) : await takeGoogleField(slug, id, field, admin.email)
+    }
     else {
       const values = body?.values
       if (!values || typeof values !== 'object' || Array.isArray(values)) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
       place = await editFromGoogle(slug, id, values as Record<string, unknown>, admin.email)
     }
-    // A check changes only what the sync reads, never what the site shows.
-    if (action !== 'check') await revalidatePublicContent()
+    // A check or a Stop changes only what the sync reads, never what the site shows.
+    if (action !== 'check' && action !== 'stop_field') await revalidatePublicContent()
     return Response.json({ ok: true, place })
   } catch (err) {
     if (err instanceof GoogleJobError) return Response.json({ ok: false, errors: [err.message] }, { status: err.status })

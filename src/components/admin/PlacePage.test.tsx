@@ -5,14 +5,14 @@ import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson } from '@/lib/fetchJson'
-import WatchKindPage from './WatchKindPage'
+import PlacePage from './PlacePage'
 import { forgetWatchJobs } from './useWatchJobs'
 import { day } from './watchText'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
-  usePathname: () => '/philly/admin/watches/kind/synagogue',
+  usePathname: () => '/philly/admin/watches/place/a',
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
@@ -23,7 +23,7 @@ const place = (id: string, name: string, over = {}) => ({
   matched: true, section: 'checked', fields: [field('Name', 'google')], readAt: new Date().toISOString(), failedAt: null, notOnGoogle: null, closure: null, compare: null, ...over,
 })
 
-async function renderPage(places: unknown[], category = 'synagogue', more: (url: string, init?: RequestInit) => unknown = () => undefined, linked?: string) {
+async function renderPage(id: string, places: unknown[], more: (url: string, init?: RequestInit) => unknown = () => undefined, from?: string) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     const got = more(String(url), init)
     if (got !== undefined) return got
@@ -32,12 +32,9 @@ async function renderPage(places: unknown[], category = 'synagogue', more: (url:
     // Every other job answers with nothing: none of these places is in it.
     throw new Error('down')
   })
-  renderWithProviders(<WatchKindPage token="tok" category={category} place={linked} />, { community: { slug: 'philly' } })
+  renderWithProviders(<PlacePage token="tok" id={id} from={from} />, { community: { slug: 'philly' } })
   await act(() => new Promise((r) => setTimeout(r, 0)))
 }
-
-const rows = () => screen.getAllByTestId('kind-place').map((r) => r.textContent)
-const tab = (name: RegExp) => screen.getByRole('tab', { name })
 
 afterEach(() => {
   cleanup()
@@ -45,23 +42,14 @@ afterEach(() => {
   forgetWatchJobs()
 })
 
-describe('WatchKindPage', () => {
-  it('opens on the first tab with places in it, each saying why', async () => {
-    await renderPage([place('a', 'Kesher Israel'), place('b', 'Lower Merion Synagogue', { section: 'to_check', fields: [field('Name', 'google'), field('Website', 'nothing')] })])
-    expect(screen.getByRole('heading', { name: 'Synagogues' })).toBeTruthy()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Waiting for you 0', 'Not checked 1', 'Up to date 1'])
-    expect(tab(/Not checked/)).toHaveAttribute('aria-selected', 'true')
-    expect(rows()).toEqual(['Lower Merion SynagogueWebsite not checked'])
-    expect(screen.getByTestId('kind-place')).toHaveAttribute('aria-expanded', 'false')
-  })
-
+describe('PlacePage', () => {
   it('opens a place not checked by what’s wrong, each with its own fix', async () => {
     const added = new Date(Date.now() - 2 * 86_400_000).toISOString()
     const page = { id: 'w2', url: 'https://lms.example/', active: true, lastRunAt: null, lastOkAt: null, lastError: null, failingSince: null, createdAt: added, lastCheck: null }
     const shul = { id: 'b', name: 'Lower Merion Synagogue', href: '/philly/synagogues/b', website: 'https://lms.example', pages: [{ watch: page }], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: [], schedules: [] } }
     const posts: unknown[] = []
     const lms = place('b', 'Lower Merion Synagogue', { matched: false, section: 'to_check', fields: [field('Name', 'nothing'), field('Website', 'nothing')] })
-    await renderPage([lms], 'synagogue', (url, init) => {
+    await renderPage('b', [lms], (url, init) => {
       if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
       if (init?.method === 'POST') {
         const body = JSON.parse(String(init.body))
@@ -70,8 +58,7 @@ describe('WatchKindPage', () => {
       }
     })
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Lower Merion Synagogue/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     expect(within(open).getAllByTestId('problem').map((p) => p.textContent)).toEqual([
       'Nothing checks its nameNamexFind it on GoogleNot on Google',
       `lms.example·never read · added ${day(added)}WebsitexRead it now`,
@@ -99,7 +86,7 @@ describe('WatchKindPage', () => {
     const page = { id: 'w3', url: 'https://chabad.example/Schedule.htm', active: true, lastRunAt: ran, lastOkAt: since, lastError: 'Couldn’t read the page: it turned the reader away (403)', failingSince: since, createdAt: since, lastCheck: null }
     const shul = { id: 'c', name: 'Chabad of the Main Line', href: '/philly/synagogues/c', website: 'https://chabad.example', pages: [{ watch: page }], off: false, reason: null, fields: ['Minyanim'], times: { key: 'minyanim', minyanim: [], schedules: [] } }
     const posts: unknown[] = []
-    await renderPage([place('c', 'Chabad of the Main Line')], 'synagogue', (url, init) => {
+    await renderPage('c', [place('c', 'Chabad of the Main Line')], (url, init) => {
       if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
       if (init?.method === 'POST') {
         posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
@@ -107,8 +94,7 @@ describe('WatchKindPage', () => {
       }
     })
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Chabad of the Main Line/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     const problem = within(open).getByTestId('problem')
     expect(within(problem).getByRole('button', { name: 'Read it now' })).toBeTruthy()
     await user.click(within(problem).getByRole('button', { name: 'Stop' }))
@@ -126,17 +112,15 @@ describe('WatchKindPage', () => {
     const since = new Date(Date.now() - 3 * 86_400_000).toISOString()
     const link = { resourceId: 'b', key: 'kosher_url', field: 'Kosher certificate', url: 'http://houseofkosher.com/Philadelphia', place: 'House of Kosher', category: 'synagogue', href: '/philly/synagogues/b', id: 'w9', checkedAt: since, error: 'Not found', failingSince: since }
     const posts: unknown[] = []
-    await renderPage([place('a', 'Kesher Israel'), place('b', 'House of Kosher')], 'synagogue', (url, init) => {
+    await renderPage('b', [place('a', 'Kesher Israel'), place('b', 'House of Kosher')], (url, init) => {
       if (url.includes('/api/admin/watches/links') && !init?.method) return { ok: true, links: [link] }
       if (init?.method === 'POST') {
         posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
         return { ok: true }
       }
     })
-    expect(rows()).toEqual(['House of KosherLink doesn’t open'])
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /House of Kosher/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     // A link's day is New York's (linkCheck.ts), not the machine's: CI runs
     // in UTC, where after 8 PM here it's already tomorrow.
     const nyDay = new Date(since).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
@@ -155,7 +139,7 @@ describe('WatchKindPage', () => {
       compare: { at, rows: [{ field: 'phone', label: 'Phone', google: '610-555-0199', changed: true }] },
     })
     const sent: unknown[] = []
-    await renderPage([lms], 'synagogue', (url, init) => {
+    await renderPage('b', [lms], (url, init) => {
       if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
       if (init?.method) {
         sent.push([init.method, url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
@@ -163,9 +147,7 @@ describe('WatchKindPage', () => {
       }
     })
     const user = userEvent.setup()
-    expect(rows()).toEqual(['Lower Merion Synagogue2 changes'])
-    await user.click(screen.getByRole('button', { name: /Lower Merion Synagogue/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([
       `From lms.example/davening · ${day(at)}Usual weekday timesMonday to FridayShacharis6:30 AM6:45 AMAcceptEditKeep as is`,
       `From its Google listing · ${day(at)}Phone610-555-0199Was 610-555-0100AcceptEditKeep as isWrong place`,
@@ -199,11 +181,10 @@ describe('WatchKindPage', () => {
     const finding = (currentSchedules: unknown[]) => ({ id: 'f1', operation: 'update', targetId: 'b', name: 'Sons of Israel', from: 'its website', says: 'Its page says', named: null, at, notes: [], lines: [], page: 'https://soi.example/cal', part: 'week', times: { field: {}, current: [], proposed: [], currentSchedules, proposedSchedules: [read] } })
     for (const [schedules, changed] of [[[had], ['Shacharis7 AM6:45 AM']], [[], ['Shacharis6:45 AM', 'Shacharis7 AM']]] as const) {
       const shul = { id: 'b', name: 'Sons of Israel', href: '/philly/synagogues/b', website: 'https://soi.example', pages: [], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: [], schedules }, findings: [finding([...schedules])] }
-      await renderPage([place('b', 'Sons of Israel')], 'synagogue', (url, init) => {
+      await renderPage('b', [place('b', 'Sons of Israel')], (url, init) => {
         if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
       })
-      await userEvent.setup().click(screen.getByRole('button', { name: /Sons of Israel/ }))
-      const group = within(screen.getByTestId('kind-place-open')).getByTestId('waiting-group')
+      const group = within(screen.getByTestId('place-open')).getByTestId('waiting-group')
       expect(within(group).getAllByTestId('waiting-day').map((d) => d.textContent)).toEqual(['Mon, Oct 26', 'Tue, Oct 27'])
       // A row a minyan (the user, Oct 28: "the way we displayed minyan
       // times before we changed was normal and good"), the old time struck.
@@ -222,7 +203,7 @@ describe('WatchKindPage', () => {
     const store = { id: 'g', name: 'GIANT', category: 'grocery', href: '/philly/grocery/g', pages: [{ watch: { id: 'w1', url: 'https://giant.example/store', active: true, lastOkAt: at, lastRunAt: at, createdAt: at } }], findings: [phone] }
     const giant = place('g', 'GIANT', { category: 'grocery', categoryLabel: 'Grocery', href: '/philly/grocery/g' })
     const sent: unknown[] = []
-    await renderPage([giant], 'grocery', (url, init) => {
+    await renderPage('g', [giant], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'grocery', pluralLabel: 'Grocery', kind: 'listing', hasAddress: true }] }
       if (url.includes('/api/admin/watches/sites')) return { ok: true, places: [store] }
       if (init?.method) {
@@ -231,9 +212,7 @@ describe('WatchKindPage', () => {
       }
     })
     const user = userEvent.setup()
-    expect(rows()).toEqual(['GIANT1 change'])
-    await user.click(screen.getByRole('button', { name: /GIANT/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     expect(within(open).getAllByTestId('waiting-group').map((g) => g.textContent)).toEqual([`From giant.example/store · ${day(at)}Phone215-555-0199Was 215-555-0100AcceptEditKeep as is`])
     await user.click(within(open).getByRole('button', { name: 'Accept' }))
     expect(sent).toEqual([['PATCH', '/api/admin/submissions/f1', { status: 'approved' }]])
@@ -248,15 +227,14 @@ describe('WatchKindPage', () => {
     const giant = place('g', 'GIANT', { category: 'grocery', categoryLabel: 'Grocery', href: '/philly/grocery/g' })
     const category = makeCategory({ id: 'grocery', hasPhone: true, detailFields: [] })
     const item = makeListing({ id: 'g', category: 'grocery', name: 'GIANT', address: '1 Main St', phone: '215-555-0100' })
-    await renderPage([giant], 'grocery', (url) => {
+    await renderPage('g', [giant], (url) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'grocery', pluralLabel: 'Grocery', kind: 'listing', hasAddress: true }] }
       if (url.includes('item=g')) return { ok: true, item, category }
       if (url.includes('/api/admin/watches/sites')) return { ok: true, places: [store] }
     })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /GIANT/ }))
-    await user.click(within(screen.getByTestId('kind-place-open')).getByRole('button', { name: 'Edit' }))
+    await user.click(within(screen.getByTestId('place-open')).getByRole('button', { name: 'Edit' }))
     expect(vi.mocked(fetchJson).mock.calls.map(([u]) => u)).toContain('/api/admin/watches/google?item=g&community=philly')
     const sheet = await screen.findByRole('dialog')
     expect(within(sheet).getByDisplayValue('(215) 555-0199')).toBeInTheDocument()
@@ -279,16 +257,15 @@ describe('WatchKindPage', () => {
     }
     const category = makeCategory({ id: 'mikvah', detailFields: [{ key: 'women_notes', label: 'Women’s Notes', type: 'textarea' }, { key: 'men_notes', label: 'Men’s Notes', type: 'textarea' }] })
     const item = makeListing({ id: 'lmc', category: 'mikvah', name: 'LMC' })
-    await renderPage([place('lmc', 'LMC', { category: 'mikvah', categoryLabel: 'Mikvahs', href: '/philly/mikvahs/lmc' })], 'mikvah', (url, init) => {
+    await renderPage('lmc', [place('lmc', 'LMC', { category: 'mikvah', categoryLabel: 'Mikvahs', href: '/philly/mikvahs/lmc' })], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'mikvah', pluralLabel: 'Mikvahs', kind: 'listing', hasAddress: true }] }
       if (url.includes('item=lmc')) return { ok: true, item, category }
       if (url.includes('/api/admin/watches/hours') && !url.includes('job=times') && !init?.method) return { name: 'Mikvah hours', places: [mikvah] }
     })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /LMC/ }))
     expect(screen.getAllByTestId('waiting-group')).toHaveLength(1)
-    await user.click(within(screen.getByTestId('kind-place-open')).getByRole('button', { name: 'Edit' }))
+    await user.click(within(screen.getByTestId('place-open')).getByRole('button', { name: 'Edit' }))
     let sheet = await screen.findByRole('dialog')
     expect(within(sheet).getByDisplayValue('Call ahead.')).toBeInTheDocument()
     await user.click(within(sheet).getByRole('button', { name: 'Save to the listing' }))
@@ -310,7 +287,7 @@ describe('WatchKindPage', () => {
       newPlaces: [{ name: 'Rita’s', address: '1 Main St', on: [{ list: 'mekor', name: 'Rita’s', url: '', says: '' }], archived: 'Rita’s Water Ice', archivedId: 'r-old', filed: 'queued', findings: [f] }],
     }
     const sent: unknown[] = []
-    await renderPage([], 'restaurant', (url, init) => {
+    await renderPage('new:Rita’s', [], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'restaurant', pluralLabel: 'Food', kind: 'listing', hasAddress: true }] }
       if (url.includes('/api/admin/watches/kosher') && !init?.method) return { ok: true, ...kosher }
       if (init?.method) {
@@ -319,8 +296,7 @@ describe('WatchKindPage', () => {
       }
     })
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Rita’s/ }))
-    const [g] = within(screen.getByTestId('kind-place-open')).getAllByTestId('waiting-group')
+    const [g] = within(screen.getByTestId('place-open')).getAllByTestId('waiting-group')
     expect(within(g).getAllByRole('button').map((b) => b.textContent)).toEqual(['Bring it back', 'Add as new', 'Don’t add'])
     await user.click(within(g).getByRole('button', { name: 'Bring it back' }))
     expect(sent).toEqual([['POST', '/api/admin/watches/kosher', { action: 'restore', resourceId: 'r-old', id: 'n1' }]])
@@ -330,97 +306,210 @@ describe('WatchKindPage', () => {
     const at = new Date().toISOString()
     const ritas = place('r', 'Rita’s', { closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: at, readAt: at, kept: null } })
     const sent: unknown[] = []
-    await renderPage([ritas], 'synagogue', (url, init) => {
+    await renderPage('r', [ritas], (url, init) => {
       if (init?.method) {
         sent.push(JSON.parse(String(init.body)))
         return { ok: true }
       }
     })
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Rita’s/ }))
-    const [g] = within(screen.getByTestId('kind-place-open')).getAllByTestId('waiting-group')
+    const [g] = within(screen.getByTestId('place-open')).getAllByTestId('waiting-group')
     expect(g.textContent).toBe(`From its Google listing · ${day(at)}Open or closedClosed for nowWas OpenOn the siteShown closed since ${day(at)}Opens again by itself when Google says open.Keep closedShow as open`)
     await user.click(within(g).getByRole('button', { name: 'Keep closed' }))
     expect(sent).toEqual([{ action: 'open', open: false, id: 'r' }])
   })
 
-  it('says where an up-to-date place is read from', async () => {
-    await renderPage([place('a', 'Kesher Israel')])
-    await userEvent.setup().click(tab(/Up to date/))
-    expect(rows()).toEqual(['Kesher IsraelGoogle'])
-    await userEvent.setup().click(tab(/Waiting for you/))
-    expect(within(screen.getByRole('tabpanel')).getByText('Nothing waiting.')).toBeTruthy()
-  })
-
-  it('opens a place up to date in its boxes, and reads, adds and changes its sources', async () => {
+  // Nov 1, boards Rule4, Listing6, Menu5, Change5: a job's row opens a page
+  // that already exists. With nothing to decide, that's the listing.
+  describe('nothing waiting: its listing, as in Places', () => {
     const at = new Date(Date.now() - 3_600_000).toISOString()
     const page = { id: 'w1', url: 'https://kesher.example/davening', active: true, lastRunAt: at, lastOkAt: at, lastError: null, failingSince: null, createdAt: at, lastCheck: { at, what: 'times', from: 'page', result: 'agrees', read: [], parts: [{ part: 'weekday', size: 1 }], differences: [], queue: null } }
     const shul = { id: 'a', name: 'Kesher Israel', href: '/philly/synagogues/a', website: 'https://kesher.example', pages: [{ watch: page }], off: false, reason: null, fields: [], times: { key: 'minyanim', minyanim: [{ id: 'm', tefillah: 'shacharis', days: ['mon'], time: '7 AM' }], schedules: [] } }
+    const shulCategory = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }, { key: 'website', label: 'Website', type: 'url' }] as never })
+    const row = (over = {}) => ({ id: 'a', name: 'Kesher Israel', category: 'synagogue', status: 'approved', hasAddress: true, changedAt: at, listing: makeListing({ id: 'a', name: 'Kesher Israel', category: 'synagogue', minyanim: [{ id: 'm', tefillah: 'shacharis', days: ['mon'], time: '7 AM' }], ...over } as never) })
     const posts: unknown[] = []
-    await renderPage([place('a', 'Kesher Israel')], 'synagogue', (url, init) => {
-      if (url.includes('job=times') && !init?.method) return { name: 'Shul times', places: [shul] }
-      if (init?.method === 'POST') {
-        const body = JSON.parse(String(init.body))
-        posts.push([url.replace(/[?&]community=philly/, ''), body])
-        return body.action === 'check' && !body.id && url.includes('hours') ? { read: ['w1'] } : { ok: true }
-      }
+    const listingPage = (over: { places?: unknown[]; job?: (url: string) => unknown; google?: unknown[] } = {}) =>
+      renderPage('a', over.google ?? [place('a', 'Kesher Israel')], (url, init) => {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(String(init.body))
+          posts.push([url.replace(/[?&]community=philly/, ''), body])
+          return { ok: true }
+        }
+        if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }
+        if (url.includes('/api/admin/listings')) return { ok: true, places: over.places ?? [row()], categories: [shulCategory] }
+        return over.job?.(url)
+      })
+    const withTimes = (url: string) => (url.includes('job=times') ? { name: 'Shul times', places: [shul] } : undefined)
+    afterEach(() => {
+      posts.length = 0
     })
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Kesher Israel/ }))
-    const open = screen.getByTestId('kind-place-open')
-    expect(within(open).getAllByTestId('job-box').map((b) => b.getAttribute('aria-label'))).toEqual(['Usual weekday times', 'Name and contact'])
-    expect(within(open).getAllByTestId('box-source').map((f) => f.textContent)).toEqual([`Same as kesher.example/davening · read ${day(at)} · Change · Stop`, `Same as its Google listing · read ${day(new Date().toISOString())}`])
 
-    // Read it now: its website searched, then its page read.
-    await user.click(within(open).getByRole('button', { name: 'Read it now' }))
-    expect(posts).toEqual([
-      ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
-      ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
-    ])
+    it('opens the listing, not a watch screen, and each row names only its job', async () => {
+      await listingPage({ job: withTimes })
+      expect(screen.queryByTestId('place-open')).toBeNull()
+      expect(screen.getByRole('button', { name: 'No changes yet' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Archive it' })).toBeTruthy()
+      const jobs = screen.getAllByTestId('row-job').map((j) => j.textContent)
+      expect(jobs).toContain('Minyan times')
+      expect(jobs).toContain('Google')
+      for (const job of jobs) expect(job).not.toMatch(/\d/)
+    })
 
-    // Add a source: a newsletter's email, as a newsletter.
-    posts.length = 0
-    await user.click(within(open).getByRole('button', { name: 'Add a source' }))
-    await user.type(within(open).getByLabelText('A web page, or the email its newsletter comes from'), 'office@kesher.example')
-    expect(within(open).getByText('An email: read for its times. Subscribe the guide’s inbox to it too.')).toBeTruthy()
-    await user.click(within(open).getByRole('button', { name: 'Add' }))
-    expect(posts).toEqual([['/api/admin/watches', { action: 'add', purpose: 'times', url: 'office@kesher.example', resourceId: 'a' }]])
+    it('its row opened says where it’s read, and Change saves another page or stops it', async () => {
+      await listingPage({ job: withTimes })
+      const user = userEvent.setup()
+      const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!
+      await user.click(minyans)
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Change`)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      const change = screen.getByTestId('source-screen')
+      expect(within(change).getByRole('textbox')).toHaveValue('https://kesher.example/davening')
+      await user.clear(within(change).getByRole('textbox'))
+      await user.type(within(change).getByRole('textbox'), 'https://kesher.example/times')
+      await user.click(within(change).getByRole('button', { name: 'Save' }))
+      expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]])
+    })
 
-    // Change: another page, in place of the one it reads.
-    posts.length = 0
-    await user.click(within(open).getByRole('button', { name: 'Change' }))
-    await user.type(within(open).getByLabelText('The page to read instead'), 'https://kesher.example/times')
-    await user.click(within(open).getByRole('button', { name: 'Use this' }))
-    expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]])
+    it('Stop reading it, on the Change screen: nothing asked first, it can be started again', async () => {
+      await listingPage({ job: withTimes })
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
+      expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
+    })
 
-    // Stop: the page no longer read, as its job page's Reads × did.
-    posts.length = 0
-    await user.click(within(open).getByRole('button', { name: 'Stop' }))
-    expect(within(open).getByText('Stop reading kesher.example/davening?')).toBeTruthy()
-    await user.click(within(open).getByRole('button', { name: 'Stop reading' }))
-    expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
+    it('a page stopped says Stopped; Start reading reads at once, and a failed read says so and stays', async () => {
+      const off = { ...shul, off: true }
+      await renderPage('a', [place('a', 'Kesher Israel')], (url, init) => {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(String(init.body))
+          posts.push([url.replace(/[?&]community=philly/, ''), body])
+          if (body.action === 'check') return body.id ? { pages: [{ id: 'w1', url: page.url, lastError: 'It wouldn’t open' }] } : { read: ['w1'] }
+          return { ok: true }
+        }
+        if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }
+        if (url.includes('/api/admin/listings')) return { ok: true, places: [row()], categories: [shulCategory] }
+        return url.includes('job=times') ? { name: 'Shul times', places: [off] } : undefined
+      })
+      const user = userEvent.setup()
+      const job = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Stopped')!
+      await user.click(job.closest('button')!)
+      expect(screen.getByTestId('row-source')).toHaveTextContent('Stopped · Change')
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      expect(screen.getByRole('textbox')).toHaveValue(page.url)
+      await user.click(screen.getByRole('button', { name: 'Start reading' }))
+      expect(posts).toEqual([
+        ['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }],
+        ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
+        ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
+      ])
+      expect(await screen.findByText('Couldn’t read that page')).toBeTruthy()
+      expect(screen.getByTestId('source-screen')).toBeTruthy()
+    })
+
+    it('a Google field: Stop, then Use Google’s; none to use says so where it’s asked', async () => {
+      const phoneCategory = shulCategory
+      const fields = [field('Name', 'google'), field('Phone', 'google')]
+      await renderPage('a', [place('a', 'Kesher Israel', { fields })], (url, init) => {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(String(init.body))
+          posts.push([url.replace(/[?&]community=philly/, ''), body])
+          if (body.action === 'use_field') throw new Error('Google has no phone for this place')
+          return { ok: true }
+        }
+        if (url.includes('item=a')) return { ok: true, item: makeListing({ id: 'a', name: 'Kesher Israel', category: 'synagogue' }), category: 'synagogue' }
+        if (url.includes('/api/admin/categories')) return { ok: true, categories: [phoneCategory] }
+        if (url.includes('/api/admin/listings')) return { ok: true, places: [row({ phone: '215-555-0100', address: '1 Main St' })], categories: [phoneCategory] }
+      })
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
+      const line = () => screen.getByTestId('row-source')
+      expect(line()).toHaveTextContent(`Google · ${day(new Date().toISOString())} · Stop`)
+      await user.click(within(line()).getByRole('button', { name: 'Stop' }))
+      expect(posts).toEqual([['/api/admin/watches/google', { action: 'stop_field', id: 'a', field: 'phone' }]])
+    })
+
+    it('says so for a place nothing watches', async () => {
+      await renderPage('gone', [place('a', 'Kesher Israel')], (url) => (url.includes('/api/admin/listings') ? { ok: true, places: [], categories: [] } : undefined))
+      expect(screen.getByText('Nothing is watching this place now.')).toBeTruthy()
+      expect(screen.queryByTestId('place-open')).toBeNull()
+    })
+
+    it('says it couldn’t load a place whose list didn’t come back', async () => {
+      await renderPage('gone', [place('a', 'Kesher Israel')])
+      expect(screen.getByText('Couldn’t load this place.')).toBeTruthy()
+    })
   })
 
-  it('has no Read it now for a place read only from Google', async () => {
-    await renderPage([place('a', 'Kesher Israel')])
-    const user = userEvent.setup()
-    await user.click(tab(/Up to date/))
-    await user.click(screen.getByRole('button', { name: /Kesher Israel/ }))
-    const open = screen.getByTestId('kind-place-open')
-    expect(within(open).queryByRole('button', { name: /Read (it|them) now/ })).toBeNull()
-    expect(within(open).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/synagogues/a')
+  // The user, Oct 31: Sababa Falafel, from the Google job, opened a page of
+  // every Food place with its card far below the fold.
+  it('is only that place, under its name, and Back goes where it was opened from', async () => {
+    const places = [place('a', 'Kesher Israel'), place('b', 'Lower Merion Synagogue')]
+    for (const [from, label, href] of [['todo', 'To do', '/philly/admin'], ['job/google', 'Google', '/philly/admin/watches/job/google'], [undefined, 'Watches', '/philly/admin/watches']] as const) {
+      await renderPage('a', places, undefined, from)
+      expect(screen.getByRole('heading', { name: 'Kesher Israel' })).toBeTruthy()
+      expect(screen.queryByText('Lower Merion Synagogue')).toBeNull()
+      expect(screen.queryByRole('tab')).toBeNull()
+      expect(screen.getByRole('link', { name: new RegExp(label) })).toHaveAttribute('href', href)
+      cleanup()
+    }
   })
 
-  it('says so for a kind nothing watches', async () => {
-    await renderPage([place('a', 'Kesher Israel')], 'whatsapp')
-    expect(screen.getByText('Nothing of this kind is watched.')).toBeTruthy()
+  describe('once it’s decided', () => {
+    const at = new Date().toISOString()
+    const closed = { closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: at, readAt: at, kept: null } }
+    const decided = { closure: { status: 'CLOSED_TEMPORARILY', shownOpen: false, since: at, readAt: at, kept: at } }
+
+    it('goes back when nothing is left to do for it', async () => {
+      mockRouter.push.mockClear()
+      let row = place('r', 'Rita’s', closed)
+      await renderPage('r', [], (url, init) => {
+        if (url.includes('/api/admin/watches/google') && init?.method) {
+          row = place('r', 'Rita’s', decided)
+          return { ok: true }
+        }
+        if (url.includes('/api/admin/watches/google')) return { ok: true, counts: {}, places: [row] }
+      }, 'todo')
+      expect(mockRouter.push).not.toHaveBeenCalled()
+      await userEvent.setup().click(within(screen.getByTestId('waiting-group')).getByRole('button', { name: 'Keep closed' }))
+      await act(() => new Promise((r) => setTimeout(r, 0)))
+      expect(mockRouter.push).toHaveBeenCalledWith('/philly/admin')
+    })
+
+    it('stays while something else is left', async () => {
+      mockRouter.push.mockClear()
+      const compare = { at, rows: [{ field: 'phone', label: 'Phone', google: '610-555-0199', changed: true }] }
+      const fields = [field('Name', 'google'), { field: 'phone', label: 'Phone', value: '610-555-0100', by: { kind: 'google' } }]
+      let row = place('r', 'Rita’s', { ...closed, compare, fields })
+      await renderPage('r', [], (url, init) => {
+        if (url.includes('/api/admin/watches/google') && init?.method) {
+          row = place('r', 'Rita’s', { ...decided, compare, fields })
+          return { ok: true }
+        }
+        if (url.includes('/api/admin/watches/google')) return { ok: true, counts: {}, places: [row] }
+      }, 'todo')
+      await userEvent.setup().click(within(screen.getByTestId('place-open')).getByRole('button', { name: 'Keep closed' }))
+      await act(() => new Promise((r) => setTimeout(r, 0)))
+      expect(mockRouter.push).not.toHaveBeenCalled()
+    })
+
+    it('doesn’t go back for what was read on an earlier visit catching up', async () => {
+      mockRouter.push.mockClear()
+      let row = place('r', 'Rita’s', closed)
+      await renderPage('r', [], (url) => (url.includes('/api/admin/watches/google') ? { ok: true, counts: {}, places: [row] } : undefined), 'todo')
+      cleanup()
+      row = place('r', 'Rita’s', decided)
+      await renderPage('r', [], (url) => (url.includes('/api/admin/watches/google') ? { ok: true, counts: {}, places: [row] } : undefined), 'todo')
+      expect(mockRouter.push).not.toHaveBeenCalled()
+    })
   })
 })
 
 // Oct 25 (the user): "the job page has all the info of eruv tracked but
 // … when you click eruv it only tracks eruv status". Its Details, Map and
 // what the Eruv page did with its sources, here.
-describe('an eruv, on its kind’s page', () => {
+describe('an eruv', () => {
   const at = new Date(Date.now() - 3_600_000).toISOString()
   const BASE = {
     id: 'x', name: 'x', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false,
@@ -433,8 +522,8 @@ describe('an eruv, on its kind’s page', () => {
   const NORTHEAST = { ...BASE, id: 'ne', name: 'Northeast Eruv', website: 'https://neeruv.org/' }
   const site = { id: 'w-lm', communityId: 'philly', kind: 'website', url: 'https://lowermerioneruv.org/', resourceId: null, active: true, lastRunAt: at, lastOkAt: at, lastError: null, failingSince: null, createdAt: at, lastCheck: null, createdBy: 'eruv website' }
   const posts: unknown[] = []
-  const eruvPage = (found: unknown = { ok: true, found: [], error: null }) =>
-    renderPage([], 'eruv-information', (url, init) => {
+  const eruvPage = (id: string, found: unknown = { ok: true, found: [], error: null }) =>
+    renderPage(id, [], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'eruv-information', pluralLabel: 'Eruv Information', kind: 'eruv' }] }
       if (url.includes('/api/admin/watches/eruv') && !init?.method) return { available: true, timezone: 'America/New_York', eruvim: [LM, ELKINS, NORTHEAST], findings: [], watches: [site] }
       if (init?.method === 'POST') {
@@ -447,58 +536,62 @@ describe('an eruv, on its kind’s page', () => {
     posts.length = 0
   })
 
-  it('opens in its Details, Status and Map, each footed with where it’s read, and stops or changes each', async () => {
-    await eruvPage()
+  // Nov 1, boards EruvListing6, EruvStatus5.
+  it('with nothing waiting, opens as a listing: every row the Eruvs job’s, but its Website', async () => {
+    await eruvPage('lm')
     const user = userEvent.setup()
-    await user.click(tab(/Up to date/))
-    await user.click(screen.getByRole('button', { name: /Lower Merion Eruv/ }))
-    const open = screen.getByTestId('kind-place-open')
-    expect(within(open).getAllByTestId('job-box').map((b) => b.getAttribute('aria-label'))).toEqual(['Status', 'Details', 'Map'])
-    expect(within(open).getAllByTestId('box-source').map((f) => f.textContent)).toEqual([
-      `Same as its status page · read ${day(at)} · Change · Stop`,
-      `Same as lowermerioneruv.org · read ${day(at)} · Stop`,
-      `Same as its map · read ${day(at)} · Change · Stop`,
-    ])
-    expect(within(open).getByText('(610) 664-5626')).toBeTruthy()
-    expect(within(open).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/eruv?item=lm')
+    expect(screen.queryByTestId('place-open')).toBeNull()
+    const rowOf = (id: string) => screen.getByTestId(`editor-row-${id}`)
+    expect(rowOf('status')).toHaveTextContent('Status')
+    expect(rowOf('map')).toHaveTextContent('On the map')
+    expect(rowOf('hotline')).toHaveTextContent('(610) 664-5626')
+    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveTextContent('Eruvs')
+    expect(within(rowOf('website')).getByTestId('row-job')).toHaveTextContent('Nothing')
 
-    // Read them now: its status page and map, then its website.
-    await user.click(within(open).getByRole('button', { name: 'Read them now' }))
-    expect(posts).toEqual([
-      ['/api/admin/eruvim', { id: 'lm', action: 'check' }],
-      ['/api/admin/watches/eruv', { action: 'read', id: 'lm' }],
-    ])
-
-    // Its page dates each week's post.
+    await user.click(rowOf('status'))
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`Its status page · ${day(at)} · Change`)
+    await user.click(screen.getByRole('checkbox', { name: 'Its page dates each week’s post' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { statusDated: true } }]])
     posts.length = 0
-    await user.click(within(open).getByRole('checkbox', { name: 'Its page dates each week’s post' }))
-    expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusDated: true } }]])
 
-    // Stop reading its map, asked first.
-    posts.length = 0
-    const map = within(open).getAllByTestId('job-box')[2]
-    await user.click(within(map).getByRole('button', { name: 'Stop' }))
-    await user.click(within(map).getByRole('button', { name: 'Keep reading' }))
-    expect(posts).toEqual([])
-    await user.click(within(map).getByRole('button', { name: 'Stop' }))
-    await user.click(within(map).getByRole('button', { name: 'Stop reading' }))
-    expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { lineUrl: '' } }]])
-
-    // Its website's read paused.
-    posts.length = 0
-    const details = within(open).getAllByTestId('job-box')[1]
-    await user.click(within(details).getByRole('button', { name: 'Stop' }))
-    await user.click(within(details).getByRole('button', { name: 'Stop reading' }))
-    expect(posts).toEqual([['/api/admin/watches', { action: 'pause', id: 'w-lm' }]])
-
-    // Change its status to its emails: the page emptied.
-    posts.length = 0
-    const status = within(open).getAllByTestId('job-box')[0]
-    await user.click(within(status).getByRole('button', { name: 'Change' }))
-    await user.type(within(status).getByLabelText('Its status page, or the address its emails come from'), 'eruv@lowermerioneruv.org')
-    expect(within(status).getByText('An email: read for its status. Subscribe the guide’s inbox to it too.')).toBeTruthy()
-    await user.click(within(status).getByRole('button', { name: 'Use this' }))
+    // Its status to its emails: the page emptied.
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+    await user.clear(screen.getByRole('textbox'))
+    await user.type(screen.getByRole('textbox'), 'eruv@lowermerioneruv.org')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusEmail: 'eruv@lowermerioneruv.org', statusUrl: '' } }]])
+  })
+
+  it('stops reading its map from Change; its website has a line and nothing to do', async () => {
+    await eruvPage('lm')
+    const user = userEvent.setup()
+    await user.click(screen.getByTestId('editor-row-map'))
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+    await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { lineUrl: '' } }]])
+    posts.length = 0
+    await user.click(await screen.findByTestId('editor-row-website'))
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Nothing reads this$/)
+  })
+
+  it('saves what was typed, and only that; the bin archives it after asking', async () => {
+    await eruvPage('lm')
+    const user = userEvent.setup()
+    await user.click(screen.getByTestId('editor-row-hotline'))
+    await user.clear(screen.getByLabelText('Hotline'))
+    await user.type(screen.getByLabelText('Hotline'), '215-555-0100')
+    await user.click(screen.getByRole('button', { name: 'Update the listing' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { hotline: '215-555-0100' } }]])
+    expect(mockRouter.push).toHaveBeenCalled()
+  })
+
+  it('the bin asks first, then archives it', async () => {
+    await eruvPage('lm')
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Archive it' }))
+    expect(posts).toEqual([])
+    await user.click(screen.getByRole('button', { name: 'Archive it' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { active: false } }]])
   })
 
   // Oct 26: Elkins Park's eruv map page, gone (404) every night since Oct 25.
@@ -506,7 +599,7 @@ describe('an eruv, on its kind’s page', () => {
     const since = new Date(Date.now() - 2 * 86_400_000).toISOString()
     const gone = { ...LM, id: 'ep', name: 'Elkins Park Eruv', website: 'https://yiep.example/eruv-map', lineUrl: null, lineReadAt: null }
     const down = { ...site, id: 'w-ep', url: 'https://yiep.example/eruv-map', lastOkAt: since, lastError: 'The page answered 404', failingSince: since }
-    await renderPage([], 'eruv-information', (url, init) => {
+    await renderPage('ep', [], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'eruv-information', pluralLabel: 'Eruv Information', kind: 'eruv' }] }
       if (url.includes('/api/admin/watches/eruv') && !init?.method) return { available: true, timezone: 'America/New_York', eruvim: [gone], findings: [], watches: [down] }
       if (init?.method === 'POST') {
@@ -515,8 +608,7 @@ describe('an eruv, on its kind’s page', () => {
       }
     })
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Elkins Park Eruv/ }))
-    const problem = within(screen.getByTestId('kind-place-open')).getByTestId('problem')
+    const problem = within(screen.getByTestId('place-open')).getByTestId('problem')
     expect(within(problem).getByRole('button', { name: 'Read it now' })).toBeTruthy()
     await user.click(within(problem).getByRole('button', { name: 'Stop' }))
     expect(within(problem).getByText('Stop reading its website?')).toBeTruthy()
@@ -525,20 +617,18 @@ describe('an eruv, on its kind’s page', () => {
   })
 
   it('an email it couldn’t read: say what it says, here', async () => {
-    await eruvPage()
+    await eruvPage('elkins')
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Elkins Park Eruv/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     expect(within(open).getByTestId('eruv-kept-email').textContent).toContain('This week')
     await user.click(within(open).getByRole('button', { name: 'It says up' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'elkins', action: 'email-says', says: 'up' }]])
   })
 
   it('nothing gives its status: find its status page on its website, or add one', async () => {
-    await eruvPage({ ok: true, found: [{ url: 'https://neeruv.org/status', link: 'Status', status: 'up', words: 'The eruv is up' }], error: null })
+    await eruvPage('ne', { ok: true, found: [{ url: 'https://neeruv.org/status', link: 'Status', status: 'up', words: 'The eruv is up' }], error: null })
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Northeast Eruv/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     await user.click(within(open).getByRole('button', { name: 'Find its status page' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'ne', action: 'find' }]])
     expect(within(open).getByTestId('eruv-found').textContent).toContain('Its “Status” page, neeruv.org/status, says it’s up')
@@ -558,11 +648,11 @@ describe('an eruv, on its kind’s page', () => {
 })
 
 // What the Hospitals and Dishes pages' Reads did with a source, here (Oct 25).
-describe('stopping a hospital’s or food place’s source, on its kind’s page', () => {
+describe('stopping a hospital’s or food place’s source', () => {
   const at = new Date(Date.now() - 3_600_000).toISOString()
   const posts: unknown[] = []
-  const kind = (category: string, label: string, job: (url: string) => unknown) =>
-    renderPage([place(category[0], category === 'hospital' ? 'CHOP' : 'Cherry Grill', { category })], category, (url, init) => {
+  const kind = (id: string, category: string, label: string, job: (url: string) => unknown) =>
+    renderPage(id, [place(category[0], category === 'hospital' ? 'CHOP' : 'Cherry Grill', { category })], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: category, pluralLabel: label, kind: 'listing', hasAddress: true }] }
       if (init?.method === 'POST') {
         posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
@@ -577,31 +667,39 @@ describe('stopping a hospital’s or food place’s source, on its kind’s page
 
   it('a hospital Refuah doesn’t have: Not on Refuah, beside Give its page', async () => {
     const chop = { id: 'h', name: 'CHOP', href: '/philly/hospitals/chop', category: 'hospital', watch: null, notOnRefuah: false, source: null, line: '', refuah: null, nearby: [], boxes: [{ title: 'Bikur Cholim', keys: ['bikur'], labels: ['Bikur Cholim room'], now: {} }] }
-    await kind('hospital', 'Hospitals', (url) => (url.includes('/api/admin/watches/hospitals') ? { hospitals: [chop] } : undefined))
+    await kind('h', 'hospital', 'Hospitals', (url) => (url.includes('/api/admin/watches/hospitals') ? { hospitals: [chop] } : undefined))
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /CHOP/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     expect(within(open).getByRole('button', { name: 'Give its page on Refuah' })).toBeTruthy()
     await user.click(within(open).getByRole('button', { name: 'Not on Refuah' }))
     expect(posts).toEqual([['/api/admin/watches/hospitals', { action: 'none', resourceId: 'h' }]])
   })
 
-  it('a food place’s menu: Stop unlinks its menu link', async () => {
+  it('a food place’s menu: Stop reading it unlinks its menu link', async () => {
     const grill = { id: 'r', name: 'Cherry Grill', href: '/philly/restaurants/cherry', category: 'restaurant', dishes: ['Schnitzel'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved', readAt: at, sourceUrl: 'https://cherrygrill88.com/menu', dishes: [{ name: 'Schnitzel', quote: 'Schnitzel', checked: true }] } }
-    await kind('restaurant', 'Restaurants', (url) => (url.includes('/api/admin/main-dishes') ? { places: [grill] } : undefined))
+    const restaurant = makeCategory({ id: 'restaurant', label: 'Restaurant', pluralLabel: 'Restaurants', detailFields: [{ key: 'mainDishes', label: 'Main dishes', type: 'tags', countLabel: 'dish', showCountInHeader: true }] as never })
+    const row = { id: 'r', name: 'Cherry Grill', category: 'restaurant', status: 'approved', hasAddress: true, changedAt: at, listing: makeListing({ id: 'r', name: 'Cherry Grill', category: 'restaurant', mainDishes: ['Schnitzel'] } as never) }
+    await renderPage('r', [place('r', 'Cherry Grill', { category: 'restaurant' })], (url, init) => {
+      if (init?.method === 'POST') {
+        posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [restaurant] }
+      if (url.includes('/api/admin/listings')) return { ok: true, places: [row], categories: [restaurant] }
+      if (url.includes('/api/admin/main-dishes')) return { places: [grill] }
+    })
     const user = userEvent.setup()
-    await user.click(tab(/Up to date/))
-    await user.click(screen.getByRole('button', { name: /Cherry Grill/ }))
-    const open = screen.getByTestId('kind-place-open')
-    await user.click(within(open).getByRole('button', { name: 'Stop' }))
-    await user.click(within(open).getByRole('button', { name: 'Stop reading' }))
+    await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Menus')!.closest('button')!)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Change`)
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+    await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])
   })
 })
 
 // Oct 26 (the user: "have everything accounted for so then we can remove
 // job pages"): what only the job pages did, on the kinds' pages.
-describe('what the job pages did, on its kind’s page', () => {
+describe('what the job pages did', () => {
   const posts: unknown[] = []
   const answer = (job: (url: string) => unknown) => (url: string, init?: RequestInit) => {
     if (init?.method === 'POST') {
@@ -614,68 +712,24 @@ describe('what the job pages did, on its kind’s page', () => {
     posts.length = 0
   })
 
-  // What's tracked links a place on its kind's page (?place=).
-  it('a link to a place opens it, on its tab', async () => {
-    await renderPage([place('a', 'Kesher Israel'), place('b', 'Lower Merion Synagogue', { section: 'to_check', fields: [field('Name', 'google'), field('Website', 'nothing')] })], 'synagogue', () => undefined, 'a')
-    expect(tab(/Up to date/)).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByTestId('kind-place-open')).toHaveAttribute('aria-label', 'Kesher Israel')
-    // Another tab picked: the link is done with.
-    await userEvent.setup().click(tab(/Not checked/))
-    expect(screen.queryByTestId('kind-place-open')).toBeNull()
-  })
-
-  it('a shul turned off, and a page of it stopped: Not read, each with Read it again', async () => {
-    const stopped = { id: 'x', url: 'https://kesher.example/events', active: false, lastRunAt: null, lastOkAt: null, lastError: null, failingSince: null, createdAt: new Date().toISOString(), lastCheck: null }
-    const shul = { id: 'a', name: 'Kesher Israel', href: '/philly/synagogues/a', website: 'https://kesher.example', pages: [], stopped: [{ watch: stopped }], off: true, reason: null, fields: [], times: { key: 'minyanim', minyanim: [], schedules: [] } }
-    await renderPage([place('a', 'Kesher Israel')], 'synagogue', answer((url) => (url.includes('job=times') ? { name: 'Shul times', places: [shul] } : undefined)), 'a')
-    const open = screen.getByTestId('kind-place-open')
-    const notRead = within(open).getByRole('region', { name: 'Not read' })
-    expect(notRead).toHaveTextContent('Not read · kesher.exampleRead it againNot read · kesher.example/eventsRead it again')
-    const user = userEvent.setup()
-    const [place_, page] = within(notRead).getAllByRole('button', { name: 'Read it again' })
-    await user.click(place_)
-    await user.click(page)
-    expect(posts).toEqual([
-      ['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }],
-      ['/api/admin/watches/hours?job=times', { action: 'again', resourceId: 'a', id: 'x' }],
-    ])
-  })
-
   it('a field nothing checks, on a place Google has: Check it against Google', async () => {
-    await renderPage([place('b', 'Lower Merion Synagogue', { section: 'to_check', fields: [field('Name', 'google'), field('Website', 'nothing')] })], 'synagogue', answer(() => undefined))
+    await renderPage('b', [place('b', 'Lower Merion Synagogue', { section: 'to_check', fields: [field('Name', 'google'), field('Website', 'nothing')] })], answer(() => undefined))
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Lower Merion Synagogue/ }))
-    await user.click(within(screen.getByTestId('kind-place-open')).getByRole('button', { name: 'Check it against Google' }))
+    await user.click(within(screen.getByTestId('place-open')).getByRole('button', { name: 'Check it against Google' }))
     expect(posts).toEqual([['/api/admin/watches/google', { action: 'check', id: 'b' }]])
   })
 
   const food = (job: (url: string) => unknown) =>
-    renderPage([place('r', 'Joy Cafe', { category: 'restaurant' })], 'restaurant', (url, init) => {
+    renderPage('r', [place('r', 'Joy Cafe', { category: 'restaurant' })], (url, init) => {
       if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'restaurant', pluralLabel: 'Restaurants', kind: 'listing', hasAddress: true }] }
       return answer(job)(url, init)
     })
-
-  it('a food place on neither kosher list: Change gives its page on Keystone-K’s list', async () => {
-    const kosher = { available: true, lists: [], counts: {}, places: [{ id: 'r', name: 'Joy Cafe', category: 'restaurant', certs: ['OU'], levels: [], on: [], differences: [], href: '/x' }], newPlaces: [] }
-    await food((url) => (url.includes('/api/admin/watches/kosher') ? kosher : undefined))
-    const user = userEvent.setup()
-    await user.click(tab(/Up to date/))
-    await user.click(screen.getByRole('button', { name: /Joy Cafe/ }))
-    const open = screen.getByTestId('kind-place-open')
-    const box = within(open).getAllByTestId('job-box').find((b) => b.getAttribute('aria-label') === 'Kosher')!
-    expect(box).toHaveTextContent('HechsherOUOn neither list')
-    await user.click(within(box).getByRole('button', { name: 'Change' }))
-    await user.type(within(open).getByLabelText('Its page on Keystone-K’s list'), 'https://keystone-k.org/kosher/joy-cafe/')
-    await user.click(within(open).getByRole('button', { name: 'Use this' }))
-    expect(posts).toEqual([['/api/admin/watches/kosher', { action: 'page', resourceId: 'r', url: 'https://keystone-k.org/kosher/joy-cafe/' }]])
-  })
 
   it('a menu that can’t be read: photos of it, or No menu online', async () => {
     const joy = { id: 'r', name: 'Joy Cafe', href: '/x', category: 'restaurant', dishes: ['Falafel'], website: 'https://joy.example', menuUrl: 'https://joy.example/menu', reading: { status: 'failed', readAt: new Date().toISOString() } }
     await food((url) => (url.includes('/api/admin/main-dishes') ? { places: [joy] } : undefined))
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Joy Cafe/ }))
-    const open = screen.getByTestId('kind-place-open')
+    const open = screen.getByTestId('place-open')
     await user.upload(within(open).getByLabelText('Photos of the menu'), new File(['x'], 'menu.jpg', { type: 'image/jpeg' }))
     await user.click(within(open).getByRole('button', { name: 'No menu online' }))
     expect(posts).toEqual([
