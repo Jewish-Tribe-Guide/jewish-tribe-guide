@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 31, 2026.
+Last updated: Nov 1, 2026.
 
 ## The branch
 
@@ -2147,6 +2147,19 @@ nothing first, since Start reading undoes it. Save on Change doesn't report a
 failed read; only Start reading does. The "Checked by" filter doesn't cover eruvs.
 Gone with the old screen, as drawn: "Read it now" and "Open its listing" for a
 place with nothing waiting.
+
+**Drawn Nov 1, not built (the *8 boards on the same canvas), waiting on the
+user:** Add a place says how each field will be watched, in the same rows and
+one line as a saved listing. It starts with Find the place, as visitors' Add
+does, and Google is read as soon as the listing is added. Before saving, the
+line reads "Google · Stop", "Google stops keeping this", "Its website · tomorrow
+morning · Change" or "Nothing reads this · Add a source". Change's box starts
+empty, since nothing is searched until it's saved, and a page given there is
+read on adding. If that read fails, the screen says "Couldn't read that page"
+instead of going back to the list. Added while drawing, for the user to judge: a
+job's name on the "Not on the listing yet" lines; "Find it on Google" on a place
+filled in by hand; "when one comes" for a newsletter's email. Drawn for a shul
+only; kosher places and hospitals aren't traced yet.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
