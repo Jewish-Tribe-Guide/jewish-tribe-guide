@@ -2135,8 +2135,10 @@ VKdnqd5xkP37DP1DKcN5qy):** a job's row opens the Places listing unless a change
 or a failed read waits; each row names its job, and its bubble holds one line ("Its menu · Oct 20 ·
 Change", Stop inside Change); Archive is a red bin beside Update the listing;
 eruvs join Places. Latest listing boards are *6: rows use the Watches job names,
-Stopped opens Change with one Start reading button. Undecided: eruv maps read
-only by the nightly job, served from the saved copy.
+Stopped opens Change with one Start reading button. The *7 boards replace
+Phone5 for fields Google keeps: "Google · Oct 19 · Stop", then Use Google's to
+go back, and a cleared field stays blank (today Google refills it). Undecided:
+eruv maps read only by the nightly job, served from the saved copy.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
