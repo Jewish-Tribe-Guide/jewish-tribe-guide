@@ -88,6 +88,7 @@ export default function DesktopTopicsManager({
   settings,
   onSettingChange,
   token,
+  onOpenCard,
 }: {
   sections: DraftHomeSection[]
   onChange: (sections: DraftHomeSection[]) => void
@@ -100,6 +101,8 @@ export default function DesktopTopicsManager({
   /** For the email sign-up card's list of who signed up; without it the
    *  list isn't shown. */
   token?: string
+  /** A row opened, or null when closed: the preview lights that card up. */
+  onOpenCard?: (kind: string | null) => void
 }) {
   // The home page's cards, in order, as rows (board 7): a row opens in
   // place to its words, width and order; taking one off asks once.
@@ -159,7 +162,10 @@ export default function DesktopTopicsManager({
                 type="button"
                 aria-expanded={open}
                 aria-describedby={meta ? `${c.id}-line` : undefined}
-                onClick={() => setOpenId(open ? null : c.id)}
+                onClick={() => {
+                  setOpenId(open ? null : c.id)
+                  onOpenCard?.(open ? null : c.kind)
+                }}
                 className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-2.5 min-h-[56px] text-left hover:bg-slate-50 cursor-pointer"
               >
                 <span className="flex-1 min-w-0 flex flex-col gap-0.5">

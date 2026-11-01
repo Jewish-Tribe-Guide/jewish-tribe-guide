@@ -14,7 +14,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(async () => ({ watches: [] })), parseOkJson: vi.fn() }))
 
-const empty: TodoData = { submissions: [], searches: [], addable: [], canDismiss: false, canTeach: false, responses: [], unmatched: [], setup: null }
+const empty: TodoData = { submissions: [], responses: [], unmatched: [], setup: null }
 const show = (data: TodoData) => renderWithProviders(<TodoList data={data} token="tok" categoriesById={new Map()} onOpen={() => {}} />, { community: { slug: 'philly' } })
 
 afterEach(() => {

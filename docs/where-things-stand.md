@@ -2109,11 +2109,26 @@ pick them (`changeLines.ts`). A new place still uses the old review.
 - Already-sent emails still work: `kind/…?place=` goes to the place, `kind/…` to
   To do. A list's digest (Keystone, Mekor) opens To do.
 
-**Next:** category switches, home wording, hiding forms. Map, Candle Lighting
-and Eruv become switches, default on; Jewish Medical Resources goes; home rows
-light up their spot in the preview; Responses becomes Feedback; the inbox
-sentence goes; searches only in Reports; Delete shows on the community card.
-Support and Volunteer tiles off on Philly needs a yes on the live site.
+**Built Nov 1 (the rest of the newcomer batch):**
+
+- Category pages hold places only. Map, Candle Lighting and Eruv are switches
+  under "On the site", on by default for a new community, empty or cloned. A
+  community with no row yet shows the switch off; the first on creates the row.
+- Jewish Medical Resources is gone from admin and isn't cloned. Its public code
+  stays, unreachable; Philly's row stays hidden. Deleting that row needs a yes.
+- Forms are hidden (`features.formsTab`). Responses is now Feedback, without the
+  inbox sentence. The forms page still answers at its address. Nothing needed
+  changing on the live site: Support and Volunteer were already off on Philly.
+- Searches are off To do. Reports shows "Asked more than once"; every search
+  folds under it.
+- Home page: boxes renamed, hovering or tabbing into one lights its part of the
+  preview beside it (computer-width admin only, a phone has no preview beside),
+  "Not on the phone version." when it isn't there, a sample link-preview card,
+  one line on what a campaign is for.
+- Delete shows on the community card, except the default community's.
+
+**To do for the user:** Washington has no Map, Candle Lighting or Eruv rows, so
+after this deploys its switches show off. Flip them in its Category pages.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten

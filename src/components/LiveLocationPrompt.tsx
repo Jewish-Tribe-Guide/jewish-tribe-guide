@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
+import { isPreviewMode } from '@/lib/previewDraft'
 
 const PROMPT_KEY = 'jpc:live-location-prompt'
 // How long to wait before asking again after a "Not now" — not a permanent
@@ -30,6 +31,8 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
 
   useEffect(() => {
     if (interactedRef.current) return
+    // The admin's preview is there to show the page, and can't answer it.
+    if (isPreviewMode()) return
     if (!enabled) {
       // Self-correcting: `enabled` can start out true for a render or two
       // before a pending silent auto-resume (see useLiveLocation's

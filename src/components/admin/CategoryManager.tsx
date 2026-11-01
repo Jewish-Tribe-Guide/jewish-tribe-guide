@@ -13,32 +13,14 @@ import EruvimManager from './EruvimManager'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
-import { AdminEmpty } from './AdminUI'
+import { AdminBox, AdminEmpty, AdminSwitch, Chevron } from './AdminUI'
+import { siteScreenState, type SiteScreen } from '@/lib/siteScreens'
 
-// ── The categories manager: Site's Category pages tab — the listing
-// categories (Grocery Stores, Synagogues, …, each with its own detail fields
-// and capabilities) and the fixed screens (Map, Zmanim, …). Forms have their
-// own tab (FormsManager.tsx). Writes go through /api/admin/categories. ──
-
-// The singleton pseudo-categories an admin can add/remove but never edit —
-// there's nothing to configure, they just turn a fixed, code-driven screen on
-// or off. See CategoryConfig.kind.
-const SINGLETON_KIND_LABELS = {
-  map: 'Map',
-  zmanim: 'Zmanim',
-  eruv: 'Eruv',
-  medical: 'Jewish Medical Resources',
-} as const
-type SingletonKind = keyof typeof SINGLETON_KIND_LABELS
-
-// A fitting default icon for each — set at creation since there's no editor
-// screen to pick one later.
-const SINGLETON_ICONS: Record<SingletonKind, string> = {
-  map: '🗺️',
-  zmanim: '🕯️',
-  eruv: '🧵',
-  medical: '🏥',
-}
+// ── The categories manager: Site's Category pages tab — the categories that
+// hold places (Grocery Stores, Synagogues, …, each with its own detail fields
+// and capabilities), with the Map, Candle Lighting and Eruv as switches above
+// them, since none of the three is a list of places (the user, Oct 31). Writes
+// go through /api/admin/categories. ──
 
 
 // editingId is opaque to the admin page's history plumbing — encoded here as
@@ -65,7 +47,7 @@ export default function CategoryManager({
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [addingSingleton, setAddingSingleton] = useState<SingletonKind | null>(null)
+  const [switching, setSwitching] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   // The category just saved, and how many saves there have been: its screen
   // starts again from the saved settings, and its Save bar says "Saved."
@@ -97,34 +79,32 @@ export default function CategoryManager({
   useLoadOnMount(load)
 
   const entries = useMemo(
-    () => (categories ? [...categories].sort((a, b) => a.pluralLabel.localeCompare(b.pluralLabel)) : null),
+    () => (categories ? categories.filter((c) => c.kind === 'listing').sort((a, b) => a.pluralLabel.localeCompare(b.pluralLabel)) : null),
     [categories],
   )
 
-  // Adds a singleton pseudo-category (Map, Zmanim, Eruv Information, Jewish
-  // Medical Resources) directly — there's nothing to configure, so this skips
-  // the editor entirely. The DB's partial unique index (category_kind_singleton)
-  // is the real guard against a second one; hiding the button once one exists
-  // (see the render below) is just UX.
-  async function addSingleton(kind: SingletonKind) {
+  // On makes the screen's row the first time and shows it after that; off
+  // hides the row, so its name and photo are still there when it comes back.
+  async function switchScreen(screen: SiteScreen, on: boolean) {
+    if (switching) return
+    const row = categories?.find((c) => c.kind === screen.kind)
     setError(null)
-    setAddingSingleton(kind)
+    setSwitching(screen.kind)
     try {
-      const label = SINGLETON_KIND_LABELS[kind]
       await fetchJson(
-        withCommunity('/api/admin/categories', community),
+        withCommunity(row ? `/api/admin/categories/${row.id}` : '/api/admin/categories', community),
         {
-          method: 'POST',
+          method: row ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ label, pluralLabel: label, kind, icon: SINGLETON_ICONS[kind] }),
+          body: JSON.stringify(row ? { active: on } : { label: screen.label, pluralLabel: screen.label, kind: screen.kind, icon: screen.icon }),
         },
-        'Could not add it.',
+        'Could not change it.',
       )
-      load()
+      await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add it.')
+      setError(err instanceof Error ? err.message : 'Could not change it.')
     } finally {
-      setAddingSingleton(null)
+      setSwitching(null)
     }
   }
 
@@ -170,7 +150,7 @@ export default function CategoryManager({
     }
   }
 
-  const hasMap = !!categories?.some((c) => c.kind === 'map')
+  const hasMap = !!categories?.some((c) => c.kind === 'map' && c.active !== false)
 
   if (editingId === `${CAT_PREFIX}new`) {
     return (
@@ -195,7 +175,7 @@ export default function CategoryManager({
     const initial = categories?.find((c) => c.id === id) ?? null
     if (!initial) return <p className="text-sm text-muted">Loading…</p>
     // Map/Zmanim/Eruv only offer the lightweight icon/background editor
-    // (see SINGLETON_EDITABLE_KINDS) — everything else is a real category.
+    // — everything else is a real category.
     if (initial.kind !== 'listing') {
       return (
         <SingletonEditor
@@ -241,36 +221,44 @@ export default function CategoryManager({
     )
   }
 
-  const missingSingletons = (Object.keys(SINGLETON_KIND_LABELS) as SingletonKind[]).filter(
-    (kind) => !categories?.some((c) => c.kind === kind),
-  )
-
   return (
     <div>
-      <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
-        <div className="flex shrink-0 gap-2 flex-wrap">
-          {missingSingletons.map((kind) => (
-            <button
-              key={kind}
-              onClick={() => addSingleton(kind)}
-              disabled={addingSingleton === kind}
-              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-            >
-              {addingSingleton === kind ? 'Adding…' : `+ Add ${SINGLETON_KIND_LABELS[kind]}`}
-            </button>
-          ))}
-          <button
-            onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-            className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-          >
-            + New category
-          </button>
-        </div>
-      </div>
-
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
+
+      {categories && (
+        <div className="mb-4">
+          <AdminBox title="On the site">
+            {siteScreenState(categories).map(({ screen, row, on }) => (
+              <div key={screen.kind} data-testid={`site-screen-${screen.kind}`} className="flex items-center gap-3 pr-4 border-b border-slate-100 last:border-b-0">
+                {row ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenEditor(`${CAT_PREFIX}${row.id}`)}
+                    className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-2.5 min-h-[52px] text-left text-[15px] font-semibold text-slate-900 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <span className="flex-1 min-w-0">{row.pluralLabel}</span>
+                    <Chevron />
+                  </button>
+                ) : (
+                  <span className="flex-1 min-w-0 pl-4 py-2.5 min-h-[52px] flex items-center text-[15px] font-semibold text-slate-900">{screen.label}</span>
+                )}
+                <AdminSwitch checked={on} label={row?.pluralLabel ?? screen.label} onChange={(next) => void switchScreen(screen, next)} />
+              </div>
+            ))}
+          </AdminBox>
+        </div>
+      )}
+
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
+          className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
+        >
+          + New category
+        </button>
+      </div>
 
       {entries === null ? (
         <p className="text-sm text-muted">Loading…</p>
@@ -278,36 +266,21 @@ export default function CategoryManager({
         <AdminEmpty>Nothing here yet.</AdminEmpty>
       ) : (
         <div className="space-y-2">
-          {entries.map((c) =>
-            c.kind === 'listing' ? (
-              <CategoryRow
-                key={`cat:${c.id}`}
-                category={c}
-                confirmingDelete={confirmDeleteId === c.id}
-                deleting={deletingId === c.id}
-                toggling={togglingId === c.id}
-                onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
-                onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${c.id}`)}
-                onAskDelete={() => setConfirmDeleteId(c.id)}
-                onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteCategory(c.id)}
-                onToggleActive={(active) => toggleCategoryActive(c.id, active)}
-              />
-            ) : (
-              <SingletonRow
-                key={`cat:${c.id}`}
-                category={c}
-                confirmingDelete={confirmDeleteId === c.id}
-                deleting={deletingId === c.id}
-                toggling={togglingId === c.id}
-                onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
-                onAskDelete={() => setConfirmDeleteId(c.id)}
-                onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteCategory(c.id)}
-                onToggleActive={(active) => toggleCategoryActive(c.id, active)}
-              />
-            ),
-          )}
+          {entries.map((c) => (
+            <CategoryRow
+              key={`cat:${c.id}`}
+              category={c}
+              confirmingDelete={confirmDeleteId === c.id}
+              deleting={deletingId === c.id}
+              toggling={togglingId === c.id}
+              onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
+              onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${c.id}`)}
+              onAskDelete={() => setConfirmDeleteId(c.id)}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={() => deleteCategory(c.id)}
+              onToggleActive={(active) => toggleCategoryActive(c.id, active)}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -319,7 +292,7 @@ export default function CategoryManager({
 const TYPE_BADGE = 'text-[10px] font-medium uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0'
 
 // Flips public visibility right from the list — no need to open the full
-// editor just to hide something. Shared by category and singleton rows.
+// editor just to hide something.
 function VisibilityToggle({
   active,
   toggling,
@@ -453,103 +426,7 @@ function CategoryRow({
   )
 }
 
-// The fixed copy for each singleton row's badge + description.
-const SINGLETON_DESCRIPTIONS: Record<SingletonKind, string> = {
-  map: 'The sitewide Map — also unlocks the Map button on listing categories.',
-  zmanim: 'The Zmanim & Shabbos card.',
-  eruv: 'The Eruv Information card.',
-  medical: 'The Jewish Medical Resources card — per-hospital Jewish life.',
-}
-
-// A Map/Zmanim/Eruv/Medical row — nothing to edit but icon/background (see
-// SingletonEditor), plus a Delete button, reusing the exact same delete/
-// confirm flow as a real listing category.
-const SINGLETON_EDITABLE_KINDS = new Set<SingletonKind>(['map', 'zmanim', 'eruv', 'medical'])
-
-function SingletonRow({
-  category: c,
-  confirmingDelete,
-  deleting,
-  toggling,
-  onEdit,
-  onAskDelete,
-  onCancelDelete,
-  onConfirmDelete,
-  onToggleActive,
-}: {
-  category: CategoryConfig
-  confirmingDelete: boolean
-  deleting: boolean
-  toggling: boolean
-  onEdit: () => void
-  onAskDelete: () => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
-  onToggleActive: (active: boolean) => void
-}) {
-  const kind = c.kind as SingletonKind
-  const badgeLabel = SINGLETON_KIND_LABELS[kind]
-  const description = SINGLETON_DESCRIPTIONS[kind]
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-      {/* On a phone the buttons go under the name, not squeezed beside it. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
-            <span className={`${TYPE_BADGE} bg-emerald-50 text-emerald-600`}>{badgeLabel}</span>
-            <span>{c.pluralLabel}</span>
-          </p>
-          <p className="text-xs text-muted mt-1">{description}</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
-          {SINGLETON_EDITABLE_KINDS.has(kind) && (
-            <button
-              onClick={onEdit}
-              className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              Edit
-            </button>
-          )}
-          <button
-            onClick={onAskDelete}
-            className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {confirmingDelete && (
-        <div className="mt-3 border-t border-slate-200 pt-3">
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-            <p className="text-sm text-red-800">
-              Remove the <span className="font-semibold">{c.pluralLabel}</span> card from the site?
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={onConfirmDelete}
-                disabled={deleting}
-                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                {deleting ? 'Removing…' : 'Remove'}
-              </button>
-              <button
-                onClick={onCancelDelete}
-                disabled={deleting}
-                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// A lightweight editor for Map/Zmanim/Eruv/Medical — no fields to change (it's
+// A lightweight editor for Map/Zmanim/Eruv — no fields to change (it's
 // a fixed, code-driven screen), just the card's name, icon, and home-screen
 // photo/text color, reusing the exact same fields as the full category editor.
 // The Eruv's also holds its eruvim (EruvimManager), which live in their own

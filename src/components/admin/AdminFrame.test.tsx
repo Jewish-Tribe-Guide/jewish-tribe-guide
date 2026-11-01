@@ -58,8 +58,8 @@ describe('AdminFrame', () => {
   it("shows the open area's pages as tabs under the heading, the current one lit", () => {
     show('/philly/admin/menus')
     const tabs = within(screen.getByRole('navigation', { name: 'Site' })).getAllByRole('link')
-    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns'])
-    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, null, 'page', null])
+    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Header and menus', 'Campaigns'])
+    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page', null])
   })
 
   // Step 2: To do is one list. Its other pages open from it, headed by
@@ -70,7 +70,7 @@ describe('AdminFrame', () => {
     expect(screen.queryByRole('link', { name: '‹ To do' })).toBeNull()
     cleanup()
     const { heading, lit } = show('/philly/admin/responses')
-    expect(heading).toBe('Responses')
+    expect(heading).toBe('Feedback')
     expect(lit).toEqual(['To do'])
     expect(screen.queryByRole('navigation', { name: 'To do' })).toBeNull()
     for (const back of screen.getAllByRole('link', { name: '‹ To do' })) expect(back).toHaveAttribute('href', '/philly/admin')

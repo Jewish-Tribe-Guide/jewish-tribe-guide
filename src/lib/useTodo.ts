@@ -2,10 +2,9 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import type { EnrichedSubmission } from '@/types'
-import type { ClassifiedMiss } from './missedSearches'
 import { parseOkJson } from './fetchJson'
 import { withCommunity } from './useCommunityData'
-import { openSearches, todoCount, unmatchedPlaces, type TodoReading, type TodoResponse, type TodoSearch, type TodoUnmatched } from './todo'
+import { todoCount, unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { setupLeft, type SetupState } from './setup'
 import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
 import { waitingNotQueued, type TodoWaiting } from '@/components/admin/todoWaiting'
@@ -17,11 +16,6 @@ import { waitingNotQueued, type TodoWaiting } from '@/components/admin/todoWaiti
 
 export type TodoData = {
   submissions: EnrichedSubmission[]
-  searches: TodoSearch[]
-  /** Categories a search can be added to or taught as. */
-  addable: { id: string; label: string }[]
-  canDismiss: boolean
-  canTeach: boolean
   responses: TodoResponse[]
   /** Places waiting to be found on Google, or said not to be on it. */
   unmatched: TodoUnmatched[]
@@ -59,18 +53,8 @@ class Unauthorized extends Error {}
 
 async function load(key: string, token: string, community: string, email: string | undefined) {
   const at = (path: string) => withCommunity(path, community)
-  const [subs, misses, readings, responses, setup, google] = await Promise.allSettled([
+  const [subs, responses, setup, google] = await Promise.allSettled([
     get<{ submissions: EnrichedSubmission[] }>(at('/api/admin/submissions'), token, 'Failed to load.'),
-    get<{ searches: ClassifiedMiss[]; addable: { id: string; label: string }[]; dismissalsAvailable: boolean }>(
-      at('/api/admin/missed-searches'),
-      token,
-      'Failed to load the searches.',
-    ),
-    get<{ readings: TodoReading[]; wordsAvailable: boolean }>(
-      at('/api/admin/read-questions'),
-      token,
-      'Failed to load the searches.',
-    ),
     get<{ responses: TodoResponse[] }>(at('/api/admin/responses?new=1'), token, 'Failed to load the responses.'),
     get<{ setup: SetupState }>(at('/api/admin/setup'), token, 'Failed to load the setup.'),
     get<{ places: Parameters<typeof unmatchedPlaces>[0] }>(at('/api/admin/watches/google'), token, 'Failed to load Google’s places.'),
@@ -83,20 +67,14 @@ async function load(key: string, token: string, community: string, email: string
         : subs.reason instanceof Error
           ? subs.reason.message
           : 'Something went wrong.'
-    set({ key, data: { submissions: [], searches: [], addable: [], canDismiss: false, canTeach: false, responses: [], unmatched: [], setup: null }, error })
+    set({ key, data: { submissions: [], responses: [], unmatched: [], setup: null }, error })
     return
   }
-  const m = misses.status === 'fulfilled' ? misses.value : null
-  const r = readings.status === 'fulfilled' ? readings.value : null
   set({
     key,
     error: null,
     data: {
       submissions: subs.value.submissions,
-      searches: openSearches(m?.searches ?? [], r?.readings ?? []),
-      addable: m?.addable ?? [],
-      canDismiss: m?.dismissalsAvailable ?? false,
-      canTeach: r?.wordsAvailable ?? false,
       responses: (responses.status === 'fulfilled' && responses.value.responses) || [],
       unmatched: google.status === 'fulfilled' && google.value.places ? unmatchedPlaces(google.value.places) : [],
       setup: setup.status === 'fulfilled' ? setup.value.setup : null,

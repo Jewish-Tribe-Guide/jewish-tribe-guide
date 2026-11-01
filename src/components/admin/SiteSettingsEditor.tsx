@@ -92,6 +92,9 @@ export default function SiteSettingsEditor({
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  // The box being worked on, which the preview lights up.
+  const [spot, setSpot] = useState<string | null>(null)
+  const spotOn = (name: string | null) => ({ onMouseEnter: () => setSpot(name), onFocusCapture: () => setSpot(name) })
   // ImageUploadField's memory of "the real original behind `value`", kept
   // here so it survives the field unmounting when the tab switches (this
   // component stays mounted across both tabs; the fields don't).
@@ -198,6 +201,7 @@ export default function SiteSettingsEditor({
                   }}
                 />
               </div>
+              <div {...spotOn('top')}>
               <AdminBox title="Top of the page">
                 <div className="flex flex-col gap-4 p-4">
                   <AdminField label="Big line">
@@ -234,15 +238,21 @@ export default function SiteSettingsEditor({
                 </div>
               </AdminBox>
 
-              <AdminBox title="Below it, in this order">
-                <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onSettingChange={set} token={token} />
-              </AdminBox>
+              </div>
 
-              <AdminBox title="Category groups">
-                <div className="p-4">
-                  <HomeSectionManager sections={sectionsDraft} onChange={setHomeSections} />
-                </div>
-              </AdminBox>
+              <div {...spotOn('cards')}>
+                <AdminBox title="Cards under the search, on a computer">
+                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onSettingChange={set} token={token} onOpenCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
+                </AdminBox>
+              </div>
+
+              <div {...spotOn('groups')}>
+                <AdminBox title="Groups on the Browse page">
+                  <div className="p-4">
+                    <HomeSectionManager sections={sectionsDraft} onChange={setHomeSections} />
+                  </div>
+                </AdminBox>
+              </div>
 
               {/* Held back from the site for now (see features.ts). */}
               {features.todayHome && (
@@ -291,7 +301,8 @@ export default function SiteSettingsEditor({
                 </AdminBox>
               )}
 
-              <AdminBox title="In link previews and search results">
+              <div {...spotOn(null)}>
+              <AdminBox title="When the link is shared">
                 <div className="flex flex-col gap-4 p-4">
                   <AdminField label="Title">
                     <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={adminInputClass} />
@@ -299,8 +310,14 @@ export default function SiteSettingsEditor({
                   <AdminField label="Description">
                     <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={adminInputClass} />
                   </AdminField>
+                  {/* How a message or a search result shows it. */}
+                  <div data-testid="link-sample" className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3">
+                    <p className="m-0 text-[15px] font-semibold text-slate-900">{draft.heroTitle}</p>
+                    <p className="m-0 mt-0.5 text-[13px] text-slate-600 line-clamp-2">{draft.mission}</p>
+                  </div>
                 </div>
               </AdminBox>
+              </div>
             </>
           ) : (
             <>
@@ -321,7 +338,7 @@ export default function SiteSettingsEditor({
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} />
+          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} spot={section === 'home' ? spot : null} page={section === 'home' && spot === 'groups' ? '/browse' : ''} />
         </aside>
       </div>
 

@@ -135,27 +135,15 @@ describe('ModerationQueue — the list', () => {
     expect(screen.getByText('3 to decide')).toBeInTheDocument()
   })
 
-  // Too many to keep up with (the user, Oct 29): not counted, not a box
-  // beside New places, but a row at the bottom that opens in place.
-  it('keeps searches nobody found at the bottom, uncounted, opening in place', async () => {
-    const user = userEvent.setup()
-    vi.mocked(fetch).mockImplementation(async (url) => ({ ...fakeResponse(200), url: String(url) }) as Response)
-    vi.mocked(parseOkJson).mockImplementation(async (res) => {
-      const url = String((res as Response).url)
-      if (url.includes('/api/admin/missed-searches'))
-        return { searches: [{ term: 'pizza', count: 3, lastDay: '2026-10-28', dismissedAt: null, verdict: { kind: 'missing' } }], addable: [], dismissalsAvailable: true }
-      return url.includes('/api/admin/submissions') ? { submissions: [submission()] } : {}
-    })
-    renderWithProviders(<ModerationQueue session={session()} />, { content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } })
-    const row = await screen.findByRole('button', { name: /^Searches nobody found/ })
-    expect(row).toHaveTextContent('1 different search')
-    expect(screen.getByText('1 to decide')).toBeInTheDocument()
-    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['New places'])
-    await user.click(row)
-    const searches = screen.getByRole('region', { name: 'Searches nobody found' })
-    expect(within(searches).getByTestId('todo-search')).toHaveTextContent('“pizza”')
-    await user.click(row)
-    expect(screen.queryByRole('region', { name: 'Searches nobody found' })).toBeNull()
+  // Nobody is expected to go through every search (the user, Oct 31): they
+  // aren't on To do at all, and To do doesn't even read them.
+  it('has no searches, and doesn’t load them', async () => {
+    renderQueue([submission()])
+    await screen.findByText('1 to decide')
+    expect(screen.queryByText(/Searches nobody found/)).toBeNull()
+    const urls = vi.mocked(fetch).mock.calls.map(([u]) => String(u))
+    expect(urls.some((u) => u.includes('/api/admin/submissions'))).toBe(true)
+    expect(urls.some((u) => u.includes('/api/admin/missed-searches') || u.includes('/api/admin/read-questions'))).toBe(false)
   })
 
   it('shows four of a group and the rest behind "N more"', async () => {
@@ -624,9 +612,8 @@ describe('ModerationQueue — Set up your guide', () => {
     expect(row.getAttribute('href')).toMatch(/\/admin\/places$/)
   })
 
-  // The full Searches page opens from Reports; To do keeps only the
-  // searches still waiting (the user, Oct 29).
-  it('leads on to Watches and Responses only, not every search', async () => {
+  // The Searches page opens from Reports.
+  it('leads on to Watches and Feedback only, not every search', async () => {
     renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true })
     expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
     const links = screen.getAllByRole('link').map((l) => l.getAttribute('href')!.replace(/^.*\/admin/, ''))

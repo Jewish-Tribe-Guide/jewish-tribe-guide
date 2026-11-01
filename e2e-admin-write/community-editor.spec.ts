@@ -109,8 +109,10 @@ test('creating a community through the real UI, starting empty, makes it live wi
   const publicRes = await request.get(`/${slug}`)
   expect(publicRes.status()).toBe(200)
 
-  const { data: categories } = await supabase.from('category').select('id').eq('community_id', slug)
-  expect(categories ?? []).toEqual([])
+  // Nothing but the Map, Candle Lighting and Eruv, on from the start.
+  const { data: categories } = await supabase.from('category').select('kind, active').eq('community_id', slug)
+  expect((categories ?? []).filter((c) => c.active).map((c) => c.kind).sort()).toEqual(['eruv', 'map', 'zmanim'])
+  expect(categories).toHaveLength(3)
 })
 
 test('cloning from an existing community carries its categories over', async ({ page }) => {
@@ -253,15 +255,10 @@ test('deleting a community through the real UI removes it and everything in it',
     await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
 
-  // Publish/Unpublish, Delete and the Team link all live behind one
-  // "Show"/"Hide" toggle on the card now (see CommunityManager.tsx's own
-  // comment on why) — collapsed by default, so Delete isn't in the DOM
-  // until this is clicked.
+  // Delete is on the card itself, without opening it (the user, Oct 31:
+  // nobody could find it behind Show).
   const card = page.getByRole('link', { name }).locator('..').locator('..')
-  await visible(page, card.getByRole('button', { name: new RegExp(`^Show ${name}$`) })).click()
-  // exact: true — otherwise this also matches the toggle button, whose own
-  // accessible name is now "Hide E2E Delete …" once expanded (a plain
-  // substring match on 'Delete' catches that too).
+  // exact: true — the Show toggle's own name holds "E2E Delete …" too.
   await visible(page, card.getByRole('button', { name: 'Delete', exact: true })).click()
   await page.getByLabel(`Type ${slug} to confirm`).fill(slug)
   // Waited for explicitly rather than inferred from the UI settling — this

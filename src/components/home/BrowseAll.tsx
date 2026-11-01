@@ -116,7 +116,7 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
           ))}
         </div>
       ) : (
-        <div className="desktop:mt-2 desktop:grid desktop:grid-cols-2 desktop:gap-x-8">
+        <div data-spot="groups" className="desktop:mt-2 desktop:grid desktop:grid-cols-2 desktop:gap-x-8">
           {sections.map((section) => (
             <section key={section.title} data-testid={`browse-group-${section.title}`} className="mt-6">
               <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">{section.title}</h2>

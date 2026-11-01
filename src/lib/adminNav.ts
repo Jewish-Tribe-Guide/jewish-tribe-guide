@@ -75,7 +75,7 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
         // others are where its bottom rows lead.
         { tab: 'queue', href: base, label: 'To do' },
         { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
-        { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
+        { tab: 'responses', href: `${base}/responses`, label: 'Feedback' },
       ],
     },
     {
@@ -94,7 +94,8 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       tabs: [
         { tab: 'home', href: `${base}/home`, label: 'Home page' },
         { tab: 'categories', href: `${base}/categories`, label: 'Category pages' },
-        { tab: 'forms', href: `${base}/forms`, label: 'Forms' },
+        // Held back for now (see features.ts).
+        ...(features.formsTab ? [{ tab: 'forms' as const, href: `${base}/forms`, label: 'Forms' }] : []),
         { tab: 'menus', href: `${base}/menus`, label: 'Header and menus' },
         { tab: 'campaigns', href: `${base}/campaigns`, label: 'Campaigns' },
         ...(isSuperAdmin ? [{ tab: 'pages' as const, href: `${base}/pages`, label: 'About and Privacy' }] : []),
@@ -131,12 +132,14 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
 
 // Paths a tab covers besides its own: History (/history/approved and
 // /history/rejected) and every search nobody found (/searches) are part of
-// Reports, which opens them. To do shows only the searches still waiting.
+// Reports, which opens them.
 // /site is Site on a phone: a list of its screens (board 21), and Site's
 // own tab there.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
   metrics: ['/history', '/searches'],
   home: ['/site'],
+  // Forms has no tab while it's held back (see features.ts).
+  categories: ['/forms'],
 }
 
 /** Which area is open and which tab is lit, for the current path. The

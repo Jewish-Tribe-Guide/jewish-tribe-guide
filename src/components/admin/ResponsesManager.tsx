@@ -6,7 +6,6 @@ import type { InboxResponse } from '@/lib/inbox'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import ResponseCard from '@/components/responses/ResponseCard'
-import { INBOX_BASE } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { AdminEmpty } from './AdminUI'
@@ -53,19 +52,12 @@ export default function ResponsesManager({ token }: { token: string }) {
 
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        Support and Volunteer responses are in{' '}
-        <a href={INBOX_BASE} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-          the inbox
-        </a>
-        .
-      </p>
-
       {formsError && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{formsError}</p>
       )}
 
-      <div className="flex flex-wrap gap-1 mb-5 border-b border-slate-200">
+      {/* Tabs only when a published form has responses of its own. */}
+      {tabs.length > 1 && <div className="flex flex-wrap gap-1 mb-5 border-b border-slate-200">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -79,7 +71,7 @@ export default function ResponsesManager({ token }: { token: string }) {
             {t.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       <ResponsesList
         key={activeKey}

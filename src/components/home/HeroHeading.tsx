@@ -264,7 +264,7 @@ export default function HeroHeading({
           to find something, not to be told what this is. The title stays
           as the page's heading for screen readers and search engines. */}
       {!today && (
-      <section className="pt-4 desktop:hidden" data-testid="phone-hero">
+      <section className="pt-4 desktop:hidden" data-testid="phone-hero" data-spot="top">
         <h1 className="sr-only">{settings.heroTitle}</h1>
         {trust}
         {ui.search.landing && (
@@ -333,7 +333,7 @@ export default function HeroHeading({
           z-30 (not something arbitrarily high) stays under SiteHeader's own
           sticky z-40, so the dropdown still tucks correctly behind the
           header on scroll instead of painting over it too. */}
-      <section className="hidden desktop:block relative z-30 left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 bg-surface desktop:-mt-[60px]">
+      <section data-spot="top" className="hidden desktop:block relative z-30 left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 bg-surface desktop:-mt-[60px]">
         {/* The photo lives in its OWN right-anchored box — NOT the full
             w-screen band (that was the earlier design: one full-bleed photo
             with a wash faked over the left side to look plain). The user

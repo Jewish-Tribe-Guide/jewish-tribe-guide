@@ -1,4 +1,6 @@
 import { getAdminClient } from './supabase/admin'
+import { createCategory, listCategoriesUncached } from './categoryStore'
+import { SITE_SCREENS } from './siteScreens'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cloning an existing community's directory SHAPE into a brand-new one — the
@@ -36,7 +38,7 @@ export async function cloneCommunityContent(target: string, source: string): Pro
   if (catErr) throw new Error(`Failed to read source categories: ${catErr.message}`)
 
   if (categories?.length) {
-    const rows = (categories as Record<string, unknown>[]).map((row) => ({
+    const rows = (categories as Record<string, unknown>[]).filter((row) => row.kind !== 'medical').map((row) => ({
       ...withoutTimestamps(row),
       community_id: target,
     }))
@@ -57,5 +59,15 @@ export async function cloneCommunityContent(target: string, source: string): Pro
     }))
     const { error } = await supabase.from('home_section').insert(rows)
     if (error) throw new Error(`Failed to clone home sections: ${error.message}`)
+  }
+}
+
+/** The Map, Candle Lighting and Eruv a new community starts with, on, unless
+ *  what it was cloned from already gave it them. */
+export async function addMissingSiteScreens(community: string): Promise<void> {
+  const existing = await listCategoriesUncached(community)
+  for (const screen of SITE_SCREENS) {
+    if (existing.some((c) => c.kind === screen.kind)) continue
+    await createCategory(community, { label: screen.label, pluralLabel: screen.label, kind: screen.kind, icon: screen.icon })
   }
 }

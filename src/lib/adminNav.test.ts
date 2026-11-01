@@ -76,14 +76,14 @@ describe('adminAreas', () => {
 
   it('is To do, Places, Site, Reports and Settings, Communities only for a superadmin', () => {
     expect(shape(true)).toEqual([
-      ['To do', ['To do', 'Watches', 'Responses']],
+      ['To do', ['To do', 'Watches', 'Feedback']],
       ['Places', ['Places']],
-      ['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns', 'About and Privacy']],
+      ['Site', ['Home page', 'Category pages', 'Header and menus', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Reports']],
       ['Settings', ['Team', 'Community', 'Communities']],
     ])
     expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Community']])
-    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Forms', 'Header and menus', 'Campaigns']])
+    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Header and menus', 'Campaigns']])
   })
 
   it('puts every tab in exactly one area, whatever is switched on', () => {
@@ -123,8 +123,9 @@ describe('adminNavPosition', () => {
     ['/philly/admin/categories/cat:abc', 'site', 'categories'],
     ['/philly/admin/campaigns', 'site', 'campaigns'],
     ['/philly/admin/home', 'site', 'home'],
-    ['/philly/admin/forms', 'site', 'forms'],
-    ['/philly/admin/forms/form:abc', 'site', 'forms'],
+    // No tab of its own while it's held back; its page still has a place.
+    ['/philly/admin/forms', 'site', 'categories'],
+    ['/philly/admin/forms/form:abc', 'site', 'categories'],
     ['/philly/admin/menus', 'site', 'menus'],
     ['/philly/admin/pages', 'site', 'pages'],
     ['/philly/admin/metrics', 'reports', 'metrics'],

@@ -7,7 +7,7 @@ import {
   listCommunityNotifyPreferenceLists,
   listCommunityPreviewTokens,
 } from '@/lib/communityStore'
-import { cloneCommunityContent } from '@/lib/communityCloning'
+import { addMissingSiteScreens, cloneCommunityContent } from '@/lib/communityCloning'
 
 // GET /api/admin/communities — the same data as the public GET
 // /api/communities, but superadmin-gated (getAdminUser — the global
@@ -117,6 +117,9 @@ export async function POST(request: Request) {
     if (body.cloneFrom) {
       await cloneCommunityContent(community.slug, body.cloneFrom)
     }
+    // On from the start, cloned or empty: without the Map's row a new
+    // community has no Map tab, which read as a bug (the user, Oct 31).
+    await addMissingSiteScreens(community.slug)
 
     // The new community's directory (and, for everyone else, the updated
     // communities list) is public content — drop the cache so it shows up

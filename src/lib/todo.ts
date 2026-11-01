@@ -8,10 +8,8 @@ import { submissionSource } from './submissionSource'
 
 // To do, the console's front page (the admin redesign's step 2, boards 1
 // and 2): everything waiting on a decision in one list. New places and
-// changes from the queue, and new responses; searches that found nothing
-// (the missed searches and the AI's read questions, one list) sit at the
-// bottom, uncounted. The page and the nav's count both count with
-// todoCount, so the two can't disagree.
+// changes from the queue, and new feedback. The page and the nav's count
+// both count with todoCount, so the two can't disagree.
 
 /** A word the AI suggests teaching the search, from its reading. */
 export type TodoWord = { word: string; categoryId: string; field?: string; value?: string; label: string }
@@ -65,6 +63,12 @@ export function openSearches(searches: ClassifiedMiss[], readings: TodoReading[]
   return [...open, ...readOnly].sort((a, b) => b.count - a.count)
 }
 
+/** Those asked more than once: all Reports asks an admin to look at, as one
+ *  person's one odd search isn't worth anyone's time (the user, Oct 31). */
+export function repeatedSearches(searches: ClassifiedMiss[], readings: TodoReading[]): TodoSearch[] {
+  return openSearches(searches, readings).filter((s) => s.count > 1)
+}
+
 /** Whether a search can be taught as one word for a category: the search
  *  takes words of up to three. */
 export function teachable(term: string): boolean {
@@ -72,8 +76,8 @@ export function teachable(term: string): boolean {
   return key.length > 0 && key.length <= 60 && key.split(' ').length <= 3
 }
 
-/** What's waiting on a decision. Not searches nobody found: there are too
- *  many to keep up with, so they're there when there's time. */
+/** What's waiting on a decision. Not searches nobody found: those are in
+ *  Reports. */
 export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[]; waiting?: unknown[] }): number {
   return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0) + (t.waiting?.length ?? 0)
 }
