@@ -475,9 +475,8 @@ export default function ListingEditor({
   // A short row, open: its fields inside its card, Done under them. Its
   // heading closes it too.
   const openInPlace = (r: EditorRow) => (
-    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow}>
+    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow} source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
-      {rowSource?.(r, changed.has(r.id))}
     </EditorOpenCard>
   )
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
@@ -729,10 +728,10 @@ export default function ListingEditor({
   const rowScreen = row && !inPlace ? (
     <div className="space-y-4" data-testid={`editor-open-${row.id}`}>
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
+      {!child && rowSource && <div className="-mt-2 px-0.5">{rowSource(row, changed.has(row.id))}</div>}
       {!child &&
         foot(
           <div className="space-y-1">
-            {rowSource && <div className="pb-2">{rowSource(row, changed.has(row.id))}</div>}
             <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
               Done
             </button>

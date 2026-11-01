@@ -42,6 +42,16 @@ afterEach(() => {
   forgetWatchJobs()
 })
 
+/** The line sits on the gray under the white card, with Done after it (boards
+ *  KosherOpen12, AddGoogle8): inside the card it crowded the button. */
+function expectLineUnderCard() {
+  const line = screen.getByTestId('row-source')
+  expect(line.closest('.bg-white')).toBeNull()
+  const done = screen.getByRole('button', { name: 'Done' })
+  expect(line.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(done.closest('.bg-white')).toBeNull()
+}
+
 describe('PlacePage', () => {
   it('opens a place not checked by what’s wrong, each with its own fix', async () => {
     const added = new Date(Date.now() - 2 * 86_400_000).toISOString()
@@ -361,6 +371,7 @@ describe('PlacePage', () => {
       const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!
       await user.click(minyans)
       expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Change`)
+      expectLineUnderCard()
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       const change = screen.getByTestId('source-screen')
       expect(within(change).getByRole('textbox')).toHaveValue('https://kesher.example/davening')
@@ -426,6 +437,7 @@ describe('PlacePage', () => {
       await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
       const line = () => screen.getByTestId('row-source')
       expect(line()).toHaveTextContent(`Google · ${day(new Date().toISOString())} · Stop`)
+      expectLineUnderCard()
       await user.click(within(line()).getByRole('button', { name: 'Stop' }))
       expect(posts).toEqual([['/api/admin/watches/google', { action: 'stop_field', id: 'a', field: 'phone' }]])
     })
@@ -550,6 +562,7 @@ describe('an eruv', () => {
 
     await user.click(rowOf('status'))
     expect(screen.getByTestId('row-source')).toHaveTextContent(`Its status page · ${day(at)} · Change`)
+    expectLineUnderCard()
     await user.click(screen.getByRole('checkbox', { name: 'Its page dates each week’s post' }))
     expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { statusDated: true } }]])
     posts.length = 0
@@ -691,6 +704,7 @@ describe('stopping a hospital’s or food place’s source', () => {
     const user = userEvent.setup()
     await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Menus')!.closest('button')!)
     expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Change`)
+    expectLineUnderCard()
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
     await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])

@@ -2197,6 +2197,16 @@ morning copy ("On Keystone-K’s list · Use it"). An email says "within the hou
 as the Gmail script looks back 14 days each hour. A shul's minyan rows get a
 second link, Add a source, so an email can sit beside a website.
 
+**Places and the opened row, built Nov 1.** A row in Places no longer shows
+when it changed: only "No address" or "Archived Oct 3" when there's something
+to say. In admin's listing and eruv, an opened row's source line now sits on
+the gray under the white card, then a solid Done, as drawn (it was inside the
+card, tight above Done). The public editor keeps Done inside its card.
+
+**Email Read now is an open question for the user** (Nov 1). What matters is
+the admin not coming back twice, not the hour. Recommended: the Gmail script
+as a web app the site can call. Not drawn or built.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").

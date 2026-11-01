@@ -45,9 +45,9 @@ describe('filterPlaces', () => {
 })
 
 describe('placeLine', () => {
-  it('says when it changed, and what’s wrong first', () => {
-    expect(placeLine(place())).toBe('Changed Oct 17')
-    expect(placeLine(place({ hasAddress: false }))).toBe('No address · changed Oct 17')
+  it('says nothing unless something is wrong or it was archived', () => {
+    expect(placeLine(place())).toBe('')
+    expect(placeLine(place({ hasAddress: false }))).toBe('No address')
     expect(placeLine(place({ status: 'archived' }))).toBe('Archived Oct 17')
   })
 })

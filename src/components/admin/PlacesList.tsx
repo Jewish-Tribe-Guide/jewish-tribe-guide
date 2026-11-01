@@ -311,7 +311,7 @@ export default function PlacesList({ token }: { token: string }) {
               onClick={() => openPlace(p.id)}
               label={`Open ${p.name}`}
               name={p.name}
-              line={<span className={lineOf(p).warn ? 'text-amber-800' : ''}>{lineOf(p).text}</span>}
+              line={lineOf(p).text ? <span className={lineOf(p).warn ? 'text-amber-800' : ''}>{lineOf(p).text}</span> : undefined}
               aside={categoriesById.get(p.category)?.label}
             />
           ))}

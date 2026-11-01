@@ -232,9 +232,8 @@ export default function EruvListing({
             {rows.map((r) => (
               <li key={r.id}>
                 {openRow === r.id ? (
-                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)}>
+                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={{ line: lineOf(r.source) }}>
                     {r.body}
-                    {lineOf(r.source)}
                   </EditorOpenCard>
                 ) : (
                   <EditorRowCard onOpen={() => setOpenRow(r.id)} testId={`editor-row-${r.id}`} opens="here" changed={changedRow(r.id)} title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : null} />
