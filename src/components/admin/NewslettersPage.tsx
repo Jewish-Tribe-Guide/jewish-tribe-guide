@@ -24,6 +24,8 @@ export type NewslettersLoaded = {
   script: string | null
   checkedAt: string | null
   account: string | null
+  /** The script's web app link is in: an email can be looked for at once. */
+  readNow?: boolean
   newsletters: NewsletterLine[]
   places: Place[]
 }
@@ -67,12 +69,14 @@ function Status({ data, now, onSetUp }: { data: NewslettersLoaded; now: number; 
     <div className={`flex flex-wrap items-center gap-3 rounded-[10px] border px-4 py-3 ${stopped ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
       <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${stopped ? 'bg-amber-600' : 'bg-green-700'}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[15px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{stopped ? `Stopped checking ${where}` : `Checking ${where} every hour`}</span>
-        <span className={`text-[13px] ${stopped ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>Last checked {checkedWhen(data.checkedAt, now)}</span>
+        <span className="text-[15px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{stopped ? `Stopped checking ${where}` : `Checking ${where}`}</span>
+        <span className={`text-[13px] ${stopped ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>Last checked {checkedWhen(data.checkedAt, now)} · Read now {data.readNow ? 'on' : 'off'}</span>
       </span>
-      <button type="button" onClick={onSetUp} className={BUTTON}>
-        Set up again
-      </button>
+      {(stopped || !data.readNow) && (
+        <button type="button" onClick={onSetUp} className={BUTTON}>
+          Set up
+        </button>
+      )}
     </div>
   )
 }
@@ -92,8 +96,16 @@ function Step({ n, title, line, children }: { n: number; title: React.ReactNode;
   )
 }
 
-function SetUp({ script }: { script: string }) {
+function SetUp({ script, onLink }: { script: string; onLink: (url: string) => Promise<string | null> }) {
   const [copied, setCopied] = useState<boolean | null>(null)
+  const [link, setLink] = useState('')
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [trying, setTrying] = useState(false)
+  async function tryLink() {
+    setTrying(true)
+    setLinkError(await onLink(link.trim()))
+    setTrying(false)
+  }
   async function copy() {
     try {
       await navigator.clipboard.writeText(script)
@@ -126,7 +138,24 @@ function SetUp({ script }: { script: string }) {
           }
           line="New project, then paste over what’s there"
         />
-        <Step n={4} title="Run install" line="Pick install at the top, press Run, then Allow" />
+        <Step n={4} title="Run install" line="Pick install, press Run, then Allow" />
+        <Step n={5} title="Deploy it" line="Deploy, New deployment, Web app, access Anyone" />
+        <Step n={6} title="Paste its link">
+          <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
+            <input
+              type="url"
+              aria-label="Its web app link"
+              placeholder="Its web app link"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              className={`${adminInputClass} min-w-0 flex-[1_1_260px]`}
+            />
+            <button type="button" disabled={trying || !link.trim()} onClick={() => void tryLink()} className={PRIMARY}>
+              {trying ? 'Trying it…' : 'Save'}
+            </button>
+          </span>
+          {linkError && <span className="text-[13px] font-semibold text-red-700">{linkError}</span>}
+        </Step>
       </ol>
     </AdminBox>
   )
@@ -232,9 +261,24 @@ export default function NewslettersPage({ token }: { token: string }) {
     }
   }
 
-  const back = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title="Newsletters" />
+  const back = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title="Shul emails" />
   if (loadError) return <div className="space-y-3.5">{back}<p className="text-sm text-red-700">{loadError}</p></div>
   if (!data) return <div className="space-y-3.5">{back}<p className="text-sm text-muted">Loading…</p></div>
+
+  async function saveLink(url: string): Promise<string | null> {
+    try {
+      await fetchJson(
+        withCommunity('/api/admin/watches/newsletters', community),
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) },
+        'That link didn’t answer. Check access is set to Anyone.',
+      )
+      setSetUpAgain(false)
+      await load()
+      return null
+    } catch (err) {
+      return err instanceof Error ? err.message : 'That link didn’t answer. Check access is set to Anyone.'
+    }
+  }
 
   const showSteps = data.script && (!data.checkedAt || setUpAgain)
   return (
@@ -243,12 +287,12 @@ export default function NewslettersPage({ token }: { token: string }) {
       {data.available ? (
         <Status data={data} now={now} onSetUp={() => setSetUpAgain((s) => !s)} />
       ) : (
-        <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[15px] text-slate-600">Newsletters can’t be set up here yet.</p>
+        <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[15px] text-slate-600">Shul emails can’t be set up here yet.</p>
       )}
-      {showSteps && <SetUp script={data.script!} />}
+      {showSteps && <SetUp script={data.script!} onLink={saveLink} />}
       {error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <AdminBox
-        title="Newsletters"
+        title="Emails"
         action={
           <>
             {data.newsletters.length > 0 && <AdminCount n={data.newsletters.length} />}

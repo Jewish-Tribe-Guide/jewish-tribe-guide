@@ -5,12 +5,14 @@ import { fetchJson } from '@/lib/fetchJson'
 import { statusPill } from '@/lib/eruvJob'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { AdminEruv } from '@/lib/eruvStore'
+import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { withCommunity } from '@/lib/useCommunityData'
 import type { CategoryConfig } from '@/lib/categories'
 import { sourceKind, sourceProblem, type WatchPurpose } from '@/lib/watchPurposes'
 import { EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, editorFieldLabel, editorInputClass } from '@/components/resources/editorParts'
+import { SignUpLine } from './AddPlace'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import { AdminBack } from './AdminUI'
 import { Pill } from './JobBoxes'
@@ -270,6 +272,12 @@ export default function EruvListing({
   )
 }
 
+type StatusRead =
+  | { state: 'reading' | 'failed' | 'no-gmail' }
+  | { state: 'done'; words: string; on?: string }
+  | { state: 'no-email'; account: string | null }
+  | { state: 'unclear'; on: string }
+
 /** Add a place, an eruv (boards AddEruv12, EruvStatusField12, AddEruvFilled12):
  *  the same Add screen, with no Google step. What's given goes on as it's added. */
 export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () => void; onAdded: () => Promise<void> | void }) {
@@ -279,7 +287,7 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
   const [screen, setScreen] = useState<{ title: string; label: string; key: 'status' | 'map'; kind: WatchPurpose } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [statusRead, setStatusRead] = useState<{ state: 'reading' | 'failed' } | { state: 'done'; words: string } | null>(null)
+  const [statusRead, setStatusRead] = useState<StatusRead | null>(null)
   const title = screen?.title ?? 'Add a place'
   const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onBack
   useSetScreenHeader(true, title, back)
@@ -287,15 +295,23 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(body: Record<string, unknown>) => fetchJson<T>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not add it.')
 
-  /** Read now (EruvRead13): what its page says, and nothing's saved. */
+  /** Read now (EruvRead13, EruvEmailNow14): what its page or its latest email
+   *  says, and nothing's saved. */
   async function readStatusNow() {
+    const email = sourceKind(draft.status) === 'email'
     setStatusRead({ state: 'reading' })
-    const reply = await fetchJson<{ state?: string; status?: string; words?: string | null }>(
+    const reply = await fetchJson<{ state?: string; status?: string; words?: string | null; on?: string; account?: string | null }>(
       withCommunity('/api/admin/read-now', community),
-      { method: 'POST', headers, body: JSON.stringify({ slot: 'eruv', url: draft.status.trim() }) },
+      { method: 'POST', headers, body: JSON.stringify({ slot: email ? 'eruv-email' : 'eruv', url: draft.status.trim() }) },
       'Could not read that.',
     ).catch(() => null)
-    setStatusRead(reply?.state === 'done' ? { state: 'done', words: reply.words || (reply.status === 'up' ? 'Up' : 'Down') } : { state: 'failed' })
+    const says = reply?.words || (reply?.status === 'up' ? 'Up' : 'Down')
+    if (reply?.state === 'done') setStatusRead({ state: 'done', words: says })
+    else if (reply?.state === 'found') setStatusRead({ state: 'done', words: says, on: reply.on })
+    else if (reply?.state === 'no-email') setStatusRead({ state: 'no-email', account: reply.account ?? null })
+    else if (reply?.state === 'no-gmail') setStatusRead({ state: 'no-gmail' })
+    else if (reply?.state === 'no-times') setStatusRead({ state: 'unclear', on: reply.on ?? '' })
+    else setStatusRead({ state: 'failed' })
   }
 
   async function add() {
@@ -346,8 +362,10 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
     </div>
   )
   const status = given(draft.status, 'status', 'Its status page, or the address its emails come from', 'eruv', 'No status yet')
-  if (draft.status.trim() && sourceKind(draft.status) !== 'email') {
-    const page = shortUrl(draft.status.trim())
+  if (draft.status.trim()) {
+    const source = draft.status.trim()
+    const email = sourceKind(source) === 'email'
+    const page = email ? source : shortUrl(source)
     const link = (words: string, onClick: () => void) => (
       <button type="button" onClick={onClick} className={LINE_LINK}>
         {words}
@@ -356,14 +374,27 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
     const change = link('Change', () => setScreen({ title: 'Change', label: 'Its status page, or the address its emails come from', key: 'status', kind: 'eruv' }))
     const idle = <SourceWords line={{ text: page }} controls={[link('Read now', () => void readStatusNow()), change]} />
     if (statusRead?.state === 'done') status.word = statusRead.words
+    const r = statusRead
     status.line =
-      statusRead?.state === 'reading' ? (
-        <SourceWords line={{ text: `Reading ${page}…` }} />
-      ) : statusRead?.state === 'done' ? (
-        <SourceWords line={{ text: page, when: 'just now' }} controls={[change]} />
-      ) : statusRead?.state === 'failed' ? (
+      r?.state === 'reading' ? (
+        <SourceWords line={{ text: email ? 'Looking in the guide’s Gmail…' : `Reading ${page}…` }} />
+      ) : r?.state === 'done' ? (
+        <SourceWords line={{ text: page, when: r.on ?? 'just now' }} controls={[change]} />
+      ) : r?.state === 'no-email' ? (
         <>
-          <SourceWords line={{ text: 'Couldn’t read that page', red: true }} />
+          <SourceWords line={{ text: `No emails from ${source} yet` }} controls={[change]} />
+          <SignUpLine account={r.account} />
+        </>
+      ) : r?.state === 'unclear' ? (
+        <SourceWords line={{ text: `${source}’s ${r.on} email didn’t say` }} controls={[change]} />
+      ) : r?.state === 'no-gmail' ? (
+        <>
+          <SourceWords line={{ text: 'The guide’s Gmail isn’t set up' }} controls={[<a key="gmail" href={`${adminBase(community)}/watches/newsletters`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>Set it up</a>]} />
+          <SourceWords line={{ text: page, when: 'within the hour' }} controls={[change]} />
+        </>
+      ) : r?.state === 'failed' ? (
+        <>
+          <SourceWords line={{ text: email ? 'Couldn’t reach the guide’s Gmail' : 'Couldn’t read that page', red: true }} />
           {idle}
         </>
       ) : (

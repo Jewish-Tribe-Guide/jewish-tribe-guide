@@ -69,7 +69,7 @@ export function emailHash(messageId: string): string {
   return createHash('sha256').update(messageId).digest('hex')
 }
 
-function attachmentSource(a: NewsletterEmail['attachment']): ScheduleSource | null {
+export function attachmentSource(a: NewsletterEmail['attachment']): ScheduleSource | null {
   if (!a) return null
   if (a.mime === 'application/pdf') return { pdf: a.b64 }
   if (IMAGE_TYPES.has(a.mime)) return { image: a.b64, mime: a.mime }

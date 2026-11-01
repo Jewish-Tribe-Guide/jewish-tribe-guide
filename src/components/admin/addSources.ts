@@ -141,7 +141,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (read?.state === 'no-email') return [{ text: `No emails from ${address} yet`, change, signUp: true }]
     if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, change }]
     if (read?.state === 'no-answer') return [{ text: 'Couldn’t reach the guide’s Gmail', red: true }, { text: address, when: 'within the hour', change }]
-    if (read?.state === 'no-gmail') return [{ text: address, change, setUpGmail: true }]
+    if (read?.state === 'no-gmail') return [{ text: 'The guide’s Gmail isn’t set up', setUpGmail: true }, { text: address, when: 'within the hour', change }]
     return [{ text: address, readNow: 'email', change }]
   }
 

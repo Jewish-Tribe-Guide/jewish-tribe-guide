@@ -3,7 +3,7 @@ import { getCategoryById } from '@/lib/categoryStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { readEruvPage } from '@/lib/eruvReader'
 import { isMekorList } from '@/lib/mekorWatch'
-import { kosherLookup, readMenuNow, readPageNow, readRefuahNow, readSiteNow, type ReadNowDraft } from '@/lib/readNow'
+import { kosherLookup, readEmailNow, readEruvEmailNow, readMenuNow, readPageNow, readRefuahNow, readSiteNow, type ReadNowDraft } from '@/lib/readNow'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { getListReads, listWatches } from '@/lib/watchStore'
 import { normalizeWatchUrl } from '@/lib/watches'
@@ -11,8 +11,8 @@ import type { KeystoneEntry } from '@/lib/keystoneWatch'
 import type { MekorEntry } from '@/lib/mekorWatch'
 
 // POST /api/admin/read-now — a place being added, read while it's added (boards
-// *13). Body: { category, slot, url?, draft }; slot is page, site, menu, refuah,
-// eruv or kosher. Answers with what to fill in, and saves nothing (readNow.ts).
+// *13). Body: { category, slot, url?, draft }; slot is page, email, site, menu,
+// refuah, eruv, eruv-email or kosher. Answers with what to fill in, and saves nothing (readNow.ts).
 
 export const maxDuration = 60
 
@@ -46,6 +46,12 @@ export async function POST(request: Request) {
     const read = await readEruvPage(url, new Date())
     return Response.json({ ok: true, ...(read.ok ? { state: 'done', status: read.status, words: read.words } : { state: 'failed' }) })
   }
+  if (body?.slot === 'eruv-email') {
+    const limited = await enforceRateLimit(request, 'admin-watch-check', LIMIT)
+    if (limited) return limited
+    if (typeof body.url !== 'string' || !body.url.includes('@')) return Response.json({ ok: false, errors: ['That isn’t an email address.'] }, { status: 400 })
+    return Response.json({ ok: true, ...(await readEruvEmailNow(community.slug, body.url.trim(), community.timezone)) })
+  }
   const draft = readDraft(body?.draft)
   const category = typeof body?.category === 'string' ? await getCategoryById(community.slug, body.category) : null
   if (!draft || !category) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
@@ -66,6 +72,11 @@ export async function POST(request: Request) {
     if (needsAi && !apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
     if (body?.slot === 'page') return Response.json({ ok: true, ...(await readPageNow(category, draft, url, { apiKey: apiKey!, communityName: community.name })) })
     if (body?.slot === 'menu') return Response.json({ ok: true, ...(await readMenuNow(category, draft, url, apiKey!)) })
+    if (body?.slot === 'email') {
+      if (!url?.includes('@')) return Response.json({ ok: false, errors: ['That isn’t an email address.'] }, { status: 400 })
+      if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
+      return Response.json({ ok: true, ...(await readEmailNow(community.slug, category, draft, url, { apiKey, communityName: community.name })) })
+    }
     if (body?.slot === 'site') return Response.json({ ok: true, ...(await readSiteNow(category, draft)) })
     if (body?.slot === 'refuah') return Response.json({ ok: true, ...(await readRefuahNow(category, draft, url)) })
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })

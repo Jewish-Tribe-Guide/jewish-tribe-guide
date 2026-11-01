@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { latestEmailFrom } from '@/lib/gmailNow'
 import { readOwnSiteNow } from '@/lib/hoursJobRun'
+import { receiveNewsletter } from '@/lib/newsletterRun'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { approveSubmission, pendingForListing } from '@/lib/submissionStore'
 import { sendStatusChangeDigest } from '@/lib/email'
@@ -14,6 +16,8 @@ import { loadSyncableListing, syncOneListing } from '@/lib/syncListing'
 //                                      does; after its Stops are saved.
 // POST { action: 'site' }              its own website read now, for a place
 //                                      whose times and hours aren't read.
+// POST { action: 'email', address }    its latest email, read and filed as if the
+//                                      hourly run had found it; says if there's none.
 // POST { action: 'take' }              all of it on the listing, as approving
 //                                      each on To do would, in the order filed.
 
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/l
   const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
   const { id } = await ctx.params
-  const body = (await request.json().catch(() => null)) as { action?: unknown } | null
+  const body = (await request.json().catch(() => null)) as { action?: unknown; address?: unknown } | null
   try {
     if (body?.action === 'google') {
       const row = await loadSyncableListing(id)
@@ -46,6 +50,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/l
       if (result.outcome === 'synced' && result.statusChange) await sendStatusChangeDigest([result.statusChange]).catch(() => {})
       await revalidatePublicContent()
       return Response.json({ ok: true, read: result.outcome === 'synced' })
+    }
+    if (body?.action === 'email') {
+      const apiKey = process.env.OPENAI_API_KEY
+      if (typeof body.address !== 'string' || !apiKey) return Response.json({ ok: true, state: 'no-answer' })
+      const look = await latestEmailFrom(community.slug, body.address)
+      if (look.state === 'found') await receiveNewsletter(community.slug, look.email, { apiKey, communityName: community.name })
+      return Response.json({ ok: true, state: look.state, account: 'account' in look ? look.account : null })
     }
     if (body?.action === 'site') return Response.json({ ok: true, read: await readOwnSiteNow(community.slug, id) })
     if (body?.action !== 'take') return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })

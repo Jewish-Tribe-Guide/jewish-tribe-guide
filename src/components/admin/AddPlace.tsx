@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import type { EditorRow, EditorValues } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
+import { adminBase } from '@/lib/adminNav'
 import { samePage } from '@/lib/hoursJob'
 import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
 import { pageReadsFor } from '@/lib/listingPageWatch'
@@ -30,11 +31,31 @@ import { sourceActions } from './sourceActions'
 // saved once the listing is: nothing is searched or watched for a place that
 // doesn't exist yet.
 
-type ReadNowReply = { state: 'done' | 'none' | 'failed' | 'not-found'; phone?: string; details?: Record<string, unknown> }
+type ReadNowReply = { state: 'done' | 'none' | 'failed' | 'not-found' | 'found' | 'no-email' | 'no-times' | 'no-answer' | 'no-gmail'; on?: string; account?: string | null; phone?: string; details?: Record<string, unknown> }
 type Found = { id: string; payload: unknown }
 type PageReply = { pages?: { watch: { id: string; url: string; lastError?: string | null } }[] }
 /** Added: being read, a page that couldn't be, or what's found. */
-type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'found'; lines: string[]; retry?: { job: 'hours' | 'times'; watchId: string; was: string } }
+type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'found' | 'no-email'; lines: string[]; fromEmail?: boolean; retry?: { job: 'hours' | 'times'; watchId: string; was: string } }
+
+/** No email has come: the guide has to be on its list (EmailNone14). */
+export function SignUpLine({ account }: { account: string | null }) {
+  const [copied, setCopied] = useState(false)
+  if (!account) return <p className="m-0 text-[13px] text-slate-500">Sign up for its emails with the guide’s Gmail</p>
+  return (
+    <p className="m-0 text-[13px] text-slate-500 [overflow-wrap:anywhere]">
+      Sign up for its emails with {account} ·{' '}
+      <button
+        type="button"
+        className={LINE_LINK}
+        onClick={() => {
+          void navigator.clipboard?.writeText(account).then(() => setCopied(true), () => {})
+        }}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </p>
+  )
+}
 
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
 
@@ -51,6 +72,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
   const [kosher, setKosher] = useState<KosherLookup | null>(null)
   const [kosherUsed, setKosherUsed] = useState<string | null>(null)
+  const [guideGmail, setGuideGmail] = useState<string | null>(null)
   const [taking, setTaking] = useState(false)
   const inGuide = useMemo(() => new Set(listings.map((l) => l.placeId).filter((id): id is string => typeof id === 'string' && !!id)), [listings])
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -151,11 +173,12 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     setReads((r) => ({ ...r, [slot]: { state: 'reading' } }))
     const url = slot === 'site' ? undefined : given[slot]
     const reply = await post<ReadNowReply>('/api/admin/read-now', { category: category.id, slot, url, draft: readDraft() }).catch(() => null)
-    if (reply?.state === 'done') {
+    if (reply?.state === 'done' || reply?.state === 'found') {
       if (reply.phone) draft.setPhone(reply.phone)
       for (const [key, value] of Object.entries(reply.details ?? {})) draft.setDetail(key, value)
     }
-    setReads((r) => ({ ...r, [slot]: { state: reply?.state ?? 'failed' } as AddRead }))
+    if (reply?.account) setGuideGmail(reply.account)
+    setReads((r) => ({ ...r, [slot]: { state: reply?.state === 'found' ? 'found' : (reply?.state ?? (slot === 'email' ? 'no-answer' : 'failed')), on: reply?.on ?? '' } as AddRead }))
   }
 
   function takeList(on: KosherLookup['lists'][number]) {
@@ -210,6 +233,13 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const f = line.useGoogle
       out.push(control('Use Google’s', () => setStopped((s) => new Set([...s].filter((x) => x !== f)))))
     }
+    if (line.setUpGmail) {
+      out.push(
+        <a key="gmail" href={`${adminBase(community)}/watches/newsletters`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>
+          Set it up
+        </a>,
+      )
+    }
     if (line.findOnGoogle) out.push(control('Find it on Google', () => setStep('find')))
     return out
   }
@@ -223,17 +253,23 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
           const controls = lineControls(line)
           // A line that's only its Add a source.
           if (!line.text) return <p key={i} className="m-0 text-[13px]">{controls}</p>
-          return <SourceWords key={i} line={line} controls={controls} />
+          return (
+            <Fragment key={i}>
+              <SourceWords line={line} controls={controls} />
+              {line.signUp && <SignUpLine account={guideGmail} />}
+            </Fragment>
+          )
         })}
       </div>
     )
   }
 
   /** What's found waiting, or back to Places with nothing to say. */
-  async function seeFound(listing: DirectoryResource) {
-    const { found } = await fetchJson<{ found: Found[] }>(withCommunity(`/api/admin/listings/${listing.id}/found`, community), { headers }, 'Could not see what it found.').catch(() => ({ found: [] as Found[] }))
+  async function seeFound(listing: DirectoryResource, noEmail = false, fromEmail = false) {
+    const { found = [] } = await fetchJson<{ found?: Found[] }>(withCommunity(`/api/admin/listings/${listing.id}/found`, community), { headers }, 'Could not see what it found.').catch(() => ({ found: [] as Found[] }))
     const lines = foundLines(category, listing as unknown as Record<string, unknown>, found, new Date().toISOString().slice(0, 10))
-    if (lines.length) setAddedAs({ listing, stage: 'found', lines })
+    if (lines.length) setAddedAs({ listing, stage: 'found', lines, fromEmail })
+    else if (noEmail) setAddedAs({ listing, stage: 'no-email', lines: [] })
     else onClose()
   }
 
@@ -263,6 +299,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     await Promise.allSettled(saves)
     // Picked on Google: its Google read now, with Stops already kept.
     if (picked) await post(`/api/admin/listings/${listing.id}/found`, { action: 'google' }).catch(() => null)
+    // Its email looked for now, and filed as the hourly run would.
+    const looked = given.email ? await post<{ state?: string; account?: string | null }>(`/api/admin/listings/${listing.id}/found`, { action: 'email', address: given.email }).catch(() => null) : null
+    if (looked?.account) setGuideGmail(looked.account)
+    const noEmail = looked?.state === 'no-email'
+    const fromEmail = looked?.state === 'found' && !given.page && !website
     const reads = pageReadsFor(category)
     if (given.page && reads) {
       // A page given is read as it's saved, and said so if it can't be (AddFailed8).
@@ -275,7 +316,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         return
       }
     } else if (website || given.menu) await readAdded(listing)
-    await seeFound(listing)
+    await seeFound(listing, noEmail, fromEmail)
   }
 
   async function takeFound(listing: DirectoryResource) {
@@ -292,7 +333,18 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: 'Back', onClick: onClose }} title={title} />
         {banner}
-        {stage === 'reading' && <p className="m-0 text-[15px] text-slate-600">Reading its website…</p>}
+        {stage === 'reading' && <p className="m-0 text-[15px] text-slate-600">{website || given.page ? 'Reading its website…' : 'Looking in the guide’s Gmail…'}</p>}
+        {stage === 'no-email' && (
+          <>
+            <div className="space-y-1">
+              <p className="m-0 text-[15px] font-bold text-slate-900">No emails from {given.email} yet</p>
+              <SignUpLine account={guideGmail} />
+            </div>
+            <button type="button" onClick={onClose} className={SUBMIT_PILL}>
+              Done
+            </button>
+          </>
+        )}
         {stage === 'failed' && addedAs.retry && (
           <SourceScreen
             label={pageReadsFor(category)?.kind === 'times' ? 'A web page, or the email it comes from' : 'A web page'}
@@ -307,7 +359,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         {stage === 'found' && (
           <>
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="m-0 text-[15px] font-extrabold text-slate-900">Found on its website</p>
+              <p className="m-0 text-[15px] font-extrabold text-slate-900">{addedAs.fromEmail ? 'Found in its email' : 'Found on its website'}</p>
               <ul className="m-0 mt-2 list-none space-y-1.5 p-0" data-testid="found-lines">
                 {addedAs.lines.map((l) => (
                   <li key={l} className="text-[15px] text-slate-700">

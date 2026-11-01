@@ -2216,15 +2216,16 @@ a website's phone and email, a menu, Refuah and an eruv's status page, and fills
 the rows with nothing saved; a food place shows at once if it's on the kosher lists,
 from their kept copy, with Use it.
 
-**Drawn Nov 1, not built (the *14 boards):** Read now for email, so an admin
-adding a place sees the answer then instead of coming back. The Gmail script
-becomes a web app the site can call: two more setup steps (Deploy it, Paste its
-link), the link tried at once. An email line says "Read now", and it looks in
-the Gmail for that address's latest email within the script's 14 days. The result
-fills the field, or says no email yet with the sign-up line, or that the email
-had no times. If Gmail doesn't answer, the hourly check still looks. Add listing
-looks too. **The user must:** re-paste and deploy Philly's script once it's built.
-These replace the "within the hour" boards.
+**Read now for email, built (the *14 boards).** The Gmail script can be deployed as
+a web app: two more setup steps (Deploy it, Paste its link), the link tried at once
+and kept only if it answers with this community's key. An email line says Read now
+and looks in the Gmail for that address's latest email within the script's 14 days.
+The result fills the rows, or says no email yet with the sign-up line, or that the
+email had no times. If the Gmail doesn't answer, the hourly check still looks. Add
+listing looks too, filing what it finds as the hourly run would. The Newsletters
+page is now called Shul emails. **The user must:** run migration 091 (dev and live,
+in the SQL editor), then re-paste and deploy Philly's script. Until then Read now
+for email stays off and says "The guide's Gmail isn't set up".
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten

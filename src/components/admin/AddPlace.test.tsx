@@ -223,4 +223,50 @@ describe('Add a place', () => {
       expect(screen.getByRole('button', { name: 'Read now' })).toBeInTheDocument()
     })
   })
+
+  describe('Read now for email', () => {
+    function reading(reply: unknown) {
+      vi.mocked(fetchJson).mockImplementation(async (url) => (String(url).includes('/read-now') ? reply : {}))
+    }
+    const sourceWords = () => screen.getAllByTestId('row-source').map((p) => p.textContent).join('\n')
+    async function giveEmail(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+      await user.click(screen.getByRole('button', { name: 'Change' }))
+      await user.type(screen.getByLabelText('A web page, or the email it comes from'), 'office@ohev.org')
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(sourceWords()).toContain('office@ohev.org'))
+    }
+    const readEmail = async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getAllByRole('button', { name: 'Read now' })[0])
+
+    it('none yet: says so, with the address to sign up with (EmailNone14)', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'no-email', account: 'guide@gmail.com' })
+      renderAdd()
+      await giveEmail(user)
+      await readEmail(user)
+      expect(await screen.findByText(/Sign up for its emails with guide@gmail.com/)).toBeInTheDocument()
+      expect(sourceWords()).toContain('No emails from office@ohev.org yet')
+      const body = posts().find(([u]) => String(u).includes('/read-now'))![1]
+      expect(body).toMatchObject({ slot: 'email', url: 'office@ohev.org' })
+    })
+
+    it('no Gmail connected: where to connect it (EmailNoGmail14)', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'no-gmail' })
+      renderAdd()
+      await giveEmail(user)
+      await readEmail(user)
+      expect(await screen.findByRole('link', { name: 'Set it up' })).toHaveAttribute('href', expect.stringContaining('/watches/newsletters'))
+    })
+
+    it('found: fills in, and says the day it was sent (EmailFound14)', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'found', on: 'Oct 30', account: 'guide@gmail.com', details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] } })
+      renderAdd()
+      await giveEmail(user)
+      await readEmail(user)
+      await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · Oct 30'))
+    })
+  })
 })

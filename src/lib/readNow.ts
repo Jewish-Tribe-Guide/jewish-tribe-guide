@@ -14,6 +14,10 @@ import { selectValues } from './categories'
 import { matchRefuah } from './refuahMatch'
 import { readRefuahHospital, readRefuahNear } from './refuahRun'
 import { refuahFields, refuahHospitalId } from './refuahWatch'
+import { readEruvEmail } from './eruvEmail'
+import { latestEmailFrom, type EmailLook } from './gmailNow'
+import { newsletterText } from './newsletter'
+import { attachmentSource } from './newsletterRun'
 import type { DirectoryResource } from '@/types'
 
 // ── Read now (boards *13): a place not added yet, read while it's added ──────
@@ -25,6 +29,12 @@ import type { DirectoryResource } from '@/types'
 export type ReadNowDraft = { name: string; address: string; phone: string; details: Record<string, unknown>; coords?: { lat: number; lng: number } | null }
 /** What was read, to fill in; or why there's nothing. */
 export type ReadNowAnswer = { state: 'done'; phone?: string; details: Record<string, unknown> } | { state: 'none' | 'failed' | 'not-found' }
+/** An email looked for (boards *14). */
+export type EmailNowAnswer =
+  | { state: 'no-gmail' | 'no-answer' }
+  | { state: 'no-email'; account: string | null }
+  | { state: 'no-times'; on: string; account: string | null }
+  | { state: 'found'; on: string; account: string | null; phone?: string; details: Record<string, unknown> }
 
 /** As much of a page's reading as is new. */
 const MAX_PAGES = 3
@@ -81,6 +91,31 @@ export async function readPageNow(category: CategoryConfig, draft: ReadNowDraft,
     }
   }
   return opened ? answer(draft, phone, details) : { state: 'failed' }
+}
+
+/** The latest email from that address, read for the shul's times. */
+export async function readEmailNow(community: string, category: CategoryConfig, draft: ReadNowDraft, address: string, { apiKey, communityName }: { apiKey: string; communityName: string }): Promise<EmailNowAnswer> {
+  const look = await latestEmailFrom(community, address)
+  if (look.state !== 'found') return look
+  const reads = pageReadsFor(category)
+  const { email, on, account } = look
+  const text = newsletterText(email.text)
+  const file = attachmentSource(email.attachment)
+  if (!reads || reads.kind !== 'times' || (text.length < 10 && !file)) return { state: 'no-times', on, account }
+  const source = text.length >= 10 ? { url: '', text } : { url: '', text: null, ...file }
+  const reading = await readPageFor(blank(category, draft), category, reads, source as never, { apiKey, communityName, now: email.date ? Date.parse(email.date) : undefined })
+  const got = reading.proposal?.submission as { details?: Record<string, unknown> } | undefined
+  const filled = answer(draft, draft.phone, { ...draft.details, ...got?.details })
+  return filled.state === 'done' ? { state: 'found', on, account, details: filled.details } : { state: 'no-times', on, account }
+}
+
+/** An eruv's latest email, read for up or down. */
+export async function readEruvEmailNow(community: string, address: string, timezone: string): Promise<EmailLook | { state: 'found'; on: string; account: string | null; status: string; words: string | null } | { state: 'no-times'; on: string; account: string | null }> {
+  const look = await latestEmailFrom(community, address)
+  if (look.state !== 'found') return look
+  const reading = readEruvEmail(look.email, look.email.date ?? new Date().toISOString(), timezone)
+  if (reading.kind !== 'read') return { state: 'no-times', on: look.on, account: look.account }
+  return { state: 'found', on: look.on, account: look.account, status: reading.write.status, words: reading.write.words }
 }
 
 /** A place's own website, for its phone and email. */

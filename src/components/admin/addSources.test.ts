@@ -98,7 +98,7 @@ describe('Add a place: what a row is read from', () => {
     expect(after({ state: 'no-email' })).toMatchObject({ text: 'No emails from office@ohev.org yet', signUp: true })
     expect(after({ state: 'no-times', on: 'Oct 28' })?.text).toBe('office@ohev.org’s Oct 28 email had no times')
     expect(after({ state: 'no-answer' })).toMatchObject({ text: 'Couldn’t reach the guide’s Gmail', red: true })
-    expect(after({ state: 'no-gmail' })).toMatchObject({ text: 'office@ohev.org', setUpGmail: true })
+    expect(after({ state: 'no-gmail' })).toMatchObject({ text: 'The guide’s Gmail isn’t set up', setUpGmail: true })
   })
 
   it('a food place’s dishes come from its menu, and only Food is on the kosher lists (FoodNoSite12, KosherFound13, KosherNone13)', () => {
