@@ -2203,9 +2203,15 @@ to say. In admin's listing and eruv, an opened row's source line now sits on
 the gray under the white card, then a solid Done, as drawn (it was inside the
 card, tight above Done). The public editor keeps Done inside its card.
 
-**Email Read now is an open question for the user** (Nov 1). What matters is
-the admin not coming back twice, not the hour. Recommended: the Gmail script
-as a web app the site can call. Not drawn or built.
+**Drawn Nov 1, not built (the *14 boards):** Read now for email, so an admin
+adding a place sees the answer then instead of coming back. The Gmail script
+becomes a web app the site can call: two more setup steps (Deploy it, Paste its
+link), the link tried at once. An email line says "Read now", and it looks in
+the Gmail for that address's latest email within the script's 14 days. The result
+fills the field, or says no email yet with the sign-up line, or that the email
+had no times. If Gmail doesn't answer, the hourly check still looks. Add listing
+looks too. **The user must:** re-paste and deploy Philly's script once it's built.
+These replace the "within the hour" boards.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
