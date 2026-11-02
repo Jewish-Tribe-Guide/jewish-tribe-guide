@@ -1,6 +1,7 @@
 import { samePage } from '@/lib/hoursJob'
 import { sourceKind, sourceProblem } from '@/lib/watchPurposes'
 import type { AddSource, Again, Change, ReadStep, Stop } from './openedPlaceBoxes'
+import type { ReadNow } from './listingSource'
 
 // What a place's sources can have done to them, from wherever they're shown:
 // its screen on To do (OpenedPlace.tsx) and its Places listing
@@ -26,6 +27,34 @@ export function sourceActions(placeId: string, post: Post) {
     if (s.job === 'eruv-site') return post('/api/admin/watches/eruv', { action: 'read', id: s.id })
     const res = await post<{ read?: string[] }>(hoursApi(s.job), { action: 'check', resourceId: s.resourceId })
     for (const id of res.read ?? []) await post(hoursApi(s.job), { action: 'check', resourceId: s.resourceId, id })
+  }
+
+  /** Read now on a saved place: read and filed as the nightly run would, and
+   *  whether it could be. `changedMenu`: dishes it found, not filed in the
+   *  queue, that wait on its To do screen. */
+  async function readSource(r: ReadNow): Promise<{ failed: boolean; changedMenu?: boolean; emailState?: string }> {
+    if ('email' in r) {
+      const reply = await post<{ state?: string }>(`/api/admin/listings/${placeId}/found`, { action: 'email', address: r.email })
+      return { failed: reply.state !== 'found', emailState: reply.state }
+    }
+    const s = r.step
+    if (s.job === 'dishes') {
+      const reply = await post<{ reading?: { status?: string } | null }>('/api/admin/main-dishes', { action: 'read', resourceId: s.resourceId })
+      return { failed: reply.reading?.status === 'failed', changedMenu: reply.reading?.status === 'proposed' }
+    }
+    if (s.job === 'refuah' || s.job === 'watch') {
+      const reply = await post<{ watch?: { lastError?: string | null } | null }>('/api/admin/watches', { action: 'check', id: s.watchId })
+      return { failed: !reply.watch || !!reply.watch.lastError }
+    }
+    if (s.job === 'eruv' || s.job === 'eruv-site') return readStep(s).then(() => ({ failed: false }))
+    const found = await post<PageReply>(hoursApi(s.job), { action: 'check', resourceId: s.resourceId })
+    const ids = found.read ?? []
+    let read = 0
+    for (const id of ids) {
+      const reply = await post<PageReply>(hoursApi(s.job), { action: 'check', resourceId: s.resourceId, id })
+      if (!reply.pages?.find((p) => p.watch.id === id)?.watch.lastError) read++
+    }
+    return { failed: read === 0 }
   }
 
   async function change(c: Change, url: string) {
@@ -137,5 +166,5 @@ export function sourceActions(placeId: string, post: Post) {
     }
   }
 
-  return { readStep, change, eruvSource, stopSource, readAgain, addSource, startReading, readPage }
+  return { readStep, readSource, change, eruvSource, stopSource, readAgain, addSource, startReading, readPage }
 }
