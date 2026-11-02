@@ -105,6 +105,20 @@ describe('readFieldChanges', () => {
     expect(r.notes).toEqual(['Women’s Hours: closes 4:00 PM, but which days isn’t said'])
   })
 
+  it('hours read for a section turn that section on, or the listing wouldn’t show them', () => {
+    const withFlag = makeCategory({
+      id: 'mikvah',
+      label: 'Mikvah',
+      detailFields: [
+        { key: 'womenTevillah', label: 'Women’s', type: 'boolean' },
+        { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+      ],
+    })
+    const read = [{ key: 'women_s_hours', hours: hours({ days: ['mon'], open: '20:00', close: '22:00' }) }]
+    expect(readFieldChanges(withFlag, makeListing({ category: 'mikvah' }), read).values.womenTevillah).toBe(true)
+    expect(readFieldChanges(withFlag, makeListing({ category: 'mikvah', womenTevillah: true }), read).values).not.toHaveProperty('womenTevillah')
+  })
+
   it('changes nothing it already says, and nothing it isn’t a field of', () => {
     const r = readFieldChanges(food, sayShe, [
       { key: 'kosherCert', value: 'IKC' },

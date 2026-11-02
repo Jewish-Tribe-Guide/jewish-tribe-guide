@@ -113,9 +113,9 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
 }
 
 /** "Its menu · Oct 20 · Change": a row's one line, its controls drawn in by the caller. */
-export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'>; controls?: ReactNode[] }) {
+export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
   return (
-    <p className="m-0 text-[13px] text-slate-500 [overflow-wrap:anywhere]" data-testid="row-source">
+    <p className={`m-0 text-[13px] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
       {line.url ? (
         <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
           {line.text}
@@ -142,6 +142,9 @@ export type SourceScreenProps = {
   stop?: () => Promise<void>
   /** Under the address: an eruv's "Its page dates each week's post". */
   extra?: ReactNode
+  placeholder?: string
+  /** It's been tried already, and couldn't be read. */
+  failedAtFirst?: boolean
   onDone: () => Promise<void> | void
   /** After a try that didn't read: the source is in by then. */
   onTried: () => Promise<void> | void
@@ -149,11 +152,11 @@ export type SourceScreenProps = {
 
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
-export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, onDone, onTried }: SourceScreenProps) {
+export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, failedAtFirst = false, onDone, onTried }: SourceScreenProps) {
   const [value, setValue] = useState(first)
   const [attempt, setAttempt] = useState<{ run: Attempt }>({ run: firstAttempt })
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState(failedAtFirst)
   const [error, setError] = useState<string | null>(null)
 
   async function go(work: () => Promise<void>) {
@@ -187,7 +190,7 @@ export function SourceScreen({ label, value: first, button: words, attempt: firs
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <label className="flex flex-col gap-1.5 text-[13px] text-slate-600">
           {label}
-          <input value={value} onChange={(e) => setValue(e.target.value)} className={INPUT} autoFocus />
+          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} className={INPUT} autoFocus />
         </label>
         {extra}
       </div>
@@ -288,6 +291,22 @@ export default function PlaceListing({
     </button>
   )
 
+  const changeControl = (c: NonNullable<SourceLine['change']>) => {
+    const stop: Stop | undefined = c.stop
+    return control('Change', () =>
+      open('Change', {
+        label: c.label,
+        value: c.value,
+        button: 'Save',
+        attempt: async (url) => {
+          await actions.change(c.act, url)
+          return { failed: false }
+        },
+        ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
+      }),
+    )
+  }
+
   function rowSource(row: EditorRow, changed: boolean): ReactNode {
     const source = sources?.(row)
     if (!source) return null
@@ -296,24 +315,7 @@ export default function PlaceListing({
     // Typed over or cleared, Google doesn't get it back on saving.
     if (line.googleStop && changed) return <SourceWords line={{ text: 'Google stops keeping this' }} />
     const controls: ReactNode[] = []
-    if (line.change) {
-      const c = line.change
-      const stop: Stop | undefined = c.stop
-      controls.push(
-        control('Change', () =>
-          open('Change', {
-            label: c.label,
-            value: c.value,
-            button: 'Save',
-            attempt: async (url) => {
-              await actions.change(c.act, url)
-              return { failed: false }
-            },
-            ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
-          }),
-        ),
-      )
-    }
+    if (line.change) controls.push(changeControl(line.change))
     if (line.start) {
       const s = line.start
       controls.push(control('Change', () => open('Change', { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) })))
@@ -331,10 +333,11 @@ export default function PlaceListing({
       controls.push(control('Use Google’s', () => void google(row, 'use_field', f)))
     }
     return (
-      <>
+      <div className="space-y-1">
         {error}
         <SourceWords line={line} controls={controls} />
-      </>
+        {source.also && <SourceWords line={source.also} controls={source.also.change ? [changeControl(source.also.change)] : undefined} />}
+      </div>
     )
   }
 

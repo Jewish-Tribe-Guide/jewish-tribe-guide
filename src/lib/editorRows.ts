@@ -83,8 +83,10 @@ const BROUGHT_UP: Partial<Record<FieldType, true>> = { url: true, text: true, te
 
 /** `week`: a shul's "This week's schedule" row is offered for it, on a
  *  listing's own edit only (thisWeekEdit.ts). `splitContact`: the contact box
- *  a row each, since a job keeps each one (the Places listing, Nov 1). */
-export function editorRows(category: CategoryConfig, details: Record<string, unknown>, { week, nextWeek, splitContact }: { week?: EditWeek | null; nextWeek?: EditWeek | null; splitContact?: boolean } = {}): EditorRow[] {
+ *  a row each, since a job keeps each one (the Places listing, Nov 1).
+ *  `allSections`: a mikvah's sections offered whether on or not, for a place
+ *  being added (sectionFlags turns on the ones written in). */
+export function editorRows(category: CategoryConfig, details: Record<string, unknown>, { week, nextWeek, splitContact, allSections }: { week?: EditWeek | null; nextWeek?: EditWeek | null; splitContact?: boolean; allSections?: boolean } = {}): EditorRow[] {
   const fields = category.detailFields
   const placed = new Set<string>()
   const take = (list: CategoryField[]) => {
@@ -138,7 +140,7 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
       !f.audienceKey &&
       (isBadge(f) || caveatParts.has(f.key) || audienceFlags.has(f.key)),
   )
-  const facts = factFields.filter((f) => !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key))
+  const facts = factFields.filter((f) => !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key) && !(allSections && audienceFlags.has(f.key)))
   // The certificate's link goes under the hechsher, not with the website
   // (the user, Oct 11), unless the admin put it in a box of its own.
   const hechsher = facts.findIndex((f) => f.caveat)
@@ -148,6 +150,7 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
     )
     facts.splice(hechsher + 1, 0, ...links)
   }
+  if (allSections) take(fields.filter((f) => audienceFlags.has(f.key)))
   if (facts.length > 0) rows.push({ id: 'facts', title: factsTitle(facts), kind: 'fields', fields: take(facts) })
 
   // 3 · The main thing.
@@ -171,7 +174,7 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
     const flag = fields.find((f) => f.key === flagKey)
     const own = fields.filter((f) => f.audienceKey === flagKey && f.renderAs !== 'hidden')
     take(own)
-    if (flag && details[flagKey]) rows.push({ id: `audience:${flagKey}`, title: flag.filterLabel ?? flag.label, kind: 'audience', fields: own, flag: flagKey })
+    if (flag && (details[flagKey] || allSections)) rows.push({ id: `audience:${flagKey}`, title: flag.filterLabel ?? flag.label, kind: 'audience', fields: own, flag: flagKey })
   }
 
   // 4 · The admin's boxes, then any list of contacts in none of them, with
@@ -255,6 +258,14 @@ function blank(f: CategoryField, v: unknown): boolean {
   if (f.type === 'hours') return !hasAnyHours(v) && !(typeof v === 'string' && v.trim())
   if (f.type === 'minyanim') return !isMinyanim(v) || v.length === 0
   return String(v ?? '').trim() === ''
+}
+
+/** The section switches a draft's writing asks for: on where its section has
+ *  anything written, off where it hasn't. */
+export function sectionFlags(category: Pick<CategoryConfig, 'detailFields'>, details: Record<string, unknown>): Record<string, boolean> {
+  const fields = category.detailFields
+  const flags = new Set(fields.map((f) => f.audienceKey).filter((k): k is string => !!k))
+  return Object.fromEntries([...flags].map((flag) => [flag, fields.some((f) => f.audienceKey === flag && !blank(f, details[f.key]))]))
 }
 
 function optionText(f: CategoryField, v: unknown): string {

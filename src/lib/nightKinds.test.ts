@@ -133,7 +133,7 @@ describe('last night, a line per kind', () => {
 
   it('every kind, in order, with its run’s time', () => {
     const views = nightKinds('philly', runs, [], google, NOW)
-    expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Newsletters', 'Mikvah hours', 'Menus'])
+    expect(views.map((v) => v.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Shul emails', 'Mikvah hours', 'Menus'])
     expect(views.map((v) => v.when)).toEqual(['2:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', '3:00 AM', null, '3:00 AM', '3:00 AM'])
   })
 
@@ -431,7 +431,7 @@ describe('everything a kind tracks', () => {
       g1: { why: 'Google has no phone' },
     }
     const views = nightKinds('philly', runs, watches, [], NOW, [], { readsOf: () => 'hours', nameOf: () => null, siteGap: (id) => gaps[id] ?? null, placePage: at })
-    const sites = kind(views, 'Website')
+    const sites = kind(views, 'Phone, email and hours')
     expect(sites).toMatchObject({ about: 'Reads a place’s own website when Google doesn’t have them.', count: '2 of 3 read' })
     expect(sites.tracked).toEqual([
       { name: 'Sababa Falafel', status: 'Google has no hours · Not loading since Oct 23', bad: true, page: at('f2') },
@@ -440,7 +440,7 @@ describe('everything a kind tracks', () => {
     ])
     expect(sites.misses).toEqual([{ name: 'Sababa Falafel', why: 'Didn’t load', page: at('f2') }])
     expect(kind(views, 'Mikvah hours').tracked.map((t) => t.name)).toEqual(['Mikvah Ohr'])
-    expect(kind(nightKinds('philly', runs, [], [], NOW), 'Website')).toBeUndefined()
+    expect(kind(nightKinds('philly', runs, [], [], NOW), 'Phone, email and hours')).toBeUndefined()
   })
 
   it('Other pages only when there are any', () => {
@@ -453,7 +453,7 @@ describe('everything a kind tracks', () => {
 describe('Newsletters', () => {
   const news = (id: string, over: Partial<Watch> = {}) => watch({ id, url: `mailto:${id}@shul.org`, label: `${id}@shul.org`, createdBy: 'shul newsletters', resourceId: `shul-${id}`, ...over })
   const view = (watches: Watch[]) =>
-    kind(nightKinds('philly', {}, watches, [], NOW, [], { readsOf: (id) => (id.startsWith('shul') ? 'times' : null), nameOf: (id) => ({ 'shul-a': 'Beth Am', 'shul-b': 'BZBI', 'shul-c': 'Kol Tzedek' })[id] ?? null, siteGap: () => null, placePage: at }), 'Newsletters')
+    kind(nightKinds('philly', {}, watches, [], NOW, [], { readsOf: (id) => (id.startsWith('shul') ? 'times' : null), nameOf: (id) => ({ 'shul-a': 'Beth Am', 'shul-b': 'BZBI', 'shul-c': 'Kol Tzedek' })[id] ?? null, siteGap: () => null, placePage: at }), 'Shul emails')
 
   it('each by its shul, with its last email; what needs a look first', () => {
     const v = view([

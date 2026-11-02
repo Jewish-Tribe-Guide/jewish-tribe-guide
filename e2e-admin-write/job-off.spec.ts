@@ -16,12 +16,12 @@ test('a job turned off leaves Watches, and comes back from Add a watch', async (
     await page.getByRole('button', { name: 'Turn it off' }).click()
 
     await expect(page).toHaveURL(/\/philly\/admin\/watches$/)
-    await expect(page.getByRole('region', { name: 'Jobs' }).getByRole('link', { name: /^Links/ })).toHaveCount(0)
+    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).toHaveCount(0)
     await page.getByRole('link', { name: '+ Add a watch' }).click()
     await page.getByRole('button', { name: /^Links/ }).click()
 
     await expect(page).toHaveURL(/\/philly\/admin\/watches$/)
-    await expect(page.getByRole('region', { name: 'Jobs' }).getByRole('link', { name: /^Links/ })).toBeVisible()
+    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).toBeVisible()
   } finally {
     // The session's own cookie signs this request.
     const token = await page.evaluate(() => Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '')

@@ -69,10 +69,9 @@ export function filterPlaces(places: AdminPlace[], { show, category, query }: { 
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** The line under a place's name: "Changed Aug 16", "No address · changed
- *  Sep 3", "Archived Oct 3". */
+/** The line under a place's name, only when there's something to say:
+ *  "No address", "Archived Oct 3". */
 export function placeLine(p: AdminPlace): string {
-  const day = shortDay(p.changedAt)
-  if (p.status === 'archived') return `Archived ${day}`
-  return p.hasAddress ? `Changed ${day}` : `No address · changed ${day}`
+  if (p.status === 'archived') return `Archived ${shortDay(p.changedAt)}`
+  return p.hasAddress ? '' : 'No address'
 }

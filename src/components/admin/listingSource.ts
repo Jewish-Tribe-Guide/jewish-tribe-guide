@@ -6,9 +6,8 @@ import { websiteKeyOf } from '@/lib/googleJob'
 import { itemWording } from '@/lib/itemMarks'
 import type { NightKindId } from '@/lib/jobRuns'
 import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
-import { pageReadsFor } from '@/lib/listingPageWatch'
+import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
-import { NIGHT_KINDS } from '@/lib/nightKinds'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
 import type { AddSource, Again, Change, Foot, Opened, Stop } from './openedPlaceBoxes'
 import { openedPlace } from './openedPlaceBoxes'
@@ -16,12 +15,12 @@ import { websiteWatchOf } from '@/lib/eruvJob'
 import type { Jobs } from './useWatchJobs'
 import { day, shortUrl } from './watchText'
 
-// ── What keeps each row of a listing (boards Listing6, States6, Menu5,
-// Change5, Stopped6, GooglePhone7, Nov 1) ───────────────────────────────────
-// A row of the Places listing names, on its right, the job that keeps it, by
-// the name Watches has it; Stopped or Nothing in amber. Opened, one line
-// says where it's read from, with the one thing that can be done about it:
-// "Its menu · Oct 20 · Change". Put together from openedPlace's boxes and each
+// ── What keeps each row of a listing (boards Listing10, TwoSources10, Nov 1) ─
+// A row of the Places listing names, on its right, the source that keeps it:
+// Google, Website, Email, Keystone-K, Refuah, Link check; Stopped or Nothing
+// in amber. The jobs stay behind them, on Watches. Opened, one line says where
+// it's read from, with the one thing that can be done about it: "Its menu ·
+// Oct 20 · Change". A week with both gets one line each. Put together from openedPlace's boxes and each
 // job's places, so the listing and the job pages say the same. PlaceListing
 // draws it. Pure.
 
@@ -43,9 +42,24 @@ export type SourceLine = {
   useGoogle?: CheckedField
 }
 
-export type RowSource = { job: string; amber: boolean; line: SourceLine }
+export type RowSource = { job: string; amber: boolean; line: SourceLine; also?: SourceLine }
 
-const nameOf = (id: NightKindId) => NIGHT_KINDS.find((k) => k.id === id)?.name ?? id
+/** What a row calls the source behind a job. A kosher list goes by its own
+ *  name, from its line. */
+const SOURCE_NAMES: Record<NightKindId, string> = {
+  google: 'Google',
+  kosher: 'Kosher list',
+  hospitals: 'Refuah',
+  eruvs: 'Website',
+  times: 'Website',
+  newsletters: 'Email',
+  hours: 'Website',
+  sites: 'Website',
+  menus: 'Website',
+  other: 'Website',
+  links: 'Link check',
+}
+const nameOf = (id: NightKindId) => SOURCE_NAMES[id]
 
 const WHERE: Record<Change['kind'], string> = {
   page: 'Where it’s read from',
@@ -71,9 +85,9 @@ const nothing = (add?: GiveSource | null, extra?: Partial<SourceLine>): RowSourc
 function fromFoot(id: NightKindId, foot: Foot, value: string): RowSource {
   const link = foot.links[0]
   // "Its newsletter", not the address it's from, which Change shows.
-  const text = link ? capital(link.text.split(',')[0]) : foot.lead
+  const text = (link ? capital(link.text.split(',')[0]) : foot.lead).replace(/\bnewsletter\b/, 'email')
   return {
-    job: nameOf(id),
+    job: foot.mail ? 'Email' : id === 'kosher' ? text.replace(/’s list$/, '') : nameOf(id),
     amber: false,
     line: {
       text,
@@ -97,7 +111,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   const opened = given ?? openedPlace(id, jobs, now)
   const off = (kind: NightKindId) => !!jobs.runs?.off?.includes(kind)
   const box = (key: string) => opened.boxes.find((b) => b.key === key)
-  const reads = pageReadsFor(category)
+  const reads = jobPageReads(category)
   const addPage: GiveSource | null = opened.add
     ? { label: opened.add.label, email: opened.add.email, run: opened.add }
     : reads
@@ -145,7 +159,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
 
   /** A week's times: the newsletter that gave them, or the page; by hand,
    *  nothing reads them. */
-  function weekRow(useBox: boolean): RowSource {
+  function oneWeekSource(useBox: boolean): RowSource {
     const shul = jobs.times?.places.find((p) => p.id === id)
     const news = off('newsletters') ? undefined : shul?.newsletters?.find((w) => w.active)
     const value = news?.url.replace(/^mailto:/, '') ?? ''
@@ -157,10 +171,23 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
       return {
         job: nameOf('newsletters'),
         amber: false,
-        line: { text: 'Its newsletter', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value, act: { kind: 'newsletter', replaces: news.id } } },
+        line: { text: 'Its email', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value, act: { kind: 'newsletter', replaces: news.id } } },
       }
     }
     return pagesRow('times', null)
+  }
+
+  /** A week read from both: Email first, one line each inside. */
+  function weekRow(useBox: boolean): RowSource {
+    const one = oneWeekSource(useBox)
+    const news = off('newsletters') ? undefined : jobs.times?.places.find((p) => p.id === id)?.newsletters?.find((w) => w.active)
+    const page = pagesRow('times', null)
+    if (!news || page.job !== 'Website') return one
+    const mail = one.job === 'Email' ? one : oneWeekSource(false)
+    if (mail.job !== 'Email') {
+      return { job: 'Website, Email', amber: false, line: { text: 'Its email', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value: news.url.replace(/^mailto:/, ''), act: { kind: 'newsletter', replaces: news.id } } }, also: page.line }
+    }
+    return { job: 'Website, Email', amber: false, line: mail.line, also: page.line }
   }
 
   function dishesRow(): RowSource {

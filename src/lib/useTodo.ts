@@ -7,7 +7,7 @@ import { withCommunity } from './useCommunityData'
 import { todoCount, unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { setupLeft, type SetupState } from './setup'
 import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
-import { waitingNotQueued, type TodoWaiting } from '@/components/admin/todoWaiting'
+import { notBeingRead, waitingNotQueued, type TodoNotRead, type TodoWaiting } from '@/components/admin/todoWaiting'
 
 // What To do holds, loaded once and shared: the To do page shows it and
 // the nav counts it, from the same copy, so a decision taken on the page
@@ -22,6 +22,8 @@ export type TodoData = {
   /** What a job read that waits on a decision but isn't in the queue: a
    *  closure, a check against Google, a menu. Loaded after the rest. */
   waiting?: TodoWaiting[]
+  /** A source that has stopped being read. Loaded with `waiting`. */
+  notRead?: TodoNotRead[]
   /** What the setup checklist ticks off; null if it couldn't be read, so
    *  no checklist shows rather than a wrong one. */
   setup: SetupState | null
@@ -80,6 +82,7 @@ async function load(key: string, token: string, community: string, email: string
       setup: setup.status === 'fulfilled' ? setup.value.setup : null,
       // Kept until the jobs answer again, so the count doesn't dip meanwhile.
       waiting: state.data?.waiting,
+      notRead: state.data?.notRead,
     },
   })
   void loadWaiting(key, token, community)
@@ -93,7 +96,7 @@ async function loadWaiting(key: string, token: string, community: string) {
   const load = ++waitingLoads
   const jobs: Jobs = {}
   await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
-  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()) }))
+  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()) }))
 }
 
 /** Loads To do (again, with `fresh`), sharing a load already under way. */

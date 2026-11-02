@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 31, 2026.
+Last updated: Nov 1, 2026.
 
 ## The branch
 
@@ -587,8 +587,8 @@ brief, one round of drawings, then the build in pieces.
    with their shul and when the last one came in; "+ Add a newsletter"
    takes the shul and its email. A sender with no shul is linked (or
    skipped, Not a shul) here now, not on What's tracked.
-   Each community's key is in `newsletter_setup` (**migration 090, not run
-   anywhere yet: run it on dev and live**). Without it the page says
+   Each community's key is in `newsletter_setup` (migration 090, run on
+   dev and live; checked Nov 1). Without it the page says
    newsletters can't be set up yet, and everything else works as before.
    `NEWSLETTER_SECRET` still works for every community, so Philly's script
    carries on unchanged; a community's own key works for it alone.
@@ -2148,6 +2148,95 @@ failed read; only Start reading does. The "Checked by" filter doesn't cover eruv
 Gone with the old screen, as drawn: "Read it now" and "Open its listing" for a
 place with nothing waiting.
 
+**Drawn Nov 1, not built (the *8 boards on the same canvas), waiting on the
+user:** Add a place says how each field will be watched, in the same rows and
+one line as a saved listing. It starts with Find the place, as visitors' Add
+does, and Google is read as soon as the listing is added. Before saving, the
+line reads "Google · Stop", "Google stops keeping this", "Its website · tomorrow
+morning · Change" or "Nothing reads this · Add a source". Change's box starts
+empty, since nothing is searched until it's saved, and a page given there is
+read on adding. If that read fails, the screen says "Couldn't read that page"
+instead of going back to the list. Added while drawing, for the user to judge: a
+job's name on the "Not on the listing yet" lines; "Find it on Google" on a place
+filled in by hand; "when one comes" for a newsletter's email. Drawn for a shul
+only; kosher places and hospitals aren't traced yet.
+
+**Agreed Nov 1, drawn, not built (the *9 boards):** a row names where it's read
+from, not the job: Google, Website, Newsletter, Keystone, Refuah, Nothing or
+Stopped. This replaces the row words on the *8 boards and the built "Watches
+names" on listings. Jobs stay as how the system runs.
+
+**Agreed Nov 1, drawn, not built (the *10 boards, which replace those words):**
+"Email", never "Newsletter" (row, line, Add a source's box, the job as "Shul
+emails"). A row with both set up says "Website, Email", with one line each
+inside. The Website job is renamed "Phone, email and hours". A link the Sunday
+job checks says "Link check", WhatsApp included. A page that isn't being read
+waits in To do under "Not being read", since today it shows only on Watches.
+Watches lists the jobs under their source and leaves To do.
+
+**Drawn Nov 1, not built (the *11 boards):** no source word on "Not on the
+listing yet" lines; the line appears once one is opened. Agreed Watches isn't a
+tab. The row at the top of Places looked crowded on a phone, so it's drawn at
+the foot of Places, under Show all, with "+ Add a place" beside the title.
+**Waiting on the user:** that placement.
+
+**Drawn Nov 1, not built (the *12 boards):** the other kinds of place on Add a
+place. A hospital's contact rows say "Refuah · tomorrow morning · Change". A food
+place's kosher row says both lists get checked, then names the one it was found
+on. A mikvah takes a page only. An eruv uses the same Add screen, with sources
+given before it goes live; today a name alone puts it on the site. After an email
+source, a line says to sign up with the guide's address, and "No email has come
+in 3 weeks" waits in To do under Not being read. The canvas now holds only
+current boards, in labelled rows. **Waiting on the user:** all of these.
+
+**Drawn Nov 1, not built (the *13 boards):** Read now while adding. A website or
+Refuah line says "Read now" and fills in the form before the place goes live,
+which needs a read that saves nothing. Without it, Add listing reads afterward
+and shows what it found, to add in one tap. Kosher shows at once from the lists'
+morning copy ("On Keystone-K’s list · Use it"). An email says "within the hour",
+as the Gmail script looks back 14 days each hour. A shul's minyan rows get a
+second link, Add a source, so an email can sit beside a website.
+
+**Places and the opened row, built Nov 1.** A row in Places no longer shows
+when it changed: only "No address" or "Archived Oct 3" when there's something
+to say. In admin's listing and eruv, an opened row's source line now sits on
+the gray under the white card, then a solid Done, as drawn (it was inside the
+card, tight above Done). The public editor keeps Done inside its card.
+
+**Building the Add a place and Watches boards (Nov 1, the user: "ready to build
+everything").** Built so far: rows name their source; Watches at the foot of
+Places, its jobs under Google, Websites, Email, Outside lists and Link check; To
+do's Not being read, with "No email has come in 3 weeks". The kosher job's Watches
+row says "Keystone-K and Mekor Habracha", as it reads both (the board says
+Keystone-K only). Add a place starts at Find the place and its rows say what reads
+them. Add listing saves the choices, reads the place at once, and offers what it
+found in one tap, or Decide later in To do. A food place's dishes go to its Dishes
+page, not this screen. Read now on the Add screen reads a shul's or mikvah's page,
+a website's phone and email, a menu, Refuah and an eruv's status page, and fills in
+the rows with nothing saved; a food place shows at once if it's on the kosher lists,
+from their kept copy, with Use it.
+
+**Add a place, all boards built and compared (Nov 1).** Not as drawn: rows follow
+the saved listing, so a shul has an Address row and "Usual weekday" and "Usual
+Shabbos times" rather than one "Usual minyan times"; adding an eruv doesn't look in
+the Gmail (only Read now; the hourly check covers it); a food place's dishes on Add
+go to the Dishes page. A mikvah section can't be said to exist on Add with nothing
+written in it; tick it on the listing's What's here afterwards.
+
+**Read now for email, built (the *14 boards).** The Gmail script can be deployed as
+a web app: two more setup steps (Deploy it, Paste its link), the link tried at once
+and kept only if it answers with this community's key. An email line says Read now
+and looks in the Gmail for that address's latest email within the script's 14 days.
+The result fills the rows, or says no email yet with the sign-up line, or that the
+email had no times. If the Gmail doesn't answer, the hourly check still looks. Add
+listing looks too, filing what it finds as the hourly run would. The Newsletters
+page is now called Shul emails. Migration 091 is run on dev and live (the user; checked Nov 1, no link saved on
+either yet). **Next, in this order:** merge this branch, so the live Shul emails page
+has the steps; then the user re-pastes Philly's script from that page, deploys it as
+a web app and pastes its link. Saving the link writes `web_app_url` on Philly's
+`newsletter_setup` row and nothing else. Until then Read now for email stays off and
+says "The guide's Gmail isn't set up".
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
@@ -2164,7 +2253,7 @@ since. A deleted community's watches kept being checked every night, its
 subscribers' emails stayed, and a new community given the same short name
 would have inherited its counts, searches, eruvin and newsletter key. Now
 every table with a `community_id` is cleared (`COMMUNITY_SCOPED_TABLES`, 21),
-a table whose migration hasn't run (090 today) is skipped, and
+a table whose migration hasn't run is skipped, and
 `communityScopedTables.test.ts` reads the migrations and fails if a new
 table is missed.
 

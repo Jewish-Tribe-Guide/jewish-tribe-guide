@@ -58,6 +58,11 @@ export function needsFirstRead(item: DirectoryResource, kind: DishKind, read: bo
  *  best first, until one names dishes. A page drawn by a script is drawn
  *  in a browser (renderPage.ts). None read is kept too, saying why. */
 export async function readPlaceMenu(slug: string, listing: DirectoryResource, kind: DishKind, apiKey: string): Promise<StoredMenuReading | null> {
+  return saveMenuReading(slug, listing.id, await readPlaceMenuPages(listing, kind, apiKey))
+}
+
+/** Its menu read, saving nothing (readNow.ts, for a place not added yet). */
+export async function readPlaceMenuPages(listing: DirectoryResource, kind: DishKind, apiKey: string): Promise<Parameters<typeof saveMenuReading>[2]> {
   const website = menuWebsite(listing, kind.category)
   const menuUrl = menuLinkOf(listing)
   // Why each couldn't be read, the first reason each, for the note.
@@ -75,23 +80,23 @@ export async function readPlaceMenu(slug: string, listing: DirectoryResource, ki
     await renderer.close()
   }
   if (!sources.length) {
-    return saveMenuReading(slug, listing.id, {
+    return {
       status: 'failed',
       sourceUrl: menuUrl ?? website,
       dishes: [],
       note: unreadMenuNote(menuUrl, website, trouble),
       model: null,
-    })
+    }
   }
   const read = (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))!
-  return saveMenuReading(slug, listing.id, {
+  return {
     status: read.dishes.length ? 'proposed' : 'failed',
     sourceUrl: read.sourceUrl,
     dishes: read.dishes,
     missing: read.missing,
     note: read.note,
     model: read.model,
-  })
+  }
 }
 
 /** A first read that agrees with the listing (no dish new to it, none it

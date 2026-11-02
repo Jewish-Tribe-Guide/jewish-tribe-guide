@@ -15,6 +15,11 @@
 //      the script read the Gmail account and reach the site: allow it. It
 //      reads once there and then, and every hour from then on.
 //
+//   3. Deploy → New deployment → Web app, with access set to Anyone, and
+//      paste its link on the Newsletters page. Then an admin adding a place
+//      can look for its latest email then and there (doPost); the hourly
+//      read goes on without it. It answers only with this KEY.
+//
 // Each run tells the site it ran, and which Gmail it's in, so the
 // Newsletters page can say it's working. A copy without a KEY (one set up
 // before Oct 29) reads NEWSLETTER_SECRET from Project Settings → Script
@@ -35,8 +40,8 @@
 // Gmail's list: search, and the List-Post header each one carries.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install and readNewsletters by name */
-/* global GmailApp, PropertiesService, ScriptApp, Session, UrlFetchApp, Utilities */
+/* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install, readNewsletters and doPost by name */
+/* global ContentService, GmailApp, PropertiesService, ScriptApp, Session, UrlFetchApp, Utilities */
 
 var SITE = 'https://phillyjewishguide.com'
 var COMMUNITY = 'philly'
@@ -130,6 +135,33 @@ function readNewsletters() {
 
 /** The newsletters on the Watches tab: the addresses, lower case, whose
  *  emails are sent. */
+/** Read now: the site asks for one address's latest email, or with no
+ *  address just whether this is here and has the key. */
+function doPost(e) {
+  var answer = function (o) {
+    return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON)
+  }
+  var asked = {}
+  try {
+    asked = JSON.parse(e.postData.contents)
+  } catch (err) {
+    return answer({ ok: false })
+  }
+  var secret = KEY || PropertiesService.getScriptProperties().getProperty('NEWSLETTER_SECRET')
+  if (!secret || asked.key !== secret) return answer({ ok: false })
+  if (!asked.address) return answer({ ok: true, account: account() })
+  var address = String(asked.address).toLowerCase().replace(/[^a-z0-9@._+-]/g, '')
+  var threads = threadsFrom([address])
+  // Oldest first: from the newest back, its newest message from them.
+  for (var i = threads.length - 1; i >= 0; i--) {
+    var messages = threads[i].getMessages()
+    for (var j = messages.length - 1; j >= 0; j--) {
+      if (addressOf(messages[j].getFrom()) === address || listOf(messages[j]) === address) return answer({ ok: true, account: account(), email: emailOf(messages[j]) })
+    }
+  }
+  return answer({ ok: true, account: account(), email: null })
+}
+
 function watchedSenders(secret) {
   var res = UrlFetchApp.fetch(SITE + '/api/inbound/newsletter?community=' + COMMUNITY, {
     method: 'get',

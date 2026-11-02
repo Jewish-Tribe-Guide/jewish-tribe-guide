@@ -80,6 +80,15 @@ export function pageReadsFor(category: Pick<CategoryConfig, 'detailFields'>): Pa
   return hours.length ? { kind: 'hours', keys, notes } : null
 }
 
+/** What a job reads a place's page for by itself. Null too for a category with
+ *  only the plain "Hours", which Google keeps: no job reads a food place's or
+ *  a hospital's hours off its website (hoursJobCategories), so it isn't told
+ *  one does, and its website is read as any other's. */
+export function jobPageReads(category: Pick<CategoryConfig, 'detailFields'>): PageReads | null {
+  const reads = pageReadsFor(category)
+  return reads?.kind === 'hours' && reads.keys.includes(PLAIN_HOURS_KEY) ? null : reads
+}
+
 /** The boxes a page that agrees with the listing dates (sourceConfirm.ts):
  *  only what it read (the user, Oct 23). A shul's usual weekday and Shabbos
  *  times and this week's (its schedules are read beside them); a mikvah's section for each of its hours and notes read, and the

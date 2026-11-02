@@ -44,7 +44,7 @@ afterEach(() => {
 })
 
 describe('NewslettersPage', () => {
-  it('not set up yet: the four steps, and the script copied whole', async () => {
+  it('not set up yet: the six steps, and the script copied whole', async () => {
     show(loaded())
     expect(await screen.findByText('Not set up yet')).toBeInTheDocument()
     const steps = within(screen.getByRole('region', { name: 'Set it up' })).getAllByRole('listitem')
@@ -52,7 +52,9 @@ describe('NewslettersPage', () => {
       '1Make a Gmail for the guideSign it up for each shul’s newsletter',
       expect.stringMatching(/^2Copy the script/),
       '3Open script.google.com ↗New project, then paste over what’s there',
-      '4Run installPick install at the top, press Run, then Allow',
+      '4Run installPick install, press Run, then Allow',
+      '5Deploy itDeploy, New deployment, Web app, access Anyone',
+      expect.stringMatching(/^6Paste its link/),
     ])
     expect(screen.getByRole('link', { name: /Open script\.google\.com/ })).toHaveAttribute('target', '_blank')
     const user = userEvent.setup()
@@ -62,13 +64,13 @@ describe('NewslettersPage', () => {
     expect(screen.getByText('None yet')).toBeInTheDocument()
   })
 
-  it('running: where it checks and when, the steps behind Set up again', async () => {
+  it('running: where it checks and when, the steps behind Set up, while Read now is off', async () => {
     const now = Date.now()
     show(loaded({ checkedAt: new Date(now - 20 * 60_000).toISOString(), account: 'riverton.guide@gmail.com' }))
-    expect(await screen.findByText('Checking riverton.guide@gmail.com every hour')).toBeInTheDocument()
+    expect(await screen.findByText('Checking riverton.guide@gmail.com')).toBeInTheDocument()
     expect(screen.getByText(/^Last checked /)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Set it up' })).toBeNull()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Set up again' }))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Set up' }))
     expect(screen.getByRole('region', { name: 'Set it up' })).toBeInTheDocument()
   })
 
@@ -79,7 +81,7 @@ describe('NewslettersPage', () => {
 
   it('without migration 090, says it can’t be set up yet', async () => {
     show(loaded({ available: false, script: null }))
-    expect(await screen.findByText('Newsletters can’t be set up here yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Shul emails can’t be set up here yet.')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Set it up' })).toBeNull()
   })
 
@@ -122,6 +124,28 @@ describe('NewslettersPage', () => {
 describe('scriptPreview', () => {
   it('shows the site, the community and the key, shortened', () => {
     expect(scriptPreview(SCRIPT)).toBe("var SITE = 'https://guide.example'\nvar COMMUNITY = 'philly'\nvar KEY = 'nl_7f3c…a91d'")
+  })
+})
+
+describe('NewslettersPage, Read now', () => {
+  it('Read now on: says so, and asks nothing more (SetupOn14)', async () => {
+    show(loaded({ checkedAt: new Date().toISOString(), account: 'guide@gmail.com', readNow: true }))
+    expect(await screen.findByText(/Read now on/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Set up' })).toBeNull()
+  })
+
+  it('Paste its link: tried at once, and says if it doesn’t answer (SetupSteps14, SetupBad14)', async () => {
+    const user = userEvent.setup()
+    show(loaded())
+    const load = vi.mocked(fetchJson).getMockImplementation()!
+    vi.mocked(fetchJson).mockImplementation(async (url, init, message) => {
+      if (init?.method === 'POST') throw new Error('That link didn’t answer. Check access is set to Anyone.')
+      return load(url, init, message)
+    })
+    expect(await screen.findByText('Deploy it')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Its web app link'), 'https://script.google.com/macros/s/AKfy/exec')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('That link didn’t answer. Check access is set to Anyone.')).toBeInTheDocument()
   })
 })
 

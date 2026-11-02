@@ -330,6 +330,19 @@ export class ReviewEditError extends Error {}
 // `only`, instead: the lines of a watch's finding the admin ticked on its job
 // page (watchFindings.ts); every other line stays as the listing says now,
 // recorded the same way.
+/** A listing's suggestions waiting in the queue, oldest first. */
+export async function pendingForListing(community: string, listingId: string): Promise<{ id: string; payload: unknown }[]> {
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .select('id, payload')
+    .eq('community_id', community)
+    .eq('target_id', listingId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`Couldn’t read the queue: ${error.message}`)
+  return (data ?? []) as { id: string; payload: unknown }[]
+}
+
 export async function approveSubmission(
   id: string,
   community?: string,

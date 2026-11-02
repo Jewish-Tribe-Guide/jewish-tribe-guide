@@ -13,7 +13,7 @@ const hoursApi = (job: 'hours' | 'times') => `/api/admin/watches/hours${job === 
  *  source is read by then, so it isn't what the first try did. */
 export type Attempt = (value: string) => Promise<{ failed: boolean; next?: Attempt }>
 
-type PageReply = { pages?: { id: string; url: string; lastError?: string | null }[]; read?: string[] }
+type PageReply = { pages?: { watch: { id: string; url: string; lastError?: string | null } }[]; read?: string[] }
 
 export function sourceActions(placeId: string, post: Post) {
   // Each of its jobs read, one after another; a shul's or mikvah's pages
@@ -92,7 +92,7 @@ export function sourceActions(placeId: string, post: Post) {
     async (value) => {
       const moved = !samePage(value, was)
       const reply = await post<PageReply>(hoursApi(job), moved ? { action: 'give', resourceId: placeId, url: value, replaces: watchId } : { action: 'check', resourceId: placeId, id: watchId })
-      const page = reply.pages?.find((p) => samePage(p.url, value))
+      const page = reply.pages?.map((p) => p.watch).find((w) => samePage(w.url, value))
       return { failed: !page || !!page.lastError, next: readPage(job, page?.id ?? watchId, value) }
     }
 
@@ -117,7 +117,7 @@ export function sourceActions(placeId: string, post: Post) {
       return async (value) => {
         await post(hoursApi(a.job), { action: 'on', resourceId: placeId })
         const reply = await post<PageReply>(hoursApi(a.job), { action: 'check', resourceId: placeId })
-        const first = reply.read?.[0] ?? reply.pages?.[0]?.id
+        const first = reply.read?.[0] ?? reply.pages?.[0]?.watch.id
         if (!first) {
           await post(hoursApi(a.job), { action: 'give', resourceId: placeId, url: value })
           return { failed: false }
@@ -137,5 +137,5 @@ export function sourceActions(placeId: string, post: Post) {
     }
   }
 
-  return { readStep, change, eruvSource, stopSource, readAgain, addSource, startReading }
+  return { readStep, change, eruvSource, stopSource, readAgain, addSource, startReading, readPage }
 }

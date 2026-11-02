@@ -67,16 +67,35 @@ export function EditorRowCard({
 }
 
 /** A short row, open where it is: its fields inside its card, Done under
- *  them. Its heading closes it too. */
-export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId }: { title: ReactNode; tags?: ReactNode; onClose: () => void; children: ReactNode; cardRef?: Ref<HTMLDivElement>; testId: string }) {
-  return (
-    <div ref={cardRef} data-testid={testId} className="scroll-my-4 space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm">
+ *  them. Its heading closes it too. With `source` (admin's listing) the card
+ *  holds only the fields: the line saying where they come from sits on the
+ *  gray under it, then a solid Done, as on the row's own screen. */
+export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId, source }: { title: ReactNode; tags?: ReactNode; onClose: () => void; children: ReactNode; cardRef?: Ref<HTMLDivElement>; testId: string; source?: { line: ReactNode } }) {
+  const card = 'space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm'
+  const inside = (
+    <>
       <button type="button" onClick={onClose} aria-expanded="true" className="flex min-h-11 w-full cursor-pointer items-center gap-3 text-left">
         <span className="min-w-0 flex-1 text-[16px] font-extrabold text-slate-900">{title}</span>
         {tags}
         <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
       </button>
       {children}
+    </>
+  )
+  if (source) {
+    return (
+      <div ref={cardRef} data-testid={testId} className="scroll-my-4 space-y-2 pb-2">
+        <div className={card}>{inside}</div>
+        {source.line && <div className="px-0.5">{source.line}</div>}
+        <button type="button" onClick={onClose} className={`${SUBMIT_PILL} mt-2`}>
+          Done
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div ref={cardRef} data-testid={testId} className={`scroll-my-4 ${card}`}>
+      {inside}
       <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary">
         Done
       </button>

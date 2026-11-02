@@ -99,8 +99,8 @@ type Props = {
   onSent?: (body: unknown) => void
   /** The admin console's "+ Add listing": Send puts it live straight away
    *  (/api/admin/listings, see useListingSubmit), with no challenge, and
-   *  closes the editor once it's in. */
-  adminSubmit?: { token: string }
+   *  closes the editor once it's in, or hands `onAdded` the new listing. */
+  adminSubmit?: { token: string; onAdded?: (listing: DirectoryResource) => void }
   /** Just these rows (editorRows ids), open, with Send under them: one
    *  box's own Edit (BoxEditSheet, Oct 15), the listing's other boxes
    *  left out. */
@@ -121,6 +121,8 @@ type Props = {
   rowSource?: (row: EditorRow, changed: boolean) => ReactNode
   /** The contact box a row each (editorRows). */
   splitContact?: boolean
+  /** editorRows' allSections. */
+  allSections?: boolean
   /** Values to put in as if typed, each new object once: Use Google's. */
   patch?: Record<string, unknown>
 }
@@ -242,6 +244,7 @@ export default function ListingEditor({
   rowAside,
   rowSource,
   splitContact,
+  allSections,
   patch,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
@@ -279,7 +282,11 @@ export default function ListingEditor({
     via: adminSave?.via ?? via,
     onSent: adminSave ? () => adminSave.onSaved() : onSent,
     adminSubmit,
-    onAdminSubmitted: onClose,
+    onAdminSubmitted: (body) => {
+      const added = (body as { listing?: DirectoryResource } | null)?.listing
+      if (adminSubmit?.onAdded && added) adminSubmit.onAdded(added)
+      else onClose()
+    },
   })
   // The category editor's Preview (previewSend.tsx): Send puts the listing
   // in the preview's list instead of sending it, and the address box
@@ -322,8 +329,8 @@ export default function ListingEditor({
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
   // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
   // next week's too. One box's own Edit has them only if it's that box.
-  const thisWeek = useEditWeek(!creating && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
-  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact })
+  const thisWeek = useEditWeek((!creating || !!rowSource) && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
+  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact, allSections })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -418,7 +425,7 @@ export default function ListingEditor({
     : []
   const needed = (r: EditorRow) =>
     creating &&
-    ((r.kind === 'name' && !draft.name.trim()) || (r.kind === 'contact' && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
+    ((r.kind === 'name' && !draft.name.trim()) || (r.kind === 'contact' && r.part !== 'phone' && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
   const nothingToSend = creating ? missing.length > 0 : changed.size === 0
 
   async function send() {
@@ -475,16 +482,15 @@ export default function ListingEditor({
   // A short row, open: its fields inside its card, Done under them. Its
   // heading closes it too.
   const openInPlace = (r: EditorRow) => (
-    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow}>
+    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow} source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
-      {rowSource?.(r, changed.has(r.id))}
     </EditorOpenCard>
   )
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
   const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
   const listScreen = (
     <div className="space-y-4" data-testid="editor-list">
-      {creating && fromGoogle && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
+      {creating && fromGoogle && !adminSubmit && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
       {adminSubmit && <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>}
       {creating && existingListings && <Lookalike existing={existingListings} draft={draft} category={category} />}
       <ul className="space-y-2">
@@ -566,7 +572,7 @@ export default function ListingEditor({
   }
 
   function rowBody(r: EditorRow): ReactNode {
-    const shown = r.fields.filter(visible)
+    const shown = allSections && r.kind === 'audience' ? r.fields : r.fields.filter(visible)
     // A minyan or a person open: just that.
     const only = child ? shown.filter((f) => f.key === child.key) : shown
     if (r.kind === 'name') {
@@ -729,10 +735,10 @@ export default function ListingEditor({
   const rowScreen = row && !inPlace ? (
     <div className="space-y-4" data-testid={`editor-open-${row.id}`}>
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
+      {!child && rowSource && <div className="-mt-2 px-0.5">{rowSource(row, changed.has(row.id))}</div>}
       {!child &&
         foot(
           <div className="space-y-1">
-            {rowSource && <div className="pb-2">{rowSource(row, changed.has(row.id))}</div>}
             <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
               Done
             </button>

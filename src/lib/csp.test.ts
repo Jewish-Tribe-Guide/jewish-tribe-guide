@@ -48,6 +48,7 @@ describe('buildCsp', () => {
         "'self'",
         'https://abcdefg.supabase.co',
         'wss://abcdefg.supabase.co',
+        'https://places.googleapis.com',
         'https://nominatim.openstreetmap.org',
         'https://o111.ingest.us.sentry.io',
       ]),

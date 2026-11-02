@@ -42,6 +42,16 @@ afterEach(() => {
   forgetWatchJobs()
 })
 
+/** The line sits on the gray under the white card, with Done after it (boards
+ *  KosherOpen12, AddGoogle8): inside the card it crowded the button. */
+function expectLineUnderCard() {
+  const line = screen.getByTestId('row-source')
+  expect(line.closest('.bg-white')).toBeNull()
+  const done = screen.getByRole('button', { name: 'Done' })
+  expect(line.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(done.closest('.bg-white')).toBeNull()
+}
+
 describe('PlacePage', () => {
   it('opens a place not checked by what’s wrong, each with its own fix', async () => {
     const added = new Date(Date.now() - 2 * 86_400_000).toISOString()
@@ -350,7 +360,7 @@ describe('PlacePage', () => {
       expect(screen.getByRole('button', { name: 'No changes yet' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Archive it' })).toBeTruthy()
       const jobs = screen.getAllByTestId('row-job').map((j) => j.textContent)
-      expect(jobs).toContain('Minyan times')
+      expect(jobs).toContain('Website')
       expect(jobs).toContain('Google')
       for (const job of jobs) expect(job).not.toMatch(/\d/)
     })
@@ -358,9 +368,10 @@ describe('PlacePage', () => {
     it('its row opened says where it’s read, and Change saves another page or stops it', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
-      const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!
+      const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!
       await user.click(minyans)
       expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Change`)
+      expectLineUnderCard()
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       const change = screen.getByTestId('source-screen')
       expect(within(change).getByRole('textbox')).toHaveValue('https://kesher.example/davening')
@@ -373,7 +384,7 @@ describe('PlacePage', () => {
     it('Stop reading it, on the Change screen: nothing asked first, it can be started again', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
-      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Minyan times')!.closest('button')!)
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
@@ -385,7 +396,7 @@ describe('PlacePage', () => {
         if (init?.method === 'POST') {
           const body = JSON.parse(String(init.body))
           posts.push([url.replace(/[?&]community=philly/, ''), body])
-          if (body.action === 'check') return body.id ? { pages: [{ id: 'w1', url: page.url, lastError: 'It wouldn’t open' }] } : { read: ['w1'] }
+          if (body.action === 'check') return body.id ? { pages: [{ watch: { id: 'w1', url: page.url, lastError: 'It wouldn’t open' }, source: '' }] } : { read: ['w1'] }
           return { ok: true }
         }
         if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }
@@ -426,6 +437,7 @@ describe('PlacePage', () => {
       await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
       const line = () => screen.getByTestId('row-source')
       expect(line()).toHaveTextContent(`Google · ${day(new Date().toISOString())} · Stop`)
+      expectLineUnderCard()
       await user.click(within(line()).getByRole('button', { name: 'Stop' }))
       expect(posts).toEqual([['/api/admin/watches/google', { action: 'stop_field', id: 'a', field: 'phone' }]])
     })
@@ -545,11 +557,12 @@ describe('an eruv', () => {
     expect(rowOf('status')).toHaveTextContent('Status')
     expect(rowOf('map')).toHaveTextContent('On the map')
     expect(rowOf('hotline')).toHaveTextContent('(610) 664-5626')
-    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveTextContent('Eruvs')
+    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveTextContent('Website')
     expect(within(rowOf('website')).getByTestId('row-job')).toHaveTextContent('Nothing')
 
     await user.click(rowOf('status'))
     expect(screen.getByTestId('row-source')).toHaveTextContent(`Its status page · ${day(at)} · Change`)
+    expectLineUnderCard()
     await user.click(screen.getByRole('checkbox', { name: 'Its page dates each week’s post' }))
     expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { statusDated: true } }]])
     posts.length = 0
@@ -689,8 +702,9 @@ describe('stopping a hospital’s or food place’s source', () => {
       if (url.includes('/api/admin/main-dishes')) return { places: [grill] }
     })
     const user = userEvent.setup()
-    await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Menus')!.closest('button')!)
+    await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
     expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Change`)
+    expectLineUnderCard()
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
     await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])

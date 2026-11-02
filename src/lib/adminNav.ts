@@ -74,15 +74,18 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
         // One list (step 2), opened from its rows rather than tabs: the
         // others are where its bottom rows lead.
         { tab: 'queue', href: base, label: 'To do' },
-        { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
         { tab: 'responses', href: `${base}/responses`, label: 'Feedback' },
       ],
     },
     {
       area: 'places',
       label: 'Places',
-      // Every listing in one list; archived ones are a filter on it.
-      tabs: [{ tab: 'places', href: `${base}/places`, label: 'Places' }],
+      // Every listing in one list; archived ones are a filter on it. Watches
+      // opens from the foot of that list (boards Places11, WatchesInPlaces10).
+      tabs: [
+        { tab: 'places', href: `${base}/places`, label: 'Places' },
+        { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
+      ],
     },
     {
       area: 'site',

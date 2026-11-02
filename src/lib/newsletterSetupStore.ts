@@ -13,6 +13,8 @@ export type NewsletterSetup = {
   checkedAt: string | null
   /** The Gmail it runs in, as the script last said. */
   account: string | null
+  /** The script's web app link, for Read now (migration 091); null: off. */
+  webAppUrl: string | null
 }
 
 export function setupTableMissing(message: string | undefined): boolean {
@@ -24,7 +26,9 @@ export function newKey(): string {
   return `nl_${randomBytes(24).toString('base64url')}`
 }
 
-type Row = { key: string; checked_at: string | null; account: string | null }
+type Row = { key: string; checked_at: string | null; account: string | null; web_app_url?: string | null }
+
+const webAppColumnMissing = (message: string | undefined) => !!message && /\bweb_app_url\b/.test(message)
 
 /** This community's setup, its key made the first time it's asked for;
  *  null without the table. */
@@ -35,10 +39,21 @@ export async function getNewsletterSetup(community: string): Promise<NewsletterS
     if (setupTableMissing(made.error.message)) return null
     throw new Error(`Failed to load the newsletter setup: ${made.error.message}`)
   }
-  const { data, error } = await db.from('newsletter_setup').select('key, checked_at, account').eq('community_id', community).single()
+  const read = (columns: string) => db.from('newsletter_setup').select(columns).eq('community_id', community).single()
+  let { data, error } = await read('key, checked_at, account, web_app_url')
+  // Before migration 091: everything as it was, and Read now off.
+  if (error && webAppColumnMissing(error.message)) ({ data, error } = await read('key, checked_at, account'))
   if (error) throw new Error(`Failed to load the newsletter setup: ${error.message}`)
-  const row = data as Row
-  return { key: row.key, checkedAt: row.checked_at, account: row.account }
+  const row = data as unknown as Row
+  return { key: row.key, checkedAt: row.checked_at, account: row.account, webAppUrl: row.web_app_url ?? null }
+}
+
+/** The script's web app link, tried and answering. False before migration 091. */
+export async function saveNewsletterWebApp(community: string, url: string): Promise<boolean> {
+  const { error } = await getAdminClient().from('newsletter_setup').update({ web_app_url: url }).eq('community_id', community)
+  if (!error) return true
+  if (webAppColumnMissing(error.message)) return false
+  throw new Error(`Failed to save the web app link: ${error.message}`)
 }
 
 /** The community whose key this is, or null: no such key, or no table. */

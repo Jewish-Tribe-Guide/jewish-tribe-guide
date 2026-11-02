@@ -613,11 +613,11 @@ describe('ModerationQueue — Set up your guide', () => {
   })
 
   // The Searches page opens from Reports.
-  it('leads on to Watches and Feedback only, not every search', async () => {
+  it('leads on to Feedback only, not Watches or every search', async () => {
     renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true })
     expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
     const links = screen.getAllByRole('link').map((l) => l.getAttribute('href')!.replace(/^.*\/admin/, ''))
-    expect(links).toEqual(['/watches', '/responses'])
+    expect(links).toEqual(['/responses'])
   })
 
   it('is gone once all four are done', async () => {

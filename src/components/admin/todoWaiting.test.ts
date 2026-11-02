@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { GooglePlace } from '@/lib/googleJob'
-import { waitingNotQueued } from './todoWaiting'
+import { notBeingRead, waitingNotQueued } from './todoWaiting'
 import { day } from './watchText'
 import type { Jobs } from './useWatchJobs'
 
@@ -43,5 +43,31 @@ describe('what To do adds to the queue', () => {
     const j = jobs({ google: { places: [place('r', 'Rita’s', { closure } as never)] } as never })
     delete j.times
     expect(waitingNotQueued(j, NOW)).toEqual([])
+  })
+})
+
+describe('notBeingRead (Todo10, EmailTodo12)', () => {
+  const letter = (at: string) => ({ id: 'n', url: 'mailto:o@s.org', active: true, pageChangedAt: at, createdAt: at })
+  const shul = (over = {}) => ({ id: 's', name: 'Bnai Abraham', href: '/s', pages: [], off: false, newsletters: [letter('2026-10-01T00:00:00Z')], ...over })
+
+  it('a shul whose email has gone quiet for three weeks', () => {
+    expect(notBeingRead(jobs({ times: { places: [shul()] } as never }), NOW)).toEqual([{ id: 's', name: 'Bnai Abraham', line: 'No email has come in 3 weeks' }])
+  })
+
+  it('an email from this month isn’t quiet', () => {
+    expect(notBeingRead(jobs({ times: { places: [shul({ newsletters: [letter('2026-10-20T00:00:00Z')] })] } as never }), NOW)).toEqual([])
+  })
+
+  it('a job turned off isn’t reported', () => {
+    expect(notBeingRead(jobs({ runs: { kinds: [], off: ['newsletters'] } as never, times: { places: [shul()] } as never }), NOW)).toEqual([])
+  })
+
+  it('an eruv whose status emails have stopped', () => {
+    const eruvim = { eruvim: [{ id: 'e', name: 'Center City Eruv', statusEmail: 'a@b.org', statusCheckedAt: '2026-10-01T00:00:00Z' }], findings: [], watches: [], timezone: 'America/New_York' }
+    expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'e', name: 'Center City Eruv', line: 'No email has come in 3 weeks' }])
+  })
+
+  it('nothing until every job has answered', () => {
+    expect(notBeingRead(jobs({ times: undefined as never }), NOW)).toEqual([])
   })
 })

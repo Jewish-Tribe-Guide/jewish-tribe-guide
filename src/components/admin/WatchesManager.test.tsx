@@ -144,10 +144,24 @@ const shulCategory = { id: 'synagogue', label: 'Shul', pluralLabel: 'Shuls', kin
 const row = (name: RegExp | string) => screen.getByRole('link', { name })
 
 describe('WatchesManager', () => {
+  it('lists its jobs under the source they read (WatchesInPlaces10)', async () => {
+    const ran = { lastAt: '2026-10-31T07:00:00Z', tracked: [{ name: 'x', status: '', bad: false, page: '' }] }
+    const kinds = ['google', 'times', 'newsletters', 'kosher', 'hospitals', 'links'].map((id) => view({ id, name: id, ...ran }))
+    const categories = [shulCategory, { id: 'restaurant', label: 'Food', pluralLabel: 'Food', kind: 'listing', hasAddress: true, detailFields: [] }, { id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals', kind: 'listing', hasAddress: true, detailFields: [] }]
+    await renderTab([], { categories, runs: { available: true, off: [], kinds } })
+    expect(screen.getByRole('link', { name: /Places/ })).toHaveAttribute('href', '/philly/admin/places')
+    expect(within(screen.getByRole('region', { name: 'Websites' })).getByRole('link', { name: /times/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Email' })).getByRole('link', { name: /newsletters/ })).toBeInTheDocument()
+    const lists = screen.getByRole('region', { name: 'Outside lists' })
+    expect(within(lists).getByRole('link', { name: /Keystone-K and Mekor Habracha/ })).toHaveTextContent('Kosher certification ·')
+    expect(within(lists).getByRole('link', { name: /Refuah/ })).toHaveTextContent('Hospitals ·')
+    expect(within(screen.getByRole('region', { name: 'Link check' })).getByRole('link', { name: /links/ })).toBeInTheDocument()
+  })
+
   it('before any job has run, explains itself; jobs say Not run yet', async () => {
     await renderTab([], { categories: [shulCategory], runs: { available: true, off: [], kinds: [view({ count: 'Not run yet', lastAt: null, tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
     expect(screen.getByTestId('watches-sentence')).toHaveTextContent('Watches read the web each night and bring you what changed.')
-    expect(within(screen.getByRole('region', { name: 'Jobs' })).getByRole('link', { name: /Google/ })).toHaveTextContent('Not run yet')
+    expect(within(screen.getByRole('region', { name: 'Google' })).getByRole('link', { name: /Google/ })).toHaveTextContent('Not run yet')
     expect(within(screen.getByRole('region', { name: 'Needs one step' })).getByRole('link', { name: /Minyan times/ })).toHaveTextContent('Add each shul’s times page')
   })
 

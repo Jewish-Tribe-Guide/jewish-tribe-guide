@@ -43,7 +43,7 @@ describe('/api/admin/watches/runs', () => {
   it('a line per kind of source, from this community’s watches and Google places', async () => {
     const body = await (await get()).json()
     expect(body.available).toBe(true)
-    expect(body.kinds.map((k: { name: string }) => k.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Newsletters', 'Mikvah hours', 'Menus'])
+    expect(body.kinds.map((k: { name: string }) => k.name)).toEqual(['Google', 'Kosher certification', 'Hospitals', 'Eruvs', 'Minyan times', 'Shul emails', 'Mikvah hours', 'Menus'])
     expect(m.listWatches).toHaveBeenCalledWith('philly')
     expect(m.loadGoogleJob).toHaveBeenCalledWith('philly', expect.any(Number))
   })

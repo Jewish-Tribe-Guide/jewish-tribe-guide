@@ -195,7 +195,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
       {data === null ? (
         <p className="text-sm text-muted">Loading submissions…</p>
       ) : (
-        !loadError && <TodoList data={data} token={token} categoriesById={categoriesById} onOpen={open} />
+        !loadError && <TodoList data={data} categoriesById={categoriesById} onOpen={open} />
       )}
     </div>
   )
