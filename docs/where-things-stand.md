@@ -2237,18 +2237,30 @@ a web app and pastes its link. Saving the link writes `web_app_url` on Philly's
 `newsletter_setup` row and nothing else. Until then Read now for email stays off and
 says "The guide's Gmail isn't set up".
 
-**Drawn Nov 1, not built (the *15 boards, four new rows at the foot of the Watches
-canvas):** no Menu link box on Add, because Change on the source line already gives
-the menu page (saved listings hide the box already). **Decided: visitors lose it too**
-(the reader and "+ Add" cover it); the listing keeps its Full menu link. Watches as a link beside Add a place, nothing at the
-foot of Places, its count line on the Watches page. The main site's bottom bar in
-the admin bar's grey, weight and solid white. Read now on a saved place: an agreeing read just
-dates it; none on Google's rows. When it differs, the user's idea, it uses To do's
-change screen (the *16 boards): filed as the nightly read would, same three answers,
-and left unanswered it waits on the row and in To do. The *15 Use it boards stay
-beside them to compare. Waiting on the user's reaction. Noticed: To do has two
-screens today, ChangeReview for pages' findings (Update the listing, Edit, Leave it)
-and OpenedPlace for menus and Google (Accept, Edit, Keep as is).
+**Built Nov 1 (the *15, *16 and E boards, on `redesign/oct18-fixes`):**
+- No Menu link box on Add or for visitors; Change on the source line gives the menu
+  page, and the listing keeps its Full menu link.
+- Watches is the first row on Places, ringed green like Minyanim by time, with its
+  count line and no chevron. Add a place is the site's floating "+ Add". It covers
+  part of a row on a phone, the cost of that choice.
+- The main site's bottom bar has the admin bar's grey, weight and solid white.
+- Read now on a saved place's source lines; none on Google's. An agreeing read dates
+  the row "just now". One that differs opens To do's change screen, filed as the
+  nightly read would; Back without answering leaves it on the row ("Its website has
+  a change · Open") and in To do. A failed read says so in red and changes nothing.
+  Tried on dev on shuls, a mikvah and a food place.
+
+**Not as drawn:** a menu that differs opens the screen To do opens for a menu
+(Accept, Edit, Keep as is), not the change screen ReadChangeDishes16 drew, because
+menus aren't filed as submissions. To do still has those two screens.
+
+**Untried:** Read now by email, until the user re-pastes Philly's Gmail script,
+deploys it as a web app and pastes its link. Read now was never drawn on a computer;
+it's the same code at the wider width, and I only tried it on a phone.
+
+**Fixed Nov 1: creating a community could sit on its form.** The community was
+made, then the page stayed on the form with no message. It's what failed
+`test:admin-write` on `main` in CI. Creating now lands with a plain page load.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
