@@ -587,8 +587,8 @@ brief, one round of drawings, then the build in pieces.
    with their shul and when the last one came in; "+ Add a newsletter"
    takes the shul and its email. A sender with no shul is linked (or
    skipped, Not a shul) here now, not on What's tracked.
-   Each community's key is in `newsletter_setup` (**migration 090, not run
-   anywhere yet: run it on dev and live**). Without it the page says
+   Each community's key is in `newsletter_setup` (migration 090, run on
+   dev and live; checked Nov 1). Without it the page says
    newsletters can't be set up yet, and everything else works as before.
    `NEWSLETTER_SECRET` still works for every community, so Philly's script
    carries on unchanged; a community's own key works for it alone.
@@ -2230,9 +2230,12 @@ and looks in the Gmail for that address's latest email within the script's 14 da
 The result fills the rows, or says no email yet with the sign-up line, or that the
 email had no times. If the Gmail doesn't answer, the hourly check still looks. Add
 listing looks too, filing what it finds as the hourly run would. The Newsletters
-page is now called Shul emails. **The user must:** run migration 091 (dev and live,
-in the SQL editor), then re-paste and deploy Philly's script. Until then Read now
-for email stays off and says "The guide's Gmail isn't set up".
+page is now called Shul emails. Migration 091 is run on dev and live (the user; checked Nov 1, no link saved on
+either yet). **Next, in this order:** merge this branch, so the live Shul emails page
+has the steps; then the user re-pastes Philly's script from that page, deploys it as
+a web app and pastes its link. Saving the link writes `web_app_url` on Philly's
+`newsletter_setup` row and nothing else. Until then Read now for email stays off and
+says "The guide's Gmail isn't set up".
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
@@ -2250,7 +2253,7 @@ since. A deleted community's watches kept being checked every night, its
 subscribers' emails stayed, and a new community given the same short name
 would have inherited its counts, searches, eruvin and newsletter key. Now
 every table with a `community_id` is cleared (`COMMUNITY_SCOPED_TABLES`, 21),
-a table whose migration hasn't run (090 today) is skipped, and
+a table whose migration hasn't run is skipped, and
 `communityScopedTables.test.ts` reads the migrations and fails if a new
 table is missed.
 
