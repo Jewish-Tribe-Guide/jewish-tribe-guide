@@ -42,6 +42,13 @@ describe('Add a place: what a row is read from', () => {
     expect(rowOf(fromGoogle, 'field:website')?.job).toBe('Google')
   })
 
+  it('a food place’s plain hours are Google’s, and a website doesn’t change that (AddFood12)', () => {
+    const food = makeCategory({ id: 'food', label: 'Food', detailFields: [{ key: 'website', label: 'Website', type: 'url' }, { key: 'hours', label: 'Hours', type: 'hours' }] })
+    const hours = JSON.stringify({ mon: { open: '09:00', close: '17:00' } })
+    const s = state({ category: food, picked: { ...picked, hours }, values: { name: 'Ohev', address: '', phone: '', details: { website: 'https://ohev.org', hours: JSON.parse(hours) } } })
+    expect(rowOf(s, 'hours')).toMatchObject({ job: 'Google', lines: [{ text: 'Google', googleStop: 'hours' }] })
+  })
+
   it('typed over, Google stops keeping it (AddTyped8)', () => {
     const typed = { ...fromGoogle, values: { ...fromGoogle.values, phone: '1-800-555-0199' } }
     expect(words(typed, 'contact:phone')).toEqual(['Google stops keeping this'])

@@ -260,6 +260,12 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
     else values[f.key] = next
   }
   if (askWhen && !(askWhen.key in values)) askWhen = null
+  // Hours read for a mikvah's section say it has that section, and the listing
+  // only shows the ones that are on.
+  for (const key of Object.keys(values)) {
+    const flag = category.detailFields.find((f) => f.key === key)?.audienceKey
+    if (flag && current(listing, flag) !== true) values[flag] = true
+  }
   return { values, lines: changeLines(fields, listing, values), held, notes, unread, askWhen }
 }
 

@@ -4,7 +4,7 @@ import { makeCategory } from '@/test/providerFixtures'
 import { FOOD, GROCERY, HOSPITAL, MIKVAH, SHUL } from '@/test/editorFixtures'
 import { timeText } from './minyanText'
 import type { Minyan } from './davening'
-import { editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type EditorValues } from './editorRows'
+import { sectionFlags, editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type EditorValues } from './editorRows'
 
 const titles = (rows: ReturnType<typeof editorRows>) => rows.map((r) => r.title)
 const keys = (rows: ReturnType<typeof editorRows>, id: string) => rows.find((r) => r.id === id)!.fields.map((f) => f.key)
@@ -53,6 +53,16 @@ describe('the whole-listing editor’s rows', () => {
     expect(titles(rows)).toEqual(['Name', 'What’s here', 'Women’s', 'Address, phone, website and email'])
     expect(keys(rows, 'audience:womenTevillah')).toEqual(['women_s_hours', 'women_s_phone', 'women_s_notes'])
     expect(titles(editorRows(MIKVAH, { womenTevillah: true, menTevillah: true }))).toContain('Men’s')
+  })
+
+  it('being added: every section is offered, off till something’s written in it (AddMikvah12)', () => {
+    const rows = editorRows(MIKVAH, {}, { allSections: true })
+    expect(titles(rows)).toEqual(expect.arrayContaining(['Women’s', 'Men’s']))
+    expect(titles(rows)).not.toContain('What’s here')
+    expect(titles(rows)).not.toContain('Women’s Tevillah')
+    expect(sectionFlags(MIKVAH, {})).toEqual({ womenTevillah: false, menTevillah: false })
+    expect(sectionFlags(MIKVAH, { women_s_notes: 'By appointment' })).toEqual({ womenTevillah: true, menTevillah: false })
+    expect(sectionFlags(MIKVAH, { men_s_hours: { mon: { open: '20:00', close: '21:00' } } })).toEqual({ womenTevillah: false, menTevillah: true })
   })
 
   // No Yom Tov and special schedules row (the user, Oct 11): a shul

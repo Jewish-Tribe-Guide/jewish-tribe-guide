@@ -94,6 +94,8 @@ export function buildCsp(env: CspEnv = {}): string {
       // Realtime, if it's ever used, is a websocket to the same host.
       supabase ? supabase.replace(/^https:/, 'wss:') : null,
       'https://maps.googleapis.com',
+      // Where Find the place's suggestions come from.
+      'https://places.googleapis.com',
       'https://nominatim.openstreetmap.org',
       env.dev ? 'ws://localhost:*' : null,
       posthog,

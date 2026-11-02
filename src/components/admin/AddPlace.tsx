@@ -2,13 +2,13 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
-import type { EditorRow, EditorValues } from '@/lib/editorRows'
+import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { adminBase } from '@/lib/adminNav'
 import { samePage } from '@/lib/hoursJob'
 import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
-import { pageReadsFor } from '@/lib/listingPageWatch'
+import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
@@ -79,6 +79,15 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
   // On the kosher lists? From their kept copy, so as soon as it has a name.
   const asksKosher = step === 'finish' && KOSHER_JOB_CATEGORIES.includes(category.id) && !!draft.name.trim()
+  // A mikvah's Women's, Men's and Keilim are each a row here, and only the ones
+  // written in say the mikvah has them.
+  const flags = JSON.stringify(sectionFlags(category, draft.details))
+  useEffect(() => {
+    for (const [flag, on] of Object.entries(JSON.parse(flags) as Record<string, boolean>)) {
+      if (!!draft.details[flag] !== on) draft.setDetail(flag, on)
+    }
+  }, [flags]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!asksKosher) return
     let live = true
@@ -275,7 +284,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   /** Read it now: its pages, as the job page reads them, or its own website. */
   async function readAdded(listing: DirectoryResource) {
-    const reads = pageReadsFor(category)
+    const reads = jobPageReads(category)
     if (reads) {
       const path = `/api/admin/watches/hours${reads.kind === 'times' ? '?job=times' : ''}`
       const reply = await post<{ read?: string[] }>(path, { action: 'check', resourceId: listing.id }).catch(() => null)
@@ -304,7 +313,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     if (looked?.account) setGuideGmail(looked.account)
     const noEmail = looked?.state === 'no-email'
     const fromEmail = looked?.state === 'found' && !given.page && !website
-    const reads = pageReadsFor(category)
+    const reads = jobPageReads(category)
     if (given.page && reads) {
       // A page given is read as it's saved, and said so if it can't be (AddFailed8).
       const job = reads.kind
@@ -347,7 +356,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         )}
         {stage === 'failed' && addedAs.retry && (
           <SourceScreen
-            label={pageReadsFor(category)?.kind === 'times' ? 'A web page, or the email it comes from' : 'A web page'}
+            label={jobPageReads(category)?.kind === 'times' ? 'A web page, or the email it comes from' : 'A web page'}
             value={given.page ?? ''}
             button="Start reading"
             failedAtFirst
@@ -390,6 +399,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       adminSubmit={{ token, onAdded: (l) => void added(l) }}
       onClose={back}
       splitContact
+      allSections
       overlay={
         screen && {
           title: screen.title,

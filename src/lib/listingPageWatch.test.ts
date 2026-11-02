@@ -16,6 +16,7 @@ import {
   timesReadLines,
   hoursReads,
   isListingPageWatch,
+  jobPageReads,
   LISTING_PAGE_FOUND_CREATOR,
   LISTING_PAGE_WATCH_CREATOR,
   LISTING_PAGE_WATCH_NAME,
@@ -73,6 +74,15 @@ describe('pageReadBoxes', () => {
     expect(pageReadBoxes(sections, {}, { kind: 'hours', keys: ['hours'], notes: [] }, false)).toEqual(['contact'])
     expect(pageReadBoxes(sections, { placeId: 'p', googleFields: ['hours'] }, { kind: 'hours', keys: ['hours'], notes: [] }, false)).toEqual([])
     expect(pageReadBoxes(shul, {}, { kind: 'times', key: 'minyanim' }, true)).toEqual(['weekday', 'shabbos', 'week', 'contact'])
+  })
+})
+
+describe('jobPageReads', () => {
+  const hours = (key: string) => ({ key, label: key, type: 'hours' as const })
+  it('nothing for the plain Hours Google keeps; a shul’s times and a mikvah’s sections as they are', () => {
+    expect(jobPageReads({ detailFields: [hours('hours')] })).toBeNull()
+    expect(jobPageReads({ detailFields: [hours('hours'), hours('women_s_hours')] })).toMatchObject({ kind: 'hours', keys: ['women_s_hours'] })
+    expect(jobPageReads({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })).toEqual({ kind: 'times', key: 'minyanim' })
   })
 })
 

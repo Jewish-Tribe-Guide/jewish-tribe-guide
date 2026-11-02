@@ -121,6 +121,8 @@ type Props = {
   rowSource?: (row: EditorRow, changed: boolean) => ReactNode
   /** The contact box a row each (editorRows). */
   splitContact?: boolean
+  /** editorRows' allSections. */
+  allSections?: boolean
   /** Values to put in as if typed, each new object once: Use Google's. */
   patch?: Record<string, unknown>
 }
@@ -242,6 +244,7 @@ export default function ListingEditor({
   rowAside,
   rowSource,
   splitContact,
+  allSections,
   patch,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
@@ -327,7 +330,7 @@ export default function ListingEditor({
   // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
   // next week's too. One box's own Edit has them only if it's that box.
   const thisWeek = useEditWeek((!creating || !!rowSource) && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
-  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact })
+  const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact, allSections })
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -569,7 +572,7 @@ export default function ListingEditor({
   }
 
   function rowBody(r: EditorRow): ReactNode {
-    const shown = r.fields.filter(visible)
+    const shown = allSections && r.kind === 'audience' ? r.fields : r.fields.filter(visible)
     // A minyan or a person open: just that.
     const only = child ? shown.filter((f) => f.key === child.key) : shown
     if (r.kind === 'name') {

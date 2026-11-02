@@ -6,7 +6,7 @@ import { websiteKeyOf } from '@/lib/googleJob'
 import { itemWording } from '@/lib/itemMarks'
 import type { NightKindId } from '@/lib/jobRuns'
 import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
-import { pageReadsFor } from '@/lib/listingPageWatch'
+import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
 import type { AddSource, Again, Change, Foot, Opened, Stop } from './openedPlaceBoxes'
@@ -111,7 +111,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   const opened = given ?? openedPlace(id, jobs, now)
   const off = (kind: NightKindId) => !!jobs.runs?.off?.includes(kind)
   const box = (key: string) => opened.boxes.find((b) => b.key === key)
-  const reads = pageReadsFor(category)
+  const reads = jobPageReads(category)
   const addPage: GiveSource | null = opened.add
     ? { label: opened.add.label, email: opened.add.email, run: opened.add }
     : reads

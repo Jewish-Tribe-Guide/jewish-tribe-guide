@@ -34,6 +34,12 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     expect(got).toMatchObject({ job: 'Nothing', amber: true, line: { text: 'Nothing reads this', useGoogle: 'hours' } })
   })
 
+  it('a food place’s plain hours are Google’s, not its website’s (FoodListing12)', () => {
+    const plain = makeCategory({ id: 'food', detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] })
+    const got = sourceOf(jobs({ google: google([fieldBy('hours', 'google')]) as never }), hours, plain)
+    expect(got).toMatchObject({ job: 'Google', line: { text: 'Google', googleStop: 'hours' } })
+  })
+
   it('the Google job turned off: nothing keeps it, and it doesn’t offer Stop', () => {
     const got = sourceOf(jobs({ runs: { kinds: [], off: ['google'] } as never, google: google([fieldBy('phone', 'google')]) as never }), phone)
     expect(got?.job).toBe('Nothing')

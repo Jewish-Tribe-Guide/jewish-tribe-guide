@@ -47,8 +47,8 @@ afterEach(() => {
 
 const posts = () => vi.mocked(fetchJson).mock.calls.filter(([, init]) => init?.method === 'POST').map(([url, init]) => [String(url).split('?')[0], JSON.parse(String(init?.body))])
 
-function renderAdd(onClose = vi.fn()) {
-  renderWithProviders(<AddPlace category={shul} listings={[{ id: 'x', category: 'synagogue', name: 'There', anchorId: 'all', distance: 0, address: '', placeId: 'in-guide' }]} token="tok" onClose={onClose} />, { community: { slug: 'philly' } })
+function renderAdd(onClose = vi.fn(), category = shul) {
+  renderWithProviders(<AddPlace category={category} listings={[{ id: 'x', category: 'synagogue', name: 'There', anchorId: 'all', distance: 0, address: '', placeId: 'in-guide' }]} token="tok" onClose={onClose} />, { community: { slug: 'philly' } })
   return onClose
 }
 
@@ -127,6 +127,48 @@ describe('Add a place', () => {
       await user.click(screen.getByRole('button', { name: 'Add listing' }))
     }
     const sent = () => posts().map(([u, b]) => `${String(u).replace(/\?.*/, '')} ${(b as { action?: string } | undefined)?.action ?? ''}`.trim())
+
+    it('a food place’s website is read as any other’s, not by the hours job (FoodDone13)', async () => {
+      const user = userEvent.setup()
+      site()
+      const food = makeCategory({ id: 'hotel', label: 'Hotel', detailFields: [{ key: 'website', label: 'Website', type: 'url' }, { key: 'hours', label: 'Hours', type: 'hours' }] })
+      renderAdd(vi.fn(), food)
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await addIt(user)
+      await waitFor(() => expect(sent()).toContain('/api/admin/listings/new/found site'))
+      expect(sent().filter((s) => s.includes('/watches/hours'))).toEqual([])
+    })
+
+    it('a mikvah: each section is a row, and what’s written in one says the mikvah has it (AddMikvah12)', async () => {
+      const user = userEvent.setup()
+      const mikvah = makeCategory({
+        id: 'mikvah',
+        label: 'Mikvah',
+        detailFields: [
+          { key: 'website', label: 'Website', type: 'url' },
+          { key: 'womenTevillah', label: 'Women’s Tevillah', filterLabel: 'Women’s', type: 'boolean', renderAs: 'badge' },
+          { key: 'menTevillah', label: 'Men’s Tevillah', filterLabel: 'Men’s', type: 'boolean', renderAs: 'badge' },
+          { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'womenTevillah' },
+          { key: 'women_s_notes', label: 'Women’s Notes', shortLabel: 'Note', type: 'textarea', audienceKey: 'womenTevillah' },
+          { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours', audienceKey: 'menTevillah' },
+        ],
+      })
+      site()
+      const fetched = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ ok: true, listing: { ...added, category: 'mikvah' } }), { status: 200 }))
+      renderAdd(vi.fn(), mikvah)
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-add-audience:womenTevillah'))
+      expect(screen.getByTestId('row-source')).toHaveTextContent('Its website · Read now · Change')
+      await user.type(document.querySelector('textarea')!, 'By appointment')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(screen.getByTestId('editor-add-audience:menTevillah')).toBeInTheDocument()
+      vi.stubGlobal('fetch', fetched)
+      await user.click(screen.getByRole('button', { name: 'Add listing' }))
+      await waitFor(() => expect(fetched).toHaveBeenCalled())
+      const sentBody = JSON.parse(String(fetched.mock.calls[0][1].body))
+      expect(sentBody.payload.details).toMatchObject({ womenTevillah: true, women_s_notes: 'By appointment' })
+      expect(sentBody.payload.details.menTevillah).toBeFalsy()
+    })
 
     it('reads it and offers what it found: one tap adds it all (AddFound13)', async () => {
       const user = userEvent.setup()

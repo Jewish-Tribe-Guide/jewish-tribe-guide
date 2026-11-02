@@ -4,7 +4,7 @@ import { editorRows, rowSummary, type EditorRow, type EditorValues } from '@/lib
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { itemWording } from '@/lib/itemMarks'
 import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
-import { pageReadsFor } from '@/lib/listingPageWatch'
+import { jobPageReads } from '@/lib/listingPageWatch'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
 import { minyanimForBox } from '@/lib/minyanimBox'
 import { timeText } from '@/lib/minyanText'
@@ -104,7 +104,7 @@ const linkCheck: AddRowSource = { job: 'Link check', amber: false, lines: [{ tex
  *  like it (its address, its About, a photo). */
 export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | null {
   const { category, picked, values, given, stopped, reads } = s
-  const pageReads = pageReadsFor(category)
+  const pageReads = jobPageReads(category)
   const websiteKey = websiteKeyOf(category)
   const website = websiteKey ? asText(values.details[websiteKey]) : ''
 
