@@ -34,6 +34,7 @@ const {
   ReviewEditError,
   attachSubmitterEmail,
   replacePendingSuggestion,
+  decidePart,
 } = await import('./submissionStore')
 
 const pendingCategoryIds: string[] = []
@@ -228,6 +229,48 @@ describe('submissionStore (integration)', () => {
     expect(after!.name).toBe(`${name} Renamed`)
     expect(after!.phone).toBe('(215) 555-0123')
     expect(after!.details).toMatchObject({ hours: 'Sun–Fri 9–5', notes: 'Knock.', kept: 'yes' })
+  })
+
+  // Nov 2: one edit decided a part at a time (reviewParts.ts).
+  it('approving one part of an edit puts only it live, and the rest waits; its last part is the edit decided whole', async () => {
+    const category = await createCategory('philly', {
+      label: `Integration Test ${randomUUID().slice(0, 8)}`,
+      fields: [{ key: 'hours', label: 'Hours', type: 'text' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+    })
+    pendingCategoryIds.push(category.id)
+    const name = `Integration Listing ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const listed = { hours: 'Sun–Thu 9–5', notes: 'Ring the bell.' }
+    await getAdminClient().from('resource').update({ phone: '(215) 555-0100', details: listed }).eq('id', created!.id)
+    const asSeen = { ...listingPayload(category.id, name), phone: '(215) 555-0100', details: listed }
+    const edit = await submitListingUpdate('philly', created!.id, { ...asSeen, phone: '(215) 555-0123', details: { ...listed, hours: 'Sun–Fri 9–5', notes: 'Knock.' } }, null, null)
+    pendingSubmissionIds.push(edit.id)
+    const track = async () => {
+      const { data } = await getAdminClient().from('submission').select('id').eq('target_id', created!.id)
+      for (const r of data ?? []) if (!pendingSubmissionIds.includes(r.id)) pendingSubmissionIds.push(r.id)
+    }
+
+    expect(await decidePart(edit.id, 'philly', 'phone', 'approved', 'admin@x.co')).toMatchObject({ whole: false })
+    await track()
+    const live = async () => (await getAdminClient().from('resource').select('phone, details').eq('id', created!.id).single()).data!
+    expect(await live()).toMatchObject({ phone: '(215) 555-0123', details: { hours: 'Sun–Thu 9–5', notes: 'Ring the bell.' } })
+    const { data: copies } = await getAdminClient().from('submission').select('status').eq('target_id', created!.id).eq('status', 'approved').eq('operation', 'update')
+    expect(copies).toHaveLength(1)
+
+    // Left: the notes are out of the edit, still waiting with the hours.
+    expect(await decidePart(edit.id, 'philly', 'notes', 'rejected', 'admin@x.co')).toMatchObject({ whole: false })
+    const waiting = (await listPendingSubmissions('philly')).find((s) => s.id === edit.id)!.payload as unknown as ResourceSubmission
+    expect(waiting.details).toMatchObject({ hours: 'Sun–Fri 9–5', notes: 'Ring the bell.' })
+    expect(await live()).toMatchObject({ details: { notes: 'Ring the bell.' } })
+
+    // The hours are the last part: the caller decides the edit itself.
+    expect(await decidePart(edit.id, 'philly', 'hours', 'approved')).toEqual({ whole: true })
+    await expect(decidePart(edit.id, 'philly', 'phone', 'approved')).rejects.toThrow(ReviewEditError)
+    await approveSubmission(edit.id, 'philly')
+    expect(await live()).toMatchObject({ phone: '(215) 555-0123', details: { hours: 'Sun–Fri 9–5', notes: 'Ring the bell.' } })
   })
 
   // Oct 21: a shul's times are filed a part at a time (timesParts.ts), each

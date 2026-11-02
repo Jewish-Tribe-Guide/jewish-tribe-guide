@@ -345,6 +345,15 @@ export default function PlaceListing({
   }
 
   /** Answered: Update the listing changed what the editor started from. */
+  async function partAnswered(id: string, updated: boolean) {
+    if (updated) {
+      const got = await fetchJson<{ item: DirectoryResource }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+      setItem(got.item)
+      setEditorRound((r) => r + 1)
+    }
+    await openChange(id)
+  }
+
   async function changeAnswered(updated: boolean) {
     if (updated) {
       const got = await fetchJson<{ item: DirectoryResource }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
@@ -355,14 +364,21 @@ export default function PlaceListing({
     await reload()
   }
 
-  async function answer(id: string, status: 'approved' | 'rejected', reason?: string) {
+  // `part`: one part of the change; the rest still waits, read again.
+  async function answer(id: string, status: 'approved' | 'rejected', reason?: string, part?: string): Promise<'partial' | 'whole' | 'failed'> {
     setChangeBusy(true)
     setChangeError(null)
     try {
-      await fetchJson(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify({ status, ...(reason ? { reason } : {}) }) }, 'Failed to update.')
+      const res = await fetchJson<{ partial?: boolean }>(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify({ status, ...(reason ? { reason } : {}), ...(part ? { part } : {}) }) }, 'Failed to update.')
+      if (res?.partial) {
+        await partAnswered(id, status === 'approved')
+        return 'partial'
+      }
       await changeAnswered(status === 'approved')
+      return 'whole'
     } catch (err) {
       setChangeError(err instanceof Error ? err.message : 'Something went wrong.')
+      return 'failed'
     } finally {
       setChangeBusy(false)
     }
@@ -459,8 +475,8 @@ export default function PlaceListing({
           busy={changeBusy}
           error={changeError}
           token={token}
-          onModerate={(id, status, reason) => void answer(id, status, reason)}
-          onUpdated={() => void changeAnswered(true)}
+          onModerate={answer}
+          onUpdated={(id, partial) => void (partial ? partAnswered(id, true) : changeAnswered(true))}
         />
       )}
       {/* Dishes wait on the screen To do opens for a menu. */}

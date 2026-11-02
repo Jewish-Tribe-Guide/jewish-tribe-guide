@@ -5,6 +5,7 @@ const m = vi.hoisted(() => ({
   getAdminUserForCommunity: vi.fn(),
   approveSubmission: vi.fn(),
   rejectSubmission: vi.fn(),
+  decidePart: vi.fn(),
   sendDecisionEmail: vi.fn(),
   sendReviewActionNotification: vi.fn(),
   sendStatusChangeDigest: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForC
 vi.mock('@/lib/submissionStore', () => ({
   approveSubmission: m.approveSubmission,
   rejectSubmission: m.rejectSubmission,
+  decidePart: m.decidePart,
   ReviewEditError: m.ReviewEditError,
 }))
 vi.mock('@/lib/confirmationEmail', () => ({ sendDecisionEmail: m.sendDecisionEmail }))
@@ -137,6 +139,45 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
     }
     expect(m.approveSubmission).not.toHaveBeenCalled()
     expect(m.rejectSubmission).not.toHaveBeenCalled()
+  })
+
+  // Nov 2: an edit decided a part at a time (reviewParts.ts).
+  it('decides one part of an edit, telling nobody until its last part', async () => {
+    m.decidePart.mockResolvedValue({ whole: false, submission: submission('update') })
+    const res = await patch({ status: 'approved', part: 'minyanim:weekday' })
+    expect(await res.json()).toMatchObject({ ok: true, partial: true })
+    expect(m.decidePart).toHaveBeenCalledWith('sub1', 'ues', 'minyanim:weekday', 'approved', 'admin@x.co', undefined)
+    expect(m.approveSubmission).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
+    expect(m.afterCallbacks).toHaveLength(0)
+
+    m.revalidatePublicContent.mockClear()
+    await patch({ status: 'rejected', part: 'phone' })
+    expect(m.rejectSubmission).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+
+  it('its last part decides the edit as before; left after a part went on, it emails nobody “not used”', async () => {
+    m.decidePart.mockResolvedValue({ whole: true })
+    m.rejectSubmission.mockResolvedValue(submission('update', { payload: { someApproved: true } }))
+    await patch({ status: 'rejected', part: 'phone' })
+    expect(m.rejectSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', undefined)
+    await runAfter()
+    expect(m.sendDecisionEmail).not.toHaveBeenCalled()
+    expect(m.sendReviewActionNotification).toHaveBeenCalled()
+  })
+
+  it('a part approved from Edit goes with the admin’s fixes', async () => {
+    m.decidePart.mockResolvedValue({ whole: false, submission: submission('update') })
+    await patch({ status: 'approved', part: 'phone', payload: { phone: '1' } })
+    expect(m.decidePart).toHaveBeenCalledWith('sub1', 'ues', 'phone', 'approved', 'admin@x.co', { phone: '1' })
+  })
+
+  it('400s a part sent with ticked lines, fixes with a leave, or that isn’t a name', async () => {
+    for (const body of [{ status: 'approved', part: 1 }, { status: 'approved', part: 'x', only: ['x'] }, { status: 'rejected', part: 'x', payload: { details: {} } }]) {
+      expect((await patch(body)).status).toBe(400)
+    }
+    expect(m.decidePart).not.toHaveBeenCalled()
   })
 
   it('400s fixes sent with a rejection: they’d be thrown away', async () => {

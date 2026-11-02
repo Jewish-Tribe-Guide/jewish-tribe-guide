@@ -19,6 +19,7 @@ import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
 import { keepOnly } from './watchFindings'
 import { editedFields, onListingNow } from './editedFields'
+import { approvingPart, leavingPart, reviewParts } from './reviewParts'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -517,6 +518,63 @@ export async function approveSubmission(
     await recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes))
   }
   return data as SubmissionRow
+}
+
+/** One part of an edit decided on its own (reviewParts.ts). `whole`: it's
+ *  the edit's last part, so the caller decides the edit as before. Else
+ *  approving puts the part on the listing as an approved copy of the edit
+ *  (history and the activity log keep what went on), as the admin fixed it
+ *  in Edit when `edited` is given, and leaving takes it
+ *  out of the edit; either way the edit stays waiting with what's left. */
+export async function decidePart(
+  id: string,
+  community: string,
+  partId: string,
+  decision: 'approved' | 'rejected',
+  reviewedBy?: string,
+  edited?: unknown,
+): Promise<{ whole: true } | { whole: false; submission: SubmissionRow }> {
+  const supabase = getAdminClient()
+  const { data: sub } = await supabase.from('submission').select('*').eq('id', id).eq('community_id', community).maybeSingle()
+  const submission = sub as SubmissionRow | null
+  if (!submission || submission.status !== 'pending') throw new ReviewEditError('This change has already been decided.')
+  if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) throw new ReviewEditError('Only an edit is decided a part at a time.')
+  const { data: row } = await supabase.from('resource').select('*').eq('community_id', community).eq('id', submission.target_id).maybeSingle()
+  if (!row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+  const listing = row as ResourceRow
+  const fields = (await getCategoryById(community, listing.category))?.detailFields ?? []
+  const payload = submission.payload as unknown as ResourceSubmission
+  const sent = onListingNow(payload, listing, fields)
+  const parts = reviewParts(listing, sent, fields)
+  const part = parts.find((p) => p.id === partId)
+  if (!part) throw new ReviewEditError('That part has already been decided.')
+  if (parts.length === 1) return { whole: true }
+
+  let next: ResourceSubmission & { someApproved?: boolean }
+  if (decision === 'approved') {
+    const rest: Record<string, unknown> = { ...submission }
+    delete rest.id
+    delete rest.case_number
+    const { data: copy, error } = await supabase
+      .from('submission')
+      .insert({ ...rest, payload: approvingPart(sent, listing, part, fields), status: 'pending', reviewed_at: null })
+      .select('id')
+      .single()
+    if (error || !copy) throw new Error(`Failed to approve a part: ${error?.message}`)
+    try {
+      await approveSubmission(copy.id, community, reviewedBy, edited)
+    } catch (err) {
+      await supabase.from('submission').delete().eq('id', copy.id)
+      throw err
+    }
+    // What's approved now matches the listing, so it no longer shows.
+    next = { ...payload, someApproved: true }
+  } else {
+    next = leavingPart(payload, listing, part, fields)
+  }
+  const { data, error } = await supabase.from('submission').update({ payload: next }).eq('id', id).select('*').single()
+  if (error) throw new Error(`Failed to keep the rest of the change: ${error.message}`)
+  return { whole: false, submission: data as SubmissionRow }
 }
 
 /** An approved eruv suggestion: its four rows, as suggested, on the eruv.

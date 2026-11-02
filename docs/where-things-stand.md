@@ -2285,6 +2285,19 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
+
+From the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL). A
+change with more than one part shows switches at the top, one per part:
+for a shul, its usual weekday times and its usual Shabbos times each; else
+a field each. Update puts only that part on the listing (an approved copy
+of the change carries it, `decidePart` in `submissionStore.ts`), Leave it
+takes it out of the change, and the next part opens. The last part left is
+the change decided whole, with its email as before; no email goes for a
+part, and none for a rejection after a part went on. Checked on dev on
+B'nai Abraham Chabad: Shabbos updated alone, phone left, weekday updated
+last.
+
 ## Done Nov 2: our own browser failing isn't a place's broken check (on `redesign/oct18-fixes`)
 
 Dev's runner has no browser for drawing pages, so two places showed "Main

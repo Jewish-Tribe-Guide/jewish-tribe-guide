@@ -9,7 +9,7 @@ import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { splitSubmissions } from '@/lib/todo'
-import { updateTodo, useTodo } from '@/lib/useTodo'
+import { loadTodo, updateTodo, useTodo } from '@/lib/useTodo'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
 import TodoList from './TodoList'
@@ -95,27 +95,35 @@ export default function ModerationQueue({ session }: { session: Session }) {
     goTo(null)
   }
 
-  async function moderate(id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission) {
+  // `part`: one part of a change; the rest still waits, so the change is
+  // read again rather than taken off the list.
+  async function moderate(id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission, part?: string): Promise<'partial' | 'whole' | 'failed'> {
     setBusyId(id)
     setOpenError(null)
     try {
-      await fetchJson(
+      const res = await fetchJson<{ partial?: boolean }>(
         withCommunity(`/api/admin/submissions/${id}`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ status, ...(reason ? { reason } : {}), ...(payload ? { payload } : {}) }),
+          body: JSON.stringify({ status, ...(reason ? { reason } : {}), ...(payload ? { payload } : {}), ...(part ? { part } : {}) }),
         },
         'Failed to update.',
       )
+      if (res?.partial) {
+        await loadTodo(token, community, session.user.email, true)
+        return 'partial'
+      }
       updateTodo((d) => ({ ...d, submissions: d.submissions.filter((s) => s.id !== id) }))
       if (openId === id) backToList()
+      return 'whole'
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.'
       // An opened card keeps the admin's fixes on screen, with the reason
       // beside them, instead of losing them to an error at the top.
       if (openId === id) setOpenError(message)
       else setError(message)
+      return 'failed'
     } finally {
       setBusyId(null)
     }
@@ -141,8 +149,9 @@ export default function ModerationQueue({ session }: { session: Session }) {
           busy={busyId === opened.id}
           error={openError}
           token={token}
-          onModerate={moderate}
-          onUpdated={(id) => {
+          onModerate={(id, status, reason, part) => moderate(id, status, reason, undefined, part)}
+          onUpdated={(id, partial) => {
+            if (partial) return void loadTodo(token, community, session.user.email, true)
             updateTodo((d) => ({ ...d, submissions: d.submissions.filter((x) => x.id !== id) }))
             backToList()
           }}

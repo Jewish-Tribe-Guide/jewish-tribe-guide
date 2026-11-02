@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -99,5 +100,75 @@ describe('a change as one list', () => {
     show({ minyanim: usual, notes: 'Side door' }, { minyanim: usual, notes: 'Front door' })
     expect(screen.getByRole('deletion')).toHaveTextContent('Front door')
     expect(screen.getByRole('insertion')).toHaveTextContent('Side door')
+  })
+})
+
+// The user, Nov 2: one thing at a time. A change with two parts is two
+// switches, each answered on its own.
+describe('a change with more than one part', () => {
+  const twoParts = (onModerate: (...a: unknown[]) => Promise<'partial' | 'whole' | 'failed'>) =>
+    renderWithProviders(
+      <ChangeReview
+        submission={{ ...change({}), payload: { category: 'synagogue', name: 'Mekor', address: '', details: { minyanim: [{ ...usual[0], time: '9:30am' }], website: 'https://new.example' } }, current: { id: 'mi', category: 'synagogue', name: 'Mekor', address: '', details: { minyanim: usual, website: 'https://old.example' } } } as unknown as EnrichedSubmission}
+        category={SHUL}
+        position={{ at: 0, total: 1, back: () => {} }}
+        token="t"
+        onModerate={onModerate}
+        onUpdated={() => {}}
+      />,
+    )
+
+  it('shows one part at a time, and Update answers that part only, then opens the next', async () => {
+    const onModerate = vi.fn(async () => 'partial' as const)
+    twoParts(onModerate)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['Website', 'Usual Shabbos times'])
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('insertion')).toHaveTextContent('https://new.example')
+    expect(screen.queryByText('Shacharis 9:30 AM')).not.toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: 'Update the listing' }))
+    expect(onModerate).toHaveBeenCalledWith('s1', 'approved', undefined, 'website')
+    expect(screen.getAllByRole('tab')[0]).toHaveTextContent('(done)')
+    expect(screen.getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('insertion')).toHaveTextContent('Shacharis 9:30 AM')
+  })
+
+  it('with one part left, the switches stay, the answered one ticked', async () => {
+    const answered = vi.fn()
+    const shul = (website: string) =>
+      ({ ...change({}), payload: { category: 'synagogue', name: 'Mekor', address: '', details: { minyanim: [{ ...usual[0], time: '9:30am' }], website: 'https://new.example' } }, current: { id: 'mi', category: 'synagogue', name: 'Mekor', address: '', details: { minyanim: usual, website } } }) as unknown as EnrichedSubmission
+    // Read again once a part is answered: the website is on the listing now.
+    function Queue() {
+      const [s, setS] = useState(shul('https://old.example'))
+      return (
+        <ChangeReview
+          submission={s}
+          category={SHUL}
+          position={{ at: 0, total: 1, back: () => {} }}
+          token="t"
+          onModerate={async (...a) => {
+            answered(...a)
+            setS(shul('https://new.example'))
+            return 'partial' as const
+          }}
+          onUpdated={() => {}}
+        />
+      )
+    }
+    renderWithProviders(<Queue />)
+    await user().click(screen.getByRole('button', { name: 'Update the listing' }))
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Website (done)', 'Usual Shabbos times'])
+    await user().click(screen.getByRole('button', { name: 'Update the listing' }))
+    expect(answered).toHaveBeenLastCalledWith('s1', 'approved', undefined, 'minyanim:shabbos')
+  })
+
+  it('Leave it leaves the open part straight away, with no reason asked: nobody is told until the last', async () => {
+    const onModerate = vi.fn(async () => 'partial' as const)
+    twoParts(onModerate)
+    await user().click(screen.getAllByRole('tab')[1])
+    await user().click(screen.getByRole('button', { name: 'Leave it' }))
+    expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', undefined, 'minyanim:shabbos')
+    expect(screen.queryByLabelText(/Why, for whoever sent it/)).not.toBeInTheDocument()
   })
 })
