@@ -88,10 +88,11 @@ export default function TodoList({
               name="Show"
               value="all"
               several={view.filters}
-              options={FILTERS.map((f) => ({ ...f, count: f.value === 'all' ? undefined : places.filter((p) => p.things.some((t) => t.filter === f.value)).length }))}
+              showValue
+              options={FILTERS.map((f) => ({ ...f, count: f.value === 'all' ? places.length : places.filter((p) => p.things.some((t) => t.filter === f.value)).length }))}
               onChange={toggle}
             />
-            <AdminMenu name="Sort" value={view.sort} options={SORTS} onChange={(sort) => onView({ ...view, sort })} />
+            <AdminMenu name="Sort" value={view.sort} showValue options={SORTS} onChange={(sort) => onView({ ...view, sort })} />
           </div>
 
           {shown.length === 0 ? (

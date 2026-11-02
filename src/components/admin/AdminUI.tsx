@@ -279,6 +279,7 @@ export function AdminMenu<V extends string>({
   onChange,
   disabled = false,
   several,
+  showValue = false,
 }: {
   name: string
   value: V
@@ -286,6 +287,9 @@ export function AdminMenu<V extends string>({
   onChange: (value: V) => void
   disabled?: boolean
   several?: V[]
+  /** The button names what's chosen even when it's the first option ("All",
+   *  "Oldest first"), where Places' menus name themselves until narrowed. */
+  showValue?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -330,7 +334,7 @@ export function AdminMenu<V extends string>({
           narrowed ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-900'
         }`}
       >
-        <span className="truncate">{narrowed ? current : name}</span>
+        <span className="truncate">{narrowed || showValue ? current : name}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -347,10 +351,28 @@ export function AdminMenu<V extends string>({
                 onChange(o.value)
                 if (!several) setOpen(false)
               }}
-              className={`block min-h-11 w-full cursor-pointer px-3.5 py-2 text-left text-[15px] font-medium ${picked(o.value) ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'}`}
+              className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-[15px] font-medium ${
+                several ? 'text-slate-900 hover:bg-slate-50' : picked(o.value) ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'
+              }`}
             >
-              {o.label}
-              {o.count !== undefined && ` (${o.count})`}
+              {/* Several at once: a tick box each, as the site's own
+                  multi-select draws it (DetailFieldInput). */}
+              {several && (
+                <span
+                  aria-hidden="true"
+                  className={`flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[4px] border-[1.5px] ${picked(o.value) ? 'border-primary bg-primary' : 'border-slate-400 bg-white'}`}
+                >
+                  {picked(o.value) && (
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 8.5l3 3 7-7" />
+                    </svg>
+                  )}
+                </span>
+              )}
+              <span>
+                {o.label}
+                {o.count !== undefined && ` (${o.count})`}
+              </span>
             </button>
           ))}
         </div>

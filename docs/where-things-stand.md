@@ -2311,10 +2311,30 @@ opens an email to them, and shows only when they left an email. Checked on
 dev: Done took the row off To do and the nav went from 64 to 63; the row
 was then put back.
 
-**Not done yet, compared with the boards:**
-- A broken check, or a job's reading, opens as a card that links to the
-  place's own screen. The fix for it isn't on the card yet.
-- Broken checks show no date.
+**The list is built; the place screens are NOT built as drawn.** Put
+beside the boards, every screen a place opens is still the old review
+screen in the new frame. Being rebuilt, in this order:
+- Done: the menus read "All" and "Oldest first", and the filter has a tick
+  box and a count per option (K1Sort, H2Open).
+- Rows: broken parts in brown in the grey line, and a date on a row with
+  only broken checks (M1List).
+- The frame (M2First): "Category · See the listing" and "N of M" under the
+  name; the source as a folded card; the buttons pinned at the bottom.
+- Broken checks fixed in place (R3Site, R2Menu, R6Menu/R6Give/R6After,
+  R2Google): the field in its editor, the failure in the folded source
+  ("didn't load since Oct 22"), and Read it again / Stop reading it, Give
+  its menu / No menu online, Find it on Google / Not on Google. Not a link
+  to the place.
+- Changes in the listing's own editor (M2First, R1Women, R5Link, E1Times,
+  E2Dishes): yellow, not green and red; "Changed" or "New" pills and "was
+  6:45 AM"; buttons that name the change and follow an edit ("Change to
+  6:40 AM / Keep 6:45 AM").
+- The new place as the listing's boxes, with "Not on the listing yet"
+  (L3NewPlace). Closures, off a list, eruv, archived coming back (L1Dropped,
+  L2Back, L4Eruv, R4Back).
+- Feedback (L5Feedback): the quote large, "Form · name · time", Done pinned.
+- Then Places drops "Check broken" (`CHECKED_BY` in `fieldCoverage.ts`,
+  `PlacesList.tsx`).
 - Only a change's Edit asks before you leave. A new place's unsaved fixes
   don't, and neither do browser Back or tapping To do in the nav.
 

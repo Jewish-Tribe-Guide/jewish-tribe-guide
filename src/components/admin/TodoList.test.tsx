@@ -67,6 +67,19 @@ describe('To do, a row per place', () => {
     expect(rowNames()).toHaveLength(3)
   })
 
+  // K1Sort, H2Open: the menus name what's chosen, and the filter ticks.
+  it('names what the menus have chosen, and ticks each filter picked', async () => {
+    const user = userEvent.setup()
+    show({ ...empty, notRead: [{ id: 'z', name: 'Zeke’s', line: 'Website didn’t load' }] })
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('All')
+    expect(screen.getByRole('button', { name: /^Sort/ })).toHaveTextContent('Oldest first')
+    await user.click(screen.getByRole('button', { name: /^Show/ }))
+    expect(screen.getByRole('menuitemcheckbox', { name: 'All (1)' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))
+    expect(screen.getByRole('menuitemcheckbox', { name: 'All (1)' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('Broken checks')
+  })
+
   it('sorts by name', async () => {
     const user = userEvent.setup()
     show({ ...empty, notRead: [{ id: 'z', name: 'Zeke’s', line: 'Website didn’t load' }, { id: 'a', name: 'Abe’s', line: 'Website didn’t load' }] })
