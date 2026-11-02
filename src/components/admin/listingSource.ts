@@ -9,9 +9,10 @@ import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
 import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
-import type { AddSource, Again, Change, Foot, Opened, Stop } from './openedPlaceBoxes'
+import type { AddSource, Again, Change, Foot, Opened, ReadStep, Stop } from './openedPlaceBoxes'
 import { openedPlace } from './openedPlaceBoxes'
 import { websiteWatchOf } from '@/lib/eruvJob'
+import type { Finding } from '@/lib/watchFindings'
 import type { Jobs } from './useWatchJobs'
 import { day, shortUrl } from './watchText'
 
@@ -23,6 +24,11 @@ import { day, shortUrl } from './watchText'
 // Oct 20 · Change". A week with both gets one line each. Put together from openedPlace's boxes and each
 // job's places, so the listing and the job pages say the same. PlaceListing
 // draws it. Pure.
+
+/** Read now on a saved place's line (SavedRead15, Nov 1): one of its job's
+ *  reads, filed as the nightly run would, or its latest email. Named for what
+ *  the line says while it reads, or that it couldn't. */
+export type ReadNow = { what: string } & ({ step: ReadStep } | { email: string })
 
 /** A page given where nothing was read: a job's own, or a Change's. */
 export type GiveSource = { label: string; email: boolean; run: AddSource | Change }
@@ -40,6 +46,7 @@ export type SourceLine = {
   /** A field Google keeps, and one it could. */
   googleStop?: CheckedField
   useGoogle?: CheckedField
+  read?: ReadNow
 }
 
 export type RowSource = { job: string; amber: boolean; line: SourceLine; also?: SourceLine }
@@ -246,7 +253,26 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
     return nothing(field === 'name' ? null : addPage, place?.matched ? { useGoogle: field } : undefined)
   }
 
-  return (row) => {
+  /** What Read now reads, for a line that has a source to read. Google's and
+   *  the link check's have none: they're not read place by place. */
+  function readFor(row: EditorRow, source: RowSource, line: SourceLine): ReadNow | undefined {
+    if (['Nothing', 'Stopped', 'Google', 'Link check'].includes(source.job) || line.text === 'Google' || line.text === 'Link check') return undefined
+    if (line.mail) return line.change?.value ? { what: 'its email', email: line.change.value } : undefined
+    if (row.kind === 'items') return { what: 'its menu', step: { job: 'dishes', resourceId: id } }
+    if (row.kind === 'minyans') return { what: 'its website', step: { job: 'times', resourceId: id } }
+    if (row.kind === 'audience' || (reads?.kind === 'hours' && row.fields.some((f) => f.type === 'hours'))) return { what: 'its website', step: { job: 'hours', resourceId: id } }
+    if (source.job === nameOf('hospitals')) {
+      const step = opened.reads.find((r) => r.job === 'refuah')
+      return step && { what: 'Refuah', step }
+    }
+    if (row.fields.some((f) => f.key === 'kosherCert')) {
+      const step = opened.reads.find((r) => r.job === 'watch')
+      return step && { what: line.text, step }
+    }
+    return own ? { what: 'its website', step: { job: 'watch', watchId: own.id } } : undefined
+  }
+
+  function rowOf(row: EditorRow): RowSource | null {
     if (row.kind === 'name') {
       const place = jobs.google?.places.find((p) => p.id === id)
       return place?.matched ? keptField('name') : null
@@ -268,6 +294,30 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
     const link = jobs.links?.find((l) => l.resourceId === id && l.key === f.key)
     return link ? { job: nameOf('links'), amber: false, line: { text: 'Link check', when: link.checkedAt ? day(link.checkedAt) : null } } : nothing()
   }
+
+  return (row) => {
+    const source = rowOf(row)
+    if (!source) return null
+    const line = { ...source.line, read: readFor(row, source, source.line) }
+    return { ...source, line, ...(source.also ? { also: { ...source.also, read: readFor(row, source, source.also) } } : {}) }
+  }
+}
+
+/** What's waiting on a row: the finding a read filed for one of its fields,
+ *  still in To do until it's answered (ReadWaiting16). */
+export function rowFinding(id: string, jobs: Jobs, row: EditorRow): { id: string; from: string } | null {
+  const findings: Finding[] = [
+    ...(jobs.times?.places.find((p) => p.id === id)?.findings ?? []),
+    ...(jobs.hours?.places.find((p) => p.id === id)?.findings ?? []),
+    ...(jobs.sites?.find((p) => p.id === id)?.findings ?? []),
+    ...((jobs.dishes?.find((p) => p.id === id)?.findings ?? []) as Finding[]),
+    ...(jobs.hospitals?.find((p) => p.id === id)?.findings ?? []),
+  ]
+  const keys = new Set(row.fields.flatMap((f) => [f.key, `${f.key}_schedules`]))
+  if (row.kind === 'contact' && row.part) keys.add(row.part)
+  if (row.kind === 'name') keys.add('name')
+  const found = findings.find((f) => (row.kind === 'audience' && f.section === row.flag) || f.lines.some((l) => keys.has(l.key)))
+  return found ? { id: found.id, from: capital(found.from) } : null
 }
 
 /** An eruv's rows (EruvListing6): every one is the Eruvs job's, but its

@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import tzLookup from 'tz-lookup'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
@@ -116,7 +115,6 @@ function cityShortName(cityQuery: string): string {
 }
 
 export default function CommunityManager({ token }: { token: string }) {
-  const router = useRouter()
   const [communities, setCommunities] = useState<CommunityWithAdminEmail[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Managing every community (browsing the list, creating a new one) is a
@@ -310,8 +308,10 @@ export default function CommunityManager({ token }: { token: string }) {
       )
       // Lands the admin directly in the new community's own console — the
       // whole point of this flow is "click a button, get a working site",
-      // and that's most visible standing inside it.
-      router.push(adminBase(body.community.slug))
+      // and that's most visible standing inside it. A plain load, not
+      // router.push: the push got its response and then sat on this form with
+      // no error, about one try in two (see confirmDelete's reload below).
+      window.location.assign(adminBase(body.community.slug))
     } catch (err) {
       setFormErrors([err instanceof Error ? err.message : 'Could not create community.'])
     } finally {
@@ -637,12 +637,12 @@ export default function CommunityManager({ token }: { token: string }) {
                   prefetching primes Next's client router cache for that
                   other community's segment of the same /admin/[community]
                   layout. That collided for real with the very next thing
-                  this screen does — creating a community and router.push-ing
-                  into its console — which silently failed to update the URL
-                  (no error, no reload, just stuck) once these rows started
-                  prefetching. Same underlying Cache Components router-cache
-                  issue as confirmDelete's own reload workaround below, just
-                  triggered by priming instead of by the delete itself. */}
+                  this screen does — creating a community and landing in its
+                  console — which silently failed to update the URL (no error,
+                  no reload, just stuck) once these rows started prefetching.
+                  Same underlying Cache Components router-cache issue as
+                  confirmDelete's own reload workaround below, just triggered
+                  by priming instead of by the delete itself. */}
               <Link href={adminBase(c.slug)} prefetch={false} className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-slate-900 text-sm">{c.name}</p>

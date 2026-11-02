@@ -266,6 +266,8 @@ export function AdminSwitch({ checked, onChange, label }: { checked: boolean; on
   )
 }
 
+const SCREEN_GUTTER = 16
+
 /** A dropdown of one choice (Places' three menus). Blue once it's off its
  *  first option, so what's narrowing the list shows at a glance. */
 export function AdminMenu<V extends string>({
@@ -298,6 +300,14 @@ export function AdminMenu<V extends string>({
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+  // Under its button, moved left just enough to stay on a phone's screen:
+  // past the edge, the whole page could be dragged sideways.
+  const menu = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!open || !menu.current) return
+    const over = menu.current.getBoundingClientRect().right - (document.documentElement.clientWidth - SCREEN_GUTTER)
+    if (over > 0) menu.current.style.left = `${-over}px`
+  }, [open])
   const narrowed = value !== options[0]?.value
   const current = options.find((o) => o.value === value)?.label
   return (
@@ -319,7 +329,7 @@ export function AdminMenu<V extends string>({
         </svg>
       </button>
       {open && (
-        <div role="menu" aria-label={name} className="absolute left-0 z-30 mt-1 max-h-80 min-w-[232px] overflow-auto rounded-[10px] border border-slate-200 bg-white py-1 shadow-lg">
+        <div ref={menu} role="menu" aria-label={name} className="absolute left-0 z-30 mt-1 max-h-80 min-w-[232px] overflow-auto rounded-[10px] border border-slate-200 bg-white py-1 shadow-lg">
           {options.map((o) => (
             <button
               key={o.value}

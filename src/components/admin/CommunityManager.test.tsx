@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CommunityManager from './CommunityManager'
-import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import type { Community } from '@/lib/communityStore'
+import { readFileSync } from 'fs'
 
 // The "New Community" flow's client-side validation (submit() in
 // CommunityManager.tsx) was exercised only by the e2e happy path, which
@@ -15,14 +15,9 @@ import type { Community } from '@/lib/communityStore'
 // fetchJson/parseOkJson mocked (this component uses parseOkJson directly
 // against a raw fetch() for its GET load, and fetchJson for the POST), no
 // provider stack needed since this component reads no content/community
-// context — only useRouter, for the post-create redirect.
+// context.
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
-vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
-  usePathname: () => '/test-community',
-  useSearchParams: () => new URLSearchParams(),
-}))
 
 // Same stub pattern ListingEditor.test.tsx uses for the same component — a
 // real AddressInput needs Google Maps loaded, which this test env has no
@@ -301,7 +296,14 @@ describe('CommunityManager — new community form', () => {
     expect(fetchJson).not.toHaveBeenCalled()
   })
 
-  it('submits the right JSON shape and navigates to the new community\'s admin console', async () => {
+  // Landing in the new console is a plain load: router.push got its response
+  // and sat on the form, no error, in 4 of 7 runs of test:admin-write (and on
+  // main in CI). jsdom can't watch a load; that suite proves the landing.
+  it('never goes back to the client router to land in the new console', () => {
+    expect(readFileSync('src/components/admin/CommunityManager.tsx', 'utf8')).not.toContain('useRouter')
+  })
+
+  it('submits the right JSON shape', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
     await user.click(screen.getByRole('button', { name: /new community/i }))
@@ -309,7 +311,7 @@ describe('CommunityManager — new community form', () => {
     await fillValidForm(user)
     await user.click(screen.getByRole('button', { name: /create community/i }))
 
-    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith(adminBase('baltimore')))
+    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
     const call = vi.mocked(fetchJson).mock.calls[0]!
     expect(call[0]).toBe('/api/admin/communities')
     const init = call[1] as RequestInit
@@ -351,7 +353,6 @@ describe('CommunityManager — new community form', () => {
     await user.click(screen.getByRole('button', { name: /create community/i }))
 
     expect(await screen.findByText('"baltimore" is already in use by another community.')).toBeInTheDocument()
-    expect(mockRouter.push).not.toHaveBeenCalled()
     // The form is still there, not swapped back to the list view.
     expect(screen.getByRole('button', { name: /create community/i })).toBeInTheDocument()
   })

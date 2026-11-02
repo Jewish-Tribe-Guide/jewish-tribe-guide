@@ -17,6 +17,21 @@ afterEach(() => cleanup())
 /** The tab's icon, as the outline of its first shape. */
 const iconOf = (name: string) => screen.getByRole('button', { name }).querySelector('svg')?.firstElementChild?.outerHTML
 
+// Nov 1 (BarNew15): the bar went unnoticed, light grey, thin and see-through;
+// the admin's stood out. A class check, as jsdom has no colours to read.
+describe('the bar’s look', () => {
+  it('is solid white, its tabs dark enough to see, the current one bold', () => {
+    render(<MobileTabBar mode="browse" tabs={todayTabs} onSelect={vi.fn()} />)
+    const nav = screen.getByRole('navigation', { name: 'Primary' })
+    expect(nav.className).toMatch(/(^| )bg-white( |$)/)
+    expect(nav.className).not.toContain('backdrop-blur')
+    const other = screen.getByRole('button', { name: 'Map' })
+    expect(other.className).toContain('text-slate-600')
+    expect(other.querySelector('span')?.className).toContain('text-xs font-semibold')
+    expect(screen.getByRole('button', { name: 'Browse' }).querySelector('span')?.className).toContain('text-xs font-bold')
+  })
+})
+
 describe('the phone tabs with Browse', () => {
   it('Browse is lit on the Browse page, and the home tab isn’t', () => {
     render(<MobileTabBar mode="browse" tabs={todayTabs} onSelect={vi.fn()} />)

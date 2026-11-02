@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -370,7 +370,7 @@ describe('PlacePage', () => {
       const user = userEvent.setup()
       const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!
       await user.click(minyans)
-      expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Change`)
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Read now · Change`)
       expectLineUnderCard()
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       const change = screen.getByTestId('source-screen')
@@ -379,6 +379,96 @@ describe('PlacePage', () => {
       await user.type(within(change).getByRole('textbox'), 'https://kesher.example/times')
       await user.click(within(change).getByRole('button', { name: 'Save' }))
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]])
+    })
+
+    // Nov 1 (SavedRead15, SavedAgrees15, SavedFailed15, SavedGoogle15,
+    // ReadChange16, ReadWaiting16): the way To do shows what a watch found.
+    describe('Read now on its source line', () => {
+      const change = {
+        id: 'sub-1', status: 'pending', operation: 'update', target_type: 'listing', target_id: 'a', created_at: at, source: 'watch',
+        payload: { category: 'synagogue', name: 'Kesher Israel', address: '', details: { minyanim: [] } },
+        current: { id: 'a', category: 'synagogue', name: 'Kesher Israel', address: '', details: { minyanim: [{ id: 'm', tefillah: 'Mincha', time: '16:50', days: [0] }] } },
+      }
+      let release: () => void = () => {}
+      let held: Promise<void> = Promise.resolve()
+      /** A read, as its routes answer. `filed`: what it files, in the queue. */
+      const readPage = (answer: { lastError?: string | null; filed?: boolean; findings?: unknown[] } = {}) => {
+        let read = false
+        const sent: [string, Record<string, unknown>][] = []
+        return renderPage('a', [place('a', 'Kesher Israel', { fields: [field('Name', 'google')] })], (url, init) => {
+          if (init?.method === 'POST') {
+            const body = JSON.parse(String(init.body))
+            sent.push([url.replace(/[?&]community=philly/, ''), body])
+            read = true
+            return { ok: true, read: body.id ? undefined : ['w1'], pages: [{ watch: { ...page, lastError: answer.lastError ?? null } }] }
+          }
+          if (init?.method === 'PATCH') return { ok: true }
+          if (url.includes('/found')) return { ok: true, found: read && answer.filed ? [{ id: 'sub-1', payload: {} }] : [] }
+          if (url.includes('/api/admin/submissions')) return held.then(() => ({ ok: true, submissions: [change] }))
+          if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }
+          if (url.includes('/api/admin/listings')) return { ok: true, places: [row()], categories: [shulCategory] }
+          if (url.includes('job=times')) return { name: 'Shul times', places: [{ ...shul, findings: read ? answer.findings ?? [] : [] }] }
+          return undefined
+        }).then(() => sent)
+      }
+      const openRow = async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
+        return within(screen.getByTestId('row-source')).getByRole('button', { name: 'Read now' })
+      }
+
+      it('agreeing, it reads each page as the job does and just dates the row', async () => {
+        const sent = await readPage()
+        const user = userEvent.setup()
+        await user.click(await openRow(user))
+        expect(sent).toEqual([
+          ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
+          ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
+        ])
+        expect(await screen.findByText(/just now/)).toBeTruthy()
+        expect(screen.queryByTestId('change-review')).toBeNull()
+      })
+
+      it('differing, it opens To do’s change screen; Back leaves it waiting, not answered', async () => {
+        held = new Promise((done) => { release = done })
+        const finding = { id: 'sub-1', from: 'its website', lines: [{ key: 'minyanim', label: 'Times', before: '', after: '' }] }
+        await readPage({ filed: true, findings: [finding] })
+        const user = userEvent.setup()
+        await user.click(await openRow(user))
+        // Still reading until its screen is up, not a line that flashes past.
+        await waitFor(() => expect(vi.mocked(fetchJson).mock.calls.some(([url]) => String(url).includes('/api/admin/submissions'))).toBe(true))
+        expect(screen.getAllByTestId('row-source')[0]).toHaveTextContent('Reading its website…')
+        const scrolled = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+        release()
+        const review = await screen.findByTestId('change-review')
+        expect(scrolled).toHaveBeenCalledWith(0, 0)
+        expect(within(review).getByRole('button', { name: 'Update the listing' })).toBeTruthy()
+        expect(review).not.toHaveTextContent('1 of 1')
+        await user.click(within(review).getByRole('button', { name: /Back/ }))
+        expect(screen.queryByTestId('change-review')).toBeNull()
+        expect(vi.mocked(fetchJson).mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false)
+        const line = screen.getAllByTestId('row-source')[0]
+        expect(line).toHaveTextContent('Its website has a change · Open')
+        await user.click(within(line).getByRole('button', { name: 'Open' }))
+        expect(await screen.findByTestId('change-review')).toBeTruthy()
+      })
+
+      it('failing, it says so in red and keeps its way to read again or change it', async () => {
+        await readPage({ lastError: 'down' })
+        const user = userEvent.setup()
+        await user.click(await openRow(user))
+        expect(await screen.findByText('Couldn’t read its website')).toHaveClass('text-red-700')
+        const lines = screen.getAllByTestId('row-source')
+        const last = lines[lines.length - 1]
+        expect(within(last).getByRole('button', { name: 'Read now' })).toBeTruthy()
+        expect(within(last).getByRole('button', { name: 'Change' })).toBeTruthy()
+      })
+
+      it('none on what Google keeps', async () => {
+        await listingPage({ job: withTimes })
+        const user = userEvent.setup()
+        await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Google')!.closest('button')!)
+        expect(within(screen.getByTestId('row-source')).queryByRole('button', { name: 'Read now' })).toBeNull()
+      })
     })
 
     it('Stop reading it, on the Change screen: nothing asked first, it can be started again', async () => {
@@ -703,7 +793,7 @@ describe('stopping a hospital’s or food place’s source', () => {
     })
     const user = userEvent.setup()
     await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
-    expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Change`)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Read now · Change`)
     expectLineUnderCard()
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
     await user.click(screen.getByRole('button', { name: 'Stop reading it' }))

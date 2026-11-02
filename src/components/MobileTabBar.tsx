@@ -45,6 +45,8 @@ type Props = {
 // Fixed bottom tab bar, mobile only — the phone-width equivalent of the
 // desktop SiteHeader/SiteFooter chrome. Always visible (even over wizard
 // overlays) so the visitor never loses their way back to the other tabs.
+// The admin bar's grey, weight and solid white (BarNew15, Nov 1): the old
+// light, see-through one went unnoticed.
 //
 // The bar is admin-configurable (labels, order, and which destinations are on
 // it — see the Mobile tab in /admin). Its three original entries survive as
@@ -56,7 +58,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
   const hasBrowse = tabs.some((t) => t.target === 'browse')
   return (
     <nav
-      className="desktop:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200/80 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
+      className="desktop:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
       aria-label="Primary"
     >
       {tabs.map((tab) => {
@@ -71,7 +73,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
         const emoji = builtIn ? undefined : iconForTarget?.(tab.target)
         // Only the emoji fallback needs the grayscale/opacity dimming trick
         // below — a hand-built line icon already takes `currentColor`, so
-        // `text-primary`/`text-slate-400` (set on the button above) already
+        // `text-primary`/`text-slate-600` (set on the button above) already
         // dims/tints it correctly, same as the built-in SVGs; grayscale-ing
         // an already-monochrome currentColor icon would just wash out its
         // active-state color for nothing.
@@ -84,7 +86,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
             onClick={() => onSelect(tab)}
             aria-current={active ? 'page' : undefined}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 cursor-pointer ${
-              active ? 'text-primary' : 'text-slate-400'
+              active ? 'text-primary' : 'text-slate-600'
             }`}
           >
             {Icon ? (
@@ -105,7 +107,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
                 {emoji ?? '•'}
               </span>
             )}
-            <span className="text-[11px] font-medium">{tab.label}</span>
+            <span className={`text-xs ${active ? 'font-bold' : 'font-semibold'}`}>{tab.label}</span>
           </button>
         )
       })}

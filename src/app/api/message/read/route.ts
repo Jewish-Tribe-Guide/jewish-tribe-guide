@@ -31,8 +31,6 @@ import { itemWording } from '@/lib/itemMarks'
 // they were read (agreed Oct 6: a menu link had been read as a new website).
 // `listingId`: the listing the box was opened from, if any.
 // `mode=menu` (with listingId): the box opened as "Add their menu" (Oct 10).
-// `mode=menu` with `placeName` instead: a place being added by hand, its
-// menu link read for the form (Oct 20).
 // What was sent is that place's menu, so it goes straight to the menu
 // reader: a link, a whole menu pasted as text, or photos of it.
 //
@@ -182,28 +180,6 @@ export async function POST(request: Request) {
       const l = byId.get(about)!
       const proposal = await menuProposal(l, l.name, link, {}, link ? null : text || null)
       return Response.json({ ok: true, proposals: [proposal], photoUrls: await keepPhotos(), model: null })
-    }
-    const newPlaceMenu = async (name: string, url: string | null) => {
-      try {
-        const sources = url ? await menuFrom(url) : 'no_source'
-        if (typeof sources === 'string') return failedMenu(null, name, sources)
-        const read = (await readMenus(sources, name, { apiKey }))!
-        if (read.dishes.length === 0) return failedMenu(null, name, 'no_dishes', read.note)
-        const items = read.dishes.map((d) => ({ name: d.name, availability: 'always' as const, doubt: null }))
-        return { kind: 'items', listingId: null, listing: null, asWritten: name, chain: false, ask: null, items, note: null, menu: { url: read.sourceUrl, dishes: read.dishes }, lines: [], held: [] }
-      } catch (err) {
-        console.error('[message/read] menu not read:', err instanceof Error ? err.message : err)
-        return failedMenu(null, name, 'down')
-      }
-    }
-    // A food place being added by hand, with its menu link typed in (the
-    // user, Oct 20): not listed yet, so it goes by the name being added,
-    // and only a link is read. Its dishes go into the form, for the
-    // contributor to check, and on to an admin with the rest of it.
-    const placeName = field('placeName').trim().slice(0, 200)
-    if (menuMode && !about && placeName) {
-      const proposal = await newPlaceMenu(placeName, link)
-      return Response.json({ ok: true, proposals: [proposal], photoUrls: [], model: null })
     }
     const reading = await readMessage({ text, images }, catalog, { apiKey, communityName: community.name, about })
     const proposals = await Promise.all(

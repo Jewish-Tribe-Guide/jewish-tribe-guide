@@ -89,10 +89,33 @@ afterEach(() => {
 })
 
 describe('Places', () => {
-  it('has Watches at its foot, with how much it reads', async () => {
+  // Nov 1 (WatchE19): it was at the foot, and went unseen.
+  it('has Watches first, above finding a place, ringed and with no chevron', async () => {
     renderPlaces()
     await screen.findByRole('region', { name: 'Places' })
-    expect(within(screen.getByRole('region', { name: 'Watches' })).getByRole('link', { name: /Watches/ })).toHaveAttribute('href', '/philly/admin/watches')
+    const watches = screen.getByRole('link', { name: /Watches/ })
+    expect(watches).toHaveAttribute('href', '/philly/admin/watches')
+    expect(watches.compareDocumentPosition(screen.getByLabelText('Find a place by name')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(watches.className).toContain('border-emerald-600')
+    expect(watches.querySelectorAll('svg')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Watches' })).not.toBeInTheDocument()
+  })
+
+  // It floats, so it's tapped from down the list; "Which category" opens at
+  // the top, out of sight unless the page goes there too.
+  it('Add a place floats like the site’s, and goes to the top to ask which category', async () => {
+    const user = userEvent.setup()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    renderPlaces()
+    const add = await screen.findByRole('button', { name: 'Add a place' })
+    expect(add.className).toContain('fixed')
+    expect(add).toHaveTextContent(/^Add$/)
+    await user.click(add)
+    expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    expect(screen.getByLabelText('Which category')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 
   it('lists what’s on the site, by name, with what’s wrong first and its category', async () => {

@@ -1,11 +1,14 @@
 'use client'
 
-import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { EditorRow } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
+import { dishStatus } from '@/lib/watchJobs'
+import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { shortDay } from '@/lib/todo'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -13,11 +16,14 @@ import { TrashIcon } from '@/components/icons'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import type { DirectoryResource } from '@/types'
 import { AdminBack, AdminBox, AdminEmpty } from './AdminUI'
+import ChangeReview from './ChangeReview'
 import ListingEditorScreen from './ListingEditorScreen'
-import { listingSources, type GiveSource, type RowSource, type SourceLine } from './listingSource'
+import { listingSources, rowFinding, type GiveSource, type ReadNow, type RowSource, type SourceLine } from './listingSource'
+import OpenedPlace from './OpenedPlace'
 import { sourceActions, type Attempt } from './sourceActions'
 import type { Stop } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
+import { kindsOf } from './WatchKinds'
 
 // A listing as an admin sees it, wherever it's opened from: Places, or a job's
 // row with nothing waiting (boards Listing6, States6, Menu5, Change5, Stopped6,
@@ -239,6 +245,22 @@ export default function PlaceListing({
   const [confirming, setConfirming] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
+  // Read now (SavedRead15, ReadChange16, Nov 1): the read under way, those done
+  // here, one that failed; what it found opens over the listing, which stays
+  // mounted underneath with whatever's been typed in it.
+  const [reading, setReading] = useState<string | null>(null)
+  const [readJust, setReadJust] = useState<readonly string[]>([])
+  const [readFailed, setReadFailed] = useState<{ read: string; text: string } | null>(null)
+  const [change, setChange] = useState<EnrichedSubmission | null>(null)
+  const [changeBusy, setChangeBusy] = useState(false)
+  const [changeError, setChangeError] = useState<string | null>(null)
+  const [menuChange, setMenuChange] = useState(false)
+  const [editorRound, setEditorRound] = useState(0)
+  // What it found opens from wherever the row was, and starts at its top.
+  const foundOpen = !!change || menuChange
+  useEffect(() => {
+    if (foundOpen) window.scrollTo?.(0, 0)
+  }, [foundOpen])
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
@@ -285,8 +307,66 @@ export default function PlaceListing({
     }
   }
 
+  type Found = { found: { id: string }[] }
+  const foundIds = async () => (await fetchJson<Found>(withCommunity(`/api/admin/listings/${place.id}/found`, community), { headers }, 'Could not see what it found.')).found.map((f) => f.id)
+
+  async function openChange(id: string) {
+    const { submissions } = await fetchJson<{ submissions: EnrichedSubmission[] }>(withCommunity('/api/admin/submissions?status=pending', community), { headers }, 'Could not open that.')
+    const found = submissions.find((s) => s.id === id)
+    if (found) setChange(found)
+  }
+
+  async function readNow(row: EditorRow, read: ReadNow) {
+    const key = JSON.stringify(read)
+    const couldnt = `Couldn’t read ${read.what}`
+    setReading(key)
+    setReadFailed(null)
+    try {
+      const before = await foundIds()
+      const result = await actions.readSource(read)
+      await reload()
+      if (result.failed) {
+        const text = result.emailState === 'no-email' ? 'No email from it yet' : result.emailState === 'no-gmail' ? 'The guide’s Gmail isn’t connected yet' : couldnt
+        setReadFailed({ read: key, text })
+        return
+      }
+      setReadJust((done) => [...done, key])
+      if (result.changedMenu) return setMenuChange(true)
+      const fresh = (await foundIds()).find((id) => !before.includes(id))
+      if (fresh) await openChange(fresh)
+    } catch {
+      setReadFailed({ read: key, text: couldnt })
+    } finally {
+      setReading(null)
+    }
+  }
+
+  /** Answered: Update the listing changed what the editor started from. */
+  async function changeAnswered(updated: boolean) {
+    if (updated) {
+      const got = await fetchJson<{ item: DirectoryResource }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+      setItem(got.item)
+      setEditorRound((r) => r + 1)
+    }
+    setChange(null)
+    await reload()
+  }
+
+  async function answer(id: string, status: 'approved' | 'rejected', reason?: string) {
+    setChangeBusy(true)
+    setChangeError(null)
+    try {
+      await fetchJson(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify({ status, ...(reason ? { reason } : {}) }) }, 'Failed to update.')
+      await changeAnswered(status === 'approved')
+    } catch (err) {
+      setChangeError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setChangeBusy(false)
+    }
+  }
+
   const control = (words: string, onClick: () => void) => (
-    <button type="button" disabled={busy} onClick={onClick} className={LINE_LINK}>
+    <button type="button" disabled={busy || !!reading} onClick={onClick} className={LINE_LINK}>
       {words}
     </button>
   )
@@ -314,7 +394,17 @@ export default function PlaceListing({
     const error = rowError?.row === row.id && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{rowError.text}</p>
     // Typed over or cleared, Google doesn't get it back on saving.
     if (line.googleStop && changed) return <SourceWords line={{ text: 'Google stops keeping this' }} />
-    const controls: ReactNode[] = []
+    const readKey = line.read && JSON.stringify(line.read)
+    if (line.read && reading === readKey) return <SourceWords line={{ text: `Reading ${line.read.what}…` }} />
+    // Back from what a read found without answering: it waits here, and in To do.
+    const waiting = rowFinding(place.id, jobs, row)
+    if (waiting) return <SourceWords line={{ text: `${waiting.from} has a change` }} controls={[control('Open', () => void openChange(waiting.id))]} />
+    const food = row.kind === 'items' && jobs.dishes?.find((p) => p.id === place.id)
+    if (food && food.reading?.status === 'proposed' && dishStatus(food) === 'differs') return <SourceWords line={{ text: 'Its menu has a change' }} controls={[control('Open', () => setMenuChange(true))]} />
+    const failed = readFailed && readFailed.read === readKey && <SourceWords line={{ text: readFailed.text, red: true }} />
+    const dated = (l: SourceLine) => (l.read && readJust.includes(JSON.stringify(l.read)) ? { ...l, when: 'just now' } : l)
+    const readControl = (l: SourceLine) => (l.read ? [control('Read now', () => void readNow(row, l.read!))] : [])
+    const controls: ReactNode[] = [...readControl(line)]
     if (line.change) controls.push(changeControl(line.change))
     if (line.start) {
       const s = line.start
@@ -335,8 +425,9 @@ export default function PlaceListing({
     return (
       <div className="space-y-1">
         {error}
-        <SourceWords line={line} controls={controls} />
-        {source.also && <SourceWords line={source.also} controls={source.also.change ? [changeControl(source.also.change)] : undefined} />}
+        {failed}
+        <SourceWords line={dated(line)} controls={controls} />
+        {source.also && <SourceWords line={dated(source.also)} controls={[...readControl(source.also), ...(source.also.change ? [changeControl(source.also.change)] : [])]} />}
       </div>
     )
   }
@@ -353,10 +444,32 @@ export default function PlaceListing({
     }
   }
 
+  const watched = menuChange ? kindsOf(jobs, adminBase(community), now)?.kinds.flatMap((k) => k.places).find((p) => p.id === place.id) : undefined
   return (
     <div>
+      {change && (
+        <ChangeReview
+          key={change.id}
+          submission={change}
+          category={category}
+          position={{ from: 'Back', at: 0, total: 1, back: () => setChange(null) }}
+          busy={changeBusy}
+          error={changeError}
+          token={token}
+          onModerate={(id, status, reason) => void answer(id, status, reason)}
+          onUpdated={() => void changeAnswered(true)}
+        />
+      )}
+      {/* Dishes wait on the screen To do opens for a menu. */}
+      {watched && !change && (
+        <div className="space-y-3.5">
+          <AdminBack back={{ label: 'Back', onClick: () => setMenuChange(false) }} title={place.name} />
+          <OpenedPlace place={watched} jobs={jobs} token={token} community={community} now={now} onChanged={reload} />
+        </div>
+      )}
+      <div className={change || watched ? 'hidden' : undefined}>
       <ListingEditorScreen
-        key={place.id}
+        key={`${place.id}-${editorRound}`}
         heading={place.name}
         backLabel={backLabel}
         item={item}
@@ -411,6 +524,7 @@ export default function PlaceListing({
           {archiveError && <p className="m-0 text-sm text-red-700">{archiveError}</p>}
         </div>
       )}
+      </div>
     </div>
   )
 }

@@ -29,7 +29,9 @@ import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
 
-export type QueuePosition = { at: number; total: number; back: () => void; next?: () => void }
+/** `from`: opened from somewhere else than To do's list (Read now on a saved
+ *  place), which goes back there and has no place in a list to show. */
+export type QueuePosition = { from?: string; at: number; total: number; back: () => void; next?: () => void }
 
 export default function ChangeReview({
   submission: s,
@@ -144,13 +146,15 @@ export default function ChangeReview({
   return (
     <div className="flex flex-col gap-4" data-testid="change-review">
       <AdminBack
-        back={{ label: 'To do', onClick: position.back }}
+        back={{ label: position.from ?? 'To do', onClick: position.back }}
         title={name}
         right={
           <span className="flex items-center gap-3 md:-mt-3">
-            <span className="text-[13.5px] text-slate-600 whitespace-nowrap">
-              {position.at + 1} of {position.total}
-            </span>
+            {!position.from && (
+              <span className="text-[13.5px] text-slate-600 whitespace-nowrap">
+                {position.at + 1} of {position.total}
+              </span>
+            )}
             {position.next && (
               <button type="button" onClick={position.next} className="max-md:hidden min-h-11 text-sm font-semibold text-primary cursor-pointer">
                 Next ›
