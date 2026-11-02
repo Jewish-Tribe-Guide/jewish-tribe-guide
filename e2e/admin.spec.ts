@@ -47,10 +47,10 @@ test.describe('admin console', () => {
     await page.goto('/philly/admin')
 
     await expect(page.getByText('Loading submissions…')).not.toBeVisible({ timeout: 10_000 })
-    // To do: "Nothing to do." or a count of what's waiting.
-    const empty = page.getByText('Nothing to do.')
-    const waiting = page.getByText(/^\d+ to decide$/)
-    await expect(empty.or(waiting)).toBeVisible()
+    // To do: "Nothing to do", or a row per place with something waiting.
+    const empty = page.getByText(/^Nothing (else )?to do\.?$/)
+    const waiting = page.getByTestId('todo-places')
+    await expect(empty.or(waiting).first()).toBeVisible()
   })
 
   test('the Categories tab lists the real configured categories', async ({ page, request }) => {

@@ -269,19 +269,23 @@ export function AdminSwitch({ checked, onChange, label }: { checked: boolean; on
 const SCREEN_GUTTER = 16
 
 /** A dropdown of one choice (Places' three menus). Blue once it's off its
- *  first option, so what's narrowing the list shows at a glance. */
+ *  first option, so what's narrowing the list shows at a glance. With
+ *  `several`, any number of choices (To do's filter): the first option is
+ *  "all", and picking it clears the rest. */
 export function AdminMenu<V extends string>({
   name,
   value,
   options,
   onChange,
   disabled = false,
+  several,
 }: {
   name: string
   value: V
   options: { value: V; label: string; count?: number }[]
   onChange: (value: V) => void
   disabled?: boolean
+  several?: V[]
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -308,8 +312,11 @@ export function AdminMenu<V extends string>({
     const over = menu.current.getBoundingClientRect().right - (document.documentElement.clientWidth - SCREEN_GUTTER)
     if (over > 0) menu.current.style.left = `${-over}px`
   }, [open])
-  const narrowed = value !== options[0]?.value
-  const current = options.find((o) => o.value === value)?.label
+  const picked = (v: V) => (several ? (v === options[0]?.value ? several.length === 0 : several.includes(v)) : v === value)
+  const narrowed = several ? several.length > 0 : value !== options[0]?.value
+  const current = several?.length
+    ? options.filter((o) => several.includes(o.value)).map((o) => o.label).join(', ')
+    : options.find((o) => o.value === (several ? options[0]?.value : value))?.label
   return (
     <div ref={box} className="relative min-w-0 flex-auto sm:flex-[0_1_170px]">
       <button
@@ -334,13 +341,13 @@ export function AdminMenu<V extends string>({
             <button
               key={o.value}
               type="button"
-              role="menuitemradio"
-              aria-checked={o.value === value}
+              role={several ? 'menuitemcheckbox' : 'menuitemradio'}
+              aria-checked={picked(o.value)}
               onClick={() => {
                 onChange(o.value)
-                setOpen(false)
+                if (!several) setOpen(false)
               }}
-              className={`block min-h-11 w-full cursor-pointer px-3.5 py-2 text-left text-[15px] font-medium ${o.value === value ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'}`}
+              className={`block min-h-11 w-full cursor-pointer px-3.5 py-2 text-left text-[15px] font-medium ${picked(o.value) ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'}`}
             >
               {o.label}
               {o.count !== undefined && ` (${o.count})`}

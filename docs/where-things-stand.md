@@ -2285,6 +2285,39 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 2: To do is one row per place (on `redesign/oct18-fixes`)
+
+The rest of the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL,
+v26). Each place is one row: its name, the oldest waiting thing's date, and a
+grey line of what's waiting ("Usual weekday times · Website didn't load"). A
+new place, a new category and each piece of feedback get a row of their own.
+Above the list are a search ("Find a place by name"), Show (pick any of
+Changes, New places, Broken checks, Feedback; that choice also decides which
+thing a place opens on) and Sort (Oldest first, Newest first, Name).
+
+A tap opens the place. Switches across the top name everything waiting
+there, and each answered one is ticked. Answering moves to the next thing.
+When a place is done, a phone goes back to the list and a computer opens
+the next place. On a computer the list stays beside the open place, and the
+up/down arrows step through places. The "N of M" counter and the nav's
+number both count places (`todoPlaceCount`). An open edit survives
+switching between things. Leaving the place with one unanswered asks
+first. With nothing left, To do says "Nothing to do / Every place was read
+this morning".
+
+Feedback opens with everything they wrote. **Done** marks it handled
+(`status: 'handled'` through `PATCH /api/admin/responses/[id]`). **Reply**
+opens an email to them, and shows only when they left an email. Checked on
+dev: Done took the row off To do and the nav went from 64 to 63; the row
+was then put back.
+
+**Not done yet, compared with the boards:**
+- A broken check, or a job's reading, opens as a card that links to the
+  place's own screen. The fix for it isn't on the card yet.
+- Broken checks show no date.
+- Only a change's Edit asks before you leave. A new place's unsaved fixes
+  don't, and neither do browser Back or tapping To do in the nav.
+
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 
 From the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL). A

@@ -4,7 +4,8 @@ import { useEffect, useSyncExternalStore } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import { parseOkJson } from './fetchJson'
 import { withCommunity } from './useCommunityData'
-import { todoCount, unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
+import { unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
+import { todoPlaceCount } from './todoPlaces'
 import { setupLeft, type SetupState } from './setup'
 import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
 import { notBeingRead, waitingNotQueued, type TodoNotRead, type TodoWaiting } from '@/components/admin/todoWaiting'
@@ -127,11 +128,11 @@ export function useTodo(token: string, community: string, email?: string, fresh 
   return s.key === key ? s : { key, data: null, error: null }
 }
 
-/** The one number in the nav: what To do holds, setup steps left
+/** The one number in the nav: the places To do lists, setup steps left
  *  included, or null until loaded. */
 export function useTodoCount(token: string, community: string): number | null {
   const { data } = useTodo(token, community)
-  return data ? todoCount(data) + setupLeft(data.setup) : null
+  return data ? todoPlaceCount(data) + setupLeft(data.setup) : null
 }
 
 /** For tests: forget what was loaded. */

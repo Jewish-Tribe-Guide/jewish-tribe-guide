@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
 import { companionKeys, type CategoryConfig } from '@/lib/categories'
 import { diffListing, diffLines } from '@/lib/submissionDiff'
@@ -51,6 +51,7 @@ export default function ChangeReview({
   token,
   onModerate,
   onUpdated,
+  inPlace,
 }: {
   submission: EnrichedSubmission
   category: CategoryConfig
@@ -63,6 +64,10 @@ export default function ChangeReview({
   /** Saved from "Edit, then update": it's approved and gone from the list,
    *  or with `partial`, that part went on and the rest still waits. */
   onUpdated: (id: string, partial?: boolean) => void
+  /** Opened as one of the things waiting at a place (To do, Nov 2): the
+   *  place's switches in place of the change's own, `part` the one open
+   *  (none: the change whole), and whether its Edit is open. */
+  inPlace?: { part?: string; switches: ReactNode; onEditing: (editing: boolean) => void }
 }) {
   const community = useCommunitySlug()
   const fields = category.detailFields
@@ -74,7 +79,13 @@ export default function ChangeReview({
   const savedPart = useRef(false)
   const [on, setOn] = useState<string | null>(null)
   // The switches stay till the change is decided, the answered ones ticked.
-  const part = order.length > 1 && parts.length > 0 ? (parts.find((p) => p.id === on && !done.includes(p.id)) ?? parts.find((p) => !done.includes(p.id)) ?? parts[0]) : undefined
+  const part = inPlace
+    ? parts.length > 1
+      ? parts.find((p) => p.id === inPlace.part)
+      : undefined
+    : order.length > 1 && parts.length > 0
+      ? (parts.find((p) => p.id === on && !done.includes(p.id)) ?? parts.find((p) => !done.includes(p.id)) ?? parts[0])
+      : undefined
   // The change as the open part alone would make it.
   const sent = part && s.current ? onListingNow(approvingPart(whole, s.current, part, fields), s.current, fields) : whole
   const things = [...order, ...parts.filter((p) => !order.some((o) => o.id === p.id))].map((p) => ({ ...p, done: done.includes(p.id) }))
@@ -95,6 +106,11 @@ export default function ChangeReview({
   const [reason, setReason] = useState('')
   // Edit, and each row open in it, is an entry: a swipe back closes it.
   useHistoryDepth('changeEdit', editing ? 1 + (step ? (step.depth ?? 1) : 0) : 0, step ? step.back : () => setEditing(false))
+  const onEditing = inPlace?.onEditing
+  useEffect(() => {
+    onEditing?.(editing)
+    return () => onEditing?.(false)
+  }, [editing, onEditing])
 
   const changed = diffListing(s.current, sent, fields).filter((r) => r.changed)
   const name = sent.name || s.current?.name || '(unknown listing)'
@@ -155,6 +171,8 @@ export default function ChangeReview({
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: step ? 'Back' : 'The change', onClick: step ? step.back : () => setEditing(false) }} title={title} />
+        {/* The edit is kept while another thing at the place is open. */}
+        {!step && inPlace?.switches}
         <ListingEditor
           item={normalizeRow(s.current)}
           category={category}
@@ -210,7 +228,7 @@ export default function ChangeReview({
       <p className="m-0 -mt-2 text-[14px] text-slate-600 md:-mt-4">
         {[s.categoryLabel, what && `a change to ${what}`].filter(Boolean).join(' · ')}
       </p>
-      {part && <ThingSwitches things={things} on={part.id} onPick={setOn} />}
+      {inPlace ? inPlace.switches : part && <ThingSwitches things={things} on={part.id} onPick={setOn} />}
 
       {changed.map((row) => {
         // Its own key, not the field it's edited with: a schedule isn't the usual times.

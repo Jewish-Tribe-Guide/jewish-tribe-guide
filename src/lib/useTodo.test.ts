@@ -15,7 +15,7 @@ function answer(setup: unknown) {
           ? { ok: false, errors: ['down'] }
           : { ok: true, setup }
         : url.includes('/api/admin/submissions')
-          ? { ok: true, submissions: [{ id: 's1' }] }
+          ? { ok: true, submissions: [{ id: 's1', operation: 'create', target_type: 'listing', target_id: null, created_at: '2026-11-01T12:00:00Z', payload: { name: 'Shalom Pizzeria' } }] }
           : { ok: true, responses: [], searches: [], readings: [], addable: [] }
       return new Response(JSON.stringify(body), { status: setup === null && url.includes('/setup') ? 502 : 200 })
     }),

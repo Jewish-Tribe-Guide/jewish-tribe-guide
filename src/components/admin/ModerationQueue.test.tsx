@@ -98,7 +98,7 @@ describe('ModerationQueue — loading and empty states', () => {
   it('shows a clear-queue message once loaded with nothing pending', async () => {
     renderQueue([])
     expect(screen.getByText('Loading submissions…')).toBeInTheDocument()
-    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
   })
 
   it('shows an unauthorized message on a 401, without treating it as an empty queue silently', async () => {
@@ -111,52 +111,44 @@ describe('ModerationQueue — loading and empty states', () => {
 
 const grocerRow = { id: 'l1', community_id: 'philly', category: 'grocery', name: 'Acme Grocery', anchor_id: 'community', distance: null, address: 'Old Address', phone: null, details: {}, status: 'approved', submitted_by: null, created_at: '', reviewed_at: null }
 
-// Board 1: one list, grouped by what you decide, each row a name and one
-// line under it.
+// The "one tap per place" boards (Nov 2): a row per place, its name, the
+// oldest thing's date, and what's waiting in a grey line.
 describe('ModerationQueue — the list', () => {
-  it('puts a new place under New places, with where it came from and its category', async () => {
+  it('says a new place is one', async () => {
     renderQueue([submission()])
-    const box = await screen.findByRole('region', { name: 'New places' })
-    expect(within(box).getByRole('button', { name: 'Open Acme Grocery' })).toHaveTextContent(/a visitor · \w{3} \d+Grocery Stores/)
-    expect(screen.getByText('1 to decide')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Changes' })).toBeNull()
+    expect(await findRow('Acme Grocery')).toHaveTextContent(/^Acme Grocery\w{3} \d+New place$/)
   })
 
-  it('puts edits, removals and new categories under Changes, each saying what it is to', async () => {
+  it('says what each change is to, in a row of its own place', async () => {
     renderQueue([
-      submission({ id: 'edit', operation: 'update', payload: { name: 'Acme Grocery', address: 'New Address', details: {} }, current: grocerRow as never }),
-      submission({ id: 'del', operation: 'delete', note: 'Permanently closed', payload: {}, current: { ...grocerRow, name: 'Old Shop' } as never }),
+      submission({ id: 'edit', operation: 'update', target_id: 'l1', payload: { name: 'Acme Grocery', address: 'New Address', details: {} }, current: grocerRow as never }),
+      submission({ id: 'del', operation: 'delete', target_id: 'l2', note: 'Permanently closed', payload: {}, current: { ...grocerRow, id: 'l2', name: 'Old Shop' } as never }),
       submission({ id: 'cat', target_type: 'category', payload: { label: 'Kosher Bakeries', firstListing: { name: 'Sweet Treats', address: '2 Oak St', phone: '' } }, categoryLabel: undefined }),
     ])
-    const box = await screen.findByRole('region', { name: 'Changes' })
-    expect(within(box).getByRole('button', { name: 'Open Acme Grocery' })).toHaveTextContent(/^Acme GroceryAddress · a visitor/)
-    expect(within(box).getByRole('button', { name: 'Open Old Shop' })).toHaveTextContent(/Remove it · a visitor/)
-    expect(within(box).getByRole('button', { name: 'Open Kosher Bakeries' })).toHaveTextContent(/New category · a visitor/)
-    expect(screen.getByText('3 to decide')).toBeInTheDocument()
+    expect(await findRow('Acme Grocery')).toHaveTextContent(/Address$/)
+    expect(row('Old Shop')).toHaveTextContent(/Closed, says a visitor$/)
+    expect(row('Kosher Bakeries')).toHaveTextContent(/New category$/)
+    expect(screen.queryByRole('region', { name: /New places|Changes/ })).toBeNull()
+  })
+
+  it('puts two suggestions for one place in its one row', async () => {
+    renderQueue([
+      submission({ id: 'a', operation: 'update', target_id: 'l1', payload: { name: 'Acme Grocery', address: 'New Address', details: {} }, current: grocerRow as never }),
+      submission({ id: 'b', operation: 'delete', target_id: 'l1', payload: {}, current: grocerRow as never }),
+    ])
+    expect(await findRow('Acme Grocery')).toHaveTextContent(/Address · Closed, says a visitor$/)
+    expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(1)
   })
 
   // Nobody is expected to go through every search (the user, Oct 31): they
   // aren't on To do at all, and To do doesn't even read them.
   it('has no searches, and doesn’t load them', async () => {
     renderQueue([submission()])
-    await screen.findByText('1 to decide')
+    await findRow('Acme Grocery')
     expect(screen.queryByText(/Searches nobody found/)).toBeNull()
     const urls = vi.mocked(fetch).mock.calls.map(([u]) => String(u))
     expect(urls.some((u) => u.includes('/api/admin/submissions'))).toBe(true)
     expect(urls.some((u) => u.includes('/api/admin/missed-searches') || u.includes('/api/admin/read-questions'))).toBe(false)
-  })
-
-  it('shows four of a group and the rest behind "N more"', async () => {
-    const user = userEvent.setup()
-    renderQueue(Array.from({ length: 7 }, (_, i) => submission({ id: `s${i}`, payload: { category: 'grocery', name: `Shop ${i}`, address: '1 Main St', details: {} } })))
-    await findRow('Shop 0')
-    expect(queryRow('Shop 4')).toBeNull()
-    await user.click(screen.getByRole('button', { name: '3 more' }))
-    expect(row('Shop 6')).toBeInTheDocument()
-    // …and folds back.
-    await user.click(screen.getByRole('button', { name: 'Show fewer' }))
-    expect(queryRow('Shop 4')).toBeNull()
-    expect(screen.getByRole('button', { name: '3 more' })).toBeInTheDocument()
   })
 
   it('opens a removal to its card, with the note, decided there', async () => {
@@ -168,15 +160,16 @@ describe('ModerationQueue — the list', () => {
     expect(screen.queryByTestId('submission-review')).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Approve' }))
     await waitFor(() => expect(patches()).toEqual([{ status: 'approved' }]))
-    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
   })
 
   it('opens a new category to its card, with its first place', async () => {
     const user = userEvent.setup()
     renderQueue([submission({ target_type: 'category', payload: { label: 'Kosher Bakeries', description: 'Near the hospital', firstListing: { name: 'Sweet Treats', address: '2 Oak St', phone: '555-0000' } }, categoryLabel: undefined })])
     await user.click(await findRow('Kosher Bakeries'))
-    expect(screen.getByText('New category')).toBeInTheDocument()
-    expect(screen.getByText('Sweet Treats')).toBeInTheDocument()
+    const opened = screen.getByTestId('todo-place')
+    expect(within(opened).getByText('New category')).toBeInTheDocument()
+    expect(within(opened).getByText('Sweet Treats')).toBeInTheDocument()
   })
 })
 
@@ -218,7 +211,7 @@ describe('ModerationQueue — deciding', () => {
       expect.objectContaining({ method: 'PATCH', headers: expect.objectContaining({ Authorization: 'Bearer tok' }) }),
       'Failed to update.',
     )
-    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
     expect(queryRow('Acme Grocery')).toBeNull()
   })
 
@@ -255,7 +248,8 @@ describe('ModerationQueue — deciding', () => {
     expect(window.location.search).toBe('?open=sub-2')
     expect(screen.queryByRole('button', { name: 'Next ›' })).toBeNull()
     await user.click(screen.getByRole('button', { name: '‹ To do' }))
-    expect(await findRow('Giant')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
+    expect(row('Giant')).toBeInTheDocument()
   })
 })
 
@@ -349,7 +343,7 @@ describe('ModerationQueue — an opened card', () => {
     await user.click(await findRow('Mekor Habracha'))
 
     expect(screen.getByRole('heading', { level: 1, name: 'Mekor Habracha' })).toBeInTheDocument()
-    expect(window.location.search).toBe('?open=sub-ai')
+    expect(window.location.search).toBe('?open=shul-1')
     const original = screen.getByRole('region', { name: 'The original' })
     expect(original.querySelector('[data-mark="used"]')?.textContent).toBe('6:20pm')
     expect(original.querySelector('[data-mark="unused"]')?.textContent).toBe('6:23pm')
@@ -364,7 +358,8 @@ describe('ModerationQueue — an opened card', () => {
     expect(screen.queryByRole('region', { name: 'Rabbi' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '‹ To do' }))
-    expect(await findRow('Mekor Habracha')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
+    expect(row('Mekor Habracha')).toBeInTheDocument()
     expect(window.location.search).toBe('')
   })
 
@@ -380,20 +375,24 @@ describe('ModerationQueue — an opened card', () => {
       renderShulQueue([aiEdit])
       await user.click(await findRow('Mekor Habracha'))
       expect(screen.getByTestId('change-review')).toBeInTheDocument()
-      await waitFor(() => expect(window.location.search).toBe('?open=sub-ai'))
+      await waitFor(() => expect(window.location.search).toBe('?open=shul-1'))
       expect(screen.getByTestId('change-review')).toBeInTheDocument()
     } finally {
       spy.mockRestore()
     }
   })
 
+  // A link from before places named the suggestion: it opens its place.
   it('opens the card a shared link names, and Back from it returns to the list', async () => {
     window.history.replaceState(null, '', '/?open=sub-ai')
     renderShulQueue([aiEdit])
     expect(await screen.findByTestId('change-review')).toBeInTheDocument()
-    window.history.replaceState(null, '', '/')
-    window.dispatchEvent(new PopStateEvent('popstate'))
-    expect(await findRow('Mekor Habracha')).toBeInTheDocument()
+    await waitFor(() => expect(window.location.search).toBe('?open=shul-1'))
+    act(() => {
+      window.history.replaceState(null, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
   })
 
   it('“Update the listing” takes the change as it came, and the list no longer has it', async () => {
@@ -602,7 +601,7 @@ describe('ModerationQueue — Set up your guide', () => {
     ])
     expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/community', '/team', '/categories/cat:new', '/home'])
     expect(screen.getByText('Nothing else to do.')).toBeInTheDocument()
-    expect(screen.queryByText('Nothing to do.')).toBeNull()
+    expect(screen.queryByText('Nothing to do')).toBeNull()
   })
 
   it('a category with no places yet sends you to add them', async () => {
@@ -612,26 +611,149 @@ describe('ModerationQueue — Set up your guide', () => {
     expect(row.getAttribute('href')).toMatch(/\/admin\/places$/)
   })
 
-  // The Searches page opens from Reports.
-  it('leads on to Feedback only, not Watches or every search', async () => {
+  // The Searches page opens from Reports, Feedback from the nav.
+  it('leads nowhere else: not Watches, every search or Feedback', async () => {
     renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true })
-    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
-    const links = screen.getAllByRole('link').map((l) => l.getAttribute('href')!.replace(/^.*\/admin/, ''))
-    expect(links).toEqual(['/responses'])
+    expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
+    expect(screen.getByText('Every place was read this morning')).toBeInTheDocument()
+    expect(screen.queryAllByRole('link')).toEqual([])
   })
 
   it('is gone once all four are done', async () => {
     renderWithSetup({ logo: true, admins: 3, categories: 4, places: 20, heroWords: true })
-    expect(await screen.findByText('Nothing to do.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Set up your guide' })).toBeNull()
   })
 
   it('sits above what there is to decide', async () => {
     renderWithSetup(SETUP, [submission()])
-    await screen.findByRole('region', { name: 'New places' })
-    const regions = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
-    expect(regions.slice(0, 2)).toEqual(['Set up your guide', 'New places'])
-    expect(screen.getByText('1 to decide')).toBeInTheDocument()
+    const place = await findRow('Acme Grocery')
+    const setup = screen.getByRole('region', { name: 'Set up your guide' })
+    expect(setup.compareDocumentPosition(place) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
+// The "one tap per place" boards (Nov 2): a place opens on its first thing,
+// switches at the top for the rest; answered ones tick; a place with
+// nothing left gives way to the list (phone) or the next place (computer).
+describe('ModerationQueue — a place opened', () => {
+  const shul = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', type: 'minyanim', label: 'Davening times' }] })
+  const current = { id: 'shul-1', category: 'synagogue', name: 'Mekor Habracha', address: '1500 Walnut St', phone: '', details: { minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['fri'], time: '6:23 PM' }] } }
+  const edit = submission({
+    id: 'sub-ai',
+    operation: 'update',
+    target_id: 'shul-1',
+    categoryLabel: 'Synagogues',
+    current: current as never,
+    payload: { category: 'synagogue', name: 'Mekor Habracha', address: '1500 Walnut St', phone: '', details: { minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['fri'], time: '6:20 PM' }] } },
+  })
+  const notOnGoogle = { id: 'shul-1', name: 'Mekor Habracha', category: 'synagogue', matched: false, notOnGoogle: null }
+
+  function renderRouted({ submissions = [], responses = [], google = [] }: { submissions?: EnrichedSubmission[]; responses?: unknown[]; google?: unknown[] }) {
+    vi.mocked(fetch).mockImplementation(async (url) => ({ ...fakeResponse(200), url: String(url) }) as Response)
+    vi.mocked(parseOkJson).mockImplementation(async (res) => {
+      const url = String((res as Response).url)
+      if (url.includes('/api/admin/responses')) return { responses }
+      if (url.includes('/api/admin/watches/google')) return { places: google }
+      if (url.includes('/api/admin/setup')) return { setup: null }
+      return { submissions }
+    })
+    return renderWithProviders(<ModerationQueue session={session()} />, { content: { categories: [shul, makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } })
+  }
+  const tabs = () => screen.getAllByRole('tab').map((t) => t.textContent)
+  let wide = false
+  beforeEach(() => {
+    wide = false
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: wide && q.includes('min-width'), media: q, addEventListener() {}, removeEventListener() {} }))
+  })
+
+  it('opens on the change, the rest behind switches, and answering it opens the next', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+    renderRouted({ submissions: [edit], google: [notOnGoogle] })
+    expect(await findRow('Mekor Habracha')).toHaveTextContent(/Usual Shabbos times · Google not found$/)
+    await user.click(row('Mekor Habracha'))
+    expect(tabs()).toEqual(['Usual Shabbos times', 'Google not found'])
+    expect(screen.getByRole('tab', { name: 'Usual Shabbos times' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(within(screen.getByRole('group', { name: 'Decide' })).getByRole('button', { name: 'Update the listing' }))
+    // Ticked, and what's left opens: a check that's fixed on the place's own screen.
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Google not found' })).toHaveAttribute('aria-selected', 'true'))
+    expect(tabs()).toEqual(['Usual Shabbos times (done)', 'Google not found'])
+    expect(screen.getByRole('link', { name: 'Open Mekor Habracha' }).getAttribute('href')).toMatch(/\/admin\/watches\/place\/shul-1\?from=todo$/)
+  })
+
+  it('opens on what the filter picked', async () => {
+    const user = userEvent.setup()
+    renderRouted({ submissions: [edit], google: [notOnGoogle] })
+    await findRow('Mekor Habracha')
+    await user.click(screen.getByRole('button', { name: /^Show/ }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))
+    await user.click(row('Mekor Habracha'))
+    expect(screen.getByRole('tab', { name: 'Google not found' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByTestId('change-review')).toBeNull()
+  })
+
+  it('a place that’s done goes back to the list on a phone', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+    renderRouted({ submissions: [submission(), submission({ id: 'sub-2', payload: { category: 'grocery', name: 'Giant', address: '2 Main St', details: {} } })] })
+    await user.click(await findRow('Acme Grocery'))
+    await user.click(screen.getByRole('button', { name: 'Approve' }))
+    await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
+    expect(row('Giant')).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+  })
+
+  it('a place that’s done gives way to the next on a computer, and up and down step through them', async () => {
+    const user = userEvent.setup()
+    wide = true
+    vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+    const three = ['Acme Grocery', 'Giant', 'Zayde’s'].map((name, i) => submission({ id: `s${i}`, payload: { category: 'grocery', name, address: '2 Main St', details: {} } }))
+    renderRouted({ submissions: three })
+    await user.click(await findRow('Acme Grocery'))
+    expect(screen.getByText('1 of 3')).toBeInTheDocument()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByText('2 of 3')).toBeInTheDocument()
+    await user.keyboard('{ArrowUp}')
+    expect(screen.getByText('1 of 3')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Approve' }))
+    await waitFor(() => expect(window.location.search).toBe('?open=s1'))
+    expect(screen.getByText('1 of 2')).toBeInTheDocument()
+    expect(within(screen.getByTestId('todo-place')).getByRole('heading', { level: 1, name: 'Giant' })).toBeInTheDocument()
+  })
+
+  it('feedback is Done, or a reply first when they left an email', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+    renderRouted({ responses: [{ id: 'f', title: 'Feedback', line: 'Hours wrong', text: ['Hours wrong', 'at Primo'], email: 'sam@example.com', createdAt: '2026-11-01T12:00:00Z' }] })
+    await user.click(await findRow('Feedback'))
+    const opened = screen.getByTestId('todo-place')
+    expect(within(opened).getByText('at Primo')).toBeInTheDocument()
+    expect(within(opened).getByRole('link', { name: 'Reply' }).getAttribute('href')).toMatch(/^mailto:sam@example\.com\?subject=/)
+    await user.click(within(opened).getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(patches()).toEqual([{ status: 'handled' }]))
+    expect(vi.mocked(fetchJson).mock.calls.find(([, init]) => init?.method === 'PATCH')![0]).toBe('/api/admin/responses/f?community=test-community')
+    expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
+  })
+
+  it('an edit is kept while another thing is open, and leaving with it open asks first', async () => {
+    const user = userEvent.setup()
+    const confirm = vi.fn(() => false)
+    vi.stubGlobal('confirm', confirm)
+    renderRouted({ submissions: [edit], google: [notOnGoogle] })
+    await user.click(await findRow('Mekor Habracha'))
+    await user.click(screen.getByRole('button', { name: 'Edit, then update' }))
+    await user.click(screen.getByRole('tab', { name: 'Google not found' }))
+    expect(screen.queryByRole('button', { name: 'Update the listing' })).toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'Usual Shabbos times' }))
+    expect(screen.getByRole('button', { name: 'Update the listing' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Google not found' }))
+    await user.click(screen.getByRole('button', { name: '‹ To do' }))
+    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('todo-place')).toBeInTheDocument()
+    confirm.mockReturnValue(true)
+    await user.click(screen.getByRole('button', { name: '‹ To do' }))
+    await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
   })
 })
 
@@ -641,11 +763,12 @@ describe('ModerationQueue — To do tapped in the nav', () => {
     const user = userEvent.setup()
     renderQueue([submission()])
     await user.click(await findRow('Acme Grocery'))
-    expect(queryRow('Acme Grocery')).not.toBeInTheDocument()
+    expect(screen.getByTestId('todo-place')).toBeInTheDocument()
     act(() => {
       window.history.pushState(null, '', window.location.pathname)
       window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
     })
+    expect(screen.queryByTestId('todo-place')).toBeNull()
     expect(row('Acme Grocery')).toBeInTheDocument()
   })
 })

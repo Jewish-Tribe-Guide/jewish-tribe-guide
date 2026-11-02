@@ -9,7 +9,7 @@ import { submissionSource } from './submissionSource'
 // To do, the console's front page (the admin redesign's step 2, boards 1
 // and 2): everything waiting on a decision in one list. New places and
 // changes from the queue, and new feedback. The page and the nav's count
-// both count with todoCount, so the two can't disagree.
+// both count places with todoPlaces, so the two can't disagree.
 
 /** A word the AI suggests teaching the search, from its reading. */
 export type TodoWord = { word: string; categoryId: string; field?: string; value?: string; label: string }
@@ -18,8 +18,8 @@ export type TodoWord = { word: string; categoryId: string; field?: string; value
 export type TodoSearch = ClassifiedMiss & { words: TodoWord[]; readingKey?: string }
 
 /** A response nobody has handled yet: the form it came in on, its first
- *  words, and when. */
-export type TodoResponse = { id: string; title: string; line: string; createdAt: string }
+ *  words, and when; all it says, and who to reply to. */
+export type TodoResponse = { id: string; title: string; line: string; createdAt: string; text?: string[]; email?: string }
 
 /** A new listing, as opposed to a change to one, a removal, an eruv fix
  *  or a new category. */
@@ -74,12 +74,6 @@ export function repeatedSearches(searches: ClassifiedMiss[], readings: TodoReadi
 export function teachable(term: string): boolean {
   const key = askWordKey(term)
   return key.length > 0 && key.length <= 60 && key.split(' ').length <= 3
-}
-
-/** What's waiting on a decision. Not searches nobody found: those are in
- *  Reports. */
-export function todoCount(t: { submissions: unknown[]; responses: unknown[]; unmatched?: unknown[]; waiting?: unknown[]; notRead?: unknown[] }): number {
-  return t.submissions.length + t.responses.length + (t.unmatched?.length ?? 0) + (t.waiting?.length ?? 0) + (t.notRead?.length ?? 0)
 }
 
 /** A place Google has no match for and nobody has said why: pick the right
@@ -139,10 +133,15 @@ export function submissionLine(s: EnrichedSubmission, category: CategoryConfig |
 }
 
 /** A response as To do lists it: its form's title ("Feedback" for
- *  Feedback), the first thing written in it, cut short, and when. */
+ *  Feedback), the first thing written in it, cut short, and when; opened,
+ *  all it says, and the email to reply to if they left one. */
 export function responseSummary(r: InboxResponse, formTitles: Map<string, string>): TodoResponse {
   const title = (r.formId && formTitles.get(r.formId)) || r.requestType
-  const first = Object.values(r.data).find((v): v is string => typeof v === 'string' && v.trim() !== '')?.trim() ?? ''
+  const text = Object.values(r.data)
+    .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+    .map((v) => v.trim())
+  const first = text[0] ?? ''
   const line = first.length > 80 ? `${first.slice(0, 79).trimEnd()}…` : first
-  return { id: r.id, title, line, createdAt: r.createdAt }
+  const email = r.contact?.email?.trim()
+  return { id: r.id, title, line, createdAt: r.createdAt, text, ...(email ? { email } : {}) }
 }

@@ -127,12 +127,17 @@ async function rowInScope(id: string, scope: ResponseScope): Promise<boolean> {
 // two cases can't be told apart from the response.
 export async function updateFormResponse(
   id: string,
-  patch: { contact?: ContactHospitalData; data?: Record<string, unknown> },
+  patch: { contact?: ContactHospitalData; data?: Record<string, unknown>; status?: 'handled' },
   scope: ResponseScope,
 ): Promise<InboxResponse | null> {
   const row: Record<string, unknown> = {}
   if (patch.contact !== undefined) row.contact = patch.contact
   if (patch.data !== undefined) row.data = patch.data
+  // Done in To do: off its list, kept in Responses.
+  if (patch.status === 'handled') {
+    row.status = 'handled'
+    row.handled_at = new Date().toISOString()
+  }
   if (Object.keys(row).length === 0) return null
 
   if (!(await rowInScope(id, scope))) return null
