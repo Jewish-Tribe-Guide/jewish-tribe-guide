@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 1, 2026.
+Last updated: Nov 2, 2026.
 
 ## The branch
 
@@ -2261,6 +2261,21 @@ it's the same code at the wider width, and I only tried it on a phone.
 **Fixed Nov 1: creating a community could sit on its form.** The community was
 made, then the page stayed on the form with no message. It's what failed
 `test:admin-write` on `main` in CI. Creating now lands with a plain page load.
+
+**Moved Nov 2: Synagogues' Minyanim row is above the search**, the user's call: it
+matches Watches and the phone home, and it's what's different about the page. It
+stays while typing and answers for every shul, so the box holds still (244 before and
+after "chabad" and a word that finds nothing, at phone width). A prayer name
+("shacharis", "mincha") still opens the Minyanim view, which has no row, so there the
+box moves up about 100px with the rest of the page. Left as it is. While typing, the
+row takes about a row's height above the results on a phone.
+
+**To do's look is next, not built.** Canvas "To do screens"
+(https://claude.ai/artifact/EmkcJDi4XaA9rPgXTMFhsH) shows what each kind of item looks
+like today, from dev's 66 items: no proposal on it yet. Next is one layout, drawn and
+tried on the worst examples before any code. None waiting on dev, so not on the
+canvas: visitor edits and new places, removals, eruv fixes, new categories, searches
+and questions, Refuah and kosher findings.
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten

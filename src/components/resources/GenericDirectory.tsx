@@ -1250,11 +1250,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (see listingRowNote).
   const flagUnconfirmed = !!now && items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
 
-  // Synagogues' Next minyan card, until something is typed, while some shul
-  // the list holds keeps times. Wherever it isn't, All davening times is
-  // back in the list heading, so it's never gone.
+  // Synagogues' Next minyan card, while some shul the list holds keeps times.
+  // It's above the search (Nov 2) and stays while typing, so the box never
+  // jumps up under a finger; it answers for every shul, not what's typed.
+  // Wherever it isn't, All davening times is back in the list heading, so
+  // it's never gone.
+  const minyanCardItems = typed ? items : filtered
   const showMinyanCard =
-    hasMinyanim && !typed && !minyanimViewOn && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+    hasMinyanim && !minyanimViewOn && minyanCardItems.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
   // The Minyanim view in place of the list, typing included: its search
   // narrows the minyanim (the user's note 4, agreed Oct 2). It used to drop
   // back to the list of shuls.
@@ -1816,13 +1819,18 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             : 'lg:translate-y-0'
         }`}
       >
-        {/* The page's one search box, limited to this category, with
-            example searches under it and, once something is typed, the
-            sentence answering it (see CategoryAsk). */}
-        {/* Under them, Synagogues' "Minyanim by time" row. Gone once
-            anything is typed: then the search's own answer says what's next
-            (see NextMinyanCard). */}
+        {/* Synagogues' "Minyanim by time" row, then the page's one search box,
+            limited to this category, with example searches under it and,
+            once something is typed, the sentence answering it (see
+            CategoryAsk). */}
         <div className={showMinyanCard ? 'space-y-3' : undefined}>
+          {/* "Minyanim by time", with the next minyan under it: the way in
+              to every minyan, on every screen size (Oct 6). */}
+          {showMinyanCard && (
+            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
+              <NextMinyanCard items={minyanCardItems} onDaveningTimes={showMinyanimView} />
+            </div>
+          )}
           {showSearch && (
             <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
               <CategoryAsk
@@ -1838,13 +1846,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 foundNothing={!minyanimView && searchFoundNothing}
                 save={searchSave}
               />
-            </div>
-          )}
-          {/* "Minyanim by time", with the next minyan under it: the way in
-              to every minyan, on every screen size (Oct 6). */}
-          {showMinyanCard && (
-            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
-              <NextMinyanCard items={filtered} onDaveningTimes={showMinyanimView} />
             </div>
           )}
         </div>
