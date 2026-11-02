@@ -8,6 +8,7 @@ import type { AdminEruv } from '@/lib/eruvStore'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 import { withCommunity } from '@/lib/useCommunityData'
 import type { CategoryConfig } from '@/lib/categories'
 import { sourceKind, sourceProblem, type WatchPurpose } from '@/lib/watchPurposes'
@@ -75,6 +76,8 @@ export default function EruvListing({
   const title = screen?.title ?? place.name
   const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onClose
   useSetScreenHeader(true, title, back)
+  // An open row, and a screen over it, are entries: a swipe back closes them.
+  useHistoryDepth('eruvStep', (openRow ? 1 : 0) + (screen ? 1 : 0), back)
 
   if (!eruv.active) {
     return (
@@ -291,6 +294,7 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
   const title = screen?.title ?? 'Add a place'
   const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onBack
   useSetScreenHeader(true, title, back)
+  useHistoryDepth('eruvAddStep', (openRow ? 1 : 0) + (screen ? 1 : 0), back)
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(body: Record<string, unknown>) => fetchJson<T>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not add it.')

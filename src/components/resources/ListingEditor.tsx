@@ -56,7 +56,9 @@ import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCa
 /** A step inside the editor, for the host's header: a row open on its own
  *  screen (or a minyan, a person in one) has a title; a row open where it
  *  is has none, the header keeps its own, and Back closes the row. */
-export type EditorStep = { title?: string; back: () => void }
+/** `depth`: how many screens in it is (a row 1, a minyan inside it 2), for
+ *  a host that gives each its own entry in the history. */
+export type EditorStep = { title?: string; back: () => void; depth?: number }
 
 /** An editor whose host draws its way back (the desktop map's sidebar, in
  *  its search box): one step back, what that step is called, and whether
@@ -326,9 +328,10 @@ export default function ListingEditor({
   })
   const stepTitle = step?.title ?? null
   const stepKey = step === null ? null : (stepTitle ?? `in-place:${openId}`)
+  const stepDepth = step === null ? 0 : child ? 1 + (child.depth ?? 1) : 1
   useEffect(() => {
-    onStep?.(stepKey === null ? null : { title: stepTitle ?? undefined, back: () => stepBack.current() })
-  }, [stepKey, stepTitle, onStep])
+    onStep?.(stepKey === null ? null : { title: stepTitle ?? undefined, back: () => stepBack.current(), depth: stepDepth })
+  }, [stepKey, stepTitle, stepDepth, onStep])
   // The open card into view, the rows around it where they were.
   const openCard = useRef<HTMLDivElement>(null)
   useEffect(() => {

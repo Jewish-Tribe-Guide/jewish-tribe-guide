@@ -9,6 +9,7 @@ import { ADMIN_AREA_TAPPED, adminBase } from '@/lib/adminNav'
 import { watchesLine } from '@/lib/todo'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { screensOpenIn } from '@/lib/useHistoryDepth'
 import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import AddPlace from './AddPlace'
@@ -173,7 +174,8 @@ export default function PlacesList({ token }: { token: string }) {
 
   function close() {
     const state = window.history.state as { placeOpen?: string; placeAdding?: string } | null
-    if (state?.placeOpen || state?.placeAdding) history.back()
+    // Over any screens the place still has open (a save from an open row).
+    if (state?.placeOpen || state?.placeAdding) history.go(-1 - screensOpenIn(state))
     setOpenId(null)
     setAdding(null)
     window.scrollTo?.(0, 0)

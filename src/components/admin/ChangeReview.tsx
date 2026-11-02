@@ -11,6 +11,7 @@ import { isMinyanim, type Minyan } from '@/lib/davening'
 import { readSchedules, schedulesKey } from '@/lib/schedules'
 import { weekDiffers } from '@/lib/thisWeekEdit'
 import { useEditWeek } from '@/lib/useEditWeek'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { normalizeRow } from '@/lib/resourceShape'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -61,6 +62,8 @@ export default function ChangeReview({
   const [step, setStep] = useState<EditorStep | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [reason, setReason] = useState('')
+  // Edit, and each row open in it, is an entry: a swipe back closes it.
+  useHistoryDepth('changeEdit', editing ? 1 + (step ? (step.depth ?? 1) : 0) : 0, step ? step.back : () => setEditing(false))
 
   const changed = diffListing(s.current, sent, fields).filter((r) => r.changed)
   const name = sent.name || s.current?.name || '(unknown listing)'

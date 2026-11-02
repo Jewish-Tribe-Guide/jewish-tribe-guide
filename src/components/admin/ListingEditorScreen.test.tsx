@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeListing } from '@/test/providerFixtures'
 import { FOOD } from '@/test/editorFixtures'
@@ -43,5 +43,29 @@ describe('ListingEditorScreen', () => {
 
     await u.click(screen.getByRole('button', { name: '‹ Back' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('an open row is an entry in the history, so a swipe back closes it and not the page', async () => {
+    // The user, Nov 2: "I use the trackpad to go back and it goes back two
+    // screens". A swipe is the browser's Back: the entry before, then popstate.
+    const u = userEvent.setup()
+    const onClose = vi.fn()
+    window.history.replaceState({ placeOpen: 'sweet-box' }, '')
+    const item = makeListing({ id: 'sweet-box', category: 'restaurant', name: 'Sweet Box Bakery' })
+    renderWithProviders(<ListingEditorScreen heading="Edit listing" item={item} category={FOOD} onClose={onClose} />)
+
+    await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Main dishes' }))
+    expect(screen.getByRole('heading', { name: 'Main dishes' })).toBeInTheDocument()
+    // Its own entry, on top of the place's (not a count of entries: the
+    // first test's Backs move jsdom's history after the fact).
+    expect(window.history.state).toEqual({ placeOpen: 'sweet-box', editorStep: 1 })
+
+    act(() => {
+      window.history.replaceState({ placeOpen: 'sweet-box' }, '')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { placeOpen: 'sweet-box' } }))
+    })
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
   })
 })

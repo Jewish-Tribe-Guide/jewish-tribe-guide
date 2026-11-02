@@ -12,6 +12,7 @@ import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { shortDay } from '@/lib/todo'
 import { withCommunity } from '@/lib/useCommunityData'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 import { TrashIcon } from '@/components/icons'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import type { DirectoryResource } from '@/types'
@@ -258,6 +259,8 @@ export default function PlaceListing({
   const [editorRound, setEditorRound] = useState(0)
   // What it found opens from wherever the row was, and starts at its top.
   const foundOpen = !!change || menuChange
+  // A change or a menu opened over the listing is an entry: a swipe back closes it.
+  useHistoryDepth('placeFound', foundOpen ? 1 : 0, () => (change ? setChange(null) : setMenuChange(false)))
   useEffect(() => {
     if (foundOpen) window.scrollTo?.(0, 0)
   }, [foundOpen])

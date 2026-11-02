@@ -2285,6 +2285,18 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 2: a trackpad swipe back goes back one screen (on `redesign/oct18-fixes`)
+
+Found by the user: "we go into new screens and then I use the trackpad to go
+back and it goes back two screens". The screens opened inside a page (an
+editor's open row, a minyan inside it, a change's Edit, an eruv's row, a
+place's "found on their website") were state only, so the browser's Back
+skipped them and left the page. Each is now an entry in the history
+(`useHistoryDepth.ts`): a swipe closes it, the screen's own Back takes the
+entry off with it, and leaving Places by its Back steps over any left open.
+Checked on dev: Places → a place → Main dishes, two swipes back to Places;
+To do → a change → Edit, two swipes back to To do.
+
 ## Done Nov 2: approving a second edit no longer undoes the first (on `redesign/oct18-fixes`)
 
 Found by the user. An edit carries the whole listing as its sender saw it,
