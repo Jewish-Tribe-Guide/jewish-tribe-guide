@@ -2237,6 +2237,15 @@ a web app and pastes its link. Saving the link writes `web_app_url` on Philly's
 `newsletter_setup` row and nothing else. Until then Read now for email stays off and
 says "The guide's Gmail isn't set up".
 
+**Drawn Nov 1, not built (the *15 boards, four new rows at the foot of the Watches
+canvas):** no Menu link box on Add, because Change on the source line already gives
+the menu page (saved listings hide the box already; a visitor's Edit listing keeps
+it, having no source line). Watches as a link beside Add a place, nothing at the
+foot of Places, its count line on the Watches page. The main site's bottom bar in
+the admin bar's grey, weight and solid white. Read now on a saved place: only what
+differs, Use it fills the row, Update the listing saves; an agreeing read just
+dates it; none on Google's rows. Waiting on the user's reaction.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
