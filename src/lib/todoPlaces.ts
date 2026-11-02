@@ -49,7 +49,7 @@ function submissionThings(s: EnrichedSubmission, category: CategoryConfig | unde
     return one(s.submitted_by?.name === GOOGLE_SUBMITTER_NAME ? 'Closed, says Google' : 'Closed, says a visitor', 'changes')
   }
   if (s.target_type === 'listing' && s.operation === 'update' && s.current && category) {
-    const parts = reviewParts(s.current, s.payload as unknown as ResourceSubmission, category.detailFields)
+    const parts = reviewParts(s.current, s.payload as unknown as ResourceSubmission, category)
     if (parts.length > 1) return parts.map((p) => ({ kind: 'submission', id: `${s.id}:${p.id}`, label: p.label, filter: 'changes', submission: s, part: p.id }))
     if (parts.length === 1) return one(parts[0].label, 'changes')
   }
@@ -142,5 +142,6 @@ export function firstThing(p: TodoPlace, filters: TodoFilter[]): TodoThing {
 
 /** The row's grey line: what's waiting, in order. */
 export function placeLine(p: TodoPlace): string {
-  return p.things.map((t) => t.label).join(' · ')
+  // "Google stopped answering Oct 17": the row's corner says when.
+  return p.things.map((t) => (t.kind === 'broken' ? t.label.replace(/ [A-Z][a-z]{2} \d{1,2}$/, '') : t.label)).join(' · ')
 }

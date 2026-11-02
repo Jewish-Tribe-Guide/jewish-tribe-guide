@@ -7,7 +7,7 @@ import { ADMIN_AREA_TAPPED, adminAreas, adminBase, adminNavPosition, type AdminA
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSiteSettings } from '@/lib/contentContext'
 import { useTodoCount } from '@/lib/useTodo'
-import { AdminHead, AdminOwnHead } from './AdminUI'
+import { AdminFullPane, AdminHead, AdminOwnHead } from './AdminUI'
 
 // The console's frame (the admin redesign's step 1, boards 1, 2, 5, 10 and
 // 11): on a computer a sidebar with the four areas, then Settings and View
@@ -99,6 +99,9 @@ export default function AdminFrame({
   // A screen with its own heading and way back (AdminBack).
   const [ownHeads, setOwnHeads] = useState(0)
   const ownHead = useCallback((by: number) => setOwnHeads((n) => n + by), [])
+  // A screen with the whole pane on a computer (To do with a place open).
+  const [fullPanes, setFullPanes] = useState(0)
+  const fullPane = useCallback((by: number) => setFullPanes((n) => n + by), [])
   const tapped = (area: AdminArea) => () => {
     if (area === open?.area) window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
   }
@@ -170,8 +173,8 @@ export default function AdminFrame({
         {account}
       </nav>
 
-      <main className="flex-1 min-w-0 px-4 pb-28 md:px-10 md:pt-8 md:pb-12">
-        <div className="max-w-[920px] flex flex-col gap-4">
+      <main className={`flex-1 min-w-0 px-4 pb-28 ${fullPanes > 0 ? 'md:p-0' : 'md:px-10 md:pt-8 md:pb-12'}`}>
+        <div className={`flex flex-col gap-4 ${fullPanes > 0 ? '' : 'max-w-[920px]'}`}>
           {showTabs && siteTab && tabsNav}
           {ownHeads > 0 ? null : open?.area === 'settings' ? (
             <AdminHead phoneOnly back={{ label: 'To do', href: areas.find((a) => a.area === 'todo')!.href }} title={open.label} />
@@ -195,7 +198,9 @@ export default function AdminFrame({
 
 
           <AdminOwnHead.Provider value={ownHead}>
-            <div>{children}</div>
+            <AdminFullPane.Provider value={fullPane}>
+              <div>{children}</div>
+            </AdminFullPane.Provider>
           </AdminOwnHead.Provider>
 
           {open?.area === 'settings' && <div className="md:hidden">{account}</div>}

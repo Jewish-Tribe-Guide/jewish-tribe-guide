@@ -65,6 +65,30 @@ export function AdminCount({ n }: { n: number }) {
  *  frame's own heading steps aside (AdminFrame). */
 export const AdminOwnHead = createContext<((by: number) => void) | null>(null)
 
+/** Tells the frame a screen takes the whole pane on a computer, edge to
+ *  edge and the window's height (To do with a place open, board N6Desk). */
+export const AdminFullPane = createContext<((by: number) => void) | null>(null)
+
+/** While mounted, the frame's heading steps aside for the screen's own. */
+export function useOwnHead() {
+  const own = useContext(AdminOwnHead)
+  useLayoutEffect(() => {
+    if (!own) return
+    own(1)
+    return () => own(-1)
+  }, [own])
+}
+
+/** While `on`, the screen has the whole pane on a computer. */
+export function useFullPane(on: boolean) {
+  const full = useContext(AdminFullPane)
+  useLayoutEffect(() => {
+    if (!full || !on) return
+    full(1)
+    return () => full(-1)
+  }, [full, on])
+}
+
 const BACK_CHEVRON = (
   <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="md:hidden">
     <path d="M10 3L5 8l5 5" />
@@ -116,12 +140,7 @@ export function AdminHead({
 /** AdminHead, for a screen inside an area: the frame's own heading steps
  *  aside while it shows. */
 export function AdminBack(props: React.ComponentProps<typeof AdminHead>) {
-  const own = useContext(AdminOwnHead)
-  useLayoutEffect(() => {
-    if (!own) return
-    own(1)
-    return () => own(-1)
-  }, [own])
+  useOwnHead()
   return <AdminHead {...props} />
 }
 

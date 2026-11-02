@@ -19,7 +19,7 @@ export type TodoSearch = ClassifiedMiss & { words: TodoWord[]; readingKey?: stri
 
 /** A response nobody has handled yet: the form it came in on, its first
  *  words, and when; all it says, and who to reply to. */
-export type TodoResponse = { id: string; title: string; line: string; createdAt: string; text?: string[]; email?: string }
+export type TodoResponse = { id: string; title: string; line: string; createdAt: string; text?: string[]; email?: string; name?: string }
 
 /** A new listing, as opposed to a change to one, a removal, an eruv fix
  *  or a new category. */
@@ -79,11 +79,12 @@ export function teachable(term: string): boolean {
 /** A place Google has no match for and nobody has said why: pick the right
  *  match or say Not on Google, once (the user, Oct 31). It's a decision, so
  *  it's here and not under Watches' Needs fixing. */
-/** `at`: when Google was last asked and didn't find it, the row's date. */
+/** `at`: when Google was last asked and didn't find it, else when it went
+ *  on the site (never matched, never read): the row's date. */
 export type TodoUnmatched = { id: string; name: string; category: string; at?: string | null }
 
-export function unmatchedPlaces(places: readonly { id: string; name: string; category: string; matched: boolean; notOnGoogle: unknown; readAt?: string | null }[]): TodoUnmatched[] {
-  return places.filter((p) => !p.matched && !p.notOnGoogle).map(({ id, name, category, readAt }) => ({ id, name, category, at: readAt ?? null }))
+export function unmatchedPlaces(places: readonly { id: string; name: string; category: string; matched: boolean; notOnGoogle: unknown; readAt?: string | null; addedAt?: string | null }[]): TodoUnmatched[] {
+  return places.filter((p) => !p.matched && !p.notOnGoogle).map(({ id, name, category, readAt, addedAt }) => ({ id, name, category, at: readAt ?? addedAt ?? null }))
 }
 
 /** A suggestion's name, as its row shows it. */
@@ -144,5 +145,6 @@ export function responseSummary(r: InboxResponse, formTitles: Map<string, string
   const first = text[0] ?? ''
   const line = first.length > 80 ? `${first.slice(0, 79).trimEnd()}…` : first
   const email = r.contact?.email?.trim()
-  return { id: r.id, title, line, createdAt: r.createdAt, text, ...(email ? { email } : {}) }
+  const name = r.contact?.fullName?.trim()
+  return { id: r.id, title, line, createdAt: r.createdAt, text, ...(email ? { email } : {}), ...(name ? { name } : {}) }
 }

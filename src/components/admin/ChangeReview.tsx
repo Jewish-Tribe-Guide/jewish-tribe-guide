@@ -2,18 +2,15 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
-import { companionKeys, type CategoryConfig } from '@/lib/categories'
-import { diffListing, diffLines } from '@/lib/submissionDiff'
+import type { CategoryConfig } from '@/lib/categories'
+import { diffLines } from '@/lib/submissionDiff'
 import { scheduleChange, usualBoxChange, type ChangeGroup, type ChangeLine } from '@/lib/changeLines'
-import { editorRows } from '@/lib/editorRows'
 import { boxChangeCount, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
 import { isMinyanim, type Minyan } from '@/lib/davening'
-import { readSchedules, schedulesKey } from '@/lib/schedules'
-import { weekDiffers } from '@/lib/thisWeekEdit'
+import { readSchedules } from '@/lib/schedules'
 import { useEditWeek } from '@/lib/useEditWeek'
 import { useHistoryDepth } from '@/lib/useHistoryDepth'
-import { onListingNow } from '@/lib/editedFields'
-import { approvingPart, reviewParts } from '@/lib/reviewParts'
+import { reviewParts } from '@/lib/reviewParts'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { normalizeRow } from '@/lib/resourceShape'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -22,6 +19,7 @@ import ListingEditor, { type EditorStep } from '@/components/resources/ListingEd
 import { AdminBack } from './AdminUI'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
+import { changeEdit } from './changeEdit'
 
 // A change opened from To do (boards 3 and 20, Oct 29; one list since Oct 31,
 // the user: "drop original vs now"): what's new highlighted and what's going
@@ -73,7 +71,7 @@ export default function ChangeReview({
   const fields = category.detailFields
   const whole = s.payload as unknown as ResourceSubmission
   // Its parts, in the order first shown; answered ones stay, ticked.
-  const parts = s.current ? reviewParts(s.current, whole, fields) : []
+  const parts = s.current ? reviewParts(s.current, whole, category) : []
   const [order] = useState(() => parts.map((p) => ({ id: p.id, label: p.label })))
   const [done, setDone] = useState<string[]>([])
   const savedPart = useRef(false)
@@ -86,8 +84,8 @@ export default function ChangeReview({
     : order.length > 1 && parts.length > 0
       ? (parts.find((p) => p.id === on && !done.includes(p.id)) ?? parts.find((p) => !done.includes(p.id)) ?? parts[0])
       : undefined
-  // The change as the open part alone would make it.
-  const sent = part && s.current ? onListingNow(approvingPart(whole, s.current, part, fields), s.current, fields) : whole
+  const weeks = useEditWeek(fields.some((f) => f.type === 'minyanim'))
+  const { sent, changed, rows: onlyRows, preset } = changeEdit(s, category, part, weeks)
   const things = [...order, ...parts.filter((p) => !order.some((o) => o.id === p.id))].map((p) => ({ ...p, done: done.includes(p.id) }))
   const decided = (id: string) => {
     setDone((d) => [...d, id])
@@ -112,7 +110,6 @@ export default function ChangeReview({
     return () => onEditing?.(false)
   }, [editing, onEditing])
 
-  const changed = diffListing(s.current, sent, fields).filter((r) => r.changed)
   const name = sent.name || s.current?.name || '(unknown listing)'
   const before = (s.current?.details ?? {}) as Record<string, unknown>
   // A shul's times by the box they changed in, as the listing has them
@@ -130,41 +127,6 @@ export default function ChangeReview({
   const what = changed.flatMap((r) => boxesFor(fieldKeyFor(r.key, fields) === r.key ? r.key : null)?.map((b) => b.title) ?? [daysFor(r.key).length > 0 ? 'the schedule' : r.label]).join(', ')
   const who = source.readBy === 'person' && (s.submitted_by?.name || s.submitted_by?.email) ? s.submitted_by.name || s.submitted_by.email : source.from
   const marked = source.readBy === 'ai' && source.original ? markTimes(source.original, sent.details) : null
-
-  // The editor's rows the change touches: a shul's times by the box they
-  // changed in.
-  const changedKeys = [...new Set(changed.map((r) => fieldKeyFor(r.key, fields)).filter((k): k is string => !!k))]
-  const weeks = useEditWeek(fields.some((f) => f.type === 'minyanim'))
-  const onlyRows = (() => {
-    const before = (s.current?.details ?? {}) as Record<string, unknown>
-    const rows = editorRows(category, sent.details, { week: weeks?.week, nextWeek: weeks?.next }).filter((r) => {
-      if (r.kind === 'name' && changedKeys.includes('name')) return true
-      if (r.id === 'contact' && (changedKeys.includes('address') || changedKeys.includes('phone'))) return true
-      if (!r.fields.some((f) => changedKeys.includes(f.key))) return false
-      if (r.kind !== 'minyans' || !r.box) return true
-      const key = r.fields[0].key
-      if (r.week) return weekDiffers(readSchedules(before[schedulesKey(key)]), readSchedules(sent.details[schedulesKey(key)]), r.week)
-      const was = isMinyanim(before[key]) ? (before[key] as Minyan[]) : []
-      const now = isMinyanim(sent.details[key]) ? (sent.details[key] as Minyan[]) : []
-      return boxChangeCount(minyanimForBox(was, r.box), minyanimForBox(now, r.box)) > 0
-    })
-    return rows.length > 0 ? rows : null
-  })()
-  // What the change proposes, as the editor's starting point.
-  const preset = (() => {
-    const out: Record<string, unknown> = {}
-    for (const k of changedKeys) {
-      if (k === 'name' || k === 'address' || k === 'phone') {
-        out[k] = sent[k] ?? ''
-        continue
-      }
-      const f = fields.find((x) => x.key === k)
-      for (const key of [k, ...(f ? companionKeys(f) : []), ...(f?.type === 'minyanim' ? [schedulesKey(k)] : [])]) {
-        if (key in sent.details) out[key] = sent.details[key]
-      }
-    }
-    return out
-  })()
 
   if (editing && s.current) {
     const title = step?.title ?? (onlyRows?.length === 1 ? onlyRows[0].title : name)

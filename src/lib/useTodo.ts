@@ -90,10 +90,11 @@ async function load(key: string, token: string, community: string, email: string
       jobs: state.data?.jobs,
     },
   })
-  void loadWaiting(key, token, community)
+  jobsLoad = loadWaiting(key, token, community)
 }
 
 let waitingLoads = 0
+let jobsLoad: Promise<void> = Promise.resolve()
 
 /** Every job's reading, after the rest so To do doesn't wait on them; what
  *  couldn't load just isn't counted. Only the latest load's answer is kept. */
@@ -115,6 +116,14 @@ export function loadTodo(token: string, community: string, email?: string, fresh
   })
   inFlight = { key, promise }
   return promise
+}
+
+/** Loads To do again, the jobs' readings too, after a fix on a place's
+ *  screen: what it fixed is gone once this resolves, what it didn't is
+ *  still there, dated afresh. */
+export async function reloadTodo(token: string, community: string, email?: string) {
+  await loadTodo(token, community, email, true)
+  await jobsLoad
 }
 
 /** Changes the loaded copy after a decision, so the page and the count

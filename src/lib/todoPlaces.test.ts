@@ -69,6 +69,13 @@ describe('todoPlaces', () => {
     ])
   })
 
+  // Sababa, Nov 2: "Oct 17 · Google stopped answering Oct 17". The row's
+  // corner has the date; the line doesn't say it again.
+  it('says a broken check’s date once, in the corner', () => {
+    const [p] = todoPlaces({ submissions: [], responses: [], unmatched: [], notRead: [{ id: 's', name: 'Sababa', line: 'Google stopped answering Oct 17', since: ['2026-10-17T07:00:00Z'] }] }, cats)
+    expect(placeLine(p)).toBe('Google stopped answering')
+  })
+
   it('a line’s "Dec 30" read in January is last year', () => {
     expect(dayToIso('Dec 30', Date.parse('2027-01-03T12:00:00Z'))).toBe('2026-12-30T12:00:00.000Z')
   })

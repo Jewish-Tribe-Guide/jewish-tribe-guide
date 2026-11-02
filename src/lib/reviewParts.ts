@@ -1,4 +1,5 @@
-import { companionKeys, type CategoryField } from './categories'
+import { companionKeys, type CategoryConfig, type CategoryField } from './categories'
+import { editorRows } from './editorRows'
 import { isMinyanim, type Minyan } from './davening'
 import { boxChangeCount, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
 import { schedulesKey } from './schedules'
@@ -11,8 +12,13 @@ import type { ResourceRow, ResourceSubmission } from '@/types'
 // for a shul's usual times, a box of them. Approving one puts that part on
 // the listing and leaves the rest waiting; leaving one takes it out of the
 // change. The last part left is the change decided whole, as before.
+//
+// Given the category, fields the listing's editor shows in one row are one
+// part, under the row's title (board R5Link: a hechsher and its link are
+// "Kosher", one card, one answer).
 
-export type ReviewPart = { id: string; label: string; key: string; box?: 'weekday' | 'shabbos' }
+/** `keys`: a row's fields, when it's more than one. */
+export type ReviewPart = { id: string; label: string; key: string; keys?: string[]; box?: 'weekday' | 'shabbos' }
 
 const BOXES = [
   { box: 'weekday', title: 'Usual weekday times' },
@@ -25,9 +31,10 @@ const minyanim = (v: unknown): Minyan[] => (isMinyanim(v) ? (v as Minyan[]) : []
 
 /** What `sent` changes on `current`, part by part, in the order the change
  *  shows them. */
-export function reviewParts(current: Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>, sent: ResourceSubmission, fields: readonly CategoryField[]): ReviewPart[] {
+export function reviewParts(current: Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>, sent: ResourceSubmission, of: CategoryConfig | readonly CategoryField[]): ReviewPart[] {
+  const fields = 'detailFields' in of ? of.detailFields : of
   const before = (current.details ?? {}) as Record<string, unknown>
-  return diffListing(current as ResourceRow, sent, [...fields])
+  const parts = diffListing(current as ResourceRow, sent, [...fields])
     .filter((r) => r.changed)
     .flatMap((r): ReviewPart[] => {
       const field = fields.find((f) => f.key === r.key)
@@ -40,12 +47,27 @@ export function reviewParts(current: Pick<ResourceRow, 'name' | 'address' | 'pho
       if (fields.some((f) => f.type === 'minyanim' && schedulesKey(f.key) === r.key)) return [{ id: r.key, label: 'The schedule', key: r.key }]
       return [{ id: r.key, label: r.label, key: r.key }]
     })
+  if (!('detailFields' in of)) return parts
+  // A field's row, for the fields the editor shows a few to a row.
+  const rowOf = new Map<string, { id: string; title: string }>()
+  for (const row of editorRows(of, sent.details)) if (row.kind === 'fields' || row.kind === 'audience') for (const f of row.fields) rowOf.set(f.key, row)
+  const together = (p: ReviewPart) => (p.box || CORE.has(p.key) ? undefined : rowOf.get(p.key))
+  const out: ReviewPart[] = []
+  for (const p of parts) {
+    const row = together(p)
+    const shared = row && parts.filter((q) => together(q) === row)
+    if (!row || !shared || shared.length < 2) out.push(p)
+    else if (shared[0] === p) out.push({ id: `row:${row.id}`, label: row.title, key: p.key, keys: shared.map((q) => q.key) })
+  }
+  return out
 }
 
 /** The keys a part writes: a tags field's "sometimes" goes with it. */
 export function partKeys(part: ReviewPart, fields: readonly CategoryField[]): string[] {
-  const field = fields.find((f) => f.key === part.key)
-  return field?.type === 'tags' ? [part.key, ...companionKeys(field)] : [part.key]
+  return (part.keys ?? [part.key]).flatMap((key) => {
+    const field = fields.find((f) => f.key === key)
+    return field?.type === 'tags' ? [key, ...companionKeys(field)] : [key]
+  })
 }
 
 /** The change as approving only `part` puts it: that part as sent, the rest

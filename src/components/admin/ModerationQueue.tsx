@@ -9,7 +9,8 @@ import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { shownPlaces, todoPlaces } from '@/lib/todoPlaces'
-import { loadTodo, updateTodo, useTodo } from '@/lib/useTodo'
+import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
+import { useFullPane } from './AdminUI'
 import TodoList, { ALL_OLDEST_FIRST } from './TodoList'
 import TodoPlaceScreen from './TodoPlaceScreen'
 
@@ -92,6 +93,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
   // Things whose Edit is open: leaving asks first.
   const editing = useRef(new Set<string>())
   const editingChanged = useCallback((id: string, e: boolean) => void (e ? editing.current.add(id) : editing.current.delete(id)), [])
+  // On a computer, the list and the place fill the window (N6Desk).
+  useFullPane(!!openPlace)
   const wasOpen = useRef<string | null>(null)
   const listWhenOpen = useRef<string[]>([])
 
@@ -179,7 +182,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
   }
 
   const next = list[at + 1]
-  const position = { at, total: list.length, back: backToList, next: next ? () => open(next.key) : undefined }
+  const prev = at > 0 ? list[at - 1] : undefined
+  const position = { at, total: list.length, back: backToList, prev: prev ? () => open(prev.key) : undefined, next: next ? () => open(next.key) : undefined }
 
   return (
     <div>
@@ -190,9 +194,15 @@ export default function ModerationQueue({ session }: { session: Session }) {
         <p className="text-sm text-muted">Loading submissions…</p>
       ) : (
         !loadError && (
-          // On a computer the list stays beside the open place (the inbox).
-          <div className={openPlace ? 'md:grid md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:gap-6 md:items-start' : undefined}>
-            <div className={openPlace ? 'max-md:hidden' : undefined}>
+          // On a computer the list stays beside the open place (the inbox),
+          // each the window's height, scrolling on its own (N6Desk).
+          <div className={openPlace ? 'md:grid md:grid-cols-[380px_minmax(0,1fr)] md:h-dvh' : undefined}>
+            <div className={openPlace ? 'max-md:hidden md:overflow-y-auto md:bg-white md:border-r md:border-slate-200 md:px-4 md:pt-6' : undefined}>
+              {openPlace && (
+                <h1 className="m-0 mb-4 flex items-baseline gap-2.5 text-[26px] font-bold text-slate-900">
+                  To do <span className="text-[14px] font-normal text-slate-500">{list.length} to decide</span>
+                </h1>
+              )}
               <TodoList data={data} categoriesById={categoriesById} view={view} onView={setView} onOpen={(p) => open(p.key)} openKey={openPlace?.key} />
             </div>
             {openPlace && (
@@ -211,6 +221,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
                   updateTodo((d) => ({ ...d, submissions: d.submissions.filter((x) => x.id !== id) }))
                 }}
                 onEditing={editingChanged}
+                jobs={data.jobs ?? null}
+                reload={() => reloadTodo(token, community, session.user.email)}
               />
             )}
           </div>

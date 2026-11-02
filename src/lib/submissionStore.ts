@@ -542,10 +542,11 @@ export async function decidePart(
   const { data: row } = await supabase.from('resource').select('*').eq('community_id', community).eq('id', submission.target_id).maybeSingle()
   if (!row) throw new ReviewEditError('The listing this changes couldn’t be found.')
   const listing = row as ResourceRow
-  const fields = (await getCategoryById(community, listing.category))?.detailFields ?? []
+  const category = await getCategoryById(community, listing.category)
+  const fields = category?.detailFields ?? []
   const payload = submission.payload as unknown as ResourceSubmission
   const sent = onListingNow(payload, listing, fields)
-  const parts = reviewParts(listing, sent, fields)
+  const parts = reviewParts(listing, sent, category ?? fields)
   const part = parts.find((p) => p.id === partId)
   if (!part) throw new ReviewEditError('That part has already been decided.')
   if (parts.length === 1) return { whole: true }

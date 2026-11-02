@@ -88,6 +88,14 @@ describe('To do, a row per place', () => {
     expect(rowNames()).toEqual(['Open Abe’s', 'Open Zeke’s'])
   })
 
+  // N6Desk: beside an open place, the open one is marked in the list.
+  it('marks the place open beside it', () => {
+    const data = { ...empty, notRead: [{ id: 'r', name: 'Rita’s', line: 'Website didn’t load' }, { id: 'g', name: 'Giant', line: 'Website didn’t load' }] }
+    renderWithProviders(<TodoList data={data} categoriesById={new Map()} view={ALL_OLDEST_FIRST} onView={() => {}} onOpen={() => {}} openKey="r" />, { community: { slug: 'philly' } })
+    expect(screen.getByRole('button', { name: 'Open Rita’s' }).closest('[aria-current]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Open Giant' }).closest('[aria-current]')).toBeNull()
+  })
+
   it('with nothing waiting, says so', () => {
     show(empty)
     expect(screen.getByText('Nothing to do')).toBeTruthy()

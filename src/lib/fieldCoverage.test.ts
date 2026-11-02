@@ -69,17 +69,16 @@ describe('what checks each thing on a place', () => {
 
 describe('the Checked by menu', () => {
   const c = placeCoverage({ id: 'a' }, food, { ...NONE, kosher: [{ id: 'a', on: ['x'] }] })
-  it('by what checks a place, what doesn’t, and what’s broken', () => {
-    expect(fitsCheckedBy(c, undefined, 'any')).toBe(true)
-    expect(fitsCheckedBy(c, undefined, 'certifier')).toBe(true)
-    expect(fitsCheckedBy(c, undefined, 'google')).toBe(false)
-    expect(fitsCheckedBy(c, undefined, 'not-watched')).toBe(false)
-    expect(fitsCheckedBy(c, ['Link doesn’t open'], 'broken')).toBe(true)
-    expect(fitsCheckedBy(undefined, undefined, 'not-watched')).toBe(false)
+  it('by what checks a place, and what doesn’t', () => {
+    expect(fitsCheckedBy(c, 'any')).toBe(true)
+    expect(fitsCheckedBy(c, 'certifier')).toBe(true)
+    expect(fitsCheckedBy(c, 'google')).toBe(false)
+    expect(fitsCheckedBy(c, 'not-watched')).toBe(false)
+    expect(fitsCheckedBy(undefined, 'not-watched')).toBe(false)
   })
   it('link check only means nothing else checks it', () => {
     const only = { fields: [], notWatched: [], mainMissing: false, nameBy: [], sources: ['links' as const] }
-    expect(fitsCheckedBy(only, undefined, 'links-only')).toBe(true)
-    expect(fitsCheckedBy({ ...only, sources: ['links', 'google'] }, undefined, 'links-only')).toBe(false)
+    expect(fitsCheckedBy(only, 'links-only')).toBe(true)
+    expect(fitsCheckedBy({ ...only, sources: ['links', 'google'] }, 'links-only')).toBe(false)
   })
 })

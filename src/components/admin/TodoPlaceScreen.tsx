@@ -14,17 +14,23 @@ import { firstThing } from '@/lib/todoPlaces'
 import { withCommunity } from '@/lib/useCommunityData'
 import { updateTodo } from '@/lib/useTodo'
 import { AdminBack, AdminBox } from './AdminUI'
-import ChangeReview, { type QueuePosition } from './ChangeReview'
+import type { QueuePosition } from './ChangeReview'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
+import TodoBroken from './TodoBroken'
+import TodoChange from './TodoChange'
+import TodoNewPlace from './TodoNewPlace'
+import TodoReading from './TodoReading'
+import PlaceFrame, { PlaceButtons, PlaceCard, type PlaceButton } from './PlaceFrame'
+import type { Jobs } from './useWatchJobs'
 
 // A place opened from To do (the "one tap per place" boards, approved
 // Nov 2): everything waiting there behind switches at the top, opened on
 // the first of the kind the filter picked, changes before broken checks.
 // Answering one ticks it and opens the next; once none is left the place
 // is done and To do moves on (ModerationQueue). A change opens as itself
-// (ChangeReview); a job's reading or a broken check opens the place's own
+// in the listing's own editor (TodoChange); a job's reading or a broken check opens the place's own
 // screen, where it's decided; feedback is Done, or a reply first.
 
 type Moderate = (id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission, part?: string) => Promise<'partial' | 'whole' | 'failed'>
@@ -42,6 +48,8 @@ export default function TodoPlaceScreen({
   moderate,
   onUpdated,
   onEditing,
+  jobs,
+  reload,
 }: {
   place: TodoPlace
   /** The list's filter, which picks the thing it opens on. */
@@ -55,6 +63,11 @@ export default function TodoPlaceScreen({
   onUpdated: (id: string, partial?: boolean) => void
   /** A change's Edit opened or closed, so leaving can ask first. */
   onEditing: (thingId: string, editing: boolean) => void
+  /** The jobs' readings, for a broken check's source and answers; null
+   *  until they've answered. */
+  jobs: Jobs | null
+  /** To do and the jobs read again, after a broken check's answer. */
+  reload: () => Promise<void>
 }) {
   const community = useCommunitySlug()
   // As first opened: answered ones stay, ticked.
@@ -98,16 +111,38 @@ export default function TodoPlaceScreen({
       const reviewable = s.target_type === 'listing' && s.operation !== 'delete'
       if (reviewable && s.operation === 'update' && category && s.current) {
         return (
-          <ChangeReview
+          <TodoChange
+            key={`${t.id}-${t.part ?? ''}`}
             submission={s}
             category={category}
+            part={t.part}
+            name={place.name}
             position={position}
+            switches={switches}
             busy={busyId === s.id}
             error={error}
             token={token}
-            onModerate={(id, status, reason, part) => moderate(id, status, reason, undefined, part)}
+            onModerate={(id, status, part) => void moderate(id, status, undefined, undefined, part)}
             onUpdated={onUpdated}
-            inPlace={{ part: t.part, switches, onEditing: editingChanged(t.id) }}
+            onEditing={editingChanged(t.id)}
+          />
+        )
+      }
+      if (reviewable && s.operation === 'create' && category) {
+        return (
+          <TodoNewPlace
+            key={t.id}
+            submission={s}
+            category={category}
+            name={place.name}
+            position={position}
+            switches={switches}
+            busy={busyId === s.id}
+            error={error}
+            token={token}
+            onModerate={(id, status) => void moderate(id, status)}
+            onUpdated={onUpdated}
+            onEditing={editingChanged(t.id)}
           />
         )
       }
@@ -122,8 +157,16 @@ export default function TodoPlaceScreen({
         ),
       )
     }
-    if (t.kind === 'feedback') return shell(<Feedback key={t.id} thing={t} token={token} community={community} />)
-    // Decided on the place's own screen, its rows and where each is read from.
+    if (t.kind === 'feedback') return <Feedback key={t.id} thing={t} name={place.name} position={position} switches={switches} token={token} community={community} />
+    // A broken check, fixed right here (R3Site, R2Menu, R2Google).
+    if (t.kind === 'broken' && jobs && place.placeId) {
+      return <TodoBroken key={t.id} placeId={place.placeId} name={place.name} label={t.label} jobs={jobs} token={token} community={community} position={position} switches={switches} reload={reload} />
+    }
+    // A job's reading, decided right here too.
+    if (t.kind === 'waiting' && jobs && place.placeId) {
+      return <TodoReading key={t.id} placeId={place.placeId} name={place.name} jobs={jobs} token={token} community={community} position={position} switches={switches} reload={reload} />
+    }
+    // Until the jobs have answered: the place's own screen.
     return shell(
       <AdminBox>
         <div className="flex flex-col items-start gap-3 p-4">
@@ -171,9 +214,26 @@ function Header({ place, position }: { place: TodoPlace; position: QueuePosition
   )
 }
 
-/** Feedback, all it says. Done whether it was fixed or was only kind
- *  words; Reply first when they left an email. */
-function Feedback({ thing, token, community }: { thing: Extract<TodoThing, { kind: 'feedback' }>; token: string; community: string }) {
+const sentAt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+
+/** Feedback, all it says, and who and when under it (L5Feedback). Done
+ *  whether it was fixed or was only kind words; Reply first when they
+ *  left an email. */
+function Feedback({
+  thing,
+  name,
+  position,
+  switches,
+  token,
+  community,
+}: {
+  thing: Extract<TodoThing, { kind: 'feedback' }>
+  name: string
+  position: QueuePosition
+  switches: ReactNode
+  token: string
+  community: string
+}) {
   const r = thing.response
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -192,29 +252,22 @@ function Feedback({ thing, token, community }: { thing: Extract<TodoThing, { kin
       setBusy(false)
     }
   }
+  const [first, ...more] = r.text?.length ? r.text : [r.line]
+  const buttons: PlaceButton[] = [
+    { label: 'Done', busy: busy && 'Marking it done…', onClick: () => void done() },
+    ...(r.email ? [{ label: 'Reply', href: `mailto:${r.email}?subject=${encodeURIComponent(`Re: your ${r.title.toLowerCase()}`)}` }] : []),
+  ]
   return (
-    <>
-      <AdminBox>
-        <div className="flex flex-col gap-2 p-4">
-          <span className="text-[13px] font-semibold text-slate-600">{[r.email, shortDay(r.createdAt)].filter(Boolean).join(' · ')}</span>
-          {(r.text?.length ? r.text : [r.line]).map((p, i) => (
-            <p key={i} className="m-0 whitespace-pre-wrap break-words text-[15px] text-slate-900">
-              {p}
-            </p>
-          ))}
-        </div>
-      </AdminBox>
-      {error && <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}
-      <div className="flex gap-2">
-        <button type="button" disabled={busy} onClick={() => void done()} className={`${button} flex-1 md:flex-none border-primary bg-primary text-white`}>
-          {busy ? 'Marking it done…' : 'Done'}
-        </button>
-        {r.email && (
-          <a href={`mailto:${r.email}?subject=${encodeURIComponent(`Re: your ${r.title.toLowerCase()}`)}`} className={`${button} flex-1 md:flex-none border-slate-300 bg-white text-slate-900`}>
-            Reply
-          </a>
-        )}
-      </div>
-    </>
+    <PlaceFrame name={name} subline={shortDay(r.createdAt)} position={position} switches={switches} error={error} foot={<PlaceButtons buttons={buttons} />}>
+      <PlaceCard>
+        <p className="m-0 whitespace-pre-wrap break-words text-[17px] font-bold text-slate-900">“{first}”</p>
+        {more.map((p, i) => (
+          <p key={i} className="m-0 whitespace-pre-wrap break-words text-[15px] text-slate-900">
+            {p}
+          </p>
+        ))}
+        <p className="m-0 text-[13.5px] text-slate-500">{[r.name ?? 'No name given', r.email, sentAt.format(new Date(r.createdAt))].filter(Boolean).join(' · ')}</p>
+      </PlaceCard>
+    </PlaceFrame>
   )
 }

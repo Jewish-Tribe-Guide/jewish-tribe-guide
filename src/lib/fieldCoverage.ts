@@ -115,12 +115,11 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
 
 // ── Places' Checked by menu ─────────────────────────────────────────────────
 
-export type CheckedBy = 'any' | 'not-watched' | 'broken' | 'google' | 'website' | 'newsletter' | 'certifier' | 'refuah' | 'links-only'
+export type CheckedBy = 'any' | 'not-watched' | 'google' | 'website' | 'newsletter' | 'certifier' | 'refuah' | 'links-only'
 
 export const CHECKED_BY: { key: CheckedBy; label: string }[] = [
   { key: 'any', label: 'Anything' },
   { key: 'not-watched', label: 'Not watched' },
-  { key: 'broken', label: 'Check broken' },
   { key: 'google', label: 'Google' },
   { key: 'website', label: 'Their website' },
   { key: 'newsletter', label: 'Newsletter' },
@@ -131,11 +130,10 @@ export const CHECKED_BY: { key: CheckedBy; label: string }[] = [
 
 export const isCheckedBy = (v: unknown): v is CheckedBy => CHECKED_BY.some((c) => c.key === v)
 
-/** Whether a place fits the menu's choice; `broken`, what's gone wrong with
- *  a check of it. */
-export function fitsCheckedBy(c: PlaceCoverage | undefined, broken: readonly string[] | undefined, choice: CheckedBy): boolean {
+/** Whether a place fits the menu's choice. A broken check isn't one: those
+ *  are fixed on To do (Nov 2). */
+export function fitsCheckedBy(c: PlaceCoverage | undefined, choice: CheckedBy): boolean {
   if (choice === 'any') return true
-  if (choice === 'broken') return !!broken?.length
   if (!c) return false
   if (choice === 'not-watched') return c.notWatched.length > 0
   if (choice === 'links-only') return c.sources.length === 1 && c.sources[0] === 'links'

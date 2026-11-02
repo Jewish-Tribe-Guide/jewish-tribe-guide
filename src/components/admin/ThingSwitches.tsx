@@ -25,7 +25,7 @@ export default function ThingSwitches({ things, on, onPick }: { things: Thing[];
             }`}
           >
             {t.done && (
-              <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 flex-none text-green-700">
+              <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 flex-none text-slate-500">
                 <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}

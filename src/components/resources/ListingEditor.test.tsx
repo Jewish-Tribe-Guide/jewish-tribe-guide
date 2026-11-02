@@ -269,6 +269,9 @@ describe('ListingEditor — dishes and items', () => {
     await u.click(within(screen.getByRole('group', { name: 'Brownies' })).getByRole('button', { name: 'Not always' }))
     expect(within(editor).getByText('Not always on the menu')).toBeInTheDocument()
     await u.type(within(editor).getByLabelText('Add a dish'), 'Babka{Enter}')
+    // R6After: one the listing doesn't have yet is marked New; its own aren't.
+    expect(within(editor).getByRole('button', { name: /^Babka\s*New$/ })).toBeInTheDocument()
+    expect(within(editor).getByRole('button', { name: 'Cupcakes' })).toBeInTheDocument()
     await u.click(done())
     expect(row('items')).toHaveTextContent('Changed')
     expect(row('items')).toHaveTextContent('3 · Cupcakes, Babka, Brownies')
@@ -373,6 +376,64 @@ describe('ListingEditor — boxes with their own editors', () => {
     expect(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Usual weekday times' })).toBeInTheDocument()
     await u.click(row('minyans:shabbos'))
     expect(screen.getByTestId('minyan-box-list')).toBeInTheDocument()
+  })
+
+  // On To do the header names the shul (E1Times): its card doesn't again.
+  it('a shul’s times as a card on To do don’t repeat its name', () => {
+    const shul = makeListing({ id: 'mi', category: 'synagogue', name: 'Mikveh Israel', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] })
+    renderWithProviders(<ListingEditor item={shul} category={SHUL} onClose={() => {}} onlyRows={['minyans:weekday']} hosted={{ onControl: () => {} }} />)
+    expect(within(screen.getByTestId('minyan-box-list')).queryByText('Mikveh Israel')).toBeNull()
+  })
+
+  // R5Link: a change on To do says by each field that it changed, and what
+  // it was; a field it didn't change says nothing.
+  it('a change on To do marks each changed field, and says what it was', () => {
+    renderWithProviders(<ListingEditor item={bakery} category={FOOD} onClose={() => {}} onlyRows={['contact', 'kind', 'facts']} hosted={{ onControl: () => {}, marks: true }} preset={{ kosherCert: 'OU', phone: '(215) 555-0100' }} />)
+    const box = screen.getByTestId('editor-box')
+    expect(box).toHaveTextContent('Was IKC')
+    expect(box).toHaveTextContent('Was (267) 975-1711')
+    expect(within(box).getAllByText('Changed')).toHaveLength(2)
+    expect(box).not.toHaveTextContent('Was 339 S 13th St')
+  })
+
+  // R1Women: a note's new words marked in the box, no Changed pill.
+  it('a change on To do marks a note’s new words', () => {
+    const mikvah = makeListing({ id: 'lm', category: 'mikvah', name: 'Lower Merion Mikvah', womenTevillah: true, women_s_notes: 'By appointment.' })
+    renderWithProviders(<ListingEditor item={mikvah} category={MIKVAH} onClose={() => {}} onlyRows={['audience:womenTevillah']} hosted={{ onControl: () => {}, marks: true }} preset={{ women_s_notes: 'By appointment. Call ahead.' }} />)
+    expect(screen.getByDisplayValue('By appointment. Call ahead.')).toBeInTheDocument()
+    expect(within(screen.getByTestId('note-marks')).getByText(/Call ahead\./, { selector: 'mark' })).toBeInTheDocument()
+    expect(screen.queryByText('Changed')).toBeNull()
+  })
+
+  // R5Link: a link it changed says what it was, short.
+  it('a change on To do says a link it was, short', () => {
+    renderWithProviders(<ListingEditor item={{ ...bakery, k: 'https://www.keystone-k.org/' }} category={FOOD} onClose={() => {}} onlyRows={['facts']} hosted={{ onControl: () => {}, marks: true }} preset={{ k: 'https://mekorhabracha.org/p' }} />)
+    expect(screen.getByTestId('editor-box')).toHaveTextContent('Was keystone-k.org')
+  })
+
+  // R1Women: one field of a section, alone, titles its card, and the rest
+  // of the section isn't there.
+  it('a card narrowed to one field of a row is titled by it', () => {
+    const mikvah = makeListing({ id: 'lm', category: 'mikvah', name: 'Lower Merion Mikvah', womenTevillah: true, women_s_notes: 'By appointment.', women_s_phone: '(610) 555-0100' })
+    renderWithProviders(<ListingEditor item={mikvah} category={MIKVAH} onClose={() => {}} onlyRows={['audience:womenTevillah']} hosted={{ onControl: () => {}, marks: true, onlyFields: ['women_s_notes'] }} preset={{ women_s_notes: 'By appointment. Call ahead.' }} />)
+    expect(screen.getByRole('heading', { level: 2, name: 'Women’s notes' })).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('(610) 555-0100')).toBeNull()
+    expect(screen.queryByText('Hours')).toBeNull()
+  })
+
+  it('without marks, a card says nothing of what changed', () => {
+    renderWithProviders(<ListingEditor item={bakery} category={FOOD} onClose={() => {}} onlyRows={['kind', 'facts']} hosted={{ onControl: () => {} }} preset={{ kosherCert: 'OU' }} />)
+    expect(screen.getByTestId('editor-box')).not.toHaveTextContent('Was IKC')
+  })
+
+  // E1Times: "6:35 AM · Mon–Fri · was 6:45 AM", marked Changed.
+  it('a changed minyan says what its time was', () => {
+    const shul = makeListing({ id: 'mi', category: 'synagogue', name: 'Mikveh Israel', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '6:45am' }] })
+    renderWithProviders(<ListingEditor item={shul} category={SHUL} onClose={() => {}} onlyRows={['minyans:weekday']} hosted={{ onControl: () => {} }} preset={{ minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '6:35am' }] }} />)
+    const list = screen.getByTestId('minyan-box-list')
+    expect(list).toHaveTextContent('6:35 AM')
+    expect(list).toHaveTextContent('was 6:45 AM')
+    expect(list).toHaveTextContent('Changed')
   })
 
   // The user, Oct 23 (drawing SwWk3BLEYTtVu2k3w2UJ5s v3).

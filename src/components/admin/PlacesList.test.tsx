@@ -208,6 +208,19 @@ describe('Places', () => {
       expect(window.location.search).toBe('?checked=website')
     })
 
+    // Broken checks are To do's to fix, one place at a time (Nov 2), so
+    // Places no longer narrows by them, and an old link lands on Anything.
+    it('has no Check broken, and an old link to it shows every place', async () => {
+      const user = userEvent.setup()
+      renderShuls('?checked=broken')
+      jobsToServe = everyJob([page('Alpha', true)])
+      await screen.findByRole('button', { name: 'Open Bravo' })
+      expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeInTheDocument()
+      await waitFor(() => expect(menu(/^Checked by/)).toBeEnabled())
+      await user.click(menu(/^Checked by/))
+      expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).not.toContainEqual(expect.stringMatching(/broken/i))
+    })
+
     it('an opened place’s rows name only the job that reads them', async () => {
       const user = userEvent.setup()
       renderShuls()

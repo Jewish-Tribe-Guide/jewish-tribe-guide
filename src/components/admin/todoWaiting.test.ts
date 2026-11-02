@@ -51,7 +51,7 @@ describe('notBeingRead (Todo10, EmailTodo12)', () => {
   const shul = (over = {}) => ({ id: 's', name: 'Bnai Abraham', href: '/s', pages: [], off: false, newsletters: [letter('2026-10-01T00:00:00Z')], ...over })
 
   it('a shul whose email has gone quiet for three weeks', () => {
-    expect(notBeingRead(jobs({ times: { places: [shul()] } as never }), NOW)).toEqual([{ id: 's', name: 'Bnai Abraham', line: 'No email has come in 3 weeks', since: ['2026-10-01T00:00:00Z'] }])
+    expect(notBeingRead(jobs({ times: { places: [shul()] } as never }), NOW)).toEqual([{ id: 's', name: 'Bnai Abraham', line: 'Their email came 4 weeks ago', since: ['2026-10-01T00:00:00Z'] }])
   })
 
   it('an email from this month isn’t quiet', () => {
@@ -64,7 +64,7 @@ describe('notBeingRead (Todo10, EmailTodo12)', () => {
 
   it('an eruv whose status emails have stopped', () => {
     const eruvim = { eruvim: [{ id: 'e', name: 'Center City Eruv', statusEmail: 'a@b.org', statusCheckedAt: '2026-10-01T00:00:00Z' }], findings: [], watches: [], timezone: 'America/New_York' }
-    expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'e', name: 'Center City Eruv', line: 'No email has come in 3 weeks', since: ['2026-10-01T00:00:00Z'] }])
+    expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'e', name: 'Center City Eruv', line: 'Their email came 4 weeks ago', since: ['2026-10-01T00:00:00Z'] }])
   })
 
   it('nothing until every job has answered', () => {

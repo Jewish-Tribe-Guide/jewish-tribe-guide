@@ -7,6 +7,7 @@ import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { sameFieldValue } from '@/lib/listingDiff'
+import { fmt } from '@/lib/submissionDiff'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { mergeMinyanimBox, minyanimForBox } from '@/lib/minyanimBox'
 import { readSchedules, schedulesKey, weekPostDays } from '@/lib/schedules'
@@ -123,7 +124,20 @@ type Props = {
   allSections?: boolean
   /** Values to put in as if typed, each new object once: Use Google's. */
   patch?: Record<string, unknown>
+  /** With `onlyRows`: each row in a white card of its own under its title,
+   *  and no Send, the host's buttons sending (To do's place screen, boards
+   *  R3Site, R2Menu); without it, the whole list with no Send (a new place
+   *  on To do, L3NewPlace). `onControl` is told what they need after each render.
+   *  `marks`: each field that differs from the listing says so, and what it
+   *  was (a change on To do, boards R5Link, E1Times). `onlyFields`: of a
+   *  row's fields, just these, and one alone titles its card (R1Women). */
+  hosted?: { onControl: (c: EditorControl) => void; marks?: boolean; onlyFields?: readonly string[] }
 }
+
+/** What a host's own buttons need from the editor (`hosted`). `edited`:
+ *  touched since it opened, a preset included (a change on To do opens
+ *  already changed from the listing). */
+export type EditorControl = { send: () => Promise<void>; changed: boolean; edited: boolean; sending: boolean; errors: readonly string[] }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
 
@@ -244,6 +258,7 @@ export default function ListingEditor({
   splitContact,
   allSections,
   patch,
+  hosted,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -311,7 +326,24 @@ export default function ListingEditor({
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
-  const rowTitle = (r: EditorRow) => (r.kind === 'name' ? draft.name.trim() || 'Name' : r.title)
+  /** A row's fields narrowed to `hosted.onlyFields`, when it has any of them. */
+  const narrowed = (r: EditorRow, fs: CategoryField[]) => {
+    const keep = hosted?.onlyFields
+    if (!keep || (r.kind !== 'fields' && r.kind !== 'audience')) return fs
+    const kept = fs.filter((f) => keep.includes(f.key))
+    return kept.length > 0 ? kept : fs
+  }
+  /** Its one field, when narrowing left one of several: it titles the card. */
+  const loneField = (r: EditorRow) => {
+    const fs = narrowed(r, r.fields)
+    return fs.length === 1 && fs.length < r.fields.length ? fs[0] : null
+  }
+  const rowTitle = (r: EditorRow) => {
+    if (r.kind === 'name') return draft.name.trim() || 'Name'
+    const f = loneField(r)
+    // "Women’s Notes" titles it as "Women’s notes".
+    return f ? f.label.replace(/ (\S+)/g, (_, w: string) => ` ${w.toLowerCase()}`) : r.title
+  }
 
   // ── What the host's header shows ──────────────────────────────────────
   // A short row opens where it is, inside its own card; a row holding a
@@ -385,9 +417,30 @@ export default function ListingEditor({
   useEffect(() => {
     onHasChanges?.(hasChanges)
   }, [hasChanges, onHasChanges])
+  // A host's own buttons send what's changed, as Send would; a new place
+  // (L3NewPlace) once nothing it needs is missing.
+  const opened = useRef<string | null>(null)
+  const valuesKey = hosted ? JSON.stringify(values) : ''
+  useLayoutEffect(() => {
+    if (!hosted) return
+    opened.current ??= valuesKey
+    const ready = creating ? missing.length === 0 : hasChanges
+    hosted.onControl({
+      send: async () => {
+        if (!ready || sender.submitting) return
+        sender.setErrors([])
+        await sender.submit(draft.buildSubmission())
+      },
+      changed: ready,
+      edited: valuesKey !== opened.current,
+      sending: sender.submitting,
+      errors: sender.errors,
+    })
+  })
 
   // ── Sent ──────────────────────────────────────────────────────────────
-  if (sender.done) {
+  // A host's own buttons say what happened next.
+  if (sender.done && !hosted) {
     return <EditorSent message={sender.doneKind === 'removal' ? 'An admin checks a removal before anything changes.' : 'An admin checks it, usually within a day.'} onDone={onClose} />
   }
 
@@ -397,6 +450,35 @@ export default function ListingEditor({
   // applies (resourceStore's validateSubmission), so Send is never on for
   // something that would be refused.
   const visible = (f: CategoryField) => fieldIsVisible(f, details)
+
+  // A field a change on To do changed (`hosted.marks`): Changed by its
+  // label, and what the listing said under it (R5Link). A long one's own
+  // editor marks it (a minyan, a dish); a note marks its new words.
+  const marks = !!hosted?.marks && !creating
+  function marked(type: CategoryField['type'] | 'name' | 'address' | 'phone', was: unknown, now: unknown, field?: CategoryField): { was: string | null } | null {
+    if (!marks || sameFieldValue(type, was, now)) return null
+    if (type === 'textarea' || type === 'contacts' || type === 'minyanim') return { was: null }
+    const before = field ? fmt(was, field) : String(was ?? '').trim() || '—'
+    // A link as it's read: "keystone-k.org" (R5Link).
+    const shown = type === 'url' ? before.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') : before
+    return { was: before === '—' ? 'Wasn’t on the listing' : `Was ${shown}` }
+  }
+  const markedLabel = (text: string, htmlFor: string | undefined, m: { was: string | null } | null) => (
+    <div className="mb-1.5 flex items-center gap-2">
+      <label htmlFor={htmlFor} className={`${fieldLabel} mb-0`}>
+        {text}
+      </label>
+      {m && <ChangedTag />}
+    </div>
+  )
+  const wasLine = (m: { was: string | null } | null) => m?.was && <p className="mt-1 whitespace-pre-line text-[13.5px] text-muted">{m.was}</p>
+  /** The field whose label the row's title says (a one-field row). */
+  const titleField = (r: EditorRow): CategoryField | null => {
+    const only = r.fields.filter(visible)
+    const same = (a?: string) => !!a && a.trim().toLowerCase() === r.title.trim().toLowerCase()
+    return r.kind === 'fields' && only.length === 1 && (same(only[0].label) || same(only[0].shortLabel)) ? only[0] : null
+  }
+
   const requiredMissing = creating ? category.detailFields.filter((f) => f.required && visible(f) && isBlank(details[f.key])) : []
   const missing = creating
     ? [!draft.name.trim() && 'Name', hasAddress && !draft.address.trim() && 'Address', ...requiredMissing.map((f) => f.label)].filter((x): x is string => !!x)
@@ -519,20 +601,22 @@ export default function ListingEditor({
         </EditorEmptyRows>
       )}
       {errors}
-      {foot(
-        adminSave?.beside ? (
-          <div className="flex items-center gap-2.5">
-            <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+      {/* A host's own buttons send it (a new place on To do). */}
+      {!hosted &&
+        foot(
+          adminSave?.beside ? (
+            <div className="flex items-center gap-2.5">
+              <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+                {sendLabel}
+              </button>
+              {adminSave.beside}
+            </div>
+          ) : (
+            <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
               {sendLabel}
             </button>
-            {adminSave.beside}
-          </div>
-        ) : (
-          <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
-            {sendLabel}
-          </button>
-        ),
-      )}
+          ),
+        )}
     </div>
   )
 
@@ -540,27 +624,50 @@ export default function ListingEditor({
   // Declarations, not consts: the list above opens a short row in place,
   // so it calls these before they're reached.
   function fieldInput(f: CategoryField, label?: string, labelHidden = false) {
+    // A note's new words are marked in it instead (R1Women).
+    const m = f.type === 'contacts' || f.type === 'textarea' ? null : marked(f.type, item[f.key], details[f.key], f)
+    if (m) {
+      return (
+        <div key={f.key}>
+          {!labelHidden && markedLabel(`${label ?? f.label}${f.required ? ' *' : ''}`, undefined, m)}
+          {plainInput(f, label, true)}
+          {wasLine(m)}
+        </div>
+      )
+    }
+    return plainInput(f, label, labelHidden)
+  }
+
+  function plainInput(f: CategoryField, label?: string, labelHidden = false) {
     return f.type === 'contacts' ? (
       <ContactsEditor key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} onStep={stepFor[f.key]} place={item.name || draft.name} />
     ) : asButtons(f) ? (
       <ChoiceButtons key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} labelHidden={labelHidden} />
     ) : (
-      <DetailFieldInput key={f.key} field={f} labelOverride={label} labelHidden={labelHidden} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
+      <DetailFieldInput
+        key={f.key}
+        field={f}
+        labelOverride={label}
+        labelHidden={labelHidden}
+        value={details[f.key]}
+        onChange={(v) => setDetail(f.key, v)}
+        marksFrom={marks && f.type === 'textarea' && !sameFieldValue(f.type, item[f.key], details[f.key]) ? String(item[f.key] ?? '') : undefined}
+      />
     )
   }
 
   function rowBody(r: EditorRow): ReactNode {
     const shown = allSections && r.kind === 'audience' ? r.fields : r.fields.filter(visible)
     // A minyan or a person open: just that.
-    const only = child ? shown.filter((f) => f.key === child.key) : shown
+    const only = child ? shown.filter((f) => f.key === child.key) : narrowed(r, shown)
+    const lone = loneField(r)
     if (r.kind === 'name') {
       return (
         <>
           <div>
-            <label htmlFor="edit-name" className={fieldLabel}>
-              Name
-            </label>
+            {markedLabel('Name', 'edit-name', marked('name', item.name, draft.name))}
             <input id="edit-name" value={draft.name} onChange={(e) => draft.setName(e.target.value)} autoFocus={creating && !draft.name} className={inputClass} />
+            {wasLine(marked('name', item.name, draft.name))}
           </div>
           {shown.map((f) =>
             f.type === 'image' ? (
@@ -580,9 +687,7 @@ export default function ListingEditor({
         <>
           {hasAddress && r.part !== 'phone' && (
             <div>
-              <label htmlFor="edit-address" className={fieldLabel}>
-                Address
-              </label>
+              {markedLabel('Address', 'edit-address', marked('address', item.address, draft.address))}
               <AddressInput
                 id="edit-address"
                 value={draft.address}
@@ -592,14 +697,14 @@ export default function ListingEditor({
                 disableAutocomplete={!!preview}
                 placeholder={draft.syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
               />
+              {wasLine(marked('address', item.address, draft.address))}
             </div>
           )}
           {hasPhone && r.part !== 'address' && (
             <div>
-              <label htmlFor="edit-phone" className={fieldLabel}>
-                Phone
-              </label>
+              {markedLabel('Phone', 'edit-phone', marked('phone', item.phone, draft.phone))}
               <input id="edit-phone" type="tel" value={draft.phone} onChange={(e) => draft.setPhone(formatPhone(e.target.value))} placeholder="(555) 555-0100" className={inputClass} />
+              {wasLine(marked('phone', item.phone, draft.phone))}
             </div>
           )}
           {shown.map((f) => fieldInput(f))}
@@ -658,6 +763,7 @@ export default function ListingEditor({
           box={r.box!}
           boxTitle={r.title}
           place={item.name || draft.name}
+          nameShown={!!hosted}
           writing={minyanWriting}
           onStep={stepFor[f.key]}
           onChange={(list) => setDetail(f.key, mergeMinyanimBox(all, r.box!, list))}
@@ -674,7 +780,7 @@ export default function ListingEditor({
       const off = only.filter((f) => !on.includes(f))
       return (
         <>
-          {on.map((f) => fieldInput(f, f.shortLabel))}
+          {on.map((f) => fieldInput(f, f.shortLabel, f === lone))}
           {off.length > 0 && (
             <div className="flex flex-wrap gap-x-5">
               {off.map((f) => {
@@ -694,7 +800,7 @@ export default function ListingEditor({
     // A row of one field whose label is the row's own title ("Hours",
     // "Denomination") says it once, in the title (the user, Oct 11).
     const same = (a?: string) => !!a && a.trim().toLowerCase() === r.title.trim().toLowerCase()
-    return <>{only.map((f) => fieldInput(f, undefined, only.length === 1 && (same(f.label) || same(f.shortLabel))))}</>
+    return <>{only.map((f) => fieldInput(f, undefined, f === lone || (only.length === 1 && (same(f.label) || same(f.shortLabel)))))}</>
   }
 
   // A row holding a list, open on its own screen, in the same white card.
@@ -736,7 +842,26 @@ export default function ListingEditor({
 
   // One box's rows, open, and Send: what its Edit opens. A row's own step
   // (a minyan, a person) shows just that, without Send, as on the list.
-  const boxScreen = boxRows ? (
+  const boxScreen = boxRows && hosted ? (
+    <div className="space-y-3" data-testid="editor-box">
+      {boxRows.map((r) => (
+        <section key={r.id} aria-label={rowTitle(r)} className="space-y-3 rounded-[14px] border border-slate-200 bg-white p-4" data-testid={`editor-open-${r.id}`}>
+          {!child && (
+            <h2 className="m-0 flex items-center gap-2 text-[17px] font-bold text-slate-900">
+              {rowTitle(r)}
+              {/* A one-field row says its field in the title: Changed goes there. */}
+              {(() => {
+                const f = loneField(r) ?? titleField(r)
+                return f && f.type !== 'textarea' && marked(f.type, item[f.key], details[f.key], f) && <ChangedTag />
+              })()}
+            </h2>
+          )}
+          {rowBody(r)}
+        </section>
+      ))}
+      {errors}
+    </div>
+  ) : boxRows ? (
     <div className="space-y-4" data-testid="editor-box">
       {boxRows.map((r) => (
         <div key={r.id} className="space-y-4" data-testid={`editor-open-${r.id}`}>

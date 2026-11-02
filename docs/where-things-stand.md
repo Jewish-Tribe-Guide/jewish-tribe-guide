@@ -2285,7 +2285,7 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
-## Done Nov 2: To do is one row per place (on `redesign/oct18-fixes`)
+## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 
 The rest of the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL,
 v26). Each place is one row: its name, the oldest waiting thing's date, and a
@@ -2311,34 +2311,52 @@ opens an email to them, and shows only when they left an email. Checked on
 dev: Done took the row off To do and the nav went from 64 to 63; the row
 was then put back.
 
-**The list is built; the place screens are NOT built as drawn.** Put
-beside the boards, every screen a place opens is still the old review
-screen in the new frame. Being rebuilt, in this order:
-- Done: the menus read "All" and "Oldest first", and the filter has a tick
-  box and a count per option (K1Sort, H2Open).
-- Done: every row is dated (N1List, P1Every; the line stays grey, brown is
-  only on a place's source card). A broken check by when it started
-  failing (`troubleSince` in `todoWaiting.ts`), Google not found by when
-  Google last looked, a job's reading by the day its line ended with.
-- The frame (M2First): "Category · See the listing" and "N of M" under the
-  name; the source as a folded card; the buttons pinned at the bottom.
-- Broken checks fixed in place (R3Site, R2Menu, R6Menu/R6Give/R6After,
-  R2Google): the field in its editor, the failure in the folded source
-  ("didn't load since Oct 22"), and Read it again / Stop reading it, Give
-  its menu / No menu online, Find it on Google / Not on Google. Not a link
-  to the place.
-- Changes in the listing's own editor (M2First, R1Women, R5Link, E1Times,
-  E2Dishes): yellow, not green and red; "Changed" or "New" pills and "was
+**The place screens are rebuilt as drawn (Nov 2).** Each was put beside its
+board, on a phone and a computer:
+- The menus read "All" and "Oldest first", and the filter has a tick box
+  and a count per option (K1Sort, H2Open).
+- Every row is dated (N1List, P1Every; the line stays grey, brown is only on
+  a place's source card). A broken check by when it started failing
+  (`troubleSince` in `todoWaiting.ts`), Google not found by when Google last
+  looked, a job's reading by the day its line ended with.
+- The frame (`PlaceFrame.tsx`, M2First, N6Desk): "Category · See the
+  listing" and "N of M" under the name; the source as a folded card; the
+  buttons pinned at the bottom.
+- Broken checks fixed in place (`TodoBroken.tsx`; R3Site, R2Menu,
+  R6Menu/R6Give/R6After, R2Google, G2Stopped): the field in its editor, the
+  failure in the folded source ("didn't load since Oct 22"), and Read it
+  again / Stop reading it, Give its menu / No menu online, Find it on Google
+  / Not on Google. Not a link to the place.
+- Changes in the listing's own editor (`TodoChange.tsx`; M2First, R1Women,
+  R5Link, E1Times, E2Dishes): yellow, "Changed" or "New" pills and "Was
   6:45 AM"; buttons that name the change and follow an edit ("Change to
-  6:40 AM / Keep 6:45 AM").
-- The new place as the listing's boxes, with "Not on the listing yet"
-  (L3NewPlace). Closures, off a list, eruv, archived coming back (L1Dropped,
-  L2Back, L4Eruv, R4Back).
-- Feedback (L5Feedback): the quote large, "Form · name · time", Done pinned.
-- Then Places drops "Check broken" (`CHECKED_BY` in `fieldCoverage.ts`,
-  `PlacesList.tsx`).
-- Only a change's Edit asks before you leave. A new place's unsaved fixes
-  don't, and neither do browser Back or tapping To do in the nav.
+  6:40 AM / Keep 6:45 AM"); who sent it in the folded source.
+- A new place as the whole listing editor, its fields filled in and
+  "Not on the listing yet" beside the empty ones (`TodoNewPlace.tsx`,
+  L3NewPlace). Add to the guide sends it as sent, or with the admin's fixes
+  over it (its Google match kept); Leave it rejects it.
+- A job's reading decided on the place (`TodoReading.tsx`; L4Eruv, R4Back,
+  E2Dishes): a closure, Google's change, a menu's new dishes, an archived
+  place coming back. Each changed thing its own yellow card with "Was …";
+  a menu only its new and going dishes, "Add the 2 dishes / Don't add
+  them". Its answers are the place screen's own (`waitingAnswers.ts`).
+- Feedback (L5Feedback): the first line large and quoted, "name · email ·
+  time" under it, Done pinned, Reply beside it when they left an email.
+- Places no longer has "Check broken" in Checked by; an old
+  `?checked=broken` link shows every place.
+- A change's or a new place's unsaved edit asks before you leave.
+
+Not as drawn, on purpose or not yet:
+- L3NewPlace's red "Not on Keystone-K's page" row note isn't built.
+- R4Back's editable Kosher select and "2 disagree" pill: a reading's
+  changes are shown as lines, not editable fields. E2Dishes' "Add a dish"
+  box isn't on a menu reading either.
+- L5Feedback's grey line starts with the form's name; the header already
+  says it, so the line starts with the person's name ("No name given").
+- E1Times: the visitor's 6:40 is in the folded source, not beside the time.
+- Field labels are the general editor's, not the boards' shorter ones.
+- No "Leave it, and why". No chevrons on R2Google's rows. Cancel shows on a
+  computer only.
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 

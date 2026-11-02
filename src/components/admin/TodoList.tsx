@@ -98,9 +98,14 @@ export default function TodoList({
           {shown.length === 0 ? (
             <AdminEmpty>None here.</AdminEmpty>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-[10px] overflow-hidden divide-y divide-slate-200" data-testid="todo-places">
+            // Beside an open place, the rows run edge to edge down the
+            // column, the open one barred in blue (N6Desk).
+            <div
+              className={`bg-white border border-slate-200 rounded-[10px] overflow-hidden divide-y divide-slate-200 ${openKey ? 'md:-mx-4 md:rounded-none md:border-x-0 md:border-b-0' : ''}`}
+              data-testid="todo-places"
+            >
               {shown.map((p) => (
-                <div key={p.key} className={p.key === openKey ? 'bg-blue-50' : undefined}>
+                <div key={p.key} aria-current={p.key === openKey || undefined} className={p.key === openKey ? 'bg-blue-50 shadow-[inset_3px_0_0_var(--color-primary)]' : undefined}>
                   <AdminRow
                     onClick={() => onOpen(p)}
                     label={`Open ${p.name}`}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { approvingPart, leavingPart, reviewParts } from './reviewParts'
 import { onListingNow } from './editedFields'
-import type { CategoryField } from './categories'
+import type { CategoryConfig, CategoryField } from './categories'
 import type { Minyan } from './davening'
 import type { ResourceRow, ResourceSubmission } from '@/types'
 
@@ -73,5 +73,40 @@ describe('reviewParts', () => {
     const [kosher] = reviewParts(r, s, FIELDS)
     expect(approvingPart(s, r, kosher, FIELDS).editedFields).toEqual(['kosher', 'kosher_sometimes'])
     expect(leavingPart(s, r, kosher, FIELDS).editedFields).toEqual([])
+  })
+})
+
+// R5Link: a hechsher and its certificate's link sit in one row of the
+// listing's editor, "Kosher", so they're one part, answered together.
+describe('reviewParts, by the editor’s rows', () => {
+  const FOOD = {
+    id: 'restaurant',
+    label: 'Food',
+    detailFields: [
+      { key: 'kosherCert', label: 'Kosher Certification', type: 'select', renderAs: 'badge', caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' } },
+      { key: 'k', label: 'Kosher Certification URL', type: 'url' },
+      { key: 'phoneNote', label: 'Phone note', type: 'text' },
+    ],
+  } as unknown as CategoryConfig
+  const place = { ...row({ kosherCert: ['Keystone-K'], k: 'https://keystone-k.org' }), category: 'restaurant' } as ResourceRow
+  const change = sentFrom(place, { phone: '(215) 555-0199', details: { ...place.details, kosherCert: ['IKC'], k: 'https://mekorhabracha.org/p' }, editedFields: ['phone', 'kosherCert', 'k'] })
+
+  it('a hechsher and its link are one part, Kosher', () => {
+    const parts = reviewParts(place, change, FOOD)
+    expect(parts.map((p) => p.label)).toEqual(['Phone', 'Kosher'])
+    expect(parts[1].keys).toEqual(['kosherCert', 'k'])
+  })
+
+  it('approving it puts both on; leaving it takes both out', () => {
+    const kosher = reviewParts(place, change, FOOD)[1]
+    const on = onListingNow(approvingPart(change, place, kosher, FOOD.detailFields), place, FOOD.detailFields)
+    expect(on.details).toMatchObject({ kosherCert: ['IKC'], k: 'https://mekorhabracha.org/p' })
+    expect(on.phone).toBe(place.phone)
+    const left = leavingPart(change, place, kosher, FOOD.detailFields)
+    expect(left.editedFields).toEqual(['phone'])
+  })
+
+  it('without the category, a field each, as before', () => {
+    expect(reviewParts(place, change, FOOD.detailFields).map((p) => p.label)).toEqual(['Phone', 'Kosher Certification', 'Kosher Certification URL'])
   })
 })

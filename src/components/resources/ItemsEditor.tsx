@@ -33,6 +33,8 @@ export default function ItemsEditor({
   const [open, setOpen] = useState<string | null>(null)
   const has = (name: string) => [...always, ...sometimes].some((x) => x.toLowerCase() === name.toLowerCase())
   const removed = [...original.always, ...original.sometimes].filter((x) => !has(x))
+  // Not on the listing yet: marked New, as a minyan is (R6After).
+  const isNew = (name: string) => ![...original.always, ...original.sometimes].some((x) => x.toLowerCase() === name.toLowerCase())
 
   function add() {
     const name = text.trim()
@@ -82,7 +84,8 @@ export default function ItemsEditor({
           Add
         </button>
       </div>
-      {groups.map((g) => (
+      {/* An empty list with no heading is nothing, not a gap under Add. */}
+      {groups.filter((g) => g.label || g.names.length).map((g) => (
         <div key={g.mark}>
           {g.label && <p className="pb-0.5 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>}
           <ul className="divide-y divide-slate-200/70">
@@ -118,8 +121,14 @@ export default function ItemsEditor({
                 </li>
               ) : (
                 <li key={name}>
-                  <button type="button" onClick={() => setOpen(name)} aria-expanded={false} className="flex min-h-11.5 w-full cursor-pointer items-center text-left text-[15.5px] text-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(name)}
+                    aria-expanded={false}
+                    className={`flex min-h-11.5 w-full cursor-pointer items-center gap-2.5 text-left text-[15.5px] text-slate-900 ${isNew(name) ? '-mx-2.5 my-1 w-[calc(100%+20px)] rounded-xl bg-yellow-50 px-2.5' : ''}`}
+                  >
                     <span className="flex-1">{name}</span>
+                    {isNew(name) && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">New</span>}
                     <ChevronRightIcon className="h-4 w-4 rotate-90 text-slate-400" />
                   </button>
                 </li>

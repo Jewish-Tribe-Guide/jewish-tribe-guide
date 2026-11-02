@@ -78,6 +78,12 @@ export type WaitGroup = { key: string; job: WaitJob; page: FootLink | null; when
 
 export type Waiting = { groups: WaitGroup[]; checked: CheckedLine[] }
 
+/** What's filed as a suggestion is on To do already, a row of its own. */
+const QUEUED: readonly Decide['kind'][] = ['findings', 'off', 'archive', 'new']
+/** The groups decided on the place itself, not filed as suggestions: a
+ *  list's new place only once the guide has it archived. */
+export const ownGroups = (groups: readonly WaitGroup[]) => groups.filter((g) => !QUEUED.includes(g.decide.kind) && (g.decide.kind !== 'later' || !!g.decide.archivedId))
+
 const NONE = '—'
 const value = (v: string) => (v === NONE || !v.trim() ? 'None' : v)
 const was = (v: string) => (v === NONE || !v.trim() ? 'none' : v)

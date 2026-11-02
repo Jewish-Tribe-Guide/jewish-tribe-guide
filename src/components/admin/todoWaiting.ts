@@ -1,6 +1,6 @@
 import { didntLoad } from '@/lib/watchJobs'
 import { linkBroken } from '@/lib/linkCheck'
-import { waitingGroups, type Decide } from './waitingGroups'
+import { ownGroups, waitingGroups, type Decide } from './waitingGroups'
 import { jobsSettled, troublesOf, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 
@@ -13,7 +13,9 @@ export type TodoWaiting = { id: string; name: string; kind: string; line: string
 /** `since`: when each broken check started failing, the row's date (J1Dates,
  *  N1List: every place on To do is dated). */
 export type TodoNotRead = { id: string; name: string; line: string; since?: (string | null)[] }
-const NO_EMAIL = 'No email has come in 3 weeks'
+/** P2Words: "Their email came 3 weeks ago", from when it last came. */
+export const emailCame = (at: string, now: number) => `Their email came ${Math.floor((now - Date.parse(at)) / WEEK)} weeks ago`
+const WEEK = 7 * 24 * 60 * 60 * 1000
 
 const earliest = (dates: readonly (string | null | undefined)[]) => dates.filter((d): d is string => !!d).sort()[0] ?? null
 type Failing = { active: boolean; failingSince: string | null; lastRunAt: string | null; lastOkAt: string | null; lastError: string | null }
@@ -46,7 +48,6 @@ export function troubleSince(id: string, trouble: string, jobs: Jobs, now: numbe
   return null
 }
 
-const QUEUED: readonly Decide['kind'][] = ['findings', 'off', 'archive', 'new']
 
 /** Its own words for one with no words of its own ("3 changes" says nothing
  *  beside the others): where the change came from. */
@@ -79,12 +80,13 @@ export function notBeingRead(jobs: Jobs, now: number): TodoNotRead[] {
     for (const p of jobs.times?.places ?? []) {
       const live = p.newsletters?.filter((w) => w.active) ?? []
       if (!out.has(p.id) && live.length > 0 && live.every((w) => quiet(w.pageChangedAt ?? w.createdAt))) {
-        out.set(p.id, { id: p.id, name: p.name, line: NO_EMAIL, since: [earliest(live.map((w) => w.pageChangedAt ?? w.createdAt))] })
+        const last = live.map((w) => w.pageChangedAt ?? w.createdAt).sort().at(-1)!
+        out.set(p.id, { id: p.id, name: p.name, line: emailCame(last, now), since: [last] })
       }
     }
   }
   if (!jobs.runs?.off?.includes('eruvs')) {
-    for (const e of jobs.eruvim?.eruvim ?? []) if (e.statusEmail && quiet(e.statusCheckedAt)) out.set(e.id, { id: e.id, name: e.name, line: NO_EMAIL, since: [e.statusCheckedAt ?? null] })
+    for (const e of jobs.eruvim?.eruvim ?? []) if (e.statusEmail && e.statusCheckedAt && quiet(e.statusCheckedAt)) out.set(e.id, { id: e.id, name: e.name, line: emailCame(e.statusCheckedAt, now), since: [e.statusCheckedAt] })
   }
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -99,7 +101,7 @@ export function waitingNotQueued(jobs: Jobs, now: number): TodoWaiting[] {
       .filter((p) => p.state === 'waiting')
       .flatMap((p) => {
         const { groups } = waitingGroups(p.id, jobs, now)
-        const own = groups.filter((g) => !QUEUED.includes(g.decide.kind) && (g.decide.kind !== 'later' || !!g.decide.archivedId))
+        const own = ownGroups(groups)
         if (groups.length > 0 && own.length === 0) return []
         return [{ id: p.id, name: p.name, kind: k.label, line: lineOf(p.pill, own[0]?.decide.kind) }]
       }),
