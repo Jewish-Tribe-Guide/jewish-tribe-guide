@@ -79,3 +79,23 @@ test('the old Archived tab opens Places on Archived', async ({ page }) => {
   await expect(page).toHaveURL(/\/philly\/admin\/places\?show=archived$/)
   await expect(page.getByRole('button', { name: 'On the site: Archived' })).toBeVisible()
 })
+
+// The user, Nov 2: Checked by opened off the screen, and the page could then
+// be moved sideways. jsdom has no layout, so this runs on a phone's width.
+for (const width of [390, 320]) {
+  test(`on a ${width}px phone, each Places menu opens on the screen`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await page.goto('/philly/admin/places')
+    for (const name of ['On the site', 'Category', 'Checked by']) {
+      const button = page.getByRole('button', { name: new RegExp(`^${name}:`) })
+      await expect(button).toBeEnabled({ timeout: 30_000 })
+      await button.click()
+      const box = (await page.getByRole('menu', { name }).boundingBox())!
+      expect(box.x, `${name} starts off the screen`).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width, `${name} ends off the screen`).toBeLessThanOrEqual(width)
+      const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(sideways, `${name} lets the page move sideways`).toBe(0)
+      await page.keyboard.press('Escape')
+    }
+  })
+}
