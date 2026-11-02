@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
@@ -14,6 +15,7 @@ import AddPlace from './AddPlace'
 import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
+import { AddButton } from '@/components/AddButton'
 import { coverageOf, troublesOf, useWatchJobsAndReload } from './useWatchJobs'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
@@ -60,15 +62,7 @@ function setAddressParam(name: string, value: string, fallback: string) {
   window.history.replaceState(window.history.state, '', url)
 }
 
-function Plus() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M8 3v10M3 8h10" />
-    </svg>
-  )
-}
-
-/** "142 pages · read last night", for Watches at the foot of the list. */
+/** "142 pages · read last night", for Watches at the top of the list. */
 function useWatchesLine(token: string, community: string, now: number): string | undefined {
   const [line, setLine] = useState<string>()
   useEffect(() => {
@@ -81,6 +75,26 @@ function useWatchesLine(token: string, community: string, now: number): string |
     }
   }, [token, community, now])
   return line
+}
+
+/** Ringed like Synagogues' Minyanim row, the way it's seen (WatchE19, Nov 1):
+ *  the one row here that isn't a place. No chevron, as drawn. */
+function WatchesRow({ href, line }: { href: string; line: string | undefined }) {
+  return (
+    <Link href={href} data-testid="places-watches" className="flex items-center gap-3 rounded-2xl border-[1.5px] border-emerald-600 bg-white px-3.5 py-3 transition-colors hover:bg-emerald-50">
+      <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+          <circle cx="8" cy="8" r="2" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-extrabold text-ink">Watches</span>
+        {/* Keeps its height while the count loads, so the list doesn't jump. */}
+        <span className="mt-0.5 block min-h-[1.3em] text-[14px] leading-snug text-slate-700">{line}</span>
+      </span>
+    </Link>
+  )
 }
 
 export default function PlacesList({ token }: { token: string }) {
@@ -223,24 +237,9 @@ export default function PlacesList({ token }: { token: string }) {
   const shown = all ? rows : rows.slice(0, SHOWN)
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="-mt-2 flex flex-wrap items-center gap-3">
-        <span className="flex-1" />
-        {adding === null && (
-          <button
-            type="button"
-            onClick={() => {
-              // A category picked above is the one it's added to.
-              if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
-              else setAdding('')
-            }}
-            className={primary}
-          >
-            <Plus />
-            Add a place
-          </button>
-        )}
-      </div>
+    // pb-14: the floating Add clears the last row and Show all.
+    <div className="flex flex-col gap-4 pb-14">
+      <WatchesRow href={`${base}/watches`} line={watches} />
 
       {adding === '' && (
         <AdminBox title="Add a place">
@@ -343,9 +342,21 @@ export default function PlacesList({ token }: { token: string }) {
           </div>
         </section>
       )}
-      <section aria-label="Watches" className="bg-white border border-slate-200 rounded-[10px] overflow-hidden">
-        <AdminRow href={`${base}/watches`} name="Watches" line={watches} />
-      </section>
+      {adding === null && (
+        <AddButton
+          label="Add a place"
+          onClick={() => {
+            // A category picked above is the one it's added to.
+            if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
+            else {
+              setAdding('')
+              // It floats, so it can be tapped from far down the list; what
+              // it opens is at the top.
+              window.scrollTo?.(0, 0)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
