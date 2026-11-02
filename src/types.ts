@@ -238,6 +238,9 @@ export type ResourceSubmission = {
   /** Coordinates captured client-side from the address autocomplete, if any.
    *  When present, the server skips geocoding and uses these directly. */
   geo?: { lat: number; lng: number } | null
+  /** An edit's: the fields it changes, worked out when it was filed, so
+   *  approving it changes only those (editedFields.ts). Set by the server. */
+  editedFields?: string[]
 }
 
 // ── Moderation queue (the `submission` table) ──────────────────────────────────

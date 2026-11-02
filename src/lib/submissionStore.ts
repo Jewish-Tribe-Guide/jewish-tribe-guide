@@ -18,6 +18,7 @@ import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
 import { keepOnly } from './watchFindings'
+import { editedFields, onListingNow } from './editedFields'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -93,7 +94,13 @@ export async function listSubmissionsByStatus(
       return { ...s, current: null, categoryLabel: categoryLabel(s, null), currentEruv: e ? { name: e.name, covers: e.covers, website: e.website, hotline: e.hotline, alertsUrl: e.alertsUrl } : null }
     }
     const current = s.target_id ? byId.get(s.target_id) ?? null : null
-    return { ...s, current, categoryLabel: categoryLabel(s, current) }
+    // A pending edit as approving it would go on the listing now: only its
+    // own fields (editedFields.ts), so it never shows another's undone.
+    const fields = categories.find((c) => c.id === current?.category)?.detailFields
+    const payload = status === 'pending' && s.operation === 'update' && s.target_type === 'listing' && current && fields
+      ? (onListingNow(s.payload as unknown as ResourceSubmission, current, fields) as unknown as Record<string, unknown>)
+      : s.payload
+    return { ...s, payload, current, categoryLabel: categoryLabel(s, current) }
   })
 }
 
@@ -157,12 +164,19 @@ export async function submitListingUpdate(
   note: string | null,
   submittedBy: { name?: string; email?: string } | null,
 ): Promise<SubmissionRow> {
+  // The fields it changes, against the listing as it is now: approving it
+  // changes only those (editedFields.ts). Never what the sender said.
+  const sent: ResourceSubmission = { ...payload }
+  delete sent.editedFields
+  const { data: row } = await getAdminClient().from('resource').select('*').eq('community_id', community).eq('id', targetId).maybeSingle()
+  const category = row ? await getCategoryById(community, (row as ResourceRow).category) : null
+  const filed: ResourceSubmission = row && category ? { ...sent, editedFields: editedFields(normalizeRow(row as ResourceRow), sent, category.detailFields) } : sent
   return insertSubmission({
     community_id: community,
     operation: 'update',
     target_type: 'listing',
     target_id: targetId,
-    payload: payload as unknown as Record<string, unknown>,
+    payload: filed as unknown as Record<string, unknown>,
     note,
     submitted_by: submittedBy,
   })
@@ -362,6 +376,17 @@ export async function approveSubmission(
   const submission = sub as SubmissionRow
   if (community && submission.community_id !== community) {
     throw new Error(`Submission not found: ${id}`)
+  }
+
+  // An edit goes on the listing as it is now, changing only its own fields
+  // (editedFields.ts): another edit approved since stays approved. The
+  // admin's Edit, a line-by-line approval and a part or section all start
+  // from this.
+  if (submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id && Array.isArray((submission.payload as { editedFields?: unknown }).editedFields)) {
+    const { data: row, error: rowErr } = await supabase.from('resource').select('*').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const category = await getCategoryById(submission.community_id, (row as ResourceRow).category)
+    submission.payload = onListingNow(submission.payload as unknown as ResourceSubmission, row as ResourceRow, category?.detailFields ?? []) as unknown as Record<string, unknown>
   }
 
   let savedPayload: Record<string, unknown> | null = null

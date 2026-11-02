@@ -193,6 +193,43 @@ describe('submissionStore (integration)', () => {
     expect(Date.parse(after!.details.confirmedAt)).toBeGreaterThanOrEqual(before - 1000)
   })
 
+  // Nov 2: two people edit one place, each from the listing as it was. An
+  // edit carried the whole listing, so approving the second put back what
+  // the first had changed (editedFields.ts). Now each changes only its own
+  // fields, and the queue shows the second as only what it changes.
+  it('approving two people’s edits to one place keeps both', async () => {
+    const category = await createCategory('philly', {
+      label: `Integration Test ${randomUUID().slice(0, 8)}`,
+      fields: [{ key: 'hours', label: 'Hours', type: 'text' }, { key: 'notes', label: 'Notes', type: 'textarea' }],
+    })
+    pendingCategoryIds.push(category.id)
+    const name = `Integration Listing ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const listed = { hours: 'Sun–Thu 9–5', notes: 'Ring the bell.', kept: 'yes' }
+    await getAdminClient().from('resource').update({ phone: '(215) 555-0100', details: listed }).eq('id', created!.id)
+    const asSeen = { ...listingPayload(category.id, name), phone: '(215) 555-0100', details: listed }
+
+    // Both from the listing as it was: one changes the phone and the hours,
+    // the other the name and the notes.
+    const first = await submitListingUpdate('philly', created!.id, { ...asSeen, phone: '(215) 555-0123', details: { ...listed, hours: 'Sun–Fri 9–5' } }, null, null)
+    const second = await submitListingUpdate('philly', created!.id, { ...asSeen, name: `${name} Renamed`, details: { ...listed, notes: 'Knock.' } }, null, null)
+    pendingSubmissionIds.push(first.id, second.id)
+    await approveSubmission(first.id)
+
+    const shown = (await listPendingSubmissions('philly')).find((s) => s.id === second.id)!.payload as unknown as ResourceSubmission
+    expect(shown.phone).toBe('(215) 555-0123')
+    expect(shown.details.hours).toBe('Sun–Fri 9–5')
+
+    await approveSubmission(second.id)
+    const { data: after } = await getAdminClient().from('resource').select('name, phone, details').eq('id', created!.id).single()
+    expect(after!.name).toBe(`${name} Renamed`)
+    expect(after!.phone).toBe('(215) 555-0123')
+    expect(after!.details).toMatchObject({ hours: 'Sun–Fri 9–5', notes: 'Knock.', kept: 'yes' })
+  })
+
   // Oct 21: a shul's times are filed a part at a time (timesParts.ts), each
   // from the listing as it was read. Approved, a part goes on the listing
   // as it is then, so approving the Shabbos times can't undo the weekday

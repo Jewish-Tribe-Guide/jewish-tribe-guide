@@ -2285,6 +2285,24 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 2: approving a second edit no longer undoes the first (on `redesign/oct18-fixes`)
+
+Found by the user. An edit carries the whole listing as its sender saw it,
+and approving it wrote all of it. So when two people edited one place (one
+the phone, one the hours) and both were approved, the second put the old
+phone back, with nothing to show it had. Now an edit records, when it's
+filed, which fields it changes against the listing as it is then
+(`editedFields.ts`), and approving it puts only those on the listing as it
+is now. The queue reads pending edits the same way, so the second edit
+shows only the hours, not the phone going back. The website reader's times
+and hours, read a part at a time, already worked like this.
+
+Left as they were: an edit filed before this has no record of its fields
+and is still approved whole. And someone who opens a listing, then sends
+an edit after another was approved in between, still has the in-between
+change counted as theirs. The window is minutes, not days. Closing it would
+mean the editor sending what it loaded, too.
+
 ## Done Oct 29: deleting a community clears all of it, and works on the live site (on `redesign/oct18-fixes`)
 
 Deleting a community (Settings gear → Communities, superadmins only) swept
