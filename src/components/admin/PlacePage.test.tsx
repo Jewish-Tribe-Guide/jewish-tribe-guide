@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -389,6 +389,8 @@ describe('PlacePage', () => {
         payload: { category: 'synagogue', name: 'Kesher Israel', address: '', details: { minyanim: [] } },
         current: { id: 'a', category: 'synagogue', name: 'Kesher Israel', address: '', details: { minyanim: [{ id: 'm', tefillah: 'Mincha', time: '16:50', days: [0] }] } },
       }
+      let release: () => void = () => {}
+      let held: Promise<void> = Promise.resolve()
       /** A read, as its routes answer. `filed`: what it files, in the queue. */
       const readPage = (answer: { lastError?: string | null; filed?: boolean; findings?: unknown[] } = {}) => {
         let read = false
@@ -402,7 +404,7 @@ describe('PlacePage', () => {
           }
           if (init?.method === 'PATCH') return { ok: true }
           if (url.includes('/found')) return { ok: true, found: read && answer.filed ? [{ id: 'sub-1', payload: {} }] : [] }
-          if (url.includes('/api/admin/submissions')) return { ok: true, submissions: [change] }
+          if (url.includes('/api/admin/submissions')) return held.then(() => ({ ok: true, submissions: [change] }))
           if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }
           if (url.includes('/api/admin/listings')) return { ok: true, places: [row()], categories: [shulCategory] }
           if (url.includes('job=times')) return { name: 'Shul times', places: [{ ...shul, findings: read ? answer.findings ?? [] : [] }] }
@@ -427,11 +429,18 @@ describe('PlacePage', () => {
       })
 
       it('differing, it opens To do’s change screen; Back leaves it waiting, not answered', async () => {
+        held = new Promise((done) => { release = done })
         const finding = { id: 'sub-1', from: 'its website', lines: [{ key: 'minyanim', label: 'Times', before: '', after: '' }] }
         await readPage({ filed: true, findings: [finding] })
         const user = userEvent.setup()
         await user.click(await openRow(user))
+        // Still reading until its screen is up, not a line that flashes past.
+        await waitFor(() => expect(vi.mocked(fetchJson).mock.calls.some(([url]) => String(url).includes('/api/admin/submissions'))).toBe(true))
+        expect(screen.getAllByTestId('row-source')[0]).toHaveTextContent('Reading its website…')
+        const scrolled = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+        release()
         const review = await screen.findByTestId('change-review')
+        expect(scrolled).toHaveBeenCalledWith(0, 0)
         expect(within(review).getByRole('button', { name: 'Update the listing' })).toBeTruthy()
         expect(review).not.toHaveTextContent('1 of 1')
         await user.click(within(review).getByRole('button', { name: /Back/ }))

@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -256,6 +256,11 @@ export default function PlaceListing({
   const [changeError, setChangeError] = useState<string | null>(null)
   const [menuChange, setMenuChange] = useState(false)
   const [editorRound, setEditorRound] = useState(0)
+  // What it found opens from wherever the row was, and starts at its top.
+  const foundOpen = !!change || menuChange
+  useEffect(() => {
+    if (foundOpen) window.scrollTo?.(0, 0)
+  }, [foundOpen])
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
@@ -389,13 +394,13 @@ export default function PlaceListing({
     const error = rowError?.row === row.id && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{rowError.text}</p>
     // Typed over or cleared, Google doesn't get it back on saving.
     if (line.googleStop && changed) return <SourceWords line={{ text: 'Google stops keeping this' }} />
+    const readKey = line.read && JSON.stringify(line.read)
+    if (line.read && reading === readKey) return <SourceWords line={{ text: `Reading ${line.read.what}…` }} />
     // Back from what a read found without answering: it waits here, and in To do.
     const waiting = rowFinding(place.id, jobs, row)
     if (waiting) return <SourceWords line={{ text: `${waiting.from} has a change` }} controls={[control('Open', () => void openChange(waiting.id))]} />
     const food = row.kind === 'items' && jobs.dishes?.find((p) => p.id === place.id)
     if (food && food.reading?.status === 'proposed' && dishStatus(food) === 'differs') return <SourceWords line={{ text: 'Its menu has a change' }} controls={[control('Open', () => setMenuChange(true))]} />
-    const readKey = line.read && JSON.stringify(line.read)
-    if (line.read && reading === readKey) return <SourceWords line={{ text: `Reading ${line.read.what}…` }} />
     const failed = readFailed && readFailed.read === readKey && <SourceWords line={{ text: readFailed.text, red: true }} />
     const dated = (l: SourceLine) => (l.read && readJust.includes(JSON.stringify(l.read)) ? { ...l, when: 'just now' } : l)
     const readControl = (l: SourceLine) => (l.read ? [control('Read now', () => void readNow(row, l.read!))] : [])
