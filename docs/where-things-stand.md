@@ -2239,12 +2239,16 @@ says "The guide's Gmail isn't set up".
 
 **Drawn Nov 1, not built (the *15 boards, four new rows at the foot of the Watches
 canvas):** no Menu link box on Add, because Change on the source line already gives
-the menu page (saved listings hide the box already; a visitor's Edit listing keeps
-it, having no source line). Watches as a link beside Add a place, nothing at the
+the menu page (saved listings hide the box already). **Decided: visitors lose it too**
+(the reader and "+ Add" cover it); the listing keeps its Full menu link. Watches as a link beside Add a place, nothing at the
 foot of Places, its count line on the Watches page. The main site's bottom bar in
-the admin bar's grey, weight and solid white. Read now on a saved place: only what
-differs, Use it fills the row, Update the listing saves; an agreeing read just
-dates it; none on Google's rows. Waiting on the user's reaction.
+the admin bar's grey, weight and solid white. Read now on a saved place: an agreeing read just
+dates it; none on Google's rows. When it differs, the user's idea, it uses To do's
+change screen (the *16 boards): filed as the nightly read would, same three answers,
+and left unanswered it waits on the row and in To do. The *15 Use it boards stay
+beside them to compare. Waiting on the user's reaction. Noticed: To do has two
+screens today, ChangeReview for pages' findings (Update the listing, Edit, Leave it)
+and OpenedPlace for menus and Google (Accept, Edit, Keep as is).
 
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
