@@ -2216,6 +2216,13 @@ a website's phone and email, a menu, Refuah and an eruv's status page, and fills
 the rows with nothing saved; a food place shows at once if it's on the kosher lists,
 from their kept copy, with Use it.
 
+**Add a place, all boards built and compared (Nov 1).** Not as drawn: rows follow
+the saved listing, so a shul has an Address row and "Usual weekday" and "Usual
+Shabbos times" rather than one "Usual minyan times"; adding an eruv doesn't look in
+the Gmail (only Read now; the hourly check covers it); a food place's dishes on Add
+go to the Dishes page. A mikvah section can't be said to exist on Add with nothing
+written in it; tick it on the listing's What's here afterwards.
+
 **Read now for email, built (the *14 boards).** The Gmail script can be deployed as
 a web app: two more setup steps (Deploy it, Paste its link), the link tried at once
 and kept only if it answers with this community's key. An email line says Read now
