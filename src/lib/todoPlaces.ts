@@ -22,7 +22,7 @@ export type TodoThing =
   /** What a job read, decided on the place itself. */
   | { kind: 'waiting'; id: string; label: string; filter: 'changes' }
   /** A check that has stopped working. */
-  | { kind: 'broken'; id: string; label: string; filter: 'broken'; unmatched?: boolean }
+  | { kind: 'broken'; id: string; label: string; filter: 'broken'; unmatched?: boolean; since?: string | null }
   | { kind: 'feedback'; id: string; label: string; filter: 'feedback'; response: TodoResponse }
 
 export type TodoPlace = {
@@ -56,9 +56,20 @@ function submissionThings(s: EnrichedSubmission, category: CategoryConfig | unde
   return one(changeWhat(s, category), 'changes')
 }
 
+/** "Oct 12", as a line says it, as the latest such day not after `now`. */
+export function dayToIso(day: string, now: number): string | null {
+  const year = new Date(now).getUTCFullYear()
+  for (const y of [year, year - 1]) {
+    const t = Date.parse(`${day}, ${y} 12:00 UTC`)
+    if (!Number.isNaN(t) && t <= now + 86_400_000) return new Date(t).toISOString()
+  }
+  return null
+}
+
 export function todoPlaces(
   data: { submissions: EnrichedSubmission[]; responses: TodoResponse[]; unmatched: TodoUnmatched[]; waiting?: TodoWaiting[]; notRead?: TodoNotRead[] },
   categoriesById: Map<string, CategoryConfig>,
+  now = Date.now(),
 ): TodoPlace[] {
   const places = new Map<string, TodoPlace>()
   const at = (key: string, name: string, placeId: string | null) => {
@@ -77,12 +88,26 @@ export function todoPlaces(
     dated(p, s.created_at)
   }
   // Its date is the row's to show, not the line's.
-  for (const w of data.waiting ?? []) at(w.id, w.name, w.id).things.push({ kind: 'waiting', id: `waiting:${w.id}`, label: w.line.replace(/ · [A-Z][a-z]{2} \d{1,2}$/, ''), filter: 'changes' })
+  for (const w of data.waiting ?? []) {
+    const p = at(w.id, w.name, w.id)
+    const day = / · ([A-Z][a-z]{2} \d{1,2})$/.exec(w.line)?.[1]
+    p.things.push({ kind: 'waiting', id: `waiting:${w.id}`, label: w.line.replace(/ · [A-Z][a-z]{2} \d{1,2}$/, ''), filter: 'changes' })
+    const iso = day && dayToIso(day, now)
+    if (iso) dated(p, iso)
+  }
   for (const n of data.notRead ?? []) {
     const p = at(n.id, n.name, n.id)
-    n.line.split(' · ').forEach((label, i) => p.things.push({ kind: 'broken', id: `broken:${n.id}:${i}`, label, filter: 'broken' }))
+    n.line.split(' · ').forEach((label, i) => {
+      const since = n.since?.[i] ?? null
+      p.things.push({ kind: 'broken', id: `broken:${n.id}:${i}`, label, filter: 'broken', since })
+      if (since) dated(p, since)
+    })
   }
-  for (const u of data.unmatched) at(u.id, u.name, u.id).things.push({ kind: 'broken', id: `unmatched:${u.id}`, label: 'Google not found', filter: 'broken', unmatched: true })
+  for (const u of data.unmatched) {
+    const p = at(u.id, u.name, u.id)
+    p.things.push({ kind: 'broken', id: `unmatched:${u.id}`, label: 'Google not found', filter: 'broken', unmatched: true, since: u.at ?? null })
+    if (u.at) dated(p, u.at)
+  }
   for (const r of data.responses) {
     const p = at(`response:${r.id}`, r.title, null)
     p.things.push({ kind: 'feedback', id: `response:${r.id}`, label: r.line || 'Feedback', filter: 'feedback', response: r })

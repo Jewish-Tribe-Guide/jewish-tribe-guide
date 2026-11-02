@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firstThing, placeLine, shownPlaces, todoPlaceCount, todoPlaces } from './todoPlaces'
+import { dayToIso, firstThing, placeLine, shownPlaces, todoPlaceCount, todoPlaces } from './todoPlaces'
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import type { CategoryConfig } from './categories'
@@ -45,6 +45,32 @@ describe('todoPlaces', () => {
     }
     expect(todoPlaceCount(data)).toBe(3)
     expect(placeLine(todoPlaces(data, cats).find((p) => p.key === 'p2')!)).toBe('Closed for now, says Google')
+  })
+
+  // N1List, P1Every: every row is dated. A broken check by when it started
+  // failing, Google not found by when Google was asked, a job's reading by
+  // the day its line ends with.
+  it('dates a place with only broken checks, and a job’s reading', () => {
+    const places = todoPlaces(
+      {
+        submissions: [],
+        responses: [],
+        unmatched: [{ id: 'p3', name: 'Mike’s Chicken', category: 'food', at: '2026-10-30T07:00:00Z' }],
+        waiting: [{ id: 'p2', name: 'Rita’s', kind: 'Food', line: 'Closed for now, says Google · Oct 17' }],
+        notRead: [{ id: 'p1', name: '20th Street Pizza', line: 'Website didn’t load · Menu didn’t load', since: ['2026-10-25T07:00:00Z', '2026-10-22T07:00:00Z'] }],
+      },
+      cats,
+      Date.parse('2026-11-02T12:00:00Z'),
+    )
+    expect(places.map((p) => [p.name, p.at])).toEqual([
+      ['Rita’s', '2026-10-17T12:00:00.000Z'],
+      ['20th Street Pizza', '2026-10-22T07:00:00Z'],
+      ['Mike’s Chicken', '2026-10-30T07:00:00Z'],
+    ])
+  })
+
+  it('a line’s "Dec 30" read in January is last year', () => {
+    expect(dayToIso('Dec 30', Date.parse('2027-01-03T12:00:00Z'))).toBe('2026-12-30T12:00:00.000Z')
   })
 
   it('says each kind in the board’s words', () => {

@@ -154,8 +154,8 @@ describe('watchesLine', () => {
 })
 
 describe('places to find on Google', () => {
-  const p = (id: string, matched: boolean, notOnGoogle: string | null) => ({ id, name: id, category: 'mikvah', matched, notOnGoogle })
-  it('only a place with no match that nobody has said is not on Google', () => {
-    expect(unmatchedPlaces([p('a', false, null), p('b', true, null), p('c', false, '2026-10-01')])).toEqual([{ id: 'a', name: 'a', category: 'mikvah' }])
+  const p = (id: string, matched: boolean, notOnGoogle: string | null) => ({ id, name: id, category: 'mikvah', matched, notOnGoogle, readAt: '2026-10-30T07:00:00Z' })
+  it('only a place with no match that nobody has said is not on Google, dated by when Google was last asked', () => {
+    expect(unmatchedPlaces([p('a', false, null), p('b', true, null), p('c', false, '2026-10-01')])).toEqual([{ id: 'a', name: 'a', category: 'mikvah', at: '2026-10-30T07:00:00Z' }])
   })
 })

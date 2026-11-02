@@ -2316,8 +2316,10 @@ beside the boards, every screen a place opens is still the old review
 screen in the new frame. Being rebuilt, in this order:
 - Done: the menus read "All" and "Oldest first", and the filter has a tick
   box and a count per option (K1Sort, H2Open).
-- Rows: broken parts in brown in the grey line, and a date on a row with
-  only broken checks (M1List).
+- Done: every row is dated (N1List, P1Every; the line stays grey, brown is
+  only on a place's source card). A broken check by when it started
+  failing (`troubleSince` in `todoWaiting.ts`), Google not found by when
+  Google last looked, a job's reading by the day its line ended with.
 - The frame (M2First): "Category · See the listing" and "N of M" under the
   name; the source as a folded card; the buttons pinned at the bottom.
 - Broken checks fixed in place (R3Site, R2Menu, R6Menu/R6Give/R6After,

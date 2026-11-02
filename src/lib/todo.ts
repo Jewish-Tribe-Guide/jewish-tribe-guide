@@ -79,10 +79,11 @@ export function teachable(term: string): boolean {
 /** A place Google has no match for and nobody has said why: pick the right
  *  match or say Not on Google, once (the user, Oct 31). It's a decision, so
  *  it's here and not under Watches' Needs fixing. */
-export type TodoUnmatched = { id: string; name: string; category: string }
+/** `at`: when Google was last asked and didn't find it, the row's date. */
+export type TodoUnmatched = { id: string; name: string; category: string; at?: string | null }
 
-export function unmatchedPlaces(places: readonly { id: string; name: string; category: string; matched: boolean; notOnGoogle: unknown }[]): TodoUnmatched[] {
-  return places.filter((p) => !p.matched && !p.notOnGoogle).map(({ id, name, category }) => ({ id, name, category }))
+export function unmatchedPlaces(places: readonly { id: string; name: string; category: string; matched: boolean; notOnGoogle: unknown; readAt?: string | null }[]): TodoUnmatched[] {
+  return places.filter((p) => !p.matched && !p.notOnGoogle).map(({ id, name, category, readAt }) => ({ id, name, category, at: readAt ?? null }))
 }
 
 /** A suggestion's name, as its row shows it. */

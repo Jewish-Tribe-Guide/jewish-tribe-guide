@@ -25,6 +25,9 @@ export type TodoData = {
   waiting?: TodoWaiting[]
   /** A source that has stopped being read. Loaded with `waiting`. */
   notRead?: TodoNotRead[]
+  /** Every job's reading, for a place's screen: its sources and their
+   *  fixes. Loaded with `waiting`. */
+  jobs?: Jobs
   /** What the setup checklist ticks off; null if it couldn't be read, so
    *  no checklist shows rather than a wrong one. */
   setup: SetupState | null
@@ -84,6 +87,7 @@ async function load(key: string, token: string, community: string, email: string
       // Kept until the jobs answer again, so the count doesn't dip meanwhile.
       waiting: state.data?.waiting,
       notRead: state.data?.notRead,
+      jobs: state.data?.jobs,
     },
   })
   void loadWaiting(key, token, community)
@@ -97,7 +101,7 @@ async function loadWaiting(key: string, token: string, community: string) {
   const load = ++waitingLoads
   const jobs: Jobs = {}
   await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
-  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()) }))
+  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()), jobs }))
 }
 
 /** Loads To do (again, with `fresh`), sharing a load already under way. */
