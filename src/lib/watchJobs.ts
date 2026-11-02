@@ -69,11 +69,14 @@ export function dishStatus(p: DishPlace): DishPlaceStatus {
 }
 
 /** A watch whose page didn't open on its last run, or that hasn't run in
- *  two days. */
+ *  two days. Not one that failed for want of our own browser: that's ours,
+ *  not the place's (runs since Nov 2 skip it; this is for those before). */
 export function didntLoad(w: Pick<Watch, 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'>, now: number): boolean {
   const state = watchHealth(w, now).state
+  if (state === 'failing' && OUR_BROWSER.test(w.lastError ?? '')) return false
   return state === 'failing' || state === 'stale'
 }
+const OUR_BROWSER = /browserType\.launch|our browser for drawing pages/
 
 /** Its menu page didn't open on the morning's check, and hasn't been read
  *  from that page since (Read now on the Dishes page). */

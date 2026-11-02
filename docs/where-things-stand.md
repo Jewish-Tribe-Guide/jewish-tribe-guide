@@ -2285,6 +2285,15 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 2: our own browser failing isn't a place's broken check (on `redesign/oct18-fixes`)
+
+Dev's runner has no browser for drawing pages, so two places showed "Main
+dishes didn't load" when their sites were fine. A browser that won't start
+is now said as ours (`no_browser`), and the nightly menu run leaves that
+menu unread, as it does one it had no time to draw, rather than failing the
+place. Failures recorded before this are not counted as "didn't load"
+either. The dev runner still has no browser; that's its own fix, later.
+
 ## Done Nov 2: a trackpad swipe back goes back one screen (on `redesign/oct18-fixes`)
 
 Found by the user: "we go into new screens and then I use the trackpad to go

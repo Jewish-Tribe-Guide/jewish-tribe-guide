@@ -88,7 +88,13 @@ export function pageRenderer(opts: { resolve?: Lookup } = {}): { render: Render 
     let context: Awaited<ReturnType<Browser['newContext']>> | null = null
     try {
       browser ??= launch()
-      context = await (await browser).newContext({
+      // Ours, not their site's: say so, so it isn't held against the page.
+      const opened = await browser.catch((err) => {
+        console.error('[renderPage] no browser', err instanceof Error ? err.message.split('\n')[0] : err)
+        return null
+      })
+      if (!opened) return fail({ why: 'no_browser' })
+      context = await opened.newContext({
         userAgent: MENU_FETCH_HEADERS['user-agent'],
         serviceWorkers: 'block',
         acceptDownloads: false,

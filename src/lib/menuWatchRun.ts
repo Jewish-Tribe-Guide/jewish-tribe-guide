@@ -141,7 +141,9 @@ export async function runMenuWatch(
 
   // A menu drawn by a script is drawn in a browser: always for "Check now",
   // within the run's budget for the daily run. One left undrawn for want
-  // of budget isn't a failure: it's read on a run with room.
+  // of budget isn't a failure: it's read on a run with room. Nor for want
+  // of the browser itself (dev's runner had none, Nov 2): that's ours, and
+  // held against the place it put a false "Main dishes didn't load" in To do.
   let undrawn = false
   const renderer = opts.renderer === undefined ? pageRenderer() : opts.renderer
   const render: Render | null =
@@ -154,7 +156,10 @@ export async function runMenuWatch(
             }
             budget.renders!--
           }
-          return renderer.render!(url, trouble)
+          return renderer.render!(url, (t) => {
+            if (t.why === 'no_browser') undrawn = true
+            trouble?.(t)
+          })
         }
       : null
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
