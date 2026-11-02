@@ -30,13 +30,9 @@ import RemovalRequest from './RemovalRequest'
 import { DetailFieldInput } from './DetailFieldInput'
 import ContactsEditor from './ContactsEditor'
 import ItemsEditor, { itemLists } from './ItemsEditor'
-import { itemsField } from '@/lib/listingView'
-import { MENU_LINK_FIELD, MENU_LINK_KEY, keepsMenuLink, readMenuLink } from '@/lib/menuLink'
-import { itemWording } from '@/lib/itemMarks'
 import MinyanBoxEditor from './MinyanBoxEditor'
 import { useListingDraft, type ListingDraft } from './useListingDraft'
 import { useListingSubmit, useTurnstileActive, type SendVia } from './useListingSubmit'
-import { menuReadText, useMenuRead } from './useMenuRead'
 import { PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
 import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, editorFieldLabel, editorInputClass } from './editorParts'
@@ -304,27 +300,6 @@ export default function ListingEditor({
   const [removalOpenState, setRemovalOpenState] = useState(false)
   const removalControlled = removalOpenProp !== undefined
   const removalOpen = removalOpenProp ?? removalOpenState
-
-  // A new menu link, read for its dishes when its box is left (useMenuRead.ts).
-  const community = useCommunitySlug()
-  const { menuRead, readMenuLinkNow } = useMenuRead({
-    enabled: challenged && keepsMenuLink(category),
-    community,
-    placeName: draft.name || item.name,
-    stored: typeof item[MENU_LINK_KEY] === 'string' ? (item[MENU_LINK_KEY] as string) : undefined,
-    token: sender.turnstileToken,
-    needsToken: turnstileActive,
-    resetToken: sender.resetTurnstile,
-    onDishes: (names) => {
-      const f = itemsField(category)
-      if (!f) return 0
-      const now = itemLists(details, f.key)
-      const have = new Set([...now.always, ...now.sometimes].map((n) => n.trim().toLowerCase()))
-      const fresh = names.filter((n, i) => !have.has(n.trim().toLowerCase()) && names.findIndex((m) => m.trim().toLowerCase() === n.trim().toLowerCase()) === i)
-      if (fresh.length > 0) setDetail(f.key, [...now.always, ...fresh])
-      return fresh.length
-    },
-  })
 
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
   // A shul's "This week's schedule" row (thisWeekEdit.ts), and for an admin
@@ -643,18 +618,6 @@ export default function ListingEditor({
               setDetail(`${f.key}_sometimes`, next.sometimes)
             }}
           />
-          {/* Where the menu is, for "Full menu" (the user, Oct 17): with the
-              dishes, under them. Not on the Dishes page, whose Reads has it. */}
-          {itemWording(f).noun === 'dish' && !adminSave && (
-            <div onBlur={() => readMenuLinkNow(details[MENU_LINK_KEY])}>
-              {fieldInput(MENU_LINK_FIELD)}
-              {menuRead && menuRead.url === readMenuLink(details[MENU_LINK_KEY]) && (
-                <p role="status" data-testid="menu-read" className="mt-1.5 text-[14px] text-muted">
-                  {menuReadText(menuRead)}
-                </p>
-              )}
-            </div>
-          )}
         </>
       )
     }

@@ -1,7 +1,7 @@
 import { itemsField } from './listingView'
 import { itemWording } from './itemMarks'
 import { isHttpUrl, normalizeUrl } from './validation'
-import type { CategoryConfig, CategoryField } from './categories'
+import type { CategoryConfig } from './categories'
 
 // ── A food place's menu link (the user, Oct 17) ─────────────────────────────
 // The "Full menu" link beside a place's Main dishes, stored as
@@ -19,15 +19,6 @@ import type { CategoryConfig, CategoryField } from './categories'
 
 export const MENU_LINK_KEY = 'menuUrl'
 export const MENU_LINK_LABEL = 'Menu link'
-
-/** The editor's input for it, on the Main dishes screen: a web address
- *  like any other link field. */
-export const MENU_LINK_FIELD: CategoryField = {
-  key: MENU_LINK_KEY,
-  label: MENU_LINK_LABEL,
-  type: 'url',
-  placeholder: 'Their menu page or PDF',
-}
 
 /** Whether a category keeps a menu link: its list of items is dishes. */
 export function keepsMenuLink(category: CategoryConfig | null | undefined): boolean {
