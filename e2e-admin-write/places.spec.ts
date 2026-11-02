@@ -94,7 +94,8 @@ for (const width of [390, 320]) {
       expect(box.x, `${name} starts off the screen`).toBeGreaterThanOrEqual(0)
       expect(box.x + box.width, `${name} ends off the screen`).toBeLessThanOrEqual(width)
       const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-      expect(sideways, `${name} lets the page move sideways`).toBe(0)
+      // Below zero on CI's browser, which keeps a scrollbar's width.
+      expect(sideways, `${name} lets the page move sideways`).toBeLessThanOrEqual(0)
       await page.keyboard.press('Escape')
     }
   })
