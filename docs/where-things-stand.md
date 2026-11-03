@@ -97,10 +97,8 @@ for that exact change, in the same conversation. Show the dry run first.
    (only the street address's, for Directions), so the nightly sync skips
    it. Fix: set its place id to the store's, on live; needs a yes, after
    looking the id up and showing it.
-1k. **Migration 092 (`look_again`)** is run on dev (the user, Nov 3), not
-   live. Until it is, live's Look again page says it isn't set up, its
-   Watches row says Not set up, and its nightly run records "Not set up".
-   Live once this branch is deployed, with a yes.
+1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
+   after PR 373 deployed: live's table has every column, no rows yet).
 
 ## For the user or the community
 
@@ -2418,7 +2416,7 @@ Fixed after the user's Nov 2 notes (same branch):
   St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
   time beside its "Oct 17" (`waitingGroups.ts`).
 
-## Done Nov 3: Look again (on `redesign/oct18-fixes`; 092 on dev only)
+## Done Nov 3: Look again (PR 373, live; 092 on dev and live)
 
 Drawn Oct 27 (canvas XSuFCMdLQmBYNJqfWaEM3A). A nightly job, 4 AM, that
 tries again what the other jobs couldn't find: an eruv with a website but
