@@ -45,19 +45,17 @@ test.afterAll(async () => {
 
 const top = (page: Page, name: string) => page.getByRole('button', { name: `Open ${name}` }).evaluate((el) => Math.round(el.getBoundingClientRect().top))
 
-test('opening a place and closing it keeps the row you clicked where it was', async ({ page }) => {
-  // The jobs answer after To do does and add their places to the list
-  // (30 rows to 57 on the test project), so wait for the list to be whole:
-  // a row's spot means nothing while rows are still arriving above it.
+/** To do at a computer's width, once the list is whole. The jobs answer
+ *  after To do does and add their places to the list (30 rows to 57 on the
+ *  test project): a row's spot means nothing while rows still arrive above it. */
+async function openTodo(page: Page) {
   const inFlight = new Set<unknown>()
   page.on('request', (r) => void (r.url().includes('/api/admin/') && inFlight.add(r)))
   page.on('requestfinished', (r) => void inFlight.delete(r))
   page.on('requestfailed', (r) => void inFlight.delete(r))
   await page.setViewportSize({ width: 1280, height: 700 })
   await page.goto('/philly/admin')
-  const name = names[9]
-  const row = page.getByRole('button', { name: `Open ${name}` })
-  await expect(row).toBeVisible()
+  await expect(page.getByRole('button', { name: `Open ${names[9]}` })).toBeVisible()
   let rows = -1
   await expect
     .poll(
@@ -70,6 +68,12 @@ test('opening a place and closing it keeps the row you clicked where it was', as
       { intervals: [700], timeout: 30_000 },
     )
     .toBe(true)
+}
+
+test('opening a place and closing it keeps the row you clicked where it was', async ({ page }) => {
+  await openTodo(page)
+  const name = names[9]
+  const row = page.getByRole('button', { name: `Open ${name}` })
   await row.evaluate((el) => el.scrollIntoView({ block: 'center' }))
   expect(await page.evaluate(() => window.scrollY), 'the list must be scrolled for this to test anything').toBeGreaterThan(200)
   const before = await top(page, name)
@@ -87,4 +91,33 @@ test('opening a place and closing it keeps the row you clicked where it was', as
   await page.locator('nav a:visible', { hasText: /^To do/ }).first().click()
   await expect(page).not.toHaveURL(/[?&]open=/)
   await expect.poll(async () => Math.abs((await top(page, name)) - scrolled), { message: 'the list came back somewhere else' }).toBeLessThan(6)
+})
+
+// The user, Nov 2: "Should there be a way to x out of the to do listings?"
+// The open place's X, and Esc, put the list back at full width, the row
+// where it was; Esc typed into a box is the box's.
+test('the open place’s X and Esc close it, back to the whole list', async ({ page }) => {
+  await openTodo(page)
+  const name = names[9]
+  const row = page.getByRole('button', { name: `Open ${name}` })
+  await row.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  const before = await top(page, name)
+
+  await row.click()
+  await expect(page).toHaveURL(/[?&]open=/)
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(page).not.toHaveURL(/[?&]open=/)
+  await expect(page.locator('[data-place][aria-current="true"]')).toHaveCount(0)
+  await expect.poll(async () => Math.abs((await top(page, name)) - before), { message: 'the X put the list back somewhere else' }).toBeLessThan(6)
+
+  await row.click()
+  await expect(page).toHaveURL(/[?&]open=/)
+  const box = page.getByRole('searchbox').or(page.getByRole('textbox')).first()
+  await box.focus()
+  await page.keyboard.press('Escape')
+  await expect(page, 'Esc in a box closed the place').toHaveURL(/[?&]open=/)
+  await box.blur()
+  await page.keyboard.press('Escape')
+  await expect(page).not.toHaveURL(/[?&]open=/)
+  await expect(page.locator('[data-place][aria-current="true"]')).toHaveCount(0)
 })

@@ -94,7 +94,8 @@ export function brokenRows(field: BrokenField, rows: readonly EditorRow[]): stri
 }
 
 /** R2Google's card: what the listing says for each thing Google would
- *  give it, in the board's order; "Not on the listing" for what it lacks. */
+ *  give it, in the board's order; "Not on the listing" for what it lacks.
+ *  Its short description only when Google gave it one. */
 export function googleRows(item: DirectoryResource, category: CategoryConfig): { label: string; value: string | null }[] {
   const d = item as Record<string, unknown>
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
@@ -106,7 +107,9 @@ export function googleRows(item: DirectoryResource, category: CategoryConfig): {
     ...(category.hasPhone !== false ? [{ label: 'Phone', value: text(item.phone) }] : []),
     ...(site ? [{ label: 'Website', value: text(d[site]) && shortUrl(text(d[site])!) }] : []),
     ...(category.detailFields.some((f) => f.type === 'hours') ? [{ label: 'Hours', value: hours }] : []),
-    { label: 'Short Description', value: text(item.googleDescription) },
+    // Google's own one-line summary, which most places don't have: only
+    // when it gave one (the user, Nov 2: "only fields we get from google").
+    ...(text(item.googleDescription) ? [{ label: 'Short Description', value: text(item.googleDescription) }] : []),
   ]
 }
 

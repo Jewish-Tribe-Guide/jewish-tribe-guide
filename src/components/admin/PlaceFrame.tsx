@@ -10,8 +10,8 @@ import { useOwnHead } from './AdminUI'
 // top, then "Category · See the listing" with "N of M" beside it in grey,
 // the switches, a white card with the field in its own editor, the source
 // folded under it, and the answers pinned over the tabs. On a computer: the
-// name with that line under it and "N of M" with up and down beside, and
-// the answers along the pane's bottom.
+// name with that line under it and "N of M" with up and down beside, an X
+// that closes the place, and the answers along the pane's bottom.
 
 export type PlacePosition = { at: number; total: number; back: () => void; prev?: () => void; next?: () => void }
 
@@ -64,6 +64,7 @@ export default function PlaceFrame({
           {counter}
           <StepButton label="The place before" onClick={position.prev} d="M4 10l4-4 4 4" />
           <StepButton label="The next place" onClick={position.next} d="M4 6l4 4 4-4" />
+          <CloseButton onClick={position.back} />
         </div>
       </header>
       {subline !== null && (
@@ -89,6 +90,12 @@ export default function PlaceFrame({
       )}
     </div>
   )
+}
+
+/** Back to the whole list (the user, Nov 2), on a computer; Esc does it
+ *  too (ModerationQueue). */
+export function CloseButton({ onClick }: { onClick: () => void }) {
+  return <StepButton label="Close" onClick={onClick} d="M4 4l8 8M12 4l-8 8" />
 }
 
 function StepButton({ label, onClick, d }: { label: string; onClick?: () => void; d: string }) {

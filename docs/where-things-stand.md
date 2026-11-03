@@ -2383,9 +2383,16 @@ Fixed after the user's Nov 2 notes (same branch):
   checked on a phone or on a Vercel preview, where `after()` runs inside
   the route's 60s.
 
+- An X beside the open place's up and down (computer), and Esc, close it:
+  the list goes back to full width with your row where it was. Esc typed
+  into a box, or with a menu or dialog open, stays theirs.
+  `todo-scroll.spec.ts`.
+- Google's card shows "Short Description" only when Google gave the place
+  one (most small places have none, so it read "Not on the listing").
+
 Raised, not built (the user's calls):
-- An X (and Esc) to close the open place; a Category menu on To do like
-  Places'; a draggable divider between the list and the place.
+- A Category menu on To do like Places'; a draggable divider between the
+  list and the place (how much room To do takes).
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 

@@ -144,7 +144,7 @@ describe('which of the listing’s rows the card holds', () => {
 })
 
 describe('the Google card (R2Google)', () => {
-  it('the listing’s name, address, phone, website, hours and description, in that order', () => {
+  it('the listing’s name, address, phone, website and hours, in that order', () => {
     const category = { id: 'food', detailFields: [{ key: 'website', type: 'url', label: 'Website' }, { key: 'hours', type: 'hours', label: 'Hours' }] } as never
     const item = { id: 'm', name: 'Mike’s Chicken', address: '700 Cedar Bridge Avenue, Lakewood, NJ 08701', phone: '(469) 278-6249', website: 'https://mikeschicken.com/' } as never
     expect(googleRows(item, category)).toEqual([
@@ -153,7 +153,16 @@ describe('the Google card (R2Google)', () => {
       { label: 'Phone', value: '(469) 278-6249' },
       { label: 'Website', value: 'mikeschicken.com' },
       { label: 'Hours', value: null },
-      { label: 'Short Description', value: null },
     ])
+  })
+
+  // The user, Nov 2: "Short description doesn't need to be in google changes
+  // screen". It's Google's own summary, which most places don't have.
+  it('its short description only when Google gave it one', () => {
+    const category = { id: 'food', detailFields: [] } as never
+    const without = googleRows({ id: 'm', name: 'Mike’s', googleDescription: ' ' } as never, category)
+    expect(without.map((r) => r.label)).not.toContain('Short Description')
+    const withOne = googleRows({ id: 'm', name: 'Mike’s', googleDescription: 'Kosher chicken shop' } as never, category)
+    expect(withOne.at(-1)).toEqual({ label: 'Short Description', value: 'Kosher chicken shop' })
   })
 })

@@ -181,6 +181,21 @@ export default function ModerationQueue({ session }: { session: Session }) {
     goTo(null)
   }
 
+  // Esc closes the open place, as its X does (the user, Nov 2), on a
+  // computer; not while typing, nor when a menu or dialog takes it first.
+  useEffect(() => {
+    if (!shownKey) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || !wide()) return
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"], dialog')) return
+      if (document.querySelector('dialog[open], [aria-modal="true"]')) return
+      backToList()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
   useEffect(() => {
     if (openPlace) {
       if (openPlace.key !== openId) goTo(openPlace.key, true)

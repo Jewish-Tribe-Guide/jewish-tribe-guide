@@ -22,7 +22,7 @@ import TodoBroken from './TodoBroken'
 import TodoChange from './TodoChange'
 import TodoNewPlace from './TodoNewPlace'
 import TodoReading from './TodoReading'
-import PlaceFrame, { PlaceButtons, PlaceCard, type PlaceButton } from './PlaceFrame'
+import PlaceFrame, { CloseButton, PlaceButtons, PlaceCard, type PlaceButton } from './PlaceFrame'
 import type { Jobs } from './useWatchJobs'
 
 // A place opened from To do (the "one tap per place" boards, approved
@@ -206,6 +206,9 @@ function Header({ place, position }: { place: TodoPlace; position: QueuePosition
               Next ›
             </button>
           )}
+          <span className="max-md:hidden">
+            <CloseButton onClick={position.back} />
+          </span>
         </span>
       }
     />
