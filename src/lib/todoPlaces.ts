@@ -120,7 +120,10 @@ export function todoPlaces(
       if (since) dated(p, since)
     })
   }
+  // Look again found it on Google: that answers it.
+  const found = new Set((data.waiting ?? []).filter((w) => w.found).map((w) => w.id))
   for (const u of data.unmatched) {
+    if (found.has(u.id)) continue
     const p = at(u.id, u.name, u.id, u.category || null)
     p.things.push({ kind: 'broken', id: `unmatched:${u.id}`, label: 'Google not found', filter: 'broken', unmatched: true, since: u.at ?? null })
     if (u.at) dated(p, u.at)

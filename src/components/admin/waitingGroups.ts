@@ -20,6 +20,7 @@ import { CONTACT_SECTION } from '@/lib/contactRead'
 import type { AdminEruv } from '@/lib/eruvStore'
 import type { EruvFinding } from '@/lib/eruvJob'
 import type { DirectoryResource } from '@/types'
+import { isFoundPage, type LookItem } from '@/lib/lookAgain'
 
 // ── A place waiting for you, opened on its own screen (piece 4, Oct 25) ────
 // Drawn on FinalChanges2, FinalNewsletter, FinalClosed, FinalDropped and
@@ -72,6 +73,8 @@ export type Decide =
   /** Nothing to decide yet: a list's new place, filed after its next read;
    *  Bring it back all the same, when the guide has it archived. */
   | { kind: 'later'; archivedId?: string }
+  /** What Look again found: an eruv's status page, a place on Google. */
+  | { kind: 'found'; look: 'eruv' | 'google' }
 /** `boxes`: a shul's times and a menu's dishes, drawn as the listing's
  *  boxes instead of lines. */
 export type WaitGroup = {
@@ -185,6 +188,37 @@ function newLines(f: Finding & { address?: string }, category: CategoryConfig | 
     ...own.map((l) => ({ label: l.label, value: l.key === 'website' && l.after !== NONE ? hostOf(l.after) : value(l.after), old: null })),
     ...kosher.map((r) => ({ label: r.name, value: r.value, old: null })),
   ]
+}
+
+/** What Look again found (board Found): offered, never set on its own. */
+function foundGroup(i: LookItem): WaitGroup | null {
+  const f = i.found
+  if (!f || i.kind === 'menu') return null
+  const by: WaitFact = { label: 'Found by', value: `Look again · ${day(f.at)}` }
+  if (isFoundPage(f)) {
+    return {
+      key: 'look-eruv',
+      job: 'eruv',
+      page: pageLink(f.url),
+      when: day(f.at),
+      at: f.at,
+      lines: [{ label: 'Status page', value: shortUrl(f.url), old: null }],
+      facts: [...(f.words ? [{ label: 'It says', value: `“${f.words}”` }] : []), { label: 'Read as', value: f.status === 'up' ? 'Up' : 'Down' }, by],
+      note: null,
+      decide: { kind: 'found', look: 'eruv' },
+    }
+  }
+  return {
+    key: 'look-google',
+    job: 'google',
+    page: { text: 'its Google listing', url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name)}&query_place_id=${encodeURIComponent(f.placeId)}` },
+    when: day(f.at),
+    at: f.at,
+    lines: [{ label: 'On Google', value: [f.name, f.address].filter(Boolean).join(', '), old: null }],
+    facts: [by],
+    note: null,
+    decide: { kind: 'found', look: 'google' },
+  }
 }
 
 export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
@@ -384,6 +418,11 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       })
     }
   }
+
+  // What Look again found.
+  const look = jobs.lookAgain?.items.find((i) => i.id === id && i.found)
+  const found = look ? foundGroup(look) : null
+  if (found) changes.push(found)
 
   const groups = [...off, ...closed, ...added, ...changes]
   const labels = new Set(groups.flatMap((g) => g.lines.map((l) => l.label)))

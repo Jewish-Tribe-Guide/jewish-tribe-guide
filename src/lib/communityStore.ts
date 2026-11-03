@@ -605,6 +605,7 @@ export const COMMUNITY_SCOPED_TABLES = [
   'eruv',
   'walk_route',
   'newsletter_setup',
+  'look_again',
 ] as const
 
 /** A table whose migration hasn't been run on this project yet has nothing

@@ -43,6 +43,13 @@ export function waitingAnswers(d: Decide, placeId: string, { patch, post }: Send
       { label: 'Keep as is', work: google({ action: 'keep' }) },
       { label: 'Wrong place', work: google({ action: 'wrong_place' }) },
     ]
+  // Look again's find: what it found used, or never offered again.
+  if (d.kind === 'found') {
+    const look = (action: 'use' | 'not') => () => post('/api/admin/watches/look-again', { action, kind: d.look, id: placeId })
+    return d.look === 'eruv'
+      ? [{ label: 'Use this page', work: look('use') }, { label: 'Not this page', work: look('not') }]
+      : [{ label: 'Use this place', work: look('use') }, { label: 'Not this place', work: look('not') }]
+  }
   if (d.kind === 'menu') return [{ label: 'Accept', work: menu('use') }, { label: 'Keep as is', work: menu('skip') }]
   return [
     { label: 'Accept', work: each(d.ids, (id) => ({ status: 'approved', ...(d.only?.[id] ? { only: d.only[id] } : {}) })) },

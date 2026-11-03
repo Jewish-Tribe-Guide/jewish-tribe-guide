@@ -82,6 +82,19 @@ describe('todoPlaces', () => {
     expect(placeLine(places[0])).toBe('Its menu has a change')
   })
 
+  it('Look again found it on Google: Google not found is answered by what it found', () => {
+    const [p] = todoPlaces(
+      {
+        submissions: [],
+        responses: [],
+        unmatched: [{ id: 'kg', name: 'The Kosher Grill', category: 'food', at: '2026-10-01T07:00:00Z' }],
+        waiting: [{ id: 'kg', name: 'The Kosher Grill', kind: 'Google', line: 'Found on Google', at: '2026-11-03T09:00:00Z', found: true }],
+      },
+      cats,
+    )
+    expect(placeLine(p)).toBe('Found on Google')
+  })
+
   it('says a broken check’s date once, in the corner', () => {
     const [p] = todoPlaces({ submissions: [], responses: [], unmatched: [], notRead: [{ id: 's', name: 'Sababa', line: 'Google stopped answering Oct 17', since: ['2026-10-17T07:00:00Z'] }] }, cats)
     expect(placeLine(p)).toBe('Google stopped answering')

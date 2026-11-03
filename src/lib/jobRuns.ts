@@ -1,7 +1,8 @@
 import type { WalkRouteRun } from './walkRouteJob'
+import type { LookAgainRun } from './lookAgain'
 
 // ── The nightly jobs and how each run went (Oct 24) ─────────────────────────
-// Four jobs run on their own every night, and the link check once a week
+// Five jobs run on their own every night, and the link check once a week
 // (vercel.json). Each run is saved
 // in job_run (migration 086, jobRunStore.ts) when it starts and filled in
 // when it ends, so the Watches tab can say what each one did, and when one
@@ -9,7 +10,7 @@ import type { WalkRouteRun } from './walkRouteJob'
 // kept anything, on each watch: the run that stopped after 29 of 107 of
 // them on Oct 24 looked like a quiet morning. Pure: the tab reads it too.
 
-export type JobId = 'sync-hours' | 'watches' | 'read-menus' | 'walk-routes' | 'check-links'
+export type JobId = 'sync-hours' | 'watches' | 'read-menus' | 'walk-routes' | 'check-links' | 'look-again'
 
 export type NightlyJob = {
   id: JobId
@@ -62,6 +63,13 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
     limitSeconds: 300,
     everyDays: 7,
     cron: '0 9 * * 0',
+  },
+  {
+    id: 'look-again',
+    name: 'Look again',
+    about: 'Tries again what a job couldn’t find, a month after the last try, a few a night: an eruv’s status page, a menu, a place on Google.',
+    limitSeconds: 300,
+    cron: '0 9 * * *',
   },
 ]
 
@@ -197,6 +205,18 @@ export function checkLinksOutcome(run: CheckLinksRun): JobOutcome {
   const parts = [checked ? `Checked ${plural(checked, 'link')}` : 'No links to check']
   if (dontOpen) parts.push(`${dontOpen} didn’t open`)
   return { ok: true, summary: parts.join(' · '), warning: left ? `Ran out of time: ${left} left for next week` : null, kinds }
+}
+
+export function lookAgainOutcome(run: LookAgainRun): JobOutcome {
+  if ('skipped' in run) return { ok: true, summary: 'Nothing tried', warning: `Not set up: ${run.skipped}` }
+  const tried = sum(run.communities, (r) => r.tried)
+  const found = sum(run.communities, (r) => r.found)
+  const failed = sum(run.communities, (r) => r.failed)
+  const left = sum(run.communities, (r) => r.left)
+  const parts = [tried ? `Tried ${tried} again` : 'Nothing due']
+  if (found) parts.push(`found ${found}`)
+  if (left) parts.push(`${left} left for the next nights`)
+  return { ok: true, summary: parts.join(' · '), warning: failed ? `${plural(failed, 'try', 'tries')} stopped with an error` : null }
 }
 
 // ── Telling the admins (Oct 24) ─────────────────────────────────────────────

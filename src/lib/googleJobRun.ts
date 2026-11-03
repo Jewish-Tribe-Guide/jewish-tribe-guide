@@ -396,6 +396,16 @@ export async function wrongPlace(community: string, id: string, now = Date.now()
   return onePlace(community, id, now)
 }
 
+/** Not this place (Look again, Nov 3): a place Google has under the
+ *  listing's name that isn't it. Never offered again, as a wrong place
+ *  isn't; the listing is left as it was. */
+export async function notThisPlace(community: string, id: string, placeId: string): Promise<void> {
+  const { row } = await loadOne(community, id)
+  const details = { ...(row.details ?? {}) }
+  const wrong = Array.isArray(details.googleWrong) ? (details.googleWrong as unknown[]).filter((x): x is string => typeof x === 'string') : []
+  await writeDetails(community, id, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
+}
+
 /** The listing with some of its fields set, through the queue and
  *  approved at once, so its history says so; Google keeps each field left
  *  as Google has it (googleAutofill, submissionStore.ts). */

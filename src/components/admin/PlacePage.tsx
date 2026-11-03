@@ -31,7 +31,7 @@ export default function PlacePage({ token, id, from }: { token: string; id: stri
   const [now] = useState(() => Date.now())
   const all = kindsOf(jobs, base, now)
   const place = all?.kinds.flatMap((k) => k.places).find((p) => p.id === id)
-  const back = placeBack(from, base, (job) => NIGHT_KINDS.find((k) => k.id === job)?.name)
+  const back = placeBack(from, base, (job) => (job === 'look-again' ? 'Look again' : NIGHT_KINDS.find((k) => k.id === job)?.name))
   const state = place?.state
 
   // What it was when something was done here: jobs seen on an earlier visit

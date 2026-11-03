@@ -162,6 +162,21 @@ async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: 
     .sort((a, b) => a.l.name.localeCompare(b.l.name))
 }
 
+/** One place's menu read again, by its id, as a first read is (Look again,
+ *  lookAgainRun.ts): null when it isn't a food place that's live. */
+export async function readMenuAgain(slug: string, id: string, apiKey: string): Promise<StoredMenuReading | null> {
+  const kinds = dishKinds(await listCategoriesUncached(slug))
+  const { data, error } = await getAdminClient().from('resource').select('*').eq('community_id', slug).eq('id', id).eq('status', 'approved').maybeSingle()
+  if (error) throw new Error(`Couldn’t load the listing: ${error.message}`)
+  if (!data) return null
+  const l = normalizeRow(data as ResourceRow)
+  const kind = kinds.find((k) => k.category.id === l.category)
+  if (!kind) return null
+  const kept = await readPlaceMenu(slug, l, kind, apiKey)
+  if (kept) await dateIfAgreeing(slug, l, kind, kept)
+  return kept
+}
+
 /** The food places whose menu was never read, for the Watches tab's
  *  Menus line (nightKinds.ts). */
 export async function listUnreadMenus(slug: string): Promise<{ id: string; name: string }[]> {

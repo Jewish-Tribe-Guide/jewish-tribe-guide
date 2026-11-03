@@ -10,7 +10,8 @@ import { kindsOf } from './WatchKinds'
 // check against Google, a menu's reading, a place the guide has archived.
 
 /** `at`: when what waits there was read, the row's date (N1List). */
-export type TodoWaiting = { id: string; name: string; kind: string; line: string; at?: string | null }
+/** `found`: Look again found it, so Google not found is answered here. */
+export type TodoWaiting = { id: string; name: string; kind: string; line: string; at?: string | null; found?: boolean }
 /** `since`: when each broken check started failing, the row's date (J1Dates,
  *  N1List: every place on To do is dated). */
 export type TodoNotRead = { id: string; name: string; line: string; since?: (string | null)[] }
@@ -56,6 +57,7 @@ function lineOf(pill: string | null, first: Decide['kind'] | undefined): string 
   if (pill && !/^\d+ changes?$/.test(pill)) return pill
   if (first === 'google') return 'Google has a change'
   if (first === 'menu') return 'Its menu has a change'
+  if (first === 'found') return 'Look again found it'
   return 'Its page has a change'
 }
 
@@ -97,7 +99,7 @@ export function waitingNotQueued(jobs: Jobs, now: number): TodoWaiting[] {
   if (!jobsSettled(jobs)) return []
   const all = kindsOf(jobs, '', now)
   if (!all) return []
-  return all.kinds.flatMap((k) =>
+  const out: TodoWaiting[] = all.kinds.flatMap((k) =>
     k.places
       .filter((p) => p.state === 'waiting')
       .flatMap((p) => {
@@ -107,4 +109,12 @@ export function waitingNotQueued(jobs: Jobs, now: number): TodoWaiting[] {
         return [{ id: p.id, name: p.name, kind: k.label, line: lineOf(p.pill, own[0]?.decide.kind), at: earliest(own.map((g) => g.at)) }]
       }),
   )
+  // What Look again found, at a place nothing else waits at (board Found).
+  for (const i of jobs.lookAgain?.items ?? []) {
+    if (!i.found || i.kind === 'menu') continue
+    const there = out.find((w) => w.id === i.id)
+    if (there) there.found = true
+    else out.push({ id: i.id, name: i.name, kind: i.kind === 'eruv' ? 'Eruv' : 'Google', line: i.kind === 'eruv' ? 'Status page found' : 'Found on Google', at: i.found.at, found: true })
+  }
+  return out
 }

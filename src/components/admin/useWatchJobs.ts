@@ -18,6 +18,7 @@ import type { HoursPlace } from './watchJobTypes'
 import type { KosherLoaded } from './watchJobTypes'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { NightKindId } from '@/lib/jobRuns'
+import type { LookAgainLoaded } from '@/lib/lookAgain'
 import { placeTroubles } from '@/lib/watchPlaces'
 import { placeCoverage, type CoverageIn, type PlaceCoverage } from '@/lib/fieldCoverage'
 import type { NightlyRunsLoaded } from './JobPage'
@@ -46,6 +47,8 @@ export type Jobs = {
   runs?: NightlyRunsLoaded | null
   /** Every listing, for what checks each of its fields (fieldCoverage.ts). */
   places?: AdminPlace[] | null
+  /** Look again's: what it tries, and what it found (lookAgain.ts). */
+  lookAgain?: LookAgainLoaded | null
 }
 
 /** What's gone wrong with a check of each place; a job turned off has none. */
@@ -131,6 +134,7 @@ export async function loadJobs(token: string, community: string, fill: <K extend
     get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
     get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
     get<{ places: AdminPlace[] }>('/api/admin/listings').then((d) => (d ? fill('places', d.places ?? null) : failed('places'))),
+    get<LookAgainLoaded>('/api/admin/watches/look-again').then((d) => (d?.items ? fill('lookAgain', d) : failed('lookAgain'))),
   ])
 }
 

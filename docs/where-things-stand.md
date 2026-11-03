@@ -97,6 +97,10 @@ for that exact change, in the same conversation. Show the dry run first.
    (only the street address's, for Directions), so the nightly sync skips
    it. Fix: set its place id to the store's, on live; needs a yes, after
    looking the id up and showing it.
+1k. **Migration 092 (`look_again`)** is not run anywhere yet. Until it is,
+   Look again's page says it isn't set up, its Watches row says Not set
+   up, and its nightly run records "Not set up". Dev first (the user, in
+   the SQL editor); live once this branch is deployed, with a yes.
 
 ## For the user or the community
 
@@ -2405,6 +2409,30 @@ Fixed after the user's Nov 2 notes (same branch):
   sorts with the rest instead of sinking to the foot of To do (Rita's South
   St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
   time beside its "Oct 17" (`waitingGroups.ts`).
+
+## Done Nov 3: Look again (on `redesign/oct18-fixes`; needs migration 092)
+
+Drawn Oct 27 (canvas XSuFCMdLQmBYNJqfWaEM3A). A nightly job, 4 AM, that
+tries again what the other jobs couldn't find: an eruv with a website but
+no status page or email (Elkins Park on dev), a menu reading that failed (11
+on dev; "no menu online" is an answer, not tried), a place Google has no
+match for. Each is tried a month after its last try, at most five a night,
+never-tried first. A kind whose own job is turned off isn't tried.
+
+- **Its page** (Watches → Look again): a group per kind, each row its
+  name, why in a few words and when ("Oct 22 · next Nov 21"); a row opens
+  with its last try in full, Read it now and Stop trying, and Open its
+  listing. Stopped trying sits at the foot. Groups (WhatsApp,
+  young-professional) are left out of Google, and it says how many.
+- **What it finds waits on To do, never set on its own**: an eruv's page
+  as "Status page found" (Use this page / Not this page), a place as
+  "Found on Google" (Use this place / Not this place), which replaces that
+  place's "Google not found". A page or place turned down is never offered
+  again. A menu read again is a reading like any other, in To do as usual.
+- Watches tab: a Look again row; a failed or late run goes under Needs
+  fixing.
+
+Not checked against the boards with real rows yet: dev needs 092 first.
 
 ## Done Nov 3: To do is what to act on, Places is how things stand (on `redesign/oct18-fixes`)
 

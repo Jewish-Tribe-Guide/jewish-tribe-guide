@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import { groupEdit, waitingGroups } from './waitingGroups'
+import { waitingAnswers } from './waitingAnswers'
 import type { Jobs } from './useWatchJobs'
 import type { Watch, WatchCheck } from '@/lib/watches'
 import type { GooglePlace } from '@/lib/googleJob'
@@ -350,5 +351,47 @@ describe('waitingGroups', () => {
       ['eruv.example/alerts', null],
     ])
     expect(g.decide).toEqual({ kind: 'findings', ids: ['e1'], only: { e1: ['hotline', 'alertsUrl'] } })
+  })
+  // Look again (board Found, Nov 3): what it found, offered, never set.
+  it('what Look again found: an eruv’s status page or a place on Google, Use this or Not this', async () => {
+    const item = (kind: string, id: string, found: unknown) => ({ kind, id, name: id, why: '', note: null, lastTry: AT, found, stopped: null })
+    const lookAgain = {
+      available: true,
+      leftOut: 0,
+      items: [
+        item('eruv', 'ep', { url: 'https://www.yiep.org/eruv-status', status: 'up', words: 'The eruv is up', at: AT }),
+        item('google', 'kg', { placeId: 'ChIJ1', name: 'The Kosher Grill', address: '3601 S Broad St', at: AT }),
+      ],
+    }
+    const [eruv] = waitingGroups('ep', jobs({ lookAgain: lookAgain as never }), NOW).groups
+    expect(eruv).toMatchObject({
+      page: { url: 'https://www.yiep.org/eruv-status' },
+      lines: [{ label: 'Status page', value: 'yiep.org/eruv-status', old: null }],
+      facts: [
+        { label: 'It says', value: '“The eruv is up”' },
+        { label: 'Read as', value: 'Up' },
+        { label: 'Found by', value: expect.stringMatching(/^Look again · /) },
+      ],
+      decide: { kind: 'found', look: 'eruv' },
+    })
+    const [place] = waitingGroups('kg', jobs({ lookAgain: lookAgain as never }), NOW).groups
+    expect(place).toMatchObject({
+      page: { text: 'its Google listing', url: expect.stringContaining('query_place_id=ChIJ1') },
+      lines: [{ label: 'On Google', value: 'The Kosher Grill, 3601 S Broad St', old: null }],
+      decide: { kind: 'found', look: 'google' },
+    })
+
+    const posts: unknown[] = []
+    const send = { patch: async () => {}, post: async (path: string, body: unknown) => void posts.push([path, body]) }
+    const pageAnswers = waitingAnswers(eruv.decide, 'ep', send)
+    const placeAnswers = waitingAnswers(place.decide, 'kg', send)
+    expect(pageAnswers.map((a) => a.label)).toEqual(['Use this page', 'Not this page'])
+    expect(placeAnswers.map((a) => a.label)).toEqual(['Use this place', 'Not this place'])
+    await pageAnswers[0].work()
+    await placeAnswers[1].work()
+    expect(posts).toEqual([
+      ['/api/admin/watches/look-again', { action: 'use', kind: 'eruv', id: 'ep' }],
+      ['/api/admin/watches/look-again', { action: 'not', kind: 'google', id: 'kg' }],
+    ])
   })
 })
