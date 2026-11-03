@@ -2394,9 +2394,12 @@ Fixed after the user's Nov 2 notes (same branch):
   at least 300px and the place at least 480px; double-click the line, or
   Enter on it, for the usual 380px; arrow keys move it. `useTodoSplit.ts`,
   `todo-scroll.spec.ts`.
-
-Raised, not built (the user's calls):
-- A Category menu on To do like Places'.
+- To do has a Category menu, as Places does, between Show and Sort. It
+  lists only the categories something waits in, with counts (dev: Food 43,
+  Synagogues 10, Mikvah 2, Grocery 1, the cache test's 1, adding to 57).
+  A job's finding takes its place's category; feedback and a new category
+  have none and show only under All categories. The up and down arrows
+  stay inside the category. `todoPlaces.ts`, `TodoList.tsx`.
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 

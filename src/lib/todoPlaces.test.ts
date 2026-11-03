@@ -125,6 +125,42 @@ describe('todoPlaces', () => {
     expect(firstThing(places[0], ['broken']).label).toBe('Website didn’t load')
     expect(firstThing(places[0], []).label).toBe('Usual weekday times')
   })
+
+  // The user, Nov 2: a Category menu on To do, as Places has. A job's
+  // finding takes its place's category from the guide's places, an eruv's
+  // from the eruv category; feedback and a new category have none.
+  it('each place has its category, and the Category menu keeps only that one', () => {
+    const ERUV = { id: 'eruv', kind: 'eruv' } as unknown as CategoryConfig
+    const places = todoPlaces(
+      {
+        submissions: [
+          timesChange,
+          sub({ id: 'n', operation: 'create', target_id: null, payload: { name: 'Shalom Pizzeria', category: 'food' } }),
+          sub({ id: 'c', operation: 'create', target_type: 'category', target_id: null, payload: { label: 'Bakeries' } }),
+        ],
+        responses: [{ id: 'r', title: 'Feedback', line: 'hi', createdAt: '2026-11-01T12:00:00Z' }],
+        unmatched: [{ id: 'p3', name: 'Mike’s Chicken', category: 'food' }],
+        waiting: [{ id: 'p2', name: 'Rita’s', kind: 'Food', line: 'Its menu has a change · Oct 17' }],
+        notRead: [{ id: 'e1', name: 'Center City Eruv', line: 'Their email came 3 weeks ago' }],
+        jobs: { places: [{ id: 'p2', category: 'food' }], eruvim: { eruvim: [{ id: 'e1' }] } },
+      },
+      new Map([...cats, ['eruv', ERUV]]),
+    )
+    const categoryOf = Object.fromEntries(places.map((p) => [p.name, p.category]))
+    expect(categoryOf).toEqual({
+      'Sons of Israel': 'synagogue',
+      'Shalom Pizzeria': 'food',
+      Bakeries: null,
+      Feedback: null,
+      'Mike’s Chicken': 'food',
+      'Rita’s': 'food',
+      'Center City Eruv': 'eruv',
+    })
+    const names = (category: string) => shownPlaces(places, { query: '', filters: [], category, sort: 'name' }).map((p) => p.name)
+    expect(names('food')).toEqual(['Mike’s Chicken', 'Rita’s', 'Shalom Pizzeria'])
+    expect(names('eruv')).toEqual(['Center City Eruv'])
+    expect(names('')).toHaveLength(7)
+  })
 })
 
 describe('shownThing', () => {

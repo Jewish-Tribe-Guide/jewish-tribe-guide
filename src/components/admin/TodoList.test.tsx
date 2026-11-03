@@ -7,6 +7,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { TodoData } from '@/lib/useTodo'
 import type { TodoPlace } from '@/lib/todoPlaces'
+import type { CategoryConfig } from '@/lib/categories'
 import TodoList, { ALL_OLDEST_FIRST } from './TodoList'
 
 vi.mock('next/navigation', () => ({
@@ -17,11 +18,12 @@ vi.mock('next/navigation', () => ({
 
 const empty: TodoData = { submissions: [], responses: [], unmatched: [], setup: null }
 
-function Host({ data, onOpen }: { data: TodoData; onOpen: (p: TodoPlace) => void }) {
+function Host({ data, onOpen, categoriesById = new Map() }: { data: TodoData; onOpen: (p: TodoPlace) => void; categoriesById?: Map<string, CategoryConfig> }) {
   const [view, setView] = useState(ALL_OLDEST_FIRST)
-  return <TodoList data={data} categoriesById={new Map()} view={view} onView={setView} onOpen={onOpen} />
+  return <TodoList data={data} categoriesById={categoriesById} view={view} onView={setView} onOpen={onOpen} />
 }
-const show = (data: TodoData, onOpen: (p: TodoPlace) => void = () => {}) => renderWithProviders(<Host data={data} onOpen={onOpen} />, { community: { slug: 'philly' } })
+const show = (data: TodoData, onOpen: (p: TodoPlace) => void = () => {}, categoriesById?: Map<string, CategoryConfig>) =>
+  renderWithProviders(<Host data={data} onOpen={onOpen} categoriesById={categoriesById} />, { community: { slug: 'philly' } })
 const rowNames = () => screen.getAllByRole('button', { name: /^Open / }).map((b) => b.getAttribute('aria-label'))
 
 afterEach(cleanup)
@@ -78,6 +80,30 @@ describe('To do, a row per place', () => {
     await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))
     expect(screen.getByRole('menuitemcheckbox', { name: 'All (1)' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('Broken checks')
+  })
+
+  // The user, Nov 2: a Category menu, as Places has, listing only the
+  // categories something waits in.
+  it('narrows to one category', async () => {
+    const user = userEvent.setup()
+    const cat = (id: string, pluralLabel: string) => [id, { id, pluralLabel } as unknown as CategoryConfig] as const
+    show(
+      {
+        ...empty,
+        unmatched: [
+          { id: 'n', name: 'New Deli', category: 'food' },
+          { id: 'b', name: 'Bnai Abraham', category: 'synagogue' },
+          { id: 'm', name: 'Mike’s Chicken', category: 'food' },
+        ],
+      },
+      undefined,
+      new Map([cat('food', 'Food'), cat('synagogue', 'Synagogues'), cat('mikvah', 'Mikvahs')]),
+    )
+    await user.click(screen.getByRole('button', { name: /^Category/ }))
+    expect(screen.queryByRole('menuitemradio', { name: /Mikvahs/ })).toBeNull()
+    await user.click(screen.getByRole('menuitemradio', { name: 'Food (2)' }))
+    expect(rowNames()).toEqual(['Open Mike’s Chicken', 'Open New Deli'])
+    expect(screen.getByRole('button', { name: /^Category/ })).toHaveTextContent('Food')
   })
 
   it('sorts by name', async () => {

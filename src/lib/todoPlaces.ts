@@ -31,6 +31,9 @@ export type TodoPlace = {
   /** A listing to open on its own screen, for what's decided there. */
   placeId: string | null
   name: string
+  /** Its category's id, for To do's Category menu; none for feedback or a
+   *  new category, or a place To do can't place. */
+  category: string | null
   /** The oldest dated thing waiting. */
   at: string | null
   things: TodoThing[]
@@ -67,14 +70,27 @@ export function dayToIso(day: string, now: number): string | null {
 }
 
 export function todoPlaces(
-  data: { submissions: EnrichedSubmission[]; responses: TodoResponse[]; unmatched: TodoUnmatched[]; waiting?: TodoWaiting[]; notRead?: TodoNotRead[] },
+  data: {
+    submissions: EnrichedSubmission[]
+    responses: TodoResponse[]
+    unmatched: TodoUnmatched[]
+    waiting?: TodoWaiting[]
+    notRead?: TodoNotRead[]
+    /** The guide's places and eruvs, for the category of what a job found. */
+    jobs?: { places?: readonly { id: string; category: string }[] | null; eruvim?: { eruvim?: readonly { id: string }[] } | null }
+  },
   categoriesById: Map<string, CategoryConfig>,
   now = Date.now(),
 ): TodoPlace[] {
+  const eruvCategory = [...categoriesById.values()].find((c) => c.kind === 'eruv')?.id ?? null
+  const categoryOf = new Map((data.jobs?.places ?? []).map((p) => [p.id, p.category]))
+  if (eruvCategory) for (const e of data.jobs?.eruvim?.eruvim ?? []) categoryOf.set(e.id, eruvCategory)
+
   const places = new Map<string, TodoPlace>()
-  const at = (key: string, name: string, placeId: string | null) => {
+  const at = (key: string, name: string, placeId: string | null, category: string | null = placeId ? (categoryOf.get(placeId) ?? null) : null) => {
     let p = places.get(key)
-    if (!p) places.set(key, (p = { key, placeId, name, at: null, things: [] }))
+    if (!p) places.set(key, (p = { key, placeId, name, category, at: null, things: [] }))
+    else p.category ??= category
     return p
   }
   const dated = (p: TodoPlace, iso: string) => {
@@ -82,8 +98,9 @@ export function todoPlaces(
   }
   for (const s of data.submissions) {
     const listing = s.target_type === 'listing' && s.operation !== 'create' && s.target_id
-    const p = listing ? at(s.target_id!, submissionName(s), s.target_id!) : at(s.id, submissionName(s), null)
     const categoryId = (s.payload as Partial<ResourceSubmission>).category ?? s.current?.category ?? ''
+    const category = s.target_type === 'eruv' ? eruvCategory : s.target_type === 'listing' ? categoryId || null : null
+    const p = listing ? at(s.target_id!, submissionName(s), s.target_id!, category) : at(s.id, submissionName(s), null, category)
     p.things.push(...submissionThings(s, categoriesById.get(categoryId)))
     dated(p, s.created_at)
   }
@@ -104,7 +121,7 @@ export function todoPlaces(
     })
   }
   for (const u of data.unmatched) {
-    const p = at(u.id, u.name, u.id)
+    const p = at(u.id, u.name, u.id, u.category || null)
     p.things.push({ kind: 'broken', id: `unmatched:${u.id}`, label: 'Google not found', filter: 'broken', unmatched: true, since: u.at ?? null })
     if (u.at) dated(p, u.at)
   }
@@ -124,11 +141,16 @@ export function todoPlaceCount(data: Parameters<typeof todoPlaces>[0]): number {
   return todoPlaces(data, new Map()).length
 }
 
-/** The rows the search, the filter and the sort leave, in order. A place
+/** The rows the search, the filters and the sort leave, in order. A place
  *  is in a filter when anything waiting there is; undated ones last. */
-export function shownPlaces(places: TodoPlace[], { query, filters, sort }: { query: string; filters: TodoFilter[]; sort: TodoSort }): TodoPlace[] {
+export function shownPlaces(
+  places: TodoPlace[],
+  { query, filters, category = '', sort }: { query: string; filters: TodoFilter[]; category?: string; sort: TodoSort },
+): TodoPlace[] {
   const q = query.trim().toLowerCase()
-  const shown = places.filter((p) => (!q || p.name.toLowerCase().includes(q)) && (filters.length === 0 || p.things.some((t) => filters.includes(t.filter))))
+  const shown = places.filter(
+    (p) => (!q || p.name.toLowerCase().includes(q)) && (filters.length === 0 || p.things.some((t) => filters.includes(t.filter))) && (!category || p.category === category),
+  )
   const byName = (a: TodoPlace, b: TodoPlace) => a.name.localeCompare(b.name)
   if (sort === 'name') return shown.sort(byName)
   const sign = sort === 'oldest' ? 1 : -1
