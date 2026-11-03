@@ -193,7 +193,7 @@ describe('Places', () => {
 
     it('lands from Watches on what isn’t watched, saying what isn’t', async () => {
       renderShuls('?checked=not-watched')
-      expect(await screen.findByRole('button', { name: 'Open Bravo' })).toHaveTextContent('Not watched: minyan times')
+      expect(await screen.findByRole('button', { name: 'Open Bravo' })).toHaveTextContent('Not checked: minyan times')
       expect(screen.queryByRole('button', { name: 'Open Alpha' })).toBeNull()
       expect(screen.getByText('2 places')).toBeInTheDocument()
     })

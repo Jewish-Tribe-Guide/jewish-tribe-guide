@@ -212,7 +212,7 @@ describe('WatchesManager', () => {
       sites: [],
       links: [],
     })
-    expect(within(screen.getByRole('region', { name: 'Not watched' })).getByRole('link')).toHaveTextContent('1 place')
+    expect(within(screen.getByRole('region', { name: 'Not checked' })).getByRole('link')).toHaveTextContent('1 place')
     expect(row('1 place')).toHaveAttribute('href', '/philly/admin/places?checked=not-watched')
   })
 

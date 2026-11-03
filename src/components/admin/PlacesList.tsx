@@ -11,7 +11,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { screensOpenIn } from '@/lib/useHistoryDepth'
 import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
-import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, type CheckedBy } from '@/lib/fieldCoverage'
+import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import AddPlace from './AddPlace'
 import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
@@ -226,12 +226,12 @@ export default function PlacesList({ token }: { token: string }) {
   const narrowed = filterPlaces(places, { show, category: category || undefined, query })
   const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), choice)
   const checkedCount = (choice: CheckedBy) => narrowed.filter((p) => fits(p, choice)).length
-  // Not watched: its main thing first, then by name as they already are.
+  // Not checked: its main thing first, then by name as they already are.
   const rows = narrowed.filter((p) => fits(p, checked))
   if (checked === 'not-watched') rows.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
   const lineOf = (p: AdminPlace): { text: string; warn: boolean } => {
     const c = coverage?.get(p.id)
-    if (checked === 'not-watched' && c) return { text: notWatchedLine(c), warn: true }
+    if (checked === 'not-watched' && c) return { text: notCheckedLine(c), warn: true }
     return { text: placeLine(p), warn: p.status === 'approved' && !p.hasAddress }
   }
   const shown = all ? rows : rows.slice(0, SHOWN)

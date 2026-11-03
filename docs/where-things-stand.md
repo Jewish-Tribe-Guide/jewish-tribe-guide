@@ -2406,6 +2406,28 @@ Fixed after the user's Nov 2 notes (same branch):
   St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
   time beside its "Oct 17" (`waitingGroups.ts`).
 
+## Done Nov 3: To do is what to act on, Places is how things stand (on `redesign/oct18-fixes`)
+
+The user's idea from Nov 2, agreed Nov 3. To do already filtered by what to
+act on (Changes, New places, Broken checks, Feedback), and Places lost
+"Check broken" on Nov 2. What was left:
+
+- Places' "Not watched" is now **Not checked** (the Checked by menu, each
+  row's line, and the Watches page's box). Old `?checked=not-watched`
+  links still work.
+- Each field says why it isn't checked, when it was stopped or can't be:
+  "Not checked: menu (no menu online)", "phone (not on Google)", "minyan
+  times (stopped reading)", "hospital contacts (not on Refuah)", "(its job
+  is off)". A field nothing was ever set up for says nothing more.
+- **No menu online now counts.** It left To do and was on no Places filter
+  (Ben & Jerry's, Nov 2). On dev: Miss Rachel's Pantry, Savvati Gourmet,
+  Stephen's Cafe, The Brazilian BBQ. `fieldCoverage.ts`.
+
+A place still waiting in To do as "Google not found" (Chalavita, The Kosher
+Grill on dev) shows under Not checked with no reason; it isn't settled yet.
+Not built: a listing in Places saying "a check is broken" with a link to To
+do (the idea allowed it, didn't need it).
+
 ## Done Nov 3: a list's new place fills from Google (on `redesign/oct18-fixes`)
 
 The user's "for later" from Nov 2, approved. Keystone-K's and Mekor

@@ -109,7 +109,7 @@ export default function WatchesManager({ token }: { token: string }) {
         </AdminBox>
       )}
       {unwatched !== null && unwatched > 0 && (
-        <AdminBox title="Not watched">
+        <AdminBox title="Not checked">
           <AdminRow href={`${base}/places?checked=not-watched`} name={`${unwatched} ${unwatched === 1 ? 'place' : 'places'}`} />
         </AdminBox>
       )}
