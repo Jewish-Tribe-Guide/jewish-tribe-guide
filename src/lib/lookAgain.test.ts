@@ -63,7 +63,9 @@ describe('lookItems: what it tries', () => {
         ],
       }),
     )
-    expect(grill).toMatchObject({ why: 'Not found on Google', lastTry: '2026-11-01T09:00:00Z', found })
+    // Found, its row says so (Leyv Ha-Ir on dev, Nov 3, said "Not found on
+    // Google · Found Nov 3").
+    expect(grill).toMatchObject({ why: 'Found on Google', lastTry: '2026-11-01T09:00:00Z', found })
     expect(sababa).toMatchObject({ stopped: '2026-11-02T12:00:00Z', lastTry: '2026-10-26T12:00:00Z' })
   })
 })

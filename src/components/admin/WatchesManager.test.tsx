@@ -195,7 +195,7 @@ describe('WatchesManager', () => {
   it('Look again: its row, and a failed run needs fixing', async () => {
     const items = [{ kind: 'google', id: 'g', name: 'The Kosher Grill', why: 'Never looked for', note: null, lastTry: null, found: null, stopped: null }, { kind: 'menu', id: 'm', name: 'Stopped One', why: 'x', note: null, lastTry: null, found: null, stopped: ago(1) }]
     const run = { id: 'r', job: 'look-again', startedAt: ago(0.3), finishedAt: ago(0.29), ok: true, summary: 'Tried 1 again', warning: null, error: null }
-    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: true, items, leftOut: 0, runs: [run] } })
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: true, items, leftOut: [], runs: [run] } })
     const look = within(screen.getByRole('region', { name: 'Look again' })).getByRole('link')
     expect(look).toHaveAttribute('href', '/philly/admin/watches/job/look-again')
     expect(look).toHaveTextContent('1 to try · Last night')
@@ -203,12 +203,12 @@ describe('WatchesManager', () => {
     expect(screen.queryByRole('region', { name: 'Needs fixing' })).toBeNull()
     cleanup()
     forgetWatchesTab()
-    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: true, items, leftOut: 0, runs: [{ ...run, ok: false, error: 'boom' }] } })
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: true, items, leftOut: [], runs: [{ ...run, ok: false, error: 'boom' }] } })
     expect(within(screen.getByRole('region', { name: 'Needs fixing' })).getByRole('link')).toHaveTextContent('Look againLast run failed')
   })
 
   it('Look again before its table: says it isn’t set up', async () => {
-    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: false, items: [], leftOut: 0, runs: [] } })
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: false, items: [], leftOut: [], runs: [] } })
     expect(within(screen.getByRole('region', { name: 'Look again' })).getByRole('link')).toHaveTextContent('Not set up')
   })
 

@@ -52,20 +52,22 @@ afterEach(() => {
 
 describe('LookAgainPage', () => {
   it('a group per kind, each row its why and when, and what it left out', async () => {
-    await renderPage({ available: true, items: ITEMS, leftOut: 10, runs: [] })
+    await renderPage({ available: true, items: ITEMS, leftOut: ['Young Professionals Philly', 'Kosher Deals WhatsApp'], runs: [] })
     expect(screen.getByTestId('look-tonight')).toHaveTextContent(/Tonight, \d{1,2}:00 AM · 2 due/)
     expect(screen.getByTestId('look-tonight')).toHaveTextContent('3 in all')
     expect(within(screen.getAllByRole('region', { name: 'Eruv status page' })[0]).getAllByRole('button', { name: /Elkins Park Eruv/ })[0]).toHaveTextContent('No status page on yiep.org')
     expect(within(screen.getAllByRole('region', { name: 'Menus that couldn’t be read' })[0]).getAllByRole('button', { name: /Shlomo/ })[0]).toHaveTextContent('Oct 24 · next Nov 23')
     const google = screen.getAllByRole('region', { name: 'Not on Google' })[0]
     expect(within(google).getAllByRole('button', { name: /The Kosher Grill/ })[0]).toHaveTextContent('Not tried yet · tonight')
-    expect(google).toHaveTextContent('Left out: 10 groups, not places')
+    // Left out opens to name them (board Main).
+    fireEvent.click(within(google).getByRole('button', { name: /Left out: 2 groups, not places/ }))
+    expect(google).toHaveTextContent('Young Professionals Philly · Kosher Deals WhatsApp')
     expect(within(google).queryByText('CKids Philly')).toBeNull()
     expect(within(screen.getByRole('region', { name: 'Stopped trying' })).getByText('1')).toBeInTheDocument()
   })
 
   it('a row opens in place: its last try in full, its next, Read it now and Stop trying', async () => {
-    await renderPage({ available: true, items: ITEMS, leftOut: 0, runs: [] }, { found: false, read: false })
+    await renderPage({ available: true, items: ITEMS, leftOut: [], runs: [] }, { found: false, read: false })
     fireEvent.click(screen.getAllByRole('button', { name: /Shlomo/ })[0])
     const opened = screen.getByTestId('look-opened')
     expect(opened).toHaveTextContent('Last try, Oct 24An online grocery catalog, not a menu of prepared dishes.')
@@ -80,14 +82,14 @@ describe('LookAgainPage', () => {
   })
 
   it('Read it now that finds it says it waits in To do', async () => {
-    await renderPage({ available: true, items: ITEMS, leftOut: 0, runs: [] }, { found: true })
+    await renderPage({ available: true, items: ITEMS, leftOut: [], runs: [] }, { found: true })
     fireEvent.click(screen.getAllByRole('button', { name: /Elkins Park/ })[0])
     await act(async () => fireEvent.click(within(screen.getByTestId('look-opened')).getByRole('button', { name: 'Read it now' })))
     expect(screen.getByRole('status')).toHaveTextContent('Found it. It’s waiting in To do.')
   })
 
   it('one stopped starts again from Stopped trying', async () => {
-    await renderPage({ available: true, items: ITEMS, leftOut: 0, runs: [] })
+    await renderPage({ available: true, items: ITEMS, leftOut: [], runs: [] })
     fireEvent.click(within(screen.getByRole('region', { name: 'Stopped trying' })).getByRole('button', { name: /Stopped trying/ }))
     fireEvent.click(screen.getByRole('button', { name: /CKids Philly/ }))
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start trying again' })))
@@ -95,7 +97,7 @@ describe('LookAgainPage', () => {
   })
 
   it('before its table, says it isn’t set up', async () => {
-    await renderPage({ available: false, items: [], leftOut: 0, runs: [] })
+    await renderPage({ available: false, items: [], leftOut: [], runs: [] })
     expect(screen.getByText('Look again isn’t set up on this site yet.')).toBeInTheDocument()
   })
 })

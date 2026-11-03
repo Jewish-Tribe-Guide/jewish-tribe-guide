@@ -97,10 +97,10 @@ for that exact change, in the same conversation. Show the dry run first.
    (only the street address's, for Directions), so the nightly sync skips
    it. Fix: set its place id to the store's, on live; needs a yes, after
    looking the id up and showing it.
-1k. **Migration 092 (`look_again`)** is not run anywhere yet. Until it is,
-   Look again's page says it isn't set up, its Watches row says Not set
-   up, and its nightly run records "Not set up". Dev first (the user, in
-   the SQL editor); live once this branch is deployed, with a yes.
+1k. **Migration 092 (`look_again`)** is run on dev (the user, Nov 3), not
+   live. Until it is, live's Look again page says it isn't set up, its
+   Watches row says Not set up, and its nightly run records "Not set up".
+   Live once this branch is deployed, with a yes.
 
 ## For the user or the community
 
@@ -2410,7 +2410,7 @@ Fixed after the user's Nov 2 notes (same branch):
   St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
   time beside its "Oct 17" (`waitingGroups.ts`).
 
-## Done Nov 3: Look again (on `redesign/oct18-fixes`; needs migration 092)
+## Done Nov 3: Look again (on `redesign/oct18-fixes`; 092 on dev only)
 
 Drawn Oct 27 (canvas XSuFCMdLQmBYNJqfWaEM3A). A nightly job, 4 AM, that
 tries again what the other jobs couldn't find: an eruv with a website but
@@ -2432,7 +2432,14 @@ never-tried first. A kind whose own job is turned off isn't tried.
 - Watches tab: a Look again row; a failed or late run goes under Needs
   fixing.
 
-Not checked against the boards with real rows yet: dev needs 092 first.
+Checked on dev with real rows (092 run there Nov 3): the page against the
+Main and Phone boards, a find in To do against the Found board. Read it now
+found Leyv Ha-Ir on Google; Use this place matched it (phone and website
+filled) and it left To do and Look again. Elkins Park and The Kosher Grill
+found nothing. Fixed on the way: a found row said "Not found on Google";
+"Left out: 10 groups" now opens to name them; the phone has no subline and
+an opened row drops its repeated line, as drawn. Left as is: the subline
+sits under the title on a computer, not beside it.
 
 ## Done Nov 3: To do is what to act on, Places is how things stand (on `redesign/oct18-fixes`)
 

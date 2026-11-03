@@ -357,7 +357,7 @@ describe('waitingGroups', () => {
     const item = (kind: string, id: string, found: unknown) => ({ kind, id, name: id, why: '', note: null, lastTry: AT, found, stopped: null })
     const lookAgain = {
       available: true,
-      leftOut: 0,
+      leftOut: [],
       items: [
         item('eruv', 'ep', { url: 'https://www.yiep.org/eruv-status', status: 'up', words: 'The eruv is up', at: AT }),
         item('google', 'kg', { placeId: 'ChIJ1', name: 'The Kosher Grill', address: '3601 S Broad St', at: AT }),

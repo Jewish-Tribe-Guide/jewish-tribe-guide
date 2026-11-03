@@ -88,6 +88,8 @@ export function lookItems(input: LookInput): LookItem[] {
   const rows = new Map(input.rows.map((r) => [`${r.kind}:${r.targetId}`, r]))
   const item = (kind: LookKind, id: string, name: string, why: string, lastTry: string | null, note: string | null = null): LookItem => {
     const row = rows.get(`${kind}:${id}`)
+    // Found, it says so: not why it was looked for.
+    if (row?.found) why = kind === 'eruv' ? 'Status page found' : 'Found on Google'
     return { kind, id, name, why, note, lastTry: later(row?.triedAt, lastTry), found: row?.found ?? null, stopped: row?.stoppedAt ?? null }
   }
   const out: LookItem[] = []
@@ -193,10 +195,10 @@ export function pickPage<T extends { url: string }>(pages: readonly T[], notThes
 
 export const isFoundPage = (f: FoundPage | FoundPlace): f is FoundPage => 'url' in f
 
-/** What its route answers. `leftOut`: listings Google doesn't check at
- *  all, in a category with no address (groups, not places). `runs`: the
- *  job's latest first. */
-export type LookAgainLoaded = { available: boolean; items: LookItem[]; leftOut: number; runs?: JobRun[] }
+/** What its route answers. `leftOut`: the names of listings Google doesn't
+ *  check at all, in a category with no address (groups, not places).
+ *  `runs`: the job's latest first. */
+export type LookAgainLoaded = { available: boolean; items: LookItem[]; leftOut: string[]; runs?: JobRun[] }
 
 /** Look again's run, per community, for the Watches tab's line. */
 export type LookAgainRun = { skipped: string } | { communities: readonly { community: string; tried: number; found: number; failed: number; left: number }[] }

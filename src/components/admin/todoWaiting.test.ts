@@ -46,7 +46,7 @@ describe('what To do adds to the queue', () => {
     const found = { placeId: 'P', name: 'The Kosher Grill', address: '3601 S Broad St', at: AT }
     const page = { url: 'https://yiep.org/eruv-status', status: 'up', words: 'The eruv is up', at: AT }
     const item = (kind: string, id: string, name: string, f: unknown) => ({ kind, id, name, why: '', note: null, lastTry: AT, found: f, stopped: null })
-    const lookAgain = { available: true, leftOut: 0, items: [item('eruv', 'ep', 'Elkins Park Eruv', page), item('google', 'kg', 'The Kosher Grill', found), item('google', 'r', 'Rita’s', found), item('google', 'x', 'Not yet', null)] }
+    const lookAgain = { available: true, leftOut: [], items: [item('eruv', 'ep', 'Elkins Park Eruv', page), item('google', 'kg', 'The Kosher Grill', found), item('google', 'r', 'Rita’s', found), item('google', 'x', 'Not yet', null)] }
     const got = waitingNotQueued(jobs({ google: { places: [place('r', 'Rita’s', { closure } as never)] } as never, lookAgain: lookAgain as never }), NOW)
     expect(got).toEqual([
       { id: 'r', name: 'Rita’s', kind: 'Food', line: `Closed for now, says Google · ${day(AT)}`, at: AT, found: true },

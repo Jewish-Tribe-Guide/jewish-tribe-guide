@@ -7,7 +7,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { NIGHTLY_JOBS, nextRunAt } from '@/lib/jobRuns'
-import { isFoundPage, lookView, type LookKind, type LookShown } from '@/lib/lookAgain'
+import { isFoundPage, lookView, type LookShown } from '@/lib/lookAgain'
 import { placePath } from '@/lib/placeLink'
 import { AdminBack, AdminBox, AdminCount, Chevron, MoreToggle } from './AdminUI'
 import { day, shortUrl } from './watchText'
@@ -102,6 +102,27 @@ function Opened({ item, token, community, base, reload }: { item: LookShown; tok
   )
 }
 
+/** "Left out: 10 groups, not places", opening to name them (board Main). */
+function LeftOut({ names }: { names: string[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-slate-100">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full min-h-11 cursor-pointer items-center gap-1.5 px-4 py-3 text-left text-[13.5px] text-slate-500"
+      >
+        <span className={open ? 'rotate-90' : ''}>
+          <Chevron />
+        </span>
+        Left out: {names.length} {names.length === 1 ? 'group' : 'groups'}, not places
+      </button>
+      {open && <p className="m-0 px-4 pb-3 pl-9 text-[13.5px] text-slate-600">{names.join(' · ')}</p>}
+    </div>
+  )
+}
+
 function Rows({ rows, ...rest }: { rows: LookShown[]; token: string; community: string; base: string; reload: () => Promise<void> }) {
   const [open, setOpen] = useState<string | null>(null)
   const [all, setAll] = useState(false)
@@ -111,7 +132,7 @@ function Rows({ rows, ...rest }: { rows: LookShown[]; token: string; community: 
         const key = `${r.kind}:${r.id}`
         const opened = open === key
         return (
-          <div key={key} className={`border-b border-slate-100 last:border-b-0 ${n >= PHONE_ROWS && !all ? 'max-sm:hidden' : ''}`}>
+          <div key={key} className={`border-b border-slate-100 last:border-b-0 ${opened ? 'bg-[#fbfcfe]' : ''} ${n >= PHONE_ROWS && !all ? 'max-sm:hidden' : ''}`}>
             <button
               type="button"
               aria-expanded={opened}
@@ -120,7 +141,7 @@ function Rows({ rows, ...rest }: { rows: LookShown[]; token: string; community: 
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:contents">
                 <span className="text-[14.5px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{r.name}</span>
-                <span className="text-[13px] text-slate-600 sm:text-[13.5px]">
+                <span className={`text-[13px] text-slate-600 sm:text-[13.5px] ${opened ? 'max-sm:hidden' : ''}`}>
                   {r.why}
                   <span className="sm:hidden"> · {r.when}</span>
                 </span>
@@ -156,13 +177,12 @@ export default function LookAgainPage({ token }: { token: string }) {
   if (!loaded.available) return <div className="space-y-4">{head}<p className="text-sm text-amber-800">Look again isn’t set up on this site yet.</p></div>
   const view = lookView(loaded.items, nextRunAt(JOB, now))
   const shared = { token, community, base, reload }
-  const leftOut: Partial<Record<LookKind, string>> = loaded.leftOut ? { google: `Left out: ${loaded.leftOut} ${loaded.leftOut === 1 ? 'group' : 'groups'}, not places` } : {}
   const [tonight, due] = view.tonight.split(' · ')
 
   return (
     <div className="flex flex-col gap-3.5">
       {head}
-      <p className="m-0 -mt-1 text-sm text-slate-600">Tries each one again a month after the last try · a few a night</p>
+      <p className="m-0 -mt-1 text-sm text-slate-600 max-md:hidden">Tries each one again a month after the last try · a few a night</p>
       <div className="flex flex-wrap gap-x-[18px] gap-y-1.5 text-[13.5px] text-slate-600" data-testid="look-tonight">
         <span>
           <span className="font-semibold text-slate-900">{tonight}</span> · {due}
@@ -172,7 +192,7 @@ export default function LookAgainPage({ token }: { token: string }) {
       {view.groups.map((g) => (
         <AdminBox key={g.kind} title={g.title} count={g.rows.length} foldOnPhone>
           <Rows rows={g.rows} {...shared} />
-          {leftOut[g.kind] && <p className="m-0 border-t border-slate-100 px-4 py-3 text-[13.5px] text-slate-500">{leftOut[g.kind]}</p>}
+          {g.kind === 'google' && loaded.leftOut.length > 0 && <LeftOut names={loaded.leftOut} />}
         </AdminBox>
       ))}
       <section aria-label="Stopped trying" className="rounded-[10px] border border-slate-200 bg-white">
@@ -183,7 +203,7 @@ export default function LookAgainPage({ token }: { token: string }) {
           onClick={() => setStoppedOpen((o) => !o)}
           className={`flex w-full min-h-11 cursor-pointer items-center gap-2.5 px-4 py-3.5 text-left disabled:cursor-default ${stoppedOpen ? 'border-b border-slate-100' : ''}`}
         >
-          <span className={stoppedOpen ? 'rotate-90' : ''}>
+          <span className={`max-sm:order-last ${stoppedOpen ? 'rotate-90' : ''}`}>
             <Chevron />
           </span>
           <h2 className="m-0 flex-1 text-base font-bold text-slate-900">Stopped trying</h2>

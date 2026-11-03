@@ -34,9 +34,10 @@ export async function loadLookAgain(community: string, now = Date.now()): Promis
   const db = getAdminClient()
   const [names, leftOut] = await Promise.all([
     failed.length ? db.from('resource').select('id,name').eq('community_id', community).eq('status', 'approved').in('id', failed.map((r) => r.resourceId)) : Promise.resolve({ data: [], error: null }),
-    groups.length ? db.from('resource').select('id', { count: 'exact', head: true }).eq('community_id', community).eq('status', 'approved').in('category', groups) : Promise.resolve({ count: 0, error: null }),
+    groups.length ? db.from('resource').select('name').eq('community_id', community).eq('status', 'approved').in('category', groups).order('name') : Promise.resolve({ data: [], error: null }),
   ])
   if (names.error) throw new Error(`Failed to load the food places: ${names.error.message}`)
+  if (leftOut.error) throw new Error(`Failed to load the groups: ${leftOut.error.message}`)
   const nameOf = new Map(((names.data ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]))
   const off = jobsOff(watches)
   const items = lookItems({
@@ -46,7 +47,7 @@ export async function loadLookAgain(community: string, now = Date.now()): Promis
     google,
     rows,
   }).filter((i) => !off.includes(JOB_OF[i.kind]))
-  return { available, items, leftOut: leftOut.count ?? 0 }
+  return { available, items, leftOut: ((leftOut.data ?? []) as { name: string }[]).map((r) => r.name) }
 }
 
 /** One try, saved: what it found, if anything. A menu read again is kept
