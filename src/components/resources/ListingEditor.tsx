@@ -417,6 +417,14 @@ export default function ListingEditor({
   useEffect(() => {
     onHasChanges?.(hasChanges)
   }, [hasChanges, onHasChanges])
+  // Adding: what a listing can't go without, the same rules the server
+  // applies (resourceStore's validateSubmission), so Send is never on for
+  // something that would be refused.
+  const visible = (f: CategoryField) => fieldIsVisible(f, details)
+  const requiredMissing = creating ? category.detailFields.filter((f) => f.required && visible(f) && isBlank(details[f.key])) : []
+  const missing = creating
+    ? [!draft.name.trim() && 'Name', hasAddress && !draft.address.trim() && 'Address', ...requiredMissing.map((f) => f.label)].filter((x): x is string => !!x)
+    : []
   // A host's own buttons send what's changed, as Send would; a new place
   // (L3NewPlace) once nothing it needs is missing.
   const opened = useRef<string | null>(null)
@@ -446,10 +454,6 @@ export default function ListingEditor({
 
   // ── What's changed, and what's still needed ───────────────────────────
   const changed = new Set(creating ? [] : rows.filter((r) => rowChanged(r, item, values)).map((r) => r.id))
-  // Adding: what a listing can't go without, the same rules the server
-  // applies (resourceStore's validateSubmission), so Send is never on for
-  // something that would be refused.
-  const visible = (f: CategoryField) => fieldIsVisible(f, details)
 
   // A field a change on To do changed (`hosted.marks`): Changed by its
   // label, and what the listing said under it (R5Link). A long one's own
@@ -479,10 +483,6 @@ export default function ListingEditor({
     return r.kind === 'fields' && only.length === 1 && (same(only[0].label) || same(only[0].shortLabel)) ? only[0] : null
   }
 
-  const requiredMissing = creating ? category.detailFields.filter((f) => f.required && visible(f) && isBlank(details[f.key])) : []
-  const missing = creating
-    ? [!draft.name.trim() && 'Name', hasAddress && !draft.address.trim() && 'Address', ...requiredMissing.map((f) => f.label)].filter((x): x is string => !!x)
-    : []
   const needed = (r: EditorRow) =>
     creating &&
     ((r.kind === 'name' && !draft.name.trim()) || (r.kind === 'contact' && r.part !== 'phone' && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
