@@ -109,7 +109,7 @@ export function todoPlaces(
     const p = at(w.id, w.name, w.id)
     const day = / · ([A-Z][a-z]{2} \d{1,2})$/.exec(w.line)?.[1]
     p.things.push({ kind: 'waiting', id: `waiting:${w.id}`, label: w.line.replace(/ · [A-Z][a-z]{2} \d{1,2}$/, ''), filter: 'changes' })
-    const iso = day && dayToIso(day, now)
+    const iso = w.at ?? (day && dayToIso(day, now))
     if (iso) dated(p, iso)
   }
   for (const n of data.notRead ?? []) {

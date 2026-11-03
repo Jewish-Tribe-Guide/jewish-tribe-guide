@@ -2400,6 +2400,11 @@ Fixed after the user's Nov 2 notes (same branch):
   A job's finding takes its place's category; feedback and a new category
   have none and show only under All categories. The up and down arrows
   stay inside the category. `todoPlaces.ts`, `TodoList.tsx`.
+- A row whose only line is a job's reading with no day in it ("Its menu
+  has a change", "Google has a change") is dated by when it was read, so it
+  sorts with the rest instead of sinking to the foot of To do (Rita's South
+  St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
+  time beside its "Oct 17" (`waitingGroups.ts`).
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 

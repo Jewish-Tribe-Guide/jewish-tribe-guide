@@ -28,8 +28,10 @@ describe('what To do adds to the queue', () => {
   it('a closure and a change from Google, each under its kind, saying what it is', () => {
     const got = waitingNotQueued(jobs({ google: { places: [place('r', 'Rita’s', { closure } as never), place('c', 'Cherry Grill', { compare } as never), place('k', 'Kesher')] } as never }), NOW)
     expect(got.map((w) => w.id).sort()).toEqual(['c', 'r'])
-    expect(got.find((w) => w.id === 'r')).toEqual({ id: 'r', name: 'Rita’s', kind: 'Food', line: `Closed for now, says Google · ${day(AT)}` })
-    expect(got.find((w) => w.id === 'c')).toEqual({ id: 'c', name: 'Cherry Grill', kind: 'Food', line: 'Google has a change' })
+    expect(got.find((w) => w.id === 'r')).toEqual({ id: 'r', name: 'Rita’s', kind: 'Food', line: `Closed for now, says Google · ${day(AT)}`, at: AT })
+    // The user, Nov 3: dated though its line has no day, by when Google was
+    // read, so it doesn't sink to the foot of To do.
+    expect(got.find((w) => w.id === 'c')).toEqual({ id: 'c', name: 'Cherry Grill', kind: 'Food', line: 'Google has a change', at: AT })
   })
 
   it('leaves out what waits only in the queue', () => {

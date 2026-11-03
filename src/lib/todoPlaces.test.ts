@@ -71,6 +71,17 @@ describe('todoPlaces', () => {
 
   // Sababa, Nov 2: "Oct 17 · Google stopped answering Oct 17". The row's
   // corner has the date; the line doesn't say it again.
+  // The user, Nov 3: "Its menu has a change" says no day, and sank to the
+  // foot of To do undated; it's dated by when the menu was read.
+  it('dates a job’s reading whose line has no day by when it was read', () => {
+    const places = todoPlaces(
+      { submissions: [], responses: [], unmatched: [], waiting: [{ id: 'p2', name: 'Rita’s', kind: 'Food', line: 'Its menu has a change', at: '2026-11-03T15:00:00Z' }] },
+      cats,
+    )
+    expect(places[0].at).toBe('2026-11-03T15:00:00Z')
+    expect(placeLine(places[0])).toBe('Its menu has a change')
+  })
+
   it('says a broken check’s date once, in the corner', () => {
     const [p] = todoPlaces({ submissions: [], responses: [], unmatched: [], notRead: [{ id: 's', name: 'Sababa', line: 'Google stopped answering Oct 17', since: ['2026-10-17T07:00:00Z'] }] }, cats)
     expect(placeLine(p)).toBe('Google stopped answering')

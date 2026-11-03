@@ -9,7 +9,8 @@ import { kindsOf } from './WatchKinds'
 // there; these are decided on the place itself: a closure Google reports, a
 // check against Google, a menu's reading, a place the guide has archived.
 
-export type TodoWaiting = { id: string; name: string; kind: string; line: string }
+/** `at`: when what waits there was read, the row's date (N1List). */
+export type TodoWaiting = { id: string; name: string; kind: string; line: string; at?: string | null }
 /** `since`: when each broken check started failing, the row's date (J1Dates,
  *  N1List: every place on To do is dated). */
 export type TodoNotRead = { id: string; name: string; line: string; since?: (string | null)[] }
@@ -103,7 +104,7 @@ export function waitingNotQueued(jobs: Jobs, now: number): TodoWaiting[] {
         const { groups } = waitingGroups(p.id, jobs, now)
         const own = ownGroups(groups)
         if (groups.length > 0 && own.length === 0) return []
-        return [{ id: p.id, name: p.name, kind: k.label, line: lineOf(p.pill, own[0]?.decide.kind) }]
+        return [{ id: p.id, name: p.name, kind: k.label, line: lineOf(p.pill, own[0]?.decide.kind), at: earliest(own.map((g) => g.at)) }]
       }),
   )
 }

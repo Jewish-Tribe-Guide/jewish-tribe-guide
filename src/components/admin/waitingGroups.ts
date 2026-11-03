@@ -74,7 +74,19 @@ export type Decide =
   | { kind: 'later'; archivedId?: string }
 /** `boxes`: a shul's times and a menu's dishes, drawn as the listing's
  *  boxes instead of lines. */
-export type WaitGroup = { key: string; job: WaitJob; page: FootLink | null; when: string | null; lines: WaitLine[]; boxes?: WaitBox[]; facts: WaitFact[]; note: string | null; decide: Decide }
+export type WaitGroup = {
+  key: string
+  job: WaitJob
+  page: FootLink | null
+  when: string | null
+  /** When `when` says, for To do's row date. */
+  at?: string | null
+  lines: WaitLine[]
+  boxes?: WaitBox[]
+  facts: WaitFact[]
+  note: string | null
+  decide: Decide
+}
 
 export type Waiting = { groups: WaitGroup[]; checked: CheckedLine[] }
 
@@ -142,6 +154,7 @@ function findingGroups(job: WaitJob, findings: readonly Finding[], pageOf: (f: F
       job,
       page: pageOf(fs[0]),
       when: at ? day(at) : null,
+      at,
       lines: fs.flatMap(findingLines),
       ...(fs.some((f) => f.times && f.part) ? { boxes: fs.flatMap((f) => timesBoxes(f) ?? []) } : {}),
       facts: [],
@@ -198,6 +211,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       job: 'kosher',
       page: listPage(jobs, f),
       when: day(f.at),
+      at: f.at,
       lines: newLines(f, kosher?.categories?.find((c) => c.id === (f.category ?? 'restaurant'))),
       facts: fresh?.archived ? [{ label: 'In the guide', value: `Archived, as “${fresh.archived}”` }] : [],
       note: null,
@@ -233,6 +247,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'kosher',
         page: list,
         when: day(f.at),
+        at: f.at,
         lines: [{ label: 'Hechsher', value: 'None', old: list.text.replace(/’s list$/, '') }],
         facts: [...siteFact(), ...(google?.matched ? [{ label: 'Google', value: google.closure ? closureText(google.closure) : 'Open' }] : [])],
         note: 'Its only hechsher. Removing archives it.',
@@ -244,6 +259,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'kosher',
         page: list,
         when: day(f.at),
+        at: f.at,
         lines: box.rows.filter((r) => r.mark !== 'same').map((r) => ({ label: r.name, value: r.mark === 'gone' ? 'None' : r.value, old: r.mark === 'changed' ? (r.was ?? null) : r.mark === 'gone' ? r.value : null })),
         facts: [],
         note: null,
@@ -261,6 +277,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       job: 'google',
       page: { text: 'its Google listing', url: null },
       when: c.readAt ? day(c.readAt) : null,
+      at: c.readAt ?? null,
       lines: [{ label: 'Open or closed', value: closureText(c), old: 'Open' }],
       facts: [...(c.since ? [{ label: 'On the site', value: `Shown closed since ${day(c.since)}` }] : []), ...siteFact()],
       note: 'Opens again by itself when Google says open.',
@@ -301,6 +318,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'dishes',
         page: url ? pageLink(url) : { text: 'its menu', url: null },
         when: day(r.readAt),
+        at: r.readAt,
         lines: [],
         // Every dish, top down, what the menu said of it under it (the
         // user, Oct 28: "didn't the reader used to say the words it got
@@ -336,6 +354,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       job: 'google',
       page: { text: 'its Google listing', url: null },
       when: day(compare.at),
+      at: compare.at,
       lines: changed.map((x) => {
         const listed = google.fields.find((f) => f.field === x.field)?.value ?? NONE
         return { label: x.label, value: value(shown(x.field, x.google)), old: was(shown(x.field, listed)) }
@@ -357,6 +376,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'eruv',
         page: eruv.website ? pageLink(eruv.website) : { text: 'its website', url: null },
         when: day(ef.at),
+        at: ef.at,
         lines: rows.map((x) => ({ label: x.name, value: x.mark === 'gone' ? 'None' : x.value, old: x.mark === 'changed' ? (x.was ?? null) : x.mark === 'gone' ? x.value : null })),
         facts: [],
         note: null,
