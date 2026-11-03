@@ -1,6 +1,6 @@
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { ADMIN_WRITE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail } from '../scripts/cacheE2eAdmin.mjs'
+import { ADMIN_WRITE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real, full-browser admin session against the disposable test
@@ -49,24 +49,10 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
     throw new Error(`Could not create the test-project admin user: ${createError.message}`)
   }
 
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: testAdminEmail,
-  })
-  if (linkError || !linkData.properties?.hashed_token) {
-    throw new Error(`Could not generate a magic link: ${linkError?.message ?? 'no hashed_token returned'}`)
-  }
-
   const anon = createClient(supabaseUrl, anonKey)
-  const { data: verifyData, error: verifyError } = await anon.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: 'magiclink',
-  })
-  if (verifyError || !verifyData.session) {
-    throw new Error(`Could not redeem the magic link: ${verifyError?.message ?? 'no session returned'}`)
-  }
+  const session = await mintMagicLinkSession(admin, anon, testAdminEmail)
 
-  const { access_token, refresh_token, expires_in, token_type } = verifyData.session
+  const { access_token, refresh_token, expires_in, token_type } = session
   const hash = new URLSearchParams({
     access_token,
     refresh_token,

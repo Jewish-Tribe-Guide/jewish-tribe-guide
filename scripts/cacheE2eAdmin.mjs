@@ -48,12 +48,40 @@ export const ADMIN_WRITE_TEST_ADMIN_EMAIL = 'admin-write-admin@test.invalid'
 // ADMIN_WRITE_TEST_ADMIN_EMAIL explicitly so the two suites never resolve to
 // the same identity on a pristine (CI) test project. Note this doesn't help
 // on a SHARED_DEV_TEST_PROJECT with a real admin_email set — both suites
-// still resolve to that same real address there, same as before this
-// change; that's a local-dev-only scenario, not the CI race this fixes.
+// still resolve to that same real address there. That was thought to be
+// local-dev-only, but CI's test project is the shared dev project now, with
+// a real admin_email, so the race is back in CI; mintMagicLinkSession below
+// is what survives it.
 export async function resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey, fallbackEmail = CACHE_TEST_ADMIN_EMAIL) {
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { data } = await admin.from('community').select('admin_email, is_default, sort_order').order('sort_order', { ascending: true })
   const rows = data ?? []
   const target = rows.find((r) => r.is_default) ?? rows[0]
   return target?.admin_email || fallbackEmail
+}
+
+// Mints a session for `email` the way the auth.setup.ts files all do
+// (generateLink + verifyOtp), trying again when the link was cancelled
+// before it could be redeemed. generateLink cancels any link still
+// outstanding for that user, so two suites signing in as the same person
+// at once (both resolve to a community's real admin_email, which the CI
+// test project has had set since it became the shared dev project too)
+// fail whichever redeems second with "invalid or has expired". Nov 3:
+// admin-write failed in CI that way with all 33 of its tests unrun, while
+// cache-roundtrip signed in beside it. A fresh link a moment later is
+// redeemed in the same few hundred milliseconds, so a few tries converge.
+export async function mintMagicLinkSession(admin, anon, email, { tries = 5, pause = () => 300 + Math.random() * 1200 } = {}) {
+  for (let attempt = 1; ; attempt++) {
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email })
+    if (linkError || !linkData?.properties?.hashed_token) {
+      throw new Error(`Could not generate a magic link: ${linkError?.message ?? 'no hashed_token returned'}`)
+    }
+    const { data: verifyData, error: verifyError } = await anon.auth.verifyOtp({ token_hash: linkData.properties.hashed_token, type: 'magiclink' })
+    if (!verifyError && verifyData?.session) return verifyData.session
+    const cancelled = /invalid or has expired/i.test(verifyError?.message ?? '')
+    if (!cancelled || attempt >= tries) {
+      throw new Error(`Could not redeem the magic link: ${verifyError?.message ?? 'no session returned'}${cancelled ? ` (${attempt} tries)` : ''}`)
+    }
+    await new Promise((r) => setTimeout(r, pause()))
+  }
 }

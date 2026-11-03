@@ -1,5 +1,6 @@
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real admin session and saves it for the `admin` project (see
@@ -44,23 +45,12 @@ setup('authenticate as admin', async ({ page, baseURL }) => {
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey)
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email })
-  if (linkError || !linkData.properties?.hashed_token) {
-    throw new Error(`Could not generate a magic link: ${linkError?.message ?? 'no hashed_token returned'}`)
-  }
-
   // The anon client, not the service-role one — this is the same call/key a
   // real signed-in browser uses, just made from Node instead of the page.
   const anon = createClient(supabaseUrl, anonKey)
-  const { data: verifyData, error: verifyError } = await anon.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: 'magiclink',
-  })
-  if (verifyError || !verifyData.session) {
-    throw new Error(`Could not redeem the magic link: ${verifyError?.message ?? 'no session returned'}`)
-  }
+  const session = await mintMagicLinkSession(admin, anon, email)
 
-  const { access_token, refresh_token, expires_in, token_type } = verifyData.session
+  const { access_token, refresh_token, expires_in, token_type } = session
   const hash = new URLSearchParams({
     access_token,
     refresh_token,

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { resolveDefaultCommunityAdminEmail } from '../scripts/cacheE2eAdmin.mjs'
+import { resolveDefaultCommunityAdminEmail, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real admin session against the disposable test Supabase project,
@@ -48,23 +48,9 @@ setup('mint a cache-test admin session', async () => {
     throw new Error(`Could not create the cache-test admin user: ${createError.message}`)
   }
 
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: testAdminEmail,
-  })
-  if (linkError || !linkData.properties?.hashed_token) {
-    throw new Error(`Could not generate a magic link: ${linkError?.message ?? 'no hashed_token returned'}`)
-  }
-
   const anon = createClient(supabaseUrl, anonKey)
-  const { data: verifyData, error: verifyError } = await anon.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: 'magiclink',
-  })
-  if (verifyError || !verifyData.session) {
-    throw new Error(`Could not redeem the magic link: ${verifyError?.message ?? 'no session returned'}`)
-  }
+  const session = await mintMagicLinkSession(admin, anon, testAdminEmail)
 
   mkdirSync('e2e-cache/.auth', { recursive: true })
-  writeFileSync(TOKEN_FILE, JSON.stringify({ accessToken: verifyData.session.access_token }))
+  writeFileSync(TOKEN_FILE, JSON.stringify({ accessToken: session.access_token }))
 })
