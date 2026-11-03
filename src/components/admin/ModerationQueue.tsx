@@ -10,6 +10,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { shownPlaces, todoPlaces } from '@/lib/todoPlaces'
 import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
+import { useTodoSplit } from './useTodoSplit'
 import { useFullPane } from './AdminUI'
 import TodoList, { ALL_OLDEST_FIRST } from './TodoList'
 import TodoPlaceScreen from './TodoPlaceScreen'
@@ -110,6 +111,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
   // puts it back there; on a phone the place covers the list, and closing
   // returns to where you'd scrolled.
   const listColumn = useRef<HTMLDivElement>(null)
+  const split = useTodoSplit()
   const spot = useRef<{ key: string; y: number; top: number } | null>(null)
   const rowOf = (key: string) => [...(listColumn.current?.querySelectorAll<HTMLElement>('[data-place]') ?? [])].find((r) => r.dataset.place === key) ?? null
   const wide = () => !!window.matchMedia?.('(min-width: 768px)').matches
@@ -276,11 +278,12 @@ export default function ModerationQueue({ session }: { session: Session }) {
       ) : (
         !loadError && (
           // On a computer the list stays beside the open place (the inbox),
-          // each the window's height, scrolling on its own (N6Desk).
-          <div className={openPlace ? 'md:grid md:grid-cols-[380px_minmax(0,1fr)] md:h-dvh' : undefined}>
+          // each the window's height, scrolling on its own (N6Desk), with
+          // the line between them dragged to share the room (useTodoSplit).
+          <div ref={openPlace ? split.gridRef : undefined} style={openPlace ? split.gridStyle : undefined} className={openPlace ? 'md:grid md:h-dvh' : undefined}>
             <div
               ref={listColumn}
-              className={openPlace ? 'max-md:hidden md:overflow-y-auto md:bg-white md:border-r md:border-slate-200 md:px-4 md:pt-6' : undefined}
+              className={openPlace ? 'max-md:hidden md:overflow-y-auto md:bg-white md:px-4 md:pt-6' : undefined}
             >
               {openPlace && (
                 <h1 className="m-0 mb-4 flex items-baseline gap-2.5 text-[26px] font-bold text-slate-900">
@@ -289,6 +292,11 @@ export default function ModerationQueue({ session }: { session: Session }) {
               )}
               <TodoList data={data} categoriesById={categoriesById} view={view} onView={setView} onOpen={(p) => open(p.key)} openKey={openPlace?.key} />
             </div>
+            {openPlace && (
+              <div {...split.handleProps} className="max-md:hidden group relative cursor-col-resize touch-none bg-white focus-visible:outline-none">
+                <span aria-hidden="true" className="absolute inset-y-0 left-0 w-px bg-slate-200 transition-[width,background-color] group-hover:w-[3px] group-hover:bg-primary group-focus-visible:w-[3px] group-focus-visible:bg-primary" />
+              </div>
+            )}
             {openPlace && (
               <TodoPlaceScreen
                 key={openPlace.key}

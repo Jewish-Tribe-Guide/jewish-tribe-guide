@@ -121,3 +121,34 @@ test('the open place’s X and Esc close it, back to the whole list', async ({ p
   await expect(page).not.toHaveURL(/[?&]open=/)
   await expect(page.locator('[data-place][aria-current="true"]')).toHaveCount(0)
 })
+
+// The user, Nov 2: how much room To do takes. The line between the list and
+// the open place drags, and the width stays for the next place opened, and
+// after a reload.
+test('dragging the line between the list and the place sets the list’s width, and it’s kept', async ({ page }) => {
+  await openTodo(page)
+  const row = page.getByRole('button', { name: `Open ${names[9]}` })
+  await row.click()
+  await expect(page).toHaveURL(/[?&]open=/)
+  const line = page.getByRole('separator', { name: 'Resize To do and the place' })
+  const list = page.locator('[data-place]').first()
+  const listWidth = () => list.evaluate((el) => Math.round(el.getBoundingClientRect().width))
+  const before = await listWidth()
+  const box = (await line.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + 200, { steps: 4 })
+  await page.mouse.move(box.x + box.width / 2 + 160, box.y + 200, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(async () => (await listWidth()) - before, { message: 'the list didn’t widen' }).toBeGreaterThan(140)
+  const wide = await listWidth()
+
+  await page.reload()
+  await expect(page).toHaveURL(/[?&]open=/)
+  await expect(page.getByRole('separator', { name: 'Resize To do and the place' })).toBeVisible()
+  await expect.poll(listWidth, { message: 'the width wasn’t kept' }).toBe(wide)
+
+  // Double-click: back to the usual width.
+  await page.getByRole('separator', { name: 'Resize To do and the place' }).dblclick()
+  await expect.poll(listWidth).toBe(before)
+})

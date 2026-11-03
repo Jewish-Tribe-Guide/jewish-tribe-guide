@@ -2389,10 +2389,14 @@ Fixed after the user's Nov 2 notes (same branch):
   `todo-scroll.spec.ts`.
 - Google's card shows "Short Description" only when Google gave the place
   one (most small places have none, so it read "Not on the listing").
+- The line between To do's list and the open place drags (computer), so
+  you set how much room To do takes; the browser keeps it. The list stays
+  at least 300px and the place at least 480px; double-click the line, or
+  Enter on it, for the usual 380px; arrow keys move it. `useTodoSplit.ts`,
+  `todo-scroll.spec.ts`.
 
 Raised, not built (the user's calls):
-- A Category menu on To do like Places'; a draggable divider between the
-  list and the place (how much room To do takes).
+- A Category menu on To do like Places'.
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 
