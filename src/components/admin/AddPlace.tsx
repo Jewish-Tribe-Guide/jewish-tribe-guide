@@ -302,7 +302,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     // Each saved as the listing's own Change would, and none stopping the rest.
     const saves: Promise<unknown>[] = [...stopped].map((field) => post('/api/admin/watches/google', { action: 'stop_field', id: listing.id, field }))
     if (given.email) saves.push(actions.addSource({ job: 'times', email: true, label: '' }, given.email))
-    if (given.menu) saves.push(actions.addSource({ job: 'dishes', email: false, label: '' }, given.menu))
+    if (given.menu) saves.push(actions.addSource({ job: 'dishes', email: false, label: '' }, given.menu, { waitForMenu: true }))
     if (given.refuah) saves.push(actions.change({ kind: 'refuah' }, given.refuah))
     if (given.keystone) saves.push(actions.change({ kind: 'keystone' }, given.keystone))
     await Promise.allSettled(saves)

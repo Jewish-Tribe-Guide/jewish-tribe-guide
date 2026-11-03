@@ -55,9 +55,10 @@ vi.mock('./geo', () => ({
 }))
 
 const mockFetchPlaceSync = vi.hoisted(() => vi.fn())
+const mockFindPlaceStatus = vi.hoisted(() => vi.fn())
 vi.mock('./googlePlaces', async () => {
   const actual = await vi.importActual<typeof import('./googlePlaces')>('./googlePlaces')
-  return { ...actual, fetchPlaceSync: mockFetchPlaceSync }
+  return { ...actual, fetchPlaceSync: mockFetchPlaceSync, findPlaceStatus: mockFindPlaceStatus, canAskGoogle: () => true }
 })
 
 // The activity log is its own store with its own tests; mocked here so an
@@ -1226,6 +1227,31 @@ describe('approveSubmission: placeId vs verifiedPlaceId', () => {
     expect(written.details.placeId).toBeUndefined()
     expect(written.details.verifiedPlaceId).toBe('place-citizens-bank')
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  // The user, Nov 2: a list's new place filed before the lists kept Google's
+  // place (Nov 3) is looked up as it's approved, so it fills from Google
+  // like the rest; only when Google's name for it is the list's, and never
+  // for a visitor's add, which brings its own from the address it picked.
+  it('looks up Google’s place for a list’s new place filed without one', async () => {
+    const listed = (name: string, by: string) =>
+      baseSubmission({ operation: 'create', submitted_by: { name: by }, payload: listingPayload({ name, phone: '', details: {} }) as unknown as Record<string, unknown> })
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+    mockFindPlaceStatus.mockImplementation(async (name: string) => ({ placeId: `id:${name}`, name: name === 'Rivka Cakes' ? 'Rivka Cakes' : 'Wawa', businessStatus: 'OPERATIONAL' }))
+
+    let insert = mockCreateFlow(listed('Rivka Cakes', KEYSTONE_WATCH_NAME))
+    await approveSubmission('sub-1')
+    expect(lastCallArg(insert.insert).details.placeId).toBe('id:Rivka Cakes')
+
+    insert = mockCreateFlow(listed('Z Candy Bar', KEYSTONE_WATCH_NAME))
+    await approveSubmission('sub-1')
+    expect(lastCallArg(insert.insert).details.placeId).toBeUndefined()
+
+    mockFindPlaceStatus.mockClear()
+    insert = mockCreateFlow(listed('Rivka Cakes', 'A visitor'))
+    await approveSubmission('sub-1')
+    expect(mockFindPlaceStatus).not.toHaveBeenCalled()
+    expect(lastCallArg(insert.insert).details.placeId).toBeUndefined()
   })
 
   // The stadium's "Permanently closed" must not close the grill inside it.

@@ -65,6 +65,30 @@ export function AdminCount({ n }: { n: number }) {
  *  frame's own heading steps aside (AdminFrame). */
 export const AdminOwnHead = createContext<((by: number) => void) | null>(null)
 
+/** Tells the frame a screen takes the whole pane on a computer, edge to
+ *  edge and the window's height (To do with a place open, board N6Desk). */
+export const AdminFullPane = createContext<((by: number) => void) | null>(null)
+
+/** While mounted, the frame's heading steps aside for the screen's own. */
+export function useOwnHead() {
+  const own = useContext(AdminOwnHead)
+  useLayoutEffect(() => {
+    if (!own) return
+    own(1)
+    return () => own(-1)
+  }, [own])
+}
+
+/** While `on`, the screen has the whole pane on a computer. */
+export function useFullPane(on: boolean) {
+  const full = useContext(AdminFullPane)
+  useLayoutEffect(() => {
+    if (!full || !on) return
+    full(1)
+    return () => full(-1)
+  }, [full, on])
+}
+
 const BACK_CHEVRON = (
   <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="md:hidden">
     <path d="M10 3L5 8l5 5" />
@@ -116,12 +140,7 @@ export function AdminHead({
 /** AdminHead, for a screen inside an area: the frame's own heading steps
  *  aside while it shows. */
 export function AdminBack(props: React.ComponentProps<typeof AdminHead>) {
-  const own = useContext(AdminOwnHead)
-  useLayoutEffect(() => {
-    if (!own) return
-    own(1)
-    return () => own(-1)
-  }, [own])
+  useOwnHead()
   return <AdminHead {...props} />
 }
 
@@ -269,19 +288,27 @@ export function AdminSwitch({ checked, onChange, label }: { checked: boolean; on
 const SCREEN_GUTTER = 16
 
 /** A dropdown of one choice (Places' three menus). Blue once it's off its
- *  first option, so what's narrowing the list shows at a glance. */
+ *  first option, so what's narrowing the list shows at a glance. With
+ *  `several`, any number of choices (To do's filter): the first option is
+ *  "all", and picking it clears the rest. */
 export function AdminMenu<V extends string>({
   name,
   value,
   options,
   onChange,
   disabled = false,
+  several,
+  showValue = false,
 }: {
   name: string
   value: V
   options: { value: V; label: string; count?: number }[]
   onChange: (value: V) => void
   disabled?: boolean
+  several?: V[]
+  /** The button names what's chosen even when it's the first option ("All",
+   *  "Oldest first"), where Places' menus name themselves until narrowed. */
+  showValue?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -308,8 +335,11 @@ export function AdminMenu<V extends string>({
     const over = menu.current.getBoundingClientRect().right - (document.documentElement.clientWidth - SCREEN_GUTTER)
     if (over > 0) menu.current.style.left = `${-over}px`
   }, [open])
-  const narrowed = value !== options[0]?.value
-  const current = options.find((o) => o.value === value)?.label
+  const picked = (v: V) => (several ? (v === options[0]?.value ? several.length === 0 : several.includes(v)) : v === value)
+  const narrowed = several ? several.length > 0 : value !== options[0]?.value
+  const current = several?.length
+    ? options.filter((o) => several.includes(o.value)).map((o) => o.label).join(', ')
+    : options.find((o) => o.value === (several ? options[0]?.value : value))?.label
   return (
     <div ref={box} className="relative min-w-0 flex-auto sm:flex-[0_1_170px]">
       <button
@@ -319,11 +349,11 @@ export function AdminMenu<V extends string>({
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-2 pr-1.5 text-[13px] font-semibold disabled:opacity-60 ${
+        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-3 pr-2 text-[13px] font-semibold disabled:opacity-60 ${
           narrowed ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-900'
         }`}
       >
-        <span className="truncate">{narrowed ? current : name}</span>
+        <span className="truncate">{narrowed || showValue ? current : name}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -334,16 +364,34 @@ export function AdminMenu<V extends string>({
             <button
               key={o.value}
               type="button"
-              role="menuitemradio"
-              aria-checked={o.value === value}
+              role={several ? 'menuitemcheckbox' : 'menuitemradio'}
+              aria-checked={picked(o.value)}
               onClick={() => {
                 onChange(o.value)
-                setOpen(false)
+                if (!several) setOpen(false)
               }}
-              className={`block min-h-11 w-full cursor-pointer px-3.5 py-2 text-left text-[15px] font-medium ${o.value === value ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'}`}
+              className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-[15px] font-medium ${
+                several ? 'text-slate-900 hover:bg-slate-50' : picked(o.value) ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'
+              }`}
             >
-              {o.label}
-              {o.count !== undefined && ` (${o.count})`}
+              {/* Several at once: a tick box each, as the site's own
+                  multi-select draws it (DetailFieldInput). */}
+              {several && (
+                <span
+                  aria-hidden="true"
+                  className={`flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[4px] border-[1.5px] ${picked(o.value) ? 'border-primary bg-primary' : 'border-slate-400 bg-white'}`}
+                >
+                  {picked(o.value) && (
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 8.5l3 3 7-7" />
+                    </svg>
+                  )}
+                </span>
+              )}
+              <span>
+                {o.label}
+                {o.count !== undefined && ` (${o.count})`}
+              </span>
             </button>
           ))}
         </div>

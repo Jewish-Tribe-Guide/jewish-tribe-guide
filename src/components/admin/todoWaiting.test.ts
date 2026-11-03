@@ -28,8 +28,10 @@ describe('what To do adds to the queue', () => {
   it('a closure and a change from Google, each under its kind, saying what it is', () => {
     const got = waitingNotQueued(jobs({ google: { places: [place('r', 'Rita’s', { closure } as never), place('c', 'Cherry Grill', { compare } as never), place('k', 'Kesher')] } as never }), NOW)
     expect(got.map((w) => w.id).sort()).toEqual(['c', 'r'])
-    expect(got.find((w) => w.id === 'r')).toEqual({ id: 'r', name: 'Rita’s', kind: 'Food', line: `Closed for now, says Google · ${day(AT)}` })
-    expect(got.find((w) => w.id === 'c')).toEqual({ id: 'c', name: 'Cherry Grill', kind: 'Food', line: 'Google has a change' })
+    expect(got.find((w) => w.id === 'r')).toEqual({ id: 'r', name: 'Rita’s', kind: 'Food', line: `Closed for now, says Google · ${day(AT)}`, at: AT })
+    // The user, Nov 3: dated though its line has no day, by when Google was
+    // read, so it doesn't sink to the foot of To do.
+    expect(got.find((w) => w.id === 'c')).toEqual({ id: 'c', name: 'Cherry Grill', kind: 'Food', line: 'Google has a change', at: AT })
   })
 
   it('leaves out what waits only in the queue', () => {
@@ -37,6 +39,20 @@ describe('what To do adds to the queue', () => {
     const finding = { id: 'f1', operation: 'update', targetId: 'g', name: 'GIANT', from: 'its website', says: 'Its page says', named: null, at, notes: [], page: 'https://giant.example/store', section: 'contact', values: { phone: '215-555-0199' }, lines: [{ key: 'phone', label: 'Phone', before: '215-555-0100', after: '215-555-0199' }] }
     const sites = { places: [{ id: 'g', name: 'GIANT', category: 'food', href: '/philly/food/g', pages: [], findings: [finding] }] }
     expect(waitingNotQueued(jobs({ google: { places: [place('g', 'GIANT')] } as never, sites: sites.places as never }), NOW)).toEqual([])
+  })
+
+  // Look again (board Found, Nov 3): what it found waits on To do.
+  it('what Look again found: a status page, a place on Google; a menu read again is a reading', () => {
+    const found = { placeId: 'P', name: 'The Kosher Grill', address: '3601 S Broad St', at: AT }
+    const page = { url: 'https://yiep.org/eruv-status', status: 'up', words: 'The eruv is up', at: AT }
+    const item = (kind: string, id: string, name: string, f: unknown) => ({ kind, id, name, why: '', note: null, lastTry: AT, found: f, stopped: null })
+    const lookAgain = { available: true, leftOut: [], items: [item('eruv', 'ep', 'Elkins Park Eruv', page), item('google', 'kg', 'The Kosher Grill', found), item('google', 'r', 'Rita’s', found), item('google', 'x', 'Not yet', null)] }
+    const got = waitingNotQueued(jobs({ google: { places: [place('r', 'Rita’s', { closure } as never)] } as never, lookAgain: lookAgain as never }), NOW)
+    expect(got).toEqual([
+      { id: 'r', name: 'Rita’s', kind: 'Food', line: `Closed for now, says Google · ${day(AT)}`, at: AT, found: true },
+      { id: 'ep', name: 'Elkins Park Eruv', kind: 'Eruv', line: 'Status page found', at: AT, found: true },
+      { id: 'kg', name: 'The Kosher Grill', kind: 'Google', line: 'Found on Google', at: AT, found: true },
+    ])
   })
 
   it('counts nothing until every job has answered', () => {
@@ -51,7 +67,7 @@ describe('notBeingRead (Todo10, EmailTodo12)', () => {
   const shul = (over = {}) => ({ id: 's', name: 'Bnai Abraham', href: '/s', pages: [], off: false, newsletters: [letter('2026-10-01T00:00:00Z')], ...over })
 
   it('a shul whose email has gone quiet for three weeks', () => {
-    expect(notBeingRead(jobs({ times: { places: [shul()] } as never }), NOW)).toEqual([{ id: 's', name: 'Bnai Abraham', line: 'No email has come in 3 weeks' }])
+    expect(notBeingRead(jobs({ times: { places: [shul()] } as never }), NOW)).toEqual([{ id: 's', name: 'Bnai Abraham', line: 'Their email came 4 weeks ago', since: ['2026-10-01T00:00:00Z'] }])
   })
 
   it('an email from this month isn’t quiet', () => {
@@ -64,10 +80,18 @@ describe('notBeingRead (Todo10, EmailTodo12)', () => {
 
   it('an eruv whose status emails have stopped', () => {
     const eruvim = { eruvim: [{ id: 'e', name: 'Center City Eruv', statusEmail: 'a@b.org', statusCheckedAt: '2026-10-01T00:00:00Z' }], findings: [], watches: [], timezone: 'America/New_York' }
-    expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'e', name: 'Center City Eruv', line: 'No email has come in 3 weeks' }])
+    expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'e', name: 'Center City Eruv', line: 'Their email came 4 weeks ago', since: ['2026-10-01T00:00:00Z'] }])
   })
 
   it('nothing until every job has answered', () => {
     expect(notBeingRead(jobs({ times: undefined as never }), NOW)).toEqual([])
+  })
+
+  // N1List, P1Every: every row is dated, a place with only a broken check
+  // too, by when that check started failing.
+  it('dates a website that didn’t load by its first failure', () => {
+    const watch = { id: 'w', url: 'https://soi.example', active: true, lastRunAt: '2026-10-31T07:00:00Z', lastOkAt: '2026-10-20T07:00:00Z', failingSince: '2026-10-22T07:00:00Z', lastError: 'HTTP 503' }
+    const got = notBeingRead(jobs({ times: { places: [shul({ newsletters: [], pages: [{ watch }] })] } as never }), NOW)
+    expect(got).toEqual([{ id: 's', name: 'Bnai Abraham', line: 'Website didn’t load', since: ['2026-10-22T07:00:00Z'] }])
   })
 })

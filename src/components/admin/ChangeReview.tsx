@@ -1,16 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
-import { companionKeys, type CategoryConfig } from '@/lib/categories'
-import { diffListing, diffLines } from '@/lib/submissionDiff'
+import type { CategoryConfig } from '@/lib/categories'
+import { diffLines } from '@/lib/submissionDiff'
 import { scheduleChange, usualBoxChange, type ChangeGroup, type ChangeLine } from '@/lib/changeLines'
-import { editorRows } from '@/lib/editorRows'
 import { boxChangeCount, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
 import { isMinyanim, type Minyan } from '@/lib/davening'
-import { readSchedules, schedulesKey } from '@/lib/schedules'
-import { weekDiffers } from '@/lib/thisWeekEdit'
+import { readSchedules } from '@/lib/schedules'
 import { useEditWeek } from '@/lib/useEditWeek'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
+import { reviewParts } from '@/lib/reviewParts'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { normalizeRow } from '@/lib/resourceShape'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -18,6 +18,8 @@ import { withCommunity } from '@/lib/useCommunityData'
 import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
 import { AdminBack } from './AdminUI'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
+import ThingSwitches from './ThingSwitches'
+import { changeEdit } from './changeEdit'
 
 // A change opened from To do (boards 3 and 20, Oct 29; one list since Oct 31,
 // the user: "drop original vs now"): what's new highlighted and what's going
@@ -26,6 +28,11 @@ import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 // times in its minyan editor, boards 20b and 20c) and updating saves what
 // the admin left there; "Leave it" turns it down. On a phone the answers
 // sit in a bar over the tabs, in reach of a thumb.
+//
+// A change with more than one part (a phone and the hours, a shul's weekday
+// and Shabbos times) is answered a part at a time (reviewParts.ts, the user,
+// Nov 2): switches over the parts, the open one shown alone, its answers
+// for it only. One answered is ticked; the last one decides the change.
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
 
@@ -42,6 +49,7 @@ export default function ChangeReview({
   token,
   onModerate,
   onUpdated,
+  inPlace,
 }: {
   submission: EnrichedSubmission
   category: CategoryConfig
@@ -49,20 +57,59 @@ export default function ChangeReview({
   busy?: boolean
   error?: string | null
   token: string
-  onModerate: (id: string, status: 'approved' | 'rejected', reason?: string) => void
-  /** Saved from "Edit, then update": it's approved and gone from the list. */
-  onUpdated: (id: string) => void
+  /** `part`: that part of it only. Resolves `partial` when the rest still waits. */
+  onModerate: (id: string, status: 'approved' | 'rejected', reason?: string, part?: string) => Promise<'partial' | 'whole' | 'failed'> | void
+  /** Saved from "Edit, then update": it's approved and gone from the list,
+   *  or with `partial`, that part went on and the rest still waits. */
+  onUpdated: (id: string, partial?: boolean) => void
+  /** Opened as one of the things waiting at a place (To do, Nov 2): the
+   *  place's switches in place of the change's own, `part` the one open
+   *  (none: the change whole), and whether its Edit is open. */
+  inPlace?: { part?: string; switches: ReactNode; onEditing: (editing: boolean) => void }
 }) {
   const community = useCommunitySlug()
-  const sent = s.payload as unknown as ResourceSubmission
   const fields = category.detailFields
+  const whole = s.payload as unknown as ResourceSubmission
+  // Its parts, in the order first shown; answered ones stay, ticked.
+  const parts = s.current ? reviewParts(s.current, whole, category) : []
+  const [order] = useState(() => parts.map((p) => ({ id: p.id, label: p.label })))
+  const [done, setDone] = useState<string[]>([])
+  const savedPart = useRef(false)
+  const [on, setOn] = useState<string | null>(null)
+  // The switches stay till the change is decided, the answered ones ticked.
+  const part = inPlace
+    ? parts.length > 1
+      ? parts.find((p) => p.id === inPlace.part)
+      : undefined
+    : order.length > 1 && parts.length > 0
+      ? (parts.find((p) => p.id === on && !done.includes(p.id)) ?? parts.find((p) => !done.includes(p.id)) ?? parts[0])
+      : undefined
+  const weeks = useEditWeek(fields.some((f) => f.type === 'minyanim'))
+  const { sent, changed, rows: onlyRows, preset } = changeEdit(s, category, part, weeks)
+  const things = [...order, ...parts.filter((p) => !order.some((o) => o.id === p.id))].map((p) => ({ ...p, done: done.includes(p.id) }))
+  const decided = (id: string) => {
+    setDone((d) => [...d, id])
+    setOn(parts.find((p) => p.id !== id && !done.includes(p.id))?.id ?? null)
+  }
+  async function decide(status: 'approved' | 'rejected', reason?: string) {
+    if ((await onModerate(s.id, status, reason, part?.id)) === 'partial' && part) {
+      decided(part.id)
+      setLeaving(false)
+    }
+  }
   const source = submissionSource(s)
   const [editing, setEditing] = useState(false)
   const [step, setStep] = useState<EditorStep | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [reason, setReason] = useState('')
+  // Edit, and each row open in it, is an entry: a swipe back closes it.
+  useHistoryDepth('changeEdit', editing ? 1 + (step ? (step.depth ?? 1) : 0) : 0, step ? step.back : () => setEditing(false))
+  const onEditing = inPlace?.onEditing
+  useEffect(() => {
+    onEditing?.(editing)
+    return () => onEditing?.(false)
+  }, [editing, onEditing])
 
-  const changed = diffListing(s.current, sent, fields).filter((r) => r.changed)
   const name = sent.name || s.current?.name || '(unknown listing)'
   const before = (s.current?.details ?? {}) as Record<string, unknown>
   // A shul's times by the box they changed in, as the listing has them
@@ -81,46 +128,13 @@ export default function ChangeReview({
   const who = source.readBy === 'person' && (s.submitted_by?.name || s.submitted_by?.email) ? s.submitted_by.name || s.submitted_by.email : source.from
   const marked = source.readBy === 'ai' && source.original ? markTimes(source.original, sent.details) : null
 
-  // The editor's rows the change touches: a shul's times by the box they
-  // changed in.
-  const changedKeys = [...new Set(changed.map((r) => fieldKeyFor(r.key, fields)).filter((k): k is string => !!k))]
-  const weeks = useEditWeek(fields.some((f) => f.type === 'minyanim'))
-  const onlyRows = (() => {
-    const before = (s.current?.details ?? {}) as Record<string, unknown>
-    const rows = editorRows(category, sent.details, { week: weeks?.week, nextWeek: weeks?.next }).filter((r) => {
-      if (r.kind === 'name' && changedKeys.includes('name')) return true
-      if (r.id === 'contact' && (changedKeys.includes('address') || changedKeys.includes('phone'))) return true
-      if (!r.fields.some((f) => changedKeys.includes(f.key))) return false
-      if (r.kind !== 'minyans' || !r.box) return true
-      const key = r.fields[0].key
-      if (r.week) return weekDiffers(readSchedules(before[schedulesKey(key)]), readSchedules(sent.details[schedulesKey(key)]), r.week)
-      const was = isMinyanim(before[key]) ? (before[key] as Minyan[]) : []
-      const now = isMinyanim(sent.details[key]) ? (sent.details[key] as Minyan[]) : []
-      return boxChangeCount(minyanimForBox(was, r.box), minyanimForBox(now, r.box)) > 0
-    })
-    return rows.length > 0 ? rows : null
-  })()
-  // What the change proposes, as the editor's starting point.
-  const preset = (() => {
-    const out: Record<string, unknown> = {}
-    for (const k of changedKeys) {
-      if (k === 'name' || k === 'address' || k === 'phone') {
-        out[k] = sent[k] ?? ''
-        continue
-      }
-      const f = fields.find((x) => x.key === k)
-      for (const key of [k, ...(f ? companionKeys(f) : []), ...(f?.type === 'minyanim' ? [schedulesKey(k)] : [])]) {
-        if (key in sent.details) out[key] = sent.details[key]
-      }
-    }
-    return out
-  })()
-
   if (editing && s.current) {
     const title = step?.title ?? (onlyRows?.length === 1 ? onlyRows[0].title : name)
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: step ? 'Back' : 'The change', onClick: step ? step.back : () => setEditing(false) }} title={title} />
+        {/* The edit is kept while another thing at the place is open. */}
+        {!step && inPlace?.switches}
         <ListingEditor
           item={normalizeRow(s.current)}
           category={category}
@@ -130,13 +144,23 @@ export default function ChangeReview({
           preset={preset}
           adminSave={{
             label: 'Update the listing',
-            via: ({ payload }) =>
-              fetch(withCommunity(`/api/admin/submissions/${s.id}`, community), {
+            via: async ({ payload }) => {
+              const res = await fetch(withCommunity(`/api/admin/submissions/${s.id}`, community), {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ status: 'approved', payload }),
-              }),
-            onSaved: () => onUpdated(s.id),
+                body: JSON.stringify({ status: 'approved', payload, ...(part ? { part: part.id } : {}) }),
+              })
+              savedPart.current = res.ok && !!((await res.clone().json().catch(() => null)) as { partial?: boolean } | null)?.partial
+              return res
+            },
+            onSaved: () => {
+              const partial = savedPart.current
+              if (partial && part) {
+                decided(part.id)
+                setEditing(false)
+              }
+              onUpdated(s.id, partial)
+            },
           }}
         />
       </div>
@@ -166,6 +190,7 @@ export default function ChangeReview({
       <p className="m-0 -mt-2 text-[14px] text-slate-600 md:-mt-4">
         {[s.categoryLabel, what && `a change to ${what}`].filter(Boolean).join(' · ')}
       </p>
+      {inPlace ? inPlace.switches : part && <ThingSwitches things={things} on={part.id} onPick={setOn} />}
 
       {changed.map((row) => {
         // Its own key, not the field it's edited with: a schedule isn't the usual times.
@@ -221,7 +246,7 @@ export default function ChangeReview({
             </label>
             <textarea id="leave-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="w-full md:basis-full rounded-lg border border-slate-300 px-3 py-2 text-[15px] resize-none" />
             <div className="flex gap-2">
-              <button type="button" disabled={busy} onClick={() => onModerate(s.id, 'rejected', reason.trim() || undefined)} className={`${BUTTON} flex-1 md:flex-none border-red-600 bg-red-600 text-white`}>
+              <button type="button" disabled={busy} onClick={() => void decide('rejected', reason.trim() || undefined)} className={`${BUTTON} flex-1 md:flex-none border-red-600 bg-red-600 text-white`}>
                 {busy ? 'Leaving it…' : 'Leave it'}
               </button>
               <button type="button" disabled={busy} onClick={() => setLeaving(false)} className={`${BUTTON} flex-1 md:flex-none border-slate-300 bg-white text-slate-900`}>
@@ -231,7 +256,7 @@ export default function ChangeReview({
           </>
         ) : (
           <>
-            <button type="button" disabled={busy || changed.length === 0} onClick={() => onModerate(s.id, 'approved')} className={`${BUTTON} border-primary bg-primary text-white`}>
+            <button type="button" disabled={busy || changed.length === 0} onClick={() => void decide('approved')} className={`${BUTTON} border-primary bg-primary text-white`}>
               {busy ? 'Updating…' : 'Update the listing'}
             </button>
             <div className="flex gap-2">
@@ -240,7 +265,7 @@ export default function ChangeReview({
                   Edit, then update
                 </button>
               )}
-              <button type="button" disabled={busy} onClick={() => setLeaving(true)} className={`${BUTTON} flex-1 md:flex-none border-slate-300 bg-white text-slate-900`}>
+              <button type="button" disabled={busy} onClick={() => (part ? void decide('rejected') : setLeaving(true))} className={`${BUTTON} flex-1 md:flex-none border-slate-300 bg-white text-slate-900`}>
                 Leave it
               </button>
             </div>

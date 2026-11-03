@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, needsLook, NIGHTLY_JOBS, nextRunAt, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
+import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, lookAgainOutcome, needsLook, NIGHTLY_JOBS, nextRunAt, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
 
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const ago = (ms: number) => new Date(NOW - ms).toISOString()
@@ -121,6 +121,16 @@ describe('each job’s run, in a line', () => {
       warning: '3 walks couldn’t be worked out',
     })
     expect(walkRoutesOutcome({ ok: true, skipped: 'OPENROUTESERVICE_API_KEY is not set' })).toMatchObject({ warning: 'Not set up: OPENROUTESERVICE_API_KEY is not set' })
+  })
+})
+
+describe('Look again’s run, in a line', () => {
+  it('what it tried, what it found, what waits for the next nights', () => {
+    const c = (over = {}) => ({ community: 'philly', tried: 5, found: 1, failed: 0, left: 12, ...over })
+    expect(lookAgainOutcome({ communities: [c()] })).toEqual({ ok: true, summary: 'Tried 5 again · found 1 · 12 left for the next nights', warning: null })
+    expect(lookAgainOutcome({ communities: [c({ tried: 0, found: 0, left: 0 })] })).toMatchObject({ summary: 'Nothing due', warning: null })
+    expect(lookAgainOutcome({ communities: [c({ found: 0, failed: 2, left: 0 })] })).toEqual({ ok: true, summary: 'Tried 5 again', warning: '2 tries stopped with an error' })
+    expect(lookAgainOutcome({ skipped: 'migration 092 (look_again) not run' })).toMatchObject({ warning: 'Not set up: migration 092 (look_again) not run' })
   })
 })
 

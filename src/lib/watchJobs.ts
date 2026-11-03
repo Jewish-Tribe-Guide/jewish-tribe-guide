@@ -19,7 +19,7 @@ export type JobCounts = { checked: number; toCheck: number; cantRead: number; di
 
 // ── Dishes ──────────────────────────────────────────────────────────────────
 
-export type DishReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
+export type DishReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu' | 'reading'
 export type DishPlace = ListedDishes & {
   website: string | null
   menuUrl: string | null
@@ -51,8 +51,10 @@ export function sentThroughSite(place: DishPlace): boolean {
  *   not_read   never read, with a website or menu link to read
  *   cant_read  no menu could be read, or nothing to read it from
  *   same       read, and its menu agrees, or decided (used or kept)
- *   off        said to have no menu: not read */
-export type DishPlaceStatus = 'differs' | 'not_read' | 'cant_read' | 'same' | 'off'
+ *   off        said to have no menu: not read
+ *   reading    its menu link just given, being read (menuReadingStore's
+ *              startMenuReading): nothing to fix, nothing to check yet */
+export type DishPlaceStatus = 'differs' | 'not_read' | 'cant_read' | 'same' | 'off' | 'reading'
 
 export function dishStatus(p: DishPlace): DishPlaceStatus {
   const r = p.reading
@@ -63,17 +65,21 @@ export function dishStatus(p: DishPlace): DishPlaceStatus {
   if (sentThroughSite(p)) return 'same'
   if (!r) return p.website || p.menuUrl ? 'not_read' : 'cant_read'
   if (r.status === 'no_menu') return 'off'
+  if (r.status === 'reading') return 'reading'
   if (r.status === 'failed') return 'cant_read'
   if (r.status === 'proposed') return dishProposal(p, { dishes: r.dishes ?? [], missing: r.missing }).updates > 0 ? 'differs' : 'same'
   return 'same'
 }
 
 /** A watch whose page didn't open on its last run, or that hasn't run in
- *  two days. */
+ *  two days. Not one that failed for want of our own browser: that's ours,
+ *  not the place's (runs since Nov 2 skip it; this is for those before). */
 export function didntLoad(w: Pick<Watch, 'active' | 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince'>, now: number): boolean {
   const state = watchHealth(w, now).state
+  if (state === 'failing' && OUR_BROWSER.test(w.lastError ?? '')) return false
   return state === 'failing' || state === 'stale'
 }
+const OUR_BROWSER = /browserType\.launch|our browser for drawing pages/
 
 /** Its menu page didn't open on the morning's check, and hasn't been read
  *  from that page since (Read now on the Dishes page). */
@@ -96,6 +102,11 @@ export function dishJobStatus(p: DishPlace, now: number): DishJobStatus {
   // Not reached isn't "didn't load": two nights unread looks stale.
   if (p.menuWatch?.missed && s === 'same') return 'not_reached'
   return menuDidntLoad(p, now) ? 'didnt_load' : s
+}
+
+/** A menu being read now: the screens showing it load again until it's in. */
+export function menusReading(places: readonly Pick<DishPlace, 'reading'>[] | null | undefined): boolean {
+  return !!places?.some((p) => p.reading?.status === 'reading')
 }
 
 export function dishCounts(places: readonly DishPlace[], now: number): JobCounts {

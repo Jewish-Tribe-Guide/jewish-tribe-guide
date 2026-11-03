@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 1, 2026.
+Last updated: Nov 3, 2026.
 
 ## The branch
 
@@ -97,6 +97,10 @@ for that exact change, in the same conversation. Show the dry run first.
    (only the street address's, for Directions), so the nightly sync skips
    it. Fix: set its place id to the store's, on live; needs a yes, after
    looking the id up and showing it.
+1k. **Migration 092 (`look_again`)** is run on dev (the user, Nov 3), not
+   live. Until it is, live's Look again page says it isn't set up, its
+   Watches row says Not set up, and its nightly run records "Not set up".
+   Live once this branch is deployed, with a yes.
 
 ## For the user or the community
 
@@ -2262,6 +2266,21 @@ it's the same code at the wider width, and I only tried it on a phone.
 made, then the page stayed on the form with no message. It's what failed
 `test:admin-write` on `main` in CI. Creating now lands with a plain page load.
 
+**Moved Nov 2: Synagogues' Minyanim row is above the search**, the user's call: it
+matches Watches and the phone home, and it's what's different about the page. It
+stays while typing and answers for every shul, so the box holds still (244 before and
+after "chabad" and a word that finds nothing, at phone width). A prayer name
+("shacharis", "mincha") still opens the Minyanim view, which has no row, so there the
+box moves up about 100px with the rest of the page. Left as it is. While typing, the
+row takes about a row's height above the results on a phone.
+
+**To do's look is next, not built.** Canvas "To do screens"
+(https://claude.ai/artifact/EmkcJDi4XaA9rPgXTMFhsH) shows what each kind of item looks
+like today, from dev's 66 items: no proposal on it yet. Next is one layout, drawn and
+tried on the worst examples before any code. None waiting on dev, so not on the
+canvas: visitor edits and new places, removals, eruv fixes, new categories, searches
+and questions, Refuah and kosher findings.
+
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
@@ -2269,6 +2288,248 @@ simpler ("it really shouldn't be that complicated").
 **Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
+
+## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
+
+The rest of the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL,
+v26). Each place is one row: its name, the oldest waiting thing's date, and a
+grey line of what's waiting ("Usual weekday times · Website didn't load"). A
+new place, a new category and each piece of feedback get a row of their own.
+Above the list are a search ("Find a place by name"), Show (pick any of
+Changes, New places, Broken checks, Feedback; that choice also decides which
+thing a place opens on) and Sort (Oldest first, Newest first, Name).
+
+A tap opens the place. Switches across the top name everything waiting
+there, and each answered one is ticked. Answering moves to the next thing.
+When a place is done, a phone goes back to the list and a computer opens
+the next place. On a computer the list stays beside the open place, and the
+up/down arrows step through places. The "N of M" counter and the nav's
+number both count places (`todoPlaceCount`). An open edit survives
+switching between things. Leaving the place with one unanswered asks
+first. With nothing left, To do says "Nothing to do / Every place was read
+this morning".
+
+Feedback opens with everything they wrote. **Done** marks it handled
+(`status: 'handled'` through `PATCH /api/admin/responses/[id]`). **Reply**
+opens an email to them, and shows only when they left an email. Checked on
+dev: Done took the row off To do and the nav went from 64 to 63; the row
+was then put back.
+
+**The place screens are rebuilt as drawn (Nov 2).** Each was put beside its
+board, on a phone and a computer:
+- The menus read "All" and "Oldest first", and the filter has a tick box
+  and a count per option (K1Sort, H2Open).
+- Every row is dated (N1List, P1Every; the line stays grey, brown is only on
+  a place's source card). A broken check by when it started failing
+  (`troubleSince` in `todoWaiting.ts`), Google not found by when Google last
+  looked, a job's reading by the day its line ended with.
+- The frame (`PlaceFrame.tsx`, M2First, N6Desk): "Category · See the
+  listing" and "N of M" under the name; the source as a folded card; the
+  buttons pinned at the bottom.
+- Broken checks fixed in place (`TodoBroken.tsx`; R3Site, R2Menu,
+  R6Menu/R6Give/R6After, R2Google, G2Stopped): the field in its editor, the
+  failure in the folded source ("didn't load since Oct 22"), and Read it
+  again / Stop reading it, Give its menu / No menu online, Find it on Google
+  / Not on Google. Not a link to the place.
+- Changes in the listing's own editor (`TodoChange.tsx`; M2First, R1Women,
+  R5Link, E1Times, E2Dishes): yellow, "Changed" or "New" pills and "Was
+  6:45 AM"; buttons that name the change and follow an edit ("Change to
+  6:40 AM / Keep 6:45 AM"); who sent it in the folded source.
+- A new place as the whole listing editor, its fields filled in and
+  "Not on the listing yet" beside the empty ones (`TodoNewPlace.tsx`,
+  L3NewPlace). Add to the guide sends it as sent, or with the admin's fixes
+  over it (its Google match kept); Leave it rejects it.
+- A job's reading decided on the place (`TodoReading.tsx`; L4Eruv, R4Back,
+  E2Dishes): a closure, Google's change, a menu's new dishes, an archived
+  place coming back. Each changed thing its own yellow card with "Was …";
+  a menu only its new and going dishes, "Add the 2 dishes / Don't add
+  them". Its answers are the place screen's own (`waitingAnswers.ts`).
+- Feedback (L5Feedback): the first line large and quoted, "name · email ·
+  time" under it, Done pinned, Reply beside it when they left an email.
+- Places no longer has "Check broken" in Checked by; an old
+  `?checked=broken` link shows every place.
+- A change's or a new place's unsaved edit asks before you leave.
+
+Not as drawn, on purpose or not yet:
+- L3NewPlace's red "Not on Keystone-K's page" row note isn't built.
+- R4Back's editable Kosher select and "2 disagree" pill: a reading's
+  changes are shown as lines, not editable fields. E2Dishes' "Add a dish"
+  box isn't on a menu reading either.
+- L5Feedback's grey line starts with the form's name; the header already
+  says it, so the line starts with the person's name ("No name given").
+- E1Times: the visitor's 6:40 is in the folded source, not beside the time.
+- Field labels are the general editor's, not the boards' shorter ones.
+- No "Leave it, and why". No chevrons on R2Google's rows. Cancel shows on a
+  computer only.
+
+Fixed after the user's Nov 2 notes (same branch):
+- Opening a place keeps your spot: on a computer the list moves into its
+  column with the row you clicked where it was on screen, and closing it
+  (To do in the sidebar, Back, the screen's own back) brings the list back
+  with that row where you left it; a phone returns to where you'd scrolled.
+  It used to jump the page to the top. `todo-scroll.spec.ts`.
+- Read it again's new reading opens next (Rita's menu): what an answer
+  brings opens before the next thing in line (`shownThing`).
+- Google stopped answering: "Use its website instead" when the listing has
+  a website (it reads the site at once, which then keeps Google's fields),
+  else "Stop using Google".
+- "Not used" in a reading's original is rose, not the amber of a change.
+- The menus' text starts 12px in, near the search box and rows (was 8px).
+- Giving a menu link answers at once (0.7s on dev, was the whole read): the
+  link is saved, the place's reading says "reading", and the menu is read
+  after the reply (`after()` in the main-dishes route, `background: true`
+  from Change / Give its menu page). Meanwhile To do shows no "can't be
+  read" for it, the Dishes box says "reading it now", and To do and Places
+  ask for the food places again every 6s until the reading lands (about
+  40s for Chalavita on dev). Kept as a failed reading with a note, as "No
+  menu" is, so no migration; a read that never finishes says so after two
+  minutes. Add a place and Start reading still wait for the read. Not
+  checked on a phone or on a Vercel preview, where `after()` runs inside
+  the route's 60s.
+
+- An X beside the open place's up and down (computer), and Esc, close it:
+  the list goes back to full width with your row where it was. Esc typed
+  into a box, or with a menu or dialog open, stays theirs.
+  `todo-scroll.spec.ts`.
+- Google's card shows "Short Description" only when Google gave the place
+  one (most small places have none, so it read "Not on the listing").
+- The line between To do's list and the open place drags (computer), so
+  you set how much room To do takes; the browser keeps it. The list stays
+  at least 300px and the place at least 480px; double-click the line, or
+  Enter on it, for the usual 380px; arrow keys move it. `useTodoSplit.ts`,
+  `todo-scroll.spec.ts`.
+- To do has a Category menu, as Places does, between Show and Sort. It
+  lists only the categories something waits in, with counts (dev: Food 43,
+  Synagogues 10, Mikvah 2, Grocery 1, the cache test's 1, adding to 57).
+  A job's finding takes its place's category; feedback and a new category
+  have none and show only under All categories. The up and down arrows
+  stay inside the category. `todoPlaces.ts`, `TodoList.tsx`.
+- A row whose only line is a job's reading with no day in it ("Its menu
+  has a change", "Google has a change") is dated by when it was read, so it
+  sorts with the rest instead of sinking to the foot of To do (Rita's South
+  St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
+  time beside its "Oct 17" (`waitingGroups.ts`).
+
+## Done Nov 3: Look again (on `redesign/oct18-fixes`; 092 on dev only)
+
+Drawn Oct 27 (canvas XSuFCMdLQmBYNJqfWaEM3A). A nightly job, 4 AM, that
+tries again what the other jobs couldn't find: an eruv with a website but
+no status page or email (Elkins Park on dev), a menu reading that failed (11
+on dev; "no menu online" is an answer, not tried), a place Google has no
+match for. Each is tried a month after its last try, at most five a night,
+never-tried first. A kind whose own job is turned off isn't tried.
+
+- **Its page** (Watches → Look again): a group per kind, each row its
+  name, why in a few words and when ("Oct 22 · next Nov 21"); a row opens
+  with its last try in full, Read it now and Stop trying, and Open its
+  listing. Stopped trying sits at the foot. Groups (WhatsApp,
+  young-professional) are left out of Google, and it says how many.
+- **What it finds waits on To do, never set on its own**: an eruv's page
+  as "Status page found" (Use this page / Not this page), a place as
+  "Found on Google" (Use this place / Not this place), which replaces that
+  place's "Google not found". A page or place turned down is never offered
+  again. A menu read again is a reading like any other, in To do as usual.
+- Watches tab: a Look again row; a failed or late run goes under Needs
+  fixing.
+
+Checked on dev with real rows (092 run there Nov 3): the page against the
+Main and Phone boards, a find in To do against the Found board. Read it now
+found Leyv Ha-Ir on Google; Use this place matched it (phone and website
+filled) and it left To do and Look again. Elkins Park and The Kosher Grill
+found nothing. Fixed on the way: a found row said "Not found on Google";
+"Left out: 10 groups" now opens to name them; the phone has no subline and
+an opened row drops its repeated line, as drawn. Left as is: the subline
+sits under the title on a computer, not beside it.
+
+## Done Nov 3: To do is what to act on, Places is how things stand (on `redesign/oct18-fixes`)
+
+The user's idea from Nov 2, agreed Nov 3. To do already filtered by what to
+act on (Changes, New places, Broken checks, Feedback), and Places lost
+"Check broken" on Nov 2. What was left:
+
+- Places' "Not watched" is now **Not checked** (the Checked by menu, each
+  row's line, and the Watches page's box). Old `?checked=not-watched`
+  links still work.
+- Each field says why it isn't checked, when it was stopped or can't be:
+  "Not checked: menu (no menu online)", "phone (not on Google)", "minyan
+  times (stopped reading)", "hospital contacts (not on Refuah)", "(its job
+  is off)". A field nothing was ever set up for says nothing more.
+- **No menu online now counts.** It left To do and was on no Places filter
+  (Ben & Jerry's, Nov 2). On dev: Miss Rachel's Pantry, Savvati Gourmet,
+  Stephen's Cafe, The Brazilian BBQ. `fieldCoverage.ts`.
+
+A place still waiting in To do as "Google not found" (Chalavita, The Kosher
+Grill on dev) shows under Not checked with no reason; it isn't settled yet.
+Not built: a listing in Places saying "a check is broken" with a link to To
+do (the idea allowed it, didn't need it).
+
+## Done Nov 3: a list's new place fills from Google (on `redesign/oct18-fixes`)
+
+The user's "for later" from Nov 2, approved. Keystone-K's and Mekor
+Habracha's watches already asked Google whether a new place is open, then
+dropped Google's answer of which place it is. Now they keep its place id
+when Google's name for it is the list's (`namesOverlap`, the same rule as
+everywhere else; a "Wawa" for "Sababa Falafel" is not kept). Approving
+the new place then fills its phone, hours and website from Google at once,
+as an admin's own add does.
+
+The new places already waiting (about 20 on dev, from Oct 17-22) were
+filed without one. Approving one of those looks Google up as it's approved
+(`withListsPlaceId` in `submissionStore.ts`), by the same rule, so no
+rows needed rewriting. A visitor's add is never looked up: it carries the
+place they picked.
+
+## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
+
+From the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL). A
+change with more than one part shows switches at the top, one per part:
+for a shul, its usual weekday times and its usual Shabbos times each; else
+a field each. Update puts only that part on the listing (an approved copy
+of the change carries it, `decidePart` in `submissionStore.ts`), Leave it
+takes it out of the change, and the next part opens. The last part left is
+the change decided whole, with its email as before; no email goes for a
+part, and none for a rejection after a part went on. Checked on dev on
+B'nai Abraham Chabad: Shabbos updated alone, phone left, weekday updated
+last.
+
+## Done Nov 2: our own browser failing isn't a place's broken check (on `redesign/oct18-fixes`)
+
+Dev's runner has no browser for drawing pages, so two places showed "Main
+dishes didn't load" when their sites were fine. A browser that won't start
+is now said as ours (`no_browser`), and the nightly menu run leaves that
+menu unread, as it does one it had no time to draw, rather than failing the
+place. Failures recorded before this are not counted as "didn't load"
+either. The dev runner still has no browser; that's its own fix, later.
+
+## Done Nov 2: a trackpad swipe back goes back one screen (on `redesign/oct18-fixes`)
+
+Found by the user: "we go into new screens and then I use the trackpad to go
+back and it goes back two screens". The screens opened inside a page (an
+editor's open row, a minyan inside it, a change's Edit, an eruv's row, a
+place's "found on their website") were state only, so the browser's Back
+skipped them and left the page. Each is now an entry in the history
+(`useHistoryDepth.ts`): a swipe closes it, the screen's own Back takes the
+entry off with it, and leaving Places by its Back steps over any left open.
+Checked on dev: Places → a place → Main dishes, two swipes back to Places;
+To do → a change → Edit, two swipes back to To do.
+
+## Done Nov 2: approving a second edit no longer undoes the first (on `redesign/oct18-fixes`)
+
+Found by the user. An edit carries the whole listing as its sender saw it,
+and approving it wrote all of it. So when two people edited one place (one
+the phone, one the hours) and both were approved, the second put the old
+phone back, with nothing to show it had. Now an edit records, when it's
+filed, which fields it changes against the listing as it is then
+(`editedFields.ts`), and approving it puts only those on the listing as it
+is now. The queue reads pending edits the same way, so the second edit
+shows only the hours, not the phone going back. The website reader's times
+and hours, read a part at a time, already worked like this.
+
+Left as they were: an edit filed before this has no record of its fields
+and is still approved whole. And someone who opens a listing, then sends
+an edit after another was approved in between, still has the in-between
+change counted as theirs. The window is minutes, not days. Closing it would
+mean the editor sending what it loaded, too.
 
 ## Done Oct 29: deleting a community clears all of it, and works on the live site (on `redesign/oct18-fixes`)
 

@@ -2197,14 +2197,21 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       ])
     })
 
-    it('goes once anything is typed, and “Minyanim by time” goes to the list heading', async () => {
+    // The user, Nov 2: above the search, like Watches on Places and the home
+    // screen's row. It stays while typing, so the box doesn't jump up.
+    it('sits above the search and stays there while typing', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      await user.type(screen.getByRole('searchbox'), 'mincha')
-      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
-      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /Minyanim by time/ })).toBeInTheDocument()
+      const box = screen.getByRole('searchbox')
+      expect(row().compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      await user.type(box, 'no shul has this')
+      expect(row().compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      await user.clear(box)
+      await user.type(box, 'mincha')
+      expect(row()).toBeInTheDocument()
+      expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /Minyanim by time/ })).not.toBeInTheDocument()
     })
 
     it('follows the list’s filters', () => {

@@ -60,6 +60,7 @@ export default function MinyanBoxEditor({
   dayChoices,
   heading,
   empty,
+  nameShown,
   onChange,
   onStep,
   send,
@@ -87,6 +88,8 @@ export default function MinyanBoxEditor({
   /** What the list says with no minyanim in it: "No minyan this week"
    *  for a week set to none (thisWeekEdit.ts). */
   empty?: string
+  /** The page names the shul already (To do's place screen): no name line. */
+  nameShown?: boolean
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
@@ -132,8 +135,8 @@ export default function MinyanBoxEditor({
 
   return (
     <div className="space-y-4" data-testid="minyan-box-list">
-      {heading ? <p className="text-[15.5px] font-extrabold text-slate-900">{heading}</p> : <p className="-mt-1 text-[14px] text-muted">{place}</p>}
-      <MinyanBoxRows rows={rows} box={box} writing={writing} mark={(m) => (isChanged(m) ? (was.has(m.id) ? 'Changed' : 'New') : null)} onOpen={setOpen} />
+      {heading ? <p className="text-[15.5px] font-extrabold text-slate-900">{heading}</p> : !nameShown && <p className="-mt-1 text-[14px] text-muted">{place}</p>}
+      <MinyanBoxRows rows={rows} box={box} writing={writing} mark={(m) => (isChanged(m) ? (was.has(m.id) ? 'Changed' : 'New') : null)} was={was} onOpen={setOpen} />
       {rows.length === 0 && (empty ? <p className="text-[15.5px] font-bold text-slate-900">{empty}</p> : <p className="text-[15px] text-slate-600">No times listed yet.</p>)}
       <button
         type="button"
@@ -157,12 +160,15 @@ export function MinyanBoxRows({
   box,
   writing,
   mark,
+  was,
   onOpen,
 }: {
   rows: readonly Minyan[]
   box: MinyanBox
   writing: MinyanWriting
   mark?: (m: Minyan) => 'Changed' | 'New' | null
+  /** The listing's own, by id: a changed time says what it was (E1Times). */
+  was?: ReadonlyMap<string, Minyan>
   onOpen?: (id: string) => void
 }) {
   const { timeText, noteText, boxGroups } = writing
@@ -176,7 +182,8 @@ export function MinyanBoxRows({
               // The week's rows are under their tefillah already: the time
               // and the days. Shabbos's say which tefillah.
               const kind = kindOf(m, box)
-              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, m.joinLink ? 'Online' : null, noteText(m.notes)].filter(Boolean).join(' · ')
+              const old = was?.get(m.id)
+              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, m.joinLink ? 'Online' : null, noteText(m.notes), old && timeText(old) !== timeText(m) ? `was ${timeText(old)}` : null].filter(Boolean).join(' · ')
               const marked = mark?.(m) ?? null
               const inside = (
                 <>

@@ -8,6 +8,8 @@ import type { ContactHospitalData } from '@/types'
 type PatchBody = {
   contact?: ContactHospitalData
   data?: Record<string, unknown>
+  /** Done in To do. */
+  status?: 'handled'
 }
 
 // Mirrors GET's own scope (see this file's GET and formResponseStore.ts's
@@ -35,11 +37,16 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
 
+  if (body.status !== undefined && body.status !== 'handled') {
+    return Response.json({ ok: false, errors: ['Invalid status.'] }, { status: 400 })
+  }
+
   try {
     const response = await updateFormResponse(id, body, adminResponseScope(community.slug))
     if (!response) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
+    // Marking it done changes nothing a visitor sees.
+    if (body.contact !== undefined || body.data !== undefined) await revalidatePublicContent()
     return Response.json({ ok: true, response })
   } catch (err) {
     console.error('[admin/responses/:id] PATCH failed:', err)

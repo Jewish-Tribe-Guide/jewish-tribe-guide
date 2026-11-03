@@ -148,6 +148,7 @@ export type Trouble =
   | { why: 'person_check' }
   | { why: 'draw_timeout' }
   | { why: 'draw_failed'; detail: string }
+  | { why: 'no_browser' } // ours: the browser that draws pages didn't start
   | { why: 'drawn_empty' }
   | { why: 'empty' }
 
@@ -174,6 +175,8 @@ export function troubleClause(t: Trouble): string {
       return 'it’s drawn by a script, and took too long to draw'
     case 'draw_failed':
       return `it’s drawn by a script, and the browser couldn’t draw it (${t.detail})`
+    case 'no_browser':
+      return 'it’s drawn by a script, and our browser for drawing pages didn’t start (ours to fix, not their site)'
     case 'drawn_empty':
       return 'it’s drawn by a script, and once drawn it still showed no menu'
     case 'empty':

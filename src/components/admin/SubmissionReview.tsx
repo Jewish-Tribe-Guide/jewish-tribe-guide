@@ -348,12 +348,12 @@ export function TheOriginal({ source, marked }: { source: SubmissionSource; mark
       {marked && (
         <span className="text-xs text-slate-500">
           <span className="rounded bg-blue-100 text-blue-900 px-1">used</span>{' '}
-          <span className="rounded bg-amber-100 text-amber-900 px-1">not used</span>
+          <span className="rounded bg-rose-100 text-rose-900 px-1">not used</span>
         </span>
       )}
     </div>
     {marked && marked.unused > 0 && (
-      <p className="mb-2 text-xs font-medium text-amber-800">
+      <p className="mb-2 text-xs font-medium text-rose-800">
         {marked.unused === 1 ? '1 time in the original isn’t used.' : `${marked.unused} times in the original aren’t used.`} Check none was missed.
       </p>
     )}
@@ -362,7 +362,7 @@ export function TheOriginal({ source, marked }: { source: SubmissionSource; mark
         {marked
           ? marked.parts.map((p, i) =>
               p.mark ? (
-                <mark key={i} data-mark={p.mark} className={p.mark === 'used' ? 'rounded bg-blue-100 text-blue-900 px-0.5' : 'rounded bg-amber-100 text-amber-900 px-0.5'}>
+                <mark key={i} data-mark={p.mark} className={p.mark === 'used' ? 'rounded bg-blue-100 text-blue-900 px-0.5' : 'rounded bg-rose-100 text-rose-900 px-0.5'}>
                   {p.text}
                 </mark>
               ) : (

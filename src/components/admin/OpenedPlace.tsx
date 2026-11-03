@@ -14,6 +14,7 @@ import { shortUrl } from './watchText'
 import type { FoundStatusPage } from '@/lib/eruvFind'
 import type { Jobs } from './useWatchJobs'
 import { groupEdit, waitingGroups, type WaitBox, type WaitGroup } from './waitingGroups'
+import { waitingAnswers } from './waitingAnswers'
 import { withSave } from './findingEdits'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import EruvEditor, { type EruvValues } from '@/components/resources/EruvEditor'
@@ -122,7 +123,7 @@ function SourceForm({ label, email, save, busy, onSave, onCancel, readFor = 'tim
 
 /** A shul's times or a menu's dishes, as the listing's box: a row each,
  *  what changes highlighted. */
-function WaitingBox({ box }: { box: WaitBox }) {
+export function WaitingBox({ box }: { box: WaitBox }) {
   return (
     <div className="grid gap-1.5 pt-1.5" data-testid="waiting-box">
       <span data-testid="waiting-part" className="flex items-center gap-2 text-[13.5px] font-bold text-slate-900">
@@ -371,45 +372,8 @@ export default function OpenedPlace({
   if (place.state === 'waiting') {
     const w = waitingGroups(place.id, jobs, now)
     const patch = (id: string, body: Record<string, unknown>) => fetchJson(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify(body) }, 'Could not do that.')
-    const each = (ids: readonly string[], body: (id: string) => Record<string, unknown>) => async () => {
-      for (const id of ids) await patch(id, body(id))
-    }
-    const google = (body: Record<string, unknown>) => () => post('/api/admin/watches/google', { ...body, id: place.id })
-    const menu = (action: 'use' | 'skip') => () => post('/api/admin/main-dishes', { action, resourceId: place.id })
-    // Bring it back: the guide's archived listing restored, with the list's
-    // hechsher once its new place is filed.
-    const restore = (archivedId: string, id?: string) => () => post('/api/admin/watches/kosher', { action: 'restore', resourceId: archivedId, ...(id ? { id } : {}) })
     // Each group's buttons, the first its main one, as drawn.
-    const buttons = (g: WaitGroup): { label: string; work: () => Promise<unknown> }[] => {
-      const d = g.decide
-      if (d.kind === 'later') return d.archivedId ? [{ label: 'Bring it back', work: restore(d.archivedId) }] : []
-      if (d.kind === 'closure') return [{ label: 'Keep closed', work: google({ action: 'open', open: false }) }, { label: 'Show as open', work: google({ action: 'open', open: true }) }]
-      if (d.kind === 'new')
-        return [
-          ...(d.archivedId ? [{ label: 'Bring it back', work: restore(d.archivedId, d.id) }] : []),
-          { label: 'Add as new', work: each([d.id], () => ({ status: 'approved' })) },
-          { label: 'Don’t add', work: each([d.id], () => ({ status: 'rejected' })) },
-        ]
-      if (d.kind === 'off' || d.kind === 'archive')
-        return [
-          { label: 'Remove the listing', work: d.kind === 'off' ? each([d.id], () => ({ status: 'approved' })) : () => post('/api/admin/watches/kosher', { action: 'archive', id: d.id }) },
-          { label: 'Keep it', work: each([d.id], () => ({ status: 'rejected' })) },
-          ...(d.kind === 'off' && d.renamed ? [{ label: `It’s ${d.renamed} now`, work: () => post('/api/admin/watches/kosher', { action: 'renamed', id: d.id }) }] : []),
-        ]
-      // Wrong place: Google matched another place. The match goes, and the
-      // place opens again on Find it on Google or Not on Google.
-      if (d.kind === 'google')
-        return [
-          { label: 'Accept', work: google({ action: 'use' }) },
-          { label: 'Keep as is', work: google({ action: 'keep' }) },
-          { label: 'Wrong place', work: google({ action: 'wrong_place' }) },
-        ]
-      if (d.kind === 'menu') return [{ label: 'Accept', work: menu('use') }, { label: 'Keep as is', work: menu('skip') }]
-      return [
-        { label: 'Accept', work: each(d.ids, (id) => ({ status: 'approved', ...(d.only?.[id] ? { only: d.only[id] } : {}) })) },
-        { label: 'Keep as is', work: each(d.ids, () => ({ status: 'rejected' })) },
-      ]
-    }
+    const buttons = (g: WaitGroup) => waitingAnswers(g.decide, place.id, { patch, post })
     // Edit: the box its job page's Edit opens, here.
     const edit = (g: WaitGroup) =>
       groupEdit(g, place.id, jobs) && (

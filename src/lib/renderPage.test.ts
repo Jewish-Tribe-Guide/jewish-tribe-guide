@@ -74,6 +74,11 @@ describe('drawing a page as a browser does', () => {
       expect(await draw()).toEqual({ got: null, heard: [{ why: 'draw_timeout' }] })
     })
 
+    it('a browser that won’t start is ours, not the page’s (dev’s runner, Nov 2)', async () => {
+      launch.mockRejectedValue(new Error("browserType.launch: Executable doesn't exist at /ms-playwright/chromium"))
+      expect(await draw()).toEqual({ got: null, heard: [{ why: 'no_browser' }] })
+    })
+
     it('a page drawn is no trouble', async () => {
       browser({})
       expect(await draw()).toEqual({ got: { url: 'https://cookies.example/', body: '<p>Cookies</p>' }, heard: [] })

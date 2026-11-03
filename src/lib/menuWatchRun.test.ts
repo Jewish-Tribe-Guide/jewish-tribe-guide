@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import { menuHash, MENU_WATCH_CREATOR } from './menuWatch'
-import type { Trouble } from './menuReader'
+import type { Render, Trouble } from './menuReader'
 
 const m = vi.hoisted(() => ({
   listCategoriesUncached: vi.fn(),
@@ -392,6 +392,13 @@ describe('a menu drawn by a script', () => {
     const second = renderer()
     expect(await runMenuWatch(watch, budget, { apiKey: 'k', renderer: second })).toEqual({ ok: true, filed: 0, skipped: true })
     expect(second.render).not.toHaveBeenCalled()
+  })
+
+  it('a browser that won’t start leaves the menu unread, not failing: it’s ours, so not the place’s broken check in To do', async () => {
+    m.readMenuPage.mockImplementation(async (_url: string, opts: { render?: Render | null; trouble?: (t: Trouble) => void }) => (await opts.render?.(URL_, opts.trouble)) ?? null)
+    const noBrowser = () => ({ render: vi.fn(async (_u: string, trouble?: (t: Trouble) => void) => (trouble?.({ why: 'no_browser' }), null)), close: vi.fn(async () => {}) })
+    expect(await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: noBrowser() })).toEqual({ ok: true, filed: 0, skipped: true })
+    expect(await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: noBrowser(), full: true })).toEqual({ ok: true, filed: 0, skipped: true })
   })
 
   it('“Check now” always draws; one that still can’t be read is a failure, as before', async () => {

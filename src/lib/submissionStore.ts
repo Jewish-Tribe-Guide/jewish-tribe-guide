@@ -3,7 +3,9 @@ import { MENU_LINK_KEY, keepsMenuLink, readMenuLink } from './menuLink'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible, type CategoryConfig } from './categories'
-import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
+import { canAskGoogle, fetchPlaceSync, findPlaceStatus, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
+import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
+import { MEKOR_WATCH_NAME } from './mekorWatch'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
 import { addedItems, goneItemsKept, itemFieldKeys, nextItemGone, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
@@ -18,6 +20,8 @@ import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
 import { keepOnly } from './watchFindings'
+import { editedFields, onListingNow } from './editedFields'
+import { approvingPart, leavingPart, reviewParts } from './reviewParts'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -93,7 +97,13 @@ export async function listSubmissionsByStatus(
       return { ...s, current: null, categoryLabel: categoryLabel(s, null), currentEruv: e ? { name: e.name, covers: e.covers, website: e.website, hotline: e.hotline, alertsUrl: e.alertsUrl } : null }
     }
     const current = s.target_id ? byId.get(s.target_id) ?? null : null
-    return { ...s, current, categoryLabel: categoryLabel(s, current) }
+    // A pending edit as approving it would go on the listing now: only its
+    // own fields (editedFields.ts), so it never shows another's undone.
+    const fields = categories.find((c) => c.id === current?.category)?.detailFields
+    const payload = status === 'pending' && s.operation === 'update' && s.target_type === 'listing' && current && fields
+      ? (onListingNow(s.payload as unknown as ResourceSubmission, current, fields) as unknown as Record<string, unknown>)
+      : s.payload
+    return { ...s, payload, current, categoryLabel: categoryLabel(s, current) }
   })
 }
 
@@ -157,12 +167,19 @@ export async function submitListingUpdate(
   note: string | null,
   submittedBy: { name?: string; email?: string } | null,
 ): Promise<SubmissionRow> {
+  // The fields it changes, against the listing as it is now: approving it
+  // changes only those (editedFields.ts). Never what the sender said.
+  const sent: ResourceSubmission = { ...payload }
+  delete sent.editedFields
+  const { data: row } = await getAdminClient().from('resource').select('*').eq('community_id', community).eq('id', targetId).maybeSingle()
+  const category = row ? await getCategoryById(community, (row as ResourceRow).category) : null
+  const filed: ResourceSubmission = row && category ? { ...sent, editedFields: editedFields(normalizeRow(row as ResourceRow), sent, category.detailFields) } : sent
   return insertSubmission({
     community_id: community,
     operation: 'update',
     target_type: 'listing',
     target_id: targetId,
-    payload: payload as unknown as Record<string, unknown>,
+    payload: filed as unknown as Record<string, unknown>,
     note,
     submitted_by: submittedBy,
   })
@@ -364,6 +381,17 @@ export async function approveSubmission(
     throw new Error(`Submission not found: ${id}`)
   }
 
+  // An edit goes on the listing as it is now, changing only its own fields
+  // (editedFields.ts): another edit approved since stays approved. The
+  // admin's Edit, a line-by-line approval and a part or section all start
+  // from this.
+  if (submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id && Array.isArray((submission.payload as { editedFields?: unknown }).editedFields)) {
+    const { data: row, error: rowErr } = await supabase.from('resource').select('*').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const category = await getCategoryById(submission.community_id, (row as ResourceRow).category)
+    submission.payload = onListingNow(submission.payload as unknown as ResourceSubmission, row as ResourceRow, category?.detailFields ?? []) as unknown as Record<string, unknown>
+  }
+
   let savedPayload: Record<string, unknown> | null = null
   // An eruv's, from Eruv status: Use this's rows, or the admin's Edit.
   if (submission.target_type === 'eruv' && submission.operation === 'update' && (only !== undefined || edited !== undefined)) {
@@ -492,6 +520,64 @@ export async function approveSubmission(
     await recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes))
   }
   return data as SubmissionRow
+}
+
+/** One part of an edit decided on its own (reviewParts.ts). `whole`: it's
+ *  the edit's last part, so the caller decides the edit as before. Else
+ *  approving puts the part on the listing as an approved copy of the edit
+ *  (history and the activity log keep what went on), as the admin fixed it
+ *  in Edit when `edited` is given, and leaving takes it
+ *  out of the edit; either way the edit stays waiting with what's left. */
+export async function decidePart(
+  id: string,
+  community: string,
+  partId: string,
+  decision: 'approved' | 'rejected',
+  reviewedBy?: string,
+  edited?: unknown,
+): Promise<{ whole: true } | { whole: false; submission: SubmissionRow }> {
+  const supabase = getAdminClient()
+  const { data: sub } = await supabase.from('submission').select('*').eq('id', id).eq('community_id', community).maybeSingle()
+  const submission = sub as SubmissionRow | null
+  if (!submission || submission.status !== 'pending') throw new ReviewEditError('This change has already been decided.')
+  if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) throw new ReviewEditError('Only an edit is decided a part at a time.')
+  const { data: row } = await supabase.from('resource').select('*').eq('community_id', community).eq('id', submission.target_id).maybeSingle()
+  if (!row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+  const listing = row as ResourceRow
+  const category = await getCategoryById(community, listing.category)
+  const fields = category?.detailFields ?? []
+  const payload = submission.payload as unknown as ResourceSubmission
+  const sent = onListingNow(payload, listing, fields)
+  const parts = reviewParts(listing, sent, category ?? fields)
+  const part = parts.find((p) => p.id === partId)
+  if (!part) throw new ReviewEditError('That part has already been decided.')
+  if (parts.length === 1) return { whole: true }
+
+  let next: ResourceSubmission & { someApproved?: boolean }
+  if (decision === 'approved') {
+    const rest: Record<string, unknown> = { ...submission }
+    delete rest.id
+    delete rest.case_number
+    const { data: copy, error } = await supabase
+      .from('submission')
+      .insert({ ...rest, payload: approvingPart(sent, listing, part, fields), status: 'pending', reviewed_at: null })
+      .select('id')
+      .single()
+    if (error || !copy) throw new Error(`Failed to approve a part: ${error?.message}`)
+    try {
+      await approveSubmission(copy.id, community, reviewedBy, edited)
+    } catch (err) {
+      await supabase.from('submission').delete().eq('id', copy.id)
+      throw err
+    }
+    // What's approved now matches the listing, so it no longer shows.
+    next = { ...payload, someApproved: true }
+  } else {
+    next = leavingPart(payload, listing, part, fields)
+  }
+  const { data, error } = await supabase.from('submission').update({ payload: next }).eq('id', id).select('*').single()
+  if (error) throw new Error(`Failed to keep the rest of the change: ${error.message}`)
+  return { whole: false, submission: data as SubmissionRow }
 }
 
 /** An approved eruv suggestion: its four rows, as suggested, on the eruv.
@@ -750,6 +836,20 @@ async function computeGoogleFields(
   return OWNABLE_SYNC_FIELDS.filter((f) => result.has(f))
 }
 
+// A new place from Keystone-K's or Mekor Habracha's list is filed with the
+// place Google found for it, so approving it fills the listing from Google
+// at once (the user, Nov 2). One filed before the lists kept it (Nov 3) has
+// none: it's asked for here, once, on the same terms (keystoneRun's
+// askGoogleIfOpen): only when Google's name for it is the list's.
+export async function withListsPlaceId(payload: ResourceSubmission, by: { name?: string } | null): Promise<Record<string, unknown>> {
+  const details = payload.details ?? {}
+  if (details.placeId || details.verifiedPlaceId) return details
+  if (by?.name !== KEYSTONE_WATCH_NAME && by?.name !== MEKOR_WATCH_NAME) return details
+  if (!canAskGoogle()) return details
+  const g = await findPlaceStatus(payload.name, payload.address ?? '')
+  return g?.name && namesOverlap(g.name, payload.name) ? { ...details, placeId: g.placeId } : details
+}
+
 // A placeId only earns sync eligibility if it actually corresponds to the
 // business being listed, not just whatever address was picked. Picking a
 // venue and then renaming the listing (a concession stand inside a stadium,
@@ -968,6 +1068,7 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
+    payload.details = await withListsPlaceId(payload, submission.submitted_by)
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)

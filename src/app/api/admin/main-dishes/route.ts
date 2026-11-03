@@ -1,3 +1,4 @@
+import { after } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listCategories } from '@/lib/categoryStore'
@@ -18,6 +19,7 @@ import {
   saveMenuLink,
   saveMenuReading,
   setMenuDishes,
+  startMenuReading,
   type StoredMenuReading,
 } from '@/lib/menuReadingStore'
 import { UUID } from '@/lib/itemMarkRoutes'
@@ -70,7 +72,9 @@ import type { DirectoryResource } from '@/types'
 //      "Give its menu link": saved on the listing as its menu link (so the
 //      tab reads it first from now on, and the menu watch watches it), then
 //      read. Saved even when it can't be read (an ordering app's, say): it's
-//      still the listing's "Full menu".
+//      still the listing's "Full menu". With `background: true` (Nov 2) it
+//      answers once the link is saved, its reading `reading`, and reads the
+//      menu after the reply; the admin's screens load again until it lands.
 // POST multipart: action=photos, resourceId, file (up to 3)
 //      "Add photos of the menu": read as the "+ Add" box reads photos (or a
 //      PDF), kept as a reading to check like any other. The photos aren't
@@ -150,6 +154,30 @@ async function dateAgreeing(slug: string, listing: DirectoryResource, field: Cat
   await revalidatePublicContent()
   const dated = new Set([...found, ...listed.menuDated].map((n) => n.toLowerCase()))
   return { reading: { ...reading, status: 'approved' as const, decidedAt: at, decidedBy: by }, menuDated: listed.dishes.filter((n) => dated.has(n.toLowerCase())) }
+}
+
+/** A menu link given, read with the rest of the place's menu on its
+ *  website (menuPages), and kept: proposed, or failed saying why. */
+async function readLink(slug: string, listing: DirectoryResource, kind: ReturnType<typeof dishKinds>[number], url: string, apiKey: string): Promise<StoredMenuReading> {
+  const renderer = pageRenderer()
+  const linkTrouble: { t?: Trouble } = {}
+  const website = menuWebsite(listing, kind.category)
+  const sources = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) })
+    .then(async (source) => (source ? menuPages(source, website ? await findMenus(website, { render: renderer.render }).catch(() => []) : []) : []))
+    .finally(() => renderer.close())
+  const read = sources.length ? (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
+  return saveMenuReading(slug, listing.id, {
+    status: read?.dishes.length ? 'proposed' : 'failed',
+    sourceUrl: read?.sourceUrl ?? url,
+    dishes: read?.dishes ?? [],
+    missing: read?.missing,
+    note: read
+      ? read.note
+      : isOrderingApp(url)
+        ? 'Saved as its menu link. The reader doesn’t open ordering apps: add photos of the menu.'
+        : `Saved as its menu link, but it couldn’t be read${linkTrouble.t ? `: ${troubleClause(linkTrouble.t)}` : ''}. Add photos of the menu.`,
+    model: read?.model ?? null,
+  })
 }
 
 /** At most this many dishes saved at once. */
@@ -272,27 +300,17 @@ export async function POST(request: Request) {
       await revalidatePublicContent()
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
-      const renderer = pageRenderer()
-      const linkTrouble: { t?: Trouble } = {}
-      // With the rest of the place's menu on its website (menuPages).
-      const website = menuWebsite(listing, kind.category)
-      const sources = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) })
-        .then(async (source) => (source ? menuPages(source, website ? await findMenus(website, { render: renderer.render }).catch(() => []) : []) : []))
-        .finally(() => renderer.close())
-      const read = sources.length ? (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
-      const reading = await saveMenuReading(community.slug, resourceId, {
-        status: read?.dishes.length ? 'proposed' : 'failed',
-        sourceUrl: read?.sourceUrl ?? url,
-        dishes: read?.dishes ?? [],
-        missing: read?.missing,
-        note: read
-          ? read.note
-          : isOrderingApp(url)
-            ? 'Saved as its menu link. The reader doesn’t open ordering apps: add photos of the menu.'
-            : `Saved as its menu link, but it couldn’t be read${linkTrouble.t ? `: ${troubleClause(linkTrouble.t)}` : ''}. Add photos of the menu.`,
-        model: read?.model ?? null,
-      })
-      return Response.json({ ok: true, menuUrl: url, ...(await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)) })
+      const readIt = async () => dateAgreeing(community.slug, listing, kind.field, await readLink(community.slug, listing, kind, url, apiKey), admin.email)
+      if (body?.background !== true) return Response.json({ ok: true, menuUrl: url, ...(await readIt()) })
+      // Answered at once, read after the reply (the user, Nov 2).
+      const started = await startMenuReading(community.slug, resourceId, url)
+      after(() =>
+        readIt().catch(async (err) => {
+          console.error('[admin/main-dishes] reading a menu link failed:', err)
+          await saveMenuReading(community.slug, resourceId, { status: 'failed', sourceUrl: url, dishes: [], note: 'Saved as its menu link, but it couldn’t be read. Read it again.', model: null }).catch(() => {})
+        }),
+      )
+      return Response.json({ ok: true, menuUrl: url, reading: started })
     }
 
     if (action === 'unlink') {

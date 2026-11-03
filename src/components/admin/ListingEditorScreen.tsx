@@ -3,6 +3,7 @@
 import { useState, type ComponentProps, type ReactNode } from 'react'
 import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 import { AdminBack } from './AdminUI'
 
 /**
@@ -25,6 +26,8 @@ export default function ListingEditorScreen({
   const [step, setStep] = useState<EditorStep | null>(null)
   const title = overlay?.title ?? step?.title ?? heading
   const back = overlay?.back ?? (step ? step.back : onClose)
+  // Each open row, and a screen over it, is an entry: a swipe back closes it.
+  useHistoryDepth('editorStep', (step ? (step.depth ?? 1) : 0) + (overlay ? 1 : 0), back)
   // The preview's own SiteHeader shows "‹ title" on mobile, as it does over
   // the real editor.
   useSetScreenHeader(true, title, back)

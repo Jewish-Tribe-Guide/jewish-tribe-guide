@@ -58,6 +58,15 @@ describe('dishStatus and dishCounts', () => {
   })
   const read = (dishes: string[], missing: string[] = []) => ({ status: 'proposed' as const, readAt: ago(1), dishes: dishes.map((name) => ({ name, quote: name, checked: true })), missing })
 
+  // Its menu link just given, read after the reply (Nov 2): nothing to fix
+  // while it reads, so To do shows no "can't be read" for it meanwhile.
+  it('a menu being read is neither can’t read, didn’t load nor to check', () => {
+    const p = place('reading', { menuUrl: 'https://x.example/menu' })
+    expect(dishStatus(p)).toBe('reading')
+    expect(dishJobStatus(p, NOW)).toBe('reading')
+    expect(dishCounts([p], NOW)).toEqual({ checked: 0, toCheck: 0, cantRead: 0, didntLoad: 0 })
+  })
+
   it('puts a read in To check only when its menu would change the listing', () => {
     // A dish on the menu the listing doesn't have.
     expect(dishStatus(place('proposed', { dishes: ['Sliders'], menuDated: ['Sliders'], reading: read(['Sliders', 'Tacos']) }))).toBe('differs')
@@ -118,6 +127,12 @@ describe('dishStatus and dishCounts', () => {
     ]
     expect(places.map((p) => dishJobStatus(p, NOW))).toEqual(['didnt_load', 'same', 'same', 'same', 'didnt_load', 'off'])
     expect(dishCounts(places, NOW)).toEqual({ checked: 3, toCheck: 0, cantRead: 0, didntLoad: 2 })
+  })
+
+  it('a menu our own browser couldn’t draw is not the place’s: it didn’t fail to load (dev, Nov 2)', () => {
+    const lastError = 'Couldn’t read the menu: it’s drawn by a script, and the browser couldn’t draw it (browserType.launch: Executable doesn’t exist…)'
+    const menuWatch = watch({ url: 'https://x.example/menu', failingSince: ago(0.5), lastError })
+    expect(dishJobStatus(place('approved', { menuWatch }), NOW)).toBe('same')
   })
 })
 

@@ -4,9 +4,11 @@ import { useEffect, useSyncExternalStore } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import { parseOkJson } from './fetchJson'
 import { withCommunity } from './useCommunityData'
-import { todoCount, unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
+import { unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
+import { todoPlaceCount } from './todoPlaces'
 import { setupLeft, type SetupState } from './setup'
-import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
+import { loadDishes, loadJobs, MENU_READING_POLL_MS, type Jobs } from '@/components/admin/useWatchJobs'
+import { menusReading } from './watchJobs'
 import { notBeingRead, waitingNotQueued, type TodoNotRead, type TodoWaiting } from '@/components/admin/todoWaiting'
 
 // What To do holds, loaded once and shared: the To do page shows it and
@@ -24,6 +26,9 @@ export type TodoData = {
   waiting?: TodoWaiting[]
   /** A source that has stopped being read. Loaded with `waiting`. */
   notRead?: TodoNotRead[]
+  /** Every job's reading, for a place's screen: its sources and their
+   *  fixes. Loaded with `waiting`. */
+  jobs?: Jobs
   /** What the setup checklist ticks off; null if it couldn't be read, so
    *  no checklist shows rather than a wrong one. */
   setup: SetupState | null
@@ -83,12 +88,14 @@ async function load(key: string, token: string, community: string, email: string
       // Kept until the jobs answer again, so the count doesn't dip meanwhile.
       waiting: state.data?.waiting,
       notRead: state.data?.notRead,
+      jobs: state.data?.jobs,
     },
   })
-  void loadWaiting(key, token, community)
+  jobsLoad = loadWaiting(key, token, community)
 }
 
 let waitingLoads = 0
+let jobsLoad: Promise<void> = Promise.resolve()
 
 /** Every job's reading, after the rest so To do doesn't wait on them; what
  *  couldn't load just isn't counted. Only the latest load's answer is kept. */
@@ -96,7 +103,29 @@ async function loadWaiting(key: string, token: string, community: string) {
   const load = ++waitingLoads
   const jobs: Jobs = {}
   await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
-  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()) }))
+  if (state.key === key && load === waitingLoads) {
+    withJobs(jobs)
+    pollMenus(key, token, community, load)
+  }
+}
+
+function withJobs(jobs: Jobs) {
+  updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()), jobs }))
+}
+
+/** A menu being read (given just now, read after the reply): the food
+ *  places asked for again until it's in, so its reading turns up on To do
+ *  without a reload. Stops when another load starts. */
+function pollMenus(key: string, token: string, community: string, load: number, tries = 0) {
+  // A read that never finishes says so after two minutes (menuReadingStore).
+  if (!menusReading(state.data?.jobs?.dishes) || tries > 30) return
+  setTimeout(async () => {
+    if (state.key !== key || load !== waitingLoads) return
+    const dishes = await loadDishes(token, community)
+    if (state.key !== key || load !== waitingLoads || !state.data?.jobs) return
+    if (dishes) withJobs({ ...state.data.jobs, dishes })
+    pollMenus(key, token, community, load, tries + 1)
+  }, MENU_READING_POLL_MS)
 }
 
 /** Loads To do (again, with `fresh`), sharing a load already under way. */
@@ -110,6 +139,14 @@ export function loadTodo(token: string, community: string, email?: string, fresh
   })
   inFlight = { key, promise }
   return promise
+}
+
+/** Loads To do again, the jobs' readings too, after a fix on a place's
+ *  screen: what it fixed is gone once this resolves, what it didn't is
+ *  still there, dated afresh. */
+export async function reloadTodo(token: string, community: string, email?: string) {
+  await loadTodo(token, community, email, true)
+  await jobsLoad
 }
 
 /** Changes the loaded copy after a decision, so the page and the count
@@ -127,11 +164,11 @@ export function useTodo(token: string, community: string, email?: string, fresh 
   return s.key === key ? s : { key, data: null, error: null }
 }
 
-/** The one number in the nav: what To do holds, setup steps left
+/** The one number in the nav: the places To do lists, setup steps left
  *  included, or null until loaded. */
 export function useTodoCount(token: string, community: string): number | null {
   const { data } = useTodo(token, community)
-  return data ? todoCount(data) + setupLeft(data.setup) : null
+  return data ? todoPlaceCount(data) + setupLeft(data.setup) : null
 }
 
 /** For tests: forget what was loaded. */

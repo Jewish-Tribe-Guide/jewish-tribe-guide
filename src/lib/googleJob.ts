@@ -68,6 +68,8 @@ export type GooglePlace = {
   /** When Google last answered for it, and, failing, when it didn't. */
   readAt: string | null
   failedAt: string | null
+  /** When it went on the site: an unmatched one's date on To do. */
+  addedAt?: string | null
   notOnGoogle: string | null
   closure: GoogleClosure | null
   /** What a check left to decide, while it's fresh. */

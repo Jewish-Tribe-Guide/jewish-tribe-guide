@@ -9,7 +9,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import type { GooglePlace } from '@/lib/googleJob'
 import type { Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
-import type { DishPlace, JobCounts } from '@/lib/watchJobs'
+import { menusReading, type DishPlace, type JobCounts } from '@/lib/watchJobs'
 import type { SitePlace } from '@/lib/watchPlaces'
 import type { EruvJobLoaded } from '@/lib/eruvJob'
 import type { LinkStanding } from '@/lib/linkCheck'
@@ -18,6 +18,7 @@ import type { HoursPlace } from './watchJobTypes'
 import type { KosherLoaded } from './watchJobTypes'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { NightKindId } from '@/lib/jobRuns'
+import type { LookAgainLoaded } from '@/lib/lookAgain'
 import { placeTroubles } from '@/lib/watchPlaces'
 import { placeCoverage, type CoverageIn, type PlaceCoverage } from '@/lib/fieldCoverage'
 import type { NightlyRunsLoaded } from './JobPage'
@@ -46,6 +47,8 @@ export type Jobs = {
   runs?: NightlyRunsLoaded | null
   /** Every listing, for what checks each of its fields (fieldCoverage.ts). */
   places?: AdminPlace[] | null
+  /** Look again's: what it tries, and what it found (lookAgain.ts). */
+  lookAgain?: LookAgainLoaded | null
 }
 
 /** What's gone wrong with a check of each place; a job turned off has none. */
@@ -102,6 +105,17 @@ export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['catego
   return keys.every((k) => jobs[k] !== undefined)
 }
 
+/** How often a screen asks again while a menu is being read (the route
+ *  reads it after its reply, Nov 2). Its read takes 15–40s. */
+export const MENU_READING_POLL_MS = 6000
+
+/** The food places alone, read again: null if they couldn't be. */
+export function loadDishes(token: string, community: string): Promise<Jobs['dishes'] | null> {
+  return fetchJson<{ places: Jobs['dishes'] }>(withCommunity('/api/admin/main-dishes', community), { headers: { Authorization: `Bearer ${token}` } }, '')
+    .then((d) => d.places ?? null)
+    .catch(() => null)
+}
+
 /** Every job's places, each handed over as it comes in. */
 export async function loadJobs(token: string, community: string, fill: <K extends keyof Jobs>(key: K, value: Jobs[K]) => void, failed: (key: keyof Jobs) => void) {
   const headers = { Authorization: `Bearer ${token}` }
@@ -120,6 +134,7 @@ export async function loadJobs(token: string, community: string, fill: <K extend
     get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
     get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
     get<{ places: AdminPlace[] }>('/api/admin/listings').then((d) => (d ? fill('places', d.places ?? null) : failed('places'))),
+    get<LookAgainLoaded>('/api/admin/watches/look-again').then((d) => (d?.items ? fill('lookAgain', d) : failed('lookAgain'))),
   ])
 }
 
@@ -138,6 +153,14 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
   useEffect(() => {
     lastSeen.set(community, jobs)
   }, [community, jobs])
+
+  // A menu being read: its places asked for again until it's in.
+  const reading = menusReading(jobs.dishes)
+  useEffect(() => {
+    if (!reading) return
+    const t = setTimeout(() => void loadDishes(token, community).then((dishes) => dishes && setJobs((j) => ({ ...j, dishes }))), MENU_READING_POLL_MS)
+    return () => clearTimeout(t)
+  }, [reading, jobs.dishes, token, community])
 
   useLoadOnMount(load)
   return { jobs, reload: load }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EnrichedSubmission } from '@/types'
 import type { ClassifiedMiss } from './missedSearches'
 import { makeCategory } from '@/test/providerFixtures'
-import { changeWhat, isNewPlace, openSearches, responseSummary, splitSubmissions, submissionLine, teachable, todoCount, unmatchedPlaces, watchesLine, type TodoReading } from './todo'
+import { changeWhat, isNewPlace, openSearches, responseSummary, splitSubmissions, submissionLine, teachable, unmatchedPlaces, watchesLine, type TodoReading } from './todo'
 
 function sub(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmission {
   return {
@@ -112,12 +112,6 @@ describe('teachable', () => {
   })
 })
 
-describe('todoCount', () => {
-  it('is suggestions and responses, never searches nobody found', () => {
-    const waiting = { submissions: [1, 2], searches: [1], responses: [1, 2, 3] }
-    expect(todoCount(waiting)).toBe(5)
-  })
-})
 
 describe('responseSummary', () => {
   const base = { id: 'r', requestId: 'q', contact: {} as never, status: 'new' as const, createdAt: '2026-10-20T12:00:00Z', handledAt: null }
@@ -127,7 +121,14 @@ describe('responseSummary', () => {
       title: 'Feedback',
       line: 'The map is great',
       createdAt: base.createdAt,
+      text: ['The map is great'],
     })
+    // Opened, all of it, and the email they left to reply to.
+    const full = responseSummary({ ...base, contact: { email: ' sam@example.com ', fullName: ' Sam Cohen ' } as never, requestType: 'Feedback', formId: null, data: { message: 'Hours wrong', more: 'at Primo' } }, new Map())
+    expect(full.text).toEqual(['Hours wrong', 'at Primo'])
+    expect(full.email).toBe('sam@example.com')
+    // And who they said they are (L5Feedback).
+    expect(full.name).toBe('Sam Cohen')
     const long = 'x'.repeat(200)
     const r = responseSummary({ ...base, requestType: 'Custom', formId: 'meals', data: { note: long } }, new Map([['meals', 'Meal sign-up']]))
     expect(r.title).toBe('Meal sign-up')
@@ -155,13 +156,13 @@ describe('watchesLine', () => {
 })
 
 describe('places to find on Google', () => {
-  const p = (id: string, matched: boolean, notOnGoogle: string | null) => ({ id, name: id, category: 'mikvah', matched, notOnGoogle })
-  it('only a place with no match that nobody has said is not on Google', () => {
-    expect(unmatchedPlaces([p('a', false, null), p('b', true, null), p('c', false, '2026-10-01')])).toEqual([{ id: 'a', name: 'a', category: 'mikvah' }])
+  const p = (id: string, matched: boolean, notOnGoogle: string | null) => ({ id, name: id, category: 'mikvah', matched, notOnGoogle, readAt: '2026-10-30T07:00:00Z' })
+  it('only a place with no match that nobody has said is not on Google, dated by when Google was last asked', () => {
+    expect(unmatchedPlaces([p('a', false, null), p('b', true, null), p('c', false, '2026-10-01')])).toEqual([{ id: 'a', name: 'a', category: 'mikvah', at: '2026-10-30T07:00:00Z' }])
   })
-  it('counts as something to do', () => {
-    expect(todoCount({ submissions: [], responses: [], unmatched: [{}] })).toBe(1)
-    // What a job read that waits on the place, not in the queue.
-    expect(todoCount({ submissions: [{}], responses: [], waiting: [{}, {}] })).toBe(3)
+  // Chalavita, Mike's Chicken, Nov 2: never matched, so never read, and
+  // undated on To do. Every row is dated (J1Dates).
+  it('dates one Google has never answered for by when it went on the site', () => {
+    expect(unmatchedPlaces([{ ...p('a', false, null), readAt: null, addedAt: '2026-08-20T12:00:00Z' }])[0].at).toBe('2026-08-20T12:00:00Z')
   })
 })

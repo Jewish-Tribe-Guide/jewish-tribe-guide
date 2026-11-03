@@ -29,7 +29,7 @@ const mockDigest = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
 const mockGoogle = vi.hoisted(() => vi.fn())
 const mockCanAsk = vi.hoisted(() => vi.fn(() => true))
-vi.mock('@/lib/googlePlaces', () => ({ findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
+vi.mock('@/lib/googlePlaces', async (actual) => ({ namesOverlap: (await actual<typeof import('@/lib/googlePlaces')>()).namesOverlap, findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
 
 const { runMekorWatch } = await import('./mekorRun')
 const LIST = 'https://www.mekorhabracha.org/center-city'
@@ -120,6 +120,23 @@ describe('runMekorWatch', () => {
     setDb([], [], [])
     await run()
     expect(mockCreate.mock.calls.find(([, p]) => p.name === 'Z Candy Bar')![1].phone).toBe('(610) 668-1481')
+  })
+
+  // The user, Nov 2: a new place from the list keeps the place Google found
+  // for it, so approving it fills the listing from Google at once. Only
+  // when Google's name is the list's: Find Place can answer with the
+  // building, or the shop next door.
+  it('files a new place with Google’s place when Google’s name is the list’s', async () => {
+    mockGoogle.mockImplementation(async (name: string) =>
+      name === 'Z Candy Bar' ? { placeId: 'zc', name: 'Z Candy Bar', businessStatus: 'OPERATIONAL' } : { placeId: 'other', name: 'Wawa', businessStatus: 'OPERATIONAL' },
+    )
+    setDb([], [], [])
+    await run()
+    const details = (name: string) => mockCreate.mock.calls.find(([, p]) => p.name === name)![1].details
+    expect(details('Z Candy Bar').placeId).toBe('zc')
+    const others = mockCreate.mock.calls.filter(([, p]) => p.name !== 'Z Candy Bar')
+    expect(others.length).toBeGreaterThan(0)
+    for (const [, p] of others) expect(p.details.placeId).toBeUndefined()
   })
 
   it('does not suggest a place already waiting in the queue', async () => {

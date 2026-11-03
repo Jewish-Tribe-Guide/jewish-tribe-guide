@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { jobLists, lastRunWord, needsFixing, watchesSentence } from '@/lib/watchJobList'
+import { lookAgainFix } from '@/lib/lookAgain'
 import type { NightKindId } from '@/lib/jobRuns'
 import type { NightKindView } from '@/lib/nightKinds'
 import { AdminBack, AdminBox, AdminRow, AdminRows } from './AdminUI'
@@ -65,7 +66,10 @@ export default function WatchesManager({ token }: { token: string }) {
   if (!jobs.runs.available) return <p className="text-sm text-amber-800">Nightly runs aren’t recorded on this site yet.</p>
 
   const lists = jobLists(jobs.categories, jobs.runs.kinds, jobs.runs.off ?? [])
-  const fixes = needsFixing(lists.jobs)
+  const look = jobs.lookAgain
+  const lookRun = look?.runs?.[0]
+  const lookFix = look?.available && look.runs ? lookAgainFix(look.runs, now) : null
+  const fixes = [...needsFixing(lists.jobs), ...(lookFix ? [lookFix] : [])]
   const sentence = watchesSentence(lists.jobs, fixes.length)
   const coverage = coverageOf(jobs)
   const unwatched = coverage ? [...coverage.values()].filter((c) => c.notWatched.length > 0).length : null
@@ -96,6 +100,16 @@ export default function WatchesManager({ token }: { token: string }) {
           </AdminBox>
         ) : null
       })}
+      {look && (
+        <AdminBox title="Look again">
+          <AdminRow
+            href={`${base}/watches/job/look-again`}
+            name="Look again"
+            line={[look.available && `${look.items.filter((i) => !i.stopped).length} to try`, lookRun && lastRunWord(lookRun.startedAt, now, true)].filter(Boolean).join(' · ') || undefined}
+            aside={!look.available ? 'Not set up' : !lookRun ? 'Not run yet' : lookFix ? <BadMark /> : <GoodMark />}
+          />
+        </AdminBox>
+      )}
       {lists.steps.length > 0 && (
         <AdminBox title="Needs one step">
           {lists.steps.map((s) => (
@@ -109,7 +123,7 @@ export default function WatchesManager({ token }: { token: string }) {
         </AdminBox>
       )}
       {unwatched !== null && unwatched > 0 && (
-        <AdminBox title="Not watched">
+        <AdminBox title="Not checked">
           <AdminRow href={`${base}/places?checked=not-watched`} name={`${unwatched} ${unwatched === 1 ? 'place' : 'places'}`} />
         </AdminBox>
       )}

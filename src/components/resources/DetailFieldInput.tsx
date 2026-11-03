@@ -10,6 +10,7 @@ import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import SchedulesInput from '@/components/intake/SchedulesInput'
 import type { SpecialSchedule } from '@/lib/schedules'
+import { addedWords } from '@/lib/addedWords'
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
@@ -44,6 +45,7 @@ export function DetailFieldInput({
   onChangeSometimes,
   schedules,
   onChangeSchedules,
+  marksFrom,
 }: {
   field: CategoryField
   /** Shown instead of field.label — used inside an audience section so
@@ -59,6 +61,9 @@ export function DetailFieldInput({
   /** A minyanim field's special schedules (schedules.ts), edited with it. */
   schedules?: unknown
   onChangeSchedules?: (v: SpecialSchedule[]) => void
+  /** A note: what the listing says, so what's new is marked in the box
+   *  (a change on To do, board R1Women). */
+  marksFrom?: string
 }) {
   const label = `${labelOverride ?? field.label}${field.required ? ' *' : ''}`
   const labelClass = labelHidden ? 'sr-only' : 'block text-sm font-medium text-slate-700 mb-1'
@@ -208,7 +213,26 @@ export function DetailFieldInput({
     return (
       <div>
         <label htmlFor={`detail-${field.key}`} className={labelClass}>{label}</label>
-        <GrowingTextarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
+        {marksFrom === undefined ? (
+          <GrowingTextarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
+        ) : (
+          // The marks behind the words, on a copy of the text set the same
+          // way: 16px on a phone too, as globals.css sets a textarea.
+          <div className="relative rounded-md bg-white">
+            <div aria-hidden="true" data-testid="note-marks" className={`${inputClass.replace('border-slate-300', 'border-transparent')} pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-transparent max-sm:text-[16px]`}>
+              {addedWords(marksFrom, (value as string) ?? '').map((r, i) =>
+                r.added ? (
+                  <mark key={i} className="rounded-sm bg-yellow-200/80 text-transparent">
+                    {r.text}
+                  </mark>
+                ) : (
+                  <span key={i}>{r.text}</span>
+                ),
+              )}
+            </div>
+            <GrowingTextarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={`${inputClass} relative bg-transparent`} />
+          </div>
+        )}
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )

@@ -2,7 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { approveSubmission, rejectSubmission, ReviewEditError } from '@/lib/submissionStore'
+import { approveSubmission, decidePart, rejectSubmission, ReviewEditError } from '@/lib/submissionStore'
 import { sendDecisionEmail } from '@/lib/confirmationEmail'
 import { sendReviewActionNotification, sendStatusChangeDigest } from '@/lib/email'
 import { loadSyncableListing, syncOneListing } from '@/lib/syncListing'
@@ -21,6 +21,9 @@ import { routes } from '@/lib/routes'
 // which is what goes live instead of what was sent (reviewEdits.ts). `only`,
 // with an approval only: the lines of a watch's finding ticked on its job
 // page ("Update 2 on the listing"); the rest stay as the listing says.
+// `part`: one part of an edit decided on its own (reviewParts.ts), the rest
+// left waiting, with `payload` when the admin fixed it in Edit; its last
+// part decides the edit as before.
 // A best-effort decision email is sent to the submitter if they provided one.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/submissions/[id]'>) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
@@ -31,7 +34,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
   const { id } = await ctx.params
 
-  let body: { status?: string; reason?: string; payload?: unknown; only?: unknown }
+  let body: { status?: string; reason?: string; payload?: unknown; only?: unknown; part?: unknown }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -56,6 +59,24 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: false, errors: ['Tick at least one line to update.'] }, { status: 400 })
   }
 
+  if (body.part !== undefined) {
+    if (typeof body.part !== 'string' || body.only !== undefined) {
+      return Response.json({ ok: false, errors: ['A part is decided on its own.'] }, { status: 400 })
+    }
+    try {
+      const decided = await decidePart(id, community.slug, body.part, decision, admin.email, body.payload)
+      if (!decided.whole) {
+        // Nobody is told yet: the change isn't decided until its last part is.
+        if (decision === 'approved') await revalidatePublicContent()
+        return Response.json({ ok: true, submission: decided.submission, partial: true })
+      }
+    } catch (err) {
+      if (err instanceof ReviewEditError) return Response.json({ ok: false, errors: [err.message] }, { status: 400 })
+      console.error('[admin/submissions/:id] PATCH part failed:', err)
+      return Response.json({ ok: false, errors: ['Could not update submission.'] }, { status: 502 })
+    }
+  }
+
   let submission
   try {
     submission =
@@ -76,7 +97,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   // the mercy of whether the invocation survives long enough to finish it.
   after(async () => {
     await Promise.all([
-      sendDecisionEmail(submission, decision, reason).catch((err) =>
+      // Some of it went on: not "it wasn't used".
+      (decision === 'rejected' && (submission.payload as { someApproved?: boolean } | null)?.someApproved ? Promise.resolve() : sendDecisionEmail(submission, decision, reason)).catch((err) =>
         console.error('[admin/submissions/:id] Decision email failed:', err),
       ),
       sendReviewActionNotification(submission, decision, admin.email).catch((err) =>

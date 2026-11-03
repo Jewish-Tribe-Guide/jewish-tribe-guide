@@ -115,7 +115,7 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
 }
 
 /** The one way to stop a job here. It says what stopping costs before it
- *  does; what the job checked then counts as Not watched. */
+ *  does; what the job checked then counts as Not checked. */
 export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; name: string; count: number; token: string }) {
   const community = useCommunitySlug()
   const router = useRouter()

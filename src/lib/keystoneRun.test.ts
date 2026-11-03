@@ -34,7 +34,7 @@ const mockDigest = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
 const mockGoogle = vi.hoisted(() => vi.fn())
 const mockCanAsk = vi.hoisted(() => vi.fn(() => true))
-vi.mock('@/lib/googlePlaces', () => ({ findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
+vi.mock('@/lib/googlePlaces', async (actual) => ({ namesOverlap: (await actual<typeof import('@/lib/googlePlaces')>()).namesOverlap, findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
 
 const { runKeystoneWatch } = await import('./keystoneRun')
 const LIST = 'https://keystone-k.org/establishments/'
@@ -187,6 +187,20 @@ describe('runKeystoneWatch', () => {
     const lines = body.ok ? body.differences : []
     expect(lines).toContain('Sababa Falafel: On the list, not in the guide (closed on Google, not filed)')
     expect(lines).toContain(`${names[0]}: On the list, not in the guide`)
+  })
+
+  // The user, Nov 2: a new place keeps the place Google found for it, so
+  // approving it fills the listing from Google at once; not when Google's
+  // name for it is another place's.
+  it('files a new place with Google’s place only when Google’s name is the list’s', async () => {
+    mockGoogle.mockImplementation(async (name: string) => ({ placeId: `id:${name}`, name: name === 'Sababa Falafel' ? 'Sababa' : 'Wawa', businessStatus: 'OPERATIONAL' }))
+    setDb([], [])
+    await run()
+    const sababa = mockCreate.mock.calls.find(([, p]) => p.name === 'Sababa Falafel')!
+    expect(sababa[1].details.placeId).toBe('id:Sababa Falafel')
+    const others = mockCreate.mock.calls.filter(([, p]) => p.name !== 'Sababa Falafel')
+    expect(others.length).toBeGreaterThan(0)
+    for (const [, p] of others) expect(p.details.placeId).toBeUndefined()
   })
 
   it('files nothing on a dry run', async () => {

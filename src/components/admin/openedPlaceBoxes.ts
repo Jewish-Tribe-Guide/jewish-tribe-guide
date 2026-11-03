@@ -280,7 +280,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
         ],
         foot: sent
           ? { lead: 'Sent through the site', links: [], when: food.menuAt ? day(food.menuAt) : null, change: { kind: 'menu' } }
-          : { lead: 'Same as', links: [{ text: 'its menu', url: menu ?? null }], when: read(r?.readAt), change: { kind: 'menu' }, stop: stopMenu },
+          : { lead: 'Same as', links: [{ text: 'its menu', url: menu ?? null }], when: r?.status === 'reading' ? 'reading it now' : read(r?.readAt), change: { kind: 'menu' }, stop: stopMenu },
       })
     }
     const live = (food.pages ?? []).filter((w) => w.active)

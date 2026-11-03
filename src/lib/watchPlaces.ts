@@ -250,7 +250,7 @@ function kosherSays(p: KosherJob['places'][number]): Say {
   return { changes: open ? Math.max(1, waiting) : 0, unchecked: [], sources }
 }
 
-// ── A check that's broken, per place (Places' Check broken) ─────────────────
+// ── A check that's broken, per place (To do's broken checks) ────────────────
 
 const BROKEN = /stopped answering|didn’t load|can’t be read|Not found on Refuah|doesn’t open/
 

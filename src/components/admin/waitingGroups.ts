@@ -20,6 +20,7 @@ import { CONTACT_SECTION } from '@/lib/contactRead'
 import type { AdminEruv } from '@/lib/eruvStore'
 import type { EruvFinding } from '@/lib/eruvJob'
 import type { DirectoryResource } from '@/types'
+import { isFoundPage, type LookItem } from '@/lib/lookAgain'
 
 // ── A place waiting for you, opened on its own screen (piece 4, Oct 25) ────
 // Drawn on FinalChanges2, FinalNewsletter, FinalClosed, FinalDropped and
@@ -72,11 +73,31 @@ export type Decide =
   /** Nothing to decide yet: a list's new place, filed after its next read;
    *  Bring it back all the same, when the guide has it archived. */
   | { kind: 'later'; archivedId?: string }
+  /** What Look again found: an eruv's status page, a place on Google. */
+  | { kind: 'found'; look: 'eruv' | 'google' }
 /** `boxes`: a shul's times and a menu's dishes, drawn as the listing's
  *  boxes instead of lines. */
-export type WaitGroup = { key: string; job: WaitJob; page: FootLink | null; when: string | null; lines: WaitLine[]; boxes?: WaitBox[]; facts: WaitFact[]; note: string | null; decide: Decide }
+export type WaitGroup = {
+  key: string
+  job: WaitJob
+  page: FootLink | null
+  when: string | null
+  /** When `when` says, for To do's row date. */
+  at?: string | null
+  lines: WaitLine[]
+  boxes?: WaitBox[]
+  facts: WaitFact[]
+  note: string | null
+  decide: Decide
+}
 
 export type Waiting = { groups: WaitGroup[]; checked: CheckedLine[] }
+
+/** What's filed as a suggestion is on To do already, a row of its own. */
+const QUEUED: readonly Decide['kind'][] = ['findings', 'off', 'archive', 'new']
+/** The groups decided on the place itself, not filed as suggestions: a
+ *  list's new place only once the guide has it archived. */
+export const ownGroups = (groups: readonly WaitGroup[]) => groups.filter((g) => !QUEUED.includes(g.decide.kind) && (g.decide.kind !== 'later' || !!g.decide.archivedId))
 
 const NONE = '—'
 const value = (v: string) => (v === NONE || !v.trim() ? 'None' : v)
@@ -136,6 +157,7 @@ function findingGroups(job: WaitJob, findings: readonly Finding[], pageOf: (f: F
       job,
       page: pageOf(fs[0]),
       when: at ? day(at) : null,
+      at,
       lines: fs.flatMap(findingLines),
       ...(fs.some((f) => f.times && f.part) ? { boxes: fs.flatMap((f) => timesBoxes(f) ?? []) } : {}),
       facts: [],
@@ -168,6 +190,37 @@ function newLines(f: Finding & { address?: string }, category: CategoryConfig | 
   ]
 }
 
+/** What Look again found (board Found): offered, never set on its own. */
+function foundGroup(i: LookItem): WaitGroup | null {
+  const f = i.found
+  if (!f || i.kind === 'menu') return null
+  const by: WaitFact = { label: 'Found by', value: `Look again · ${day(f.at)}` }
+  if (isFoundPage(f)) {
+    return {
+      key: 'look-eruv',
+      job: 'eruv',
+      page: pageLink(f.url),
+      when: day(f.at),
+      at: f.at,
+      lines: [{ label: 'Status page', value: shortUrl(f.url), old: null }],
+      facts: [...(f.words ? [{ label: 'It says', value: `“${f.words}”` }] : []), { label: 'Read as', value: f.status === 'up' ? 'Up' : 'Down' }, by],
+      note: null,
+      decide: { kind: 'found', look: 'eruv' },
+    }
+  }
+  return {
+    key: 'look-google',
+    job: 'google',
+    page: { text: 'its Google listing', url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name)}&query_place_id=${encodeURIComponent(f.placeId)}` },
+    when: day(f.at),
+    at: f.at,
+    lines: [{ label: 'On Google', value: [f.name, f.address].filter(Boolean).join(', '), old: null }],
+    facts: [by],
+    note: null,
+    decide: { kind: 'found', look: 'google' },
+  }
+}
+
 export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
   const off: WaitGroup[] = []
   const closed: WaitGroup[] = []
@@ -192,6 +245,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       job: 'kosher',
       page: listPage(jobs, f),
       when: day(f.at),
+      at: f.at,
       lines: newLines(f, kosher?.categories?.find((c) => c.id === (f.category ?? 'restaurant'))),
       facts: fresh?.archived ? [{ label: 'In the guide', value: `Archived, as “${fresh.archived}”` }] : [],
       note: null,
@@ -227,6 +281,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'kosher',
         page: list,
         when: day(f.at),
+        at: f.at,
         lines: [{ label: 'Hechsher', value: 'None', old: list.text.replace(/’s list$/, '') }],
         facts: [...siteFact(), ...(google?.matched ? [{ label: 'Google', value: google.closure ? closureText(google.closure) : 'Open' }] : [])],
         note: 'Its only hechsher. Removing archives it.',
@@ -238,6 +293,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'kosher',
         page: list,
         when: day(f.at),
+        at: f.at,
         lines: box.rows.filter((r) => r.mark !== 'same').map((r) => ({ label: r.name, value: r.mark === 'gone' ? 'None' : r.value, old: r.mark === 'changed' ? (r.was ?? null) : r.mark === 'gone' ? r.value : null })),
         facts: [],
         note: null,
@@ -255,6 +311,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       job: 'google',
       page: { text: 'its Google listing', url: null },
       when: c.readAt ? day(c.readAt) : null,
+      at: c.readAt ?? null,
       lines: [{ label: 'Open or closed', value: closureText(c), old: 'Open' }],
       facts: [...(c.since ? [{ label: 'On the site', value: `Shown closed since ${day(c.since)}` }] : []), ...siteFact()],
       note: 'Opens again by itself when Google says open.',
@@ -295,6 +352,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'dishes',
         page: url ? pageLink(url) : { text: 'its menu', url: null },
         when: day(r.readAt),
+        at: r.readAt,
         lines: [],
         // Every dish, top down, what the menu said of it under it (the
         // user, Oct 28: "didn't the reader used to say the words it got
@@ -330,6 +388,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       job: 'google',
       page: { text: 'its Google listing', url: null },
       when: day(compare.at),
+      at: compare.at,
       lines: changed.map((x) => {
         const listed = google.fields.find((f) => f.field === x.field)?.value ?? NONE
         return { label: x.label, value: value(shown(x.field, x.google)), old: was(shown(x.field, listed)) }
@@ -351,6 +410,7 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
         job: 'eruv',
         page: eruv.website ? pageLink(eruv.website) : { text: 'its website', url: null },
         when: day(ef.at),
+        at: ef.at,
         lines: rows.map((x) => ({ label: x.name, value: x.mark === 'gone' ? 'None' : x.value, old: x.mark === 'changed' ? (x.was ?? null) : x.mark === 'gone' ? x.value : null })),
         facts: [],
         note: null,
@@ -358,6 +418,11 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
       })
     }
   }
+
+  // What Look again found.
+  const look = jobs.lookAgain?.items.find((i) => i.id === id && i.found)
+  const found = look ? foundGroup(look) : null
+  if (found) changes.push(found)
 
   const groups = [...off, ...closed, ...added, ...changes]
   const labels = new Set(groups.flatMap((g) => g.lines.map((l) => l.label)))

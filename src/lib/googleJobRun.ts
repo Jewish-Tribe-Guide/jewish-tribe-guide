@@ -50,6 +50,8 @@ type Row = {
   anchor_id: string
   distance: number | null
   details: Record<string, unknown> | null
+  created_at?: string | null
+  reviewed_at?: string | null
 }
 
 /** Google's answer, kept for Use Google's: its raw values. */
@@ -220,6 +222,7 @@ function placeOf(row: Row, category: CategoryConfig, watches: readonly Watch[], 
     fields,
     readAt: isoOr(details.googleSyncedAt) ?? isoOr(details.googleStatusCheckedAt),
     failedAt: isoOr(details.lastSyncFailedAt),
+    addedAt: row.reviewed_at ?? row.created_at ?? null,
     notOnGoogle: isoOr(details.notOnGoogle),
     closure: closureOf(details),
     compare: compareOf(row, category, fields, check, now),
@@ -227,7 +230,7 @@ function placeOf(row: Row, category: CategoryConfig, watches: readonly Watch[], 
   }
 }
 
-const COLUMNS = 'id,name,category,phone,address,anchor_id,distance,details'
+const COLUMNS = 'id,name,category,phone,address,anchor_id,distance,details,created_at,reviewed_at'
 
 /** Every listing the sync covers: in a category with an address. */
 export async function loadGoogleJob(community: string, now = Date.now()): Promise<GooglePlace[]> {
@@ -391,6 +394,16 @@ export async function wrongPlace(community: string, id: string, now = Date.now()
   for (const k of MATCH_KEYS) delete details[k]
   await writeDetails(community, id, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
   return onePlace(community, id, now)
+}
+
+/** Not this place (Look again, Nov 3): a place Google has under the
+ *  listing's name that isn't it. Never offered again, as a wrong place
+ *  isn't; the listing is left as it was. */
+export async function notThisPlace(community: string, id: string, placeId: string): Promise<void> {
+  const { row } = await loadOne(community, id)
+  const details = { ...(row.details ?? {}) }
+  const wrong = Array.isArray(details.googleWrong) ? (details.googleWrong as unknown[]).filter((x): x is string => typeof x === 'string') : []
+  await writeDetails(community, id, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
 }
 
 /** The listing with some of its fields set, through the queue and

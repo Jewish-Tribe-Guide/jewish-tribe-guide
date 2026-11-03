@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('./supabase/admin', () => ({ getAdminClient: () => ({}) }))
-const { isNoMenu, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
+const { fromRow, isNoMenu, READING_NOTE, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
 
 // The listing's dishes a menu doesn't name (the user, Oct 21) are kept
 // among a reading's dishes, so they need no migration.
@@ -89,5 +89,24 @@ describe('withMenuChecked', () => {
   it('null when nothing moves', () => {
     expect(withMenuChecked(details, 'dishes', ['Latkes'], AT)).toBeNull()
     expect(withMenuChecked({ ...details, itemMenu: { dishes: { Sliders: AT } } }, 'dishes', ['Sliders'], AT)).toBeNull()
+  })
+})
+
+// Read in the background (the user, Nov 2): kept as a failed reading with
+// a note, so no migration; one that never finished says so.
+describe('a menu being read', () => {
+  const row = { resource_id: 'r1', status: 'failed' as const, source_url: 'https://rita.example/menu', dishes: [], note: READING_NOTE, model: null, read_at: '2026-11-02T12:00:00.000Z', decided_at: null, decided_by: null }
+  const at = (s: number) => Date.parse(row.read_at) + s * 1000
+
+  it('says it’s being read while a read can still be running', () => {
+    expect(fromRow(row, at(50))).toMatchObject({ status: 'reading', note: READING_NOTE })
+  })
+
+  it('a read that never finished comes back failed, saying to read it again', () => {
+    expect(fromRow(row, at(180))).toMatchObject({ status: 'failed', note: expect.stringMatching(/didn’t finish/) })
+  })
+
+  it('a reading that failed for its own reasons stays failed', () => {
+    expect(fromRow({ ...row, note: 'Saved as its menu link, but it couldn’t be read.' }, at(5)).status).toBe('failed')
   })
 })

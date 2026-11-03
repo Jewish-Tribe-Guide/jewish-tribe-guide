@@ -9,14 +9,15 @@ import { ADMIN_AREA_TAPPED, adminBase } from '@/lib/adminNav'
 import { watchesLine } from '@/lib/todo'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { screensOpenIn } from '@/lib/useHistoryDepth'
 import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
-import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notWatchedLine, type CheckedBy } from '@/lib/fieldCoverage'
+import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import AddPlace from './AddPlace'
 import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
 import { AddButton } from '@/components/AddButton'
-import { coverageOf, troublesOf, useWatchJobsAndReload } from './useWatchJobs'
+import { coverageOf, useWatchJobsAndReload } from './useWatchJobs'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
 // Find one by name, narrow by three menus (what's on the site, its category,
@@ -106,7 +107,6 @@ export default function PlacesList({ token }: { token: string }) {
   const [now] = useState(() => Date.now())
   const watches = useWatchesLine(token, community, now)
   const coverage = useMemo(() => coverageOf(jobs), [jobs])
-  const troubles = useMemo(() => troublesOf(jobs, now), [jobs, now])
   const [show, setShow] = useState<PlaceShow>('site')
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
@@ -173,7 +173,8 @@ export default function PlacesList({ token }: { token: string }) {
 
   function close() {
     const state = window.history.state as { placeOpen?: string; placeAdding?: string } | null
-    if (state?.placeOpen || state?.placeAdding) history.back()
+    // Over any screens the place still has open (a save from an open row).
+    if (state?.placeOpen || state?.placeAdding) history.go(-1 - screensOpenIn(state))
     setOpenId(null)
     setAdding(null)
     window.scrollTo?.(0, 0)
@@ -223,15 +224,14 @@ export default function PlacesList({ token }: { token: string }) {
 
   const counts = placeCounts(places, category || undefined)
   const narrowed = filterPlaces(places, { show, category: category || undefined, query })
-  const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), troubles.get(p.id), choice)
+  const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), choice)
   const checkedCount = (choice: CheckedBy) => narrowed.filter((p) => fits(p, choice)).length
-  // Not watched: its main thing first, then by name as they already are.
+  // Not checked: its main thing first, then by name as they already are.
   const rows = narrowed.filter((p) => fits(p, checked))
   if (checked === 'not-watched') rows.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
   const lineOf = (p: AdminPlace): { text: string; warn: boolean } => {
-    if (checked === 'broken') return { text: troubles.get(p.id)?.join(' · ') ?? '', warn: true }
     const c = coverage?.get(p.id)
-    if (checked === 'not-watched' && c) return { text: notWatchedLine(c), warn: true }
+    if (checked === 'not-watched' && c) return { text: notCheckedLine(c), warn: true }
     return { text: placeLine(p), warn: p.status === 'approved' && !p.hasAddress }
   }
   const shown = all ? rows : rows.slice(0, SHOWN)
@@ -299,7 +299,7 @@ export default function PlacesList({ token }: { token: string }) {
           name="Checked by"
           value={checked}
           disabled={!coverage}
-          options={CHECKED_BY.filter((c) => c.key === 'any' || c.key === checked || c.key === 'not-watched' || c.key === 'broken' || checkedCount(c.key) > 0).map((c) => ({
+          options={CHECKED_BY.filter((c) => c.key === 'any' || c.key === checked || c.key === 'not-watched' || checkedCount(c.key) > 0).map((c) => ({
             value: c.key,
             label: c.label,
             count: c.key === 'any' ? undefined : checkedCount(c.key),

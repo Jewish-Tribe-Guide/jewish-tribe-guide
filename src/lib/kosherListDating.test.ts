@@ -17,7 +17,7 @@ const m = vi.hoisted(() => ({
 vi.mock('@/lib/sourceConfirm', () => ({ confirmFromSource: m.confirmFromSource }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: vi.fn(async () => {}) }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingCreate: vi.fn(), submitListingUpdate: vi.fn(), submitListingDelete: vi.fn() }))
-vi.mock('@/lib/googlePlaces', () => ({ canAskGoogle: () => false, findPlaceStatus: vi.fn() }))
+vi.mock('@/lib/googlePlaces', async (actual) => ({ namesOverlap: (await actual<typeof import('@/lib/googlePlaces')>()).namesOverlap, canAskGoogle: () => false, findPlaceStatus: vi.fn() }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
