@@ -7,7 +7,6 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { CategoryEditor } from './CategoryEditor'
-import ListingEditorScreen from './ListingEditorScreen'
 import CategoryPreview from './CategoryPreview'
 import EruvimManager from './EruvimManager'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
@@ -24,9 +23,9 @@ import { ERUV_SCREEN, screenState, siteScreenState, type SiteScreen } from '@/li
 
 
 // editingId is opaque to the admin page's history plumbing — encoded here as
-// 'cat:<id>', 'cat:new', or 'listing:<category id>' (adding a place).
+// 'cat:<id>' or 'cat:new'. Places are added from Places (Nov 3), which offers
+// hidden categories too; an old 'listing:<id>' address lands on the list.
 const CAT_PREFIX = 'cat:'
-const LISTING_PREFIX = 'listing:'
 
 /** The category a save just moved to: see `justSaved` below. */
 let savedHandOff: string | null = null
@@ -218,15 +217,6 @@ export default function CategoryManager({
     )
   }
 
-  if (editingId?.startsWith(LISTING_PREFIX)) {
-    const id = editingId.slice(LISTING_PREFIX.length)
-    const category = categories?.find((c) => c.id === id) ?? null
-    if (!category) return <p className="text-sm text-muted">Loading…</p>
-    return (
-      <ListingEditorScreen heading={`Add a ${category.label}`} category={category} adminSubmit={{ token }} onClose={onCloseEditor} />
-    )
-  }
-
   return (
     <div>
       {error && (
@@ -278,7 +268,6 @@ export default function CategoryManager({
               deleting={deletingId === c.id}
               toggling={togglingId === c.id}
               onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
-              onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${c.id}`)}
               onAskDelete={() => setConfirmDeleteId(c.id)}
               onCancelDelete={() => setConfirmDeleteId(null)}
               onConfirmDelete={() => deleteCategory(c.id)}
@@ -367,7 +356,6 @@ function CategoryRow({
   deleting,
   toggling,
   onEdit,
-  onAddListing,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
@@ -378,7 +366,6 @@ function CategoryRow({
   deleting: boolean
   toggling: boolean
   onEdit: () => void
-  onAddListing: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
@@ -417,13 +404,6 @@ function CategoryRow({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
-          <button
-            onClick={onAddListing}
-            title="Add a listing directly — publishes immediately, no review queue. Works even while this category is hidden."
-            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            + Add listing
-          </button>
           <button
             onClick={onEdit}
             className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"

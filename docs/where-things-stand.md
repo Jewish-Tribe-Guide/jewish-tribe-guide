@@ -2122,8 +2122,10 @@ pick them (`changeLines.ts`). A new place still uses the old review.
   with nothing to open (the Map's name and photos showed nowhere; its zoom
   radius stays as stored, 10 miles on dev and live, with no field to change
   it). The Eruv moved out of that box into the category list, in name order,
-  with Visible/Hidden and Edit (its eruvim) and no Add listing or Delete. A
-  new community still starts with all three on.
+  with Visible/Hidden and Edit (its eruvim) and no Delete. A new community
+  still starts with all three on. No category row has "+ Add listing" any
+  more: places are added from Places' Add a place, which offers hidden
+  categories too (a seasonal one ahead of its reveal is seeded there).
 - Jewish Medical Resources is gone from admin and isn't cloned. Its public code
   stays, unreachable; Philly's row stays hidden. Deleting that row needs a yes.
 - Forms are hidden (`features.formsTab`). Responses is now Feedback, without the

@@ -76,6 +76,14 @@ describe('CategoryManager', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ active: false })
   })
 
+  // Places are added from Places (Nov 3), which offers hidden categories too.
+  it('adds no places from a category’s row', async () => {
+    show([shul, food, eruv])
+    await screen.findByText('Synagogues')
+    expect(screen.queryByRole('button', { name: /Add listing/ })).toBeNull()
+    expect(within(screen.getByTestId('category-row-synagogue')).getAllByRole('button').map((b) => b.textContent)).toEqual(['Visible', 'Edit', 'Delete'])
+  })
+
   // The Eruv's screen holds its eruvim and their maps, so it sits with the
   // categories (Nov 3): in name order, shown or hidden, and Edit opens it.
   it('lists the Eruv among the categories, in name order', async () => {

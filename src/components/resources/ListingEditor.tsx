@@ -96,7 +96,7 @@ type Props = {
   /** See useListingSubmit. */
   via?: SendVia
   onSent?: (body: unknown) => void
-  /** The admin console's "+ Add listing": Send puts it live straight away
+  /** The admin console's Add a place (Places): Send puts it live straight away
    *  (/api/admin/listings, see useListingSubmit), with no challenge, and
    *  closes the editor once it's in, or hands `onAdded` the new listing. */
   adminSubmit?: { token: string; onAdded?: (listing: DirectoryResource) => void }
