@@ -13,7 +13,7 @@ import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import { askGoogleIfOpen } from '@/lib/keystoneRun'
+import { askGoogleIfOpen, withPlaceId } from '@/lib/keystoneRun'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
@@ -144,6 +144,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   // guide lacks is asked about on Google first, and a permanently closed
   // one isn't suggested.
   const notes = new Map<MekorFinding, string>()
+  const placeIds = new Map<MekorFinding, string>()
   const closed: string[] = []
   const closedNow = new Set<MekorFinding>()
   const fresh: MekorFinding[] = []
@@ -157,6 +158,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
         continue
       }
       note += `\n${g.line}`
+      if (g.placeId) placeIds.set(f, g.placeId)
     }
     notes.set(f, note)
     fresh.push(f)
@@ -198,7 +200,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
           distance: null,
           address: from?.address ?? f.entry.address,
           phone: from?.phone ?? phone(f.entry.phone),
-          details: f.details,
+          details: withPlaceId(f.details, placeIds.get(f)),
           submittedBy: by,
         },
         note,

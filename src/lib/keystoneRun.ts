@@ -12,7 +12,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
-import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
+import { canAskGoogle, findPlaceStatus, namesOverlap } from '@/lib/googlePlaces'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
@@ -50,13 +50,17 @@ function describe(f: WatchFinding): WatchDigestItem {
  *  closed is not suggested at all, anything else is said on the card. Only
  *  new places are asked; the guide's own listings are already checked every
  *  night by the Google sync. */
-async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<{ closed: boolean; line: string }> {
+async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<GoogleSays> {
   return askGoogleIfOpen(f.entry.name, f.entry.address)
 }
 
+/** `placeId`: the place Google found, to file with a new place, so
+ *  approving it fills the listing from Google at once (the user, Nov 2). */
+type GoogleSays = { closed: boolean; line: string; placeId?: string }
+
 /** Whether Google says a place a list names is still open, as a line for
  *  its card. Shared with Mekor Habracha's watch (mekorRun.ts). */
-export async function askGoogleIfOpen(name: string, address: string): Promise<{ closed: boolean; line: string }> {
+export async function askGoogleIfOpen(name: string, address: string): Promise<GoogleSays> {
   // Run with no Google key (the test project's daily run, which leaves
   // Google's paid calls out): said so, never "couldn't find it", so the
   // admin checks it's open before approving.
@@ -65,8 +69,18 @@ export async function askGoogleIfOpen(name: string, address: string): Promise<{ 
   if (!g) return { closed: false, line: 'Google: couldn\u2019t find it.' }
   const as = g.name ? ` (as "${g.name}")` : ''
   if (g.businessStatus === 'CLOSED_PERMANENTLY') return { closed: true, line: `Google: permanently closed${as}.` }
-  if (g.businessStatus === 'CLOSED_TEMPORARILY') return { closed: false, line: `Google: temporarily closed${as}.` }
-  return { closed: false, line: `Google: open${as}.` }
+  // Kept only when Google's name for it is the list's, as approval asks of
+  // a place picked by address (withResolvedPlaceId): Find Place's first
+  // answer can be the building, or the shop next door.
+  const place = g.name && namesOverlap(g.name, name) ? { placeId: g.placeId } : {}
+  if (g.businessStatus === 'CLOSED_TEMPORARILY') return { closed: false, line: `Google: temporarily closed${as}.`, ...place }
+  return { closed: false, line: `Google: open${as}.`, ...place }
+}
+
+/** A new place's details with Google's place, unless it has one. Shared
+ *  with mekorRun.ts. */
+export function withPlaceId<T extends Record<string, unknown>>(details: T, placeId: string | undefined): T {
+  return placeId && !details.placeId ? { ...details, placeId } : details
 }
 
 export type KeystoneRun =
@@ -139,6 +153,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   const unfiled = findings.filter((f) => !filed.has(findingKey(f)))
 
   const notes = new Map<WatchFinding, string>()
+  const placeIds = new Map<WatchFinding, string>()
   const closed: string[] = []
   const closedNow = new Set<WatchFinding>()
   const fresh: WatchFinding[] = []
@@ -152,6 +167,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
         continue
       }
       note += `\n${g.line}`
+      if (g.placeId) placeIds.set(f, g.placeId)
     }
     notes.set(f, note)
     fresh.push(f)
@@ -190,7 +206,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
           distance: null,
           address: f.entry.address,
           phone: f.entry.phone,
-          details: f.details,
+          details: withPlaceId(f.details, placeIds.get(f)),
           submittedBy: by,
         },
         note,

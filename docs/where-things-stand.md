@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 2, 2026.
+Last updated: Nov 3, 2026.
 
 ## The branch
 
@@ -2405,6 +2405,22 @@ Fixed after the user's Nov 2 notes (same branch):
   sorts with the rest instead of sinking to the foot of To do (Rita's South
   St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
   time beside its "Oct 17" (`waitingGroups.ts`).
+
+## Done Nov 3: a list's new place fills from Google (on `redesign/oct18-fixes`)
+
+The user's "for later" from Nov 2, approved. Keystone-K's and Mekor
+Habracha's watches already asked Google whether a new place is open, then
+dropped Google's answer of which place it is. Now they keep its place id
+when Google's name for it is the list's (`namesOverlap`, the same rule as
+everywhere else; a "Wawa" for "Sababa Falafel" is not kept). Approving
+the new place then fills its phone, hours and website from Google at once,
+as an admin's own add does.
+
+The new places already waiting (about 20 on dev, from Oct 17-22) were
+filed without one. Approving one of those looks Google up as it's approved
+(`withListsPlaceId` in `submissionStore.ts`), by the same rule, so no
+rows needed rewriting. A visitor's add is never looked up: it carries the
+place they picked.
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 

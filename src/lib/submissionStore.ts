@@ -3,7 +3,9 @@ import { MENU_LINK_KEY, keepsMenuLink, readMenuLink } from './menuLink'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible, type CategoryConfig } from './categories'
-import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
+import { canAskGoogle, fetchPlaceSync, findPlaceStatus, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
+import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
+import { MEKOR_WATCH_NAME } from './mekorWatch'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
 import { addedItems, goneItemsKept, itemFieldKeys, nextItemGone, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
@@ -834,6 +836,20 @@ async function computeGoogleFields(
   return OWNABLE_SYNC_FIELDS.filter((f) => result.has(f))
 }
 
+// A new place from Keystone-K's or Mekor Habracha's list is filed with the
+// place Google found for it, so approving it fills the listing from Google
+// at once (the user, Nov 2). One filed before the lists kept it (Nov 3) has
+// none: it's asked for here, once, on the same terms (keystoneRun's
+// askGoogleIfOpen): only when Google's name for it is the list's.
+export async function withListsPlaceId(payload: ResourceSubmission, by: { name?: string } | null): Promise<Record<string, unknown>> {
+  const details = payload.details ?? {}
+  if (details.placeId || details.verifiedPlaceId) return details
+  if (by?.name !== KEYSTONE_WATCH_NAME && by?.name !== MEKOR_WATCH_NAME) return details
+  if (!canAskGoogle()) return details
+  const g = await findPlaceStatus(payload.name, payload.address ?? '')
+  return g?.name && namesOverlap(g.name, payload.name) ? { ...details, placeId: g.placeId } : details
+}
+
 // A placeId only earns sync eligibility if it actually corresponds to the
 // business being listed, not just whatever address was picked. Picking a
 // venue and then renaming the listing (a concession stand inside a stadium,
@@ -1052,6 +1068,7 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
+    payload.details = await withListsPlaceId(payload, submission.submitted_by)
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
