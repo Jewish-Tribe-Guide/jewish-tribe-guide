@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brokenKind, brokenRows, brokenView, googleRows } from './brokenView'
+import { brokenKind, brokenRows, brokenView, googleRows, stoppedGoogleAnswers } from './brokenView'
 import type { Jobs } from './useWatchJobs'
 
 const NOW = Date.parse('2026-10-31T12:00:00Z')
@@ -53,12 +53,24 @@ describe('a broken check on To do (R3Site, R2Menu, R2Google)', () => {
     expect(v.source.failed).toBe('can’t be read')
   })
 
-  it('Google: Find it on Google, and Not on Google or Stop using it', () => {
+  it('Google: Find it on Google, and Not on Google or Stop using Google', () => {
     expect(brokenView('x', 'Google not found', jobs(), NOW)!.answers.map((a) => a.label)).toEqual(['Find it on Google', 'Not on Google'])
     const g = brokenView('x', 'Google stopped answering Oct 17', jobs({ google: { places: [{ id: 'x', failedAt: '2026-10-17T07:00:00Z', readAt: '2026-10-16T07:00:00Z' }] } as never }), NOW)!
-    expect(g.answers.map((a) => a.label)).toEqual(['Find it on Google', 'Stop using it'])
+    expect(g.answers.map((a) => a.label)).toEqual(['Find it on Google', 'Stop using Google'])
     expect(g.source.failed).toBe('hasn’t answered since Oct 17')
     expect(g.field).toBe('google')
+  })
+
+  // The user, Nov 2: "Instead of saying stop using it, should we say read
+  // information from website". Stopping reads its website at once.
+  it('Google stopped, with a website on the listing: Use its website instead', () => {
+    const category = { id: 'food', detailFields: [{ key: 'website', type: 'url', label: 'Website' }] } as never
+    const g = brokenView('x', 'Google stopped answering Oct 17', jobs({ google: { places: [{ id: 'x', failedAt: '2026-10-17T07:00:00Z' }] } as never }), NOW)!
+    const labels = (item: object) => stoppedGoogleAnswers(g, item as never, category).map((a) => a.label)
+    expect(labels({ id: 'x', name: 'Rita’s', website: 'https://ritas.com' })).toEqual(['Find it on Google', 'Use its website instead'])
+    expect(labels({ id: 'x', name: 'Rita’s', website: ' ' })).toEqual(['Find it on Google', 'Stop using Google'])
+    const missing = brokenView('x', 'Google not found', jobs(), NOW)!
+    expect(stoppedGoogleAnswers(missing, { id: 'x', website: 'https://ritas.com' } as never, category).map((a) => a.label)).toEqual(['Find it on Google', 'Not on Google'])
   })
 
   it('times that can’t be read: give the page with them, or Still right', () => {

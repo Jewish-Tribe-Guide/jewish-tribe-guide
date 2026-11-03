@@ -140,6 +140,20 @@ export function firstThing(p: TodoPlace, filters: TodoFilter[]): TodoThing {
   return p.things.find((t) => filters.includes(t.filter)) ?? p.things[0]
 }
 
+/** The thing a place screen shows: the one picked while it waits. Once it's
+ *  answered, what arrived since the place opened (Read it again's new
+ *  reading, which follows from that answer), else the next one still
+ *  waiting after it in the order first opened. */
+export function shownThing<T extends { id: string }>(order: readonly { id: string }[], things: readonly T[], on: string): T | undefined {
+  const present = new Map(things.map((t) => [t.id, t]))
+  const picked = present.get(on)
+  if (picked) return picked
+  const arrived = things.find((t) => !order.some((o) => o.id === t.id))
+  if (arrived) return arrived
+  const at = order.findIndex((t) => t.id === on)
+  return [...order.slice(at), ...order.slice(0, at)].map((t) => present.get(t.id)).find(Boolean) ?? things[0]
+}
+
 /** The row's grey line: what's waiting, in order. */
 export function placeLine(p: TodoPlace): string {
   // "Google stopped answering Oct 17": the row's corner says when.

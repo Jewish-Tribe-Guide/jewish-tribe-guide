@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { fetchJson } from '@/lib/fetchJson'
 import type { ResourceSubmission } from '@/types'
@@ -104,15 +104,81 @@ export default function ModerationQueue({ session }: { session: Session }) {
     return true
   }
 
+  // Opening a place and closing it keeps your spot in the list (the user,
+  // Nov 2: "it loads the whole page"). On a computer the list moves into its
+  // own column with the row you clicked where it was on screen, and closing
+  // puts it back there; on a phone the place covers the list, and closing
+  // returns to where you'd scrolled.
+  const listColumn = useRef<HTMLDivElement>(null)
+  const spot = useRef<{ key: string; y: number; top: number } | null>(null)
+  const rowOf = (key: string) => [...(listColumn.current?.querySelectorAll<HTMLElement>('[data-place]') ?? [])].find((r) => r.dataset.place === key) ?? null
+  const wide = () => !!window.matchMedia?.('(min-width: 768px)').matches
+  const shownKey = openPlace?.key ?? null
+  const wasShown = useRef<string | null>(null)
+
+  // Where the open row sits in its column as the place closes, so the list
+  // comes back with it there: read before the list re-renders, as you may
+  // have scrolled the column since.
+  function remember() {
+    const key = wasShown.current
+    const row = key && wide() ? rowOf(key) : null
+    if (row) spot.current = { key: key!, y: spot.current?.y ?? 0, top: row.getBoundingClientRect().top }
+  }
+  useEffect(() => {
+    window.addEventListener('popstate', remember)
+    window.addEventListener(ADMIN_AREA_TAPPED, remember)
+    return () => {
+      window.removeEventListener('popstate', remember)
+      window.removeEventListener(ADMIN_AREA_TAPPED, remember)
+    }
+  })
+
   function open(key: string) {
     if (key === openPlace?.key || !leave()) return
     setOpenError(null)
+    if (!openPlace) spot.current = { key, y: window.scrollY, top: rowOf(key)?.getBoundingClientRect().top ?? 0 }
     goTo(key)
-    window.scrollTo?.(0, 0)
+    if (!wide()) window.scrollTo?.(0, 0)
   }
 
+  useLayoutEffect(() => {
+    const before = wasShown.current
+    wasShown.current = shownKey
+    if (shownKey === before) return
+    // Now, and again once the frame around it has taken its new shape
+    // (useFullPane, a render of its own); each move is to a place, not by an
+    // amount, so the second only corrects the first. Not cancelled by the
+    // next render, since this runs once per open or close; gone by then,
+    // there's no column and nothing to move.
+    const settle = () => {
+      const s = spot.current
+      if (!wide()) {
+        if (!shownKey && s) window.scrollTo(0, s.y)
+        return
+      }
+      const column = listColumn.current
+      if (shownKey) {
+        const row = rowOf(shownKey)
+        if (!row || !column) return
+        if (!before) {
+          window.scrollTo(0, 0)
+          if (s?.key === shownKey) column.scrollTop += row.getBoundingClientRect().top - s.top
+          else row.scrollIntoView?.({ block: 'center' })
+        } else row.scrollIntoView?.({ block: 'nearest' })
+        return
+      }
+      const row = before ? rowOf(before) : null
+      if (row && s?.key === before) window.scrollTo(0, window.scrollY + row.getBoundingClientRect().top - s.top)
+      else if (s) window.scrollTo(0, s.y)
+    }
+    settle()
+    setTimeout(settle, 0)
+  })
+
   function backToList() {
-    if (leave()) goTo(null)
+    if (!leave()) return
+    remember()
+    goTo(null)
   }
 
   useEffect(() => {
@@ -197,7 +263,10 @@ export default function ModerationQueue({ session }: { session: Session }) {
           // On a computer the list stays beside the open place (the inbox),
           // each the window's height, scrolling on its own (N6Desk).
           <div className={openPlace ? 'md:grid md:grid-cols-[380px_minmax(0,1fr)] md:h-dvh' : undefined}>
-            <div className={openPlace ? 'max-md:hidden md:overflow-y-auto md:bg-white md:border-r md:border-slate-200 md:px-4 md:pt-6' : undefined}>
+            <div
+              ref={listColumn}
+              className={openPlace ? 'max-md:hidden md:overflow-y-auto md:bg-white md:border-r md:border-slate-200 md:px-4 md:pt-6' : undefined}
+            >
               {openPlace && (
                 <h1 className="m-0 mb-4 flex items-baseline gap-2.5 text-[26px] font-bold text-slate-900">
                   To do <span className="text-[14px] font-normal text-slate-500">{list.length} to decide</span>

@@ -144,7 +144,7 @@ export function SubmissionCard({
           )}
           {!isCategory && !isEruv && s.operation !== 'delete' && listNote && <SourceNote text={listNote} />}
           {unused > 0 && (
-            <p className="mt-2 text-xs font-medium text-amber-800">
+            <p className="mt-2 text-xs font-medium text-rose-800">
               {unused === 1 ? '1 time in the original isn’t used.' : `${unused} times in the original aren’t used.`} Open it to check.
             </p>
           )}

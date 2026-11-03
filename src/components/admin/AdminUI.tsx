@@ -349,7 +349,7 @@ export function AdminMenu<V extends string>({
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-2 pr-1.5 text-[13px] font-semibold disabled:opacity-60 ${
+        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-3 pr-2 text-[13px] font-semibold disabled:opacity-60 ${
           narrowed ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-900'
         }`}
       >

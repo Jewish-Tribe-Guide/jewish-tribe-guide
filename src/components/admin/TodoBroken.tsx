@@ -14,7 +14,7 @@ import ListingEditor, { type EditorControl, type EditorStep } from '@/components
 import { FindSheet } from './FindSheet'
 import PlaceFrame, { PlaceButtons, PlaceCard, SourceCard, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { sourceActions } from './sourceActions'
-import { brokenRows, brokenView, googleRows, type BrokenAct, type BrokenAnswer } from './brokenView'
+import { brokenRows, brokenView, googleRows, stoppedGoogleAnswers, type BrokenAct, type BrokenAnswer } from './brokenView'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
 
@@ -289,7 +289,7 @@ export default function TodoBroken({
         )
       }
       error={error ?? still}
-      foot={!inStep && view.answers.length > 0 && <PlaceButtons buttons={view.answers.map(answer)} />}
+      foot={!inStep && view.answers.length > 0 && <PlaceButtons buttons={(loaded ? stoppedGoogleAnswers(view, loaded.item, loaded.category) : view.answers).map(answer)} />}
     >
       {card}
       {finding && googlePlace && (

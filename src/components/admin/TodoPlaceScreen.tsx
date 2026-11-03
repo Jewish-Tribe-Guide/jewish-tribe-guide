@@ -10,7 +10,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { placePath } from '@/lib/placeLink'
 import { shortDay } from '@/lib/todo'
 import type { TodoFilter, TodoPlace, TodoThing } from '@/lib/todoPlaces'
-import { firstThing } from '@/lib/todoPlaces'
+import { firstThing, shownThing } from '@/lib/todoPlaces'
 import { withCommunity } from '@/lib/useCommunityData'
 import { updateTodo } from '@/lib/useTodo'
 import { AdminBack, AdminBox } from './AdminUI'
@@ -76,9 +76,7 @@ export default function TodoPlaceScreen({
   const [editing, setEditing] = useState<string[]>([])
   const present = new Map(place.things.map((t) => [t.id, t]))
   const all = [...order, ...place.things.filter((t) => !order.some((o) => o.id === t.id))]
-  // The one picked, or once it's answered, the next one still waiting.
-  const at = all.findIndex((t) => t.id === on)
-  const current = [...all.slice(at), ...all.slice(0, at)].map((t) => present.get(t.id)).find(Boolean) ?? place.things[0]
+  const current = shownThing(order, place.things, on) ?? place.things[0]
   const switches = <ThingSwitches things={all.map((t) => ({ id: t.id, label: t.label, done: !present.has(t.id) }))} on={current.id} onPick={setOn} />
 
   // One handler per thing, kept, since a change reports through an effect

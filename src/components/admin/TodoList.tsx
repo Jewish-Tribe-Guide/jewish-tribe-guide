@@ -105,7 +105,7 @@ export default function TodoList({
               data-testid="todo-places"
             >
               {shown.map((p) => (
-                <div key={p.key} aria-current={p.key === openKey || undefined} className={p.key === openKey ? 'bg-blue-50 shadow-[inset_3px_0_0_var(--color-primary)]' : undefined}>
+                <div key={p.key} data-place={p.key} aria-current={p.key === openKey || undefined} className={p.key === openKey ? 'bg-blue-50 shadow-[inset_3px_0_0_var(--color-primary)]' : undefined}>
                   <AdminRow
                     onClick={() => onOpen(p)}
                     label={`Open ${p.name}`}

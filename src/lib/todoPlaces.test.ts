@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayToIso, firstThing, placeLine, shownPlaces, todoPlaceCount, todoPlaces } from './todoPlaces'
+import { dayToIso, firstThing, placeLine, shownPlaces, shownThing, todoPlaceCount, todoPlaces } from './todoPlaces'
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import type { CategoryConfig } from './categories'
@@ -124,5 +124,23 @@ describe('todoPlaces', () => {
     expect(names({ query: '', filters: ['broken'], sort: 'oldest' })).toEqual(['Sons of Israel', 'Abe’s'])
     expect(firstThing(places[0], ['broken']).label).toBe('Website didn’t load')
     expect(firstThing(places[0], []).label).toBe('Usual weekday times')
+  })
+})
+
+describe('shownThing', () => {
+  const ids = (...xs: string[]) => xs.map((id) => ({ id }))
+  const order = ids('menu-broken', 'closure', 'hours')
+
+  it('stays on the one picked while it waits', () => {
+    expect(shownThing(order, ids('menu-broken', 'closure', 'hours', 'menu-reading'), 'closure')?.id).toBe('closure')
+  })
+
+  it('once answered, opens what that answer brought (Read it again’s new reading), not the next in line', () => {
+    expect(shownThing(order, ids('closure', 'hours', 'menu-reading'), 'menu-broken')?.id).toBe('menu-reading')
+  })
+
+  it('with nothing new, the next one still waiting, wrapping round', () => {
+    expect(shownThing(order, ids('closure', 'hours'), 'menu-broken')?.id).toBe('closure')
+    expect(shownThing(order, ids('menu-broken'), 'hours')?.id).toBe('menu-broken')
   })
 })

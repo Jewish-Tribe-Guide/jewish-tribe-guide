@@ -110,6 +110,16 @@ export function googleRows(item: DirectoryResource, category: CategoryConfig): {
   ]
 }
 
+/** Stop using Google reads the place's own website straight away, which
+ *  then keeps what Google kept (notOnGoogle); so with a website on the
+ *  listing, it says that. */
+export function stoppedGoogleAnswers(view: BrokenView, item: DirectoryResource, category: CategoryConfig): BrokenAnswer[] {
+  const site = websiteKeyOf(category)
+  const has = !!site && typeof (item as Record<string, unknown>)[site] === 'string' && !!((item as Record<string, unknown>)[site] as string).trim()
+  if (view.kind !== 'google-stopped' || !has) return view.answers
+  return view.answers.map((a) => (a.act.kind === 'not-on-google' ? { ...a, label: 'Use its website instead' } : a))
+}
+
 const since = (iso: string | null) => (iso ? ` since ${day(iso)}` : '')
 const host = (url: string) => shortUrl(url).split('/')[0]
 const pages = (n: number) => (n > 1 ? ` and ${n - 1} of its pages` : '')
@@ -188,7 +198,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
       },
       answers: [
         { label: 'Find it on Google', act: { kind: 'find-google' } },
-        { label: kind === 'google-missing' ? 'Not on Google' : 'Stop using it', act: { kind: 'not-on-google' } },
+        { label: kind === 'google-missing' ? 'Not on Google' : 'Stop using Google', act: { kind: 'not-on-google' } },
       ],
     }
   }

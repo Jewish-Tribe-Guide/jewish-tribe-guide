@@ -2358,6 +2358,28 @@ Not as drawn, on purpose or not yet:
 - No "Leave it, and why". No chevrons on R2Google's rows. Cancel shows on a
   computer only.
 
+Fixed after the user's Nov 2 notes (same branch):
+- Opening a place keeps your spot: on a computer the list moves into its
+  column with the row you clicked where it was on screen, and closing it
+  (To do in the sidebar, Back, the screen's own back) brings the list back
+  with that row where you left it; a phone returns to where you'd scrolled.
+  It used to jump the page to the top. `todo-scroll.spec.ts`.
+- Read it again's new reading opens next (Rita's menu): what an answer
+  brings opens before the next thing in line (`shownThing`).
+- Google stopped answering: "Use its website instead" when the listing has
+  a website (it reads the site at once, which then keeps Google's fields),
+  else "Stop using Google".
+- "Not used" in a reading's original is rose, not the amber of a change.
+- The menus' text starts 12px in, near the search box and rows (was 8px).
+
+Raised, not built (the user's calls):
+- An X (and Esc) to close the open place; a Category menu on To do like
+  Places'; a draggable divider between the list and the place.
+- Adding a menu takes as long as it does because it all runs in the one
+  request: a browser renders the page, the website's own menu pages are
+  looked for, the AI reads them, then To do reloads every job. Could reply
+  first and read in the background.
+
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 
 From the "one tap per place" boards (canvas RHnm5WvGCsVa86Dam8rtmL). A
