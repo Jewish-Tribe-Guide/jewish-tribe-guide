@@ -145,7 +145,10 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   await expect(addButton).toBeEnabled()
   await addButton.click()
 
-  await expect(visible(page.getByRole('status').filter({ hasText: `${listingName} is added` }))).toBeVisible({ timeout: 30_000 })
+  // With nothing to read, "… is added" shows only while it looks, then it's
+  // back on Places, listing it. Waiting on the banner raced that: CI missed
+  // it, a local run caught it.
+  await expect(visible(page.getByRole('button', { name: `Open ${listingName}` }))).toBeVisible({ timeout: 30_000 })
 
   const { data: listing } = await supabase
     .from('resource')
