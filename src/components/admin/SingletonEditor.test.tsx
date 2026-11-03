@@ -9,10 +9,8 @@ import { fetchJson } from '@/lib/fetchJson'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminEruv } from '@/lib/eruvStore'
 
-// SingletonEditor is the fixed, code-driven card editor for Map/Zmanim/Eruv/
-// Jewish Medical Resources (see CATEGORY_MANAGER's SINGLETON_EDITABLE_KINDS)
-// — name/icon/background only, except the Map zoom radius, which lives here
-// specifically because it's a Map-only concern. Exported from
+// SingletonEditor is the fixed, code-driven card editor — name/icon/background
+// only. Since Nov 3 only the Eruv opens it from the list. Exported from
 // CategoryManager.tsx purely so this can render it directly, same reasoning
 // CategoryEditor.test.tsx gives for testing that sibling editor standalone.
 
@@ -59,49 +57,18 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('SingletonEditor — Map zoom radius', () => {
-  it('shows the zoom radius field, blank when unset, only for the Map category', () => {
-    renderWithProviders(<SingletonEditor token="t" category={mapCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByRole('spinbutton')).toHaveValue(null)
-  })
-
-  it('does not show the field for a non-Map singleton (e.g. Zmanim)', () => {
-    renderWithProviders(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+// The Map's zoom radius is set once and stays as stored (Nov 3): the Map is
+// a switch on the list with nothing to open, and an old link to its editor
+// neither shows the field nor sends it, so a save can't blank it.
+describe('SingletonEditor — the Map keeps its zoom radius', () => {
+  it('has no zoom radius field', () => {
+    renderWithProviders(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   })
 
-  it('pre-fills the current value when already set', () => {
-    renderWithProviders(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByRole('spinbutton')).toHaveValue(10)
-  })
-
-  it('saving sends the entered number in the PATCH body, for Map only', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<SingletonEditor token="t" category={mapCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
-
-    await user.type(screen.getByRole('spinbutton'), '10')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.mapZoomRadiusMiles).toBe(10)
-  })
-
-  it('blanking the field back out sends null, not an empty string or NaN', async () => {
+  it('never sends mapZoomRadiusMiles, so the stored one stays', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
-
-    await user.clear(screen.getByRole('spinbutton'))
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.mapZoomRadiusMiles).toBeNull()
-  })
-
-  it('never sends mapZoomRadiusMiles for a non-Map singleton', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
 

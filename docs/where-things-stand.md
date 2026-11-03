@@ -2118,6 +2118,12 @@ pick them (`changeLines.ts`). A new place still uses the old review.
 - Category pages hold places only. Map, Candle Lighting and Eruv are switches
   under "On the site", on by default for a new community, empty or cloned. A
   community with no row yet shows the switch off; the first on creates the row.
+  **Changed Nov 3 (the user):** the Map and Candle Lighting are bare switches
+  with nothing to open (the Map's name and photos showed nowhere; its zoom
+  radius stays as stored, 10 miles on dev and live, with no field to change
+  it). The Eruv moved out of that box into the category list, in name order,
+  with Visible/Hidden and Edit (its eruvim) and no Add listing or Delete. A
+  new community still starts with all three on.
 - Jewish Medical Resources is gone from admin and isn't cloned. Its public code
   stays, unreachable; Philly's row stays hidden. Deleting that row needs a yes.
 - Forms are hidden (`features.formsTab`). Responses is now Feedback, without the
