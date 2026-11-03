@@ -184,7 +184,9 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   await review.getByRole('button', { name: 'Approve', exact: true }).click()
 
   // The real signal: back on the list without it once the PATCH resolves.
-  await expect(review).not.toBeVisible()
+  // An approval is ~1.2s locally; CI's busier runner took over 5s on Nov 3
+  // (PR 373), so the wait is the round trip's, not expect's default.
+  await expect(review).not.toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('*').eq('name', name).maybeSingle()

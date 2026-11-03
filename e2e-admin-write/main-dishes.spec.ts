@@ -195,7 +195,9 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   await sheet.getByRole('button', { name: 'Add', exact: true }).click()
   await sheet.getByRole('button', { name: 'Save to the listing' }).click()
   await expect(sheet).not.toBeVisible()
-  await expect(open.getByTestId('waiting-group')).toHaveCount(0)
+  // The save, then To do read again: two round trips, which took over 5s on
+  // CI's runner on Nov 3 (PR 373).
+  await expect(open.getByTestId('waiting-group')).toHaveCount(0, { timeout: 15_000 })
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
   await expect.poll(async () => (await stored())[f.key]).toEqual(['Shawarma', 'Laffa Wraps'])
