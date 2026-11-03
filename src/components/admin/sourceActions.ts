@@ -64,7 +64,7 @@ export function sourceActions(placeId: string, post: Post) {
       if (problem) throw new Error(problem)
       await post('/api/admin/watches', { action: 'add', purpose: 'times', url, resourceId: placeId })
       await post('/api/admin/watches', { action: 'remove', id: c.replaces })
-    } else if (c.kind === 'menu') await post('/api/admin/main-dishes', { action: 'link', resourceId: placeId, url })
+    } else if (c.kind === 'menu') await post('/api/admin/main-dishes', { action: 'link', resourceId: placeId, url, background: true })
     else if (c.kind === 'eruv-status') await eruvSource(url)
     else if (c.kind === 'eruv-map') {
       const problem = sourceProblem('hours', url)
@@ -104,11 +104,13 @@ export function sourceActions(placeId: string, post: Post) {
     else await post('/api/admin/watches', { action: 'resume', id: a.watchId })
   }
 
-  async function addSource(a: AddSource, url: string) {
+  /** A menu link given (Change, Add) is read after the reply (the user,
+   *  Nov 2), unless `waitForMenu`: Add a place reads it anyway. */
+  async function addSource(a: AddSource, url: string, opts: { waitForMenu?: boolean } = {}) {
     if (a.job === 'eruv') return eruvSource(url)
     const problem = sourceProblem(a.job === 'times' ? 'times' : 'hours', url)
     if (problem) throw new Error(problem)
-    if (a.job === 'dishes') await post('/api/admin/main-dishes', { action: 'link', resourceId: placeId, url })
+    if (a.job === 'dishes') await post('/api/admin/main-dishes', { action: 'link', resourceId: placeId, url, background: !opts.waitForMenu })
     else if (sourceKind(url) === 'email') await post('/api/admin/watches', { action: 'add', purpose: 'times', url, resourceId: placeId })
     else await post(hoursApi(a.job), { action: 'give', resourceId: placeId, url })
   }

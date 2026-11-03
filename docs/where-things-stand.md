@@ -2371,14 +2371,21 @@ Fixed after the user's Nov 2 notes (same branch):
   else "Stop using Google".
 - "Not used" in a reading's original is rose, not the amber of a change.
 - The menus' text starts 12px in, near the search box and rows (was 8px).
+- Giving a menu link answers at once (0.7s on dev, was the whole read): the
+  link is saved, the place's reading says "reading", and the menu is read
+  after the reply (`after()` in the main-dishes route, `background: true`
+  from Change / Give its menu page). Meanwhile To do shows no "can't be
+  read" for it, the Dishes box says "reading it now", and To do and Places
+  ask for the food places again every 6s until the reading lands (about
+  40s for Chalavita on dev). Kept as a failed reading with a note, as "No
+  menu" is, so no migration; a read that never finishes says so after two
+  minutes. Add a place and Start reading still wait for the read. Not
+  checked on a phone or on a Vercel preview, where `after()` runs inside
+  the route's 60s.
 
 Raised, not built (the user's calls):
 - An X (and Esc) to close the open place; a Category menu on To do like
   Places'; a draggable divider between the list and the place.
-- Adding a menu takes as long as it does because it all runs in the one
-  request: a browser renders the page, the website's own menu pages are
-  looked for, the AI reads them, then To do reloads every job. Could reply
-  first and read in the background.
 
 ## Done Nov 2: a change is answered a part at a time (on `redesign/oct18-fixes`)
 

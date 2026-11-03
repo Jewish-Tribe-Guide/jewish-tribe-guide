@@ -8,7 +8,8 @@ import { MENU_LINK_KEY } from './menuLink'
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
 // missing table (the migration not run yet) isn't an error: the tab says so.
 
-export type MenuReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed'
+/** `reading`: a read under way (startMenuReading), never stored as such. */
+export type MenuReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'reading'
 
 export type StoredMenuReading = {
   resourceId: string
@@ -59,13 +60,16 @@ export function splitDishes(raw: unknown): { dishes: MenuDish[]; missing: string
   }
 }
 
-function fromRow(r: Row): StoredMenuReading {
+export function fromRow(r: Row, now = Date.now()): StoredMenuReading {
+  const reading = isReadingRow(r)
+  // A read that never finished (its function stopped): failed, saying so.
+  const stale = reading && now - Date.parse(r.read_at) > READING_GIVES_UP_MS
   return {
     resourceId: r.resource_id,
-    status: r.status,
+    status: reading && !stale ? 'reading' : r.status,
     sourceUrl: r.source_url,
     ...splitDishes(r.dishes),
-    note: r.note,
+    note: stale ? READING_STOPPED_NOTE : r.note,
     model: r.model,
     readAt: r.read_at,
     decidedAt: r.decided_at,
@@ -125,6 +129,36 @@ export async function decideMenuReading(community: string, resourceId: string, s
     .eq('community_id', community)
     .eq('resource_id', resourceId)
   if (error) throw new Error(`Failed to save the decision: ${error.message}`)
+}
+
+// ── Read in the background (the user, Nov 2) ───────────────────────────────
+// "Why does it take so long to add menu": giving a menu link saves it and
+// answers at once, and the menu is read after the reply (route's `after`).
+// Meanwhile the place's reading says `reading`. Kept as a failed reading
+// with this note, as "No menu" is kept below, so it needs no migration;
+// a read that never finishes (the function stopped at its 60s) comes back
+// as failed, saying so, once it's older than any read can run.
+
+export const READING_NOTE = 'Reading its menu now'
+export const READING_STOPPED_NOTE = 'Its read didn’t finish. Read it again.'
+export const READING_GIVES_UP_MS = 2 * 60_000
+
+function isReadingRow(r: Pick<Row, 'status' | 'note'>): boolean {
+  return r.status === 'failed' && r.note === READING_NOTE
+}
+
+/** Marks a place's menu as being read, the last reading's dishes kept. */
+export async function startMenuReading(community: string, resourceId: string, sourceUrl: string): Promise<StoredMenuReading> {
+  const { data, error } = await getAdminClient()
+    .from('menu_reading')
+    .upsert(
+      { community_id: community, resource_id: resourceId, status: 'failed', source_url: sourceUrl, note: READING_NOTE, read_at: new Date().toISOString(), decided_at: null, decided_by: null },
+      { onConflict: 'community_id,resource_id' },
+    )
+    .select(COLUMNS)
+    .single()
+  if (error) throw new Error(`Failed to start reading the menu: ${error.message}`)
+  return fromRow(data as Row)
 }
 
 // ── "No menu" (the user, Oct 20) ─────────────────────────────────────────────

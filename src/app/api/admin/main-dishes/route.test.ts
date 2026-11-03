@@ -24,7 +24,10 @@ const m = vi.hoisted(() => ({
   updateWatch: vi.fn(),
   jobFindings: vi.fn(),
   runAndRecord: vi.fn(),
+  startMenuReading: vi.fn(),
+  afterCallbacks: [] as (() => unknown)[],
 }))
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => void m.afterCallbacks.push(fn) }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, updateWatch: m.updateWatch }))
 vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
 vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
@@ -44,6 +47,7 @@ vi.mock('@/lib/menuReadingStore', () => ({
   clearMenuReading: m.clearMenuReading,
   saveMenuLink: m.saveMenuLink,
   setMenuDishes: m.setMenuDishes,
+  startMenuReading: m.startMenuReading,
   NO_MENU_NOTE: 'No menu',
   isNoMenu: (r: { status: string; note: string | null; dishes: unknown[] }) => r.status === 'skipped' && r.note === 'No menu' && r.dishes.length === 0,
 }))
@@ -95,6 +99,8 @@ const reading = { resourceId: ID, status: 'proposed', sourceUrl: 'https://judah.
 
 beforeEach(() => {
   vi.clearAllMocks()
+  m.afterCallbacks.length = 0
+  m.startMenuReading.mockImplementation(async (_c, id, url) => ({ ...reading, resourceId: id, status: 'reading', sourceUrl: url, note: 'Reading its menu now' }))
   m.resolveCommunity.mockResolvedValue({ slug: 'philly' })
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.listCategories.mockResolvedValue([food, grocery])
@@ -340,6 +346,40 @@ describe('/api/admin/main-dishes', () => {
 
     // Rita's, Oct 22: its menu link is its location's page, and its flavors
     // are on the site's Treats page; both are read, the link first.
+    // The user, Nov 2: "Why does it take so long to add menu". Given from
+    // a place's screen, it answers once the link is saved and reads after.
+    it('in the background: saved and answered at once, the menu read after the reply', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: true }], note: null, model: 'gpt' })
+      const body = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'judah.example/menu', background: true }))).json()
+      expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, 'https://judah.example/menu')
+      expect(body).toMatchObject({ ok: true, menuUrl: 'https://judah.example/menu', reading: { status: 'reading' } })
+      expect(m.startMenuReading).toHaveBeenCalledWith('philly', ID, 'https://judah.example/menu')
+      expect(m.readMenuPage).not.toHaveBeenCalled()
+      expect(m.saveMenuReading).not.toHaveBeenCalled()
+      await Promise.all(m.afterCallbacks.map((f) => f()))
+      expect(m.readMenu).toHaveBeenCalled()
+      expect(closeRenderer).toHaveBeenCalled()
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'proposed' }))
+    })
+
+    it('in the background: a read that throws is kept as failed, not left reading', async () => {
+      m.readMenuPage.mockRejectedValue(new Error('browser died'))
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu', background: true }))
+      await Promise.all(m.afterCallbacks.map((f) => f()))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', sourceUrl: 'https://judah.example/menu' }))
+      error.mockRestore()
+    })
+
+    it('not in the background (Add a place, Start reading): read before the answer, as before', async () => {
+      m.readMenuPage.mockResolvedValue(null)
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))
+      expect(m.startMenuReading).not.toHaveBeenCalled()
+      expect(m.afterCallbacks).toHaveLength(0)
+      expect(m.saveMenuReading).toHaveBeenCalled()
+    })
+
     it('a menu link is read with the other menu pages on the place’s website', async () => {
       m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
       m.findMenu.mockResolvedValue({ url: 'https://judah.example/treats/', text: 'treats', pdf: null })

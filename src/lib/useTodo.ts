@@ -7,7 +7,8 @@ import { withCommunity } from './useCommunityData'
 import { unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { todoPlaceCount } from './todoPlaces'
 import { setupLeft, type SetupState } from './setup'
-import { loadJobs, type Jobs } from '@/components/admin/useWatchJobs'
+import { loadDishes, loadJobs, MENU_READING_POLL_MS, type Jobs } from '@/components/admin/useWatchJobs'
+import { menusReading } from './watchJobs'
 import { notBeingRead, waitingNotQueued, type TodoNotRead, type TodoWaiting } from '@/components/admin/todoWaiting'
 
 // What To do holds, loaded once and shared: the To do page shows it and
@@ -102,7 +103,29 @@ async function loadWaiting(key: string, token: string, community: string) {
   const load = ++waitingLoads
   const jobs: Jobs = {}
   await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
-  if (state.key === key && load === waitingLoads) updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()), jobs }))
+  if (state.key === key && load === waitingLoads) {
+    withJobs(jobs)
+    pollMenus(key, token, community, load)
+  }
+}
+
+function withJobs(jobs: Jobs) {
+  updateTodo((d) => ({ ...d, waiting: waitingNotQueued(jobs, Date.now()), notRead: notBeingRead(jobs, Date.now()), jobs }))
+}
+
+/** A menu being read (given just now, read after the reply): the food
+ *  places asked for again until it's in, so its reading turns up on To do
+ *  without a reload. Stops when another load starts. */
+function pollMenus(key: string, token: string, community: string, load: number, tries = 0) {
+  // A read that never finishes says so after two minutes (menuReadingStore).
+  if (!menusReading(state.data?.jobs?.dishes) || tries > 30) return
+  setTimeout(async () => {
+    if (state.key !== key || load !== waitingLoads) return
+    const dishes = await loadDishes(token, community)
+    if (state.key !== key || load !== waitingLoads || !state.data?.jobs) return
+    if (dishes) withJobs({ ...state.data.jobs, dishes })
+    pollMenus(key, token, community, load, tries + 1)
+  }, MENU_READING_POLL_MS)
 }
 
 /** Loads To do (again, with `fresh`), sharing a load already under way. */
