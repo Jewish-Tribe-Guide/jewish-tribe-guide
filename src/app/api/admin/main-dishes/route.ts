@@ -35,7 +35,8 @@ import { lastNight, missedLastNight, type LastNight } from '@/lib/nightKinds'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
 import { listedContact } from '@/lib/contactRead'
-import { MENU_WATCH_CREATOR, type Watch } from '@/lib/watches'
+import { type Watch } from '@/lib/watches'
+import { menuWatchFor } from '@/lib/menuWatch'
 import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -121,8 +122,8 @@ const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) =>
 /** A place's menu watch, as the tab needs it. `missed`: why last night's
  *  run didn't read it ("ran out of reads"), so the kind page puts it under
  *  Not checked, not Up to date (the user, Oct 28). */
-function menuWatchOf(watches: readonly Watch[], id: string, night: LastNight | null) {
-  const w = watches.find((x) => x.resourceId === id && x.createdBy === MENU_WATCH_CREATOR)
+function menuWatchOf(watches: readonly Watch[], listing: DirectoryResource, night: LastNight | null) {
+  const w = menuWatchFor(watches, listing)
   if (!w) return null
   const missed = missedLastNight(w, night)
   return { url: w.url, active: w.active, lastRunAt: w.lastRunAt, lastOkAt: w.lastOkAt, lastError: w.lastError, failingSince: w.failingSince, ...(missed ? { missed } : {}) }
@@ -241,7 +242,7 @@ export async function GET(request: Request) {
           menuAt: newestMenuDate(l, field),
           reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
           pages: pagesOf(watches, l.id),
-          menuWatch: menuWatchOf(watches, l.id, night),
+          menuWatch: menuWatchOf(watches, l, night),
           findings: findings.filter((f) => f.targetId === l.id),
           hours: homePageReads(category, l as unknown as Record<string, unknown>).includes('hours') ? (l.hours ?? null) : undefined,
           contact: listedContact(category, l as unknown as Record<string, unknown>),

@@ -153,3 +153,15 @@ export function changedMenuNote(found: MenuDish[], missing: readonly string[] = 
 export function menuMovedNote(url: string, found: MenuDish[], missing: readonly string[] = []): string {
   return `Its menu page stopped opening, and the menu is now at ${url}. Approving makes that its menu link.${dishDifferences(found, missing)}`
 }
+
+/** A place's menu watch: its own, or else the one on its menu link, which
+ *  a branch shares with the branch it was made on (wantedMenuWatches makes
+ *  one per page). Before (the user, Nov 4), the screens looked for each
+ *  branch's own, so every branch but one said its menu wasn't checked. */
+export function menuWatchFor<W extends { url: string; resourceId: string | null; createdBy: string | null }>(watches: readonly W[], listing: DirectoryResource): W | null {
+  const menus = watches.filter((w) => w.createdBy === MENU_WATCH_CREATOR)
+  const own = menus.find((w) => w.resourceId === listing.id)
+  if (own) return own
+  const link = watchableMenuLink(listing)
+  return (link && menus.find((w) => w.url === link)) || null
+}

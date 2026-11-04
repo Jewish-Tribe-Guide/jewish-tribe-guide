@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedMenuNote, dishesToLookFor, listedDishes, menuHash, menuMovedNote, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches, type FoundReading } from './menuWatch'
+import { changedMenuNote, dishesToLookFor, listedDishes, menuHash, menuMovedNote, MENU_WATCH_CREATOR, menuWatchChanges, menuWatchFor, newDishes, wantedMenuWatches, type FoundReading } from './menuWatch'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 
 const food = makeCategory({
@@ -193,5 +193,26 @@ describe('dishesToLookFor', () => {
 describe('changedMenuNote: an unchanged menu read for dishes added since', () => {
   it('says what differs, not that the menu changed', () => {
     expect(changedMenuNote([], ['Bagels'], false)).toBe('One listed dish isn’t on it any more: Bagels.')
+  })
+})
+
+// The user, Nov 4 (note 8): Rita's, Dottie's, PLNT, Playa Bowls and
+// Insomnia showed "Not checked" on Places. Their branches share one menu
+// watch (one per page), made on the first branch only, and the screens
+// looked for each branch's own.
+describe('menuWatchFor', () => {
+  const watch = (id: string, url: string, resourceId: string, createdBy = MENU_WATCH_CREATOR) => ({ id, url, resourceId, createdBy })
+  const ritas = (id: string) => makeListing({ id, category: 'restaurant', name: 'Rita’s', menuUrl: 'https://ritas.com/menu' })
+
+  it('a place’s own menu watch', () => {
+    expect(menuWatchFor([watch('w', 'https://other.example/menu', 'a')], ritas('a'))?.id).toBe('w')
+  })
+
+  it('a branch shares the one on its menu link', () => {
+    expect(menuWatchFor([watch('w', 'https://ritas.com/menu', 'a')], ritas('b'))?.id).toBe('w')
+  })
+
+  it('not a watch on that page that isn’t a menu’s, nor a menu watch on another page', () => {
+    expect(menuWatchFor([watch('w', 'https://ritas.com/menu', 'a', 'me@x.co'), watch('v', 'https://playa.example/menu', 'c')], ritas('b'))).toBeNull()
   })
 })
