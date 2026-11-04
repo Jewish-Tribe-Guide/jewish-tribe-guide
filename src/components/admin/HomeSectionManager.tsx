@@ -5,6 +5,7 @@ import { newDraftSectionId, type DraftHomeSection } from '@/lib/homeSections'
 import { useCategories } from '@/lib/useCategories'
 import { useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
+import DragList, { AddMenu, InnerRow, OrderRow, addButton, rowButton } from './DragList'
 
 // ── The home-screen section grouping (title + which cards belong to each, in
 // order), part of the Home page tab (see SiteSettingsEditor.tsx). Purely a
@@ -68,9 +69,13 @@ export default function HomeSectionManager({
   sections: DraftHomeSection[]
   onChange: (sections: DraftHomeSection[]) => void
 }) {
-  const [newTitle, setNewTitle] = useState('')
+  // Each group one row with its cards named under it, opening to its name
+  // and its cards (note 26); taking one off asks once.
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
   const cardOptions = useCardOptions()
   const labelById = useMemo(() => new Map(cardOptions.map((c) => [c.id, c.label])), [cardOptions])
+  const cardName = (id: string) => labelById.get(id) ?? id
 
   const sectionEntries = sections.filter((s) => s.kind === 'section')
   // Left exactly as they are in every onChange call below — DesktopTopicsManager
@@ -81,30 +86,20 @@ export default function HomeSectionManager({
   const unassigned = cardOptions.filter((c) => !assignedIds.has(c.id))
 
   function addSection() {
-    if (!newTitle.trim()) return
-    onChange([
-      ...sectionEntries,
-      { id: newDraftSectionId(), kind: 'section', title: newTitle.trim(), cardIds: [], width: 'full' },
-      ...builtInEntries,
-    ])
-    setNewTitle('')
+    const id = newDraftSectionId()
+    onChange([...sectionEntries, { id, kind: 'section', title: 'New group', cardIds: [], width: 'full' }, ...builtInEntries])
+    setOpenId(id)
   }
 
   function renameSection(id: string, title: string) {
     onChange(sections.map((s) => (s.id === id ? { ...s, title } : s)))
   }
 
-  function deleteSection(id: string, title: string) {
-    if (!confirm(`Remove "${title}"? Its cards will fall into the home page's trailing "More" section until reassigned.`)) return
+  // Its cards fall into the home page's trailing "More" until placed again.
+  function deleteSection(id: string) {
+    setRemoving(null)
+    setOpenId(null)
     onChange(sections.filter((s) => s.id !== id))
-  }
-
-  function moveSection(index: number, dir: -1 | 1) {
-    const other = index + dir
-    if (other < 0 || other >= sectionEntries.length) return
-    const reordered = [...sectionEntries]
-    ;[reordered[index], reordered[other]] = [reordered[other], reordered[index]]
-    onChange([...reordered, ...builtInEntries])
   }
 
   // Adds a card to `sectionId`, first pulling it out of whatever section it's
@@ -119,108 +114,79 @@ export default function HomeSectionManager({
     )
   }
 
-  function removeCard(sectionId: string, cardId: string) {
-    onChange(sections.map((s) => (s.id === sectionId ? { ...s, cardIds: s.cardIds.filter((id) => id !== cardId) } : s)))
-  }
-
-  function moveCard(sectionId: string, index: number, dir: -1 | 1) {
-    const section = sections.find((s) => s.id === sectionId)
-    if (!section) return
-    const other = index + dir
-    if (other < 0 || other >= section.cardIds.length) return
-    const cardIds = [...section.cardIds]
-    ;[cardIds[index], cardIds[other]] = [cardIds[other], cardIds[index]]
+  function setCards(sectionId: string, cardIds: string[]) {
     onChange(sections.map((s) => (s.id === sectionId ? { ...s, cardIds } : s)))
   }
 
+  const quiet = 'min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer'
+
   return (
     <div>
-      <div className="space-y-4 max-w-2xl">
-        {sectionEntries.map((s, i) => (
-          <div key={s.id} className="bg-white border border-slate-200 rounded-lg p-4">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <input
-                value={s.title}
-                onChange={(e) => renameSection(s.id, e.target.value)}
-                className={`${inputClass} font-medium`}
-              />
-              <div className="flex items-center gap-1 shrink-0 pt-1.5">
-                <button onClick={() => moveSection(i, -1)} disabled={i === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label="Move section up">↑</button>
-                <button onClick={() => moveSection(i, 1)} disabled={i === sectionEntries.length - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label="Move section down">↓</button>
-                <button onClick={() => deleteSection(s.id, s.title)} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Delete</button>
-              </div>
-            </div>
-
-            {s.cardIds.length === 0 ? (
-              <p className="text-xs text-muted italic mb-2">No cards yet.</p>
-            ) : (
-              <ul className="space-y-1 mb-3">
-                {s.cardIds.map((cardId, ci) => (
-                  <li key={cardId} className="flex items-center justify-between gap-2 bg-slate-50 rounded px-2 py-1">
-                    <span className="text-sm text-slate-800">{labelById.get(cardId) ?? cardId}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => moveCard(s.id, ci, -1)} disabled={ci === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label="Move card up">↑</button>
-                      <button onClick={() => moveCard(s.id, ci, 1)} disabled={ci === s.cardIds.length - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label="Move card down">↓</button>
-                      <button onClick={() => removeCard(s.id, cardId)} className="text-xs text-red-600 hover:underline cursor-pointer ml-1">Remove</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Every card not already in THIS section — not just the
-                unassigned pool. addCard already pulls a card out of whatever
-                section it's currently in, so this is also how a card moves
-                from one section to another; scoping the list to `unassigned`
-                only meant that once every card had a home, the "+ Add a
-                card" control vanished from every section with no way left to
-                reorganize them short of removing one first. */}
-            {(() => {
-              const availableHere = cardOptions.filter((c) => !s.cardIds.includes(c.id))
-              return availableHere.length > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && addCard(s.id, e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
+      <DragList items={sectionEntries} keyOf={(s) => s.id} nameOf={(s) => s.title} onReorder={(next) => onChange([...next, ...builtInEntries])}>
+        {(s, row) => {
+          const open = openId === s.id
+          // Every card not already in THIS group — not just the unassigned
+          // pool: addCard pulls a card out of its old group, so this is also
+          // how a card moves from one group to another.
+          const availableHere = cardOptions
+            .filter((c) => !s.cardIds.includes(c.id))
+            .map((c) => ({ id: c.id, label: unassigned.includes(c) ? c.label : `${c.label} (move here)` }))
+          return (
+            <OrderRow
+              row={row}
+              name={s.title || 'Untitled group'}
+              line={s.cardIds.length ? s.cardIds.map(cardName).join(' · ') : 'No cards yet'}
+              open={open}
+              onToggle={() => setOpenId(open ? null : s.id)}
+            >
+              <label className="block">
+                <span className="block text-[13px] font-semibold text-slate-700 mb-1">Name</span>
+                <input value={s.title} onChange={(e) => renameSection(s.id, e.target.value)} className={inputClass} />
+              </label>
+              {s.cardIds.length > 0 && (
+                <DragList
+                  items={s.cardIds}
+                  keyOf={(id) => id}
+                  nameOf={cardName}
+                  onReorder={(next) => setCards(s.id, next)}
+                  className="rounded-lg border border-slate-200"
                 >
-                  <option value="">+ Add a card…</option>
-                  {availableHere.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                      {!unassigned.includes(c) ? ' (move here)' : ''}
-                    </option>
-                  ))}
-                </select>
-              )
-            })()}
-          </div>
-        ))}
-      </div>
+                  {(cardId, inner) => (
+                    <InnerRow row={inner} name={cardName(cardId)} onRemove={() => setCards(s.id, s.cardIds.filter((id) => id !== cardId))} />
+                  )}
+                </DragList>
+              )}
+              {removing === s.id ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="m-0 flex-1 text-sm font-semibold text-slate-900">Take {s.title || 'this group'} off? Its cards move to More.</p>
+                  <button type="button" onClick={() => deleteSection(s.id)} className="min-h-10 px-3 rounded-lg bg-red-600 text-white text-sm font-semibold cursor-pointer">
+                    Take it off
+                  </button>
+                  <button type="button" onClick={() => setRemoving(null)} className={quiet}>
+                    Leave it
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <AddMenu label="+ Add a card" options={availableHere} onPick={(id) => addCard(s.id, id)} />
+                  <button type="button" onClick={() => setRemoving(s.id)} className={rowButton}>
+                    Take it off
+                  </button>
+                </div>
+              )}
+            </OrderRow>
+          )
+        }}
+      </DragList>
 
-      <div className="flex items-center gap-2 mt-4 max-w-2xl">
-        <input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          placeholder="New section title"
-          className={inputClass}
-        />
-        <button
-          onClick={addSection}
-          disabled={!newTitle.trim()}
-          className="shrink-0 text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-        >
-          Add section
-        </button>
-      </div>
-
-      {unassigned.length > 0 && (
-        <div className="mt-6 max-w-2xl">
-          <p className="text-xs font-medium text-slate-700 mb-1.5">
-            Not in any section — shown in a trailing &ldquo;More&rdquo; section on the home page:
-          </p>
-          <p className="text-xs text-muted">{unassigned.map((c) => c.label).join(', ')}</p>
+      <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3">
+        <div>
+          <button type="button" onClick={addSection} className={addButton}>
+            + Add a group
+          </button>
         </div>
-      )}
+        {unassigned.length > 0 && <p className="m-0 text-[13px] text-slate-600">In More, at the end: {unassigned.map((c) => c.label).join(', ')}</p>}
+      </div>
     </div>
   )
 }

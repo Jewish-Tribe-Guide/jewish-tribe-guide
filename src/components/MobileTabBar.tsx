@@ -28,6 +28,13 @@ const BUILT_IN_ICONS: Record<string, typeof GridIcon> = {
   you: BookmarkIcon,
 }
 
+/** A built-in tab's line icon; with a Browse tab, the home tab is a house.
+ *  Shared with the admin's list of tabs (MobileTabsEditor). */
+export function builtInTabIcon(target: string, hasBrowse: boolean): typeof GridIcon | null {
+  if (!isBuiltInTabTarget(target)) return null
+  return target === 'categories' && hasBrowse ? HomeIcon : BUILT_IN_ICONS[target]
+}
+
 type Props = {
   /** Current screen — decides which tab reads as active. */
   mode: AppMode
@@ -79,7 +86,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
             ? !ownTab && BUILT_IN_MODES[tab.target].includes(cameFrom)
             : BUILT_IN_MODES[tab.target].includes(mode)
           : mode === 'find' && activeCardId === tab.target
-        const Icon = builtIn ? (tab.target === 'categories' && hasBrowse ? HomeIcon : BUILT_IN_ICONS[tab.target]) : null
+        const Icon = builtInTabIcon(tab.target, hasBrowse)
         const emoji = builtIn ? undefined : iconForTarget?.(tab.target)
         // Only the emoji fallback needs the grayscale/opacity dimming trick
         // below — a hand-built line icon already takes `currentColor`, so

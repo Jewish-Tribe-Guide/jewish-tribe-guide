@@ -254,7 +254,9 @@ describe('SiteSettingsEditor — Header and menus', () => {
   it('saves only what changed here', async () => {
     const user = userEvent.setup()
     await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Old name', feedbackHeading: 'Old heading' })
-    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    const top = screen.getByRole('region', { name: 'Top of the page, on a computer' })
+    await user.click(within(top).getByRole('button', { name: 'Map' }))
+    await user.click(within(top).getByRole('button', { name: 'Take it off' }))
     await saveWith(user, SITE_SETTINGS_DEFAULTS)
     expect(Object.keys(sentBody())).toEqual(['desktopNavItems'])
   })
@@ -266,8 +268,10 @@ describe('SiteSettingsEditor — Header and menus', () => {
     const user = userEvent.setup()
     await renderEditor('menus')
     const warning = /The nav needs at least one item/
+    const top = screen.getByRole('region', { name: 'Top of the page, on a computer' })
     for (let i = 0; i < 10 && !screen.queryByText(warning); i++) {
-      await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+      await user.click(within(top).getAllByRole('button', { expanded: false })[0])
+      await user.click(within(top).getByRole('button', { name: 'Take it off' }))
     }
     expect(screen.getByText(warning)).toBeInTheDocument()
   })

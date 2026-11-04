@@ -248,19 +248,30 @@ describe('DesktopTopicsManager', () => {
 
   // Up and down sit on each row, without opening it, and a phone's thumb
   // can reach them (board 21c).
-  it('moves a card from its row, swapping it with its neighbour', async () => {
+  // Dragging itself needs layout, so it is in e2e-admin-write (drag.spec.ts);
+  // here, the handle and its keyboard (note 25: drag, not arrows).
+  it('moves a card by its handle, with the arrow keys, and has no up and down buttons', async () => {
     const user = userEvent.setup()
     const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories and Search Card', cardIds: [], width: 'full' }
     const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([browse, davening])
 
-    const ups = screen.getAllByRole('button', { name: /^Move .* up$/ })
-    const downs = screen.getAllByRole('button', { name: /^Move .* down$/ })
-    expect(ups.map((b) => (b as HTMLButtonElement).disabled)).toEqual([true, false])
-    expect(downs.map((b) => (b as HTMLButtonElement).disabled)).toEqual([false, true])
-    await user.click(downs[0]!)
-
+    expect(screen.queryByRole('button', { name: /^Move .* (up|down)$/ })).toBeNull()
+    const handles = screen.getAllByRole('button', { name: /^Move / })
+    expect(handles).toHaveLength(2)
+    handles[0]!.focus()
+    await user.keyboard('{ArrowUp}')
+    expect(onChange).not.toHaveBeenCalled()
+    await user.keyboard('{ArrowDown}')
     expect(onChange).toHaveBeenCalledWith([davening, browse])
+  })
+
+  it('puts the width and Take it off on one line', async () => {
+    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
+    renderManager([subscribe])
+    await openRow(userEvent.setup(), /^Stay in the Loop/)
+    const width = screen.getByRole('group', { name: 'Width' })
+    expect(screen.getByRole('button', { name: 'Take it off' }).parentElement).toBe(width.parentElement)
   })
 
   // The same shared draft array also carries plain category sections (see

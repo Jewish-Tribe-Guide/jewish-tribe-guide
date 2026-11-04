@@ -2402,12 +2402,19 @@ Built Nov 4, from the user's picks:
 - **18/19:** Look again is one list, like To do and Places: a name search,
   a Kind menu with counts, and Still trying / Stopped trying. Each row
   names its kind while all kinds show. Watches is unchanged (4e65f1fd).
+- **25-28, reordering:** built as drawn (KdHT8Tci1ufXSXobnnSfEm v4). All
+  four lists (Cards under the search, Groups on the Browse page, Top of
+  the page, Tabs on a phone) are one kind of row (`DragList.tsx`): a
+  handle to drag, press and hold on a phone, arrow keys on the handle, and
+  a tap opens the row. The arrows are gone. Groups and Top of the page are
+  rows that open, with their cards or links as inner rows with an ×.
+  Every "Remove" and "Delete" here is "Take it off".
+  - Not in the drawing: a dropdown's links also open (Name, Opens), so
+    they can still be renamed. Groups keep the "In More, at the end" line.
+  - Only checked in Chrome, including a simulated touch. Not tried on a
+    real phone yet.
 
 Still open:
-- **25-28, reordering:** draw first. One drag list for all four (a handle,
-  and long-press on a phone). Groups on the Browse page and Top of the
-  page, on a computer are redrawn as rows that open. Show the drawing
-  before building.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 

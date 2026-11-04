@@ -1,13 +1,17 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   BUILT_IN_TAB_TARGETS,
   MAX_MOBILE_TABS,
-  isBuiltInTabTarget,
   type MobileTabConfig,
 } from '@/lib/siteSettings'
+import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
+import { useCategoriesIfAny } from '@/lib/contentContext'
+import { kindKeyById } from '@/lib/placeKinds'
+import { builtInTabIcon } from '../MobileTabBar'
 import { useCardOptions } from './HomeSectionManager'
+import DragList, { AddMenu, OrderRow, rowButton } from './DragList'
 
 // ── The mobile bottom tab bar editor ─────────────────────────────────────────
 // Phone-only. The bar is the mobile counterpart of the desktop featured-card
@@ -29,6 +33,18 @@ const BUILT_IN_LABELS: Record<string, string> = {
   you: 'You (saved places and searches)',
 }
 
+/** What a row says its tab opens, as the bar's own screens are called. */
+const OPENS: Record<string, string> = {
+  categories: 'the home page',
+  map: 'the Map',
+  feedback: 'the Feedback form',
+  browse: 'the Browse page',
+  you: 'You',
+}
+
+const inputClass =
+  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+
 /** Ids must survive renames, so they're minted once and never derived from the
  *  label or target. */
 function newTabId(): string {
@@ -43,6 +59,8 @@ export default function MobileTabsEditor({
   onChange: (tabs: MobileTabConfig[]) => void
 }) {
   const cardOptions = useCardOptions()
+  const categories = useCategoriesIfAny()
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const targetLabel = useMemo(() => {
     const byId = new Map(cardOptions.map((c) => [c.id, c.label]))
@@ -63,73 +81,61 @@ export default function MobileTabsEditor({
   }
 
   function remove(id: string) {
+    setOpenId(null)
     onChange(tabs.filter((t) => t.id !== id))
-  }
-
-  function move(index: number, delta: number) {
-    const next = [...tabs]
-    const dest = index + delta
-    if (dest < 0 || dest >= next.length) return
-    ;[next[index], next[dest]] = [next[dest], next[index]]
-    onChange(next)
   }
 
   function add(target: string) {
     if (!target || tabs.length >= MAX_MOBILE_TABS) return
     // Seed the label from the destination's own name — almost always what's
-    // wanted, and still editable right there in the row.
-    onChange([...tabs, { id: newTabId(), label: targetLabel(target), target }])
+    // wanted, and still editable once the row is open.
+    const id = newTabId()
+    onChange([...tabs, { id, label: targetLabel(target), target }])
+    setOpenId(id)
   }
 
+  const hasBrowse = tabs.some((t) => t.target === 'browse')
+
   return (
-    <div className="p-4 space-y-3">
+    <div>
       {tabs.length === 0 && (
-        <p className="text-xs text-red-600">
+        <p className="m-0 px-4 pt-3 text-xs text-red-600">
           The bar needs at least one tab — add one below, or visitors lose their way back.
         </p>
       )}
 
-      <ul className="space-y-2">
-        {tabs.map((tab, i) => (
-          <li key={tab.id} className="flex items-start gap-2 rounded-md border border-slate-200 p-2">
-            <div className="flex flex-col gap-0.5 pt-1">
-              <button
-                type="button"
-                onClick={() => move(i, -1)}
-                disabled={i === 0}
-                aria-label={`Move ${tab.label} earlier`}
-                className="text-xs leading-none text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:hover:text-slate-400 cursor-pointer disabled:cursor-default"
-              >
-                ▲
-              </button>
-              <button
-                type="button"
-                onClick={() => move(i, 1)}
-                disabled={i === tabs.length - 1}
-                aria-label={`Move ${tab.label} later`}
-                className="text-xs leading-none text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:hover:text-slate-400 cursor-pointer disabled:cursor-default"
-              >
-                ▼
-              </button>
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-2">
+      {/* Each tab one row with its icon, dragged into order (note 28). */}
+      <DragList items={tabs} keyOf={(t) => t.id} nameOf={(t) => t.label || targetLabel(t.target)} onReorder={onChange}>
+        {(tab, row) => {
+          const open = openId === tab.id
+          const Icon = builtInTabIcon(tab.target, hasBrowse)
+          return (
+            <OrderRow
+              row={row}
+              name={tab.label || targetLabel(tab.target)}
+              line={`Opens ${OPENS[tab.target] ?? targetLabel(tab.target)}`}
+              icon={
+                Icon ? (
+                  <Icon className="h-[22px] w-[22px]" />
+                ) : hasCategoryIcon(kindKeyById(tab.target, categories)) ? (
+                  <CategoryGlyph categoryId={tab.target} icon="" className="h-[22px] w-[22px]" />
+                ) : undefined
+              }
+              open={open}
+              onToggle={() => setOpenId(open ? null : tab.id)}
+            >
               <label className="block">
-                <span className="block text-[11px] font-medium text-slate-600 mb-1">Label</span>
+                <span className="block text-[13px] font-semibold text-slate-700 mb-1">Name</span>
                 <input
                   value={tab.label}
                   onChange={(e) => update(tab.id, { label: e.target.value })}
                   placeholder="Shown under the icon"
-                  className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={inputClass}
                 />
               </label>
               <label className="block">
-                <span className="block text-[11px] font-medium text-slate-600 mb-1">Opens</span>
-                <select
-                  value={tab.target}
-                  onChange={(e) => update(tab.id, { target: e.target.value })}
-                  className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                >
+                <span className="block text-[13px] font-semibold text-slate-700 mb-1">Opens</span>
+                <select value={tab.target} onChange={(e) => update(tab.id, { target: e.target.value })} className={inputClass}>
                   {/* The current target stays selectable even though it's
                       "taken" — by this very row. */}
                   <option value={tab.target}>{targetLabel(tab.target)}</option>
@@ -139,48 +145,26 @@ export default function MobileTabsEditor({
                     </option>
                   ))}
                 </select>
-                {!isBuiltInTabTarget(tab.target) && (
-                  <span className="block text-[11px] text-muted mt-1">
-                    Uses this destination&rsquo;s own emoji as the tab icon.
-                  </span>
-                )}
               </label>
-            </div>
+              <div>
+                <button type="button" onClick={() => remove(tab.id)} className={rowButton}>
+                  Take it off
+                </button>
+              </div>
+            </OrderRow>
+          )
+        }}
+      </DragList>
 
-            <button
-              type="button"
-              onClick={() => remove(tab.id)}
-              className="shrink-0 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer pt-1"
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {tabs.length >= MAX_MOBILE_TABS ? (
-        <p className="text-[11px] text-muted">
-          That&rsquo;s the {MAX_MOBILE_TABS}-tab maximum. Remove one to add another.
-        </p>
-      ) : available.length === 0 ? (
-        <p className="text-[11px] text-muted">Every available destination is already on the bar.</p>
-      ) : (
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-1">Add a tab</span>
-          <select
-            value=""
-            onChange={(e) => add(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Choose a destination…</option>
-            {available.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
+        {tabs.length >= MAX_MOBILE_TABS ? (
+          <p className="m-0 text-[13px] text-slate-600">Five tabs at most. Take one off to add another.</p>
+        ) : available.length === 0 ? (
+          <p className="m-0 text-[13px] text-slate-600">Every place a tab can open is on the bar.</p>
+        ) : (
+          <AddMenu label="+ Add a tab" options={available} onPick={add} />
+        )}
+      </div>
     </div>
   )
 }

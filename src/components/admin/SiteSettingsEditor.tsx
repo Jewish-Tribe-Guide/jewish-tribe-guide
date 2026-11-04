@@ -247,10 +247,8 @@ export default function SiteSettingsEditor({
               </div>
 
               <div {...spotOn('groups')}>
-                <AdminBox title="Groups on the Browse page">
-                  <div className="p-4">
-                    <HomeSectionManager sections={sectionsDraft} onChange={setHomeSections} />
-                  </div>
+                <AdminBox title="Groups on the Browse page" count={sectionsDraft.filter((s) => s.kind === 'section').length}>
+                  <HomeSectionManager sections={sectionsDraft} onChange={setHomeSections} />
                 </AdminBox>
               </div>
 
@@ -343,15 +341,11 @@ export default function SiteSettingsEditor({
               </AdminBox>
 
               <AdminBox title="Top of the page, on a computer">
-                <div className="p-4">
-                  <DesktopNavEditor items={draft.desktopNavItems} onChange={(items) => set('desktopNavItems', items)} />
-                </div>
+                <DesktopNavEditor items={draft.desktopNavItems} onChange={(items) => set('desktopNavItems', items)} />
               </AdminBox>
 
-              <AdminBox title="Tabs, on a phone">
-                <div className="p-4">
-                  <MobileTabsEditor tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS} onChange={(tabs) => set('mobileTabs', tabs)} />
-                </div>
+              <AdminBox title="Tabs, on a phone" count={(draft.mobileTabs ?? DEFAULT_MOBILE_TABS).length}>
+                <MobileTabsEditor tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS} onChange={(tabs) => set('mobileTabs', tabs)} />
               </AdminBox>
 
             </>
