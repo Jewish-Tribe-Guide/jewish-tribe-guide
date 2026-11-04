@@ -1,13 +1,18 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import type { DirectoryResource } from '@/types'
+import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { ChangedTag } from '@/components/resources/editorParts'
+import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
+import { withSave } from './findingEdits'
+import { sourceActions } from './sourceActions'
 import PlaceFrame, { PlaceButtons, PlaceCard, SourceCard, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { kindsOf } from './WatchKinds'
 import { waitingAnswers, type WaitAnswer } from './waitingAnswers'
-import { ownGroups, waitingGroups, type WaitBox, type WaitGroup, type WaitRow } from './waitingGroups'
+import { groupEdit, ownGroups, waitingGroups, type WaitBox, type WaitGroup, type WaitRow } from './waitingGroups'
 import type { Jobs } from './useWatchJobs'
 
 // What a job read that's decided on the place itself (a closure, a check
@@ -17,8 +22,14 @@ import type { Jobs } from './useWatchJobs'
 // its new and going dishes (E2Dishes); where it was read, folded under; and
 // the answers at the foot. One reading at a time; once
 // it's answered, the next one shows, or the place is done.
+//
+// A menu's reading can be put right here too, as on Places (the user, Nov
+// 4, of Nothing Bundt Cakes: "I want to edit that. I also want to re-run
+// the source"): Edit its dishes before they're added, and, folded under
+// where it was read, Read it again or Change the page it's read from.
 
 const CHANGED = 'border-amber-200 bg-yellow-50'
+const SOURCE_LINK = 'self-start min-h-8 cursor-pointer text-[15px] font-semibold text-primary hover:underline disabled:opacity-50'
 const MARK: Record<Exclude<WaitRow['mark'], 'same'>, string> = { new: 'New', gone: 'Going', changed: 'Changed' }
 
 function Tag({ children }: { children: ReactNode }) {
@@ -73,6 +84,8 @@ export default function TodoReading({
   const [now] = useState(() => Date.now())
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit } | null>(null)
+  const [changing, setChanging] = useState<string | null>(null)
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const send = (method: 'PATCH' | 'POST', path: string, body: Record<string, unknown>) =>
     fetchJson(withCommunity(path, community), { method, headers, body: JSON.stringify(body) }, 'Could not do that.')
@@ -89,20 +102,41 @@ export default function TodoReading({
     )
   }
 
-  async function run(a: WaitAnswer) {
+  async function run(a: Pick<WaitAnswer, 'label' | 'work'>) {
     setError(null)
     setBusy(a.label)
     try {
       await a.work()
       await reload()
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not do that.')
+      return false
     } finally {
       setBusy(null)
     }
   }
+  const menu = g.decide.kind === 'menu'
+  const actions = sourceActions(placeId, <T,>(path: string, body: Record<string, unknown>) => send('POST', path, body) as Promise<T>)
+
+  async function openEdit() {
+    const e = groupEdit(g, placeId, jobs)
+    if (e?.kind !== 'boxes') return
+    setError(null)
+    try {
+      const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/google?item=${placeId}`, community), { headers }, 'Could not open its listing.')
+      const fe = e.makers.map((m) => m(item, category)).find((x) => x !== null)
+      if (!fe) throw new Error('Could not open its box.')
+      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => void reload().then(() => setEditing(null)) }) })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open its listing.')
+    }
+  }
   const answers = todoAnswerLabels(g, waitingAnswers(g.decide, placeId, { patch: (id, body) => send('PATCH', `/api/admin/submissions/${id}`, body), post: (path, body) => send('POST', path, body) }))
   const buttons: PlaceButton[] = answers.map((a) => ({ label: a.label, busy: busy === a.label && 'Saving…', disabled: busy !== null, onClick: () => void run(a) }))
+  if (menu && groupEdit(g, placeId, jobs)) buttons.push({ label: 'Edit', disabled: busy !== null, onClick: () => void openEdit() })
+  const readAgain = () => void run({ label: 'read', work: () => actions.readStep({ job: 'dishes', resourceId: placeId }) })
+  const giveLink = () => void run({ label: 'link', work: () => actions.change({ kind: 'menu' }, changing!.trim()) }).then((ok) => ok && setChanging(null))
 
   return (
     <PlaceFrame
@@ -113,15 +147,50 @@ export default function TodoReading({
       error={error}
       source={
         <SourceCard name={g.page ? g.page.text.charAt(0).toUpperCase() + g.page.text.slice(1) : 'Its source'} rest={g.when ? ` · ${g.when}` : undefined}>
-          {g.page?.url && (
+          {g.page?.url && changing === null && (
             <a href={g.page.url} target="_blank" rel="noopener noreferrer" className="self-start text-[15px] font-semibold text-primary hover:underline">
               {g.page.text}
             </a>
+          )}
+          {menu && changing === null && (
+            <span className="flex gap-5">
+              <button type="button" disabled={busy !== null} onClick={readAgain} className={SOURCE_LINK}>
+                {busy === 'read' ? 'Reading…' : 'Read it again'}
+              </button>
+              <button type="button" disabled={busy !== null} onClick={() => setChanging(g.page?.url ?? '')} className={SOURCE_LINK}>
+                Change
+              </button>
+            </span>
+          )}
+          {menu && changing !== null && (
+            <span className="flex flex-col gap-2">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[13.5px] font-semibold text-slate-500">A link to its menu</span>
+                <input
+                  type="url"
+                  value={changing}
+                  onChange={(e) => setChanging(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && changing.trim() && giveLink()}
+                  placeholder="https://"
+                  className="w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3.5 text-[16px] text-slate-900"
+                  autoFocus
+                />
+              </label>
+              <span className="flex gap-5">
+                <button type="button" disabled={busy !== null || !changing.trim()} onClick={giveLink} className={SOURCE_LINK}>
+                  {busy === 'link' ? 'Reading…' : 'Read it'}
+                </button>
+                <button type="button" disabled={busy !== null} onClick={() => setChanging(null)} className={SOURCE_LINK}>
+                  Cancel
+                </button>
+              </span>
+            </span>
           )}
         </SourceCard>
       }
       foot={buttons.length > 0 && <PlaceButtons buttons={buttons} />}
     >
+      {editing && <BoxEditSheet item={editing.item} category={editing.category} edit={editing.edit} onClose={() => setEditing(null)} />}
       <div className="flex flex-col gap-3" data-testid="todo-waiting">
         {g.lines.map((l) => (
           <section key={l.label} aria-label={l.label} className={`flex items-start gap-3 rounded-2xl border px-4 py-2.5 ${CHANGED}`}>
