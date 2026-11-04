@@ -829,16 +829,16 @@ describe('what the job pages did', () => {
       return answer(job)(url, init)
     })
 
-  it('a menu that can’t be read: photos of it, or No menu online', async () => {
+  it('a menu that can’t be read: photos of it, or Stop reading it', async () => {
     const joy = { id: 'r', name: 'Joy Cafe', href: '/x', category: 'restaurant', dishes: ['Falafel'], website: 'https://joy.example', menuUrl: 'https://joy.example/menu', reading: { status: 'failed', readAt: new Date().toISOString() } }
     await food((url) => (url.includes('/api/admin/main-dishes') ? { places: [joy] } : undefined))
     const user = userEvent.setup()
     const open = screen.getByTestId('place-open')
     await user.upload(within(open).getByLabelText('Photos of the menu'), new File(['x'], 'menu.jpg', { type: 'image/jpeg' }))
-    await user.click(within(open).getByRole('button', { name: 'No menu online' }))
+    await user.click(within(open).getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([
       ['/api/admin/main-dishes', ['action', 'resourceId', 'file']],
-      ['/api/admin/main-dishes', { action: 'no_menu', resourceId: 'r' }],
+      ['/api/admin/main-dishes', { action: 'cant_read', resourceId: 'r' }],
     ])
   })
 })

@@ -59,7 +59,10 @@ describe('a broken check on To do (R3Site, R2Menu, R2Google)', () => {
 
   it('a menu that can’t be read has nothing to read again', () => {
     const v = brokenView('p', 'Menu can’t be read', jobs({ dishes: [{ id: 'p', name: 'Pizza', dishes: [], menuUrl: 'https://x.example/menu.jpg', reading: { status: 'failed', readAt: '2026-10-20T07:00:00Z' } }] as never }), NOW)!
-    expect(v.answers.map((a) => a.label)).toEqual(['Give its menu', 'No menu online'])
+    // Not "No menu online": almost all of these have one, on an ordering
+    // site that can't be read (the user, Nov 4).
+    expect(v.answers.map((a) => a.label)).toEqual(['Give its menu', 'Stop reading it'])
+    expect(v.answers[1].act).toEqual({ kind: 'stop', stops: [{ kind: 'menu', action: 'cant_read', what: 'its menu' }] })
     expect(v.source.failed).toBe('can’t be read')
   })
 

@@ -173,6 +173,9 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
     const w = food && menuDidntLoad(food, now) ? food.menuWatch : null
     const give: BrokenAnswer = { label: 'Give its menu', act: { kind: 'give', change: { kind: 'menu' }, label: 'Its menu' } }
     const none: BrokenAnswer = { label: 'No menu online', act: { kind: 'stop', stops: [{ kind: 'menu', action: 'no_menu', what: 'its menu' }] } }
+    // Not "No menu online": almost all of these have one, on an ordering
+    // site (the user, Nov 4).
+    const stop: BrokenAnswer = { label: 'Stop reading it', act: { kind: 'stop', stops: [{ kind: 'menu', action: 'cant_read', what: 'its menu' }] } }
     return {
       kind,
       field: 'items',
@@ -183,7 +186,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
         url,
         why: kind === 'menu-load' ? whyNoLoad(w?.lastError) : 'Its menu isn’t words on a page, so it can’t be read',
       },
-      answers: kind === 'menu-load' ? [{ label: 'Read it again', act: { kind: 'read', steps: [{ job: 'dishes', resourceId: id }] } }, give, none] : [give, none],
+      answers: kind === 'menu-load' ? [{ label: 'Read it again', act: { kind: 'read', steps: [{ job: 'dishes', resourceId: id }] } }, give, none] : [give, stop],
     }
   }
 

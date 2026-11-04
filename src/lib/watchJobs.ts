@@ -19,12 +19,16 @@ export type JobCounts = { checked: number; toCheck: number; cantRead: number; di
 
 // ── Dishes ──────────────────────────────────────────────────────────────────
 
+/** A menu stopped as one that can't be read (an ordering site's), kept
+ *  apart from "No menu" by its note: both are 'no_menu' to the tab. */
+export const MENU_CANT_READ_NOTE = 'Can’t be read'
+
 export type DishReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu' | 'reading'
 export type DishPlace = ListedDishes & {
   website: string | null
   menuUrl: string | null
   menuAt?: string | null
-  reading: { status: DishReadingStatus; readAt: string; sourceUrl?: string | null; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
+  reading: { status: DishReadingStatus; readAt: string; sourceUrl?: string | null; dishes?: readonly ReadDish[]; missing?: readonly string[]; note?: string | null } | null
   /** What its website's pages found, waiting: its hours or phone, for a
    *  place Google doesn't keep (Main dishes board 3, Oct 22). */
   findings?: readonly unknown[]

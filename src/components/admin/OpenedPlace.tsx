@@ -545,8 +545,8 @@ export default function OpenedPlace({
               Not on Refuah
             </button>
           )}
-          {/* A menu that can't be read: photos of it, or none online, as
-              its job page's Reads had them. */}
+          {/* A menu that can't be read: photos of it, or stop reading it
+              (Nov 4: not "No menu online", almost all have one). */}
           {f.kind === 'change' && f.change.kind === 'menu' && (
             <>
               <label className={`cursor-pointer ${BUTTON} ${busy !== null ? 'pointer-events-none opacity-50' : ''}`}>
@@ -564,8 +564,8 @@ export default function OpenedPlace({
                   }}
                 />
               </label>
-              <button type="button" disabled={busy !== null} onClick={() => void run(key, () => post('/api/admin/main-dishes', { action: 'no_menu', resourceId: place.id }))} className={BUTTON}>
-                No menu online
+              <button type="button" disabled={busy !== null} onClick={() => void run(key, () => post('/api/admin/main-dishes', { action: 'cant_read', resourceId: place.id }))} className={BUTTON}>
+                Stop reading it
               </button>
             </>
           )}

@@ -45,7 +45,7 @@ export type Stop = (
   | { kind: 'eruv-status' | 'eruv-map'; id: string }
   | { kind: 'watch'; watchId: string }
   | { kind: 'page'; job: 'hours' | 'times'; watchId: string }
-  | { kind: 'menu'; action: 'unlink' | 'no_menu' }
+  | { kind: 'menu'; action: 'unlink' | 'no_menu' | 'cant_read' }
   | { kind: 'refuah' }
 ) & { what: string }
 

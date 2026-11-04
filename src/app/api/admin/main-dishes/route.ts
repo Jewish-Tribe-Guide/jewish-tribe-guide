@@ -37,6 +37,7 @@ import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
 import { listedContact } from '@/lib/contactRead'
 import { type Watch } from '@/lib/watches'
 import { menuWatchFor } from '@/lib/menuWatch'
+import { MENU_CANT_READ_NOTE } from '@/lib/watchJobs'
 import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -83,7 +84,8 @@ import type { DirectoryResource } from '@/types'
 // POST body: { action: 'stop', resourceId, id }
 //      Stop reading one of its website's pages (a hours/phone page, Oct 22):
 //      kept, never read, so the morning's run never adds it again.
-// POST body: { action: 'no_menu' | 'undo_no_menu', resourceId }
+// POST body: { action: 'no_menu' | 'cant_read' | 'undo_no_menu', resourceId }
+//   cant_read: stopped as no_menu is, as a menu that can't be read (Nov 4).
 //      "No menu": the place has none to read (menuReadingStore's isNoMenu).
 //
 // A reading marked "no menu" is sent as status 'no_menu'. Each place also
@@ -113,8 +115,8 @@ const MAX_PHOTOS = 3
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
 const PHOTO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf'])
 
-type Action = 'read' | 'use' | 'save' | 'skip' | 'link' | 'unlink' | 'photos' | 'no_menu' | 'undo_no_menu' | 'stop'
-const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unlink', 'photos', 'no_menu', 'undo_no_menu', 'stop']
+type Action = 'read' | 'use' | 'save' | 'skip' | 'link' | 'unlink' | 'photos' | 'no_menu' | 'cant_read' | 'undo_no_menu' | 'stop'
+const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unlink', 'photos', 'no_menu', 'cant_read', 'undo_no_menu', 'stop']
 
 /** A place's website pages the daily run reads for its hours and phone. */
 const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) => w.resourceId === id && isListingPageWatch(w))
@@ -347,8 +349,8 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, ...(await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)) })
     }
 
-    if (action === 'no_menu') {
-      return Response.json({ ok: true, reading: forTab(await markNoMenu(community.slug, resourceId, admin.email)) })
+    if (action === 'no_menu' || action === 'cant_read') {
+      return Response.json({ ok: true, reading: forTab(await (action === 'cant_read' ? markNoMenu(community.slug, resourceId, admin.email, MENU_CANT_READ_NOTE) : markNoMenu(community.slug, resourceId, admin.email))) })
     }
 
     const stored = await getMenuReading(community.slug, resourceId)

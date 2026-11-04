@@ -24,6 +24,12 @@ describe('dishes a menu doesn’t name, kept with the reading', () => {
   it('aren’t dishes: a "No menu" stays one', () => {
     expect(isNoMenu({ status: 'skipped', note: 'No menu', ...splitDishes(storedDishes([], ['Kugel'])) })).toBe(true)
   })
+
+  // Nov 4: "Stop reading it" on a menu that can't be read (an ordering
+  // site's) is stopped as "no menu" is, kept apart by its words.
+  it('a menu stopped as one that can’t be read isn’t read either', () => {
+    expect(isNoMenu({ status: 'skipped', note: 'Can’t be read', dishes: [] })).toBe(true)
+  })
 })
 
 // Use this, and Edit's Save to the listing (Oct 21): the list set whole.

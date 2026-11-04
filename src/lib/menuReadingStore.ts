@@ -3,7 +3,7 @@ import { getAdminClient } from './supabase/admin'
 import { TAGS } from './cacheTags'
 import type { MenuDish } from './menuReader'
 import { MENU_LINK_KEY } from './menuLink'
-import { READING_GIVES_UP_MS } from './watchJobs'
+import { MENU_CANT_READ_NOTE, READING_GIVES_UP_MS } from './watchJobs'
 
 // What the menu reader proposed for each food place, and what an admin
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
@@ -173,10 +173,11 @@ export async function startMenuReading(community: string, resourceId: string, so
 export const NO_MENU_NOTE = 'No menu'
 
 export function isNoMenu(r: Pick<StoredMenuReading, 'status' | 'note' | 'dishes'>): boolean {
-  return r.status === 'skipped' && r.note === NO_MENU_NOTE && r.dishes.length === 0
+  return r.status === 'skipped' && (r.note === NO_MENU_NOTE || r.note === MENU_CANT_READ_NOTE) && r.dishes.length === 0
 }
 
-export async function markNoMenu(community: string, resourceId: string, by: string): Promise<StoredMenuReading> {
+/** `note`: MENU_CANT_READ_NOTE for one that can't be read (Nov 4). */
+export async function markNoMenu(community: string, resourceId: string, by: string, note: string = NO_MENU_NOTE): Promise<StoredMenuReading> {
   const now = new Date().toISOString()
   const { data, error } = await getAdminClient()
     .from('menu_reading')
@@ -187,7 +188,7 @@ export async function markNoMenu(community: string, resourceId: string, by: stri
         status: 'skipped',
         source_url: null,
         dishes: [],
-        note: NO_MENU_NOTE,
+        note,
         model: null,
         read_at: now,
         decided_at: now,
