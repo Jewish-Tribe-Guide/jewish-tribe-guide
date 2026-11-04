@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { jobLists, lastRunWord, needsFixing, watchesSentence } from '@/lib/watchJobList'
@@ -10,13 +11,14 @@ import type { NightKindView } from '@/lib/nightKinds'
 import { AdminBack, AdminBox, AdminRow, AdminRows } from './AdminUI'
 import { BadMark, GoodMark } from './JobPage'
 import { JobsNotLoaded } from './WatchKinds'
-import { coverageOf, forgetWatchJobs, useWatchJobsAndReload } from './useWatchJobs'
+import { forgetWatchJobs, useWatchJobsAndReload } from './useWatchJobs'
 
 // ── Watches (the user, Oct 31; boards "Watches" and "a new admin") ──────────
 // One page, for a new admin and an old one alike. A sentence on whether
 // anything needs fixing, what does, each job with when it last ran and a check
-// or an X, the jobs that need one step, and how many places have something no
-// job checks. What a watch finds waits in To do, not here. A place's own page
+// or an X, and the jobs that need one step. + Add a watch is at the top right,
+// as the job pages have theirs (the user, Nov 4); what no job checks is on
+// Places, as Not checked. What a watch finds waits in To do, not here. A place's own page
 // opens on its own from Needs fixing and from a job (PlacePage.tsx).
 
 /** For tests: start from nothing. */
@@ -32,6 +34,9 @@ const WATCH_SOURCES: { title: string; jobs: NightKindId[] }[] = [
   { title: 'Outside lists', jobs: ['kosher', 'hospitals'] },
   { title: 'Link check', jobs: ['links'] },
 ]
+
+/** As the job pages' buttons at the top right (JobPage). */
+const addButton = 'inline-flex items-center justify-center min-h-11 px-3.5 rounded-lg text-sm font-semibold whitespace-nowrap border border-primary bg-primary text-white'
 
 /** A list goes by whose it is, with what it's read for under it. */
 const OUTSIDE: Partial<Record<NightKindId, { name: string; about: string }>> = {
@@ -86,12 +91,18 @@ export default function WatchesManager({ token }: { token: string }) {
   const lookFix = look?.available && look.runs ? lookAgainFix(look.runs, now) : null
   const fixes = [...needsFixing(lists.jobs), ...(lookFix ? [lookFix] : [])]
   const sentence = watchesSentence(lists.jobs, fixes.length)
-  const coverage = coverageOf(jobs)
-  const unwatched = coverage ? [...coverage.values()].filter((c) => c.notWatched.length > 0).length : null
 
   return (
     <div className="flex flex-col gap-3">
-      <AdminBack back={{ label: 'Places', href: `${base}/places` }} title="Watches" />
+      <AdminBack
+        back={{ label: 'Places', href: `${base}/places` }}
+        title="Watches"
+        right={
+          <Link href={`${base}/watches/add`} className={addButton}>
+            + Add a watch
+          </Link>
+        }
+      />
       <div className="flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5" data-testid="watches-sentence">
         {sentence.tone === 'good' && <GoodMark label="" />}
         {sentence.tone === 'bad' && <BadMark label="" />}
@@ -136,16 +147,6 @@ export default function WatchesManager({ token }: { token: string }) {
           {lists.steps.map((s) => (
             <AdminRow key={s.id} href={s.id === 'newsletters' ? `${base}/watches/newsletters` : `${base}/watches/job/${s.id}`} name={s.name} line={s.step} />
           ))}
-        </AdminBox>
-      )}
-      {lists.more.length > 0 && (
-        <AdminBox>
-          <AdminRow href={`${base}/watches/add`} name={<span className="text-primary">+ Add a watch</span>} />
-        </AdminBox>
-      )}
-      {unwatched !== null && unwatched > 0 && (
-        <AdminBox title="Not checked">
-          <AdminRow href={`${base}/places?checked=not-watched`} name={`${unwatched} ${unwatched === 1 ? 'place' : 'places'}`} />
         </AdminBox>
       )}
     </div>

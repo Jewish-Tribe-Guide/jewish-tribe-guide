@@ -233,7 +233,17 @@ describe('WatchesManager', () => {
   it('a job turned off leaves the list, and + Add a watch offers it', async () => {
     await renderTab([], { categories: [], runs: { available: true, off: ['google'], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
     expect(screen.queryByRole('link', { name: /^Google/ })).toBeNull()
-    expect(row('+ Add a watch')).toHaveAttribute('href', '/philly/admin/watches/add')
+    expect(screen.getByRole('link', { name: '+ Add a watch' })).toHaveAttribute('href', '/philly/admin/watches/add')
+  })
+
+  // The user, Nov 4: "Should add a watch be a button at the top?" It's at
+  // the top right, as the job pages have theirs, and there with nothing
+  // turned off too (it used to show only then).
+  it('+ Add a watch is a button at the top, always', async () => {
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
+    const add = screen.getByRole('link', { name: '+ Add a watch' })
+    expect(add).toHaveAttribute('href', '/philly/admin/watches/add')
+    expect(add.compareDocumentPosition(screen.getByTestId('watches-sentence')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('newsletters open their own page', async () => {
@@ -241,7 +251,9 @@ describe('WatchesManager', () => {
     expect(row(/^Newsletters/)).toHaveAttribute('href', '/philly/admin/watches/newsletters')
   })
 
-  it('counts the places with something no job checks, and opens them on Places', async () => {
+  // The user, Nov 4: "Don't need not checked in watches now": it's on
+  // Places (Checked by), where a place is.
+  it('has no Not checked box: that’s on Places', async () => {
     const approved = (id: string, listing: Record<string, unknown>) => ({ id, name: id, category: 'synagogue', status: 'approved', hasAddress: true, changedAt: ago(1), listing: { id, ...listing } })
     await renderTab([], {
       categories: [shulCategory],
@@ -257,8 +269,9 @@ describe('WatchesManager', () => {
       sites: [],
       links: [],
     })
-    expect(within(screen.getByRole('region', { name: 'Not checked' })).getByRole('link')).toHaveTextContent('1 place')
-    expect(row('1 place')).toHaveAttribute('href', '/philly/admin/places?checked=not-watched')
+    await screen.findByTestId('watches-sentence')
+    expect(screen.queryByRole('region', { name: 'Not checked' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /1 place/ })).toBeNull()
   })
 
   it('says so when the jobs couldn’t be loaded', async () => {
