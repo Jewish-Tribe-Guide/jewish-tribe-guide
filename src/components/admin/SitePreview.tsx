@@ -121,15 +121,12 @@ export default function SitePreview({
   sections,
   initialDevice = 'computer',
   spot = null,
-  page = '',
 }: {
   community: string
   settings: SiteSettings
   sections: DraftHomeSection[]
   initialDevice?: PreviewDevice
   spot?: string | null
-  /** A page other than the home page, for what shows only there. */
-  page?: string
 }) {
   // Which draft the frame shows; 0 until the first one is written, so the
   // frame never loads ahead of it and shows the saved site instead. A pause
@@ -144,5 +141,5 @@ export default function SitePreview({
     return () => clearTimeout(t)
   }, [settings, sections])
 
-  return <PreviewBeside src={version > 0 ? previewUrl(community, page) : undefined} reload={version} initialDevice={initialDevice} spot={spot} />
+  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} initialDevice={initialDevice} spot={spot} />
 }

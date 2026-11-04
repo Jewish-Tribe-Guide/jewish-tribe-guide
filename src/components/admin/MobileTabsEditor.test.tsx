@@ -45,16 +45,20 @@ describe('MobileTabsEditor', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('a row opens to its name, what it opens, and Take it off', async () => {
+  // The name is edited in the row, beside a trash can (the user, Nov 4).
+  it('a row opens to its name in the row, a trash can, and what it opens', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     show(TABS, onChange)
     await user.click(screen.getByRole('button', { name: 'Map' }))
-    const name = screen.getByLabelText('Name')
+    expect(screen.getByLabelText('Opens')).toHaveValue('map')
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    const name = screen.getByRole('textbox', { name: 'Name' })
     await user.clear(name)
     await user.type(name, 'Find')
     expect(screen.getByRole('button', { name: 'Find' })).toHaveAttribute('aria-expanded', 'true')
-    await user.click(screen.getByRole('button', { name: 'Take it off' }))
+    expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Take Find off' }))
     expect(onChange).toHaveBeenLastCalledWith([TABS[0], TABS[2]])
   })
 

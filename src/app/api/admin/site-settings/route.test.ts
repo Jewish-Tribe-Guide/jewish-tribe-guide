@@ -49,4 +49,27 @@ describe('PATCH /api/admin/site-settings', () => {
       expect(m.updateSiteSettings).not.toHaveBeenCalled()
     },
   )
+
+  // Tabs (lib/navTabs.ts): all links or all headings, headings hold links,
+  // nothing deeper; an empty tab saves, since it's just not shown yet.
+  const link = (id: string) => ({ id, label: id, kind: 'link', target: 'about' })
+  const heading = (id: string, items: unknown[] = [link(`${id}-l`)]) => ({ id, label: id, kind: 'heading', items })
+  const tab = (items: unknown[]) => ({ id: 't', label: 'Tab', kind: 'more-menu', items })
+  it.each([
+    ['an empty tab', tab([])],
+    ['a tab of links', tab([link('a'), link('b')])],
+    ['a tab of headings', tab([heading('h1'), heading('h2', [])])],
+  ])('saves %s', async (_name, item) => {
+    expect((await patch({ desktopNavItems: [item] })).status).toBe(200)
+  })
+
+  it.each([
+    ['links and headings mixed', tab([link('a'), heading('h')])],
+    ['a heading in a heading', tab([heading('h', [heading('deeper')])])],
+    ['a heading outside a tab', heading('h')],
+    ['a tab in a tab', tab([tab([])])],
+  ])('refuses %s', async (_name, item) => {
+    expect((await patch({ desktopNavItems: [item] })).status).toBe(400)
+    expect(m.updateSiteSettings).not.toHaveBeenCalled()
+  })
 })

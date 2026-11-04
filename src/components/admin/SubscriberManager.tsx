@@ -6,7 +6,7 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import type { Subscriber } from '@/lib/subscriberStore'
-import { useCardOptions } from './HomeSectionManager'
+import { useCardOptions } from './useCardOptions'
 
 // ── A "Subscribers" section inside the home page's email sign-up card: everyone who's
 // opted in to "Stay in the Loop" (SubscribeSection, desktop-only) — the one

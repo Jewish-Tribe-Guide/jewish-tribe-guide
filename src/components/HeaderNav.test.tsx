@@ -6,7 +6,7 @@ import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
-import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { SITE_SETTINGS_DEFAULTS, type DesktopNavItem } from '@/lib/siteSettings'
 import HeaderNav from './HeaderNav'
 
 // Replaces SectionTabs — see this component's own doc for why. The mega-menu
@@ -183,7 +183,10 @@ describe('HeaderNav — More', () => {
               id: 'more',
               label: 'More',
               kind: 'more-menu',
-              items: [{ id: 'about', label: 'Who we are', kind: 'link', target: 'about' }],
+              items: [
+                { id: 'about', label: 'Who we are', kind: 'link', target: 'about' },
+                { id: 'privacy', label: 'Privacy', kind: 'link', target: 'privacy' },
+              ],
             },
           ],
         },
@@ -197,6 +200,58 @@ describe('HeaderNav — More', () => {
 
     await user.click(screen.getByRole('button', { name: /More/ }))
     expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/test-community/about')
+  })
+
+  // Tabs (lib/navTabs.ts): one link is a link, two a dropdown, headings a
+  // dropdown with links under each; an empty tab isn't on the site.
+  const tabs = (desktopNavItems: DesktopNavItem[], feedbackEnabled = true) =>
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery, mapCategory], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled, desktopNavItems } },
+    })
+
+  it('a tab with one link is that link, under the tab’s name', () => {
+    tabs([{ id: 't', label: 'Who we are', kind: 'more-menu', items: [{ id: 'a', label: 'About', kind: 'link', target: 'about' }] }])
+    expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/test-community/about')
+    expect(screen.queryByRole('button', { name: /Who we are/ })).not.toBeInTheDocument()
+  })
+
+  it('a tab whose second link is hidden is a link too', () => {
+    tabs(
+      [
+        {
+          id: 't',
+          label: 'Help',
+          kind: 'more-menu',
+          items: [
+            { id: 'a', label: 'About', kind: 'link', target: 'about' },
+            { id: 'f', label: 'Feedback', kind: 'link', target: 'feedback' },
+          ],
+        },
+      ],
+      false,
+    )
+    expect(screen.getByRole('link', { name: 'Help' })).toHaveAttribute('href', '/test-community/about')
+  })
+
+  it('a tab of headings is a dropdown with each heading over its links; an empty heading or tab isn’t shown', async () => {
+    const user = userEvent.setup()
+    tabs([
+      {
+        id: 't',
+        label: 'Info',
+        kind: 'more-menu',
+        items: [
+          { id: 'h1', label: 'Pages', kind: 'heading', items: [{ id: 'a', label: 'About', kind: 'link', target: 'about' }] },
+          { id: 'h2', label: 'Empty', kind: 'heading', items: [] },
+        ],
+      },
+      { id: 'e', label: 'New tab', kind: 'more-menu', items: [] },
+    ])
+    expect(screen.queryByRole('button', { name: /New tab/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Info/ }))
+    expect(screen.getByText('Pages')).toBeInTheDocument()
+    expect(screen.queryByText('Empty')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/test-community/about')
   })
 
   it('hides the feedback item when an admin has turned feedback off', async () => {

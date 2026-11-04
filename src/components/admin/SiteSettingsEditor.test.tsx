@@ -80,7 +80,7 @@ describe('SiteSettingsEditor — Home page', () => {
   it('sorts its settings by what they change on the home page', async () => {
     await renderEditor('home')
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(boxes).toEqual(['Top of the page', 'Cards under the search, on a computer', 'Groups on the Browse page', 'Today home', 'When the link is shared'])
+    expect(boxes).toEqual(['Top of the page', 'Cards under the search, on a computer', 'Today home', 'When the link is shared'])
     // The header's settings are on their own tab.
     expect(screen.queryByText('Tabs, on a phone')).toBeNull()
   })
@@ -256,7 +256,7 @@ describe('SiteSettingsEditor — Header and menus', () => {
     await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Old name', feedbackHeading: 'Old heading' })
     const top = screen.getByRole('region', { name: 'Top of the page, on a computer' })
     await user.click(within(top).getByRole('button', { name: 'Map' }))
-    await user.click(within(top).getByRole('button', { name: 'Take it off' }))
+    await user.click(within(top).getAllByRole('button', { name: 'Take Map off' })[0]!)
     await saveWith(user, SITE_SETTINGS_DEFAULTS)
     expect(Object.keys(sentBody())).toEqual(['desktopNavItems'])
   })
@@ -271,7 +271,8 @@ describe('SiteSettingsEditor — Header and menus', () => {
     const top = screen.getByRole('region', { name: 'Top of the page, on a computer' })
     for (let i = 0; i < 10 && !screen.queryByText(warning); i++) {
       await user.click(within(top).getAllByRole('button', { expanded: false })[0])
-      await user.click(within(top).getByRole('button', { name: 'Take it off' }))
+      // The open tab's trash can comes before its links' ×s.
+      await user.click(within(top).getAllByRole('button', { name: /^Take .* off$/ })[0]!)
     }
     expect(screen.getByText(warning)).toBeInTheDocument()
   })

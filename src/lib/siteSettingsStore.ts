@@ -86,9 +86,9 @@ function toDesktopNavItem(entry: unknown): DesktopNavItem | null {
   if (!entry || typeof entry !== 'object') return null
   const { id, label, kind, target, items } = entry as Record<string, unknown>
   if (typeof id !== 'string' || !id.trim() || typeof label !== 'string' || !label.trim()) return null
-  if (kind !== 'categories-menu' && kind !== 'more-menu' && kind !== 'link') return null
+  if (kind !== 'categories-menu' && kind !== 'more-menu' && kind !== 'link' && kind !== 'heading') return null
   if (kind === 'link' && (typeof target !== 'string' || !target.trim())) return null
-  if (kind === 'more-menu') {
+  if (kind === 'more-menu' || kind === 'heading') {
     const subItems = Array.isArray(items) ? items.flatMap((i) => toDesktopNavItem(i) ?? []) : []
     return { id, label, kind, items: subItems }
   }

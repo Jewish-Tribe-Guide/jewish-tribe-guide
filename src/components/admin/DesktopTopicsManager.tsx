@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { BUILT_IN_BLOCKS, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
 import SubscriberManager from './SubscriberManager'
-import DragList, { OrderRow, rowButton } from './DragList'
+import DragList, { OrderRow } from './DragList'
 
 // ── The desktop home screen's five singleton cards — Categories & Search,
 // Davening Times, Update Listings, Email Signup, and Jewish Times —
@@ -165,28 +165,26 @@ export default function DesktopTopicsManager({
                 setOpenId(open ? null : c.id)
                 onOpenCard?.(open ? null : c.kind)
               }}
+              // The card's heading is its name, edited in the row.
+              rename={
+                meta?.headingKey
+                  ? {
+                      value: settings[meta.headingKey] as string,
+                      onChange: (v) => onSettingChange(meta.headingKey!, v as SiteSettings[NonNullable<typeof meta.headingKey>]),
+                    }
+                  : undefined
+              }
+              onRemove={() => setRemoving(c.id)}
             >
-              {meta?.headingKey && (
-                <div className={`grid grid-cols-1 gap-2 ${meta.eyebrowKey ? 'sm:grid-cols-2' : ''}`}>
-                  {meta.eyebrowKey && (
-                    <label className="block">
-                      <span className="block text-[13px] font-semibold text-slate-700 mb-1">Small line above</span>
-                      <input
-                        value={settings[meta.eyebrowKey] as string}
-                        onChange={(e) => onSettingChange(meta.eyebrowKey!, e.target.value as SiteSettings[typeof meta.eyebrowKey])}
-                        className={inputClass}
-                      />
-                    </label>
-                  )}
-                  <label className="block">
-                    <span className="block text-[13px] font-semibold text-slate-700 mb-1">Heading</span>
-                    <input
-                      value={settings[meta.headingKey!] as string}
-                      onChange={(e) => onSettingChange(meta.headingKey!, e.target.value as SiteSettings[NonNullable<typeof meta.headingKey>])}
-                      className={inputClass}
-                    />
-                  </label>
-                </div>
+              {meta?.eyebrowKey && (
+                <label className="block">
+                  <span className="block text-[13px] font-semibold text-slate-700 mb-1">Small line above</span>
+                  <input
+                    value={settings[meta.eyebrowKey] as string}
+                    onChange={(e) => onSettingChange(meta.eyebrowKey!, e.target.value as SiteSettings[typeof meta.eyebrowKey])}
+                    className={inputClass}
+                  />
+                </label>
               )}
               {c.kind === 'subscribe' && token && <SubscriberManager token={token} />}
               {removing === c.id ? (
@@ -200,9 +198,8 @@ export default function DesktopTopicsManager({
                   </button>
                 </div>
               ) : (
-                // The width and Take it off on one line (the user, Nov 4).
-                <div className="flex items-center gap-2.5">
-                  {!meta?.sharedRow && (
+                !meta?.sharedRow && (
+                  <div>
                     <div role="group" aria-label="Width" className="inline-flex gap-0.5 rounded-lg border border-slate-300 p-0.5">
                       {(['full', 'half'] as const).map((w) => (
                         <button
@@ -218,11 +215,8 @@ export default function DesktopTopicsManager({
                         </button>
                       ))}
                     </div>
-                  )}
-                  <button type="button" onClick={() => setRemoving(c.id)} className={rowButton}>
-                    Take it off
-                  </button>
-                </div>
+                  </div>
+                )
               )}
               {!meta?.sharedRow && c.width === 'half' && removing !== c.id && (
                 <p className="m-0 text-[13px] text-slate-600">Sits beside the next half-width card.</p>

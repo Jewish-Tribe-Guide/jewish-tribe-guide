@@ -170,17 +170,23 @@ describe('DesktopTopicsManager', () => {
 
     expect(screen.queryByText('Heading')).not.toBeInTheDocument()
     expect(screen.queryByText('Small line above')).not.toBeInTheDocument()
+    // Its trash can is in the row, so it opens to nothing under it: no gap.
+    const opened = screen.getByRole('button', { name: 'Take Davening Times off' }).closest('[data-drag-row]')!.firstElementChild!
+    expect(opened.children).toHaveLength(1)
   })
 
   // Jewish Times has no eyebrow field at all — its real eyebrow is the
   // computed Hebrew date + location, not static text worth overriding (see
   // CARD_META's own doc).
-  it('shows only a Heading input for the Jewish Times card, no Eyebrow field', async () => {
+  // Its heading is its name, edited in the row (the user, Nov 4).
+  it('the Jewish Times card edits its heading in its row, with no Eyebrow field', async () => {
     const jewishTimes: DraftHomeSection = { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', cardIds: [], width: 'full' }
     renderManager([jewishTimes])
     await openRow(userEvent.setup(), new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`))
 
-    expect(screen.getByText('Heading')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue(SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading)
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    expect(screen.queryByText('Heading')).not.toBeInTheDocument()
     expect(screen.queryByText('Small line above')).not.toBeInTheDocument()
   })
 
@@ -225,7 +231,7 @@ describe('DesktopTopicsManager', () => {
     const { onChange } = renderManager([davening])
     await openRow(user, /^Davening Times/)
 
-    await user.click(screen.getByRole('button', { name: 'Take it off' }))
+    await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
     expect(screen.getByText('Take Davening Times off the home page?')).toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Take it off' }))
@@ -239,11 +245,11 @@ describe('DesktopTopicsManager', () => {
     const { onChange } = renderManager([davening])
     await openRow(user, /^Davening Times/)
 
-    await user.click(screen.getByRole('button', { name: 'Take it off' }))
+    await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
     await user.click(screen.getByRole('button', { name: 'Leave it' }))
 
     expect(onChange).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Take it off' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
   })
 
   // Up and down sit on each row, without opening it, and a phone's thumb
@@ -266,16 +272,17 @@ describe('DesktopTopicsManager', () => {
     expect(onChange).toHaveBeenCalledWith([davening, browse])
   })
 
-  it('puts the width and Take it off on one line', async () => {
+  it('an open card has a trash can in its row and no Take it off button', async () => {
     const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
     renderManager([subscribe])
     await openRow(userEvent.setup(), /^Stay in the Loop/)
-    const width = screen.getByRole('group', { name: 'Width' })
-    expect(screen.getByRole('button', { name: 'Take it off' }).parentElement).toBe(width.parentElement)
+    expect(screen.getByRole('group', { name: 'Width' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Take Stay in the Loop off' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
   })
 
   // The same shared draft array also carries plain category sections (see
-  // HomeSectionManager) — this component must never touch or reorder them.
+  // DesktopNavEditor's Categories headings) — this component must never touch or reorder them.
   it('leaves a plain section entry riding along in the draft completely untouched', async () => {
     const user = userEvent.setup()
     const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery'], width: 'full' }
@@ -283,7 +290,7 @@ describe('DesktopTopicsManager', () => {
     const { onChange } = renderManager([section, davening])
 
     await openRow(user, /^Davening Times/)
-    await user.click(screen.getByRole('button', { name: 'Take it off' }))
+    await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
     await user.click(screen.getByRole('button', { name: 'Take it off' }))
 
     expect(onChange).toHaveBeenCalledWith([section])

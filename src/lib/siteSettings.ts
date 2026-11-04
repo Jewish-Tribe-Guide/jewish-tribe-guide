@@ -122,15 +122,17 @@ export type DesktopNavItem = {
   label: string
   /** 'categories-menu' is the one fixed built-in — the mega-menu driven by
    *  Home page sections, always the same panel, can't point anywhere else.
-   *  'more-menu' opens a small nested list of its own 'link' items (`items`
-   *  below). Anything else is a plain 'link'. */
-  kind: 'categories-menu' | 'more-menu' | 'link'
+   *  'more-menu' is a tab (lib/navTabs.ts): its `items` are all 'link' (one
+   *  is a link on the site, two a dropdown) or all 'heading'. A top-level
+   *  'link' is a tab saved before tabs, holding one link. A 'heading' is
+   *  only ever inside a tab, its `items` its links. */
+  kind: 'categories-menu' | 'more-menu' | 'link' | 'heading'
   /** Only for kind 'link': a built-in destination (see
    *  BUILT_IN_DESKTOP_LINK_TARGETS) or a CardDef id (category slug / form
    *  id), same targets a mobile tab can point at. */
   target?: string
-  /** Only for kind 'more-menu': its own ordered sub-items, each kind
-   *  'link' (never nested further). */
+  /** For kind 'more-menu' and 'heading': their own ordered items. Nothing
+   *  goes deeper than a tab's headings' links. */
   items?: DesktopNavItem[]
 }
 

@@ -2421,38 +2421,27 @@ Built Nov 4, from the user's picks:
   - Only checked in Chrome, including a simulated touch. Not tried on a
     real phone yet.
 
+- **Top of the page: tabs, links and headings:** built as drawn
+  (KdHT8Tci1ufXSXobnnSfEm v15). Links and dropdowns are one thing, a tab
+  (`navTabs.ts`): one link in it shows as a link, two as a dropdown.
+  - What goes in first decides: "+ Add a tab" adds an empty "New tab", its
+    name selected, with "+ Add a link" and "+ Add a heading". With links in
+    it, only links; with headings, only headings, and links go inside
+    each. Nothing goes deeper (the save route refuses it). An empty tab or
+    heading says "Nothing in it yet" in its row and isn't on the site.
+  - An open row edits its name in place, a trash can beside its chevron.
+    The same row now on Tabs on a phone and Cards under the search (the
+    user, Nov 4): no Name box, no Take it off button.
+  - The groups are Categories' headings, and the "Groups on the Browse
+    page" box is gone from the Home page (`HomeSectionManager` deleted).
+    The leftover group is "Other" (was "More"), the last row, with no
+    handle or trash; new categories land there.
+  - Not in the drawing: a dropdown's links still open, to rename and pick
+    where they go. Taking off a card or a Categories heading still asks
+    once ("Its links move to Other"); a tab, heading or link goes at once.
+  - Only checked in Chrome (computer and phone width). Not on a real phone.
+
 Still open:
-- **Top of the page: tabs, links and headings:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v15: boards "New · What goes in first
-  decides" and "Tabs, links and headings"; the one-rule (v10) and
-  all-or-nothing (v11) boards are off the drawing). The user: links and
-  dropdowns are one thing, a tab; one link in it makes it a link, two a
-  dropdown.
-  - What goes in first decides (the user's rule): "+ Add a tab" adds an
-    empty "New tab", its Name highlighted, with "+ Add a link" and
-    "+ Add a heading". With links in it, only "+ Add a link"; with
-    headings, only "+ Add a heading", and links go inside each. Emptied,
-    both are back. Nothing moves or changes shape, and nothing goes
-    deeper. An empty tab or heading says "Nothing in it yet" under its
-    name (the user), and isn't on the site. On the site, the
-    two shapes it has today: a list (More) or columns under headings
-    (Categories).
-  - A row that's open edits its name in place, the trash beside its
-    chevron; no separate Name box (the user: "Should we just be able to
-    edit the place itself?"). A new tab or heading opens with its name
-    selected. Open, tapping the name edits it, so the chevron closes the
-    row: try on a real phone.
-  - A one-link tab shows only its Add, with no hint about making it a
-    dropdown (the user, Nov 4).
-  - So the groups are Categories' headings (the "Groups on the Browse
-    page" box on Site → Home page goes: `/browse` still draws them, but no
-    tab or link opens it, checked Nov 4), cards in a tab are links, and
-    the leftover group is "Other", where new categories land.
-  - My picks, drawn but not yet agreed: a trash can in place of the Take
-    it off button; Other as a real last row (no handle,
-    no trash).
-  - Card width on the home page stays a Full/Half switch.
-  - Waiting on the user's look before building.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 

@@ -2,25 +2,27 @@
 
 import { useMemo, useState } from 'react'
 import { BUILT_IN_DESKTOP_LINK_TARGETS, type DesktopNavItem } from '@/lib/siteSettings'
-import { useCardOptions } from './HomeSectionManager'
-import DragList, { AddMenu, InnerRow, OrderRow, addButton, rowButton } from './DragList'
+import { newDraftSectionId, type DraftHomeSection } from '@/lib/homeSections'
+import { headingLine, headings, tabHolds, tabItems, tabLine, withTabItems } from '@/lib/navTabs'
+import { LEFTOVER_SECTION } from '@/components/home/sections'
+import { useCardOptions } from './useCardOptions'
+import DragList, { AddMenu, InnerRow, OrderRow, addButton, type RowRename } from './DragList'
 
-// ── The desktop header's top nav editor — Categories / Map / More by
-// default, now add/rename/reorder/remove-able the same way MobileTabsEditor
-// already lets the mobile tab bar be. Replaces what used to be a fully
-// hardcoded structure in HeaderNav.tsx (including the More panel's own
-// About/Feedback/Privacy sub-items, which nest one level in here as a
-// 'more-menu' item's own `items` list — see DesktopNavItem's own doc).
+// ── The top of the page, on a computer, as tabs (the user, Nov 4; drawing
+// KdHT8Tci1ufXSXobnnSfEm, boards "New · What goes in first decides" and
+// "Tabs, links and headings"). A tab holds links or headings, and what goes
+// in first decides which (lib/navTabs.ts): an empty tab offers both, a tab
+// with a link offers only links, a tab with a heading only headings.
 //
-// 'categories-menu' is the one fixed built-in that isn't a link at all —
-// it's the mega-menu driven by Home page sections (Site tab), so it has no
-// "Opens" destination to pick; renaming it is still allowed (it's just a
-// label on a trigger), same as any other item.
+// Categories is the tab whose headings are the home sections — the groups,
+// which only ever showed as this menu's columns, so they're edited here now
+// rather than on the Home page. Its last row is Other, where any category in
+// no heading lands; Other has no handle and no trash can, since it isn't a
+// heading anyone made.
 //
-// Reuses useCardOptions — the same list the featured-card picker, the
-// mobile tab bar, and the section manager all draw from — so a top-level or
-// More-panel item can point anywhere those can, and a newly added category
-// shows up here without touching this file. ─────────────────────────────────
+// Reuses useCardOptions — the same list the featured-card picker and the
+// mobile tab bar draw from — so a link can point anywhere those can, and a
+// newly added category shows up here without touching this file. ──────────
 
 const BUILT_IN_LABELS: Record<string, string> = {
   map: 'Map',
@@ -32,11 +34,6 @@ const BUILT_IN_LABELS: Record<string, string> = {
 
 function newItemId(): string {
   return `nav_${Math.random().toString(36).slice(2, 9)}`
-}
-
-function targetLabelFn(cardOptions: ReturnType<typeof useCardOptions>) {
-  const byId = new Map(cardOptions.map((c) => [c.id, c.label]))
-  return (target: string) => BUILT_IN_LABELS[target] ?? byId.get(target) ?? target
 }
 
 /** What a row says its link opens, as the site's own screens are called. */
@@ -53,30 +50,37 @@ const inputClass =
 
 const fieldLabel = 'block text-[13px] font-semibold text-slate-700 mb-1'
 
+type Option = { id: string; label: string }
+
 export default function DesktopNavEditor({
   items,
   onChange,
+  sections = [],
+  onSectionsChange = () => {},
 }: {
   items: DesktopNavItem[]
   onChange: (items: DesktopNavItem[]) => void
+  /** Every home_section row: the plain ones are Categories' headings. */
+  sections?: DraftHomeSection[]
+  onSectionsChange?: (sections: DraftHomeSection[]) => void
 }) {
   const cardOptions = useCardOptions()
-  const targetLabel = useMemo(() => targetLabelFn(cardOptions), [cardOptions])
+  const targetLabel = useMemo(() => {
+    const byId = new Map(cardOptions.map((c) => [c.id, c.label]))
+    return (target: string) => BUILT_IN_LABELS[target] ?? byId.get(target) ?? target
+  }, [cardOptions])
   const opens = (target: string) => `Opens ${OPENS[target] ?? targetLabel(target)}`
-  // Each link one row saying where it goes; a dropdown opens to its own
-  // links, in the same rows (note 27).
+  const allTargets: Option[] = [...BUILT_IN_DESKTOP_LINK_TARGETS.map((t) => ({ id: t, label: BUILT_IN_LABELS[t]! })), ...cardOptions]
   const [openId, setOpenId] = useState<string | null>(null)
+  // Just added: its name is selected, ready to type over.
+  const [fresh, setFresh] = useState<string | null>(null)
   const toggle = (id: string) => setOpenId(openId === id ? null : id)
 
   const hasCategoriesMenu = items.some((i) => i.kind === 'categories-menu')
-  const takenTopLevel = new Set(items.filter((i) => i.kind === 'link').map((i) => i.target))
-  const topLevelLinkOptions = [
-    ...BUILT_IN_DESKTOP_LINK_TARGETS.filter((t) => !takenTopLevel.has(t)).map((t) => ({ id: t, label: BUILT_IN_LABELS[t] })),
-    ...cardOptions.filter((c) => !takenTopLevel.has(c.id)),
-  ]
+  const headingCount = sections.filter((s) => s.kind === 'section').length
 
-  function update(id: string, patch: Partial<DesktopNavItem>) {
-    onChange(items.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+  function update(id: string, next: DesktopNavItem) {
+    onChange(items.map((i) => (i.id === id ? next : i)))
   }
 
   function remove(id: string) {
@@ -88,14 +92,14 @@ export default function DesktopNavEditor({
     const id = newItemId()
     onChange([...items, { id, ...item }])
     setOpenId(id)
+    setFresh(id)
   }
 
-  function line(item: DesktopNavItem) {
-    if (item.kind === 'categories-menu') return 'Menu of the Browse groups'
-    if (item.kind === 'link') return opens(item.target!)
-    const subs = item.items ?? []
-    return `Dropdown · ${subs.length ? subs.map((s) => s.label).join(', ') : 'nothing in it yet'}`
-  }
+  const rename = (item: DesktopNavItem): RowRename => ({
+    value: item.label,
+    fresh: fresh === item.id,
+    onChange: (label) => update(item.id, { ...item, label }),
+  })
 
   return (
     <div>
@@ -105,38 +109,33 @@ export default function DesktopNavEditor({
 
       <DragList items={items} keyOf={(i) => i.id} nameOf={(i) => i.label} onReorder={onChange}>
         {(item, row) => (
-          <OrderRow row={row} name={item.label || 'Untitled'} line={line(item)} open={openId === item.id} onToggle={() => toggle(item.id)}>
-            <label className="block">
-              <span className={fieldLabel}>Name</span>
-              <input value={item.label} onChange={(e) => update(item.id, { label: e.target.value })} className={inputClass} />
-            </label>
-            {item.kind === 'link' && (
-              <OpensField value={item.target!} options={topLevelLinkOptions} targetLabel={targetLabel} onChange={(target) => update(item.id, { target })} />
-            )}
-            {item.kind === 'more-menu' ? (
-              <MoreMenuItems
-                items={item.items ?? []}
-                onChange={(subItems) => update(item.id, { items: subItems })}
+          <OrderRow
+            row={row}
+            name={item.label || 'Untitled'}
+            line={item.kind === 'categories-menu' ? `Dropdown · ${headings(headingCount)}` : tabLine(item, opens)}
+            open={openId === item.id}
+            onToggle={() => toggle(item.id)}
+            rename={rename(item)}
+            onRemove={() => remove(item.id)}
+          >
+            {item.kind === 'categories-menu' ? (
+              <CategoriesHeadings sections={sections} onChange={onSectionsChange} cardOptions={cardOptions} />
+            ) : (
+              <TabContents
+                tab={item}
+                onChange={(next) => update(item.id, next)}
+                allTargets={allTargets}
                 targetLabel={targetLabel}
                 opens={opens}
-                topLevelLinkOptions={topLevelLinkOptions}
-                onRemoveMenu={() => remove(item.id)}
               />
-            ) : (
-              <div>
-                <button type="button" onClick={() => remove(item.id)} className={rowButton}>
-                  Take it off
-                </button>
-              </div>
             )}
           </OrderRow>
         )}
       </DragList>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
-        <AddMenu label="+ Add a link" options={topLevelLinkOptions} onPick={(target) => add({ label: targetLabel(target), kind: 'link', target })} />
-        <button type="button" onClick={() => add({ label: 'More', kind: 'more-menu', items: [] })} className={addButton}>
-          + Add a dropdown
+        <button type="button" onClick={() => add({ label: 'New tab', kind: 'more-menu', items: [] })} className={addButton}>
+          + Add a tab
         </button>
         {!hasCategoriesMenu && (
           <button type="button" onClick={() => add({ label: 'Categories', kind: 'categories-menu' })} className={addButton}>
@@ -148,93 +147,266 @@ export default function DesktopNavEditor({
   )
 }
 
-function OpensField({
-  value,
-  options,
-  targetLabel,
+/** An open tab: its links or headings, and what can go in next. */
+function TabContents({
+  tab,
   onChange,
-}: {
-  value: string
-  options: { id: string; label: string }[]
-  targetLabel: (target: string) => string
-  onChange: (target: string) => void
-}) {
-  return (
-    <label className="block">
-      <span className={fieldLabel}>Opens</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
-        {/* The current target stays selectable, though this very row has it. */}
-        <option value={value}>{targetLabel(value)}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-// The links inside a 'more-menu' item, in the same rows — minus adding
-// another dropdown or the Categories menu (a nested dropdown, or one
-// mega-menu nested inside another, isn't a shape this header can render).
-// A link's name opens it to rename it or change where it goes.
-function MoreMenuItems({
-  items,
-  onChange,
+  allTargets,
   targetLabel,
   opens,
-  topLevelLinkOptions,
-  onRemoveMenu,
 }: {
-  items: DesktopNavItem[]
-  onChange: (items: DesktopNavItem[]) => void
+  tab: DesktopNavItem
+  onChange: (tab: DesktopNavItem) => void
+  allTargets: Option[]
   targetLabel: (target: string) => string
   opens: (target: string) => string
-  topLevelLinkOptions: { id: string; label: string }[]
-  onRemoveMenu: () => void
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
-  const taken = new Set(items.map((i) => i.target))
-  const available = topLevelLinkOptions.filter((o) => !taken.has(o.id))
+  const [fresh, setFresh] = useState<string | null>(null)
+  const holds = tabHolds(tab)
+  const inside = tabItems(tab)
+  const set = (next: DesktopNavItem[]) => onChange(withTabItems(tab, next))
 
-  function update(id: string, patch: Partial<DesktopNavItem>) {
-    onChange(items.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+  function addLink(target: string) {
+    set([...inside, { id: newItemId(), label: targetLabel(target), kind: 'link', target }])
   }
-  function add(target: string) {
+  function addHeading() {
     const id = newItemId()
-    onChange([...items, { id, label: targetLabel(target), kind: 'link', target }])
+    set([...inside, { id, label: 'New heading', kind: 'heading', items: [] }])
     setOpenId(id)
+    setFresh(id)
   }
+
+  const linkAdd = <AddMenu label="+ Add a link" options={allTargets.filter((o) => !inside.some((i) => i.target === o.id))} onPick={addLink} />
+  const headingAdd = (
+    <button type="button" onClick={addHeading} className={addButton}>
+      + Add a heading
+    </button>
+  )
 
   return (
     <>
-      {items.length > 0 && (
-        <DragList items={items} keyOf={(i) => i.id} nameOf={(i) => i.label} onReorder={onChange} className="rounded-lg border border-slate-200">
-          {(sub, row) => (
-            <InnerRow
-              row={row}
-              name={sub.label || 'Untitled'}
-              aside={opens(sub.target!)}
-              onRemove={() => onChange(items.filter((i) => i.id !== sub.id))}
-              open={openId === sub.id}
-              onToggle={() => setOpenId(openId === sub.id ? null : sub.id)}
-            >
-              <label className="block">
-                <span className={fieldLabel}>Name</span>
-                <input value={sub.label} onChange={(e) => update(sub.id, { label: e.target.value })} className={inputClass} />
-              </label>
-              <OpensField value={sub.target!} options={available} targetLabel={targetLabel} onChange={(target) => update(sub.id, { target })} />
-            </InnerRow>
-          )}
+      {holds === 'links' && <Links links={inside} onChange={set} allTargets={allTargets} targetLabel={targetLabel} opens={opens} />}
+      {holds === 'headings' && (
+        <DragList items={inside} keyOf={(h) => h.id} nameOf={(h) => h.label} onReorder={set} className="rounded-lg border border-slate-200">
+          {(h, row) => {
+            const links = h.items ?? []
+            const put = (next: DesktopNavItem) => set(inside.map((i) => (i.id === h.id ? next : i)))
+            return (
+              <OrderRow
+                row={row}
+                name={h.label || 'Untitled'}
+                line={headingLine(links.map((l) => l.label))}
+                open={openId === h.id}
+                onToggle={() => setOpenId(openId === h.id ? null : h.id)}
+                rename={{ value: h.label, fresh: fresh === h.id, onChange: (label) => put({ ...h, label }) }}
+                onRemove={() => set(inside.filter((i) => i.id !== h.id))}
+              >
+                {links.length > 0 && (
+                  <Links links={links} onChange={(next) => put({ ...h, items: next })} allTargets={allTargets} targetLabel={targetLabel} opens={opens} />
+                )}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <AddMenu
+                    label="+ Add a link"
+                    options={allTargets.filter((o) => !links.some((l) => l.target === o.id))}
+                    onPick={(target) => put({ ...h, items: [...links, { id: newItemId(), label: targetLabel(target), kind: 'link', target }] })}
+                  />
+                </div>
+              </OrderRow>
+            )
+          }}
         </DragList>
       )}
       <div className="flex flex-wrap items-center gap-2.5">
-        <AddMenu label="+ Add a link" options={available} onPick={add} />
-        <button type="button" onClick={onRemoveMenu} className={rowButton}>
-          Take it off
+        {holds !== 'headings' && linkAdd}
+        {holds !== 'links' && headingAdd}
+      </div>
+    </>
+  )
+}
+
+/** A tab's or a heading's links, each saying where it goes. A link's name
+ *  opens it, to rename it in its row and change where it goes. */
+function Links({
+  links,
+  onChange,
+  allTargets,
+  targetLabel,
+  opens,
+}: {
+  links: DesktopNavItem[]
+  onChange: (links: DesktopNavItem[]) => void
+  allTargets: Option[]
+  targetLabel: (target: string) => string
+  opens: (target: string) => string
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const put = (id: string, patch: Partial<DesktopNavItem>) => onChange(links.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+  return (
+    <DragList items={links} keyOf={(l) => l.id} nameOf={(l) => l.label} onReorder={onChange} className="rounded-lg border border-slate-200">
+      {(link, row) => (
+        <InnerRow
+          row={row}
+          name={link.label || 'Untitled'}
+          line={opens(link.target!)}
+          onRemove={() => onChange(links.filter((l) => l.id !== link.id))}
+          open={openId === link.id}
+          onToggle={() => setOpenId(openId === link.id ? null : link.id)}
+          rename={{ value: link.label, onChange: (label) => put(link.id, { label }) }}
+        >
+          <label className="block">
+            <span className={fieldLabel}>Opens</span>
+            <select value={link.target} onChange={(e) => put(link.id, { target: e.target.value })} className={inputClass}>
+              {/* The current target stays selectable, though this very row has it. */}
+              <option value={link.target}>{targetLabel(link.target!)}</option>
+              {allTargets
+                .filter((o) => !links.some((l) => l.target === o.id))
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </InnerRow>
+      )}
+    </DragList>
+  )
+}
+
+/** Categories' headings: the home sections, each over its categories, then
+ *  Other. A category is in one heading at most; picking one from another
+ *  heading moves it. Taking a heading off asks once, and its links move to
+ *  Other. */
+function CategoriesHeadings({
+  sections,
+  onChange,
+  cardOptions,
+}: {
+  sections: DraftHomeSection[]
+  onChange: (sections: DraftHomeSection[]) => void
+  cardOptions: Option[]
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
+  const labelById = useMemo(() => new Map(cardOptions.map((c) => [c.id, c.label])), [cardOptions])
+  const cardName = (id: string) => labelById.get(id) ?? id
+
+  const sectionEntries = sections.filter((s) => s.kind === 'section')
+  // The home page's built-in blocks share the table; left exactly as they are.
+  const builtInEntries = sections.filter((s) => s.kind !== 'section')
+  const assigned = new Set(sectionEntries.flatMap((s) => s.cardIds))
+  const other = cardOptions.filter((c) => !assigned.has(c.id))
+
+  const put = (id: string, patch: Partial<DraftHomeSection>) => onChange(sections.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+
+  function addHeading() {
+    const id = newDraftSectionId()
+    onChange([...sectionEntries, { id, kind: 'section', title: 'New heading', cardIds: [], width: 'full' }, ...builtInEntries])
+    setOpenId(id)
+    setFresh(id)
+  }
+
+  // Pulled out of whatever heading it was in: a category is in one at most.
+  function addCard(sectionId: string, cardId: string) {
+    onChange(
+      sections.map((s) => {
+        if (s.id === sectionId) return { ...s, cardIds: [...s.cardIds, cardId] }
+        if (s.cardIds.includes(cardId)) return { ...s, cardIds: s.cardIds.filter((id) => id !== cardId) }
+        return s
+      }),
+    )
+  }
+
+  function removeHeading(id: string) {
+    setRemoving(null)
+    setOpenId(null)
+    onChange(sections.filter((s) => s.id !== id))
+  }
+
+  const quiet = 'min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer'
+
+  return (
+    <>
+      <div className="rounded-lg border border-slate-200">
+        <DragList items={sectionEntries} keyOf={(s) => s.id} nameOf={(s) => s.title} onReorder={(next) => onChange([...next, ...builtInEntries])}>
+          {(s, row) => {
+            const open = openId === s.id
+            const availableHere = cardOptions
+              .filter((c) => !s.cardIds.includes(c.id))
+              .map((c) => ({ id: c.id, label: assigned.has(c.id) ? `${c.label} (move here)` : c.label }))
+            return (
+              <OrderRow
+                row={row}
+                name={s.title || 'Untitled'}
+                line={headingLine(s.cardIds.map(cardName))}
+                open={open}
+                onToggle={() => setOpenId(open ? null : s.id)}
+                rename={{ value: s.title, fresh: fresh === s.id, onChange: (title) => put(s.id, { title }) }}
+                onRemove={() => setRemoving(s.id)}
+              >
+                {s.cardIds.length > 0 && (
+                  <DragList
+                    items={s.cardIds}
+                    keyOf={(id) => id}
+                    nameOf={cardName}
+                    onReorder={(cardIds) => put(s.id, { cardIds })}
+                    className="rounded-lg border border-slate-200"
+                  >
+                    {(cardId, inner) => (
+                      <InnerRow row={inner} name={cardName(cardId)} onRemove={() => put(s.id, { cardIds: s.cardIds.filter((id) => id !== cardId) })} />
+                    )}
+                  </DragList>
+                )}
+                {removing === s.id ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="m-0 flex-1 text-sm font-semibold text-slate-900">
+                      Take {s.title || 'this heading'} off? Its links move to {LEFTOVER_SECTION}.
+                    </p>
+                    <button type="button" onClick={() => removeHeading(s.id)} className="min-h-10 px-3 rounded-lg bg-red-600 text-white text-sm font-semibold cursor-pointer">
+                      Take it off
+                    </button>
+                    <button type="button" onClick={() => setRemoving(null)} className={quiet}>
+                      Leave it
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <AddMenu label="+ Add a link" options={availableHere} onPick={(id) => addCard(s.id, id)} />
+                  </div>
+                )}
+              </OrderRow>
+            )
+          }}
+        </DragList>
+        <OtherRow names={other.map((c) => c.label)} />
+      </div>
+      <div>
+        <button type="button" onClick={addHeading} className={addButton}>
+          + Add a heading
         </button>
       </div>
     </>
+  )
+}
+
+/** Other, last: what's in no heading. No handle and no trash can; it opens
+ *  to its links. */
+function OtherRow({ names }: { names: string[] }) {
+  const [open, setOpen] = useState(false)
+  const line = names.length ? `${names.join(' · ')} · new categories land here` : 'New categories land here'
+  return (
+    <OrderRow row={{ handle: <span className="w-8 shrink-0" aria-hidden />, rowProps: { onPointerDown: () => {}, onContextMenu: () => {} }, lifted: false }} name={LEFTOVER_SECTION} line={line} open={open} onToggle={() => setOpen(!open)}>
+      {names.length > 0 && (
+        <ul className="m-0 flex list-none flex-col rounded-lg border border-slate-200 p-0">
+          {names.map((n) => (
+            <li key={n} className="border-b border-slate-100 px-3 py-2.5 text-[15px] font-medium text-slate-900 last:border-b-0">
+              {n}
+            </li>
+          ))}
+        </ul>
+      )}
+    </OrderRow>
   )
 }

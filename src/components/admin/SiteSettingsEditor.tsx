@@ -9,7 +9,6 @@ import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { adminBase } from '@/lib/adminNav'
-import HomeSectionManager from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
@@ -246,12 +245,6 @@ export default function SiteSettingsEditor({
                 </AdminBox>
               </div>
 
-              <div {...spotOn('groups')}>
-                <AdminBox title="Groups on the Browse page" count={sectionsDraft.filter((s) => s.kind === 'section').length}>
-                  <HomeSectionManager sections={sectionsDraft} onChange={setHomeSections} />
-                </AdminBox>
-              </div>
-
               {/* Held back from the site for now (see features.ts). */}
               {features.todayHome && (
                 <AdminBox title="Today home">
@@ -341,7 +334,12 @@ export default function SiteSettingsEditor({
               </AdminBox>
 
               <AdminBox title="Top of the page, on a computer">
-                <DesktopNavEditor items={draft.desktopNavItems} onChange={(items) => set('desktopNavItems', items)} />
+                <DesktopNavEditor
+                  items={draft.desktopNavItems}
+                  onChange={(items) => set('desktopNavItems', items)}
+                  sections={sectionsDraft}
+                  onSectionsChange={setHomeSections}
+                />
               </AdminBox>
 
               <AdminBox title="Tabs, on a phone" count={(draft.mobileTabs ?? DEFAULT_MOBILE_TABS).length}>
@@ -353,7 +351,7 @@ export default function SiteSettingsEditor({
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} spot={section === 'home' ? spot : null} page={section === 'home' && spot === 'groups' ? '/browse' : ''} />
+          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} spot={section === 'home' ? spot : null} />
         </aside>
       </div>
 

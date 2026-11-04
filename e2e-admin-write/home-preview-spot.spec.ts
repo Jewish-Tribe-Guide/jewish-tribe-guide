@@ -21,11 +21,6 @@ test('hovering a box lights its part of the preview, and a box for another devic
   await expect(lit.first()).toHaveAttribute('data-spot', /\bcards\b/, { timeout: 15_000 })
   expect(await page.evaluate(() => window.scrollY)).toBe(settingsAt)
 
-  // The groups only show on the Browse page, so the preview goes there.
-  await page.getByRole('region', { name: 'Groups on the Browse page' }).hover()
-  await expect(lit).toHaveAttribute('data-spot', 'groups', { timeout: 20_000 })
-  await expect(page.locator('iframe[title="Preview"]')).toHaveAttribute('src', /\/philly\/browse\?/)
-
   // A phone has none of the computer's cards.
   await page.getByRole('region', { name: 'Top of the page' }).hover()
   await page.getByRole('group', { name: 'Preview on' }).getByRole('button', { name: 'Phone' }).click()

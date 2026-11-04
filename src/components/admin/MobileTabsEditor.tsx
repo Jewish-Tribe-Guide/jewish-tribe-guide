@@ -10,8 +10,8 @@ import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
 import { useCategoriesIfAny } from '@/lib/contentContext'
 import { kindKeyById } from '@/lib/placeKinds'
 import { builtInTabIcon } from '../MobileTabBar'
-import { useCardOptions } from './HomeSectionManager'
-import DragList, { AddMenu, OrderRow, rowButton } from './DragList'
+import { useCardOptions } from './useCardOptions'
+import DragList, { AddMenu, OrderRow } from './DragList'
 
 // ── The mobile bottom tab bar editor ─────────────────────────────────────────
 // Phone-only. The bar is the mobile counterpart of the desktop featured-card
@@ -123,16 +123,9 @@ export default function MobileTabsEditor({
               }
               open={open}
               onToggle={() => setOpenId(open ? null : tab.id)}
+              rename={{ value: tab.label, placeholder: 'Shown under the icon', onChange: (label) => update(tab.id, { label }) }}
+              onRemove={() => remove(tab.id)}
             >
-              <label className="block">
-                <span className="block text-[13px] font-semibold text-slate-700 mb-1">Name</span>
-                <input
-                  value={tab.label}
-                  onChange={(e) => update(tab.id, { label: e.target.value })}
-                  placeholder="Shown under the icon"
-                  className={inputClass}
-                />
-              </label>
               <label className="block">
                 <span className="block text-[13px] font-semibold text-slate-700 mb-1">Opens</span>
                 <select value={tab.target} onChange={(e) => update(tab.id, { target: e.target.value })} className={inputClass}>
@@ -146,11 +139,6 @@ export default function MobileTabsEditor({
                   ))}
                 </select>
               </label>
-              <div>
-                <button type="button" onClick={() => remove(tab.id)} className={rowButton}>
-                  Take it off
-                </button>
-              </div>
             </OrderRow>
           )
         }}

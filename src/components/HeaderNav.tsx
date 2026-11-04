@@ -13,6 +13,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { routes } from '@/lib/routes'
 import { DEFAULT_DESKTOP_NAV_ITEMS, type DesktopNavItem } from '@/lib/siteSettings'
+import { tabHolds, tabItems } from '@/lib/navTabs'
 
 // Loaded when Feedback is first opened (it carries the anti-spam check), not
 // with every page's header.
@@ -263,11 +264,17 @@ export default function HeaderNav() {
           )
         }
 
-        if (item.kind === 'link') {
-          if (item.target === 'map' && !hasMap) return null
-          if (item.target === 'feedback' && !settings.feedbackEnabled) return null
-          const href = resolveHref(item.target!, hrefById, communitySlug, hasMap)
-          if (item.target === 'feedback') {
+        // A tab: one link is a link, two a dropdown, headings a dropdown
+        // with links under each (lib/navTabs.ts). An empty one isn't shown.
+        const shown = (link: DesktopNavItem) =>
+          link.target === 'feedback' ? settings.feedbackEnabled : resolveHref(link.target!, hrefById, communitySlug, hasMap) !== null
+        const holds = tabHolds(item)
+        const links = holds === 'links' ? tabItems(item).filter(shown) : []
+
+        if (links.length === 1) {
+          const target = links[0]!.target!
+          const href = resolveHref(target, hrefById, communitySlug, hasMap)
+          if (target === 'feedback') {
             return (
               <button
                 key={item.id}
@@ -288,7 +295,7 @@ export default function HeaderNav() {
               // KB budget; the user, Oct 13). It loads when it's opened.
               // Nor You, which carries the home's search to ask saved
               // searches again.
-              prefetch={item.target === 'map' || item.target === 'you' ? false : undefined}
+              prefetch={target === 'map' || target === 'you' ? false : undefined}
               className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
             >
               {item.label}
@@ -296,10 +303,18 @@ export default function HeaderNav() {
           )
         }
 
-        // 'more-menu' — a small nested dropdown of its own 'link' items
-        // (About/Feedback/Privacy by default).
-        const subItems = (item.items ?? []).flatMap((sub) => linkAction(sub, () => setOpen(null)) ?? [])
-        if (subItems.length === 0) return null
+        // A dropdown: its links (About/Feedback/Privacy by default), or its
+        // headings, each over its own links.
+        const close = () => setOpen(null)
+        const heads =
+          holds === 'headings'
+            ? tabItems(item).flatMap((h) => {
+                const actions = (h.items ?? []).filter(shown).flatMap((l) => linkAction(l, close) ?? [])
+                return actions.length ? [{ id: h.id, label: h.label, actions }] : []
+              })
+            : []
+        const subItems = links.flatMap((l) => linkAction(l, close) ?? [])
+        if (subItems.length === 0 && heads.length === 0) return null
         return (
           <div key={item.id} className="relative">
             <button
@@ -327,9 +342,16 @@ export default function HeaderNav() {
                 // the panel's left edge back near wherever the OTHER menu
                 // happens to start — the two looked like they opened from
                 // the same spot instead of each hanging from its own tab.
-                className="absolute left-0 top-full z-30 mt-3 w-48 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl"
+                className={`absolute left-0 top-full z-30 mt-3 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl ${heads.length ? 'flex gap-4' : 'w-48'}`}
               >
-                {subItems}
+                {heads.length
+                  ? heads.map((h) => (
+                      <div key={h.id} className="w-48">
+                        <p className="mb-1 px-3 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">{h.label}</p>
+                        {h.actions}
+                      </div>
+                    ))
+                  : subItems}
               </div>
             )}
           </div>
