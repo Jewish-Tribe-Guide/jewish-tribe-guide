@@ -2423,19 +2423,19 @@ Built Nov 4, from the user's picks:
 
 Still open:
 - **Top of the page: tabs, links and headings:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v11: boards "New · A dropdown is all links or
-  all headings" and "Tabs, links and headings"; the one-rule board, v10,
-  is off the drawing, as the user found it confusing). The user: links
-  and dropdowns are one thing, a tab; one link in it makes it a link, two
-  a dropdown. "+ Add a tab" at the top.
-  - A dropdown is all links or all headings (the user: "I can't imagine
-    we're going to have a dropdown with some headings and some not"). A
-    dropdown of links has "+ Add a link" and "+ Add a heading"; the first
-    heading takes its links, its Name highlighted to name it. A dropdown
-    of headings has "+ Add a heading", and links are added inside each.
-    Taking the last heading off makes it a plain list again. Nothing goes
-    deeper. On the site, the two shapes it has today: a list (More) or
-    columns under headings (Categories).
+  (KdHT8Tci1ufXSXobnnSfEm v12: boards "New · What goes in first
+  decides" and "Tabs, links and headings"; the one-rule (v10) and
+  all-or-nothing (v11) boards are off the drawing). The user: links and
+  dropdowns are one thing, a tab; one link in it makes it a link, two a
+  dropdown.
+  - What goes in first decides (the user's rule): "+ Add a tab" adds an
+    empty "New tab", its Name highlighted, with "+ Add a link" and
+    "+ Add a heading". With links in it, only "+ Add a link"; with
+    headings, only "+ Add a heading", and links go inside each. Emptied,
+    both are back. Nothing moves or changes shape, and nothing goes
+    deeper. An empty tab or heading isn't on the site. On the site, the
+    two shapes it has today: a list (More) or columns under headings
+    (Categories).
   - So the groups are Categories' headings (the "Groups on the Browse
     page" box on Site → Home page goes: `/browse` still draws them, but no
     tab or link opens it, checked Nov 4), cards in a tab are links, and
