@@ -2,7 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import type { NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { updateCategory, deleteCategory, renameCategoryId } from '@/lib/categoryStore'
+import { updateCategory, deleteCategory, categoryDeleteCounts, renameCategoryId } from '@/lib/categoryStore'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryFormSection } from '@/lib/categories'
@@ -202,7 +202,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 }
 
 // DELETE /api/admin/categories/:id — permanently remove a category and all of
-// its listings. Admin only.
+// its listings (and the Eruv's eruvim and their watches). Admin only.
+// ?dry=1 only counts what would go, for the confirm.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]'>) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const admin = await getAdminUserForCommunity(request, community.slug)
@@ -210,10 +211,13 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   const { id } = await ctx.params
   try {
-    const { listings } = await deleteCategory(community.slug, id)
+    if (new URL(request.url).searchParams.get('dry') === '1') {
+      return Response.json({ ok: true, ...(await categoryDeleteCounts(community.slug, id)) })
+    }
+    const counts = await deleteCategory(community.slug, id)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
-    return Response.json({ ok: true, listings })
+    return Response.json({ ok: true, ...counts })
   } catch (err) {
     console.error('[admin/categories/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete category.'] }, { status: 502 })

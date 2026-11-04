@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { isPlaceKind, PLACE_KIND_INFO, placeKindFromSlug, type PlaceKind } from './placeKinds'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { ERUV_WEBSITE_CREATOR } from './eruvWebsite'
 import { withAskWords } from './askWordStore'
 import { assertUsableSlug, slugify } from './routes'
 import { listCampaignBanners } from './campaignBannerStore'
@@ -448,24 +449,50 @@ export async function countCategoryListings(community: string, id: string): Prom
 // first (resource.category has no DB cascade), then the category row. Votes
 // cascade from the resource delete. Returns how many listings were removed so
 // the caller can confirm the scope of the deletion.
-export async function deleteCategory(community: string, id: string): Promise<{ listings: number }> {
+/** What deleting a category takes with it: its listings, and for the Eruv
+ *  category every eruv and its website's watch, which live in tables of
+ *  their own (the user, Nov 4: "Eruv should be able to be deleted as a
+ *  category"). */
+export type CategoryDeleteCounts = { listings: number; eruvim: number; watches: number }
+
+async function isEruvCategory(community: string, id: string): Promise<boolean> {
+  const { data } = await getAdminClient().from('category').select('kind').eq('community_id', community).eq('id', id).maybeSingle()
+  return (data as { kind?: string } | null)?.kind === 'eruv'
+}
+
+/** The counts alone, for the confirm. Deletes nothing. */
+export async function categoryDeleteCounts(community: string, id: string): Promise<CategoryDeleteCounts> {
   const supabase = getAdminClient()
+  const count = async (q: PromiseLike<{ count: number | null }>) => (await q).count ?? 0
+  const listings = await count(supabase.from('resource').select('id', { count: 'exact', head: true }).eq('community_id', community).eq('category', id))
+  if (!(await isEruvCategory(community, id))) return { listings, eruvim: 0, watches: 0 }
+  const [eruvim, watches] = await Promise.all([
+    count(supabase.from('eruv').select('id', { count: 'exact', head: true }).eq('community_id', community)),
+    count(supabase.from('watch').select('id', { count: 'exact', head: true }).eq('community_id', community).eq('created_by', ERUV_WEBSITE_CREATOR)),
+  ])
+  return { listings, eruvim, watches }
+}
+
+export async function deleteCategory(community: string, id: string): Promise<CategoryDeleteCounts> {
+  const supabase = getAdminClient()
+  const counts = await categoryDeleteCounts(community, id)
 
   // Scoped by community: `resource.category` is a plain text column (not a
   // foreign key into the composite category key), so an unscoped delete here
   // would remove every community's listings that happen to share this slug.
-  const { count } = await supabase
-    .from('resource')
-    .select('id', { count: 'exact', head: true })
-    .eq('community_id', community)
-    .eq('category', id)
-
   const { error: resErr } = await supabase
     .from('resource')
     .delete()
     .eq('community_id', community)
     .eq('category', id)
   if (resErr) throw new Error(`Failed to delete the category's listings: ${resErr.message}`)
+
+  if (counts.eruvim || counts.watches) {
+    const { error: watchErr } = await supabase.from('watch').delete().eq('community_id', community).eq('created_by', ERUV_WEBSITE_CREATOR)
+    if (watchErr) throw new Error(`Failed to delete the eruvim's watches: ${watchErr.message}`)
+    const { error: eruvErr } = await supabase.from('eruv').delete().eq('community_id', community)
+    if (eruvErr) throw new Error(`Failed to delete the eruvim: ${eruvErr.message}`)
+  }
 
   const { error: catErr } = await supabase
     .from('category')
@@ -474,5 +501,5 @@ export async function deleteCategory(community: string, id: string): Promise<{ l
     .eq('id', id)
   if (catErr) throw new Error(`Failed to delete category: ${catErr.message}`)
 
-  return { listings: count ?? 0 }
+  return counts
 }
