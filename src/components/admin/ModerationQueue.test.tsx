@@ -716,6 +716,17 @@ describe('ModerationQueue — a place opened', () => {
     expect(screen.queryByRole('link', { name: 'Open Mekor Habracha' })).toBeNull()
   })
 
+  // The user, Nov 4: Watches' "N things need fixing" opens To do on its
+  // broken checks.
+  it('opens on Broken checks from Watches’ link', async () => {
+    window.history.replaceState(null, '', '/?show=broken')
+    renderRouted({ submissions: [submission()], google: [notOnGoogle] })
+    await findRow('Mekor Habracha')
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('Broken checks')
+    expect(screen.queryByRole('button', { name: 'Open Acme Grocery' })).toBeNull()
+    expect(window.location.search).toBe('')
+  })
+
   it('opens on what the filter picked', async () => {
     const user = userEvent.setup()
     renderRouted({ submissions: [edit], google: [notOnGoogle] })

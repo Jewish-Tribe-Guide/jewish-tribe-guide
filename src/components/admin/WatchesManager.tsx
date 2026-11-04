@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { brokenPlaceCount } from '@/lib/todoPlaces'
+import { useTodo } from '@/lib/useTodo'
 import { jobLists, lastRunWord, needsFixing, watchesSentence } from '@/lib/watchJobList'
 import { lookAgainFix } from '@/lib/lookAgain'
 import type { NightKindId } from '@/lib/jobRuns'
@@ -77,6 +79,8 @@ function JobRow({ job, base, now }: { job: NightKindView; base: string; now: num
 export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
   const { jobs } = useWatchJobsAndReload(token)
+  const { data: todo } = useTodo(token, community)
+  const broken = todo ? brokenPlaceCount(todo) : 0
   // Read once per render pass for every row alike; the tab is reloaded to refresh.
   const [now] = useState(() => Date.now())
   const base = adminBase(community)
@@ -89,8 +93,20 @@ export default function WatchesManager({ token }: { token: string }) {
   const look = jobs.lookAgain
   const lookRun = look?.runs?.[0]
   const lookFix = look?.available && look.runs ? lookAgainFix(look.runs, now) : null
-  const fixes = [...needsFixing(lists.jobs), ...(lookFix ? [lookFix] : [])]
-  const sentence = watchesSentence(lists.jobs, fixes.length)
+  // A place's broken check is To do's, counted as To do counts it (the
+  // user, Nov 4: "do we need needs fixing or is that for to do?"); only a
+  // whole job failing is listed here.
+  const fixes = [...needsFixing(lists.jobs).filter((f) => f.whole), ...(lookFix ? [lookFix] : [])]
+  const sentence = watchesSentence(lists.jobs, fixes.length + broken)
+  const toBroken = `${base}?show=broken`
+  const sentenceBox = 'flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5'
+  const said = (
+    <>
+      {sentence.tone === 'good' && <GoodMark label="" />}
+      {sentence.tone === 'bad' && <BadMark label="" />}
+      <p className="m-0 text-lg font-semibold leading-snug text-slate-900">{sentence.text}</p>
+    </>
+  )
 
   return (
     <div className="flex flex-col gap-3">
@@ -103,17 +119,23 @@ export default function WatchesManager({ token }: { token: string }) {
           </Link>
         }
       />
-      <div className="flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5" data-testid="watches-sentence">
-        {sentence.tone === 'good' && <GoodMark label="" />}
-        {sentence.tone === 'bad' && <BadMark label="" />}
-        <p className="m-0 text-lg font-semibold leading-snug text-slate-900">{sentence.text}</p>
-      </div>
+      {/* Only broken checks: the sentence opens To do on them. */}
+      {broken > 0 && fixes.length === 0 ? (
+        <Link href={toBroken} className={`${sentenceBox} hover:bg-slate-50`} data-testid="watches-sentence">
+          {said}
+        </Link>
+      ) : (
+        <div className={sentenceBox} data-testid="watches-sentence">
+          {said}
+        </div>
+      )}
       <JobsNotLoaded jobs={jobs} />
       {fixes.length > 0 && (
         <AdminBox title="Needs fixing">
           <AdminRows items={fixes}>
             {(f) => <AdminRow key={`${f.name}${f.why}`} href={f.page ? `${base}/watches/${f.page}` : `${base}/watches`} name={f.name} line={<span className="text-amber-800">{f.why}</span>} />}
           </AdminRows>
+          {broken > 0 && <AdminRow href={toBroken} name="Broken checks" line={<span className="text-amber-800">{`${broken} ${broken === 1 ? 'place' : 'places'}`}</span>} />}
         </AdminBox>
       )}
       {WATCH_SOURCES.map((source) => {

@@ -8,11 +8,11 @@ import { useCategories } from '@/lib/useCategories'
 import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import { shownPlaces, todoPlaces } from '@/lib/todoPlaces'
+import { shownPlaces, todoPlaces, type TodoFilter } from '@/lib/todoPlaces'
 import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
 import { useTodoSplit } from './useTodoSplit'
 import { useFullPane } from './AdminUI'
-import TodoList, { ALL_OLDEST_FIRST } from './TodoList'
+import TodoList, { ALL_OLDEST_FIRST, type TodoView } from './TodoList'
 import TodoPlaceScreen from './TodoPlaceScreen'
 
 // The admin's front page, To do (mounted at /<community>/admin itself):
@@ -58,6 +58,17 @@ function subscribeToAddress(onChange: () => void) {
   }
 }
 
+const SHOWS: readonly TodoFilter[] = ['changes', 'new', 'broken', 'feedback']
+
+/** A link's `?show=broken` (Watches' "N things need fixing", Nov 4): To do
+ *  opens on it. Taken off the address once read, so it isn't kept in every
+ *  address after it. */
+function viewFromAddress(): TodoView {
+  if (typeof window === 'undefined') return ALL_OLDEST_FIRST
+  const shows = (new URLSearchParams(window.location.search).get('show') ?? '').split(',')
+  return { ...ALL_OLDEST_FIRST, filters: SHOWS.filter((f) => shows.includes(f)) }
+}
+
 /** `replace`: moving on by itself, so Back doesn't return to a place that's done. */
 function goTo(openId: string | null, replace = false) {
   const url = new URL(window.location.href)
@@ -78,7 +89,13 @@ export default function ModerationQueue({ session }: { session: Session }) {
   const openId = useSyncExternalStore(subscribeToAddress, openIdNow, () => null)
   const [openError, setOpenError] = useState<string | null>(null)
   // Kept while a place is open, the list beside it or behind it.
-  const [view, setView] = useState(ALL_OLDEST_FIRST)
+  const [view, setView] = useState(viewFromAddress)
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('show')) return
+    url.searchParams.delete('show')
+    window.history.replaceState(window.history.state, '', url)
+  }, [])
   // Same categories the public site and the category admin editor read —
   // loaded fresh per admin page request (see /admin/layout.tsx's
   // ContentProvider), so a field added a minute ago already has a `label`

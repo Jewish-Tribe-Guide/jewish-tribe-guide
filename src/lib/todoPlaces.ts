@@ -144,6 +144,11 @@ export function todoPlaceCount(data: Parameters<typeof todoPlaces>[0]): number {
   return todoPlaces(data, new Map()).length
 }
 
+/** The places To do lists under Broken checks, for Watches (Nov 4). */
+export function brokenPlaceCount(data: Parameters<typeof todoPlaces>[0]): number {
+  return todoPlaces(data, new Map()).filter((p) => p.things.some((t) => t.filter === 'broken')).length
+}
+
 /** The rows the search, the filters and the sort leave, in order. A place
  *  is in a filter when anything waiting there is; undated ones last. */
 export function shownPlaces(
