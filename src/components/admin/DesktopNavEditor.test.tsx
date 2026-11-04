@@ -88,8 +88,11 @@ describe('DesktopNavEditor — tabs', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(row('Rename Find on map')).toHaveTextContent('Find on map')
     expect(screen.getByRole('button', { name: 'Find on map', expanded: true })).toBeInTheDocument()
-    // The tab's trash can comes first; then its one link's ×.
-    await user.click(screen.getAllByRole('button', { name: 'Take Find on map off' })[0]!)
+    // Its trash can is last, at the bottom with the Adds (its one link, the
+    // tab saved before tabs, carries its name).
+    const trash = screen.getAllByRole('button', { name: 'Take Find on map off' }).at(-1)!
+    expect(trash.parentElement).toContainElement(screen.getByLabelText('+ Add a link'))
+    await user.click(trash)
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT_DESKTOP_NAV_ITEMS.filter((i) => i.id !== 'map'))
     expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
   })
@@ -97,8 +100,21 @@ describe('DesktopNavEditor — tabs', () => {
   it('a tap anywhere in the open row but its name and buttons closes it', async () => {
     const { user } = show()
     await user.click(row('Map'))
+    await user.click(screen.getByTestId('open-row'))
+    expect(row('Map')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('typing a name, a press elsewhere only finishes the typing: no row opens or closes', async () => {
+    const { user } = show()
+    await user.click(row('Map'))
     await user.click(row('Rename Map'))
+    await user.click(screen.getByTestId('open-row'))
+    expect(screen.queryByRole('textbox')).toBeNull()
     expect(row('Map')).toHaveAttribute('aria-expanded', 'true')
+    await user.click(row('Rename Map'))
+    await user.click(row('You'))
+    expect(row('You')).toHaveAttribute('aria-expanded', 'false')
+    // With nothing being typed, the next press does what it says.
     await user.click(screen.getByTestId('open-row'))
     expect(row('Map')).toHaveAttribute('aria-expanded', 'false')
   })

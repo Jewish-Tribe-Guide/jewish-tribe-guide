@@ -241,7 +241,7 @@ export default function SiteSettingsEditor({
 
               <div {...spotOn('cards')}>
                 <AdminBox title="Cards under the search, on a computer">
-                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onSettingChange={set} token={token} onOpenCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
+                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onSettingChange={set} onOpenCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
                 </AdminBox>
               </div>
 
@@ -342,7 +342,8 @@ export default function SiteSettingsEditor({
                 />
               </AdminBox>
 
-              <AdminBox title="Tabs, on a phone" count={(draft.mobileTabs ?? DEFAULT_MOBILE_TABS).length}>
+              {/* No count beside the title (the user, Nov 4); five at most says so when it's reached. */}
+              <AdminBox title="Tabs, on a phone">
                 <MobileTabsEditor tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS} onChange={(tabs) => set('mobileTabs', tabs)} />
               </AdminBox>
 

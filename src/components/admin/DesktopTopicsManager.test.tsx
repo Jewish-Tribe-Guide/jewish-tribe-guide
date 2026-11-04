@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { DraftHomeSection } from '@/lib/homeSections'
 import { SITE_SETTINGS_DEFAULTS, type SiteSettings } from '@/lib/siteSettings'
@@ -172,9 +172,10 @@ describe('DesktopTopicsManager', () => {
 
     expect(screen.queryByText('Heading')).not.toBeInTheDocument()
     expect(screen.queryByText('Small line above')).not.toBeInTheDocument()
-    // Its trash can is in the row, so it opens to nothing under it: no gap.
+    // It opens to its trash can alone, at the bottom (no width: it shares a row).
     const opened = screen.getByRole('button', { name: 'Take Davening Times off' }).closest('[data-drag-row]')!.firstElementChild!
-    expect(opened.children).toHaveLength(1)
+    expect(opened.children[1]!.textContent).toBe('')
+    expect(within(opened.children[1] as HTMLElement).getAllByRole('button')).toHaveLength(1)
   })
 
   // Jewish Times has no eyebrow field at all — its real eyebrow is the

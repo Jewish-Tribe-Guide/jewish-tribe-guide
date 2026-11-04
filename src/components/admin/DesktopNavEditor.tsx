@@ -6,7 +6,7 @@ import { newDraftSectionId, type DraftHomeSection } from '@/lib/homeSections'
 import { headingLine, headings, tabHolds, tabItems, tabLine, withTabItems } from '@/lib/navTabs'
 import { LEFTOVER_SECTION } from '@/components/home/sections'
 import { useCardOptions } from './useCardOptions'
-import DragList, { AddMenu, InnerRow, OrderRow, addButton, type RowRename } from './DragList'
+import DragList, { AddMenu, InnerRow, OrderRow, RowActions, addButton, type RowRename } from './DragList'
 
 // ── The top of the page, on a computer, as tabs (the user, Nov 4; drawing
 // KdHT8Tci1ufXSXobnnSfEm, boards "New · What goes in first decides" and
@@ -116,13 +116,13 @@ export default function DesktopNavEditor({
             open={openId === item.id}
             onToggle={() => toggle(item.id)}
             rename={rename(item)}
-            onRemove={() => remove(item.id)}
           >
             {item.kind === 'categories-menu' ? (
-              <CategoriesHeadings sections={sections} onChange={onSectionsChange} cardOptions={cardOptions} />
+              <CategoriesHeadings sections={sections} onChange={onSectionsChange} cardOptions={cardOptions} name={item.label || 'Untitled'} onRemove={() => remove(item.id)} />
             ) : (
               <TabContents
                 tab={item}
+                onRemove={() => remove(item.id)}
                 onChange={(next) => update(item.id, next)}
                 allTargets={allTargets}
                 linkName={linkName}
@@ -150,12 +150,14 @@ export default function DesktopNavEditor({
 /** An open tab: its links or headings, and what can go in next. */
 function TabContents({
   tab,
+  onRemove,
   onChange,
   allTargets,
   linkName,
   opens,
 }: {
   tab: DesktopNavItem
+  onRemove: () => void
   onChange: (tab: DesktopNavItem) => void
   allTargets: Option[]
   linkName: (target: string) => string
@@ -200,27 +202,26 @@ function TabContents({
                 open={openId === h.id}
                 onToggle={() => setOpenId(openId === h.id ? null : h.id)}
                 rename={{ value: h.label, fresh: fresh === h.id, onChange: (label) => put({ ...h, label }) }}
-                onRemove={() => set(inside.filter((i) => i.id !== h.id))}
               >
                 {links.length > 0 && (
                   <Links links={links} onChange={(next) => put({ ...h, items: next })} linkName={linkName} opens={opens} />
                 )}
-                <div className="flex flex-wrap items-center gap-2.5">
+                <RowActions name={h.label || 'Untitled'} onRemove={() => set(inside.filter((i) => i.id !== h.id))}>
                   <AddMenu
                     label="+ Add a link"
                     options={allTargets.filter((o) => !links.some((l) => l.target === o.id))}
                     onPick={(target) => put({ ...h, items: [...links, { id: newItemId(), label: linkName(target), kind: 'link', target }] })}
                   />
-                </div>
+                </RowActions>
               </OrderRow>
             )
           }}
         </DragList>
       )}
-      <div className="flex flex-wrap items-center gap-2.5">
+      <RowActions name={tab.label || 'Untitled'} onRemove={onRemove}>
         {holds !== 'headings' && linkAdd}
         {holds !== 'links' && headingAdd}
-      </div>
+      </RowActions>
     </>
   )
 }
@@ -261,10 +262,15 @@ function CategoriesHeadings({
   sections,
   onChange,
   cardOptions,
+  name,
+  onRemove,
 }: {
   sections: DraftHomeSection[]
   onChange: (sections: DraftHomeSection[]) => void
   cardOptions: Option[]
+  /** The Categories tab's own name and trash can, at the bottom. */
+  name: string
+  onRemove: () => void
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [fresh, setFresh] = useState<string | null>(null)
@@ -323,7 +329,6 @@ function CategoriesHeadings({
                 open={open}
                 onToggle={() => setOpenId(open ? null : s.id)}
                 rename={{ value: s.title, fresh: fresh === s.id, onChange: (title) => put(s.id, { title }) }}
-                onRemove={() => setRemoving(s.id)}
               >
                 {s.cardIds.length > 0 && (
                   <DragList
@@ -351,9 +356,9 @@ function CategoriesHeadings({
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-2.5">
+                  <RowActions name={s.title || 'Untitled'} onRemove={() => setRemoving(s.id)}>
                     <AddMenu label="+ Add a link" options={availableHere} onPick={(id) => addCard(s.id, id)} />
-                  </div>
+                  </RowActions>
                 )}
               </OrderRow>
             )
@@ -361,11 +366,11 @@ function CategoriesHeadings({
         </DragList>
         <OtherRow names={other.map((c) => c.label)} />
       </div>
-      <div>
+      <RowActions name={name} onRemove={onRemove}>
         <button type="button" onClick={addHeading} className={addButton}>
           + Add a heading
         </button>
-      </div>
+      </RowActions>
     </>
   )
 }

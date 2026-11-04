@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { BUILT_IN_BLOCKS, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
-import SubscriberManager from './SubscriberManager'
-import DragList, { OrderRow } from './DragList'
+import DragList, { OrderRow, RowActions } from './DragList'
 
 // ── The desktop home screen's five singleton cards — Categories & Search,
 // Davening Times, Update Listings, Email Signup, and Jewish Times —
@@ -87,7 +86,6 @@ export default function DesktopTopicsManager({
   onChange,
   settings,
   onSettingChange,
-  token,
   onOpenCard,
 }: {
   sections: DraftHomeSection[]
@@ -98,9 +96,6 @@ export default function DesktopTopicsManager({
   /** SiteSettingsEditor's own `set` function — writes one field onto its
    *  draft, same as every other input on that page. */
   onSettingChange: <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) => void
-  /** For the email sign-up card's list of who signed up; without it the
-   *  list isn't shown. */
-  token?: string
   /** A row opened, or null when closed: the preview lights that card up. */
   onOpenCard?: (kind: string | null) => void
 }) {
@@ -174,7 +169,6 @@ export default function DesktopTopicsManager({
                     }
                   : undefined
               }
-              onRemove={() => setRemoving(c.id)}
             >
               {meta?.eyebrowKey && (
                 <label className="block">
@@ -186,7 +180,6 @@ export default function DesktopTopicsManager({
                   />
                 </label>
               )}
-              {c.kind === 'subscribe' && token && <SubscriberManager token={token} />}
               {removing === c.id ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="m-0 flex-1 text-sm font-semibold text-slate-900">Take {label} off the home page?</p>
@@ -198,8 +191,8 @@ export default function DesktopTopicsManager({
                   </button>
                 </div>
               ) : (
-                !meta?.sharedRow && (
-                  <div>
+                <RowActions name={label} onRemove={() => setRemoving(c.id)}>
+                  {!meta?.sharedRow && (
                     <div role="group" aria-label="Width" className="inline-flex gap-0.5 rounded-lg border border-slate-300 p-0.5">
                       {(['full', 'half'] as const).map((w) => (
                         <button
@@ -215,8 +208,8 @@ export default function DesktopTopicsManager({
                         </button>
                       ))}
                     </div>
-                  </div>
-                )
+                  )}
+                </RowActions>
               )}
               {!meta?.sharedRow && c.width === 'half' && removing !== c.id && (
                 <p className="m-0 text-[13px] text-slate-600">Sits beside the next half-width card.</p>

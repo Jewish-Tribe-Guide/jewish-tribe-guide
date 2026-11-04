@@ -11,7 +11,7 @@ import { useCategoriesIfAny } from '@/lib/contentContext'
 import { kindKeyById } from '@/lib/placeKinds'
 import { builtInTabIcon } from '../MobileTabBar'
 import { useCardOptions } from './useCardOptions'
-import DragList, { AddMenu, OrderRow } from './DragList'
+import DragList, { AddMenu, OrderRow, RowActions } from './DragList'
 
 // ── The mobile bottom tab bar editor ─────────────────────────────────────────
 // Phone-only. The bar is the mobile counterpart of the desktop featured-card
@@ -41,9 +41,6 @@ const OPENS: Record<string, string> = {
   browse: 'the Browse page',
   you: 'You',
 }
-
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 /** Ids must survive renames, so they're minted once and never derived from the
  *  label or target. */
@@ -88,7 +85,8 @@ export default function MobileTabsEditor({
   function add(target: string) {
     if (!target || tabs.length >= MAX_MOBILE_TABS) return
     // Seed the label from the destination's own name — almost always what's
-    // wanted, and still editable once the row is open.
+    // wanted, and still editable once the row is open. Where it goes isn't
+    // changed afterwards (the user, Nov 4): take it off and add another.
     const id = newTabId()
     onChange([...tabs, { id, label: targetLabel(target), target }])
     setOpenId(id)
@@ -124,21 +122,8 @@ export default function MobileTabsEditor({
               open={open}
               onToggle={() => setOpenId(open ? null : tab.id)}
               rename={{ value: tab.label, placeholder: 'Shown under the icon', onChange: (label) => update(tab.id, { label }) }}
-              onRemove={() => remove(tab.id)}
             >
-              <label className="block">
-                <span className="block text-[13px] font-semibold text-slate-700 mb-1">Opens</span>
-                <select value={tab.target} onChange={(e) => update(tab.id, { target: e.target.value })} className={inputClass}>
-                  {/* The current target stays selectable even though it's
-                      "taken" — by this very row. */}
-                  <option value={tab.target}>{targetLabel(tab.target)}</option>
-                  {available.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <RowActions name={tab.label || targetLabel(tab.target)} onRemove={() => remove(tab.id)} />
             </OrderRow>
           )
         }}

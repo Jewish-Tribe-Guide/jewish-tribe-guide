@@ -2444,6 +2444,15 @@ Built Nov 4, from the user's picks:
     can is boxed, beside the name. Links don't open (as drawn): a name and
     an ×, named as the site calls it ("You", not "You (saved places and
     searches)"), with "Opens …" only for an older link named otherwise.
+  - Later notes, Nov 4: typing a name, a press elsewhere only finishes the
+    typing (no row opens or closes on that press); the trash can sits at
+    the bottom of an open row, right after its Adds (not off at the far
+    end), on all three lists; phone tabs don't ask where they go once
+    added (take it off and add another) and have no count by their title;
+    Stay in the Loop no longer lists or counts its subscribers (the user:
+    "Don't say how many people signed up"). That list was the admin's only
+    way to see or remove one (`SubscriberManager` deleted with its tests
+    and its e2e spec); `/api/admin/subscribers` stays, unused for now.
   - Only checked in Chrome (computer and phone width). Not on a real phone.
 
 Still open:

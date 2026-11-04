@@ -154,6 +154,18 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(within(saveBar()!).getByText('1 change')).toBeInTheDocument()
   })
 
+  // The user, Nov 4: "Don't say how many people signed up".
+  it('the email sign-up card says nothing about who signed up, and asks for no list', async () => {
+    const user = userEvent.setup()
+    await renderEditor('home', SITE_SETTINGS_DEFAULTS, [
+      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 0, cardIds: [], width: 'full' },
+    ])
+    await user.click(screen.getByRole('button', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading }))
+    expect(screen.getByRole('button', { name: 'Half width' })).toBeInTheDocument()
+    expect(screen.queryByText(/signed up|subscri/i)).toBeNull()
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).includes('/api/admin/subscribers'))).toBe(false)
+  })
+
   it('shows the home page beside the settings, with what hasn’t been saved', async () => {
     const user = userEvent.setup()
     await renderEditor('home')
@@ -236,6 +248,8 @@ describe('SiteSettingsEditor — Header and menus', () => {
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
     expect(boxes).toEqual(['Name and logo', 'Top of the page, on a computer', 'Tabs, on a phone'])
     expect(screen.queryByText('Cards under the search, on a computer')).toBeNull()
+    // No count beside the phone's tabs.
+    expect(screen.getByRole('heading', { name: 'Tabs, on a phone' }).parentElement!.textContent).toBe('Tabs, on a phone')
   })
 
   it('saves the name with the rest of the header', async () => {
@@ -271,8 +285,8 @@ describe('SiteSettingsEditor — Header and menus', () => {
     const top = screen.getByRole('region', { name: 'Top of the page, on a computer' })
     for (let i = 0; i < 10 && !screen.queryByText(warning); i++) {
       await user.click(within(top).getAllByRole('button', { expanded: false })[0])
-      // The open tab's trash can comes before its links' ×s.
-      await user.click(within(top).getAllByRole('button', { name: /^Take .* off$/ })[0]!)
+      // The open tab's trash can is last, after its links' ×s.
+      await user.click(within(top).getAllByRole('button', { name: /^Take .* off$/ }).at(-1)!)
     }
     expect(screen.getByText(warning)).toBeInTheDocument()
   })

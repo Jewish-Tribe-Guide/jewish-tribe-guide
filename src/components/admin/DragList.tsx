@@ -265,7 +265,40 @@ const TRASH = (
 )
 
 const trashButton =
-  'grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-md border border-slate-300 bg-white text-slate-500 hover:border-red-300 hover:bg-red-50 hover:text-red-600'
+  'grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-slate-300 bg-white text-slate-500 hover:border-red-300 hover:bg-red-50 hover:text-red-600'
+
+/** The bottom of an open row: what can go in (its Adds, a width), then the
+ *  trash can right after them (the user, Nov 4: "move the garbage down to
+ *  where we have those add buttons", and not off at the far end). */
+export function RowActions({ name, onRemove, children }: { name: string; onRemove: () => void; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2.5">
+      {children}
+      <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={trashButton}>
+        {TRASH}
+      </button>
+    </div>
+  )
+}
+
+// Typing in a name, a press elsewhere only finishes the typing: it doesn't
+// also open or close a row (the user, Nov 4: "When something is in focus and
+// we click away we still allow another action"). Read at the press, before
+// the box loses focus. One listener for the page.
+let typingAtPress = false
+let pressListening = false
+function listenForPresses() {
+  if (pressListening) return
+  pressListening = true
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      const el = document.activeElement
+      typingAtPress = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !['checkbox', 'radio', 'button'].includes(el.type))
+    },
+    true,
+  )
+}
 
 const iconButton = 'grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-800'
 
@@ -315,11 +348,11 @@ function RowName({ rename, name }: { rename: RowRename; name: string }) {
 }
 
 /** A row of a drag list, as drawn: the handle, a name with one line under
- *  it, and a chevron; it opens in place, under itself. Open, its name is
- *  edited in the row (`rename`), and a trash can takes it off (`onRemove`).
- *  Open, the line goes, since what it summed up is showing under it, and a
- *  tap anywhere in the row but its name and buttons closes it (the user,
- *  Nov 4: "hard to close the thing once it's open"). */
+ *  it, and a chevron; it opens in place, under itself. Open, the line goes,
+ *  since what it summed up is showing under it; its name is edited in the
+ *  row (`rename`); and a tap anywhere in the row but its name and buttons
+ *  closes it (the user, Nov 4: "hard to close the thing once it's open").
+ *  Its trash can is in its `RowActions`, at the bottom. */
 export function OrderRow({
   row,
   name,
@@ -328,7 +361,6 @@ export function OrderRow({
   open,
   onToggle,
   rename,
-  onRemove,
   children,
 }: {
   row: DragRow
@@ -338,33 +370,28 @@ export function OrderRow({
   open: boolean
   onToggle: () => void
   rename?: RowRename
-  onRemove?: () => void
   /** What it opens to. */
   children?: React.ReactNode
 }) {
   // The row is named by its name alone; its line describes it.
   const lineId = useId()
+  useEffect(listenForPresses, [])
+  const toggle = () => !typingAtPress && onToggle()
   const iconBox = icon && <span className="grid h-7 w-7 shrink-0 place-items-center text-slate-600">{icon}</span>
   return (
     <div className={`border-b border-slate-100 last:border-b-0 ${row.lifted ? 'border-transparent' : ''}`}>
       <div className="flex items-center pl-1.5 pr-2">
         {row.handle}
-        {open && (rename || onRemove) ? (
+        {open && rename ? (
           <>
             {/* The chevron is the keyboard's way to close; this is the mouse's and a finger's. */}
             <div
               data-testid="open-row"
-              onClick={(e) => !(e.target as HTMLElement).closest('input, button, select, a') && onToggle()}
+              onClick={(e) => !(e.target as HTMLElement).closest('input, button, select, a') && toggle()}
               className="flex min-h-[52px] min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-2 pl-1.5 pr-1"
             >
               {iconBox}
-              {rename ? <RowName rename={rename} name={name} /> : <span className="text-[15px] font-semibold text-slate-900">{name}</span>}
-              {/* Beside the name it acts on, boxed like it (the user, Nov 4: the loose trash can was "very off"). */}
-              {onRemove && (
-                <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={trashButton}>
-                  {TRASH}
-                </button>
-              )}
+              <RowName rename={rename} name={name} />
             </div>
             <button type="button" aria-expanded aria-label={name} onClick={onToggle} className={`${iconButton} rotate-90`}>
               <Chevron />
@@ -374,15 +401,15 @@ export function OrderRow({
         <button
           type="button"
           aria-expanded={open}
-          aria-describedby={line ? lineId : undefined}
-          onClick={onToggle}
+          aria-describedby={line && !open ? lineId : undefined}
+          onClick={toggle}
           {...row.rowProps}
           className="flex min-h-[52px] min-w-0 flex-1 cursor-pointer select-none items-center gap-2.5 py-2 pl-1.5 pr-2 text-left"
         >
           {iconBox}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-[15px] font-semibold text-slate-900">{name}</span>
-            {line && (
+            {line && !open && (
               <span id={lineId} aria-hidden className="text-[13px] text-slate-600">
                 {line}
               </span>
@@ -394,7 +421,6 @@ export function OrderRow({
         </button>
         )}
       </div>
-      {/* A row with nothing under it (its trash can in the row) opens to no gap. */}
       {open && Children.toArray(children).length > 0 && <div className="flex flex-col gap-3 px-4 pb-4 pt-1 sm:pl-10">{children}</div>}
     </div>
   )

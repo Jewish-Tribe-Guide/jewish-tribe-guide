@@ -51,7 +51,8 @@ describe('MobileTabsEditor', () => {
     const onChange = vi.fn()
     show(TABS, onChange)
     await user.click(screen.getByRole('button', { name: 'Map' }))
-    expect(screen.getByLabelText('Opens')).toHaveValue('map')
+    // Where it goes is its line, closed; open, nothing asks it again.
+    expect(screen.queryByLabelText('Opens')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Rename Map' }))
     const name = screen.getByRole('textbox', { name: 'Name' })
