@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import AdminAuthGate from './AdminAuthGate'
@@ -146,7 +147,35 @@ describe('AdminAuthGate — tab-visibility token-refresh noise', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1) // NOT called again
   })
 
-  it('still re-checks authorization when the access_token actually changes', async () => {
+  // Real bug, Nov 4 ("the page seems to randomly reload"): Supabase rotates
+  // the token about once an hour. Each rotation re-checked access, which
+  // showed "Loading…" in place of the console and remounted every screen
+  // under it, losing an open place and its unsaved edit.
+  it('keeps the console mounted when the token rotates for the same admin', async () => {
+    const { fireAuthStateChange } = mockSignedIn()
+    let mounts = 0
+    function Screen() {
+      useEffect(() => void mounts++, [])
+      return <div>children</div>
+    }
+    render(
+      <AdminAuthGate community="philly">
+        <Screen />
+      </AdminAuthGate>,
+    )
+    await screen.findByText('children')
+    expect(mounts).toBe(1)
+
+    fireAuthStateChange('TOKEN_REFRESHED', { ...session, access_token: 'tok-2' })
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(screen.queryByText('Loading…')).toBeNull()
+    expect(screen.getByText('children')).toBeInTheDocument()
+    expect(mounts).toBe(1)
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+  })
+
+  it('still re-checks authorization when a different person signs in', async () => {
     const { fireAuthStateChange } = mockSignedIn()
     render(
       <AdminAuthGate community="philly">
@@ -156,9 +185,10 @@ describe('AdminAuthGate — tab-visibility token-refresh noise', () => {
     await screen.findByText('children')
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
 
-    fireAuthStateChange('TOKEN_REFRESHED', { ...session, access_token: 'tok-2' })
+    fireAuthStateChange('SIGNED_IN', { access_token: 'tok-3', user: { email: 'someone@example.com' } })
 
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(fetch).mock.calls[1][1]).toEqual({ headers: { Authorization: 'Bearer tok-3' } })
   })
 })
 
