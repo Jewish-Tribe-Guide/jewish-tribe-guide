@@ -2423,7 +2423,7 @@ Built Nov 4, from the user's picks:
 
 Still open:
 - **Top of the page: tabs, links and headings:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v12: boards "New · What goes in first
+  (KdHT8Tci1ufXSXobnnSfEm v13: boards "New · What goes in first
   decides" and "Tabs, links and headings"; the one-rule (v10) and
   all-or-nothing (v11) boards are off the drawing). The user: links and
   dropdowns are one thing, a tab; one link in it makes it a link, two a
@@ -2436,12 +2436,19 @@ Still open:
     deeper. An empty tab or heading isn't on the site. On the site, the
     two shapes it has today: a list (More) or columns under headings
     (Categories).
+  - A row that's open edits its name in place, the trash beside its
+    chevron; no separate Name box (the user: "Should we just be able to
+    edit the place itself?"). A new tab or heading opens with its name
+    selected. Open, tapping the name edits it, so the chevron closes the
+    row: try on a real phone.
+  - A one-link tab says "Add another to make it a dropdown." beside its
+    Add, rather than "Now a dropdown. Give it a name." after (the user).
   - So the groups are Categories' headings (the "Groups on the Browse
     page" box on Site → Home page goes: `/browse` still draws them, but no
     tab or link opens it, checked Nov 4), cards in a tab are links, and
     the leftover group is "Other", where new categories land.
-  - My picks, drawn but not yet agreed: a trash can beside every Name in
-    place of the Take it off button; Other as a real last row (no handle,
+  - My picks, drawn but not yet agreed: a trash can in place of the Take
+    it off button; Other as a real last row (no handle,
     no trash).
   - Card width on the home page stays a Full/Half switch.
   - Waiting on the user's look before building.
