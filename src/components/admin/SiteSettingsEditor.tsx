@@ -227,7 +227,7 @@ export default function SiteSettingsEditor({
                     />
                   </div>
                   {draft.desktopHeroImage?.url && (
-                    <AdminField label="Photo, described">
+                    <AdminField label="Photo description, for screen readers">
                       <input
                         value={draft.desktopHeroImage.alt}
                         onChange={(e) => draft.desktopHeroImage && set('desktopHeroImage', { ...draft.desktopHeroImage, alt: e.target.value })}
