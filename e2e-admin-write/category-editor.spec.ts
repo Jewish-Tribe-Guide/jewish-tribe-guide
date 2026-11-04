@@ -90,7 +90,7 @@ test('creating a category through the real editor makes it live, and deleting it
   expect(afterDelete, 'the category should be gone after confirming delete').toBeNull()
 })
 
-test('a category created hidden stays hidden, and "+ Add listing" publishes a listing to it directly with no moderation queue', async ({ page }) => {
+test('a category created hidden stays hidden, and Places\' Add a place publishes a listing to it directly with no moderation queue', async ({ page }) => {
   const categoryName = `E2E Hidden Cat ${randomUUID().slice(0, 8)}`
   const listingName = `E2E Direct Listing ${randomUUID().slice(0, 8)}`
   pendingCategoryNames.push(categoryName)
@@ -129,13 +129,15 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   expect(created, 'the category should exist in the database after Create').not.toBeNull()
   expect(created!.active, 'a category created with the box unchecked should never touch active:true').toBe(false)
 
-  // "+ Add listing" — publishes directly, live, with no review queue, even
-  // though the category itself is hidden. This is the path a hidden
+  // Places' Add a place — publishes directly, live, with no review queue,
+  // even though the category itself is hidden. This is the path a hidden
   // seasonal category (e.g. Sukkahs, ahead of its campaign banner's reveal
-  // date) is meant to be seeded through.
+  // date) is meant to be seeded through. It was the category row's own
+  // "+ Add listing" until Nov 3; Places offers hidden categories too.
   // The visitors' editor (ListingEditor): the Name row, then Done back to
   // the list, where Send reads "Add listing".
-  await row.getByRole('button', { name: '+ Add listing' }).click()
+  await page.goto(`/philly/admin/places?category=${created!.id}`)
+  await visible(page.getByRole('button', { name: 'Add a place' })).click()
   await visible(page.getByTestId('editor-row-name')).click()
   await visible(page.getByRole('textbox', { name: 'Name' })).fill(listingName)
   await visible(page.getByRole('button', { name: 'Done' })).click()
@@ -143,8 +145,10 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   await expect(addButton).toBeEnabled()
   await addButton.click()
 
-  // Closing the form navigates back to the category list.
-  await expect(row).toBeVisible({ timeout: 30_000 })
+  // With nothing to read, "… is added" shows only while it looks, then it's
+  // back on Places, listing it. Waiting on the banner raced that: CI missed
+  // it, a local run caught it.
+  await expect(visible(page.getByRole('button', { name: `Open ${listingName}` }))).toBeVisible({ timeout: 30_000 })
 
   const { data: listing } = await supabase
     .from('resource')

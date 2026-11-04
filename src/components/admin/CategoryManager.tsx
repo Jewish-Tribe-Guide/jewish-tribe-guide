@@ -7,26 +7,25 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { CategoryEditor } from './CategoryEditor'
-import ListingEditorScreen from './ListingEditorScreen'
 import CategoryPreview from './CategoryPreview'
 import EruvimManager from './EruvimManager'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
-import { AdminBox, AdminEmpty, AdminSwitch, Chevron } from './AdminUI'
-import { siteScreenState, type SiteScreen } from '@/lib/siteScreens'
+import { AdminBox, AdminEmpty, AdminSwitch } from './AdminUI'
+import { ERUV_SCREEN, screenState, siteScreenState, type SiteScreen } from '@/lib/siteScreens'
 
 // ── The categories manager: Site's Category pages tab — the categories that
 // hold places (Grocery Stores, Synagogues, …, each with its own detail fields
-// and capabilities), with the Map, Candle Lighting and Eruv as switches above
-// them, since none of the three is a list of places (the user, Oct 31). Writes
-// go through /api/admin/categories. ──
+// and capabilities), and the Eruv among them, with the Map and Candle
+// Lighting as bare switches above (the user, Oct 31 and Nov 3: neither has
+// anything to change). Writes go through /api/admin/categories. ──
 
 
 // editingId is opaque to the admin page's history plumbing — encoded here as
-// 'cat:<id>', 'cat:new', or 'listing:<category id>' (adding a place).
+// 'cat:<id>' or 'cat:new'. Places are added from Places (Nov 3), which offers
+// hidden categories too; an old 'listing:<id>' address lands on the list.
 const CAT_PREFIX = 'cat:'
-const LISTING_PREFIX = 'listing:'
 
 /** The category a save just moved to: see `justSaved` below. */
 let savedHandOff: string | null = null
@@ -78,10 +77,16 @@ export default function CategoryManager({
 
   useLoadOnMount(load)
 
-  const entries = useMemo(
-    () => (categories ? categories.filter((c) => c.kind === 'listing').sort((a, b) => a.pluralLabel.localeCompare(b.pluralLabel)) : null),
-    [categories],
-  )
+  // The categories that hold places, and the Eruv in its place among them by
+  // name — with or without a row yet (switching it on makes one).
+  const entries = useMemo(() => {
+    if (!categories) return null
+    const eruv = screenState(categories, ERUV_SCREEN)
+    return [
+      ...categories.filter((c) => c.kind === 'listing').map((c) => ({ key: `cat:${c.id}`, label: c.pluralLabel, category: c, eruv: null })),
+      { key: 'eruv', label: eruv.row?.pluralLabel ?? ERUV_SCREEN.label, category: null, eruv },
+    ].sort((a, b) => a.label.localeCompare(b.label))
+  }, [categories])
 
   // On makes the screen's row the first time and shows it after that; off
   // hides the row, so its name and photo are still there when it comes back.
@@ -212,15 +217,6 @@ export default function CategoryManager({
     )
   }
 
-  if (editingId?.startsWith(LISTING_PREFIX)) {
-    const id = editingId.slice(LISTING_PREFIX.length)
-    const category = categories?.find((c) => c.id === id) ?? null
-    if (!category) return <p className="text-sm text-muted">Loading…</p>
-    return (
-      <ListingEditorScreen heading={`Add a ${category.label}`} category={category} adminSubmit={{ token }} onClose={onCloseEditor} />
-    )
-  }
-
   return (
     <div>
       {error && (
@@ -232,18 +228,7 @@ export default function CategoryManager({
           <AdminBox title="On the site">
             {siteScreenState(categories).map(({ screen, row, on }) => (
               <div key={screen.kind} data-testid={`site-screen-${screen.kind}`} className="flex items-center gap-3 pr-4 border-b border-slate-100 last:border-b-0">
-                {row ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenEditor(`${CAT_PREFIX}${row.id}`)}
-                    className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-2.5 min-h-[52px] text-left text-[15px] font-semibold text-slate-900 hover:bg-slate-50 cursor-pointer"
-                  >
-                    <span className="flex-1 min-w-0">{row.pluralLabel}</span>
-                    <Chevron />
-                  </button>
-                ) : (
-                  <span className="flex-1 min-w-0 pl-4 py-2.5 min-h-[52px] flex items-center text-[15px] font-semibold text-slate-900">{screen.label}</span>
-                )}
+                <span className="flex-1 min-w-0 pl-4 py-2.5 min-h-[52px] flex items-center text-[15px] font-semibold text-slate-900">{row?.pluralLabel ?? screen.label}</span>
                 <AdminSwitch checked={on} label={row?.pluralLabel ?? screen.label} onChange={(next) => void switchScreen(screen, next)} />
               </div>
             ))}
@@ -266,15 +251,23 @@ export default function CategoryManager({
         <AdminEmpty>Nothing here yet.</AdminEmpty>
       ) : (
         <div className="space-y-2">
-          {entries.map((c) => (
+          {entries.map(({ key, label, category: c, eruv }) => eruv ? (
+            <EruvRow
+              key={key}
+              label={label}
+              on={eruv.on}
+              toggling={switching === 'eruv'}
+              onEdit={eruv.row ? () => onOpenEditor(`${CAT_PREFIX}${eruv.row!.id}`) : null}
+              onToggleActive={(on) => void switchScreen(ERUV_SCREEN, on)}
+            />
+          ) : c && (
             <CategoryRow
-              key={`cat:${c.id}`}
+              key={key}
               category={c}
               confirmingDelete={confirmDeleteId === c.id}
               deleting={deletingId === c.id}
               toggling={togglingId === c.id}
               onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
-              onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${c.id}`)}
               onAskDelete={() => setConfirmDeleteId(c.id)}
               onCancelDelete={() => setConfirmDeleteId(null)}
               onConfirmDelete={() => deleteCategory(c.id)}
@@ -318,13 +311,51 @@ function VisibilityToggle({
   )
 }
 
+// The Eruv among the categories: shown or hidden like them, and Edit opens
+// its eruvim. No places to add and nothing to delete — hiding it is how it
+// goes. Before it has a row, showing it makes one, and Edit waits for that.
+function EruvRow({
+  label,
+  on,
+  toggling,
+  onEdit,
+  onToggleActive,
+}: {
+  label: string
+  on: boolean
+  toggling: boolean
+  onEdit: (() => void) | null
+  onToggleActive: (active: boolean) => void
+}) {
+  return (
+    <div data-testid="category-row-eruv" className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+          <span className={`${TYPE_BADGE} bg-slate-100 text-slate-600`}>Eruv</span>
+          <span>{label}</span>
+        </p>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <VisibilityToggle active={on} toggling={toggling} onToggle={onToggleActive} />
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CategoryRow({
   category: c,
   confirmingDelete,
   deleting,
   toggling,
   onEdit,
-  onAddListing,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
@@ -335,7 +366,6 @@ function CategoryRow({
   deleting: boolean
   toggling: boolean
   onEdit: () => void
-  onAddListing: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
@@ -347,7 +377,7 @@ function CategoryRow({
     ...(c.upvotesEnabled ? ['Upvotes'] : []),
   ]
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+    <div data-testid={`category-row-${c.id}`} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
       {/* On a phone the buttons go under the name, not squeezed beside it. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -374,13 +404,6 @@ function CategoryRow({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
-          <button
-            onClick={onAddListing}
-            title="Add a listing directly — publishes immediately, no review queue. Works even while this category is hidden."
-            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            + Add listing
-          </button>
           <button
             onClick={onEdit}
             className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -448,24 +471,15 @@ export function SingletonEditor({
   const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
   const [cardBandImageUrl, setCardBandImageUrl] = useState(category.cardBandImageUrl ?? '')
-  // Map only — kept as a string (not number|null) so the field can sit blank
-  // mid-edit rather than snapping to 0. Parsed back to number|null on save.
-  const [mapZoomRadius, setMapZoomRadius] = useState(
-    category.kind === 'map' && category.mapZoomRadiusMiles != null ? String(category.mapZoomRadiusMiles) : '',
-  )
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
   // Live preview, same pattern as CategoryEditor's own (history entry so
   // Back/the preview's own Up button land here instead of skipping past to
-  // the category list) — only for the two kinds CategoryPreview actually
-  // knows how to render standalone content for (see its own kind switch).
-  // Map's preview is the site's real map (a much bigger surface, already
-  // reachable from the live site) and Hospitals is a whole chooser+detail
-  // flow tied to real hospital data, not a single card of content — neither
-  // fits this same "preview the draft" shape without a lot more scaffolding
-  // than a Save/Cancel-only editor like this one has needed until now.
-  const previewSupported = category.kind === 'eruv' || category.kind === 'zmanim'
+  // the category list). Only the Eruv opens this screen from the list now
+  // (Nov 3); the Map and Candle Lighting are switches with nothing to edit,
+  // so an old link to either still lands here but has nothing to preview.
+  const previewSupported = category.kind === 'eruv'
   const [previewing, setPreviewing] = useState(false)
 
   useEffect(() => {
@@ -519,9 +533,6 @@ export function SingletonEditor({
             iconImageUrl: iconImageUrl.trim() || null,
             cardImageUrl: cardImageUrl.trim() || null,
             cardBandImageUrl: cardBandImageUrl.trim() || null,
-            ...(category.kind === 'map'
-              ? { mapZoomRadiusMiles: mapZoomRadius.trim() === '' ? null : Number(mapZoomRadius) }
-              : {}),
           }),
         },
         'Save failed.',
@@ -547,8 +558,7 @@ export function SingletonEditor({
         <span className="ml-2 text-xs font-normal text-muted">{category.id}</span>
       </h2>
       <p className="text-xs text-muted mb-4">
-        This is a fixed, code-driven card — only its name, icon, home-screen appearance
-        {category.kind === 'map' ? ', and zoom behavior are' : ' are'} editable here.
+        This is a fixed, code-driven card — only its name, icon and home-screen appearance are editable here.
       </p>
 
       <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
@@ -574,31 +584,6 @@ export function SingletonEditor({
           previewColor={getCategoryColor([category], category.id)}
           token={token}
         />
-        {category.kind === 'map' && (
-          <label className="block pt-3 border-t border-slate-100">
-            <span className="block text-xs font-medium text-slate-700 mb-1">Zoom radius</span>
-            <span className="block text-[11px] text-muted mb-2">
-              How far (in miles) a listing can be from the visitor — or the community center, if no
-              location is set — and still count toward the map zooming out to fit everything when a
-              category is selected or searched. A far-off listing (e.g. a delivery-only address) is
-              still shown as a pin either way; this only keeps it from forcing the initial zoom out
-              to include it. Leave blank for no limit.
-            </span>
-            <span className="flex items-center gap-2">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                inputMode="numeric"
-                value={mapZoomRadius}
-                onChange={(e) => setMapZoomRadius(e.target.value)}
-                placeholder="No limit"
-                className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <span className="text-sm text-muted">miles</span>
-            </span>
-          </label>
-        )}
       </section>
 
       {errors.length > 0 && (

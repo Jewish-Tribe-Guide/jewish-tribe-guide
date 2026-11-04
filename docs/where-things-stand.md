@@ -97,10 +97,8 @@ for that exact change, in the same conversation. Show the dry run first.
    (only the street address's, for Directions), so the nightly sync skips
    it. Fix: set its place id to the store's, on live; needs a yes, after
    looking the id up and showing it.
-1k. **Migration 092 (`look_again`)** is run on dev (the user, Nov 3), not
-   live. Until it is, live's Look again page says it isn't set up, its
-   Watches row says Not set up, and its nightly run records "Not set up".
-   Live once this branch is deployed, with a yes.
+1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
+   after PR 373 deployed: live's table has every column, no rows yet).
 
 ## For the user or the community
 
@@ -2118,6 +2116,14 @@ pick them (`changeLines.ts`). A new place still uses the old review.
 - Category pages hold places only. Map, Candle Lighting and Eruv are switches
   under "On the site", on by default for a new community, empty or cloned. A
   community with no row yet shows the switch off; the first on creates the row.
+  **Changed Nov 3 (the user):** the Map and Candle Lighting are bare switches
+  with nothing to open (the Map's name and photos showed nowhere; its zoom
+  radius stays as stored, 10 miles on dev and live, with no field to change
+  it). The Eruv moved out of that box into the category list, in name order,
+  with Visible/Hidden and Edit (its eruvim) and no Delete. A new community
+  still starts with all three on. No category row has "+ Add listing" any
+  more: places are added from Places' Add a place, which offers hidden
+  categories too (a seasonal one ahead of its reveal is seeded there).
 - Jewish Medical Resources is gone from admin and isn't cloned. Its public code
   stays, unreachable; Philly's row stays hidden. Deleting that row needs a yes.
 - Forms are hidden (`features.formsTab`). Responses is now Feedback, without the
@@ -2410,7 +2416,7 @@ Fixed after the user's Nov 2 notes (same branch):
   St on dev: Nov 3, was undated at 54 of 57). Each waiting group carries the
   time beside its "Oct 17" (`waitingGroups.ts`).
 
-## Done Nov 3: Look again (on `redesign/oct18-fixes`; 092 on dev only)
+## Done Nov 3: Look again (PR 373, live; 092 on dev and live)
 
 Drawn Oct 27 (canvas XSuFCMdLQmBYNJqfWaEM3A). A nightly job, 4 AM, that
 tries again what the other jobs couldn't find: an eruv with a website but

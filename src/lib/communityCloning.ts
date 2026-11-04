@@ -1,6 +1,6 @@
 import { getAdminClient } from './supabase/admin'
 import { createCategory, listCategoriesUncached } from './categoryStore'
-import { SITE_SCREENS } from './siteScreens'
+import { ERUV_SCREEN, SITE_SCREENS } from './siteScreens'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cloning an existing community's directory SHAPE into a brand-new one — the
@@ -66,7 +66,9 @@ export async function cloneCommunityContent(target: string, source: string): Pro
  *  what it was cloned from already gave it them. */
 export async function addMissingSiteScreens(community: string): Promise<void> {
   const existing = await listCategoriesUncached(community)
-  for (const screen of SITE_SCREENS) {
+  // The Eruv is listed with the categories rather than switched up top, but
+  // a new community starts with it all the same.
+  for (const screen of [...SITE_SCREENS, ERUV_SCREEN]) {
     if (existing.some((c) => c.kind === screen.kind)) continue
     await createCategory(community, { label: screen.label, pluralLabel: screen.label, kind: screen.kind, icon: screen.icon })
   }

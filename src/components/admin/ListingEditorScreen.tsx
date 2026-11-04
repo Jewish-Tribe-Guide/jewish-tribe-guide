@@ -8,7 +8,7 @@ import { AdminBack } from './AdminUI'
 
 /**
  * The visitors' editor (ListingEditor) as a screen of its own, for the
- * admin console: the category editor's Preview, and "+ Add listing". On the
+ * admin console: the category editor's Preview, and Places' Add and edit. On the
  * site it sits in a sheet or a dialog whose header carries the title and
  * Back; here that header is the console's own, its chevron on a phone, and
  * Back closes an open row (or a minyan, a person in one) before it leaves.
