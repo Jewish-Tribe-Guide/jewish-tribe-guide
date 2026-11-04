@@ -2423,7 +2423,7 @@ Built Nov 4, from the user's picks:
 
 Still open:
 - **Top of the page: tabs, links and headings:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v13: boards "New · What goes in first
+  (KdHT8Tci1ufXSXobnnSfEm v14: boards "New · What goes in first
   decides" and "Tabs, links and headings"; the one-rule (v10) and
   all-or-nothing (v11) boards are off the drawing). The user: links and
   dropdowns are one thing, a tab; one link in it makes it a link, two a
@@ -2433,7 +2433,8 @@ Still open:
     "+ Add a heading". With links in it, only "+ Add a link"; with
     headings, only "+ Add a heading", and links go inside each. Emptied,
     both are back. Nothing moves or changes shape, and nothing goes
-    deeper. An empty tab or heading isn't on the site. On the site, the
+    deeper. An empty tab or heading says "Nothing in it yet" under its
+    name (the user), and isn't on the site. On the site, the
     two shapes it has today: a list (More) or columns under headings
     (Categories).
   - A row that's open edits its name in place, the trash beside its
