@@ -20,6 +20,7 @@ import {
   watchableMenuLink,
 } from '@/lib/menuWatch'
 import { checkFrom, pageCheck } from '@/lib/listingPageWatch'
+import { samePage } from '@/lib/hoursJob'
 import { pageRenderer } from '@/lib/renderPage'
 import { itemsField } from '@/lib/listingView'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -118,6 +119,21 @@ export async function syncMenuWatches(): Promise<{ community: string; added: num
     out.push({ community: slug, added, removed: remove.length })
   }
   return out
+}
+
+/** The place whose menu link is a website page watch's own page, for the
+ *  run to read its menu there too (sharedPageWatch.ts): the guide keeps
+ *  one watch per page, so no menu watch is ever made for it (the Brazilian
+ *  BBQ, the Kosher Grill; the user, Nov 4). Null for any other page. */
+export async function menuOnPage(watch: Pick<Watch, 'communityId' | 'url' | 'resourceId'>): Promise<string | null> {
+  if (!watch.resourceId) return null
+  const row = await getResourceRowById(watch.resourceId, watch.communityId)
+  if (!row || row.status !== 'approved') return null
+  const listing = normalizeRow(row)
+  const category = (await listCategoriesUncached(watch.communityId)).find((c) => c.id === listing.category)
+  if (!category || !keepsMenuLink(category)) return null
+  const link = watchableMenuLink(listing)
+  return link && samePage(link, watch.url) ? listing.id : null
 }
 
 /** One food place's menu: read it, and when its words changed, have the AI

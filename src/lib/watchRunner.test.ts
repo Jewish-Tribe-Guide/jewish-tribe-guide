@@ -11,7 +11,8 @@ const refuah = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./refuahRun', () => ({ runRefuahWatch: refuah.run }))
 const mekor = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./mekorRun', () => ({ runMekorWatch: mekor.run }))
-vi.mock('./menuWatchRun', () => ({ runMenuWatch: vi.fn() }))
+const menu = vi.hoisted(() => ({ run: vi.fn(), onPage: vi.fn() }))
+vi.mock('./menuWatchRun', () => ({ runMenuWatch: menu.run, menuOnPage: menu.onPage }))
 const page = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./listingPageRun', () => ({ runListingPageWatch: page.run }))
 vi.mock('./websiteWatch', () => ({ readWebsite: m.readWebsite }))
@@ -86,6 +87,31 @@ describe('runWatch: a listing’s own page', () => {
     page.run.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
     await runWatch(shulPage, undefined, undefined, { full: true })
     expect(page.run).toHaveBeenCalledWith(expect.objectContaining({ resourceId: 's1' }), undefined, { full: true })
+  })
+
+  // The user, Nov 4: the Brazilian BBQ's menu link is its website, read
+  // for its hours and phone; no menu watch was made, so its menu never was.
+  it('reads its menu too when the page is its place’s menu link, each read with its own fingerprint', async () => {
+    const A = 'a'.repeat(64)
+    const B = 'b'.repeat(64)
+    const bbq = { ...shulPage, url: 'https://koshercityeats.com/', resourceId: 'bbq', createdBy: 'listing pages (found)', pageHash: `${A}+${B}` }
+    page.run.mockResolvedValue({ ok: true, filed: 0, pageHash: A })
+    menu.onPage.mockResolvedValue('bbq')
+    menu.run.mockResolvedValue({ ok: true, filed: 1, pageHash: 'c'.repeat(64) })
+    const budget = { aiReads: 3 }
+    expect(await runWatch(bbq, budget)).toEqual({ ok: true, filed: 1, pageHash: `${A}+${'c'.repeat(64)}` })
+    expect(page.run).toHaveBeenCalledWith(expect.objectContaining({ pageHash: A }), budget, { full: false })
+    expect(menu.run).toHaveBeenCalledWith({ communityId: 'philly', url: bbq.url, resourceId: 'bbq', pageHash: B }, budget, { full: false })
+  })
+
+  it('reads no menu on a page that isn’t one, or that didn’t load', async () => {
+    page.run.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    menu.onPage.mockResolvedValue(null)
+    expect(await runWatch(shulPage)).toEqual({ ok: true, filed: 0, pageHash: 'h' })
+    page.run.mockResolvedValue({ ok: false, error: 'Couldn’t read the page' })
+    menu.onPage.mockResolvedValue('s1')
+    expect(await runWatch(shulPage)).toEqual({ ok: false, error: 'Couldn’t read the page' })
+    expect(menu.run).not.toHaveBeenCalled()
   })
 
   it('an admin’s plain watch on the same page is only checked for a change', async () => {

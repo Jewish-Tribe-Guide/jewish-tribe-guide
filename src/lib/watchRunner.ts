@@ -5,7 +5,8 @@ import { runMekorWatch } from './mekorRun'
 import { readWebsite } from './websiteWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { runRefuahWatch } from './refuahRun'
-import { runMenuWatch, type MenuReadBudget } from './menuWatchRun'
+import { menuOnPage, runMenuWatch, type MenuReadBudget } from './menuWatchRun'
+import { mergeSharedPage, splitPageHash } from './sharedPageWatch'
 import { isListingPageWatch } from './listingPageWatch'
 import { runListingPageWatch } from './listingPageRun'
 import { updateWatch } from './watchStore'
@@ -59,8 +60,15 @@ export async function runWatch(
     }
     // A shul's or mikvah's own page, read by the AI for its times or hours
     // only when it changed (listingPageWatch.ts). Shares the run's AI reads.
+    // A page that is also its place's menu link has its menu read too, each
+    // read with its own fingerprint (sharedPageWatch.ts).
     if (isListingPageWatch({ createdBy: watch.createdBy ?? null })) {
-      return await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
+      const hashes = splitPageHash(watch.pageHash)
+      const page = await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: hashes.page, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
+      const menuOf = page.ok ? await menuOnPage({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null }) : null
+      if (!menuOf) return page
+      const menu = await runMenuWatch({ communityId: watch.communityId, url: watch.url, resourceId: menuOf, pageHash: hashes.menu }, budget, { full })
+      return mergeSharedPage(hashes, page, menu)
     }
     return await readWebsite(watch.url)
   } catch (err) {

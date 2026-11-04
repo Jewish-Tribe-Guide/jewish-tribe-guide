@@ -212,6 +212,13 @@ describe('menuWatchFor', () => {
     expect(menuWatchFor([watch('w', 'https://ritas.com/menu', 'a')], ritas('b'))?.id).toBe('w')
   })
 
+  // The Brazilian BBQ (Nov 4): its menu link is its website, read there.
+  it('its own website page’s watch, when that page is its menu link', () => {
+    const bbq = makeListing({ id: 'bbq', category: 'restaurant', name: 'The Brazillian BBQ', menuUrl: 'https://koshercityeats.com/' })
+    expect(menuWatchFor([watch('w', 'https://koshercityeats.com/', 'bbq', 'listing pages (found)')], bbq)?.id).toBe('w')
+    expect(menuWatchFor([watch('w', 'https://koshercityeats.com/', 'other', 'listing pages (found)'), watch('v', 'https://koshercityeats.com/about', 'bbq', 'listing pages (found)')], bbq)).toBeNull()
+  })
+
   it('not a watch on that page that isn’t a menu’s, nor a menu watch on another page', () => {
     expect(menuWatchFor([watch('w', 'https://ritas.com/menu', 'a', 'me@x.co'), watch('v', 'https://playa.example/menu', 'c')], ritas('b'))).toBeNull()
   })
