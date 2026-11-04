@@ -39,17 +39,32 @@ const OUTSIDE: Partial<Record<NightKindId, { name: string; about: string }>> = {
   hospitals: { name: 'Refuah', about: 'Hospitals' },
 }
 
+/** A job's row: an X when something of it needs fixing; with only last
+ *  night's trouble ("1 didn’t load", which needs a second night to be a
+ *  fix), that trouble and no mark. It used to show a check over a menu that
+ *  had just failed (the user, Nov 4). */
 function JobRow({ job, base, now }: { job: NightKindView; base: string; now: number }) {
   const bad = job.fixes.length > 0
   const outside = OUTSIDE[job.id]
   const when = job.lastAt ? lastRunWord(job.lastAt, now, job.id !== 'newsletters' && job.id !== 'links') : undefined
   const href = job.id === 'newsletters' ? `${base}/watches/newsletters` : `${base}/watches/job/${job.id}`
+  const said = [outside?.about, when].filter(Boolean).join(' · ')
+  const trouble = job.lastAt && job.trouble ? job.trouble : null
   return (
     <AdminRow
       href={href}
       name={outside?.name ?? job.name}
-      line={[outside?.about, when].filter(Boolean).join(' · ') || undefined}
-      aside={!job.lastAt ? 'Not run yet' : bad ? <BadMark /> : <GoodMark />}
+      line={
+        trouble ? (
+          <>
+            {said && `${said} · `}
+            <span className="text-amber-800">{trouble}</span>
+          </>
+        ) : (
+          said || undefined
+        )
+      }
+      aside={!job.lastAt ? 'Not run yet' : bad ? <BadMark /> : trouble ? undefined : <GoodMark />}
     />
   )
 }

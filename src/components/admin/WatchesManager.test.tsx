@@ -190,6 +190,15 @@ describe('WatchesManager', () => {
     expect(within(row(/^Minyan times/)).getByRole('img', { name: 'Something wrong' })).toBeInTheDocument()
   })
 
+  // Real bug, Nov 4: Menus showed a check the morning a menu didn't load.
+  // One night isn't a fix yet, but it isn't fine either.
+  it('a job with trouble last night says it, with no check', async () => {
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ id: 'menus', name: 'Menus', count: '20 of 21 read', trouble: '1 didn’t load', tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
+    const job = row(/^Menus/)
+    expect(job).toHaveTextContent('1 didn’t load')
+    expect(within(job).queryByRole('img', { name: 'Good' })).toBeNull()
+  })
+
   // Look again (Nov 3): its own row, how many it has to try and when it
   // last ran; a run that failed needs fixing like any job's.
   it('Look again: its row, and a failed run needs fixing', async () => {
