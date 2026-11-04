@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 3, 2026.
+Last updated: Nov 4, 2026.
 
 ## The branch
 
@@ -2294,6 +2294,38 @@ simpler ("it really shouldn't be that complicated").
 **Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
+
+## Done Nov 4: the bugs from the user's 33 notes (on `redesign/oct18-fixes`)
+
+The user sent 33 notes on Nov 4, mostly about the admin screens, and said
+"bugs first". Each fix has a test that failed against the old code.
+
+- **13, the console "randomly reloads":** a renewed sign-in redrew the
+  whole console. Now only a different person signing in re-checks access.
+- **33, tapping away from a menu:** it closes the menu and does nothing
+  else (it used to also hit what was under it).
+- **17, a menu that failed showing a check on Watches:** a job with only
+  last night's trouble says it in amber, with no mark.
+- **12 and 29, Elkins Park eruv:** a website that doesn't open is "Website
+  didn't load", in To do's Broken checks with Read it again and Stop
+  reading it, not "No status". Look again counts a website that didn't open
+  as a failed try ("1 try stopped with an error"), not "nothing found".
+- **4, Chabad of Main Line in Broken checks:** a shul whose pages were all
+  stopped leaves To do and shows as Not checked (stopped reading).
+- **10, Forward:** Forward onto a screen that was closed steps straight back
+  (it can't reopen it). To do's editors now add a history step per open
+  row, as Places' editor does, so Back closes the row, not the place.
+- **6, menus that "randomly" read:** dishes read from a picture say "from a
+  picture" in To do's Main dishes box. The four menu links given on Nov 4
+  that never finished (Insomnia twice, Shlomo's, Center City Pretzel) ran
+  out of the route's 60s; it has 300s now. On the live site they say "Its
+  read didn't finish. Read it again." Once this is deployed, Read it again
+  on each.
+
+Still open from the same notes, waiting for the user to pick what's next:
+the small tweaks (11, 14, 15, 16, 30, 31, 32, 24, 3), the menu reader
+(1, 2, 5, 8, 9, 21, 7), and the ones that need a drawing or a decision
+(25-28, 18/19, 20, 22, 23).
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 
