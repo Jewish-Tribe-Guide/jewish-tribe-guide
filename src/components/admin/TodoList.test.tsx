@@ -106,6 +106,20 @@ describe('To do, a row per place', () => {
     expect(screen.getByRole('button', { name: /^Category/ })).toHaveTextContent('Food')
   })
 
+  // The user, Nov 4: "only show what's available", as the other menus do.
+  it('lists only the categories under what the search and Show leave, with how many', async () => {
+    const user = userEvent.setup()
+    const cat = (id: string, pluralLabel: string) => [id, { id, pluralLabel } as unknown as CategoryConfig] as const
+    show(
+      { ...empty, unmatched: [{ id: 'n', name: 'New Deli', category: 'food' }, { id: 'b', name: 'Bnai Abraham', category: 'synagogue' }, { id: 'm', name: 'Mike’s Chicken', category: 'food' }] },
+      undefined,
+      new Map([cat('food', 'Food'), cat('synagogue', 'Synagogues')]),
+    )
+    await user.type(screen.getByLabelText('Find a place by name'), 'bnai')
+    await user.click(screen.getByRole('button', { name: /^Category/ }))
+    expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).toEqual(['All categories', 'Synagogues (1)'])
+  })
+
   it('sorts by name', async () => {
     const user = userEvent.setup()
     show({ ...empty, notRead: [{ id: 'z', name: 'Zeke’s', line: 'Website didn’t load' }, { id: 'a', name: 'Abe’s', line: 'Website didn’t load' }] })
