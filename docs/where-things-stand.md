@@ -2342,9 +2342,47 @@ Then "the small tweaks", each with a test that failed against the old code:
 - **24:** the home photo's alt field is "Photo description, for screen
   readers".
 
-Still open from the same notes, waiting for the user to pick what's next:
-the menu reader (1, 2, 5, 8, 9, 21, 7), and the ones that need a drawing or
-a decision (25-28, 18/19, 20, 22, 23).
+### The menu reader, from the same notes (Nov 4)
+
+- **5, typing dishes in by hand on To do:** "Save these dishes" once
+  something is typed, saved as the menu's dishes, so the place leaves To do.
+- **1, Nothing Bundt Cakes:** a menu's reading on To do has Edit, Read it
+  again and Change (a new menu link, read in the background), as Places has.
+  Its bad reading came from /find-a-bakery/, taken before Oct 22's fix.
+- **8:**
+  - Branches sharing one menu watch (Rita's, Dottie's, PLNT, Playa Bowls,
+    Insomnia) count as checked.
+  - A menu whose reading failed is "Not checked: menu (can't be read)" on
+    Places, until dishes are given by hand.
+  - To do's and the opened place's answer for a menu that can't be read is
+    "Stop reading it" (saved as no menu is, noted "Can't be read"), not "No
+    menu online".
+- **2 and 9, one page that is both a place's website and its menu:** the
+  guide keeps one watch per page, so only one reader ever ran. The run now
+  reads both on that one watch, each with its own fingerprint
+  (`sharedPageWatch.ts`); the hours sync takes a place's own menu watch on
+  its website over as its website watch. No migration. On live this
+  affects the Brazilian BBQ and the Citizens Bank Park Kosher Grill (menu
+  now read) and Zevi's Bakery and the Xfinity Kosher Grill (hours and phone
+  now read), from the first nightly run after this deploys.
+  - Not built: Zevi's hours are pickup windows on /ordering, not its home
+    page. Reading them needs /ordering given as a page (Add a source), and
+    the reader putting pickup windows in a note.
+  - Trade-off: stopping such a page's website reads stops its menu read too
+    (one watch).
+- **21, Ben & Jerry's:** nothing to build. Our run started from /upenn,
+  whose menu link goes to an ordering site.
+
+Still open:
+- **7, KCL:** waiting on the user. KCL's current list
+  (kclkashrus.org/wp-content/uploads/2025/06/KCL-Establishments-June-2025.pdf,
+  dated December 2025 inside) is a PDF of names only: no addresses. All 4
+  live KCL places are on it, under slightly different names ("South Side
+  Smokehouse" for Southside, "Mike's Chicken Crunchers" for Mike's
+  Chicken). A watch would need a PDF reader (none in the project) and
+  could match by name only. IKC is already checked through Mekor's list,
+  so the other unchecked hechsher is Cherry-K (4 places).
+- The ones that need a drawing or a decision: 25-28, 18/19, 20, 22, 23.
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 
