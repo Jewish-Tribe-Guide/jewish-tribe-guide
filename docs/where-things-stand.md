@@ -2422,28 +2422,21 @@ Built Nov 4, from the user's picks:
     real phone yet.
 
 Still open:
-- **Top of the page, one Add button:** drawn Nov 4 (KdHT8Tci1ufXSXobnnSfEm
-  v6, board "New"). "+ Add a dropdown" and "+ Add the Categories menu" go;
-  "+ Add a link"'s list ends with the Categories menu (when it's gone) and
-  "A dropdown of links". Waiting on the user's look before building.
-  Card width stays a Full/Half switch (recommended; not dragged side by side).
-- **Every item at the top of the page is a tab:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v8, board "New · Every item at the top of the
-  page is a tab"). The user: links and dropdowns become one thing, a tab;
-  one thing in it makes it a link, two a dropdown, and taking one out
-  makes it a link again. One "+ Add a tab" (replaces the one-Add-button
-  board below). Also drawn as my picks, not yet agreed: a trash can
-  beside every Name instead of a Take it off button, and the groups'
-  More as a real last row (no handle, no trash) instead of the "In More,
-  at the end" line. Waiting on the user's look before building.
-- **The groups inside the Categories row:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v7, board "New · The groups go inside the
-  Categories row"). The groups only show as the computer's Categories
-  menu: `/browse` still draws them, but no tab or link opens it (checked
-  Nov 4). So the "Groups on the Browse page" box on Site → Home page goes,
-  and the Categories row on Header and menus opens to its groups (each
-  opening to its cards), with "+ Add a group" and its Take it off beside
-  its Name. Waiting on the user's look before building.
+- **Top of the page: tabs, links and headings:** drawn Nov 4
+  (KdHT8Tci1ufXSXobnnSfEm v9, board "New · Tabs, links and headings";
+  it replaces the one-Add-button and groups-in-Categories boards, which
+  are off the drawing). The user: links and dropdowns are one thing, a
+  tab; one link in it makes it a link, two a dropdown. A dropdown can put
+  its links under headings, and nothing goes deeper. So the groups are
+  Categories' headings (the "Groups on the Browse page" box on Site →
+  Home page goes: `/browse` still draws them, but no tab or link opens
+  it, checked Nov 4), cards in a tab are links, and the leftover group is
+  "Other", where new categories land. One "+ Add a tab".
+  - My picks, drawn but not yet agreed: a trash can beside every Name in
+    place of the Take it off button; Other as a real last row (no handle,
+    no trash).
+  - Card width on the home page stays a Full/Half switch.
+  - Waiting on the user's look before building.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 
