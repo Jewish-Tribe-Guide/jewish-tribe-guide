@@ -193,6 +193,8 @@ const nextConfig: NextConfig = {
       // (/admin/site, the old Basics, is Site's list of screens now.)
       { source: '/:community((?!api\\b).*)/admin/desktop', destination: '/:community/admin/home', permanent: false },
       { source: '/:community((?!api\\b).*)/admin/mobile', destination: '/:community/admin/menus', permanent: false },
+      // The name and logo were Settings' Community tab until Nov 4.
+      { source: '/:community((?!api\\b).*)/admin/community', destination: '/:community/admin/menus', permanent: false },
     ];
   },
 };

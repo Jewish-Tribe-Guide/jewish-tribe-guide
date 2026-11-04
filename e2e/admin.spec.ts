@@ -103,11 +103,11 @@ test.describe('admin console', () => {
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
-  test('Settings → Community shows the real saved site name', async ({ page, request }) => {
+  test('Header and menus shows the real saved site name', async ({ page, request }) => {
     const res = await request.get('/api/site-settings')
     const settings = (await res.json()).settings as { name: string }
 
-    await page.goto('/philly/admin/community')
+    await page.goto('/philly/admin/menus')
     await expect(page.getByRole('heading', { name: 'Name and logo' })).toBeVisible()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue(settings.name)
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
@@ -121,7 +121,7 @@ test.describe('admin console', () => {
   })
 
   test('the old Site addresses land on the new tabs', async ({ page }) => {
-    for (const [from, to] of [['desktop', 'home'], ['mobile', 'menus']]) {
+    for (const [from, to] of [['desktop', 'home'], ['mobile', 'menus'], ['community', 'menus']]) {
       await page.goto(`/philly/admin/${from}`)
       await expect(page).toHaveURL(new RegExp(`/philly/admin/${to}$`))
     }

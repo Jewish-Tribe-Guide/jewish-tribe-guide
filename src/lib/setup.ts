@@ -26,7 +26,7 @@ export type SetupStep = { key: string; name: string; line: string; href: string;
 
 export function setupSteps(s: SetupState, base: string): SetupStep[] {
   return [
-    { key: 'name', name: 'Name and logo', line: 'The name at the top, and its logo', href: `${base}/community`, done: s.logo },
+    { key: 'name', name: 'Name and logo', line: 'The name at the top, and its logo', href: `${base}/menus`, done: s.logo },
     { key: 'admins', name: 'A second admin', line: 'Someone to share the deciding', href: `${base}/team`, done: s.admins >= 2 },
     {
       key: 'category',

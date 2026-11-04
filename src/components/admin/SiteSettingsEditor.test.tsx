@@ -228,19 +228,29 @@ describe('SiteSettingsEditor — Home page', () => {
 })
 
 describe('SiteSettingsEditor — Header and menus', () => {
-  // Feedback moved to the Forms tab (FeedbackEditor.test.tsx), and the name
-  // and logo to Settings (CommunityEditor.test.tsx).
-  it('holds the computer’s top of the page and the phone’s tabs', async () => {
+  // Feedback moved to the Forms tab (FeedbackEditor.test.tsx). The name and
+  // logo came back from Settings (the user, Nov 4: "Why does settings have
+  // name and logo there? Versus site"): they're the header's.
+  it('holds the name and logo, the computer’s top of the page and the phone’s tabs', async () => {
     await renderEditor('menus')
     const boxes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(boxes).toEqual(['Top of the page, on a computer', 'Tabs, on a phone'])
-    expect(screen.queryByLabelText('Name')).toBeNull()
+    expect(boxes).toEqual(['Name and logo', 'Top of the page, on a computer', 'Tabs, on a phone'])
     expect(screen.queryByText('Cards under the search, on a computer')).toBeNull()
   })
 
-  // Forms and Settings save the feedback form and the name on their own.
-  // This draft may hold what they were before, so sending it whole put
-  // them back.
+  it('saves the name with the rest of the header', async () => {
+    const user = userEvent.setup()
+    await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Old name' })
+    const name = screen.getByLabelText('Name', { exact: true })
+    expect(name).toHaveValue('Old name')
+    await user.clear(name)
+    await user.type(name, 'Philly Jewish Guide')
+    await saveWith(user, { ...SITE_SETTINGS_DEFAULTS, name: 'Philly Jewish Guide' })
+    expect(sentBody()).toEqual({ name: 'Philly Jewish Guide' })
+  })
+
+  // Forms saves the feedback form on its own. This draft may hold what it
+  // was before, so sending it whole put it back.
   it('saves only what changed here', async () => {
     const user = userEvent.setup()
     await renderEditor('menus', { ...SITE_SETTINGS_DEFAULTS, name: 'Old name', feedbackHeading: 'Old heading' })

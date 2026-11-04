@@ -642,7 +642,7 @@ describe('ModerationQueue — Set up your guide', () => {
       ['Your first categoryPick a kind, then add its places', 'false'],
       ['The home page’s wordsThe big line and the line under it', 'false'],
     ])
-    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/community', '/team', '/categories/cat:new', '/home'])
+    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/menus', '/team', '/categories/cat:new', '/home'])
     expect(screen.getByText('Nothing else to do.')).toBeInTheDocument()
     expect(screen.queryByText('Nothing to do')).toBeNull()
   })

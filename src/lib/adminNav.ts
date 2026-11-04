@@ -45,7 +45,6 @@ export type AdminTab =
   | 'metrics'
   | 'watches'
   | 'team'
-  | 'community'
   | 'communities'
 
 export type AdminTabLink = { tab: AdminTab; href: string; label: string }
@@ -119,7 +118,6 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       label: 'Settings',
       tabs: [
         { tab: 'team', href: `${base}/team`, label: 'Team' },
-        { tab: 'community', href: `${base}/community`, label: 'Community' },
         ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
       ],
     },
