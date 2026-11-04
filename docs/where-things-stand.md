@@ -2391,7 +2391,20 @@ Then "the small tweaks", each with a test that failed against the old code:
     Keystone-K and Mekor.
 
 Still open:
-- The ones that need a drawing or a decision: 25-28, 18/19, 20, 22, 23.
+- Decided Nov 4 (the user's picks):
+  - **25-28, reordering:** draw first. One drag list for all four (a handle,
+    and long-press on a phone). Groups on the Browse page and Top of the
+    page, on a computer are redrawn as rows that open. Show the drawing
+    before building.
+  - **18/19:** Look again becomes one list with a kind filter and search,
+    like To do and Places. Watches stays as it is.
+  - **22:** the site's name and logo move from Settings to Site → Header
+    and menus.
+  - **23:** the Eruv category can be deleted, with the usual confirm saying
+    how many eruvim and watches go with it. This reverses the Nov 3 Hidden
+    only rule.
+- **20, asking visitors about something seen today:** waits on the user
+  naming the place where they saw it.
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 
