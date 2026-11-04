@@ -2427,6 +2427,14 @@ Still open:
   "+ Add a link"'s list ends with the Categories menu (when it's gone) and
   "A dropdown of links". Waiting on the user's look before building.
   Card width stays a Full/Half switch (recommended; not dragged side by side).
+- **The groups inside the Categories row:** drawn Nov 4
+  (KdHT8Tci1ufXSXobnnSfEm v7, board "New · The groups go inside the
+  Categories row"). The groups only show as the computer's Categories
+  menu: `/browse` still draws them, but no tab or link opens it (checked
+  Nov 4). So the "Groups on the Browse page" box on Site → Home page goes,
+  and the Categories row on Header and menus opens to its groups (each
+  opening to its cards), with "+ Add a group" and its Take it off beside
+  its Name. Waiting on the user's look before building.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 
