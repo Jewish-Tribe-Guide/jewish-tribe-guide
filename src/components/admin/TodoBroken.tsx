@@ -6,6 +6,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { editorRows } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
 import { listingSlug } from '@/lib/listingSlug'
+import { itemsField } from '@/lib/listingView'
 import { routes } from '@/lib/routes'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -97,6 +98,12 @@ export default function TodoBroken({
   const loaded = listing && listing !== 'none' ? listing : null
   const rows = loaded ? brokenRows(view.field, editorRows(loaded.category, loaded.item as Record<string, unknown>, { splitContact: true })) : []
   const href = loaded ? routes.listing(community, loaded.category.id, listingSlug(loaded.item)) : (googlePlace?.href ?? null)
+  // A menu's dishes typed in are saved as its reading's answer (the main
+  // dishes tab's own Save), so a menu that can't be read leaves To do with
+  // them. Before (the user, Nov 4: "couldn't find where to submit") they
+  // had no button, and went out only with another answer.
+  const food = jobs.dishes?.find((p) => p.id === placeId)
+  const dishesKey = (view.kind === 'menu-load' || view.kind === 'menu-read') && loaded && food?.reading ? itemsField(loaded.category)?.key : undefined
 
   async function run(what: string, work: () => Promise<unknown>, after?: string | null) {
     setError(null)
@@ -257,7 +264,14 @@ export default function TodoBroken({
         hosted={{ onControl }}
         adminSave={{
           label: 'Update the listing',
-          via: ({ payload }) => fetch(withCommunity(`/api/admin/listings/${placeId}`, community), { method: 'PATCH', headers, body: JSON.stringify({ payload }) }),
+          via: ({ payload }) =>
+            dishesKey
+              ? fetch(withCommunity('/api/admin/main-dishes', community), {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ action: 'save', resourceId: placeId, always: payload.details?.[dishesKey] ?? [], sometimes: payload.details?.[`${dishesKey}_sometimes`] ?? [] }),
+                })
+              : fetch(withCommunity(`/api/admin/listings/${placeId}`, community), { method: 'PATCH', headers, body: JSON.stringify({ payload }) }),
           onSaved: () => {},
         }}
       />
@@ -293,7 +307,17 @@ export default function TodoBroken({
         )
       }
       error={error ?? still}
-      foot={!inStep && view.answers.length > 0 && <PlaceButtons buttons={(loaded ? stoppedGoogleAnswers(view, loaded.item, loaded.category) : view.answers).map(answer)} />}
+      foot={
+        !inStep &&
+        view.answers.length > 0 && (
+          <PlaceButtons
+            buttons={[
+              ...(dishesKey && edit.changed ? [{ label: 'Save these dishes', busy: busy === 'save' && 'Saving…', disabled: busy !== null || edit.sending, onClick: () => void run('save', async () => {}) }] : []),
+              ...(loaded ? stoppedGoogleAnswers(view, loaded.item, loaded.category) : view.answers).map(answer),
+            ]}
+          />
+        )
+      }
     >
       {card}
       {finding && googlePlace && (
