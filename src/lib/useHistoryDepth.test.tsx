@@ -70,6 +70,22 @@ describe('useHistoryDepth', () => {
     expect(screensOpenIn({ placeOpen: 'x' })).toBe(0)
   })
 
+  // The user, Nov 4: "not sure forward is working". A closed screen can't
+  // be opened again from history, so Forward goes straight back rather
+  // than leaving the page on an entry that says a screen is open.
+  it('Forward onto a screen that was closed steps back off it', () => {
+    const back = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const { rerender } = renderHook(({ d }) => useHistoryDepth('step', d, back), { initialProps: { d: 0 } })
+    rerender({ d: 1 })
+    swipeBack({ placeOpen: 'x' })
+    rerender({ d: 0 })
+    go.mockClear()
+    swipeBack({ placeOpen: 'x', step: 1 })
+    expect(go).toHaveBeenCalledWith(-1)
+    expect(back).toHaveBeenCalledTimes(1)
+  })
+
   it('leaves a popstate that isn’t its own alone', () => {
     const back = vi.fn()
     renderHook(() => useHistoryDepth('step', 0, back))

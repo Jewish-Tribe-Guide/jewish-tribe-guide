@@ -17,6 +17,7 @@ import { sourceActions } from './sourceActions'
 import { brokenRows, brokenView, googleRows, stoppedGoogleAnswers, type BrokenAct, type BrokenAnswer } from './brokenView'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 
 // A broken check, fixed where it's shown (boards R3Site, R2Menu, R2Google,
 // R6Give, O2Pizza): the listing's field in its own editor, where it's read
@@ -80,6 +81,9 @@ export default function TodoBroken({
     setEdit((s) => (s.changed === c.changed && s.sending === c.sending ? s : { changed: c.changed, sending: c.sending }))
   }, [])
   const [step, setStep] = useState<EditorStep | null>(null)
+  // An open row or a minyan in it is an entry, as in Places' editor: a
+  // swipe back closes it rather than leaving the place (Nov 4).
+  useHistoryDepth('todoStep', step ? (step.depth ?? 1) : 0, () => step?.back())
 
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
