@@ -37,9 +37,9 @@ import { routes } from './routes'
 export type WatchState = 'waiting' | 'not_checked' | 'up_to_date'
 
 /** Where a place is read from, in the order it's said. */
-export type WatchSource = 'refuah' | 'google' | 'keystone' | 'mekor' | 'menu' | 'website' | 'newsletter' | 'email'
-const SOURCES: readonly WatchSource[] = ['refuah', 'google', 'keystone', 'mekor', 'menu', 'website', 'newsletter', 'email']
-const NAMED: Partial<Record<WatchSource, string>> = { refuah: 'Refuah', google: 'Google', keystone: 'Keystone-K', mekor: 'Mekor Habracha' }
+export type WatchSource = 'refuah' | 'google' | 'keystone' | 'mekor' | 'kcl' | 'menu' | 'website' | 'newsletter' | 'email'
+const SOURCES: readonly WatchSource[] = ['refuah', 'google', 'keystone', 'mekor', 'kcl', 'menu', 'website', 'newsletter', 'email']
+const NAMED: Partial<Record<WatchSource, string>> = { refuah: 'Refuah', google: 'Google', keystone: 'Keystone-K', mekor: 'Mekor Habracha', kcl: 'KCL' }
 const OWN: Partial<Record<WatchSource, [one: string, many: string]>> = {
   menu: ['its menu', 'menus'],
   website: ['its website', 'websites'],
@@ -104,7 +104,7 @@ export type WatchJobsIn = {
 
 const dayText = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
-const LIST_NAMES = { keystone: 'Keystone-K’s', mekor: 'Mekor Habracha’s' } as const
+const LIST_NAMES = { keystone: 'Keystone-K’s', mekor: 'Mekor Habracha’s', kcl: 'KCL’s' } as const
 
 /** What one job says of a place: changes waiting, things not checked
  *  (each with its own pill), and where it reads it from. */

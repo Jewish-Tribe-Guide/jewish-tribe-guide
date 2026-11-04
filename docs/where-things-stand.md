@@ -2372,16 +2372,24 @@ Then "the small tweaks", each with a test that failed against the old code:
     (one watch).
 - **21, Ben & Jerry's:** nothing to build. Our run started from /upenn,
   whose menu link goes to an ordering site.
+- **7, KCL:** built (`kclWatch.ts`, `kclRun.ts`). A website watch on
+  kclkashrus.org's home page finds the list PDF it links ("See Complete
+  Listing"; the file's address changes each edition) and reads its names
+  with `unpdf` (pinned 1.9.1). A place that says KCL and is on the list,
+  by the same name or one starting the other (at least 6 letters, one
+  match only), is on "KCL's list": its Kosher row says KCL and its
+  hechsher is dated, so it's off Not checked. Nothing is filed, since the
+  list has no addresses. A name on the list never counts for a place that
+  doesn't already say KCL. On dev: 207 names, all 4 KCL places matched.
+  The Kosher box used to name every non-Keystone list "Mekor Habracha's
+  list"; it now uses each list's own name, and "On neither list" became
+  "Not on a kosher list".
+  - Live needs the watch added (the user's yes): kind `website`, URL
+    `https://www.kclkashrus.org/`, label "KCL's list".
+  - Not done: Add's "Read now" lookup (`kosherLookup`) still only checks
+    Keystone-K and Mekor.
 
 Still open:
-- **7, KCL:** waiting on the user. KCL's current list
-  (kclkashrus.org/wp-content/uploads/2025/06/KCL-Establishments-June-2025.pdf,
-  dated December 2025 inside) is a PDF of names only: no addresses. All 4
-  live KCL places are on it, under slightly different names ("South Side
-  Smokehouse" for Southside, "Mike's Chicken Crunchers" for Mike's
-  Chicken). A watch would need a PDF reader (none in the project) and
-  could match by name only. IKC is already checked through Mekor's list,
-  so the other unchecked hechsher is Cherry-K (4 places).
 - The ones that need a drawing or a decision: 25-28, 18/19, 20, 22, 23.
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)

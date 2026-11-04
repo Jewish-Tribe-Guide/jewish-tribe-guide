@@ -2,6 +2,8 @@ import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import { runKeystoneWatch } from './keystoneRun'
 import { isMekorList } from './mekorWatch'
 import { runMekorWatch } from './mekorRun'
+import { isKclList } from './kclWatch'
+import { runKclWatch } from './kclRun'
 import { readWebsite } from './websiteWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { runRefuahWatch } from './refuahRun'
@@ -47,6 +49,12 @@ export async function runWatch(
     if (isMekorList(watch.url)) {
       const run = await runMekorWatch(watch.communityId, watch.url)
       return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
+    }
+    // KCL's list of names, linked from its home page: it only dates the
+    // hechsher of the places that say KCL and are on it (kclWatch.ts).
+    if (isKclList(watch.url)) {
+      const run = await runKclWatch(watch.communityId, watch.url)
+      return run.ok ? { ok: true, filed: 0, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
     }
     // A hospital's page on Refuah builds itself in the browser, so it's read
     // from the data it's built from, and compared with the hospital's

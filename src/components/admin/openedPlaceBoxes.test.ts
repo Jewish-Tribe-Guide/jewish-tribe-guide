@@ -301,6 +301,20 @@ describe('openedPlace, what isn’t read', () => {
     const o = openedPlace('p', jobs({ kosher }), NOW)
     const box = o.boxes.find((b) => b.key === 'kosher')!
     expect(box.kind === 'rows' && box.groups[0].rows).toEqual([{ name: 'Hechsher', right: 'OU' }])
-    expect(box.foot).toEqual({ lead: 'On neither list', links: [], when: null, change: { kind: 'keystone' } })
+    expect(box.foot).toEqual({ lead: 'Not on a kosher list', links: [], when: null, change: { kind: 'keystone' } })
+  })
+
+  // Nov 4: Gelbstein's Bakery, on KCL's list only, said "Same as Mekor
+  // Habracha's list".
+  it('a food place on KCL’s list says KCL’s', () => {
+    const kosher = {
+      available: true,
+      lists: [{ list: 'kcl' as const, url: 'https://www.kclkashrus.org/', watch: null, error: null, entries: 207, updated: 'December 2025' }],
+      counts: { checked: 1, toCheck: 0, cantRead: 0, didntLoad: 0, notListed: 0 },
+      places: [{ id: 'p', name: 'Gelbstein’s Bakery', category: 'restaurant', certs: ['OU', 'cRc', 'KCL'], levels: [], on: [{ list: 'kcl' as const, name: 'Gelbstein’s Bakery', url: 'https://www.kclkashrus.org/', says: 'KCL' }], differences: [], href: '/x' }],
+      newPlaces: [],
+    }
+    const box = openedPlace('p', jobs({ kosher }), NOW).boxes.find((b) => b.key === 'kosher')!
+    expect(box.foot?.links).toEqual([{ text: 'KCL’s list', url: 'https://www.kclkashrus.org/' }])
   })
 })

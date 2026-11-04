@@ -9,6 +9,7 @@ import {
   type KeystoneEntry,
   type WatchFinding,
 } from './keystoneWatch'
+import { KCL_HOME_URL, kclMatches, type KclEntry } from './kclWatch'
 import { compareMekor, findingKey as mekorKey, matchEntries, type GuideListing, type MekorEntry, type MekorFinding } from './mekorWatch'
 import type { JobCounts } from './watchJobs'
 
@@ -26,9 +27,9 @@ import type { JobCounts } from './watchJobs'
 // Pure: the route reads the lists and the database.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type KosherList = 'keystone' | 'mekor'
+export type KosherList = 'keystone' | 'mekor' | 'kcl'
 
-export const KOSHER_LIST_NAMES: Record<KosherList, string> = { keystone: 'Keystone-K’s list', mekor: 'Mekor Habracha’s list' }
+export const KOSHER_LIST_NAMES: Record<KosherList, string> = { keystone: 'Keystone-K’s list', mekor: 'Mekor Habracha’s list', kcl: 'KCL’s list' }
 
 /** What became of a difference: a finding waiting to compare; one filed
  *  before and decided (not filed again until the list or the listing
@@ -126,10 +127,12 @@ export type KosherInput = {
    *  it didn't load). */
   keystone: KeystoneEntry[] | null
   mekor: MekorEntry[] | null
+  /** KCL's names (kclWatch.ts): it only confirms, so it has no differences. */
+  kcl?: KclEntry[] | null
   filed?: Partial<Record<KosherList, Filed>>
 }
 
-export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherInput): { places: KosherPlace[]; newPlaces: NewOnList[] } {
+export function kosherPlaces({ listings, keystone, mekor, kcl = null, filed = {} }: KosherInput): { places: KosherPlace[]; newPlaces: NewOnList[] } {
   const live = listings.filter((l) => l.status === 'approved')
   const on = new Map<string, OnList[]>(live.map((l) => [l.id, []]))
   const differences = new Map<string, Difference[]>(live.map((l) => [l.id, []]))
@@ -161,6 +164,10 @@ export function kosherPlaces({ listings, keystone, mekor, filed = {} }: KosherIn
       if (f.kind === 'new') fresh.push({ on: mekorOn(f.entry), address: f.entry.address, archived: f.archived?.name ?? null, archivedId: f.archived?.id ?? null, filed: state })
       else differences.get(f.listing.id)?.push({ list: 'mekor', line: mekorLine(f), filed: state })
     }
+  }
+
+  if (kcl) {
+    for (const [id, name] of kclMatches(kcl, live)) on.get(id)?.push({ list: 'kcl', name, url: KCL_HOME_URL, says: 'KCL' })
   }
 
   // A place new on both lists is one place.
