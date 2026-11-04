@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
 import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
@@ -56,6 +57,13 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
   // With a Browse tab, the grid is Browse's, and the home tab is a house.
   const categories = useCategoriesIfAny()
   const hasBrowse = tabs.some((t) => t.target === 'browse')
+  // The tab whose screen the visitor was last on. A category page belongs to
+  // no tab of its own, so the one it was reached from stays lit, as Spotify
+  // does (the user, Nov 4): before, nothing was lit there. A first load onto
+  // a category counts as reached from home.
+  const [cameFrom, setCameFrom] = useState<AppMode>(mode === 'find' ? 'home' : mode)
+  if (mode !== 'find' && mode !== cameFrom) setCameFrom(mode)
+  const ownTab = mode === 'find' && tabs.some((t) => t.target === activeCardId)
   return (
     <nav
       className="desktop:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
@@ -67,7 +75,9 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
         // otherwise every card tab would light up alongside Categories, which
         // shares the 'find' mode with them.
         const active = builtIn
-          ? BUILT_IN_MODES[tab.target].includes(mode) && (tab.target !== 'categories' || !activeCardId)
+          ? mode === 'find'
+            ? !ownTab && BUILT_IN_MODES[tab.target].includes(cameFrom)
+            : BUILT_IN_MODES[tab.target].includes(mode)
           : mode === 'find' && activeCardId === tab.target
         const Icon = builtIn ? (tab.target === 'categories' && hasBrowse ? HomeIcon : BUILT_IN_ICONS[tab.target]) : null
         const emoji = builtIn ? undefined : iconForTarget?.(tab.target)
