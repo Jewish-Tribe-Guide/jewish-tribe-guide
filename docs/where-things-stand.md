@@ -2415,6 +2415,11 @@ Built Nov 4, from the user's picks:
     real phone yet.
 
 Still open:
+- **Top of the page, one Add button:** drawn Nov 4 (KdHT8Tci1ufXSXobnnSfEm
+  v6, board "New"). "+ Add a dropdown" and "+ Add the Categories menu" go;
+  "+ Add a link"'s list ends with the Categories menu (when it's gone) and
+  "A dropdown of links". Waiting on the user's look before building.
+  Card width stays a Full/Half switch (recommended; not dragged side by side).
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 
