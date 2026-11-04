@@ -148,12 +148,21 @@ export default function ModerationQueue({ session }: { session: Session }) {
     const row = key && wide() ? rowOf(key) : null
     if (row) spot.current = { key: key!, y: spot.current?.y ?? 0, top: row.getBoundingClientRect().top }
   }
+  // To do tapped on the list itself starts it over, filters, search and
+  // sort (the user, Nov 4); with a place open it only closes the place.
+  const tapped = () => {
+    remember()
+    if (!shownKey) {
+      doneHere = null
+      setView(TODO_START)
+    }
+  }
   useEffect(() => {
     window.addEventListener('popstate', remember)
-    window.addEventListener(ADMIN_AREA_TAPPED, remember)
+    window.addEventListener(ADMIN_AREA_TAPPED, tapped)
     return () => {
       window.removeEventListener('popstate', remember)
-      window.removeEventListener(ADMIN_AREA_TAPPED, remember)
+      window.removeEventListener(ADMIN_AREA_TAPPED, tapped)
     }
   })
 

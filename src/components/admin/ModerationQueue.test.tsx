@@ -856,4 +856,29 @@ describe('ModerationQueue — To do tapped in the nav', () => {
     expect(screen.queryByTestId('todo-place')).toBeNull()
     expect(row('Acme Grocery')).toBeInTheDocument()
   })
+
+  // The user, Nov 4: "should hitting to do again remove the filters?" With
+  // a place open it closes the place, the list as it was; on the list, it
+  // starts the list over.
+  it('on the list, starts it over: filters, search and sort', async () => {
+    const user = userEvent.setup()
+    renderQueue([submission(), submission({ id: 'sub-2', payload: { category: 'grocery', name: 'Giant', address: '2 Main St', details: {} } })])
+    await user.click(await findRow('Acme Grocery'))
+    await user.click(screen.getByRole('button', { name: /^Show/ }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /New places/ }))
+    await user.keyboard('{Escape}')
+    const tap = () =>
+      act(() => {
+        window.history.pushState(null, '', window.location.pathname)
+        window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
+      })
+    tap()
+    expect(screen.queryByTestId('todo-place')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('New places')
+    await user.type(screen.getByLabelText('Find a place by name'), 'gia')
+    tap()
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('All')
+    expect(screen.getByLabelText('Find a place by name')).toHaveValue('')
+    expect(row('Acme Grocery')).toBeInTheDocument()
+  })
 })
