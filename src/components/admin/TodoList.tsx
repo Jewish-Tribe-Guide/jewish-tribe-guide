@@ -31,7 +31,9 @@ const SORTS: { value: TodoSort; label: string }[] = [
 /** `category`: a category's id, or '' for all of them. */
 export type TodoView = { query: string; filters: TodoFilter[]; category: string; sort: TodoSort }
 
-export const ALL_OLDEST_FIRST: TodoView = { query: '', filters: [], category: '', sort: 'oldest' }
+/** Where To do starts: everything, newest first (the user, Nov 4), so a
+ *  place read again, dated today, comes up top. */
+export const TODO_START: TodoView = { query: '', filters: [], category: '', sort: 'newest' }
 
 export default function TodoList({
   data,
@@ -55,8 +57,10 @@ export default function TodoList({
   const toggle = (v: TodoFilter | 'all') =>
     onView({ ...view, filters: v === 'all' ? [] : view.filters.includes(v) ? view.filters.filter((f) => f !== v) : [...view.filters, v] })
   // As Places' Category menu (the user, Nov 2), with only the categories
-  // something waits in, and the one picked even once it's emptied.
-  const inCategory = (id: string) => places.filter((p) => p.category === id).length
+  // something waits in under the search and Show (Nov 4), and the one
+  // picked even once it's emptied.
+  const besideCategory = shownPlaces(places, { ...view, category: '' })
+  const inCategory = (id: string) => besideCategory.filter((p) => p.category === id).length
   const categories = [...categoriesById.values()].filter((c) => c.id === view.category || inCategory(c.id) > 0)
 
   return (

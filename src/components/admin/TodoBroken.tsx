@@ -6,6 +6,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { editorRows } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
 import { listingSlug } from '@/lib/listingSlug'
+import { itemsField } from '@/lib/listingView'
 import { routes } from '@/lib/routes'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -17,6 +18,7 @@ import { sourceActions } from './sourceActions'
 import { brokenRows, brokenView, googleRows, stoppedGoogleAnswers, type BrokenAct, type BrokenAnswer } from './brokenView'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 
 // A broken check, fixed where it's shown (boards R3Site, R2Menu, R2Google,
 // R6Give, O2Pizza): the listing's field in its own editor, where it's read
@@ -80,6 +82,9 @@ export default function TodoBroken({
     setEdit((s) => (s.changed === c.changed && s.sending === c.sending ? s : { changed: c.changed, sending: c.sending }))
   }, [])
   const [step, setStep] = useState<EditorStep | null>(null)
+  // An open row or a minyan in it is an entry, as in Places' editor: a
+  // swipe back closes it rather than leaving the place (Nov 4).
+  useHistoryDepth('todoStep', step ? (step.depth ?? 1) : 0, () => step?.back())
 
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -93,6 +98,12 @@ export default function TodoBroken({
   const loaded = listing && listing !== 'none' ? listing : null
   const rows = loaded ? brokenRows(view.field, editorRows(loaded.category, loaded.item as Record<string, unknown>, { splitContact: true })) : []
   const href = loaded ? routes.listing(community, loaded.category.id, listingSlug(loaded.item)) : (googlePlace?.href ?? null)
+  // A menu's dishes typed in are saved as its reading's answer (the main
+  // dishes tab's own Save), so a menu that can't be read leaves To do with
+  // them. Before (the user, Nov 4: "couldn't find where to submit") they
+  // had no button, and went out only with another answer.
+  const food = jobs.dishes?.find((p) => p.id === placeId)
+  const dishesKey = (view.kind === 'menu-load' || view.kind === 'menu-read') && loaded && food?.reading ? itemsField(loaded.category)?.key : undefined
 
   async function run(what: string, work: () => Promise<unknown>, after?: string | null) {
     setError(null)
@@ -253,7 +264,14 @@ export default function TodoBroken({
         hosted={{ onControl }}
         adminSave={{
           label: 'Update the listing',
-          via: ({ payload }) => fetch(withCommunity(`/api/admin/listings/${placeId}`, community), { method: 'PATCH', headers, body: JSON.stringify({ payload }) }),
+          via: ({ payload }) =>
+            dishesKey
+              ? fetch(withCommunity('/api/admin/main-dishes', community), {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ action: 'save', resourceId: placeId, always: payload.details?.[dishesKey] ?? [], sometimes: payload.details?.[`${dishesKey}_sometimes`] ?? [] }),
+                })
+              : fetch(withCommunity(`/api/admin/listings/${placeId}`, community), { method: 'PATCH', headers, body: JSON.stringify({ payload }) }),
           onSaved: () => {},
         }}
       />
@@ -289,7 +307,17 @@ export default function TodoBroken({
         )
       }
       error={error ?? still}
-      foot={!inStep && view.answers.length > 0 && <PlaceButtons buttons={(loaded ? stoppedGoogleAnswers(view, loaded.item, loaded.category) : view.answers).map(answer)} />}
+      foot={
+        !inStep &&
+        view.answers.length > 0 && (
+          <PlaceButtons
+            buttons={[
+              ...(dishesKey && edit.changed ? [{ label: 'Save these dishes', busy: busy === 'save' && 'Saving…', disabled: busy !== null || edit.sending, onClick: () => void run('save', async () => {}) }] : []),
+              ...(loaded ? stoppedGoogleAnswers(view, loaded.item, loaded.category) : view.answers).map(answer),
+            ]}
+          />
+        )
+      }
     >
       {card}
       {finding && googlePlace && (

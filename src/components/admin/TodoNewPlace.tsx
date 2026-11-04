@@ -9,6 +9,7 @@ import ListingEditor, { type EditorControl, type EditorStep } from '@/components
 import { useListingDraft } from '@/components/resources/useListingDraft'
 import PlaceFrame, { PlaceButtons, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { SubmissionSourceCard } from './TodoChange'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 
 // A new place on To do (board L3NewPlace): the listing as it would go in,
 // in the site's own editor, a row for each thing it has and "Not on the
@@ -89,6 +90,9 @@ export default function TodoNewPlace({
     return () => onEditing(false)
   }, [edit.edited, onEditing])
   const [step, setStep] = useState<EditorStep | null>(null)
+  // An open row or a minyan in it is an entry, as in Places' editor: a
+  // swipe back closes it rather than leaving the place (Nov 4).
+  useHistoryDepth('todoStep', step ? (step.depth ?? 1) : 0, () => step?.back())
   const inStep = !!step?.title
 
   const sending = busy || edit.sending

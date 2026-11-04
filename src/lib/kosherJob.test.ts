@@ -127,6 +127,18 @@ describe('kosherPlaces', () => {
     expect(places[0].differences.map((d) => d.line)).toEqual(['The listing says IKC; Mekor Habracha’s list doesn’t have it'])
   })
 
+  // The user, Nov 4: KCL's list, "to get hechsher things off of not checked".
+  it('a listing that says KCL is on KCL’s list by its name there', () => {
+    const l = listing({ id: 'ss', name: 'Southside', details: { kosherCert: ['KCL'] } })
+    const other = listing({ id: 'akc', name: 'Authentic Kosher Chinese', details: { kosherCert: ['OU'] } })
+    const { places } = kosherPlaces({ listings: [l, other], keystone: null, mekor: null, kcl: [{ name: 'South Side Smokehouse' }, { name: 'Authentic Kosher Chinese' }] })
+    expect(places.map((p) => [p.name, p.on.map((o) => [o.list, o.name])])).toEqual([
+      ['Authentic Kosher Chinese', []],
+      ['Southside', [['kcl', 'South Side Smokehouse']]],
+    ])
+    expect(kosherSection(places[1])).not.toBe('not_listed')
+  })
+
   it('a place on neither list is not listed, not checked', () => {
     const l = listing({ id: 'star', name: 'Star K Place', details: { kosherCert: ['Star-K'] } })
     const { places } = kosherPlaces({ listings: [l], keystone: [cherryEntry], mekor: [] })

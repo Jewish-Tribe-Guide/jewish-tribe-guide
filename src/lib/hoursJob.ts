@@ -1,5 +1,5 @@
 import { LISTING_PAGE_FOUND_CREATOR, pageReadsFor } from './listingPageWatch'
-import { normalizeWatchUrl, settles, watchHealth, type Watch } from './watches'
+import { MENU_WATCH_CREATOR, normalizeWatchUrl, settles, watchHealth, type Watch } from './watches'
 import type { HoursPage } from './hoursPages'
 import type { JobCounts } from './watchJobs'
 import type { CategoryConfig } from './categories'
@@ -260,18 +260,23 @@ export function siteGap(category: Pick<CategoryConfig, 'hasPhone' | 'detailField
 /** A place's home page watch: added when its website has something
  *  Google doesn't keep (homePageReads) and nothing watches that page yet;
  *  taken away, its own only, once Google keeps both. A page an admin gave,
- *  stopped or turned off is never touched. */
+ *  stopped or turned off is never touched. `adopt`: its own menu watch on
+ *  that page, to become its home page watch, which reads its menu too
+ *  (sharedPageWatch.ts): else its hours and phone were never read (Zevi's
+ *  Bakery, Nov 4). */
 export function homePageWatchChanges(
   place: { id: string; name: string; website: string | null; details: Record<string, unknown> },
   category: Pick<CategoryConfig, 'hasPhone' | 'detailFields'>,
   watches: readonly Watch[],
-): { add: { url: string; label: string }[]; remove: string[] } {
+): { add: { url: string; label: string }[]; remove: string[]; adopt?: string[] } {
   if (watches.some((w) => w.resourceId === place.id && isHoursOff(w))) return { add: [], remove: [] }
   const url = place.website && normalizeWatchUrl(place.website)
   const want = !!url && homePageReads(category, place.details).length > 0
-  const add = want && !watches.some((w) => same(w.url, url)) ? [{ url, label: foundPageLabel(place.name, null) }] : []
+  const on = want ? watches.filter((w) => same(w.url, url)) : []
+  const add = want && !on.length ? [{ url, label: foundPageLabel(place.name, null) }] : []
+  const adopt = on.length === 1 && on[0].createdBy === MENU_WATCH_CREATOR && on[0].resourceId === place.id ? [on[0].id] : []
   const remove = watches.filter((w) => w.resourceId === place.id && isFoundHoursPage(w) && !(want && same(w.url, url))).map((w) => w.id)
-  return { add, remove }
+  return { add, remove, ...(adopt.length ? { adopt } : {}) }
 }
 
 /** Where a place sits on the job's page:
@@ -290,7 +295,7 @@ export type HoursSection = 'to_check' | 'waiting' | 'checked' | 'cant_read' | 'o
  *  that differs only because of one already decided (Update or Skip) is
  *  settled, not to check. `decidedAt`: when its last finding was decided.
  *  `newsletters`: a shul's, read as part of it (the user, Oct 22). */
-export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number; decidedAt?: string | null; newsletters?: readonly Watch[] }
+export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number; decidedAt?: string | null; newsletters?: readonly Watch[]; stopped?: number }
 
 const loads = (w: Watch, now: number) => {
   const state = watchHealth(w, now).state
@@ -308,7 +313,10 @@ export function hoursSection(p: HoursPlace, now: number): HoursSection {
   if (p.waiting) return 'to_check'
   const read = (p.newsletters ?? []).some((w) => newsletterReads(w, now))
   const live = p.pages.filter((w) => w.active)
-  if (!live.length) return read ? 'checked' : p.pages.length ? 'off' : p.found ? 'waiting' : 'cant_read'
+  // Every page stopped (`stopped`: how many an admin stopped) is off, not
+  // can't be read: "Stop reading it" on Chabad of the Main Line's only page
+  // left it on To do as "Times can't be read" (the user, Nov 4).
+  if (!live.length) return read ? 'checked' : p.pages.length || p.stopped ? 'off' : p.found ? 'waiting' : 'cant_read'
   const ok = live.filter((w) => loads(w, now))
   if (!ok.length) return read ? 'checked' : 'cant_read'
   const results = ok.map((w) => (w.lastRunAt && w.lastCheck ? w.lastCheck.result : null))

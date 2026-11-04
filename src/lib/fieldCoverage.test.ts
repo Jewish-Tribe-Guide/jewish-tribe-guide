@@ -68,12 +68,29 @@ describe('what checks each thing on a place', () => {
       const c = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', menuUrl: null, reading: { status: 'no_menu' } }] })
       expect(notCheckedLine(c)).toBe('Not checked: menu (no menu online)')
     })
+    // The user, Nov 4 (note 8): "no menu online feels sort of misleading
+    // because there is a menu online for almost all of these it's just that
+    // the menu can't read", and one that can't be read showed as kept by
+    // its website when nothing was reading it.
+    it('a menu that can’t be read, or was stopped as one, says so', () => {
+      const watched = { menuUrl: 'https://order.toasttab.com/x', menuWatch: { active: true } }
+      const failed = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', ...watched, reading: { status: 'failed', readAt: '2026-11-03T07:00:00Z' } }] })
+      expect(notCheckedLine(failed)).toBe('Not checked: menu (can’t be read)')
+      const stopped = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', ...watched, reading: { status: 'no_menu', note: 'Can’t be read' } }] })
+      expect(notCheckedLine(stopped)).toBe('Not checked: menu (can’t be read)')
+      // Its dishes given by hand since: checked, as before.
+      const given = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', ...watched, menuAt: '2026-11-04T07:00:00Z', reading: { status: 'failed', readAt: '2026-11-03T07:00:00Z' } }] })
+      expect(given.notWatched).toEqual([])
+    })
     it('Not on Google', () => {
       const c = placeCoverage({ id: 'a', phone: '215' }, food, { ...NONE, kosher, google: [{ id: 'a', notOnGoogle: '2026-11-01', fields: [{ field: 'phone', by: { kind: 'you' } }] }] as never })
       expect(notCheckedLine(c)).toBe('Not checked: phone (not on Google)')
     })
     it('Stop reading it: a stopped page, menu or Refuah page', () => {
       expect(notCheckedLine(placeCoverage({ id: 'a' }, shul, { ...NONE, times: [{ id: 'a', pages: [{ watch: { active: false } }] }] }))).toBe('Not checked: minyan times (stopped reading)')
+      // As the job sends a stopped page: among `stopped`, not `pages`
+      // (Chabad of the Main Line, Nov 4).
+      expect(notCheckedLine(placeCoverage({ id: 'a' }, shul, { ...NONE, times: [{ id: 'a', pages: [], stopped: [{ watch: { active: false } }] }] }))).toBe('Not checked: minyan times (stopped reading)')
       const menu = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', menuUrl: 'https://m.example', menuWatch: { active: false } }] })
       expect(notCheckedLine(menu)).toBe('Not checked: menu (stopped reading)')
       const hospital = makeCategory({ id: 'hospital', kind: 'listing', hasPhone: false, detailFields: [] } as Partial<CategoryConfig>)

@@ -200,6 +200,16 @@ describe('syncHoursWatches', () => {
     expect(m.addWatch.mock.calls.map((c) => c[1].resourceId)).toEqual(['gr', 'hn'])
   })
 
+  // Nov 4: Zevi's Bakery's menu link is its website, so its menu watch was
+  // on that page and nothing ever read its hours or phone.
+  it('takes over its own menu watch on its website, to read the page for both', async () => {
+    m.rows = [row('zv', 'Zevi’s Bakery', 'https://www.zevisbakery.com/home', 'restaurant')]
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'menu', url: 'https://www.zevisbakery.com/home', resourceId: 'zv', createdBy: 'menu links', active: true, pageHash: 'h' }], available: true })
+    expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 1, removed: 0 }])
+    expect(m.addWatch).not.toHaveBeenCalled()
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'menu', { createdBy: HOURS_FOUND_CREATOR, label: 'Zevi’s Bakery · its website', pageHash: null })
+  })
+
   it('takes away its own page it no longer finds', async () => {
     m.listWatches.mockResolvedValue({ watches: [{ id: 'old', url: 'https://lmcmikvah.org/old-hours/', resourceId: 'lmc', createdBy: HOURS_FOUND_CREATOR, active: true }], available: true })
     expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 3, removed: 1 }])

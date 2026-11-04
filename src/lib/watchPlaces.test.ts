@@ -300,6 +300,17 @@ describe('placeTroubles', () => {
     const broken = placeTroubles({ google: [notFound], dishes: null, hours: null, times: null, sites: null, hospitals: null, links: [{ resourceId: 'l', field: 'website', failingSince: '2026-10-01T00:00:00Z', lastError: 'x', dontOpen: true } as never] }, NOW)
     expect(broken.has('g')).toBe(false)
   })
+
+  // The user, Nov 4: "Chabad of Main Line shouldn't be in broken checks. I
+  // took it off by saying it won't work." Stop reading it had stopped its
+  // only page, and it came back as "Times can't be read".
+  it('a shul whose every page was stopped isn’t broken; one never given a page is', () => {
+    const shul = (over: Partial<PagesPlace>): PagesPlace => ({ id: 'c', name: 'Chabad of the Main Line', href: '/c', pages: [], off: false, ...over })
+    const stopped = [{ watch: { id: 'w', active: false, createdBy: 'listing pages (stopped)' } as Watch, source: 'found' }]
+    const run = (p: PagesPlace) => placeTroubles({ google: null, dishes: null, hours: null, times: [p], sites: null, hospitals: null, links: null }, NOW)
+    expect(run(shul({ stopped })).has('c')).toBe(false)
+    expect(run(shul({})).get('c')).toEqual(['Times can’t be read'])
+  })
 })
 
 describe('kindSourcesText', () => {

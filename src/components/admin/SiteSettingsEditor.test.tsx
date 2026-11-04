@@ -101,10 +101,11 @@ describe('SiteSettingsEditor — Home page', () => {
 
   // Regression: the photo uploads through ImageUploadField, the same as a
   // category icon or listing photo, so it can be repositioned afterwards.
+  // The user, Nov 4 (note 24): "Photo, described" didn't say what it was for.
   it('the photo can be repositioned, and described once there is one', async () => {
     await renderEditor('home', { ...SITE_SETTINGS_DEFAULTS, desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: 'City Hall' } })
     expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
-    expect(screen.getByLabelText('Photo, described')).toHaveValue('City Hall')
+    expect(screen.getByLabelText('Photo description, for screen readers')).toHaveValue('City Hall')
   })
 
   it('has no Save bar until something changes, then says how much', async () => {

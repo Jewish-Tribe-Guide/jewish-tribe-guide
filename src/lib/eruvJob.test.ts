@@ -38,6 +38,13 @@ describe('its tab and pill', () => {
     expect(standing(BASE, null, watch({ lastError: 'The page answered 503' }))).toMatchObject({ pill: { text: 'Website didn’t load' }, didntLoad: true })
   })
 
+  // Elkins Park, Nov 4: no status source, and its website "page not found"
+  // since Oct 25, which "No status" hid.
+  it('no status source, and its website down: Website didn’t load', () => {
+    expect(standing(NO_SOURCE, null, watch({ lastError: 'The page answered 404' }))).toEqual({ tab: 'cant_read', pill: { text: 'Website didn’t load', tone: 'grey' }, didntLoad: true })
+    expect(standing(NO_SOURCE, null, watch({ active: false, lastError: 'The page answered 404' }))).toMatchObject({ pill: { text: 'No status' } })
+  })
+
   it('a paused website that last failed is not a problem', () => {
     expect(standing(BASE, null, watch({ active: false, lastError: 'The page answered 503' }))).toMatchObject({ tab: 'checked' })
   })

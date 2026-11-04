@@ -8,7 +8,7 @@ import { unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { todoPlaceCount } from './todoPlaces'
 import { setupLeft, type SetupState } from './setup'
 import { loadDishes, loadJobs, MENU_READING_POLL_MS, type Jobs } from '@/components/admin/useWatchJobs'
-import { menusReading } from './watchJobs'
+import { menusReading, READING_GIVES_UP_MS } from './watchJobs'
 import { notBeingRead, waitingNotQueued, type TodoNotRead, type TodoWaiting } from '@/components/admin/todoWaiting'
 
 // What To do holds, loaded once and shared: the To do page shows it and
@@ -117,8 +117,9 @@ function withJobs(jobs: Jobs) {
  *  places asked for again until it's in, so its reading turns up on To do
  *  without a reload. Stops when another load starts. */
 function pollMenus(key: string, token: string, community: string, load: number, tries = 0) {
-  // A read that never finishes says so after two minutes (menuReadingStore).
-  if (!menusReading(state.data?.jobs?.dishes) || tries > 30) return
+  // A read that never finishes says so once it's older than any read can
+  // run (menuReadingStore); asking stops then too, not before (Nov 4).
+  if (!menusReading(state.data?.jobs?.dishes) || tries * MENU_READING_POLL_MS > READING_GIVES_UP_MS) return
   setTimeout(async () => {
     if (state.key !== key || load !== waitingLoads) return
     const dishes = await loadDishes(token, community)

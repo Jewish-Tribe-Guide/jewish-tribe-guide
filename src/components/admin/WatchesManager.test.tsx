@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, within } from '@testing-library/react'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { fetchJson } from '@/lib/fetchJson'
+import { fetchJson, parseOkJson } from '@/lib/fetchJson'
+import { resetTodo } from '@/lib/useTodo'
 import type { Watch } from '@/lib/watches'
 import WatchesManager, { forgetWatchesTab } from './WatchesManager'
 
@@ -65,8 +66,19 @@ async function renderTab(
     sites = null as unknown[] | null,
     links = null as unknown[] | null,
     lookAgain = null as Record<string, unknown> | null,
+    /** Google's places as To do reads them, for its broken checks. */
+    todoGoogle = [] as unknown[],
   } = {},
 ) {
+  // To do's own reads, for the broken checks it counts (useTodo).
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url: String(url), status: 200 }) as Response))
+  vi.mocked(parseOkJson).mockImplementation(async (res) => {
+    const url = String((res as Response).url)
+    if (url.includes('/api/admin/watches/google')) return { places: todoGoogle }
+    if (url.includes('/api/admin/responses')) return { responses: [] }
+    if (url.includes('/api/admin/setup')) return { setup: null }
+    return { submissions: [] }
+  })
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body))
@@ -140,8 +152,10 @@ afterEach(() => {
   posts.length = 0
   cleanup()
   vi.mocked(fetchJson).mockReset()
+  vi.mocked(parseOkJson).mockReset()
   vi.unstubAllGlobals()
   forgetWatchesTab()
+  resetTodo()
 })
 
 const view = (over: Record<string, unknown>) => ({ id: 'google', name: 'Google', about: '', when: '2:00 AM', count: '', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: ago(0.3), schedule: 'Runs every night at 2:00 AM', ...over })
@@ -180,14 +194,37 @@ describe('WatchesManager', () => {
     expect(within(job).getByRole('img', { name: 'Good' })).toBeInTheDocument()
   })
 
-  it('what needs fixing is listed, and its job gets an X', async () => {
+  // The user, Nov 4: "Do we need needs fixing or is that for to do?" A
+  // place's broken check is To do's: counted as To do counts it, and the
+  // sentence opens To do on them. Only a whole job failing is listed here.
+  it('counts To do’s broken checks, and opens To do on them', async () => {
     const fix = { name: 'Lower Merion Synagogue', why: 'Page didn’t open, 3 nights', page: 'place/l' }
-    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ id: 'times', name: 'Minyan times', tracked: [{ name: 'x', status: '', bad: false, page: '' }], fixes: [fix] })] } })
-    expect(screen.getByTestId('watches-sentence')).toHaveTextContent('1 thing needs fixing. The rest is fine.')
-    const box = screen.getByRole('region', { name: 'Needs fixing' })
-    expect(within(box).getByRole('link')).toHaveTextContent('Lower Merion SynagoguePage didn’t open, 3 nights')
-    expect(within(box).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/place/l')
+    const google = [{ id: 'shul-1', name: 'Mekor Habracha', category: 'synagogue', matched: false, notOnGoogle: null }, { id: 'shul-2', name: 'Kesher Israel', category: 'synagogue', matched: false, notOnGoogle: null }]
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ id: 'times', name: 'Minyan times', tracked: [{ name: 'x', status: '', bad: false, page: '' }], fixes: [fix] })] }, todoGoogle: google })
+    const sentence = await screen.findByRole('link', { name: '2 things need fixing. The rest is fine.' })
+    expect(sentence).toHaveAttribute('href', '/philly/admin?show=broken')
+    expect(screen.queryByRole('region', { name: 'Needs fixing' })).toBeNull()
     expect(within(row(/^Minyan times/)).getByRole('img', { name: 'Something wrong' })).toBeInTheDocument()
+  })
+
+  it('a whole job failing is listed, with To do’s broken checks as one row', async () => {
+    const whole = { name: 'Minyan times', why: 'Last run failed', page: 'job/times', whole: true }
+    const google = [{ id: 'shul-1', name: 'Mekor Habracha', category: 'synagogue', matched: false, notOnGoogle: null }]
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ id: 'times', name: 'Minyan times', tracked: [{ name: 'x', status: '', bad: false, page: '' }], fixes: [whole] })] }, todoGoogle: google })
+    await screen.findByRole('link', { name: /^Broken checks/ })
+    expect(screen.getByTestId('watches-sentence')).toHaveTextContent('2 things need fixing. The rest is fine.')
+    const box = within(screen.getByRole('region', { name: 'Needs fixing' }))
+    expect(box.getAllByRole('link').map((l) => l.textContent)).toEqual(['Minyan timesLast run failed', 'Broken checks1 place'])
+    expect(box.getByRole('link', { name: /^Broken checks/ })).toHaveAttribute('href', '/philly/admin?show=broken')
+  })
+
+  // Real bug, Nov 4: Menus showed a check the morning a menu didn't load.
+  // One night isn't a fix yet, but it isn't fine either.
+  it('a job with trouble last night says it, with no check', async () => {
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ id: 'menus', name: 'Menus', count: '20 of 21 read', trouble: '1 didn’t load', tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
+    const job = row(/^Menus/)
+    expect(job).toHaveTextContent('1 didn’t load')
+    expect(within(job).queryByRole('img', { name: 'Good' })).toBeNull()
   })
 
   // Look again (Nov 3): its own row, how many it has to try and when it
@@ -207,6 +244,15 @@ describe('WatchesManager', () => {
     expect(within(screen.getByRole('region', { name: 'Needs fixing' })).getByRole('link')).toHaveTextContent('Look againLast run failed')
   })
 
+  // Elkins Park, Nov 4: a try whose website didn't open read as all fine.
+  it('Look again with a failed try says so, with no check', async () => {
+    const run = { id: 'r', job: 'look-again', startedAt: ago(0.3), finishedAt: ago(0.29), ok: true, summary: 'Tried 1 again', warning: '1 try stopped with an error', error: null }
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: true, items: [], leftOut: [], runs: [run] } })
+    const look = within(screen.getByRole('region', { name: 'Look again' })).getByRole('link')
+    expect(look).toHaveTextContent('1 try stopped with an error')
+    expect(within(look).queryByRole('img', { name: 'Good' })).toBeNull()
+  })
+
   it('Look again before its table: says it isn’t set up', async () => {
     await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: false, items: [], leftOut: [], runs: [] } })
     expect(within(screen.getByRole('region', { name: 'Look again' })).getByRole('link')).toHaveTextContent('Not set up')
@@ -215,7 +261,17 @@ describe('WatchesManager', () => {
   it('a job turned off leaves the list, and + Add a watch offers it', async () => {
     await renderTab([], { categories: [], runs: { available: true, off: ['google'], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
     expect(screen.queryByRole('link', { name: /^Google/ })).toBeNull()
-    expect(row('+ Add a watch')).toHaveAttribute('href', '/philly/admin/watches/add')
+    expect(screen.getByRole('link', { name: '+ Add a watch' })).toHaveAttribute('href', '/philly/admin/watches/add')
+  })
+
+  // The user, Nov 4: "Should add a watch be a button at the top?" It's at
+  // the top right, as the job pages have theirs, and there with nothing
+  // turned off too (it used to show only then).
+  it('+ Add a watch is a button at the top, always', async () => {
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] } })
+    const add = screen.getByRole('link', { name: '+ Add a watch' })
+    expect(add).toHaveAttribute('href', '/philly/admin/watches/add')
+    expect(add.compareDocumentPosition(screen.getByTestId('watches-sentence')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('newsletters open their own page', async () => {
@@ -223,7 +279,9 @@ describe('WatchesManager', () => {
     expect(row(/^Newsletters/)).toHaveAttribute('href', '/philly/admin/watches/newsletters')
   })
 
-  it('counts the places with something no job checks, and opens them on Places', async () => {
+  // The user, Nov 4: "Don't need not checked in watches now": it's on
+  // Places (Checked by), where a place is.
+  it('has no Not checked box: that’s on Places', async () => {
     const approved = (id: string, listing: Record<string, unknown>) => ({ id, name: id, category: 'synagogue', status: 'approved', hasAddress: true, changedAt: ago(1), listing: { id, ...listing } })
     await renderTab([], {
       categories: [shulCategory],
@@ -239,8 +297,9 @@ describe('WatchesManager', () => {
       sites: [],
       links: [],
     })
-    expect(within(screen.getByRole('region', { name: 'Not checked' })).getByRole('link')).toHaveTextContent('1 place')
-    expect(row('1 place')).toHaveAttribute('href', '/philly/admin/places?checked=not-watched')
+    await screen.findByTestId('watches-sentence')
+    expect(screen.queryByRole('region', { name: 'Not checked' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /1 place/ })).toBeNull()
   })
 
   it('says so when the jobs couldn’t be loaded', async () => {

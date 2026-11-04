@@ -39,7 +39,14 @@ export function useHistoryDepth(key: string, depth: number, back: () => void) {
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
-      if (now.current.depth > depthIn(e.state, key)) now.current.back()
+      const to = depthIn(e.state, key)
+      if (now.current.depth > to) now.current.back()
+      // Forward onto a screen that was closed: nothing says which row was
+      // open, so it can't be opened again. Left there, the page sat on an
+      // entry claiming a screen, and its own Back (screensOpenIn) stepped
+      // over one entry too many (the user, Nov 4: "not sure forward is
+      // working"). It goes straight back, so Forward does nothing.
+      else if (to > now.current.depth) window.history.go(now.current.depth - to)
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)

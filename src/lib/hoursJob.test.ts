@@ -189,8 +189,13 @@ describe('a food place’s home page (Main dishes board 3)', () => {
 
   it('is watched once, as its website, unless another watch already reads that page', () => {
     expect(homePageWatchChanges(chalavita, food, [])).toEqual({ add: [{ url: 'https://chalavita.com/', label: 'Chalavita · its website' }], remove: [] })
+    // Its own menu watch on its website is taken over, so the page is
+    // read for its hours and phone too, and its menu still (watchRunner.ts):
+    // Zevi's Bakery's and the Kosher Grill's never were (the user, Nov 4).
     const menu = watch({ id: 'menu', url: 'https://www.chalavita.com', resourceId: 'cv', createdBy: 'menu links' })
-    expect(homePageWatchChanges(chalavita, food, [menu])).toEqual({ add: [], remove: [] })
+    expect(homePageWatchChanges(chalavita, food, [menu])).toEqual({ add: [], remove: [], adopt: ['menu'] })
+    // Another place's menu watch on that page isn't its to take.
+    expect(homePageWatchChanges(chalavita, food, [{ ...menu, resourceId: 'other' }])).toEqual({ add: [], remove: [] })
     expect(homePageWatchChanges({ ...chalavita, website: null }, food, [])).toEqual({ add: [], remove: [] })
   })
 

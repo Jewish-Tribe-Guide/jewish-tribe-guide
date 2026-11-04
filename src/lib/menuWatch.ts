@@ -4,6 +4,8 @@ import { itemsField } from './listingView'
 import { keepsMenuLink, MENU_LINK_KEY, menuWebsite, readElsewhere, readMenuLink } from './menuLink'
 import { isOrderingApp, type MenuDish, type MenuSource } from './menuReader'
 import { MENU_WATCH_CREATOR } from './watches'
+import { isListingPageWatch } from './listingPageWatch'
+import { samePage } from './hoursJob'
 import { listedAlready, readerMarks, sameDish, type ListedDishes, type ReadDish } from './dishProposal'
 import type { DirectoryResource } from '@/types'
 
@@ -152,4 +154,19 @@ export function changedMenuNote(found: MenuDish[], missing: readonly string[] = 
  *  that page the menu link (setMenuDishes), so it says so. */
 export function menuMovedNote(url: string, found: MenuDish[], missing: readonly string[] = []): string {
   return `Its menu page stopped opening, and the menu is now at ${url}. Approving makes that its menu link.${dishDifferences(found, missing)}`
+}
+
+/** A place's menu watch: its own, or else the one on its menu link, which
+ *  a branch shares with the branch it was made on (wantedMenuWatches makes
+ *  one per page). Before (the user, Nov 4), the screens looked for each
+ *  branch's own, so every branch but one said its menu wasn't checked.
+ *  Or its own website page's watch, when that page is its menu link: the
+ *  run reads its menu there (sharedPageWatch.ts). */
+export function menuWatchFor<W extends { url: string; resourceId: string | null; createdBy: string | null }>(watches: readonly W[], listing: DirectoryResource): W | null {
+  const menus = watches.filter((w) => w.createdBy === MENU_WATCH_CREATOR)
+  const own = menus.find((w) => w.resourceId === listing.id)
+  if (own) return own
+  const link = watchableMenuLink(listing)
+  if (!link) return null
+  return menus.find((w) => w.url === link) ?? watches.find((w) => w.resourceId === listing.id && isListingPageWatch(w) && samePage(w.url, link)) ?? null
 }

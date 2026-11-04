@@ -9,7 +9,7 @@ import { linkBroken } from '@/lib/linkCheck'
 import type { Watch } from '@/lib/watches'
 import { whyNoLoad } from '@/lib/whyNoLoad'
 import type { Change, ReadStep, Stop } from './openedPlaceBoxes'
-import { troubleSince } from './todoWaiting'
+import { eruvSiteWatches, troubleSince } from './todoWaiting'
 import type { Jobs } from './useWatchJobs'
 import { day, shortUrl } from './watchText'
 
@@ -151,7 +151,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
         urls.push({ url: w.url, error: w.lastError })
       }
     }
-    for (const w of [...(site?.pages ?? []).map((x) => x.watch), ...(food?.pages ?? [])].filter(down)) {
+    for (const w of [...(site?.pages ?? []).map((x) => x.watch), ...(food?.pages ?? []), ...eruvSiteWatches(id, jobs)].filter(down)) {
       steps.push({ job: 'watch', watchId: w.id })
       stops.push({ kind: 'watch', watchId: w.id, what: shortUrl(w.url) })
       urls.push({ url: w.url, error: w.lastError })
@@ -173,6 +173,9 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
     const w = food && menuDidntLoad(food, now) ? food.menuWatch : null
     const give: BrokenAnswer = { label: 'Give its menu', act: { kind: 'give', change: { kind: 'menu' }, label: 'Its menu' } }
     const none: BrokenAnswer = { label: 'No menu online', act: { kind: 'stop', stops: [{ kind: 'menu', action: 'no_menu', what: 'its menu' }] } }
+    // Not "No menu online": almost all of these have one, on an ordering
+    // site (the user, Nov 4).
+    const stop: BrokenAnswer = { label: 'Stop reading it', act: { kind: 'stop', stops: [{ kind: 'menu', action: 'cant_read', what: 'its menu' }] } }
     return {
       kind,
       field: 'items',
@@ -183,7 +186,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
         url,
         why: kind === 'menu-load' ? whyNoLoad(w?.lastError) : 'Its menu isn’t words on a page, so it can’t be read',
       },
-      answers: kind === 'menu-load' ? [{ label: 'Read it again', act: { kind: 'read', steps: [{ job: 'dishes', resourceId: id }] } }, give, none] : [give, none],
+      answers: kind === 'menu-load' ? [{ label: 'Read it again', act: { kind: 'read', steps: [{ job: 'dishes', resourceId: id }] } }, give, none] : [give, stop],
     }
   }
 
@@ -211,7 +214,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
     const live = ((job === 'times' ? shul : mikvah)?.pages ?? []).map((p) => p.watch).filter((w) => w.active)
     const first = live[0]
     const field = job === 'times' ? 'minyanim' : 'hours'
-    // No page at all (Chabad of the Main Line): nothing to give a better
+    // No page at all, and none stopped (that's Not checked): nothing to give a better
     // one for, so one is added.
     if (!first)
       return {

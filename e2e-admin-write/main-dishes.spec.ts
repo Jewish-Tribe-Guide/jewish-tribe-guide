@@ -206,11 +206,11 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   expect((await supabase.from('menu_reading').select('status').eq('resource_id', id).single()).data?.status).toBe('approved')
 })
 
-// A place whose menu couldn't be read: not checked, and "No menu online"
-// kept and undone (Read it again); then its menu link given, saved on the
+// A place whose menu couldn't be read: not checked, and "Stop reading it"
+// (Nov 4: not "No menu online") kept and undone (Read it again); then its menu link given, saved on the
 // listing even when the reader can't open it (a .invalid address never
 // resolves, so no AI is ever asked).
-test('a menu that can’t be read: No menu online, read again, then its menu link given', async ({ page }) => {
+test('a menu that can’t be read: Stop reading it, read again, then its menu link given', async ({ page }) => {
   const supabase = getAdminClient()
   const found = await dishField()
   test.skip(!found, 'no category with a list of dishes on the test project')
@@ -235,8 +235,8 @@ test('a menu that can’t be read: No menu online, read again, then its menu lin
   await expect(problem).toBeVisible()
 
   const reading = async () => (await supabase.from('menu_reading').select('status, note, decided_by').eq('resource_id', id).maybeSingle()).data
-  await problem.getByRole('button', { name: 'No menu online' }).click()
-  await expect.poll(async () => (await reading())?.note).toBe('No menu')
+  await problem.getByRole('button', { name: 'Stop reading it' }).click()
+  await expect.poll(async () => (await reading())?.note).toBe('Can’t be read')
   expect((await reading())?.decided_by).toBeTruthy()
 
   // Kept: after a reload it isn't read, and Read it again undoes it.

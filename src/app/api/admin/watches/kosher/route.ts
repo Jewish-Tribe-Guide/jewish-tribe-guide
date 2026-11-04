@@ -9,6 +9,8 @@ import { jobFindings } from '@/lib/watchFindingStore'
 import type { Finding } from '@/lib/watchFindings'
 import { MEKOR_LIST_URL, MEKOR_WATCH_NAME, isMekorList, submissionKey as mekorSubmissionKey, type GuideListing, type MekorEntry } from '@/lib/mekorWatch'
 import { readKeystoneList } from '@/lib/keystoneRun'
+import { KCL_HOME_URL, isKclList, type KclEntry } from '@/lib/kclWatch'
+import { readKclList } from '@/lib/kclRun'
 import { CATEGORIES, readMekorList } from '@/lib/mekorRun'
 import { KOSHER_JOB_CATEGORIES, kosherCounts, kosherPlaces, type Filed, type KosherList } from '@/lib/kosherJob'
 import { listingSlug } from '@/lib/listingSlug'
@@ -23,7 +25,7 @@ import { kosherBoxKeys, renamedTo } from '@/lib/kosherBox'
 import type { ResourceSubmission } from '@/types'
 
 // GET /api/admin/watches/kosher — the Watches tab's Kosher certification
-//     page (step 5, Oct 21): Keystone-K's and Mekor Habracha's lists, as
+//     page (step 5, Oct 21): Keystone-K's, Mekor Habracha's and KCL's lists, as
 //     their last read saw them (kept on each list's watch by the morning's
 //     read or Check now, Oct 22; read now only before a list's first), and
 //     every food place in the guide with what each list says about
@@ -77,6 +79,7 @@ function filedFrom(rows: readonly Submission[], key: (s: Submission) => string |
 const LISTS: { list: KosherList; url: string; is: (w: Watch) => boolean }[] = [
   { list: 'keystone', url: KEYSTONE_LIST_URL, is: (w) => w.kind === 'keystone_list' },
   { list: 'mekor', url: MEKOR_LIST_URL, is: (w) => isMekorList(w.url) },
+  { list: 'kcl', url: KCL_HOME_URL, is: (w) => isKclList(w.url) },
 ]
 
 export async function GET(request: Request) {
@@ -124,21 +127,25 @@ export async function GET(request: Request) {
     const watchOf = (list: KosherList) => watches.find(LISTS.find((l) => l.list === list)!.is) ?? null
     const keystoneWatch = watchOf('keystone')
     const mekorWatch = watchOf('mekor')
+    const kclWatch = watchOf('kcl')
     // Each list as its last read saw it; read now only before its first
     // (the tab opening must not read two outside sites every time). A
     // paused one isn't.
     const kept = (w: Watch | null) => (w ? (listReads.get(w.id) ?? null) : null)
     const keptKeystone = kept(keystoneWatch)
     const keptMekor = kept(mekorWatch)
-    const [keystone, mekor] = await Promise.all([
+    const keptKcl = kept(kclWatch)
+    const [keystone, mekor, kcl] = await Promise.all([
       !keystoneWatch?.active ? null : keptKeystone ? { entries: keptKeystone.entries as KeystoneEntry[] } : readKeystoneList(keystoneWatch.url),
       !mekorWatch?.active ? null : keptMekor ? { updated: keptMekor.updated, entries: keptMekor.entries as MekorEntry[] } : readMekorList(mekorWatch.url),
+      !kclWatch?.active ? null : keptKcl ? { updated: keptKcl.updated, entries: keptKcl.entries as KclEntry[] } : readKclList(kclWatch.url),
     ])
 
     const { places, newPlaces } = kosherPlaces({
       listings: (listingRows.data ?? []) as GuideListing[],
       keystone: keystone && 'entries' in keystone ? keystone.entries : null,
       mekor: mekor && 'entries' in mekor ? mekor.entries : null,
+      kcl: kcl && 'entries' in kcl ? kcl.entries : null,
       filed: {
         keystone: filedFrom(keystoneFiled, keystoneSubmissionKey),
         mekor: filedFrom(mekorFiled, mekorSubmissionKey),
@@ -146,8 +153,8 @@ export async function GET(request: Request) {
     })
 
     const lists = LISTS.map(({ list, url }) => {
-      const watch = list === 'keystone' ? keystoneWatch : mekorWatch
-      const read = list === 'keystone' ? keystone : mekor
+      const watch = { keystone: keystoneWatch, mekor: mekorWatch, kcl: kclWatch }[list]
+      const read = { keystone, mekor, kcl }[list]
       return {
         list,
         url: watch?.url ?? url,

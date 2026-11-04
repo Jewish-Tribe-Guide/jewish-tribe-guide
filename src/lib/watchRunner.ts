@@ -2,10 +2,13 @@ import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import { runKeystoneWatch } from './keystoneRun'
 import { isMekorList } from './mekorWatch'
 import { runMekorWatch } from './mekorRun'
+import { isKclList } from './kclWatch'
+import { runKclWatch } from './kclRun'
 import { readWebsite } from './websiteWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { runRefuahWatch } from './refuahRun'
-import { runMenuWatch, type MenuReadBudget } from './menuWatchRun'
+import { menuOnPage, runMenuWatch, type MenuReadBudget } from './menuWatchRun'
+import { mergeSharedPage, splitPageHash } from './sharedPageWatch'
 import { isListingPageWatch } from './listingPageWatch'
 import { runListingPageWatch } from './listingPageRun'
 import { updateWatch } from './watchStore'
@@ -47,6 +50,12 @@ export async function runWatch(
       const run = await runMekorWatch(watch.communityId, watch.url)
       return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
     }
+    // KCL's list of names, linked from its home page: it only dates the
+    // hechsher of the places that say KCL and are on it (kclWatch.ts).
+    if (isKclList(watch.url)) {
+      const run = await runKclWatch(watch.communityId, watch.url)
+      return run.ok ? { ok: true, filed: 0, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
+    }
     // A hospital's page on Refuah builds itself in the browser, so it's read
     // from the data it's built from, and compared with the hospital's
     // listing (refuahWatch.ts).
@@ -59,8 +68,15 @@ export async function runWatch(
     }
     // A shul's or mikvah's own page, read by the AI for its times or hours
     // only when it changed (listingPageWatch.ts). Shares the run's AI reads.
+    // A page that is also its place's menu link has its menu read too, each
+    // read with its own fingerprint (sharedPageWatch.ts).
     if (isListingPageWatch({ createdBy: watch.createdBy ?? null })) {
-      return await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
+      const hashes = splitPageHash(watch.pageHash)
+      const page = await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: hashes.page, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
+      const menuOf = page.ok ? await menuOnPage({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null }) : null
+      if (!menuOf) return page
+      const menu = await runMenuWatch({ communityId: watch.communityId, url: watch.url, resourceId: menuOf, pageHash: hashes.menu }, budget, { full })
+      return mergeSharedPage(hashes, page, menu)
     }
     return await readWebsite(watch.url)
   } catch (err) {

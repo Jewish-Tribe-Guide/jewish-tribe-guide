@@ -8,6 +8,7 @@ import { formatHoursSummary } from '@/lib/hours'
 import { READER_MARK_TEXT, readerMarks, type ReaderMark } from '@/lib/dishProposal'
 import { TEFILLAH_LABELS } from '@/lib/davening'
 import { watchHealth, type Watch } from '@/lib/watches'
+import { KOSHER_LIST_NAMES } from '@/lib/kosherJob'
 import { day, shortUrl } from './watchText'
 import { partPages, usualRows, type ShulPlace } from './TimesProposal'
 import { sectionPages, type ListedSection, type MikvahPlace } from './MikvahHours'
@@ -45,7 +46,7 @@ export type Stop = (
   | { kind: 'eruv-status' | 'eruv-map'; id: string }
   | { kind: 'watch'; watchId: string }
   | { kind: 'page'; job: 'hours' | 'times'; watchId: string }
-  | { kind: 'menu'; action: 'unlink' | 'no_menu' }
+  | { kind: 'menu'; action: 'unlink' | 'no_menu' | 'cant_read' }
   | { kind: 'refuah' }
 ) & { what: string }
 
@@ -232,7 +233,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   function pagesProblems(job: 'hours' | 'times', p: ShulPlace | MikvahPlace, live: Watch[], fields: Field[]) {
     const step: ReadStep = { job, resourceId: id }
     for (const w of live) sitePages.push({ watch: w, step })
-    const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters }
+    const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters, stopped: p.stopped?.length }
     if (hoursDidntLoad(state, now)) {
       // A site that's down is one group, its pages read together.
       const down = live.filter((x) => didntLoad(x, now))
@@ -310,9 +311,9 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
 
   // Its hechsher, as the lists it's on have it.
   const kosher = jobs.kosher?.places.find((x) => x.id === id)
-  // On neither list: its own hechsher, and a way to give its page on
+  // On no list: its own hechsher, and a way to give its page on
   // Keystone-K's (the Kosher job page's Add a page).
-  if (kosher && !kosher.on.length) boxes.push({ key: 'kosher', kind: 'rows', title: 'Kosher', groups: [{ head: '', rows: [{ name: 'Hechsher', right: kosher.certs.join(', ') || 'None listed' }] }], foot: { lead: 'On neither list', links: [], when: null, change: { kind: 'keystone' } } })
+  if (kosher && !kosher.on.length) boxes.push({ key: 'kosher', kind: 'rows', title: 'Kosher', groups: [{ head: '', rows: [{ name: 'Hechsher', right: kosher.certs.join(', ') || 'None listed' }] }], foot: { lead: 'Not on a kosher list', links: [], when: null, change: { kind: 'keystone' } } })
   if (kosher?.on.length) {
     const lists = jobs.kosher!.lists
     const on = [...new Set(kosher.on.map((o) => o.list))]
@@ -329,7 +330,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       kind: 'rows',
       title: 'Kosher',
       groups: [{ head: '', rows: [{ name: 'Hechsher', right: kosher.certs.join(', ') || kosher.on[0].says }] }],
-      foot: { lead: 'Same as', links: on.map((l, i) => ({ text: l === 'keystone' ? 'Keystone-K’s list' : 'Mekor Habracha’s list', url: states[i]?.url ?? null })), when: read(at), ...(on.includes('keystone') ? { change: { kind: 'keystone' as const } } : {}) },
+      foot: { lead: 'Same as', links: on.map((l, i) => ({ text: KOSHER_LIST_NAMES[l], url: states[i]?.url ?? null })), when: read(at), ...(on.includes('keystone') ? { change: { kind: 'keystone' as const } } : {}) },
     })
   }
 

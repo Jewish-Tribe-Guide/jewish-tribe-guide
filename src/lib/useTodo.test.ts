@@ -72,4 +72,22 @@ describe('a menu being read', () => {
     await new Promise((r) => setTimeout(r, 120))
     expect(asked).toBe(settled)
   })
+
+  // Nov 4: a read may run the route's whole 300s now. To do stopped asking
+  // after 30 tries (3 minutes at 6s), so a slow read's result never showed.
+  it('keeps asking for as long as a read can run, not a fixed 30 times', async () => {
+    let asked = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const status = url.includes('/api/admin/main-dishes') && ++asked >= 40 ? 'proposed' : 'reading'
+        const body = url.includes('/api/admin/main-dishes')
+          ? { ok: true, places: [{ id: 'p1', name: 'Insomnia', href: '/x', website: null, menuUrl: 'https://insomnia.example/', dishes: [], reading: { status, readAt: '2026-11-04T00:19:52Z', dishes: [] } }] }
+          : { ok: true, submissions: [], responses: [], places: [] }
+        return new Response(JSON.stringify(body), { status: 200 })
+      }),
+    )
+    const { result } = renderHook(() => useTodo('tok', 'philly'))
+    await waitFor(() => expect(result.current.data?.jobs?.dishes?.[0].reading?.status).toBe('proposed'), { timeout: 4000 })
+  })
 })

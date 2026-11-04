@@ -83,3 +83,39 @@ describe('the You tab', () => {
     expect(DEFAULT_MOBILE_TABS.map((t) => t.target).slice(0, 3)).toEqual(['categories', 'map', 'you'])
   })
 })
+
+// The user, Nov 4 (note 32): on a category page no tab was lit, so the bar
+// stopped saying where you were. Like Spotify, the tab you came from stays
+// lit on the screens you reach from it.
+describe('on a page reached from a tab', () => {
+  const tabs: MobileTabConfig[] = [
+    { id: 'categories', label: 'Home', target: 'categories' },
+    { id: 'map', label: 'Map', target: 'map' },
+    { id: 'you', label: 'You', target: 'you' },
+  ]
+  const lit = () => screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page').map((b) => b.querySelector('span:last-child')?.textContent)
+
+  it('keeps Home lit on a category opened from Home', () => {
+    const { rerender } = render(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    expect(lit()).toEqual(['Home'])
+  })
+
+  it('keeps You lit on a place opened from You', () => {
+    const { rerender } = render(<MobileTabBar mode="you" tabs={tabs} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    expect(lit()).toEqual(['You'])
+  })
+
+  it('lights Home when a category is the first page opened', () => {
+    render(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    expect(lit()).toEqual(['Home'])
+  })
+
+  it('a category with its own tab lights that tab only', () => {
+    const withShuls = [...tabs, { id: 'shuls', label: 'Shuls', target: 'shuls' }]
+    const { rerender } = render(<MobileTabBar mode="you" tabs={withShuls} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="find" activeCardId="shuls" tabs={withShuls} onSelect={vi.fn()} />)
+    expect(lit()).toEqual(['Shuls'])
+  })
+})

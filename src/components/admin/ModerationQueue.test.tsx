@@ -115,6 +115,18 @@ const grocerRow = { id: 'l1', community_id: 'philly', category: 'grocery', name:
 // The "one tap per place" boards (Nov 2): a row per place, its name, the
 // oldest thing's date, and what's waiting in a grey line.
 describe('ModerationQueue — the list', () => {
+  // The user, Nov 4: "start page with newest to oldest". A place read
+  // again is dated today, so it comes up top rather than at the foot.
+  it('opens newest first', async () => {
+    renderQueue([
+      submission({ id: 'old', created_at: '2026-10-01T12:00:00Z', payload: { category: 'grocery', name: 'Old Grocer', address: '1 Main St', details: {} } }),
+      submission({ id: 'new', created_at: '2026-11-03T12:00:00Z', payload: { category: 'grocery', name: 'New Grocer', address: '2 Main St', details: {} } }),
+    ])
+    await findRow('New Grocer')
+    expect(screen.getByRole('button', { name: /^Sort/ })).toHaveTextContent('Newest first')
+    expect(screen.getAllByRole('button', { name: /^Open / }).map((b) => b.getAttribute('aria-label'))).toEqual(['Open New Grocer', 'Open Old Grocer'])
+  })
+
   it('says a new place is one', async () => {
     renderQueue([submission()])
     expect(await findRow('Acme Grocery')).toHaveTextContent(/^Acme Grocery\w{3} \d+New place$/)
@@ -716,12 +728,25 @@ describe('ModerationQueue — a place opened', () => {
     expect(screen.queryByRole('link', { name: 'Open Mekor Habracha' })).toBeNull()
   })
 
+  // The user, Nov 4: Watches' "N things need fixing" opens To do on its
+  // broken checks.
+  it('opens on Broken checks from Watches’ link', async () => {
+    window.history.replaceState(null, '', '/?show=broken')
+    renderRouted({ submissions: [submission()], google: [notOnGoogle] })
+    await findRow('Mekor Habracha')
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('Broken checks')
+    expect(screen.queryByRole('button', { name: 'Open Acme Grocery' })).toBeNull()
+    expect(window.location.search).toBe('')
+  })
+
   it('opens on what the filter picked', async () => {
     const user = userEvent.setup()
     renderRouted({ submissions: [edit], google: [notOnGoogle] })
     await findRow('Mekor Habracha')
     await user.click(screen.getByRole('button', { name: /^Show/ }))
     await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))
+    // A tap away only closes the menu (AdminMenu, Nov 4), so it's closed first.
+    await user.keyboard('{Escape}')
     await user.click(row('Mekor Habracha'))
     expect(screen.getByRole('tab', { name: 'Google not found' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('button', { name: 'Change to 6:20 PM' })).toBeNull()
@@ -736,6 +761,11 @@ describe('ModerationQueue — a place opened', () => {
     await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
     expect(row('Giant')).toBeInTheDocument()
     expect(window.location.search).toBe('')
+    // Where it went, said (the user, Nov 4: a menu read again "disappeared.
+    // Where'd they go").
+    expect(screen.getByRole('status')).toHaveTextContent('Acme Grocery: nothing left to do')
+    await user.click(row('Giant'))
+    expect(screen.queryByText(/nothing left to do/)).toBeNull()
   })
 
   it('a place that’s done gives way to the next on a computer, and up and down step through them', async () => {
@@ -824,6 +854,31 @@ describe('ModerationQueue — To do tapped in the nav', () => {
       window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
     })
     expect(screen.queryByTestId('todo-place')).toBeNull()
+    expect(row('Acme Grocery')).toBeInTheDocument()
+  })
+
+  // The user, Nov 4: "should hitting to do again remove the filters?" With
+  // a place open it closes the place, the list as it was; on the list, it
+  // starts the list over.
+  it('on the list, starts it over: filters, search and sort', async () => {
+    const user = userEvent.setup()
+    renderQueue([submission(), submission({ id: 'sub-2', payload: { category: 'grocery', name: 'Giant', address: '2 Main St', details: {} } })])
+    await user.click(await findRow('Acme Grocery'))
+    await user.click(screen.getByRole('button', { name: /^Show/ }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /New places/ }))
+    await user.keyboard('{Escape}')
+    const tap = () =>
+      act(() => {
+        window.history.pushState(null, '', window.location.pathname)
+        window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
+      })
+    tap()
+    expect(screen.queryByTestId('todo-place')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('New places')
+    await user.type(screen.getByLabelText('Find a place by name'), 'gia')
+    tap()
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('All')
+    expect(screen.getByLabelText('Find a place by name')).toHaveValue('')
     expect(row('Acme Grocery')).toBeInTheDocument()
   })
 })

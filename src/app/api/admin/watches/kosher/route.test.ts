@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   getListReads: vi.fn(),
   readKeystoneList: vi.fn(),
   readMekorList: vi.fn(),
+  readKclList: vi.fn(),
   rows: {} as Record<string, unknown[]>,
   filters: [] as [string, string, unknown][],
   jobFindings: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForC
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, getListReads: m.getListReads }))
 vi.mock('@/lib/keystoneRun', () => ({ readKeystoneList: m.readKeystoneList }))
+vi.mock('@/lib/kclRun', () => ({ readKclList: m.readKclList }))
 vi.mock('@/lib/mekorRun', () => ({ readMekorList: m.readMekorList, CATEGORIES: ['restaurant', 'grocery'] }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -66,6 +68,7 @@ const req = () => new Request('http://x/api/admin/watches/kosher')
 const w = (over: Partial<Watch>) => ({ id: 'w1', communityId: 'philly', kind: 'website', active: true, createdBy: null, lastCheck: null, ...over }) as Watch
 const KEYSTONE = w({ id: 'k', kind: 'keystone_list', url: 'https://keystone-k.org/establishments/' })
 const MEKOR = w({ id: 'm', url: 'https://www.mekorhabracha.org/center-city' })
+const KCL = w({ id: 'c', url: 'https://www.kclkashrus.org/' })
 
 const judah = {
   id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
@@ -133,8 +136,24 @@ describe('GET /api/admin/watches/kosher', () => {
     expect(body.lists).toEqual([
       expect.objectContaining({ list: 'keystone', entries: 1, error: null, watch: expect.objectContaining({ id: 'k' }) }),
       expect.objectContaining({ list: 'mekor', entries: null, error: 'Mekor Habracha’s list answered 503' }),
+      expect.objectContaining({ list: 'kcl', entries: null, error: null, watch: null }),
     ])
     expect(body.counts).toMatchObject({ toCheck: 1, didntLoad: 1 })
+  })
+
+  // Nov 4: KCL's list, its last read kept like the others'. It only says a
+  // place that says KCL is on it.
+  it('a place that says KCL, on KCL’s list as its last read had it', async () => {
+    m.rows = { resource: [judah, { ...judah, id: 'gb', name: 'Gelbstein’s Bakery', details: { kosherCert: ['OU', 'KCL'] } }] }
+    m.listWatches.mockResolvedValue({ watches: [KEYSTONE, MEKOR, KCL], available: true })
+    m.getListReads.mockResolvedValue(new Map([['c', { updated: 'December 2025', entries: [{ name: 'Gelbstein’s Bakery' }, { name: 'Judah Grille' }] }]]))
+    const body = await (await GET(req())).json()
+    expect(m.readKclList).not.toHaveBeenCalled()
+    expect(body.lists[2]).toMatchObject({ list: 'kcl', entries: 2, updated: 'December 2025', error: null })
+    expect(body.places.map((p: { name: string; on: { list: string }[] }) => [p.name, p.on.map((o) => o.list)])).toEqual([
+      ['Gelbstein’s Bakery', ['kcl']],
+      ['Judah Grille', ['keystone']],
+    ])
   })
 
   // Oct 22: the tab opening read both lists' websites every time. A list's
@@ -153,6 +172,7 @@ describe('GET /api/admin/watches/kosher', () => {
     expect(body.lists).toEqual([
       expect.objectContaining({ list: 'keystone', entries: 1, error: null }),
       expect.objectContaining({ list: 'mekor', entries: 0, updated: 'Oct 20, 2026', error: 'Mekor Habracha’s list answered 503' }),
+      expect.objectContaining({ list: 'kcl', entries: null }),
     ])
     expect(body.counts).toMatchObject({ toCheck: 1, didntLoad: 1 })
   })
@@ -208,6 +228,7 @@ describe('GET /api/admin/watches/kosher', () => {
     expect(body.lists.map((l: { watch: unknown; url: string }) => [!!l.watch, l.url])).toEqual([
       [true, 'https://keystone-k.org/establishments/'],
       [false, 'https://www.mekorhabracha.org/center-city'],
+      [false, 'https://www.kclkashrus.org/'],
     ])
     expect(body.places[0].differences).toEqual([])
   })

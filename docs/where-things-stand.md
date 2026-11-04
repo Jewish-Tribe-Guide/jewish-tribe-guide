@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 3, 2026.
+Last updated: Nov 4, 2026.
 
 ## The branch
 
@@ -2294,6 +2294,103 @@ simpler ("it really shouldn't be that complicated").
 **Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
+
+## Done Nov 4: the bugs and small tweaks from the user's 33 notes (on `redesign/oct18-fixes`)
+
+The user sent 33 notes on Nov 4, mostly about the admin screens, and said
+"bugs first". Each fix has a test that failed against the old code.
+
+- **13, the console "randomly reloads":** a renewed sign-in redrew the
+  whole console. Now only a different person signing in re-checks access.
+- **33, tapping away from a menu:** it closes the menu and does nothing
+  else (it used to also hit what was under it).
+- **17, a menu that failed showing a check on Watches:** a job with only
+  last night's trouble says it in amber, with no mark.
+- **12 and 29, Elkins Park eruv:** a website that doesn't open is "Website
+  didn't load", in To do's Broken checks with Read it again and Stop
+  reading it, not "No status". Look again counts a website that didn't open
+  as a failed try ("1 try stopped with an error"), not "nothing found".
+- **4, Chabad of Main Line in Broken checks:** a shul whose pages were all
+  stopped leaves To do and shows as Not checked (stopped reading).
+- **10, Forward:** Forward onto a screen that was closed steps straight back
+  (it can't reopen it). To do's editors now add a history step per open
+  row, as Places' editor does, so Back closes the row, not the place.
+- **6, menus that "randomly" read:** dishes read from a picture say "from a
+  picture" in To do's Main dishes box. The four menu links given on Nov 4
+  that never finished (Insomnia twice, Shlomo's, Center City Pretzel) ran
+  out of the route's 60s; it has 300s now. On the live site they say "Its
+  read didn't finish. Read it again." Once this is deployed, Read it again
+  on each.
+
+Then "the small tweaks", each with a test that failed against the old code:
+
+- **11, the Category menu:** on Places and To do it lists only categories
+  with something under the other menus and the search, with counts
+  ("Food (1)").
+- **14 and 15, Watches:** "+ Add a watch" is a button at the top right,
+  always; the Not checked box is gone (it's on Places).
+- **16, broken checks on Watches:** a place's broken check is To do's. The
+  Watches sentence counts them and opens To do on Broken checks, and Needs
+  fixing has a "Broken checks" row beside a whole job failing.
+- **30 and 3, To do:** opens newest first; when the last thing on a place
+  is done, the list says "<place>: nothing left to do".
+- **31:** tapping To do while on the list starts it over (filters, search,
+  sort).
+- **32, phone bar:** the tab you came from stays lit on a category page, as
+  Spotify does (Home, You or Browse). A first load onto a category lights
+  Home; a category with its own tab lights only that.
+- **24:** the home photo's alt field is "Photo description, for screen
+  readers".
+
+### The menu reader, from the same notes (Nov 4)
+
+- **5, typing dishes in by hand on To do:** "Save these dishes" once
+  something is typed, saved as the menu's dishes, so the place leaves To do.
+- **1, Nothing Bundt Cakes:** a menu's reading on To do has Edit, Read it
+  again and Change (a new menu link, read in the background), as Places has.
+  Its bad reading came from /find-a-bakery/, taken before Oct 22's fix.
+- **8:**
+  - Branches sharing one menu watch (Rita's, Dottie's, PLNT, Playa Bowls,
+    Insomnia) count as checked.
+  - A menu whose reading failed is "Not checked: menu (can't be read)" on
+    Places, until dishes are given by hand.
+  - To do's and the opened place's answer for a menu that can't be read is
+    "Stop reading it" (saved as no menu is, noted "Can't be read"), not "No
+    menu online".
+- **2 and 9, one page that is both a place's website and its menu:** the
+  guide keeps one watch per page, so only one reader ever ran. The run now
+  reads both on that one watch, each with its own fingerprint
+  (`sharedPageWatch.ts`); the hours sync takes a place's own menu watch on
+  its website over as its website watch. No migration. On live this
+  affects the Brazilian BBQ and the Citizens Bank Park Kosher Grill (menu
+  now read) and Zevi's Bakery and the Xfinity Kosher Grill (hours and phone
+  now read), from the first nightly run after this deploys.
+  - Not built: Zevi's hours are pickup windows on /ordering, not its home
+    page. Reading them needs /ordering given as a page (Add a source), and
+    the reader putting pickup windows in a note.
+  - Trade-off: stopping such a page's website reads stops its menu read too
+    (one watch).
+- **21, Ben & Jerry's:** nothing to build. Our run started from /upenn,
+  whose menu link goes to an ordering site.
+- **7, KCL:** built (`kclWatch.ts`, `kclRun.ts`). A website watch on
+  kclkashrus.org's home page finds the list PDF it links ("See Complete
+  Listing"; the file's address changes each edition) and reads its names
+  with `unpdf` (pinned 1.9.1). A place that says KCL and is on the list,
+  by the same name or one starting the other (at least 6 letters, one
+  match only), is on "KCL's list": its Kosher row says KCL and its
+  hechsher is dated, so it's off Not checked. Nothing is filed, since the
+  list has no addresses. A name on the list never counts for a place that
+  doesn't already say KCL. On dev: 207 names, all 4 KCL places matched.
+  The Kosher box used to name every non-Keystone list "Mekor Habracha's
+  list"; it now uses each list's own name, and "On neither list" became
+  "Not on a kosher list".
+  - Live needs the watch added (the user's yes): kind `website`, URL
+    `https://www.kclkashrus.org/`, label "KCL's list".
+  - Not done: Add's "Read now" lookup (`kosherLookup`) still only checks
+    Keystone-K and Mekor.
+
+Still open:
+- The ones that need a drawing or a decision: 25-28, 18/19, 20, 22, 23.
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 

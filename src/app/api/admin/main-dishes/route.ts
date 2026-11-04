@@ -35,7 +35,9 @@ import { lastNight, missedLastNight, type LastNight } from '@/lib/nightKinds'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
 import { listedContact } from '@/lib/contactRead'
-import { MENU_WATCH_CREATOR, type Watch } from '@/lib/watches'
+import { type Watch } from '@/lib/watches'
+import { menuWatchFor } from '@/lib/menuWatch'
+import { MENU_CANT_READ_NOTE } from '@/lib/watchJobs'
 import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -82,7 +84,8 @@ import type { DirectoryResource } from '@/types'
 // POST body: { action: 'stop', resourceId, id }
 //      Stop reading one of its website's pages (a hours/phone page, Oct 22):
 //      kept, never read, so the morning's run never adds it again.
-// POST body: { action: 'no_menu' | 'undo_no_menu', resourceId }
+// POST body: { action: 'no_menu' | 'cant_read' | 'undo_no_menu', resourceId }
+//   cant_read: stopped as no_menu is, as a menu that can't be read (Nov 4).
 //      "No menu": the place has none to read (menuReadingStore's isNoMenu).
 //
 // A reading marked "no menu" is sent as status 'no_menu'. Each place also
@@ -103,14 +106,17 @@ import type { DirectoryResource } from '@/types'
 // stopped opening shows here (watchJobs.ts's menuDidntLoad), the Watches
 // tab no longer listing those watches (Oct 22).
 
-export const maxDuration = 60
+// A menu link's read runs after the reply, in this same function, so it
+// has to fit in it: four stopped at 60s on Nov 4 (menuReadingStore.ts's
+// READING_GIVES_UP_MS waits past this).
+export const maxDuration = 300
 
 const MAX_PHOTOS = 3
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
 const PHOTO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf'])
 
-type Action = 'read' | 'use' | 'save' | 'skip' | 'link' | 'unlink' | 'photos' | 'no_menu' | 'undo_no_menu' | 'stop'
-const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unlink', 'photos', 'no_menu', 'undo_no_menu', 'stop']
+type Action = 'read' | 'use' | 'save' | 'skip' | 'link' | 'unlink' | 'photos' | 'no_menu' | 'cant_read' | 'undo_no_menu' | 'stop'
+const ACTIONS: readonly Action[] = ['read', 'use', 'save', 'skip', 'link', 'unlink', 'photos', 'no_menu', 'cant_read', 'undo_no_menu', 'stop']
 
 /** A place's website pages the daily run reads for its hours and phone. */
 const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) => w.resourceId === id && isListingPageWatch(w))
@@ -118,8 +124,8 @@ const pagesOf = (watches: readonly Watch[], id: string) => watches.filter((w) =>
 /** A place's menu watch, as the tab needs it. `missed`: why last night's
  *  run didn't read it ("ran out of reads"), so the kind page puts it under
  *  Not checked, not Up to date (the user, Oct 28). */
-function menuWatchOf(watches: readonly Watch[], id: string, night: LastNight | null) {
-  const w = watches.find((x) => x.resourceId === id && x.createdBy === MENU_WATCH_CREATOR)
+function menuWatchOf(watches: readonly Watch[], listing: DirectoryResource, night: LastNight | null) {
+  const w = menuWatchFor(watches, listing)
   if (!w) return null
   const missed = missedLastNight(w, night)
   return { url: w.url, active: w.active, lastRunAt: w.lastRunAt, lastOkAt: w.lastOkAt, lastError: w.lastError, failingSince: w.failingSince, ...(missed ? { missed } : {}) }
@@ -238,7 +244,7 @@ export async function GET(request: Request) {
           menuAt: newestMenuDate(l, field),
           reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
           pages: pagesOf(watches, l.id),
-          menuWatch: menuWatchOf(watches, l.id, night),
+          menuWatch: menuWatchOf(watches, l, night),
           findings: findings.filter((f) => f.targetId === l.id),
           hours: homePageReads(category, l as unknown as Record<string, unknown>).includes('hours') ? (l.hours ?? null) : undefined,
           contact: listedContact(category, l as unknown as Record<string, unknown>),
@@ -343,8 +349,8 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, ...(await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)) })
     }
 
-    if (action === 'no_menu') {
-      return Response.json({ ok: true, reading: forTab(await markNoMenu(community.slug, resourceId, admin.email)) })
+    if (action === 'no_menu' || action === 'cant_read') {
+      return Response.json({ ok: true, reading: forTab(await (action === 'cant_read' ? markNoMenu(community.slug, resourceId, admin.email, MENU_CANT_READ_NOTE) : markNoMenu(community.slug, resourceId, admin.email))) })
     }
 
     const stored = await getMenuReading(community.slug, resourceId)

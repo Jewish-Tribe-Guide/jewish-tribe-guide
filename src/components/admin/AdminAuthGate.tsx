@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
@@ -116,13 +116,27 @@ export default function AdminAuthGate({
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  // Who is signed in, not which token they hold. Supabase rotates the token
+  // about once an hour (autoRefreshToken), and on coming back to a tab after
+  // it expired. Checking again on each rotation set `authorized` to null,
+  // which swapped the whole console for "Loading…" and remounted every
+  // screen: an open place, its unsaved edit and the scroll all went, and it
+  // looked like the page had reloaded on its own. Access goes by the email,
+  // so a new token for the same person is let through as it is.
+  const email = session?.user.email ?? null
+  const sessionRef = useRef(session)
   useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
+    const session = sessionRef.current
     // No setState here for the !session case — render already treats
     // `!session` as unauthenticated regardless of `authorized`'s last value
     // (see the `!session || authorized === false` check below), and a
     // subsequent real session re-runs this effect and resets `authorized`
     // itself, right before its own fetch.
-    if (!session) return
+    if (!session || !email) return
 
     // Wrapped in an async function so the only synchronous statement in the
     // effect body is the call below — every setAuthorized happens inside
@@ -154,7 +168,7 @@ export default function AdminAuthGate({
     return () => {
       cancelled = true
     }
-  }, [session, community])
+  }, [email, community])
 
   // Supabase redirects back from a failed/declined Google sign-in with
   // ?error=...&error_description=... on the query string, rather than

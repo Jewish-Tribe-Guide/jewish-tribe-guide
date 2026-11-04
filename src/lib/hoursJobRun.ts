@@ -6,7 +6,7 @@ import { fetchPublic, troubleClause, type Trouble } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readListingPage, type PageSource } from '@/lib/listingPageRun'
 import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
-import { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_JOBS, homePageWatchChanges, hoursJobCategories, ownSiteCategories, hoursSearchedUrl, hoursWatchChanges, isHoursOff, isHoursSearched, jobWords, looksLikeHours, searchReason, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
+import { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, PAGE_JOBS, foundPageLabel, homePageWatchChanges, hoursJobCategories, ownSiteCategories, hoursSearchedUrl, hoursWatchChanges, isHoursOff, isHoursSearched, jobWords, looksLikeHours, searchReason, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { runAndRecord } from '@/lib/watchRunner'
 import { siteCategories } from '@/lib/watchFindings'
@@ -182,9 +182,13 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     for (const place of own.places) {
       const category = own.categories.find((c) => c.id === place.category)
       if (!category) continue
-      const { add, remove } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
+      const { add, remove, adopt = [] } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
       for (const w of add) {
         if (await addWatch(slug, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })) added++
+      }
+      for (const id of adopt) {
+        await adoptMenuWatch(slug, id, place.name)
+        added++
       }
       for (const id of remove) {
         await removeWatch(slug, id)
@@ -194,6 +198,12 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     out.push({ community: slug, added, removed })
   }
   return out
+}
+
+/** Its menu watch, on its website, made its home page watch: read on its
+ *  first morning as a page found is (no fingerprint yet), its menu too. */
+async function adoptMenuWatch(community: string, id: string, name: string) {
+  await updateWatch(community, id, { createdBy: HOURS_FOUND_CREATOR, label: foundPageLabel(name, null), pageHash: null })
 }
 
 /** One place's website, watched and read now rather than at the morning's
@@ -210,8 +220,13 @@ export async function readOwnSiteNow(community: string, placeId: string): Promis
   if (!place || !category) return false
   const { watches, available } = await listWatches(community)
   if (!available) return false
-  const { add } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
+  const { add, adopt = [] } = homePageWatchChanges({ id: place.id, name: place.name, website: websiteOf(place), details: place as unknown as Record<string, unknown> }, category, watches)
   const added = (await Promise.all(add.map((w) => addWatch(community, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })))).filter((w): w is Watch => !!w)
+  for (const id of adopt) {
+    await adoptMenuWatch(community, id, place.name)
+    const w = watches.find((x) => x.id === id)
+    if (w) added.push({ ...w, createdBy: HOURS_FOUND_CREATOR, label: foundPageLabel(place.name, null), pageHash: null })
+  }
   for (const w of added) await runAndRecord(w, undefined, undefined, { full: true })
   return added.length > 0
 }

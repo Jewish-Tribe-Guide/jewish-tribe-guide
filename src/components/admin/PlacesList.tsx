@@ -235,6 +235,12 @@ export default function PlacesList({ token }: { token: string }) {
     return { text: placeLine(p), warn: p.status === 'approved' && !p.hasAddress }
   }
   const shown = all ? rows : rows.slice(0, SHOWN)
+  // Category, as Checked by: only the categories the other menus and the
+  // search leave something in, with how many (the user, Nov 4), and the one
+  // picked even once it's emptied.
+  const besideCategory = filterPlaces(places, { show, query }).filter((p) => fits(p, checked))
+  const inCategory = (id: string) => besideCategory.filter((p) => p.category === id).length
+  const categoryChoices = listingCategories.filter((c) => c.id === category || inCategory(c.id) > 0)
 
   return (
     // pb-14: the floating Add clears the last row and Show all.
@@ -288,7 +294,7 @@ export default function PlacesList({ token }: { token: string }) {
         <AdminMenu
           name="Category"
           value={category}
-          options={[{ value: '', label: 'All categories' }, ...listingCategories.map((c) => ({ value: c.id, label: c.pluralLabel }))]}
+          options={[{ value: '', label: 'All categories' }, ...categoryChoices.map((c) => ({ value: c.id, label: c.pluralLabel, count: inCategory(c.id) }))]}
           onChange={(v) => {
             setCategory(v)
             setAll(false)

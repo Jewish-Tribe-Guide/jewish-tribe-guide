@@ -37,9 +37,9 @@ import { routes } from './routes'
 export type WatchState = 'waiting' | 'not_checked' | 'up_to_date'
 
 /** Where a place is read from, in the order it's said. */
-export type WatchSource = 'refuah' | 'google' | 'keystone' | 'mekor' | 'menu' | 'website' | 'newsletter' | 'email'
-const SOURCES: readonly WatchSource[] = ['refuah', 'google', 'keystone', 'mekor', 'menu', 'website', 'newsletter', 'email']
-const NAMED: Partial<Record<WatchSource, string>> = { refuah: 'Refuah', google: 'Google', keystone: 'Keystone-K', mekor: 'Mekor Habracha' }
+export type WatchSource = 'refuah' | 'google' | 'keystone' | 'mekor' | 'kcl' | 'menu' | 'website' | 'newsletter' | 'email'
+const SOURCES: readonly WatchSource[] = ['refuah', 'google', 'keystone', 'mekor', 'kcl', 'menu', 'website', 'newsletter', 'email']
+const NAMED: Partial<Record<WatchSource, string>> = { refuah: 'Refuah', google: 'Google', keystone: 'Keystone-K', mekor: 'Mekor Habracha', kcl: 'KCL' }
 const OWN: Partial<Record<WatchSource, [one: string, many: string]>> = {
   menu: ['its menu', 'menus'],
   website: ['its website', 'websites'],
@@ -75,7 +75,7 @@ export type WatchKind = { id: string; label: string; places: WatchedPlace[]; cou
 
 type Page = { watch: Watch }
 type Found = { id: string; at?: string; operation?: string; from?: string }
-export type PagesPlace = { id: string; name: string; href: string; pages: Page[]; off: boolean; findings?: readonly Found[]; decided?: { at: string } | null; newsletters?: readonly Watch[] }
+export type PagesPlace = { id: string; name: string; href: string; pages: Page[]; off: boolean; findings?: readonly Found[]; decided?: { at: string } | null; newsletters?: readonly Watch[]; stopped?: readonly Page[] }
 export type DishesPlace = DishPlace & { id: string; name: string; href: string; pages?: readonly Watch[] }
 /** A place whose own website is read with no job page of its own (a
  *  grocery's, a childcare's): what it finds waits under its kind's row. */
@@ -104,7 +104,7 @@ export type WatchJobsIn = {
 
 const dayText = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
-const LIST_NAMES = { keystone: 'Keystone-K’s', mekor: 'Mekor Habracha’s' } as const
+const LIST_NAMES = { keystone: 'Keystone-K’s', mekor: 'Mekor Habracha’s', kcl: 'KCL’s' } as const
 
 /** What one job says of a place: changes waiting, things not checked
  *  (each with its own pill), and where it reads it from. */
@@ -209,7 +209,7 @@ function dishesSays(p: DishesPlace, now: number): Say {
 }
 
 function pagesSays(p: PagesPlace, job: 'hours' | 'times', now: number): Say {
-  const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters }
+  const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters, stopped: p.stopped?.length }
   const section = hoursSection(state, now)
   const what = job === 'times' ? 'Times' : 'Hours'
   const unchecked =

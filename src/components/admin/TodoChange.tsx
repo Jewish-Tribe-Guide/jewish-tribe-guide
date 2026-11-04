@@ -18,6 +18,7 @@ import PlaceFrame, { PlaceButtons, SourceCard, placeSubline, type PlaceButton, t
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import { changeEdit } from './changeEdit'
 import { changeAnswers, oneMinyanTime } from './changeView'
+import { useHistoryDepth } from '@/lib/useHistoryDepth'
 
 // A change on To do, in the listing's own editor (boards E1Times, R5Link,
 // R1Women, R6After): the rows it changes, filled in as it would leave them,
@@ -78,6 +79,9 @@ export default function TodoChange({
     return () => onEditing(false)
   }, [edit.edited, onEditing])
   const [step, setStep] = useState<EditorStep | null>(null)
+  // An open row or a minyan in it is an entry, as in Places' editor: a
+  // swipe back closes it rather than leaving the place (Nov 4).
+  useHistoryDepth('todoStep', step ? (step.depth ?? 1) : 0, () => step?.back())
   const savedPart = useRef(false)
 
   // The answers, named by what it changes.

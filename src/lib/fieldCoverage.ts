@@ -8,6 +8,7 @@ import { pageReadsFor } from './listingPageWatch'
 import type { LinkStanding } from './linkCheck'
 import { HOSPITAL_CATEGORY } from './refuahMatch'
 import type { Watch } from './watches'
+import { MENU_CANT_READ_NOTE } from './watchJobs'
 
 // ── What checks each thing on a listing (the user, Oct 31) ──────────────────
 // A place is Not checked when anything on it that goes out of date has no
@@ -43,7 +44,7 @@ export type PlaceCoverage = {
 }
 
 type Page = { watch: Pick<Watch, 'active'> }
-type PagesIn = { id: string; off?: boolean; pages: readonly Page[]; newsletters?: readonly Pick<Watch, 'active'>[] }
+type PagesIn = { id: string; off?: boolean; pages: readonly Page[]; newsletters?: readonly Pick<Watch, 'active'>[]; stopped?: readonly unknown[] }
 
 /** Each job's places, as the Watches tab loads them. Null: not loaded. */
 export type CoverageIn = {
@@ -51,7 +52,7 @@ export type CoverageIn = {
   times: readonly PagesIn[] | null
   hours: readonly PagesIn[] | null
   sites: readonly PagesIn[] | null
-  dishes: readonly { id: string; menuUrl: string | null; menuWatch?: { active: boolean } | null; pages?: readonly Pick<Watch, 'active'>[]; reading?: { status: string } | null }[] | null
+  dishes: readonly { id: string; menuUrl: string | null; menuWatch?: { active: boolean } | null; pages?: readonly Pick<Watch, 'active'>[]; menuAt?: string | null; reading?: { status: string; readAt?: string; note?: string | null } | null }[] | null
   hospitals: readonly { id: string; watch: Pick<Watch, 'active'> | null; notOnRefuah: boolean }[] | null
   kosher: readonly { id: string; on: readonly unknown[] }[] | null
   links: readonly Pick<LinkStanding, 'resourceId' | 'field'>[] | null
@@ -64,6 +65,7 @@ const filled = (v: unknown) => (typeof v === 'string' ? !!v.trim() : Array.isArr
 const reads = (p: PagesIn | undefined) => !!p && !p.off && p.pages.some((x) => x.watch.active)
 const JOB_OFF = 'its job is off'
 const STOPPED = 'stopped reading'
+const CANT_READ = 'can’t be read'
 
 export function placeCoverage(listing: Listing, category: CategoryConfig, input: CoverageIn): PlaceCoverage {
   const on = (kind: NightKindId) => !input.off.includes(kind)
@@ -92,7 +94,7 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
   }
   // Pages it had, all stopped, or their job turned off.
   const pagesWhy = (kind: NightKindId, p: PagesIn | undefined) => {
-    if (!p?.pages.length) return undefined
+    if (!p?.pages.length && !p?.stopped?.length) return undefined
     if (!on(kind)) return JOB_OFF
     if (p.off || !p.pages.some((x) => x.watch.active)) return STOPPED
   }
@@ -115,8 +117,12 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
   }
   if (KOSHER_JOB_CATEGORIES.includes(category.id)) add('hechsher', 'hechsher', on('kosher') && find(input.kosher)?.on.length ? ['certifier'] : [], true)
   // No menu online (Ben & Jerry's, Nov 2) left To do and was nowhere on Places.
-  if (dishes?.reading?.status === 'no_menu') add('menu', 'menu', [], false, 'no menu online')
-  else if (dishes?.menuUrl) add('menu', 'menu', on('menus') && dishes.menuWatch?.active ? ['website'] : [], false, !on('menus') ? JOB_OFF : dishes.menuWatch ? STOPPED : undefined)
+  // One that can't be read isn't checked either, though its watch runs
+  // (the user, Nov 4), until its dishes are given by hand.
+  const r = dishes?.reading
+  const cantRead = r?.status === 'failed' && !(dishes?.menuAt && r.readAt && Date.parse(dishes.menuAt) > Date.parse(r.readAt))
+  if (r?.status === 'no_menu') add('menu', 'menu', [], false, r.note === MENU_CANT_READ_NOTE ? CANT_READ : 'no menu online')
+  else if (dishes?.menuUrl) add('menu', 'menu', on('menus') && dishes.menuWatch?.active && !cantRead ? ['website'] : [], false, !on('menus') ? JOB_OFF : cantRead ? CANT_READ : dishes.menuWatch ? STOPPED : undefined)
   if (category.hasPhone !== false && filled(listing.phone)) add('phone', 'phone', google ? fromGoogle('phone') : ownSite ? ['website'] : [], false, googleWhy('phone'))
   const websiteKey = websiteKeyOf(category)
   if (websiteKey && filled(listing[websiteKey])) {

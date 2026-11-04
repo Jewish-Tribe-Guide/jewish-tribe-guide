@@ -1,4 +1,6 @@
 import { didntLoad } from '@/lib/watchJobs'
+import { websiteWatchOf } from '@/lib/eruvJob'
+import type { Watch } from '@/lib/watches'
 import { linkBroken } from '@/lib/linkCheck'
 import { ownGroups, waitingGroups, type Decide } from './waitingGroups'
 import { jobsSettled, troublesOf, type Jobs } from './useWatchJobs'
@@ -20,6 +22,13 @@ export const emailCame = (at: string, now: number) => `Their email came ${Math.f
 const WEEK = 7 * 24 * 60 * 60 * 1000
 
 const earliest = (dates: readonly (string | null | undefined)[]) => dates.filter((d): d is string => !!d).sort()[0] ?? null
+
+/** An eruv's website watch, when its website is one (none for a place). */
+export function eruvSiteWatches(id: string, jobs: Pick<Jobs, 'eruvim'>): Watch[] {
+  const e = jobs.eruvim?.eruvim.find((x) => x.id === id)
+  const w = e && jobs.eruvim ? websiteWatchOf(e, jobs.eruvim.watches) : null
+  return w ? [w] : []
+}
 type Failing = { active: boolean; failingSince: string | null; lastRunAt: string | null; lastOkAt: string | null; lastError: string | null }
 /** Since when a page has failed: its first failure, else its last good read. */
 const failedSince = (watches: readonly Failing[], now: number) =>
@@ -33,7 +42,7 @@ export function troubleSince(id: string, trouble: string, jobs: Jobs, now: numbe
   const food = jobs.dishes?.find((p) => p.id === id)
   if (trouble === 'Website didn’t load') {
     const pages = [...(shul?.pages ?? []), ...(mikvah?.pages ?? []), ...(site?.pages ?? [])].map((p) => p.watch)
-    return failedSince([...pages, ...(food?.pages ?? [])], now)
+    return failedSince([...pages, ...(food?.pages ?? []), ...eruvSiteWatches(id, jobs)], now)
   }
   if (trouble === 'Menu didn’t load') return food?.menuWatch ? failedSince([food.menuWatch], now) : null
   if (trouble === 'Menu can’t be read') return food?.reading?.readAt ?? null
@@ -89,7 +98,15 @@ export function notBeingRead(jobs: Jobs, now: number): TodoNotRead[] {
     }
   }
   if (!jobs.runs?.off?.includes('eruvs')) {
-    for (const e of jobs.eruvim?.eruvim ?? []) if (e.statusEmail && e.statusCheckedAt && quiet(e.statusCheckedAt)) out.set(e.id, { id: e.id, name: e.name, line: emailCame(e.statusCheckedAt, now), since: [e.statusCheckedAt] })
+    for (const e of jobs.eruvim?.eruvim ?? []) {
+      if (e.statusEmail && e.statusCheckedAt && quiet(e.statusCheckedAt)) out.set(e.id, { id: e.id, name: e.name, line: emailCame(e.statusCheckedAt, now), since: [e.statusCheckedAt] })
+      // Its website not opening, as a place's is: Elkins Park's had said
+      // "page not found" for ten days with nothing on To do (Nov 4).
+      else if (eruvSiteWatches(e.id, jobs).some((w) => w.active && didntLoad(w, now))) {
+        const line = 'Website didn’t load'
+        out.set(e.id, { id: e.id, name: e.name, line, since: [troubleSince(e.id, line, jobs, now)] })
+      }
+    }
   }
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name))
 }

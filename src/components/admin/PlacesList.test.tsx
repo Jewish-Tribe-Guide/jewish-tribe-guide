@@ -158,7 +158,18 @@ describe('Places', () => {
     await screen.findByRole('region', { name: 'Places' })
     await user.click(menu(/^Category/))
     const names = screen.getAllByRole('menuitemradio').map((o) => o.textContent)
-    expect(names).toEqual(['All categories', 'Food', 'Networking'])
+    expect(names).toEqual(['All categories', 'Food (1)', 'Networking (1)'])
+  })
+
+  // The user, Nov 4: "if we are looking at archived and hit category filter
+  // it should only show categories that would show up. With a number too."
+  it('the category menu lists only the categories under the other menus, with how many', async () => {
+    const user = userEvent.setup()
+    renderPlaces()
+    await screen.findByRole('region', { name: 'Places' })
+    await choose(/^On the site/, /^Archived/)
+    await user.click(menu(/^Category/))
+    expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).toEqual(['All categories', 'Food (1)'])
   })
 
   describe('Checked by', () => {
@@ -240,10 +251,11 @@ describe('Places', () => {
   it('finds by name and narrows by category', async () => {
     const user = userEvent.setup()
     renderPlaces()
-    await user.type(await screen.findByLabelText('Find a place by name'), 'gold')
-    expect(screen.getByRole('button', { name: 'Open Goldie' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open Base Philadelphia' })).toBeNull()
+    await screen.findByRole('region', { name: 'Places' })
     await choose(/^Category/, /^Networking/)
+    expect(screen.getByRole('button', { name: 'Open Base Philadelphia' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open Goldie' })).toBeNull()
+    await user.type(screen.getByLabelText('Find a place by name'), 'gold')
     expect(screen.getByText('No places match.')).toBeInTheDocument()
     expect(window.location.search).toBe('?category=networking')
   })

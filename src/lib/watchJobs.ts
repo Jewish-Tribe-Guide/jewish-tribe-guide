@@ -19,12 +19,16 @@ export type JobCounts = { checked: number; toCheck: number; cantRead: number; di
 
 // ── Dishes ──────────────────────────────────────────────────────────────────
 
+/** A menu stopped as one that can't be read (an ordering site's), kept
+ *  apart from "No menu" by its note: both are 'no_menu' to the tab. */
+export const MENU_CANT_READ_NOTE = 'Can’t be read'
+
 export type DishReadingStatus = 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu' | 'reading'
 export type DishPlace = ListedDishes & {
   website: string | null
   menuUrl: string | null
   menuAt?: string | null
-  reading: { status: DishReadingStatus; readAt: string; sourceUrl?: string | null; dishes?: readonly ReadDish[]; missing?: readonly string[] } | null
+  reading: { status: DishReadingStatus; readAt: string; sourceUrl?: string | null; dishes?: readonly ReadDish[]; missing?: readonly string[]; note?: string | null } | null
   /** What its website's pages found, waiting: its hours or phone, for a
    *  place Google doesn't keep (Main dishes board 3, Oct 22). */
   findings?: readonly unknown[]
@@ -103,6 +107,12 @@ export function dishJobStatus(p: DishPlace, now: number): DishJobStatus {
   if (p.menuWatch?.missed && s === 'same') return 'not_reached'
   return menuDidntLoad(p, now) ? 'didnt_load' : s
 }
+
+/** How long a menu read can run (the main-dishes route's maxDuration,
+ *  300s, and a little): older, it never finished (menuReadingStore), and
+ *  the screens waiting on it stop asking. Here, not in the store, so a
+ *  screen can use it without the server's client. */
+export const READING_GIVES_UP_MS = 6 * 60_000
 
 /** A menu being read now: the screens showing it load again until it's in. */
 export function menusReading(places: readonly Pick<DishPlace, 'reading'>[] | null | undefined): boolean {

@@ -210,6 +210,13 @@ describe('waitingGroups', () => {
       { name: 'Falafel', sub: '“Falafel”', mark: 'new' },
       { name: 'Laffa', sub: '“wrapped in bread”', flag: 'these words don’t name it', mark: 'same' },
     ])
+    // A dish read from a picture of the menu isn't checked against the
+    // page, so it says where it came from (the user, Nov 4: "some menus
+    // didn't read and then randomly 'read' and I'm pretty skeptical").
+    const seen = { ...place([]), reading: { ...place([]).reading, dishes: [{ name: 'Brisket', quote: 'Slow Roasted Brisket', checked: false, picture: true as const }, { name: 'Kugel', quote: 'side of kugel', checked: false, named: false, picture: true as const }] } }
+    expect(waitingGroups('p', jobs({ dishes: [seen] }), NOW).groups[0].boxes![0].groups[0].rows).toEqual([{ name: 'Brisket', sub: '“Slow Roasted Brisket”', flag: 'from a picture', mark: 'new' }])
+    const both = { ...place(['Kugel']), reading: seen.reading }
+    expect(waitingGroups('p', jobs({ dishes: [both] }), NOW).groups[0].boxes![0].groups[0].rows.find((r) => r.name === 'Kugel')?.flag).toBe('from a picture · these words don’t name it')
   })
 
   // Oct 25 (the user): "grocery should go to grocery". A grocery's own

@@ -459,6 +459,14 @@ describe('/api/admin/main-dishes', () => {
       expect(m.clearMenuReading).not.toHaveBeenCalled()
     })
 
+    // Nov 4: "Stop reading it" on a menu that can't be read, kept as no
+    // menu is, by its own words.
+    it('cant_read: stopped as no menu is, saying it can’t be read', async () => {
+      const body = await (await POST(req('POST', { action: 'cant_read', resourceId: ID }))).json()
+      expect(body.ok).toBe(true)
+      expect(m.markNoMenu).toHaveBeenCalledWith('philly', ID, 'me@x.co', 'Can’t be read')
+    })
+
     it('each place says when its newest dish came off a menu', async () => {
       m.listApprovedResources.mockResolvedValue([{ ...judah, dishes: ['Falafel', 'Burgers'], itemMenu: { dishes: { falafel: '2026-10-01T12:00:00Z', burgers: '2026-10-20T12:00:00Z' } } }])
       expect((await (await GET(req('GET'))).json()).places[0].menuAt).toBe('2026-10-20T12:00:00Z')
