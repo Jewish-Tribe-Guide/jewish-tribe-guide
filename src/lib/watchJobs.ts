@@ -104,6 +104,12 @@ export function dishJobStatus(p: DishPlace, now: number): DishJobStatus {
   return menuDidntLoad(p, now) ? 'didnt_load' : s
 }
 
+/** How long a menu read can run (the main-dishes route's maxDuration,
+ *  300s, and a little): older, it never finished (menuReadingStore), and
+ *  the screens waiting on it stop asking. Here, not in the store, so a
+ *  screen can use it without the server's client. */
+export const READING_GIVES_UP_MS = 6 * 60_000
+
 /** A menu being read now: the screens showing it load again until it's in. */
 export function menusReading(places: readonly Pick<DishPlace, 'reading'>[] | null | undefined): boolean {
   return !!places?.some((p) => p.reading?.status === 'reading')

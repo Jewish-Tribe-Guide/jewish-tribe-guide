@@ -364,7 +364,11 @@ export function waitingGroups(id: string, jobs: Jobs, now: number): Waiting {
               {
                 rows: proposal.rows.map((d): WaitRow => {
                   const sub = d.quote ? `“${d.quote}”` : d.status === 'not_found' ? 'Not found on its menu' : undefined
-                  return { name: d.name, ...(sub ? { sub } : {}), ...(d.quote && d.named === false ? { flag: 'these words don’t name it' } : {}), mark: d.status === 'gone' || d.status === 'new' ? d.status : 'same' }
+                  // Read from a picture: its words weren't found on the page,
+                  // so it says so (the user, Nov 4, skeptical of menus that
+                  // "randomly" read).
+                  const flag = [d.picture && 'from a picture', d.quote && d.named === false && 'these words don’t name it'].filter(Boolean).join(' · ')
+                  return { name: d.name, ...(sub ? { sub } : {}), ...(flag ? { flag } : {}), mark: d.status === 'gone' || d.status === 'new' ? d.status : 'same' }
                 }),
               },
             ],

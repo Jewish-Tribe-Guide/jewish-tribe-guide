@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 vi.mock('./supabase/admin', () => ({ getAdminClient: () => ({}) }))
-const { fromRow, isNoMenu, READING_NOTE, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
+const { fromRow, isNoMenu, READING_GIVES_UP_MS, READING_NOTE, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
 
 // The listing's dishes a menu doesn't name (the user, Oct 21) are kept
 // among a reading's dishes, so they need no migration.
@@ -103,10 +105,23 @@ describe('a menu being read', () => {
   })
 
   it('a read that never finished comes back failed, saying to read it again', () => {
-    expect(fromRow(row, at(180))).toMatchObject({ status: 'failed', note: expect.stringMatching(/didn’t finish/) })
+    expect(fromRow(row, at(400))).toMatchObject({ status: 'failed', note: expect.stringMatching(/didn’t finish/) })
   })
 
   it('a reading that failed for its own reasons stays failed', () => {
     expect(fromRow({ ...row, note: 'Saved as its menu link, but it couldn’t be read.' }, at(5)).status).toBe('failed')
+  })
+
+  // Nov 4: Insomnia (twice), Shlomo's and Center City Pretzel, each given
+  // a menu link, never finished. The read runs after the reply in the same
+  // function, and the route stopped at 60s: Insomnia's read takes ~49s on
+  // a laptop, more on Vercel with its browser starting cold. A real
+  // timeout can't run here, so this pins the two numbers it turned on.
+  it('the route lets a slow menu read finish, and only then is it given up', () => {
+    const route = readFileSync(join(__dirname, '../app/api/admin/main-dishes/route.ts'), 'utf8')
+    const seconds = Number(route.match(/export const maxDuration = (\d+)/)?.[1])
+    expect(seconds).toBeGreaterThanOrEqual(180)
+    expect(READING_GIVES_UP_MS).toBeGreaterThan(seconds * 1000)
+    expect(fromRow(row, at(seconds - 10)).status).toBe('reading')
   })
 })

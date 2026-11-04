@@ -3,6 +3,7 @@ import { getAdminClient } from './supabase/admin'
 import { TAGS } from './cacheTags'
 import type { MenuDish } from './menuReader'
 import { MENU_LINK_KEY } from './menuLink'
+import { READING_GIVES_UP_MS } from './watchJobs'
 
 // What the menu reader proposed for each food place, and what an admin
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
@@ -136,12 +137,13 @@ export async function decideMenuReading(community: string, resourceId: string, s
 // answers at once, and the menu is read after the reply (route's `after`).
 // Meanwhile the place's reading says `reading`. Kept as a failed reading
 // with this note, as "No menu" is kept below, so it needs no migration;
-// a read that never finishes (the function stopped at its 60s) comes back
-// as failed, saying so, once it's older than any read can run.
+// a read that never finishes (the function stopped at its maxDuration, 300s
+// since Nov 4) comes back as failed, saying so, once it's older than any
+// read can run.
 
 export const READING_NOTE = 'Reading its menu now'
 export const READING_STOPPED_NOTE = 'Its read didn’t finish. Read it again.'
-export const READING_GIVES_UP_MS = 2 * 60_000
+export { READING_GIVES_UP_MS }
 
 function isReadingRow(r: Pick<Row, 'status' | 'note'>): boolean {
   return r.status === 'failed' && r.note === READING_NOTE

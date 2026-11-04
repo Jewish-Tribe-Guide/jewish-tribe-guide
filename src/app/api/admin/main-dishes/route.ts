@@ -103,7 +103,10 @@ import type { DirectoryResource } from '@/types'
 // stopped opening shows here (watchJobs.ts's menuDidntLoad), the Watches
 // tab no longer listing those watches (Oct 22).
 
-export const maxDuration = 60
+// A menu link's read runs after the reply, in this same function, so it
+// has to fit in it: four stopped at 60s on Nov 4 (menuReadingStore.ts's
+// READING_GIVES_UP_MS waits past this).
+export const maxDuration = 300
 
 const MAX_PHOTOS = 3
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
