@@ -120,8 +120,14 @@ export default function WatchesManager({ token }: { token: string }) {
           <AdminRow
             href={`${base}/watches/job/look-again`}
             name="Look again"
-            line={[look.available && `${look.items.filter((i) => !i.stopped).length} to try`, lookRun && lastRunWord(lookRun.startedAt, now, true)].filter(Boolean).join(' · ') || undefined}
-            aside={!look.available ? 'Not set up' : !lookRun ? 'Not run yet' : lookFix ? <BadMark /> : <GoodMark />}
+            line={
+              <>
+                {[look.available && `${look.items.filter((i) => !i.stopped).length} to try`, lookRun && lastRunWord(lookRun.startedAt, now, true)].filter(Boolean).join(' · ')}
+                {/* A try that failed ("1 try stopped with an error"), as a job's trouble. */}
+                {!lookFix && lookRun?.warning && <span className="text-amber-800"> · {lookRun.warning}</span>}
+              </>
+            }
+            aside={!look.available ? 'Not set up' : !lookRun ? 'Not run yet' : lookFix ? <BadMark /> : lookRun.warning ? undefined : <GoodMark />}
           />
         </AdminBox>
       )}

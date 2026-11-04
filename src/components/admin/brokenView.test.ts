@@ -39,6 +39,16 @@ describe('a broken check on To do (R3Site, R2Menu, R2Google)', () => {
     ])
   })
 
+  it('an eruv’s website reads and stops its watch', () => {
+    const eruvim = { eruvim: [{ id: 'elkins-park', name: 'Elkins Park Eruv', website: 'https://www.yiep.org/eruv-map' }], findings: [], watches: [down('w', 'https://www.yiep.org/eruv-map', 'The page answered 404')], timezone: 'America/New_York' }
+    const v = brokenView('elkins-park', 'Website didn’t load', jobs({ eruvim: eruvim as never }), NOW)!
+    expect(v.source.failed).toBe('didn’t load since Oct 22')
+    expect(v.answers.map((a) => a.act)).toEqual([
+      { kind: 'read', steps: [{ job: 'watch', watchId: 'w' }] },
+      { kind: 'stop', stops: [{ kind: 'watch', watchId: 'w', what: 'yiep.org/eruv-map' }] },
+    ])
+  })
+
   it('a menu that didn’t load: Read it again, Give its menu, No menu online', () => {
     const menuWatch = down('m', 'https://20thstreet.pizza/menu')
     const v = brokenView('p', 'Menu didn’t load', jobs({ dishes: [{ id: 'p', name: 'Pizza', dishes: [], menuUrl: 'https://20thstreet.pizza/menu', menuWatch, reading: null }] as never }), NOW)!

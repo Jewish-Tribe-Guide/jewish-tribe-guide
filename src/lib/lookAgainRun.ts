@@ -61,7 +61,10 @@ export async function tryLook(community: string, item: Pick<LookItem, 'kind' | '
     const eruv = (await listEruvimForAdmin(community)).eruvim.find((e) => e.id === item.id)
     if (eruv?.website) {
       const pages = await findEruvStatusPages(eruv.website)
-      const page = 'found' in pages ? pickPage(pages.found, await getNotThese(community, 'eruv', item.id)) : null
+      // A website that didn't open is a try that failed, not "nothing
+      // found": Elkins Park's 404 read as all fine (the user, Nov 4).
+      if ('error' in pages) throw new Error(`Its website didn’t open: ${pages.error}`)
+      const page = pickPage(pages.found, await getNotThese(community, 'eruv', item.id))
       if (page) found = { url: page.url, status: page.status, words: page.words, at }
     }
   } else if (item.kind === 'google') {

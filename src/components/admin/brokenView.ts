@@ -9,7 +9,7 @@ import { linkBroken } from '@/lib/linkCheck'
 import type { Watch } from '@/lib/watches'
 import { whyNoLoad } from '@/lib/whyNoLoad'
 import type { Change, ReadStep, Stop } from './openedPlaceBoxes'
-import { troubleSince } from './todoWaiting'
+import { eruvSiteWatches, troubleSince } from './todoWaiting'
 import type { Jobs } from './useWatchJobs'
 import { day, shortUrl } from './watchText'
 
@@ -151,7 +151,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
         urls.push({ url: w.url, error: w.lastError })
       }
     }
-    for (const w of [...(site?.pages ?? []).map((x) => x.watch), ...(food?.pages ?? [])].filter(down)) {
+    for (const w of [...(site?.pages ?? []).map((x) => x.watch), ...(food?.pages ?? []), ...eruvSiteWatches(id, jobs)].filter(down)) {
       steps.push({ job: 'watch', watchId: w.id })
       stops.push({ kind: 'watch', watchId: w.id, what: shortUrl(w.url) })
       urls.push({ url: w.url, error: w.lastError })

@@ -216,6 +216,15 @@ describe('WatchesManager', () => {
     expect(within(screen.getByRole('region', { name: 'Needs fixing' })).getByRole('link')).toHaveTextContent('Look againLast run failed')
   })
 
+  // Elkins Park, Nov 4: a try whose website didn't open read as all fine.
+  it('Look again with a failed try says so, with no check', async () => {
+    const run = { id: 'r', job: 'look-again', startedAt: ago(0.3), finishedAt: ago(0.29), ok: true, summary: 'Tried 1 again', warning: '1 try stopped with an error', error: null }
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: true, items: [], leftOut: [], runs: [run] } })
+    const look = within(screen.getByRole('region', { name: 'Look again' })).getByRole('link')
+    expect(look).toHaveTextContent('1 try stopped with an error')
+    expect(within(look).queryByRole('img', { name: 'Good' })).toBeNull()
+  })
+
   it('Look again before its table: says it isn’t set up', async () => {
     await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: [{ name: 'x', status: '', bad: false, page: '' }] })] }, lookAgain: { available: false, items: [], leftOut: [], runs: [] } })
     expect(within(screen.getByRole('region', { name: 'Look again' })).getByRole('link')).toHaveTextContent('Not set up')

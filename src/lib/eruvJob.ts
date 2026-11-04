@@ -59,6 +59,9 @@ export function eruvStanding(
   const n = updatesOf(e, finding)
   if (n) return { tab: 'to_check', pill: { text: `${n} update${n === 1 ? '' : 's'}`, tone: 'amber' } }
   const section = eruvSection(e)
+  // Its website down says so before "No status": Elkins Park's had been
+  // "page not found" since Oct 25 behind it (the user, Nov 4).
+  if (section === 'no_source' && siteFailed(watch)) return { tab: 'cant_read', pill: { text: 'Website didn’t load', tone: 'grey' }, didntLoad: true }
   if (section === 'no_source') return { tab: 'cant_read', pill: { text: 'No status', tone: 'grey' } }
   if (section === 'email') return { tab: 'cant_read', pill: { text: 'Email not read', tone: 'amber' } }
   if (section === 'didnt_load') return { tab: 'cant_read', pill: { text: 'Status didn’t load', tone: 'grey' }, didntLoad: true }

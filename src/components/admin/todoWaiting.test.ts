@@ -83,6 +83,16 @@ describe('notBeingRead (Todo10, EmailTodo12)', () => {
     expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'e', name: 'Center City Eruv', line: 'Their email came 4 weeks ago', since: ['2026-10-01T00:00:00Z'] }])
   })
 
+  // Elkins Park, Nov 4: its website had said "page not found" for ten days
+  // with nothing on To do.
+  it('an eruv whose website didn’t load, dated by its first failure', () => {
+    const watch = { id: 'w', url: 'https://www.yiep.org/eruv-map', active: true, lastRunAt: '2026-10-31T07:00:00Z', lastOkAt: null, failingSince: '2026-10-25T07:00:00Z', lastError: 'The page answered 404' }
+    const eruvim = { eruvim: [{ id: 'elkins-park', name: 'Elkins Park Eruv', website: 'https://www.yiep.org/eruv-map', statusEmail: null, statusCheckedAt: null }], findings: [], watches: [watch], timezone: 'America/New_York' }
+    expect(notBeingRead(jobs({ eruvim: eruvim as never }), NOW)).toEqual([{ id: 'elkins-park', name: 'Elkins Park Eruv', line: 'Website didn’t load', since: ['2026-10-25T07:00:00Z'] }])
+    const paused = { ...eruvim, watches: [{ ...watch, active: false }] }
+    expect(notBeingRead(jobs({ eruvim: paused as never }), NOW)).toEqual([])
+  })
+
   it('nothing until every job has answered', () => {
     expect(notBeingRead(jobs({ times: undefined as never }), NOW)).toEqual([])
   })
