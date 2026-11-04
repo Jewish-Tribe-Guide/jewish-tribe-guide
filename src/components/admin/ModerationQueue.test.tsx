@@ -115,6 +115,18 @@ const grocerRow = { id: 'l1', community_id: 'philly', category: 'grocery', name:
 // The "one tap per place" boards (Nov 2): a row per place, its name, the
 // oldest thing's date, and what's waiting in a grey line.
 describe('ModerationQueue — the list', () => {
+  // The user, Nov 4: "start page with newest to oldest". A place read
+  // again is dated today, so it comes up top rather than at the foot.
+  it('opens newest first', async () => {
+    renderQueue([
+      submission({ id: 'old', created_at: '2026-10-01T12:00:00Z', payload: { category: 'grocery', name: 'Old Grocer', address: '1 Main St', details: {} } }),
+      submission({ id: 'new', created_at: '2026-11-03T12:00:00Z', payload: { category: 'grocery', name: 'New Grocer', address: '2 Main St', details: {} } }),
+    ])
+    await findRow('New Grocer')
+    expect(screen.getByRole('button', { name: /^Sort/ })).toHaveTextContent('Newest first')
+    expect(screen.getAllByRole('button', { name: /^Open / }).map((b) => b.getAttribute('aria-label'))).toEqual(['Open New Grocer', 'Open Old Grocer'])
+  })
+
   it('says a new place is one', async () => {
     renderQueue([submission()])
     expect(await findRow('Acme Grocery')).toHaveTextContent(/^Acme Grocery\w{3} \d+New place$/)
@@ -749,6 +761,11 @@ describe('ModerationQueue — a place opened', () => {
     await waitFor(() => expect(screen.queryByTestId('todo-place')).toBeNull())
     expect(row('Giant')).toBeInTheDocument()
     expect(window.location.search).toBe('')
+    // Where it went, said (the user, Nov 4: a menu read again "disappeared.
+    // Where'd they go").
+    expect(screen.getByRole('status')).toHaveTextContent('Acme Grocery: nothing left to do')
+    await user.click(row('Giant'))
+    expect(screen.queryByText(/nothing left to do/)).toBeNull()
   })
 
   it('a place that’s done gives way to the next on a computer, and up and down step through them', async () => {

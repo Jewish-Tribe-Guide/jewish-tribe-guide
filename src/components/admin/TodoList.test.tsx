@@ -8,7 +8,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import type { TodoData } from '@/lib/useTodo'
 import type { TodoPlace } from '@/lib/todoPlaces'
 import type { CategoryConfig } from '@/lib/categories'
-import TodoList, { ALL_OLDEST_FIRST } from './TodoList'
+import TodoList, { TODO_START } from './TodoList'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
 const empty: TodoData = { submissions: [], responses: [], unmatched: [], setup: null }
 
 function Host({ data, onOpen, categoriesById = new Map() }: { data: TodoData; onOpen: (p: TodoPlace) => void; categoriesById?: Map<string, CategoryConfig> }) {
-  const [view, setView] = useState(ALL_OLDEST_FIRST)
+  const [view, setView] = useState(TODO_START)
   return <TodoList data={data} categoriesById={categoriesById} view={view} onView={setView} onOpen={onOpen} />
 }
 const show = (data: TodoData, onOpen: (p: TodoPlace) => void = () => {}, categoriesById?: Map<string, CategoryConfig>) =>
@@ -74,7 +74,7 @@ describe('To do, a row per place', () => {
     const user = userEvent.setup()
     show({ ...empty, notRead: [{ id: 'z', name: 'Zeke’s', line: 'Website didn’t load' }] })
     expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('All')
-    expect(screen.getByRole('button', { name: /^Sort/ })).toHaveTextContent('Oldest first')
+    expect(screen.getByRole('button', { name: /^Sort/ })).toHaveTextContent('Newest first')
     await user.click(screen.getByRole('button', { name: /^Show/ }))
     expect(screen.getByRole('menuitemcheckbox', { name: 'All (1)' })).toHaveAttribute('aria-checked', 'true')
     await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))
@@ -131,7 +131,7 @@ describe('To do, a row per place', () => {
   // N6Desk: beside an open place, the open one is marked in the list.
   it('marks the place open beside it', () => {
     const data = { ...empty, notRead: [{ id: 'r', name: 'Rita’s', line: 'Website didn’t load' }, { id: 'g', name: 'Giant', line: 'Website didn’t load' }] }
-    renderWithProviders(<TodoList data={data} categoriesById={new Map()} view={ALL_OLDEST_FIRST} onView={() => {}} onOpen={() => {}} openKey="r" />, { community: { slug: 'philly' } })
+    renderWithProviders(<TodoList data={data} categoriesById={new Map()} view={TODO_START} onView={() => {}} onOpen={() => {}} openKey="r" />, { community: { slug: 'philly' } })
     expect(screen.getByRole('button', { name: 'Open Rita’s' }).closest('[aria-current]')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Open Giant' }).closest('[aria-current]')).toBeNull()
   })

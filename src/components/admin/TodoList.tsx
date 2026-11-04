@@ -31,7 +31,9 @@ const SORTS: { value: TodoSort; label: string }[] = [
 /** `category`: a category's id, or '' for all of them. */
 export type TodoView = { query: string; filters: TodoFilter[]; category: string; sort: TodoSort }
 
-export const ALL_OLDEST_FIRST: TodoView = { query: '', filters: [], category: '', sort: 'oldest' }
+/** Where To do starts: everything, newest first (the user, Nov 4), so a
+ *  place read again, dated today, comes up top. */
+export const TODO_START: TodoView = { query: '', filters: [], category: '', sort: 'newest' }
 
 export default function TodoList({
   data,

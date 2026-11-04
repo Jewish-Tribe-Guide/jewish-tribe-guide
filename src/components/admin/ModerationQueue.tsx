@@ -12,7 +12,7 @@ import { shownPlaces, todoPlaces, type TodoFilter } from '@/lib/todoPlaces'
 import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
 import { useTodoSplit } from './useTodoSplit'
 import { useFullPane } from './AdminUI'
-import TodoList, { ALL_OLDEST_FIRST, type TodoView } from './TodoList'
+import TodoList, { TODO_START, type TodoView } from './TodoList'
 import TodoPlaceScreen from './TodoPlaceScreen'
 
 // The admin's front page, To do (mounted at /<community>/admin itself):
@@ -31,6 +31,9 @@ const OPENED = 'moderation-open'
 // history.pushState, and the address changes a moment after the call, so
 // reading it straight away still saw the list.
 let openedHere: string | null | undefined
+// The place that just left the list, said where it went (the user, Nov 4:
+// menus read again "disappeared. Where'd they go"). Until the next opens.
+let doneHere: string | null = null
 
 function openIdNow(): string | null {
   return openedHere !== undefined ? openedHere : new URLSearchParams(window.location.search).get('open')
@@ -55,6 +58,7 @@ function subscribeToAddress(onChange: () => void) {
     window.removeEventListener(ADMIN_AREA_TAPPED, onTapped)
     // Coming back to the queue later reads the address afresh.
     openedHere = undefined
+    doneHere = null
   }
 }
 
@@ -64,9 +68,9 @@ const SHOWS: readonly TodoFilter[] = ['changes', 'new', 'broken', 'feedback']
  *  opens on it. Taken off the address once read, so it isn't kept in every
  *  address after it. */
 function viewFromAddress(): TodoView {
-  if (typeof window === 'undefined') return ALL_OLDEST_FIRST
+  if (typeof window === 'undefined') return TODO_START
   const shows = (new URLSearchParams(window.location.search).get('show') ?? '').split(',')
-  return { ...ALL_OLDEST_FIRST, filters: SHOWS.filter((f) => shows.includes(f)) }
+  return { ...TODO_START, filters: SHOWS.filter((f) => shows.includes(f)) }
 }
 
 /** `replace`: moving on by itself, so Back doesn't return to a place that's done. */
@@ -113,7 +117,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
   const editingChanged = useCallback((id: string, e: boolean) => void (e ? editing.current.add(id) : editing.current.delete(id)), [])
   // On a computer, the list and the place fill the window (N6Desk).
   useFullPane(!!openPlace)
-  const wasOpen = useRef<string | null>(null)
+  const wasOpen = useRef<{ key: string; name: string } | null>(null)
+  const done = useSyncExternalStore(subscribeToAddress, () => doneHere, () => null)
   const listWhenOpen = useRef<string[]>([])
 
   function leave(): boolean {
@@ -155,6 +160,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
   function open(key: string) {
     if (key === openPlace?.key || !leave()) return
     setOpenError(null)
+    doneHere = null
     if (!openPlace) spot.current = { key, y: window.scrollY, top: rowOf(key)?.getBoundingClientRect().top ?? 0 }
     goTo(key)
     if (!wide()) window.scrollTo?.(0, 0)
@@ -218,13 +224,14 @@ export default function ModerationQueue({ session }: { session: Session }) {
   useEffect(() => {
     if (openPlace) {
       if (openPlace.key !== openId) goTo(openPlace.key, true)
-      wasOpen.current = openPlace.key
+      wasOpen.current = { key: openPlace.key, name: openPlace.name }
       listWhenOpen.current = list.map((p) => p.key)
       return
     }
     // Nothing left at the open place: back to the list on a phone, the
     // next place on a computer.
-    if (!openId || !places || wasOpen.current !== openId) return
+    if (!openId || !places || wasOpen.current?.key !== openId) return
+    doneHere = wasOpen.current.name
     wasOpen.current = null
     editing.current.clear()
     const keys = listWhenOpen.current
@@ -306,6 +313,11 @@ export default function ModerationQueue({ session }: { session: Session }) {
                 <h1 className="m-0 mb-4 flex items-baseline gap-2.5 text-[26px] font-bold text-slate-900">
                   To do <span className="text-[14px] font-normal text-slate-500">{list.length} to decide</span>
                 </h1>
+              )}
+              {done && (
+                <p role="status" className="m-0 mb-3 text-[15px] text-slate-600">
+                  {done}: nothing left to do
+                </p>
               )}
               <TodoList data={data} categoriesById={categoriesById} view={view} onView={setView} onOpen={(p) => open(p.key)} openKey={openPlace?.key} />
             </div>
