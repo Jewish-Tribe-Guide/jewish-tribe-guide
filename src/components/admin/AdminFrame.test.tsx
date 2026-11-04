@@ -155,12 +155,11 @@ describe('AdminFrame', () => {
 
   it('offers Communities under Settings to the site owner only', () => {
     show('/philly/admin/team')
-    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Team', 'Community'])
+    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Team'])
     cleanup()
     show('/philly/admin/team', true)
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual([
       'Team',
-      'Community',
       'Communities',
     ])
   })

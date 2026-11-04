@@ -2390,19 +2390,24 @@ Then "the small tweaks", each with a test that failed against the old code:
   - Not done: Add's "Read now" lookup (`kosherLookup`) still only checks
     Keystone-K and Mekor.
 
+Built Nov 4, from the user's picks:
+- **22:** the site's name and logo are on Site → Header and menus, in a
+  "Name and logo" box first. Settings is Team (and Communities for the
+  site owner); the old Settings → Community address goes to Header and
+  menus (10298b7a).
+- **23:** the Eruv category has Delete. Its confirm says how many eruvim
+  and website watches go with it, and deleting removes all of them. The
+  Eruv stays on the list, hidden, to start again. This reverses the Nov 3
+  Hidden only rule (e2de0cf9).
+- **18/19:** Look again is one list, like To do and Places: a name search,
+  a Kind menu with counts, and Still trying / Stopped trying. Each row
+  names its kind while all kinds show. Watches is unchanged (4e65f1fd).
+
 Still open:
-- Decided Nov 4 (the user's picks):
-  - **25-28, reordering:** draw first. One drag list for all four (a handle,
-    and long-press on a phone). Groups on the Browse page and Top of the
-    page, on a computer are redrawn as rows that open. Show the drawing
-    before building.
-  - **18/19:** Look again becomes one list with a kind filter and search,
-    like To do and Places. Watches stays as it is.
-  - **22:** the site's name and logo move from Settings to Site → Header
-    and menus.
-  - **23:** the Eruv category can be deleted, with the usual confirm saying
-    how many eruvim and watches go with it. This reverses the Nov 3 Hidden
-    only rule.
+- **25-28, reordering:** draw first. One drag list for all four (a handle,
+  and long-press on a phone). Groups on the Browse page and Top of the
+  page, on a computer are redrawn as rows that open. Show the drawing
+  before building.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 
