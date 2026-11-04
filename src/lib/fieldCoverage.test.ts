@@ -74,6 +74,9 @@ describe('what checks each thing on a place', () => {
     })
     it('Stop reading it: a stopped page, menu or Refuah page', () => {
       expect(notCheckedLine(placeCoverage({ id: 'a' }, shul, { ...NONE, times: [{ id: 'a', pages: [{ watch: { active: false } }] }] }))).toBe('Not checked: minyan times (stopped reading)')
+      // As the job sends a stopped page: among `stopped`, not `pages`
+      // (Chabad of the Main Line, Nov 4).
+      expect(notCheckedLine(placeCoverage({ id: 'a' }, shul, { ...NONE, times: [{ id: 'a', pages: [], stopped: [{ watch: { active: false } }] }] }))).toBe('Not checked: minyan times (stopped reading)')
       const menu = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', menuUrl: 'https://m.example', menuWatch: { active: false } }] })
       expect(notCheckedLine(menu)).toBe('Not checked: menu (stopped reading)')
       const hospital = makeCategory({ id: 'hospital', kind: 'listing', hasPhone: false, detailFields: [] } as Partial<CategoryConfig>)

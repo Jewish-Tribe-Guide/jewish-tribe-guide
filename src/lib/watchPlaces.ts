@@ -75,7 +75,7 @@ export type WatchKind = { id: string; label: string; places: WatchedPlace[]; cou
 
 type Page = { watch: Watch }
 type Found = { id: string; at?: string; operation?: string; from?: string }
-export type PagesPlace = { id: string; name: string; href: string; pages: Page[]; off: boolean; findings?: readonly Found[]; decided?: { at: string } | null; newsletters?: readonly Watch[] }
+export type PagesPlace = { id: string; name: string; href: string; pages: Page[]; off: boolean; findings?: readonly Found[]; decided?: { at: string } | null; newsletters?: readonly Watch[]; stopped?: readonly Page[] }
 export type DishesPlace = DishPlace & { id: string; name: string; href: string; pages?: readonly Watch[] }
 /** A place whose own website is read with no job page of its own (a
  *  grocery's, a childcare's): what it finds waits under its kind's row. */
@@ -209,7 +209,7 @@ function dishesSays(p: DishesPlace, now: number): Say {
 }
 
 function pagesSays(p: PagesPlace, job: 'hours' | 'times', now: number): Say {
-  const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters }
+  const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters, stopped: p.stopped?.length }
   const section = hoursSection(state, now)
   const what = job === 'times' ? 'Times' : 'Hours'
   const unchecked =

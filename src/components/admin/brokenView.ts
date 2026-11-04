@@ -211,7 +211,7 @@ export function brokenView(id: string, label: string, jobs: Jobs, now: number): 
     const live = ((job === 'times' ? shul : mikvah)?.pages ?? []).map((p) => p.watch).filter((w) => w.active)
     const first = live[0]
     const field = job === 'times' ? 'minyanim' : 'hours'
-    // No page at all (Chabad of the Main Line): nothing to give a better
+    // No page at all, and none stopped (that's Not checked): nothing to give a better
     // one for, so one is added.
     if (!first)
       return {

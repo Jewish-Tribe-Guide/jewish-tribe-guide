@@ -43,7 +43,7 @@ export type PlaceCoverage = {
 }
 
 type Page = { watch: Pick<Watch, 'active'> }
-type PagesIn = { id: string; off?: boolean; pages: readonly Page[]; newsletters?: readonly Pick<Watch, 'active'>[] }
+type PagesIn = { id: string; off?: boolean; pages: readonly Page[]; newsletters?: readonly Pick<Watch, 'active'>[]; stopped?: readonly unknown[] }
 
 /** Each job's places, as the Watches tab loads them. Null: not loaded. */
 export type CoverageIn = {
@@ -92,7 +92,7 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
   }
   // Pages it had, all stopped, or their job turned off.
   const pagesWhy = (kind: NightKindId, p: PagesIn | undefined) => {
-    if (!p?.pages.length) return undefined
+    if (!p?.pages.length && !p?.stopped?.length) return undefined
     if (!on(kind)) return JOB_OFF
     if (p.off || !p.pages.some((x) => x.watch.active)) return STOPPED
   }

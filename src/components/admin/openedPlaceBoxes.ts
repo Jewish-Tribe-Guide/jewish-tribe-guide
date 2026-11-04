@@ -232,7 +232,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   function pagesProblems(job: 'hours' | 'times', p: ShulPlace | MikvahPlace, live: Watch[], fields: Field[]) {
     const step: ReadStep = { job, resourceId: id }
     for (const w of live) sitePages.push({ watch: w, step })
-    const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters }
+    const state = { pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length, decidedAt: p.decided?.at, newsletters: p.newsletters, stopped: p.stopped?.length }
     if (hoursDidntLoad(state, now)) {
       // A site that's down is one group, its pages read together.
       const down = live.filter((x) => didntLoad(x, now))
