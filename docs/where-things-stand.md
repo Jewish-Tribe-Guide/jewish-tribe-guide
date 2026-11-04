@@ -2384,8 +2384,9 @@ Then "the small tweaks", each with a test that failed against the old code:
   The Kosher box used to name every non-Keystone list "Mekor Habracha's
   list"; it now uses each list's own name, and "On neither list" became
   "Not on a kosher list".
-  - Live needs the watch added (the user's yes): kind `website`, URL
-    `https://www.kclkashrus.org/`, label "KCL's list".
+  - Live: merged in PR 375 and deployed; the watch was added on live Nov 4
+    with the user's yes (kind `website`, `https://www.kclkashrus.org/`,
+    "KCL's list"). Its first read is the next nightly run.
   - Not done: Add's "Read now" lookup (`kosherLookup`) still only checks
     Keystone-K and Mekor.
 
