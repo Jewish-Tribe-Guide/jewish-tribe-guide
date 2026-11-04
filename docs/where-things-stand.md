@@ -2423,7 +2423,7 @@ Built Nov 4, from the user's picks:
 
 Still open:
 - **Top of the page: tabs, links and headings:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v14: boards "New · What goes in first
+  (KdHT8Tci1ufXSXobnnSfEm v15: boards "New · What goes in first
   decides" and "Tabs, links and headings"; the one-rule (v10) and
   all-or-nothing (v11) boards are off the drawing). The user: links and
   dropdowns are one thing, a tab; one link in it makes it a link, two a
@@ -2442,8 +2442,8 @@ Still open:
     edit the place itself?"). A new tab or heading opens with its name
     selected. Open, tapping the name edits it, so the chevron closes the
     row: try on a real phone.
-  - A one-link tab says "Add another to make it a dropdown." beside its
-    Add, rather than "Now a dropdown. Give it a name." after (the user).
+  - A one-link tab shows only its Add, with no hint about making it a
+    dropdown (the user, Nov 4).
   - So the groups are Categories' headings (the "Groups on the Browse
     page" box on Site → Home page goes: `/browse` still draws them, but no
     tab or link opens it, checked Nov 4), cards in a tab are links, and
