@@ -2422,16 +2422,22 @@ Built Nov 4, from the user's picks:
     real phone yet.
 
 Still open:
-- **Top of the page: tabs, links and headings:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v9, board "New · Tabs, links and headings";
-  it replaces the one-Add-button and groups-in-Categories boards, which
-  are off the drawing). The user: links and dropdowns are one thing, a
-  tab; one link in it makes it a link, two a dropdown. A dropdown can put
-  its links under headings, and nothing goes deeper. So the groups are
-  Categories' headings (the "Groups on the Browse page" box on Site →
-  Home page goes: `/browse` still draws them, but no tab or link opens
-  it, checked Nov 4), cards in a tab are links, and the leftover group is
-  "Other", where new categories land. One "+ Add a tab".
+- **Top of the page: one rule, one Add:** drawn Nov 4
+  (KdHT8Tci1ufXSXobnnSfEm v10, board "New · One rule, one Add"; the
+  boards it replaces are off the drawing, but for v9's, kept below it as
+  "Before"). The user: links and dropdowns are one thing, a tab, and the
+  admin's adding decides which. One link makes a link; two make a
+  dropdown at the top and a heading inside a dropdown. Links under a
+  heading don't open, so nothing goes deeper. "+ Add a tab" at the top
+  and "+ Add a link" inside; no "+ Add a heading" or "+ Add a dropdown".
+  - A one-link row inside a dropdown says "Add another to make it a
+    heading." beside its Add (the user: say it before, not "Now a
+    dropdown, give it a name" after). Once it has two, its Name box is
+    highlighted, with no sentence.
+  - So the groups are Categories' headings (the "Groups on the Browse
+    page" box on Site → Home page goes: `/browse` still draws them, but no
+    tab or link opens it, checked Nov 4), cards in a tab are links, and
+    the leftover group is "Other", where new categories land.
   - My picks, drawn but not yet agreed: a trash can beside every Name in
     place of the Take it off button; Other as a real last row (no handle,
     no trash).
