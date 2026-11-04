@@ -722,6 +722,8 @@ describe('ModerationQueue — a place opened', () => {
     await findRow('Mekor Habracha')
     await user.click(screen.getByRole('button', { name: /^Show/ }))
     await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))
+    // A tap away only closes the menu (AdminMenu, Nov 4), so it's closed first.
+    await user.keyboard('{Escape}')
     await user.click(row('Mekor Habracha'))
     expect(screen.getByRole('tab', { name: 'Google not found' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('button', { name: 'Change to 6:20 PM' })).toBeNull()
