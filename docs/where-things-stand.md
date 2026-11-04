@@ -2427,6 +2427,15 @@ Still open:
   "+ Add a link"'s list ends with the Categories menu (when it's gone) and
   "A dropdown of links". Waiting on the user's look before building.
   Card width stays a Full/Half switch (recommended; not dragged side by side).
+- **Every item at the top of the page is a tab:** drawn Nov 4
+  (KdHT8Tci1ufXSXobnnSfEm v8, board "New · Every item at the top of the
+  page is a tab"). The user: links and dropdowns become one thing, a tab;
+  one thing in it makes it a link, two a dropdown, and taking one out
+  makes it a link again. One "+ Add a tab" (replaces the one-Add-button
+  board below). Also drawn as my picks, not yet agreed: a trash can
+  beside every Name instead of a Take it off button, and the groups'
+  More as a real last row (no handle, no trash) instead of the "In More,
+  at the end" line. Waiting on the user's look before building.
 - **The groups inside the Categories row:** drawn Nov 4
   (KdHT8Tci1ufXSXobnnSfEm v7, board "New · The groups go inside the
   Categories row"). The groups only show as the computer's Categories
