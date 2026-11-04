@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dueQueue, lookAgainFix, lookItems, lookView, menuWhy, pickFound, pickPage, LOOK_AGAIN_MS, type LookInput, type LookItem } from './lookAgain'
+import { dueQueue, filterLooks, lookAgainFix, lookItems, lookView, menuWhy, pickFound, pickPage, LOOK_AGAIN_MS, type LookInput, type LookItem } from './lookAgain'
 import { nextRunAt, NIGHTLY_JOBS, type JobRun } from './jobRuns'
 
 // Look again (board XSuFCMdLQmBYNJqfWaEM3A, Oct 27): each one tried again a
@@ -90,8 +90,7 @@ describe('when each is tried', () => {
     const view = lookView([...never, item('Tried', '2026-10-22T14:00:00Z'), item('Stopped', null, { stopped: '2026-11-02T12:00:00Z' })], NEXT)
     expect(view.tonight).toBe('Tonight, 4:00 AM · 5 due')
     expect(view.total).toBe(7)
-    expect(view.groups.map((g) => g.title)).toEqual(['Not on Google'])
-    expect(view.groups[0].rows.map((r) => [r.name, r.when, r.next])).toEqual([
+    expect(view.rows.map((r) => [r.name, r.when, r.next])).toEqual([
       ['A', 'Not tried yet · tonight', 'Tonight'],
       ['B', 'Not tried yet · tonight', 'Tonight'],
       ['C', 'Not tried yet · tonight', 'Tonight'],
@@ -101,6 +100,19 @@ describe('when each is tried', () => {
       ['Tried', 'Oct 22 · next Nov 21', 'Nov 21'],
     ])
     expect(view.stopped.map((r) => [r.name, r.when, r.next])).toEqual([['Stopped', 'Stopped Nov 2', null]])
+  })
+
+  // The user, Nov 4: "all in one list with filters and search".
+  it('one list across kinds, tonight’s first, narrowed by kind and name', () => {
+    const view = lookView([
+      item('Tried', '2026-10-22T14:00:00Z'),
+      { ...item('Elkins Park Eruv', null), kind: 'eruv' },
+      { ...item('Shlomo’s Market', '2026-10-20T14:00:00Z'), kind: 'menu' },
+    ], NEXT)
+    expect(view.rows.map((r) => r.name)).toEqual(['Elkins Park Eruv', 'Shlomo’s Market', 'Tried'])
+    expect(filterLooks(view.rows, 'menu', '').map((r) => r.name)).toEqual(['Shlomo’s Market'])
+    expect(filterLooks(view.rows, '', 'park').map((r) => r.name)).toEqual(['Elkins Park Eruv'])
+    expect(filterLooks(view.rows, 'google', 'park')).toEqual([])
   })
 })
 
@@ -124,4 +136,5 @@ describe('lookAgainFix', () => {
     expect(lookAgainFix([run({ ok: false, error: 'boom' })], NOW)).toEqual({ name: 'Look again', why: 'Last run failed', page: 'job/look-again' })
     expect(lookAgainFix([run({ startedAt: '2026-10-30T09:00:00Z', finishedAt: '2026-10-30T09:01:00Z' })], NOW)?.why).toBe('Didn’t run since Oct 30')
   })
+
 })

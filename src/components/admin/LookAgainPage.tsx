@@ -7,23 +7,28 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { NIGHTLY_JOBS, nextRunAt } from '@/lib/jobRuns'
-import { isFoundPage, lookView, type LookShown } from '@/lib/lookAgain'
+import { filterLooks, isFoundPage, lookView, LOOK_GROUPS, type LookKind, type LookShown } from '@/lib/lookAgain'
 import { placePath } from '@/lib/placeLink'
-import { AdminBack, AdminBox, AdminCount, Chevron, MoreToggle } from './AdminUI'
+import { AdminBack, AdminEmpty, AdminMenu, Chevron, MoreToggle } from './AdminUI'
 import { day, shortUrl } from './watchText'
 import { useWatchJobsAndReload } from './useWatchJobs'
 
 // Look again (board XSuFCMdLQmBYNJqfWaEM3A, Oct 27): what the jobs couldn't
-// find, tried again a month after the last try, a few a night. A group per
-// kind, each row its name, why and when; a row opens in place with its last
-// try, its next, Read it now and Stop trying. What it finds waits on To do.
+// find, tried again a month after the last try, a few a night. One list,
+// like To do and Places, with a search and Kind and Trying menus (the user,
+// Nov 4: "all in one list with filters and search"); each row its name, its
+// kind and why, and when; a row opens in place with its last try, its next,
+// Read it now and Stop trying. What it finds waits on To do.
 
 const button = 'flex-1 inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-lg text-sm font-semibold whitespace-nowrap cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
 const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
 
-/** Rows a group shows on a phone before "N more" (board Phone). */
+/** Rows the list shows on a phone before "N more" (board Phone). */
 const PHONE_ROWS = 5
+
+const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900'
+const SHORT = Object.fromEntries(LOOK_GROUPS.map((g) => [g.kind, g.short])) as Record<LookKind, string>
 
 const JOB = NIGHTLY_JOBS.find((j) => j.id === 'look-again')!
 
@@ -123,7 +128,7 @@ function LeftOut({ names }: { names: string[] }) {
   )
 }
 
-function Rows({ rows, ...rest }: { rows: LookShown[]; token: string; community: string; base: string; reload: () => Promise<void> }) {
+function Rows({ rows, showKind, ...rest }: { rows: LookShown[]; showKind: boolean; token: string; community: string; base: string; reload: () => Promise<void> }) {
   const [open, setOpen] = useState<string | null>(null)
   const [all, setAll] = useState(false)
   return (
@@ -142,7 +147,7 @@ function Rows({ rows, ...rest }: { rows: LookShown[]; token: string; community: 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:contents">
                 <span className="text-[14.5px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{r.name}</span>
                 <span className={`text-[13px] text-slate-600 sm:text-[13.5px] ${opened ? 'max-sm:hidden' : ''}`}>
-                  {r.why}
+                  {showKind ? `${SHORT[r.kind]} · ${r.why}` : r.why}
                   <span className="sm:hidden"> · {r.when}</span>
                 </span>
                 <span className="hidden whitespace-nowrap text-right text-[12.5px] text-slate-500 sm:block">{r.when}</span>
@@ -169,7 +174,9 @@ export default function LookAgainPage({ token }: { token: string }) {
   const base = adminBase(community)
   const { jobs, reload } = useWatchJobsAndReload(token)
   const [now] = useState(() => Date.now())
-  const [stoppedOpen, setStoppedOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [kind, setKind] = useState<LookKind | ''>('')
+  const [stopped, setStopped] = useState<'trying' | 'stopped'>('trying')
   const head = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title="Look again" />
   const loaded = jobs.lookAgain
   if (loaded === undefined) return <div className="space-y-4">{head}<p className="text-sm text-muted">Loading…</p></div>
@@ -178,6 +185,10 @@ export default function LookAgainPage({ token }: { token: string }) {
   const view = lookView(loaded.items, nextRunAt(JOB, now))
   const shared = { token, community, base, reload }
   const [tonight, due] = view.tonight.split(' · ')
+  const pool = stopped === 'stopped' ? view.stopped : view.rows
+  const rows = filterLooks(pool, kind, query)
+  const inKind = (k: LookKind) => filterLooks(pool, k, query).length
+  const kinds = LOOK_GROUPS.filter((g) => g.kind === kind || inKind(g.kind) > 0)
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -189,28 +200,52 @@ export default function LookAgainPage({ token }: { token: string }) {
         </span>
         <span>{view.total} in all</span>
       </div>
-      {view.groups.map((g) => (
-        <AdminBox key={g.kind} title={g.title} count={g.rows.length} foldOnPhone>
-          <Rows rows={g.rows} {...shared} />
-          {g.kind === 'google' && loaded.leftOut.length > 0 && <LeftOut names={loaded.leftOut} />}
-        </AdminBox>
-      ))}
-      <section aria-label="Stopped trying" className="rounded-[10px] border border-slate-200 bg-white">
-        <button
-          type="button"
-          aria-expanded={stoppedOpen}
-          disabled={view.stopped.length === 0}
-          onClick={() => setStoppedOpen((o) => !o)}
-          className={`flex w-full min-h-11 cursor-pointer items-center gap-2.5 px-4 py-3.5 text-left disabled:cursor-default ${stoppedOpen ? 'border-b border-slate-100' : ''}`}
-        >
-          <span className={`max-sm:order-last ${stoppedOpen ? 'rotate-90' : ''}`}>
-            <Chevron />
-          </span>
-          <h2 className="m-0 flex-1 text-base font-bold text-slate-900">Stopped trying</h2>
-          <AdminCount n={view.stopped.length} />
-        </button>
-        {stoppedOpen && <Rows rows={view.stopped} {...shared} />}
-      </section>
+
+      <label className={`${field} flex items-center gap-2`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M10.5 10.5L14 14" />
+        </svg>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Find one by name"
+          aria-label="Find one by name"
+          className="min-w-0 flex-1 border-0 bg-transparent outline-none"
+        />
+      </label>
+
+      <div className="flex gap-1.5 sm:gap-2">
+        <AdminMenu
+          name="Kind"
+          value={kind}
+          options={[{ value: '' as const, label: 'All kinds' }, ...kinds.map((g) => ({ value: g.kind, label: g.title, count: inKind(g.kind) }))]}
+          onChange={setKind}
+        />
+        <AdminMenu
+          name="Trying"
+          value={stopped}
+          options={[
+            { value: 'trying' as const, label: 'Still trying', count: view.rows.length },
+            { value: 'stopped' as const, label: 'Stopped trying', count: view.stopped.length },
+          ]}
+          onChange={setStopped}
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <AdminEmpty>{query || kind ? 'None match.' : stopped === 'stopped' ? 'None stopped.' : 'Nothing to look for again.'}</AdminEmpty>
+      ) : (
+        <section aria-label="Look again" className="rounded-[10px] border border-slate-200 bg-white">
+          <Rows key={`${stopped}:${kind}:${query}`} rows={rows} showKind={!kind} {...shared} />
+        </section>
+      )}
+      {stopped === 'trying' && (kind === '' || kind === 'google') && !query && loaded.leftOut.length > 0 && (
+        <section aria-label="Left out" className="rounded-[10px] border border-slate-200 bg-white [&>div]:border-t-0">
+          <LeftOut names={loaded.leftOut} />
+        </section>
+      )}
     </div>
   )
 }
