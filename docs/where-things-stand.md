@@ -2422,18 +2422,20 @@ Built Nov 4, from the user's picks:
     real phone yet.
 
 Still open:
-- **Top of the page: one rule, one Add:** drawn Nov 4
-  (KdHT8Tci1ufXSXobnnSfEm v10, board "New · One rule, one Add"; the
-  boards it replaces are off the drawing, but for v9's, kept below it as
-  "Before"). The user: links and dropdowns are one thing, a tab, and the
-  admin's adding decides which. One link makes a link; two make a
-  dropdown at the top and a heading inside a dropdown. Links under a
-  heading don't open, so nothing goes deeper. "+ Add a tab" at the top
-  and "+ Add a link" inside; no "+ Add a heading" or "+ Add a dropdown".
-  - A one-link row inside a dropdown says "Add another to make it a
-    heading." beside its Add (the user: say it before, not "Now a
-    dropdown, give it a name" after). Once it has two, its Name box is
-    highlighted, with no sentence.
+- **Top of the page: tabs, links and headings:** drawn Nov 4
+  (KdHT8Tci1ufXSXobnnSfEm v11: boards "New · A dropdown is all links or
+  all headings" and "Tabs, links and headings"; the one-rule board, v10,
+  is off the drawing, as the user found it confusing). The user: links
+  and dropdowns are one thing, a tab; one link in it makes it a link, two
+  a dropdown. "+ Add a tab" at the top.
+  - A dropdown is all links or all headings (the user: "I can't imagine
+    we're going to have a dropdown with some headings and some not"). A
+    dropdown of links has "+ Add a link" and "+ Add a heading"; the first
+    heading takes its links, its Name highlighted to name it. A dropdown
+    of headings has "+ Add a heading", and links are added inside each.
+    Taking the last heading off makes it a plain list again. Nothing goes
+    deeper. On the site, the two shapes it has today: a list (More) or
+    columns under headings (Categories).
   - So the groups are Categories' headings (the "Groups on the Browse
     page" box on Site → Home page goes: `/browse` still draws them, but no
     tab or link opens it, checked Nov 4), cards in a tab are links, and
