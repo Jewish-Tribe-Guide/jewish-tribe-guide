@@ -2295,7 +2295,7 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
-## Done Nov 4: the bugs from the user's 33 notes (on `redesign/oct18-fixes`)
+## Done Nov 4: the bugs and small tweaks from the user's 33 notes (on `redesign/oct18-fixes`)
 
 The user sent 33 notes on Nov 4, mostly about the admin screens, and said
 "bugs first". Each fix has a test that failed against the old code.
@@ -2322,10 +2322,29 @@ The user sent 33 notes on Nov 4, mostly about the admin screens, and said
   read didn't finish. Read it again." Once this is deployed, Read it again
   on each.
 
+Then "the small tweaks", each with a test that failed against the old code:
+
+- **11, the Category menu:** on Places and To do it lists only categories
+  with something under the other menus and the search, with counts
+  ("Food (1)").
+- **14 and 15, Watches:** "+ Add a watch" is a button at the top right,
+  always; the Not checked box is gone (it's on Places).
+- **16, broken checks on Watches:** a place's broken check is To do's. The
+  Watches sentence counts them and opens To do on Broken checks, and Needs
+  fixing has a "Broken checks" row beside a whole job failing.
+- **30 and 3, To do:** opens newest first; when the last thing on a place
+  is done, the list says "<place>: nothing left to do".
+- **31:** tapping To do while on the list starts it over (filters, search,
+  sort).
+- **32, phone bar:** the tab you came from stays lit on a category page, as
+  Spotify does (Home, You or Browse). A first load onto a category lights
+  Home; a category with its own tab lights only that.
+- **24:** the home photo's alt field is "Photo description, for screen
+  readers".
+
 Still open from the same notes, waiting for the user to pick what's next:
-the small tweaks (11, 14, 15, 16, 30, 31, 32, 24, 3), the menu reader
-(1, 2, 5, 8, 9, 21, 7), and the ones that need a drawing or a decision
-(25-28, 18/19, 20, 22, 23).
+the menu reader (1, 2, 5, 8, 9, 21, 7), and the ones that need a drawing or
+a decision (25-28, 18/19, 20, 22, 23).
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 
