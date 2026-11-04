@@ -36,6 +36,10 @@ function newItemId(): string {
   return `nav_${Math.random().toString(36).slice(2, 9)}`
 }
 
+/** A new link's name, as the site's own header calls it. Links aren't
+ *  renamed here, so it has to read right on the site. */
+const LINK_NAMES: Record<string, string> = { map: 'Map', you: 'You', about: 'About', privacy: 'Privacy', feedback: 'Feedback' }
+
 /** What a row says its link opens, as the site's own screens are called. */
 const OPENS: Record<string, string> = {
   map: 'the Map',
@@ -44,11 +48,6 @@ const OPENS: Record<string, string> = {
   privacy: 'the Privacy page',
   feedback: 'the Feedback form',
 }
-
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
-
-const fieldLabel = 'block text-[13px] font-semibold text-slate-700 mb-1'
 
 type Option = { id: string; label: string }
 
@@ -70,6 +69,7 @@ export default function DesktopNavEditor({
     return (target: string) => BUILT_IN_LABELS[target] ?? byId.get(target) ?? target
   }, [cardOptions])
   const opens = (target: string) => `Opens ${OPENS[target] ?? targetLabel(target)}`
+  const linkName = (target: string) => LINK_NAMES[target] ?? targetLabel(target)
   const allTargets: Option[] = [...BUILT_IN_DESKTOP_LINK_TARGETS.map((t) => ({ id: t, label: BUILT_IN_LABELS[t]! })), ...cardOptions]
   const [openId, setOpenId] = useState<string | null>(null)
   // Just added: its name is selected, ready to type over.
@@ -125,7 +125,7 @@ export default function DesktopNavEditor({
                 tab={item}
                 onChange={(next) => update(item.id, next)}
                 allTargets={allTargets}
-                targetLabel={targetLabel}
+                linkName={linkName}
                 opens={opens}
               />
             )}
@@ -152,13 +152,13 @@ function TabContents({
   tab,
   onChange,
   allTargets,
-  targetLabel,
+  linkName,
   opens,
 }: {
   tab: DesktopNavItem
   onChange: (tab: DesktopNavItem) => void
   allTargets: Option[]
-  targetLabel: (target: string) => string
+  linkName: (target: string) => string
   opens: (target: string) => string
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
@@ -168,7 +168,7 @@ function TabContents({
   const set = (next: DesktopNavItem[]) => onChange(withTabItems(tab, next))
 
   function addLink(target: string) {
-    set([...inside, { id: newItemId(), label: targetLabel(target), kind: 'link', target }])
+    set([...inside, { id: newItemId(), label: linkName(target), kind: 'link', target }])
   }
   function addHeading() {
     const id = newItemId()
@@ -186,7 +186,7 @@ function TabContents({
 
   return (
     <>
-      {holds === 'links' && <Links links={inside} onChange={set} allTargets={allTargets} targetLabel={targetLabel} opens={opens} />}
+      {holds === 'links' && <Links links={inside} onChange={set} linkName={linkName} opens={opens} />}
       {holds === 'headings' && (
         <DragList items={inside} keyOf={(h) => h.id} nameOf={(h) => h.label} onReorder={set} className="rounded-lg border border-slate-200">
           {(h, row) => {
@@ -203,13 +203,13 @@ function TabContents({
                 onRemove={() => set(inside.filter((i) => i.id !== h.id))}
               >
                 {links.length > 0 && (
-                  <Links links={links} onChange={(next) => put({ ...h, items: next })} allTargets={allTargets} targetLabel={targetLabel} opens={opens} />
+                  <Links links={links} onChange={(next) => put({ ...h, items: next })} linkName={linkName} opens={opens} />
                 )}
                 <div className="flex flex-wrap items-center gap-2.5">
                   <AddMenu
                     label="+ Add a link"
                     options={allTargets.filter((o) => !links.some((l) => l.target === o.id))}
-                    onPick={(target) => put({ ...h, items: [...links, { id: newItemId(), label: targetLabel(target), kind: 'link', target }] })}
+                    onPick={(target) => put({ ...h, items: [...links, { id: newItemId(), label: linkName(target), kind: 'link', target }] })}
                   />
                 </div>
               </OrderRow>
@@ -225,50 +225,29 @@ function TabContents({
   )
 }
 
-/** A tab's or a heading's links, each saying where it goes. A link's name
- *  opens it, to rename it in its row and change where it goes. */
+/** A tab's or a heading's links, each a name and an ×. A link added here is
+ *  named after where it goes, so only an older one named otherwise says
+ *  where (the user, Nov 4: "How many times are we going to say opens map"). */
 function Links({
   links,
   onChange,
-  allTargets,
-  targetLabel,
+  linkName,
   opens,
 }: {
   links: DesktopNavItem[]
   onChange: (links: DesktopNavItem[]) => void
-  allTargets: Option[]
-  targetLabel: (target: string) => string
+  linkName: (target: string) => string
   opens: (target: string) => string
 }) {
-  const [openId, setOpenId] = useState<string | null>(null)
-  const put = (id: string, patch: Partial<DesktopNavItem>) => onChange(links.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   return (
     <DragList items={links} keyOf={(l) => l.id} nameOf={(l) => l.label} onReorder={onChange} className="rounded-lg border border-slate-200">
       {(link, row) => (
         <InnerRow
           row={row}
           name={link.label || 'Untitled'}
-          line={opens(link.target!)}
+          line={link.label === linkName(link.target!) ? undefined : opens(link.target!)}
           onRemove={() => onChange(links.filter((l) => l.id !== link.id))}
-          open={openId === link.id}
-          onToggle={() => setOpenId(openId === link.id ? null : link.id)}
-          rename={{ value: link.label, onChange: (label) => put(link.id, { label }) }}
-        >
-          <label className="block">
-            <span className={fieldLabel}>Opens</span>
-            <select value={link.target} onChange={(e) => put(link.id, { target: e.target.value })} className={inputClass}>
-              {/* The current target stays selectable, though this very row has it. */}
-              <option value={link.target}>{targetLabel(link.target!)}</option>
-              {allTargets
-                .filter((o) => !links.some((l) => l.target === o.id))
-                .map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-            </select>
-          </label>
-        </InnerRow>
+        />
       )}
     </DragList>
   )

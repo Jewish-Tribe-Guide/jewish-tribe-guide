@@ -153,9 +153,11 @@ describe('DesktopTopicsManager', () => {
   it('shows Eyebrow and Heading inputs for a card that has both, seeded from settings', async () => {
     const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
     renderManager([listings], vi.fn(), { ...SITE_SETTINGS_DEFAULTS, desktopListingsEyebrow: 'Right now', desktopListingsHeading: 'Kept by you' })
-    await openRow(userEvent.setup(), /^Kept by you/)
+    const user = userEvent.setup()
+    await openRow(user, /^Kept by you/)
 
     expect(screen.getByDisplayValue('Right now')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Rename Kept by you' }))
     expect(screen.getByDisplayValue('Kept by you')).toBeInTheDocument()
   })
 
@@ -182,7 +184,10 @@ describe('DesktopTopicsManager', () => {
   it('the Jewish Times card edits its heading in its row, with no Eyebrow field', async () => {
     const jewishTimes: DraftHomeSection = { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', cardIds: [], width: 'full' }
     renderManager([jewishTimes])
-    await openRow(userEvent.setup(), new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`))
+    const user = userEvent.setup()
+    await openRow(user, new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`))
+    expect(screen.queryByRole('textbox')).toBeNull()
+    await user.click(screen.getByRole('button', { name: `Rename ${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}` }))
 
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue(SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading)
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
@@ -195,6 +200,7 @@ describe('DesktopTopicsManager', () => {
     const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
     render(<ManagerHarness initialSections={[listings]} />)
     await openRow(user, new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopListingsHeading}`))
+    await user.click(screen.getByRole('button', { name: `Rename ${SITE_SETTINGS_DEFAULTS.desktopListingsHeading}` }))
 
     const headingInput = screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)
     await user.clear(headingInput)

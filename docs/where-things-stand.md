@@ -2436,9 +2436,14 @@ Built Nov 4, from the user's picks:
     page" box is gone from the Home page (`HomeSectionManager` deleted).
     The leftover group is "Other" (was "More"), the last row, with no
     handle or trash; new categories land there.
-  - Not in the drawing: a dropdown's links still open, to rename and pick
-    where they go. Taking off a card or a Categories heading still asks
-    once ("Its links move to Other"); a tab, heading or link goes at once.
+  - Taking off a card or a Categories heading still asks once ("Its links
+    move to Other"); a tab, heading or link goes at once.
+  - The user's notes, Nov 4, same day: an open row drops its line (what it
+    summed up shows under it); its name reads as text until tapped, then
+    edits in a box; a tap anywhere else in the row closes it; the trash
+    can is boxed, beside the name. Links don't open (as drawn): a name and
+    an ×, named as the site calls it ("You", not "You (saved places and
+    searches)"), with "Opens …" only for an older link named otherwise.
   - Only checked in Chrome (computer and phone width). Not on a real phone.
 
 Still open:

@@ -74,18 +74,33 @@ describe('DesktopNavEditor — tabs', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('open, a tab edits its name in its row, beside a trash can; there is no separate Name box', async () => {
+  it('open, a tab shows its name, not its line; a tap on the name edits it, beside a trash can', async () => {
     const { user, onChange } = show()
     await user.click(row('Map'))
+    // What the line summed up is showing under it, so it goes.
+    expect(screen.queryByText('Opens the Map')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    await user.click(row('Rename Map'))
     const name = screen.getByRole('textbox', { name: 'Name' })
-    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    expect(name).toHaveFocus()
     await user.clear(name)
-    await user.type(name, 'Find on map')
+    await user.type(name, 'Find on map{Enter}')
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(row('Rename Find on map')).toHaveTextContent('Find on map')
     expect(screen.getByRole('button', { name: 'Find on map', expanded: true })).toBeInTheDocument()
     // The tab's trash can comes first; then its one link's ×.
     await user.click(screen.getAllByRole('button', { name: 'Take Find on map off' })[0]!)
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT_DESKTOP_NAV_ITEMS.filter((i) => i.id !== 'map'))
     expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
+  })
+
+  it('a tap anywhere in the open row but its name and buttons closes it', async () => {
+    const { user } = show()
+    await user.click(row('Map'))
+    await user.click(row('Rename Map'))
+    expect(row('Map')).toHaveAttribute('aria-expanded', 'true')
+    await user.click(screen.getByTestId('open-row'))
+    expect(row('Map')).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('+ Add a tab adds an empty New tab, open with its name ready to type over, offering a link or a heading', async () => {
@@ -94,7 +109,6 @@ describe('DesktopNavEditor — tabs', () => {
     const name = screen.getByRole('textbox', { name: 'Name' })
     expect(name).toHaveValue('New tab')
     expect(name).toHaveFocus()
-    expect(screen.getByText('Nothing in it yet')).toBeInTheDocument()
     expect(screen.getByLabelText('+ Add a link')).toBeInTheDocument()
     expect(row('+ Add a heading')).toBeInTheDocument()
   })
@@ -104,7 +118,6 @@ describe('DesktopNavEditor — tabs', () => {
     await user.click(row('+ Add a tab'))
     await user.selectOptions(screen.getByLabelText('+ Add a link'), 'map')
     expect(screen.queryByRole('button', { name: '+ Add a heading' })).toBeNull()
-    expect(screen.getByText('Opens the Map', { selector: 'span:not([aria-hidden])' })).toBeInTheDocument()
     expect(onChange.mock.lastCall![0].at(-1)).toMatchObject({ label: 'New tab', kind: 'more-menu', items: [{ kind: 'link', target: 'map' }] })
     await user.click(screen.getByRole('button', { name: 'Take Map off' }))
     expect(adds()).toBe(2)
@@ -130,7 +143,10 @@ describe('DesktopNavEditor — tabs', () => {
   it('a link saved before tabs is a tab holding one link; a second makes it a dropdown', async () => {
     const { user, onChange } = show()
     await user.click(row('Map'))
-    expect(screen.getByRole('button', { name: 'Map', expanded: false })).toHaveAccessibleDescription('Opens the Map')
+    // Its one link is a name and an ×, and doesn't open.
+    // (The tab's trash can, then the link's ×.)
+    expect(screen.getAllByRole('button', { name: 'Take Map off' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Map', expanded: false })).toBeNull()
     await user.selectOptions(screen.getByLabelText('+ Add a link'), 'you')
     expect(screen.getByRole('button', { name: 'Map', expanded: true })).toBeInTheDocument()
     expect(onChange.mock.lastCall![0][1]).toMatchObject({
@@ -141,19 +157,26 @@ describe('DesktopNavEditor — tabs', () => {
     })
   })
 
-  it('a dropdown opens to its links, each with an ×, opening to rename it in its row', async () => {
-    const { user } = show()
+  it('a dropdown opens to its links, each a name and an × that never opens, saying once where it goes', async () => {
+    const more = DEFAULT_DESKTOP_NAV_ITEMS.find((i) => i.id === 'more')!
+    const renamed = { ...more, items: [{ ...more.items![0]!, label: 'Who we are' }, ...more.items!.slice(1)] }
+    const { user } = show([renamed])
     await user.click(row('More'))
-    expect(row('About')).toHaveAccessibleDescription('Opens the About page')
+    expect(screen.queryByRole('button', { name: 'About', expanded: false })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Who we are', expanded: false })).toBeNull()
+    // Named after where it goes, a link says nothing more; named otherwise, it says where.
+    expect(screen.getByText('Feedback', { selector: 'span' }).nextSibling).toBeNull()
+    expect(screen.getByText('Opens the About page')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Take Feedback off' }))
-    await user.click(row('About'))
-    expect(screen.getByLabelText('Opens')).toHaveValue('about')
-    const name = screen.getAllByRole('textbox', { name: 'Name' })[1]!
-    await user.clear(name)
-    await user.type(name, 'Who we are')
-    await user.click(screen.getByRole('button', { name: 'Who we are', expanded: true }))
-    expect(screen.getByRole('button', { name: 'Who we are', expanded: false })).toHaveAccessibleDescription('Opens the About page')
-    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    expect(screen.queryByText('Feedback', { selector: 'span' })).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('a link added is named as the site calls it', async () => {
+    const { user, onChange } = show()
+    await user.click(row('+ Add a tab'))
+    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'you')
+    expect(onChange.mock.lastCall![0].at(-1).items).toEqual([expect.objectContaining({ label: 'You', target: 'you' })])
   })
 
   it('moves a tab, and a link inside a dropdown, by its handle with the arrow keys', async () => {
@@ -212,7 +235,8 @@ describe('DesktopNavEditor — Categories’ headings (the groups)', () => {
     const { user, onSectionsChange } = show()
     await open(user)
     await user.click(row('Food'))
-    const name = screen.getAllByRole('textbox', { name: 'Name' })[1]!
+    await user.click(row('Rename Food'))
+    const name = screen.getByRole('textbox', { name: 'Name' })
     await user.clear(name)
     await user.type(name, 'Eat')
     expect(onSectionsChange.mock.lastCall![0]).toEqual([{ ...food, title: 'Eat' }])

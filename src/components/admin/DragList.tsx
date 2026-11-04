@@ -259,10 +259,13 @@ export default function DragList<T>({
 }
 
 const TRASH = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
   </svg>
 )
+
+const trashButton =
+  'grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-md border border-slate-300 bg-white text-slate-500 hover:border-red-300 hover:bg-red-50 hover:text-red-600'
 
 const iconButton = 'grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-800'
 
@@ -276,23 +279,47 @@ export type RowRename = {
   fresh?: boolean
 }
 
-function NameInput({ rename }: { rename: RowRename }) {
+/** Open, the name reads as the name; a tap on it edits it, and leaving
+ *  the box (or Enter) puts it back (the user, Nov 4: "being able to edit the
+ *  name right away is a throw off"). Just added, it starts in the box. */
+function RowName({ rename, name }: { rename: RowRename; name: string }) {
+  const [editing, setEditing] = useState(!!rename.fresh)
+  // The box's padding hangs to the left, so the name sits where it did closed.
+  const pad = '-ml-2.5 rounded-md border px-2.5 py-1.5 text-[15px] font-semibold'
+  if (!editing)
+    return (
+      <button
+        type="button"
+        aria-label={`Rename ${name}`}
+        onClick={() => setEditing(true)}
+        className={`${pad} min-w-0 cursor-text truncate border-transparent text-left text-slate-900 hover:border-slate-200 hover:bg-slate-50`}
+      >
+        {rename.value || <span className="text-slate-400">{rename.placeholder}</span>}
+      </button>
+    )
   return (
     <input
       aria-label="Name"
       value={rename.value}
       placeholder={rename.placeholder}
-      autoFocus={rename.fresh}
+      autoFocus
       onFocus={(e) => rename.fresh && e.target.select()}
       onChange={(e) => rename.onChange(e.target.value)}
-      className="w-full min-w-0 rounded-md border border-slate-300 px-2.5 py-1.5 text-[15px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+      onBlur={() => setEditing(false)}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
+      // As wide as the name, so the rest of the row is there to tap closed.
+      size={Math.max(rename.value.length || (rename.placeholder?.length ?? 0), 6) + 2}
+      className={`${pad} min-w-0 max-w-full border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary`}
     />
   )
 }
 
 /** A row of a drag list, as drawn: the handle, a name with one line under
  *  it, and a chevron; it opens in place, under itself. Open, its name is
- *  edited in the row (`rename`), and a trash can takes it off (`onRemove`). */
+ *  edited in the row (`rename`), and a trash can takes it off (`onRemove`).
+ *  Open, the line goes, since what it summed up is showing under it, and a
+ *  tap anywhere in the row but its name and buttons closes it (the user,
+ *  Nov 4: "hard to close the thing once it's open"). */
 export function OrderRow({
   row,
   name,
@@ -324,18 +351,21 @@ export function OrderRow({
         {row.handle}
         {open && (rename || onRemove) ? (
           <>
-            <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 py-2 pl-1.5 pr-1">
+            {/* The chevron is the keyboard's way to close; this is the mouse's and a finger's. */}
+            <div
+              data-testid="open-row"
+              onClick={(e) => !(e.target as HTMLElement).closest('input, button, select, a') && onToggle()}
+              className="flex min-h-[52px] min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-2 pl-1.5 pr-1"
+            >
               {iconBox}
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                {rename ? <NameInput rename={rename} /> : <span className="text-[15px] font-semibold text-slate-900">{name}</span>}
-                {line && <span className="text-[13px] text-slate-600">{line}</span>}
-              </div>
+              {rename ? <RowName rename={rename} name={name} /> : <span className="text-[15px] font-semibold text-slate-900">{name}</span>}
+              {/* Beside the name it acts on, boxed like it (the user, Nov 4: the loose trash can was "very off"). */}
+              {onRemove && (
+                <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={trashButton}>
+                  {TRASH}
+                </button>
+              )}
             </div>
-            {onRemove && (
-              <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={iconButton}>
-                {TRASH}
-              </button>
-            )}
             <button type="button" aria-expanded aria-label={name} onClick={onToggle} className={`${iconButton} rotate-90`}>
               <Chevron />
             </button>
@@ -371,82 +401,24 @@ export function OrderRow({
 }
 
 /** A row inside an opened row (a heading's links, a dropdown's links): the
- *  handle, its name with a line under it, and an × to take it off. With
- *  `onToggle`, its name opens it too, under itself; open, its name is
- *  edited in the row (`rename`) and a chevron closes it. */
-export function InnerRow({
-  row,
-  name,
-  line,
-  onRemove,
-  open = false,
-  onToggle,
-  rename,
-  children,
-}: {
-  row: DragRow
-  name: string
-  line?: string
-  onRemove: () => void
-  open?: boolean
-  onToggle?: () => void
-  rename?: RowRename
-  children?: React.ReactNode
-}) {
-  const lineId = useId()
-  const nameClass = 'flex min-w-0 flex-1 select-none flex-col gap-0.5 py-2 text-left'
-  const text = (
-    <>
-      <span className="text-[15px] font-medium text-slate-900">{name}</span>
-      {line && (
-        <span id={lineId} aria-hidden className="text-[13px] text-slate-600">
-          {line}
-        </span>
-      )}
-    </>
-  )
+ *  handle, its name, a line under it when there's one, and an × to take it
+ *  off. It doesn't open (the drawing; the user, Nov 4: "why are links like
+ *  that"). */
+export function InnerRow({ row, name, line, onRemove }: { row: DragRow; name: string; line?: string; onRemove: () => void }) {
   return (
     <div className={`border-b border-slate-100 bg-white last:border-b-0 ${row.lifted ? 'border-transparent' : ''}`}>
       <div className="flex min-h-11 items-center gap-1 pl-1 pr-1">
         {row.handle}
-        {open && rename ? (
-          <div className="flex min-w-0 flex-1 flex-col gap-1 py-2">
-            <NameInput rename={rename} />
-            {line && <span className="text-[13px] text-slate-600">{line}</span>}
-          </div>
-        ) : onToggle ? (
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-describedby={line ? lineId : undefined}
-            onClick={onToggle}
-            {...row.rowProps}
-            className={`${nameClass} cursor-pointer`}
-          >
-            {text}
-          </button>
-        ) : (
-          <span {...row.rowProps} className={nameClass}>
-            {text}
-          </span>
-        )}
-        {open && rename && onToggle && (
-          <button type="button" aria-expanded aria-label={name} onClick={onToggle} className={`${iconButton} rotate-90`}>
-            <Chevron />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Take ${name} off`}
-          className={iconButton}
-        >
+        <span {...row.rowProps} className="flex min-w-0 flex-1 select-none flex-col gap-0.5 py-2 text-left">
+          <span className="text-[15px] font-medium text-slate-900">{name}</span>
+          {line && <span className="text-[13px] text-slate-600">{line}</span>}
+        </span>
+        <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={iconButton}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <path d="M4 4l8 8M12 4l-8 8" />
           </svg>
         </button>
       </div>
-      {open && children && <div className="flex flex-col gap-3 px-3 pb-3 sm:pl-10">{children}</div>}
     </div>
   )
 }
