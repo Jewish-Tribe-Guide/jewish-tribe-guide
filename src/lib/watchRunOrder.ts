@@ -1,5 +1,5 @@
 import { MENU_WATCH_CREATOR, type Watch } from './watches'
-import { isMekorList } from './mekorWatch'
+import { isKosherListWatch } from './kosherListWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { isEruvWebsiteWatch } from './eruvWebsite'
 import { isListingPageWatch } from './listingPageWatch'
@@ -26,7 +26,7 @@ export const WATCH_PRIORITY = ['kosher', 'hospital', 'eruv', 'times', 'website',
 export type WatchPriority = (typeof WATCH_PRIORITY)[number]
 
 export function watchPriority(w: Pick<Watch, 'kind' | 'url' | 'createdBy'>): WatchPriority {
-  if (w.kind === 'keystone_list' || isMekorList(w.url)) return 'kosher'
+  if (isKosherListWatch(w)) return 'kosher'
   if (refuahHospitalId(w.url)) return 'hospital'
   if (isEruvWebsiteWatch(w)) return 'eruv'
   if (isListingPageWatch(w) || isNewsletterWatch({ createdBy: w.createdBy, url: w.url })) return 'times'

@@ -75,6 +75,11 @@ describe('To do, a row per place', () => {
     show({ ...empty, notRead: [{ id: 'z', name: 'Zeke’s', line: 'Website didn’t load' }] })
     expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('All')
     expect(screen.getByRole('button', { name: /^Sort/ })).toHaveTextContent('Newest first')
+    // Where it starts isn't lit as a choice (the user, Nov 4: Newest first
+    // "highlights blue rather than having newest first be the natural
+    // starting view").
+    expect(screen.getByRole('button', { name: /^Sort/ })).not.toHaveClass('bg-blue-50')
+    expect(screen.getByRole('button', { name: /^Show/ })).not.toHaveClass('bg-blue-50')
     await user.click(screen.getByRole('button', { name: /^Show/ }))
     expect(screen.getByRole('menuitemcheckbox', { name: 'All (1)' })).toHaveAttribute('aria-checked', 'true')
     await user.click(screen.getByRole('menuitemcheckbox', { name: /Broken checks/ }))

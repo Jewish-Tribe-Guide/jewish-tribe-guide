@@ -2387,6 +2387,11 @@ Then "the small tweaks", each with a test that failed against the old code:
   - Live: merged in PR 375 and deployed; the watch was added on live Nov 4
     with the user's yes (kind `website`, `https://www.kclkashrus.org/`,
     "KCL's list"). Its first read is the next nightly run.
+  - Fixed Nov 4 (the user: "I don't see the KCL check in watches"): three
+    copies of "is this a kosher list" named only Keystone-K and Mekor, so
+    KCL's watch went under Other on Watches, ran with the plain websites
+    and was counted as one. Now one test (`kosherListWatch.ts`) for all
+    three; the Watches row reads "Keystone-K, Mekor Habracha and KCL".
   - Not done: Add's "Read now" lookup (`kosherLookup`) still only checks
     Keystone-K and Mekor.
 
@@ -2402,6 +2407,8 @@ Built Nov 4, from the user's picks:
 - **18/19:** Look again is one list, like To do and Places: a name search,
   a Kind menu with counts, and Still trying / Stopped trying. Each row
   names its kind while all kinds show. Watches is unchanged (4e65f1fd).
+- **To do's Sort starts on Newest first unlit:** Newest first is now the
+  menu's first choice, so the start isn't shown as narrowed (blue).
 - **25-28, reordering:** built as drawn (KdHT8Tci1ufXSXobnnSfEm v4). All
   four lists (Cards under the search, Groups on the Browse page, Top of
   the page, Tabs on a phone) are one kind of row (`DragList.tsx`): a

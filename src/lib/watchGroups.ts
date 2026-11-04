@@ -8,7 +8,7 @@
 import { MENU_WATCH_CREATOR, type Watch } from './watches'
 import { isIgnoredSender, isNewsletterWatch } from './newsletter'
 import { refuahHospitalId } from './refuahWatch'
-import { isMekorList } from './mekorWatch'
+import { isKosherListWatch } from './kosherListWatch'
 import { isListingPageWatch } from './listingPageWatch'
 import type { ListingReads, WatchPurpose } from './watchPurposes'
 
@@ -19,7 +19,7 @@ export type ReadsOf = (resourceId: string) => ListingReads
 
 export function watchGroupOf(w: Watch, readsOf: ReadsOf = () => null): WatchGroupKey {
   if (isNewsletterWatch(w) || isIgnoredSender(w)) return 'times'
-  if (w.kind === 'keystone_list' || isMekorList(w.url)) return 'kosher'
+  if (isKosherListWatch(w)) return 'kosher'
   if (refuahHospitalId(w.url)) return 'hospital'
   if (w.createdBy === MENU_WATCH_CREATOR) return 'menu'
   if (isListingPageWatch(w)) {

@@ -3,6 +3,7 @@ import { orderForRun, runSideBySide, sideBySideKeys, watchPriority, WATCHES_AT_O
 import { MENU_WATCH_CREATOR, type Watch } from './watches'
 import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import { MEKOR_LIST_URL } from './mekorWatch'
+import { KCL_HOME_URL } from './kclWatch'
 import { ERUV_WEBSITE_CREATOR } from './eruvWebsite'
 import { LISTING_PAGE_FOUND_CREATOR, LISTING_PAGE_WATCH_CREATOR } from './listingPageWatch'
 
@@ -14,6 +15,7 @@ const w = (id: string, over: Partial<W> = {}): W => ({ id, active: true, kind: '
 
 const KOSHER = w('kosher', { kind: 'keystone_list', url: KEYSTONE_LIST_URL })
 const MEKOR = w('mekor', { url: MEKOR_LIST_URL })
+const KCL = w('kcl', { url: KCL_HOME_URL })
 const HOSPITAL = w('hospital', { url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5' })
 const ERUV = w('eruv', { createdBy: ERUV_WEBSITE_CREATOR })
 const SHUL = w('shul', { createdBy: LISTING_PAGE_WATCH_CREATOR })
@@ -23,7 +25,7 @@ const MENU = w('menu', { createdBy: MENU_WATCH_CREATOR })
 
 describe('watchPriority', () => {
   it('sorts each kind of watch into its place', () => {
-    expect([KOSHER, MEKOR, HOSPITAL, ERUV, SHUL, MIKVAH, SITE, MENU].map(watchPriority)).toEqual(['kosher', 'kosher', 'hospital', 'eruv', 'times', 'times', 'website', 'menu'])
+    expect([KOSHER, MEKOR, KCL, HOSPITAL, ERUV, SHUL, MIKVAH, SITE, MENU].map(watchPriority)).toEqual(['kosher', 'kosher', 'kosher', 'hospital', 'eruv', 'times', 'times', 'website', 'menu'])
   })
 })
 

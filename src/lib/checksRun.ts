@@ -2,7 +2,7 @@ import type { CategoryConfig } from './categories'
 import type { DirectoryResource } from '@/types'
 import type { CheckKind } from './phoneHome'
 import { MENU_WATCH_CREATOR, type Watch } from './watches'
-import { isMekorList } from './mekorWatch'
+import { isKosherListWatch } from './kosherListWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { isEruvWebsiteWatch } from './eruvWebsite'
 import { isNewsletterWatch } from './newsletter'
@@ -28,7 +28,7 @@ type WatchFields = Pick<Watch, 'kind' | 'url' | 'resourceId' | 'createdBy'>
  *  plain website, a restaurant's own page for its hours). */
 export function watchCheckKind(watch: WatchFields, category: Pick<CategoryConfig, 'detailFields'> | undefined): CheckKind | null {
   const w = { ...watch, createdBy: watch.createdBy ?? null }
-  if (w.kind === 'keystone_list' || isMekorList(w.url)) return 'kosher'
+  if (isKosherListWatch(w)) return 'kosher'
   if (refuahHospitalId(w.url)) return 'hospitals'
   if (isEruvWebsiteWatch(w)) return 'eruv'
   if (w.createdBy === MENU_WATCH_CREATOR) return 'menus'

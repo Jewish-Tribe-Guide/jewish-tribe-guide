@@ -23,8 +23,8 @@ const FILTERS: { value: TodoFilter | 'all'; label: string }[] = [
   { value: 'feedback', label: 'Feedback' },
 ]
 const SORTS: { value: TodoSort; label: string }[] = [
-  { value: 'oldest', label: 'Oldest first' },
   { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
   { value: 'name', label: 'Name' },
 ]
 
