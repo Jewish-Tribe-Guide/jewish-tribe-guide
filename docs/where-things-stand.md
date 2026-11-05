@@ -385,9 +385,11 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   list of items, Text, Link), then the field's screen. When nothing
   matches, the list says so and offers "Make your own: <what was typed>".
 - Drawn Nov 5 (boards 14, 15), waiting on the user: a ready-made field
-  is one shared definition. Opened after adding, it says "Ready-made ·
-  The same on every community's site"; name, note and questions show as
-  answers, not inputs; "Remove this field" stays. Its choices are one of
+  is one shared definition. Opened after adding, it says "Ready-made"
+  beside its name, and nothing more (the user, Nov 5: no "same
+  everywhere" or "Philly's own" labels; the choices box shows which by
+  having + Add and × or not); name, note and questions show as answers,
+  not inputs; "Remove this field" stays. Its choices are one of
   two, decided per field by the ready-made definition, never split
   inside one field (the user, Nov 5: a split by choice felt wrong;
   hechshers are local, but Kosher Store's choices are what every admin
