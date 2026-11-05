@@ -230,7 +230,7 @@ describe('ModerationQueue — a new place', () => {
     const user = userEvent.setup()
     renderQueue([submission()])
     await user.click(await findRow('Acme Grocery'))
-    expect(screen.getAllByText('New place · Grocery Stores').length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('New place · Grocery Stores')).length).toBeGreaterThan(0)
     expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Acme Grocery')
     expect(screen.getByTestId('editor-row-contact:address')).toHaveTextContent('1 Main St')
     expect(screen.getByTestId('editor-row-contact:phone')).toHaveTextContent('555-1234')
@@ -316,7 +316,7 @@ describe('ModerationQueue — a new place', () => {
     const user = userEvent.setup()
     renderQueue([submission(), submission({ id: 'sub-2', payload: { category: 'grocery', name: 'Giant', address: '2 Main St', details: {} } })])
     await user.click(await findRow('Acme Grocery'))
-    expect(screen.getAllByText('1 of 2').length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('1 of 2')).length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'The next place' }))
     expect(screen.getAllByText('2 of 2').length).toBeGreaterThan(0)
     expect(window.location.search).toBe('?open=sub-2')
@@ -795,7 +795,9 @@ describe('ModerationQueue — a place opened', () => {
     const three = ['Acme Grocery', 'Giant', 'Zayde’s'].map((name, i) => submission({ id: `s${i}`, payload: { category: 'grocery', name, address: '2 Main St', details: {} } }))
     renderRouted({ submissions: three })
     await user.click(await findRow('Acme Grocery'))
-    expect(screen.getAllByText('1 of 3').length).toBeGreaterThan(0)
+    // Waited for: on a slow CI runner the place hadn't opened yet when this
+    // was read straight after the click (PR 377's run, Nov 5).
+    expect((await screen.findAllByText('1 of 3')).length).toBeGreaterThan(0)
     await user.keyboard('{ArrowDown}')
     expect(screen.getAllByText('2 of 3').length).toBeGreaterThan(0)
     await user.keyboard('{ArrowUp}')
