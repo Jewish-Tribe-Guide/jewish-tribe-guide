@@ -322,10 +322,10 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Up next: Site → Category pages, organised and cleaned up
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". **Fifth draw Nov 5,
+"organized better and just cleaned up in general". **Sixth draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 1b, 1c, 1d, 2d, 3d, 4b, 5e, 6e, 7 are current; 2c, 3c, 6d kept to
-compare). The user: design it as it should be, not as the settings are
+boards 1b, 1d, 1e, 2d, 3d, 4b, 5f, 5g, 5h, 6e, 7 are current; 1c, 2c, 3c,
+5e, 6d kept to compare). The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
 all 16 pages; Map is off only on the three with no address (WhatsApp,
 Networking, Cemetery); no page sets Groups. On the drawing:
@@ -334,15 +334,18 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   chevron; "+ New category page" beside the heading. Candle Lighting &
   Zmanim is back in the list as a row, like Eruv.
 - "+ New category page" opens **What kind of places?** as its own screen
-  (the user's idea, Nov 5; today it's a box inside the new page's
-  editor). **Ready-made**: Shuls, Food, Groceries, Mikvahs, Hotels,
-  Hospitals, each a row. **Make your own**: Start empty. Either one opens
-  the page's screen, filled from the kind or empty ("Don't make this
-  page" at the bottom until it's saved). Hospitals has no field template
-  today; its sections come with the kind.
+  (the user, Nov 5: ready-made is easier for admins and for us).
+  **Ready-made** is every listing page live today (Cemetery, Childcare,
+  Food, Grocery, Hospitals, Hotels, Mikvah, Networking, Schools,
+  Synagogues, WhatsApp Groups), each with its real fields as the line;
+  one the community already has says "Already a page". **Make your own**:
+  Start empty. Either opens the page's screen, filled or empty ("Don't
+  make this page" until it's saved). Today only six kinds have
+  templates, and live `place_kind` is unset on every page, so building
+  this means copying a page's fields, not a template file.
 - Three sections on every page, and on every field: **Basics** (a
   page's icon, name, banner; a field's name), the details (a page's
-  fields; a field's choices), and **Questions**, each a No / Yes. The
+  **Fields**, renamed from "Each place" Nov 5; a field's choices), and **Questions**, each a No / Yes. The
   user's idea, Nov 5.
 - A page's Questions: "Can visitors upvote places?" (the round thumbs-up
   with a count on each place; it also adds a "Most upvoted" sort and
@@ -360,11 +363,14 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   Today only Address and Phone are switches (`has_address`,
   `has_phone`); Hours, Website and Photo are ordinary fields (live: no
   Hours on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
-- "+ Add a field" works the same way: **Ready-made** first, each "+ Add",
-  one tap, nothing to fill in: the five above plus the kinds' common
-  choice fields (Kosher Certification, Denomination, with the templates'
-  choices). Below it, **Make your own**: Choices, Yes or no, A list of
-  items, Text, Link, each opening the field's screen.
+- "+ Add a field" works the same way, with three boxes. **Ready-made**:
+  Address, Phone, Hours, Website, Photo, Description, Email, whichever the
+  page lacks, each "+ Add", one tap, nothing to fill in. **From another
+  page**: one row per page, then that page's fields, each "+ Add" with
+  its choices (Kosher Certification brings "Everything here is kosher"
+  with it). **Make your own field**: one row, then "What kind of
+  field?" (Choices, Yes or no, A list of items, Text, Link), then the
+  field's screen.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Board 7 maps each kind to the questions it asks: required (not Yes or
