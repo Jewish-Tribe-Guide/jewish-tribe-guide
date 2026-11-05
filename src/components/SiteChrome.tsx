@@ -94,8 +94,9 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
   // mobileTabs field (or a stale cached one): the bar is on every mobile
   // screen, so an undefined here would be a crash on load rather than a
   // missing tab.
+  // A tab with nothing in it yet isn't on the bar.
   const visibleTabs = (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).filter((t) =>
-    t.target === 'map' ? hasMap : t.target === 'feedback' ? settings.feedbackEnabled : true,
+    !t.target ? false : t.target === 'map' ? hasMap : t.target === 'feedback' ? settings.feedbackEnabled : true,
   )
 
   return (

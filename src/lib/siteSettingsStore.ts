@@ -72,10 +72,11 @@ function toMobileTabs(raw: unknown): MobileTabConfig[] {
     if (!entry || typeof entry !== 'object') return []
     const { id, label, target } = entry as Record<string, unknown>
     if (typeof id !== 'string' || typeof label !== 'string' || typeof target !== 'string') return []
-    if (!id.trim() || !label.trim() || !target.trim()) return []
-    return [{ id, label, target }]
+    // A blank target is a tab with nothing in it yet: kept, not shown.
+    if (!id.trim() || !label.trim()) return []
+    return [{ id, label, target: target.trim() }]
   })
-  return tabs.length ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
+  return tabs.some((t) => t.target) ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
 }
 
 // Same shape as toMobileTabs above: jsonb comes back as whatever was

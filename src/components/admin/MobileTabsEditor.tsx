@@ -11,7 +11,7 @@ import { useCategoriesIfAny } from '@/lib/contentContext'
 import { kindKeyById } from '@/lib/placeKinds'
 import { builtInTabIcon } from '../MobileTabBar'
 import { useCardOptions } from './useCardOptions'
-import DragList, { AddMenu, OrderRow, RowActions } from './DragList'
+import DragList, { AddMenu, InnerRow, OrderRow, RowActions } from './DragList'
 
 // ── The mobile bottom tab bar editor ─────────────────────────────────────────
 // Phone-only. The bar is the mobile counterpart of the desktop featured-card
@@ -39,6 +39,15 @@ const OPENS: Record<string, string> = {
   map: 'the Map',
   feedback: 'the Feedback form',
   browse: 'the Browse page',
+  you: 'You',
+}
+
+/** What a tab opens, as one link inside it, named as the site calls it. */
+const PLACE_NAMES: Record<string, string> = {
+  categories: 'Home',
+  map: 'Map',
+  feedback: 'Feedback',
+  browse: 'Browse',
   you: 'You',
 }
 
@@ -85,8 +94,8 @@ export default function MobileTabsEditor({
   function add(target: string) {
     if (!target || tabs.length >= MAX_MOBILE_TABS) return
     // Seed the label from the destination's own name — almost always what's
-    // wanted, and still editable once the row is open. Where it goes isn't
-    // changed afterwards (the user, Nov 4): take it off and add another.
+    // wanted, and still editable once the row is open. Where it goes changes
+    // by taking its link out (×) and adding another.
     const id = newTabId()
     onChange([...tabs, { id, label: targetLabel(target), target }])
     setOpenId(id)
@@ -106,12 +115,13 @@ export default function MobileTabsEditor({
       <DragList items={tabs} keyOf={(t) => t.id} nameOf={(t) => t.label || targetLabel(t.target)} onReorder={onChange}>
         {(tab, row) => {
           const open = openId === tab.id
+          const empty = !tab.target
           const Icon = builtInTabIcon(tab.target, hasBrowse)
           return (
             <OrderRow
               row={row}
               name={tab.label || targetLabel(tab.target)}
-              line={`Opens ${OPENS[tab.target] ?? targetLabel(tab.target)}`}
+              line={empty ? 'Nothing in it yet' : `Opens ${OPENS[tab.target] ?? targetLabel(tab.target)}`}
               icon={
                 Icon ? (
                   <Icon className="h-[22px] w-[22px]" />
@@ -123,7 +133,19 @@ export default function MobileTabsEditor({
               onToggle={() => setOpenId(open ? null : tab.id)}
               rename={{ value: tab.label, placeholder: 'Shown under the icon', onChange: (label) => update(tab.id, { label }) }}
             >
-              <RowActions name={tab.label || targetLabel(tab.target)} onRemove={() => remove(tab.id)} />
+              {/* Opens to what's in it, as a tab at the top of the page on a
+                  computer does (the user, Nov 4): its one link, with an × to
+                  take it out and put another in. */}
+              {!empty && (
+                <DragList items={[tab]} keyOf={(t) => t.id} nameOf={(t) => t.label} onReorder={() => {}} className="rounded-lg border border-slate-200">
+                  {(t, inner) => (
+                    <InnerRow row={inner} name={PLACE_NAMES[t.target] ?? targetLabel(t.target)} onRemove={() => update(tab.id, { target: '' })} />
+                  )}
+                </DragList>
+              )}
+              <RowActions name={tab.label || targetLabel(tab.target)} onRemove={() => remove(tab.id)}>
+                {empty && <AddMenu label="+ Add a link" options={available} onPick={(target) => update(tab.id, { target })} />}
+              </RowActions>
             </OrderRow>
           )
         }}

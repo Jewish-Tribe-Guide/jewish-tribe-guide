@@ -149,6 +149,16 @@ describe('getSiteSettingsUncached', () => {
       expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
     })
 
+    it('keeps a tab with nothing in it yet (a blank target)', async () => {
+      const tabs = [
+        { id: 'home', label: 'Home', target: '/' },
+        { id: 'm', label: 'Map', target: '' },
+      ]
+      mockFrom.mockReturnValue(chainable({ data: { ...rawRow, mobile_tabs: tabs }, error: null }))
+      const settings = await getSiteSettingsUncached('philly')
+      expect(settings.mobileTabs).toEqual(tabs)
+    })
+
     it('falls back to the default trio when every entry is malformed (not a half-broken bar)', async () => {
       mockFrom.mockReturnValue(chainable({ data: { ...rawRow, mobile_tabs: [{}] }, error: null }))
       const settings = await getSiteSettingsUncached('philly')

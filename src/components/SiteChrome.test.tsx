@@ -83,6 +83,22 @@ describe('SiteChrome', () => {
     expect(within(mobileTabBar).getByText('Map')).toBeInTheDocument()
   })
 
+  it('leaves a tab with nothing in it yet off the bar', () => {
+    const mobileTabs = [
+      { id: 'a', label: 'Feedback', target: 'feedback' },
+      { id: 'b', label: 'Empty one', target: '' },
+    ]
+    renderWithProviders(
+      <SiteChrome year={2026}>
+        <p>Page content</p>
+      </SiteChrome>,
+      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, mobileTabs } } },
+    )
+    const mobileTabBar = screen.getByRole('navigation', { name: 'Primary' })
+    expect(within(mobileTabBar).getByText('Feedback')).toBeInTheDocument()
+    expect(within(mobileTabBar).queryByText('Empty one')).toBeNull()
+  })
+
   it('shows nothing from ContentFailureNotice when nothing failed', () => {
     renderWithProviders(
       <SiteChrome year={2026}>

@@ -2453,6 +2453,11 @@ Built Nov 4, from the user's picks:
     "Don't say how many people signed up"). That list was the admin's only
     way to see or remove one (`SubscriberManager` deleted with its tests
     and its e2e spec); `/api/admin/subscribers` stays, unused for now.
+  - A phone tab opens like a tab on a computer (the user: "Why would this
+    work differently than the You tab"): its link inside, a name and an ×.
+    The × empties it ("Nothing in it yet"), then "+ Add a link" sits by the
+    trash can. An empty phone tab saves and isn't on the bar; a bar where
+    no tab opens anything is refused.
   - Only checked in Chrome (computer and phone width). Not on a real phone.
 
 Still open:

@@ -72,4 +72,14 @@ describe('PATCH /api/admin/site-settings', () => {
     expect((await patch({ desktopNavItems: [item] })).status).toBe(400)
     expect(m.updateSiteSettings).not.toHaveBeenCalled()
   })
+  // A phone tab emptied by its × (Nov 4) saves, like an empty tab on a computer.
+  const phone = (target: string, id = target || 'blank') => ({ id, label: id, target })
+  it('saves a phone tab with nothing in it yet', async () => {
+    expect((await patch({ mobileTabs: [phone('map'), phone('')] })).status).toBe(200)
+  })
+
+  it('refuses a phone bar where no tab opens anything', async () => {
+    expect((await patch({ mobileTabs: [phone(''), phone('', 'b')] })).status).toBe(400)
+    expect(m.updateSiteSettings).not.toHaveBeenCalled()
+  })
 })

@@ -89,12 +89,18 @@ export async function PATCH(request: Request) {
         { status: 400 },
       )
     }
-    if (tabs.some((t) => !t?.id?.trim() || !t?.label?.trim() || !t?.target?.trim())) {
-      return Response.json({ ok: false, errors: ['Every mobile tab needs a label and a destination.'] }, { status: 400 })
+    // A tab with nothing in it yet (a blank target) saves, and isn't shown,
+    // like an empty tab at the top of the page on a computer.
+    if (tabs.some((t) => !t?.id?.trim() || !t?.label?.trim() || typeof t?.target !== 'string')) {
+      return Response.json({ ok: false, errors: ['Every mobile tab needs a label.'] }, { status: 400 })
+    }
+    const targets = tabs.map((t) => t.target.trim()).filter(Boolean)
+    if (targets.length === 0) {
+      return Response.json({ ok: false, errors: ['The mobile tab bar needs at least one tab that opens something.'] }, { status: 400 })
     }
     // Two tabs pointing at the same screen would both light up as active — the
     // bar would look broken rather than merely redundant.
-    if (new Set(tabs.map((t) => t.target)).size !== tabs.length) {
+    if (new Set(targets).size !== targets.length) {
       return Response.json({ ok: false, errors: ['Two mobile tabs cannot share a destination.'] }, { status: 400 })
     }
   }
