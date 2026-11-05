@@ -341,6 +341,15 @@ on real iPhones (e56fb820), and what held there was each row's own click
 handler checking a flag, not a document-wide swallow. jsdom can't show
 this, so check it on a real phone (the commit's Vercel preview).
 
+## Later: Settings shows a lone "Team" tab
+
+The user, Nov 5, "for later": Settings has Team as its only tab, so get rid
+of it. `AdminFrame.tsx` shows an area's tab row when it has more than one
+tab or its one tab is named differently from the area; Settings' one tab is
+"Team", so the row shows (Reports' is "Reports", so its row doesn't). A
+superadmin also gets Communities there, so the row should stay for them.
+The likely fix is hiding the row whenever an area has one tab.
+
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
