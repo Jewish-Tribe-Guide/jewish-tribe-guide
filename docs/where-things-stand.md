@@ -325,7 +325,7 @@ The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
 cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-16
-adding a field, 17-19 a listing's boxes; earlier drafts and the field map are off the canvas;
+adding a field, 17-19 a listing's boxes, 20 a place's card; earlier drafts and the field map are off the canvas;
 reviewed Nov 5 at the user's ask: the Denomination board shows the one
 list as one choice, Nusach is on Synagogues and in the ready-made list,
 the page's "Kind" tag is gone (a copied page brings its kind, one made
@@ -361,7 +361,22 @@ dishes, then Contact (Address, Phone, Hours, Website) and About
 times, Contact (Address, Phone, Website). A fixed box (Top, Contact,
 About) opens to its fields and "+ Add a field", with no handle, rename or
 trash. Neither page has saved listing parts live today, so these are the
-order the listing already shows. The user's rule, Nov 5: admins
+order the listing already shows.
+Board 20, Nov 5 (the user: a section for how the card looks before it's
+opened, built from the fields already added). "The card" sits between
+Fields and Questions, drawn on Food: First line (Photo, Name · where it
+is, recommends), Second line (Open or opens at and Distance, both
+automatic, then Food Type, Kosher Certification, Store Type, each with a
+handle and a trash can, "+ Show a field"), Third line, the first that
+applies (Not everything here is kosher, Not confirmed by anyone yet, both
+automatic, then Short Description). The preview's Page tab shows two
+cards. Boards 4 and 6 have the section with its lines closed, and their
+fields lost "In the list" (Filter stays). Today the card is set on each
+field (listingRow.ts): a choice shows only as a badge that's also a
+filter, Short Description by "in the header", order by field order;
+building this separates "on the card" from "a filter". A restaurant's
+dishes stay off the card (the user, Oct 10); a store's items line would
+be its own line when a page has one. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
