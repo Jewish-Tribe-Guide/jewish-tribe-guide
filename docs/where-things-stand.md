@@ -322,23 +322,34 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Up next: Site → Category pages, organised and cleaned up
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". **Drawn Nov 5, waiting
-on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
-boards 1-5). Agreed before drawing: no Computer / Phone switch (only the
-preview needs one); Map and Candle Lighting leave the list for their own
-rows on Site; the visitor switches stay (all five are read by the site),
-named by what a visitor sees. On the drawing:
+"organized better and just cleaned up in general". **Redrawn Nov 5,
+waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
+boards 1b-4b and 5-6 are current; 1-3 are the first try, kept to compare).
+Agreed: no Computer / Phone switch (only the preview needs one); the
+visitor switches stay (all five are read by the site), named by what a
+visitor sees ("Search bar", "Add a place", "Correct a place", "Ask to take
+a place off", "Recommend button"). On the drawing:
 
 - The list is rows: line glyph, name, places count, "Hidden" when off,
-  chevron. Delete moves inside the page.
-- A page's boxes run as the page reads: Top of the page (name, icon,
-  banner, Ask box), The list (question card, groups, Recommend button),
-  Each place (fields), An opened place (four rows with their value, the
-  long explanations gone), Map, Bottom of the list ("Not listed here?"),
-  What visitors can do (Add a place, Correct a place, Ask to take a place
-  off), Its link (web address, link preview words), Delete this page.
-- Kind is a tag by the name. Checked: no setting in the editor depends on
-  the kind today, so nothing hides by kind.
+  chevron; "+ New category page" under the rows. Candle Lighting & Zmanim
+  is back in the list as a row, like Eruv.
+- No Map switch: the Map is on the site when the header or a tab links to
+  it (Home page already sets those). Code change only; the old Map row can
+  be ignored. Site keeps its rows as today.
+- A page's boxes: Top of the page (name, icon, banner, Search bar), List
+  of places (groups, Recommend button, "Link under the list" row for
+  "Not listed here?"), Each place (fields), Map, What visitors can do,
+  Its link, Delete this page.
+- The question card is chosen by the site: the filter blank on the most
+  places, else "Been there lately?". No setting.
+- The four listing options (card first, places within a walk, boxes,
+  This Shabbos card) are set by the kind (Hotels, Hospitals use them
+  today), not shown to the community admin; superadmin can adjust.
+- Preview has Page · A listing · Adding. On a phone, Preview is the
+  full-width round button, as on Home page.
+- Add a field: pick what kind (rows, each with a real example), then the
+  field's screen: name, choices as rows (no "value | label" box), how it
+  shows, when someone adds a place, Remove. Preview beside on Adding.
 
 Still to fix when building: `/philly/admin/categories/restaurant` (no
 `cat:`) silently shows the list.
