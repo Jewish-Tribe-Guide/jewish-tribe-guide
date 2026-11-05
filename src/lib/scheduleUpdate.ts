@@ -238,7 +238,7 @@ function pairDay(
       continue
     }
     const [c] = cur.splice(i, 1)
-    out.push({ ...rowFrom(c.row, day, newId), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...timeOf(r, c.row) })
+    out.push({ ...rowFrom(c.row, day, newId), ...datedNotes(r), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...timeOf(r, c.row) })
   }
   left.sort((a, b) => sortKey(a, zm) - sortKey(b, zm))
   cur.sort((a, b) => sortKey(a.row, zm) - sortKey(b.row, zm))
@@ -249,7 +249,7 @@ function pairDay(
       day,
       tefillah: r.tefillah,
       ...pickTime(r),
-      ...(r.notes ? { notes: r.notes } : c?.row.notes ? { notes: c.row.notes } : {}),
+      ...(r.notes ? { notes: r.notes } : !r.date && c?.row.notes ? { notes: c.row.notes } : {}),
       status: c ? 'changed' : 'new',
       ...(c ? { was: c.row.time, rowId: c.row.id } : {}),
       quote: r.quote,
@@ -261,6 +261,12 @@ function pairDay(
   for (const c of cur) out.push({ ...rowFrom(c.row, day, newId), status: complete ? 'gone' : 'kept' })
   return out
 }
+
+/** A dated time's note is what its own date says, never the usual
+ *  minyan's it matched: a week and the usual times are two things (the
+ *  user, Nov 5). Kol Tzedek's calendar has Fri Nov 13 online only, on
+ *  Zoom, and came out with the usual Friday's "hybrid, tea and cookies". */
+const datedNotes = (r: ReadRegularTime): { notes?: string } => (r.date ? { notes: r.notes || undefined } : {})
 
 /** A matched time shows as the message gives it when that's a clock time
  *  for a date (6:12 PM this Friday), and as the shul's rule otherwise. */
@@ -570,6 +576,15 @@ export function readWeekLines(before: SpecialSchedule | undefined, after: Specia
     const left = on(before, d).filter((o) => !on(after, d).some((m) => same(o, m)))
     const right = on(after, d).filter((m) => !on(before, d).some((o) => same(o, m)))
     for (const m of right) {
+      // The same time with another note: the note is what changes, said
+      // so (the user, Nov 5), never "was" the same time.
+      const k = left.findIndex((o) => o.tefillah === m.tefillah && o.time === m.time)
+      if (k >= 0) {
+        const o = left.splice(k, 1)[0]
+        const at = `${m.tefillah.replace(/_/g, ' ')} · ${dateText(d, { weekday: true })} · ${m.time}`
+        lines.push(`${after.name}: ${at}, ${!o.notes ? `note added: “${m.notes}”` : !m.notes ? `note taken off: “${o.notes}”` : `note now “${m.notes}”, was “${o.notes}”`}`)
+        continue
+      }
       const i = left.findIndex((o) => o.tefillah === m.tefillah)
       if (i >= 0) lines.push(`${after.name}: ${text(m, d)}, was ${left.splice(i, 1)[0].time}`)
       else lines.push(`${after.name}: new, ${text(m, d)}`)

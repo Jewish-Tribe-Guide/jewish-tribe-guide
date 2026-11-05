@@ -216,11 +216,11 @@ describe('weekChanges', () => {
           // The whole week, each as it is or what changes (the user, Oct
           // 27: "the whole schedule with the new ones highlighted").
           rows: [
-            { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', status: 'same', was: null },
-            { what: 'Shacharis', day: 'Mon, Oct 26', when: '8:15 AM', status: 'changed', was: '8 AM' },
-            { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', status: 'same', was: null },
-            { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', status: 'new', was: null },
-            { what: 'Maariv', day: 'Tue, Oct 27', when: 'Taken off', status: 'gone', was: '9 PM' },
+            { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', note: null, status: 'same', was: null, says: null, struck: [] },
+            { what: 'Shacharis', day: 'Mon, Oct 26', when: '8:15 AM', note: null, status: 'changed', was: '8 AM', says: null, struck: [] },
+            { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', note: null, status: 'same', was: null, says: null, struck: [] },
+            { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', note: null, status: 'new', was: null, says: null, struck: [] },
+            { what: 'Maariv', day: 'Tue, Oct 27', when: 'Taken off', note: null, status: 'gone', was: '9 PM', says: null, struck: [] },
           ],
         },
       ],
@@ -234,9 +234,9 @@ describe('weekChanges', () => {
   it('a week it hasn’t got, or has with nothing in it: the whole week, all new', () => {
     const read = week('w', [minyan('1', 'shacharis', '2026-10-26', '6:45am'), minyan('2', 'shacharis', '2026-10-27', '7:00am'), minyan('3', 'mincha', '2026-10-27', '5:45pm')])
     const rows = [
-      { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', status: 'new', was: null },
-      { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', status: 'new', was: null },
-      { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', status: 'new', was: null },
+      { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', note: null, status: 'new', was: null, says: null, struck: [] },
+      { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', note: null, status: 'new', was: null, says: null, struck: [] },
+      { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', note: null, status: 'new', was: null, says: null, struck: [] },
     ]
     expect(weekChanges([], [read]).weeks).toEqual([{ title: 'This week’s schedule, Oct 25 – Oct 31', had: null, total: 3, same: 0, none: false, rows }])
     // The Shtiebel's, Oct 27: the listing had the week, empty.
@@ -254,6 +254,32 @@ describe('weekChanges', () => {
   it('a minyan whose sign-up or link changes is changed, saying so', () => {
     const had = week('w', [minyan('1', 'shacharis', '2026-10-26', '7:15am')])
     const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), signUp: { link: 'https://chat.whatsapp.com/MI' } }])
-    expect(weekChanges([had], [read]).weeks[0].rows).toEqual([{ what: 'Shacharis', day: 'Mon, Oct 26', when: '7:15 AM · Sign-up: chat.whatsapp.com/MI', status: 'changed', was: '7:15 AM' }])
+    expect(weekChanges([had], [read]).weeks[0].rows).toEqual([{ what: 'Shacharis', day: 'Mon, Oct 26', when: '7:15 AM', note: 'Sign-up: chat.whatsapp.com/MI', status: 'changed', was: null, says: 'Sign-up added', struck: [] }])
+  })
+
+  // The user, Nov 5: "Either just mark the note as new and we don't need
+  // to show the same time as old" — one line, clear that it's the note.
+  it('a minyan whose note alone changes says so, and never shows its same time as old', () => {
+    const had = week('w', [minyan('1', 'kabbalas_shabbos', '2026-10-30', '6:00pm'), { ...minyan('2', 'shacharis', '2026-10-31', '9:00am'), notes: 'In the sanctuary' }, { ...minyan('3', 'mincha', '2026-10-31', '1:00pm'), notes: 'After kiddush' }])
+    const read = week('w', [
+      // Paired by its time, not by order: the 5:30 PM one is new.
+      minyan('9', 'kabbalas_shabbos', '2026-10-30', '5:30pm'),
+      { ...minyan('1', 'kabbalas_shabbos', '2026-10-30', '6:00pm'), notes: 'Online only, on Zoom' },
+      { ...minyan('2', 'shacharis', '2026-10-31', '9:00am'), notes: 'In the chapel' },
+      minyan('3', 'mincha', '2026-10-31', '1:00pm'),
+    ])
+    const rows = weekChanges([had], [read]).weeks[0].rows
+    expect(rows.map(({ when, note, status, was, says, struck }) => ({ when, note, status, was, says, struck }))).toEqual([
+      { when: '5:30 PM', note: null, status: 'new', was: null, says: null, struck: [] },
+      { when: '6 PM', note: 'Online only, on Zoom', status: 'changed', was: null, says: 'Note added', struck: [] },
+      { when: '9 AM', note: 'In the chapel', status: 'changed', was: null, says: 'Note changed', struck: ['In the sanctuary'] },
+      { when: '1 PM', note: null, status: 'changed', was: null, says: 'Note taken off', struck: ['After kiddush'] },
+    ])
+  })
+
+  it('a minyan whose time changes shows the old time, and its note only when that changes too', () => {
+    const had = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:00am'), notes: 'Upstairs' }])
+    const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), notes: 'Upstairs' }])
+    expect(weekChanges([had], [read]).weeks[0].rows).toMatchObject([{ when: '7:15 AM', note: 'Upstairs', was: '7 AM', says: null, struck: [] }])
   })
 })

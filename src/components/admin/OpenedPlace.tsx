@@ -146,7 +146,7 @@ export function WaitingBox({ box }: { box: WaitBox }) {
                   (r.sub || r.struck || r.flag) && (
                     <>
                       {r.sub}
-                      {r.flag && <span className="text-amber-800"> · {r.flag}</span>}
+                      {r.flag && <span className="text-amber-800">{r.sub ? ' · ' : ''}{r.flag}</span>}
                       {r.struck?.map((w) => (
                         <s key={w} className="ml-1.5">
                           {w}
