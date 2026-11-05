@@ -346,12 +346,24 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   on the map when its places have an address), Groups, web address (set
   from the name when the page is made), link-preview words.
 - Each place: Address (puts the page on the map), Phone, Hours, Website,
-  Photo first, each with its own switch, so an admin can turn any off;
-  then the page's own fields, each saying where it shows: "Filter · in
-  the list", "In the list", "When a place is opened". Today only Address
-  and Phone are real switches (`has_address`, `has_phone`); Hours,
-  Website and Photo are ordinary fields most pages have (live: no Hours
-  on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
+  Photo first, as plain rows you open and remove (no switches, the user
+  Nov 5); a removed one comes back through "+ Add a field". Then the
+  page's own fields, each saying where it shows: "Filter · in the list",
+  "In the list", "When a place is opened". Today only Address and Phone
+  are switches (`has_address`, `has_phone`); Hours, Website and Photo are
+  ordinary fields (live: no Hours on Synagogues, Hotels, Cemetery; no
+  Website on WhatsApp).
+- Board 7 maps each kind to the questions it asks: required (not Yes or
+  no, not Photo), part of the filter (Choices, Yes or no, Hours as "Open
+  now"), show before opened (Choices, Yes or no, a list's count, Text's
+  line, Link's button; Hours, Address, Photo always show), both X and Y
+  and the "Other" row (Choices only), note under it (all but Photo),
+  button words (Link). A field's screen shows only its kind's questions.
+- Notes under a field, live: Store Type ("Pick Scheduled Deliveries
+  if ..."), Delivery Details (an example), Grocery's Kosher Store and
+  Kosher items available. Grey words inside the box instead: WhatsApp
+  Description, "What isn't kosher?", Hotel Notes. One "Note under it"
+  replaces both.
 - A field's Questions, in the user's words (Nov 5): "Is it a required
   field?", "Should it be part of the filter?", "Show it before a place is
   opened?", and for choices "Can a place be both Meat and Dairy?" (built
