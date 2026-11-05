@@ -254,6 +254,18 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(screen.getByTitle('Preview').parentElement!.style.width).toBe('390px')
   })
 
+  // The user, Nov 5: on an iPhone the page kept jumping back to the top.
+  // Hidden on a phone, the preview still loaded the whole home page.
+  it('on a phone, loads no preview beside the settings', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q, addEventListener() {}, removeEventListener() {} }))
+    const user = userEvent.setup()
+    await renderEditor()
+    await show(user, 'Phone')
+    await new Promise((r) => setTimeout(r, 900))
+    expect(screen.queryByTitle('Preview')).toBeNull()
+    expect(writePreviewDraft).not.toHaveBeenCalled()
+  })
+
   // Narrower than the preview beside needs (a phone), a Preview button
   // opens the page full size, with what hasn't been saved (board 21c).
   it('Preview opens the home page full size, with what hasn’t been saved', async () => {

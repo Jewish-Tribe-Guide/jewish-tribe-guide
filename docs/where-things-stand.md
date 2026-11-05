@@ -2332,9 +2332,12 @@ Oct 30" runs to Oct 31 and ends on its own.
   its note does too. Kol Tzedek's Nov 13 and 14 had lost both.
 - **Five live shul suggestions to file again** once this is live (Leyv
   Ha-Ir, South Philadelphia Shtiebel, BZBI, Kol Tzedek, Rodeph Shalom). Re-run the dry run first; writing needs the user's yes.
-- **Open: admin Home on a phone, with Phone picked, scrolls back to the
-  top** while you scroll down (the user, Nov 5). Not found yet: nothing in
-  the Home editor scrolls the page; reproducing it needs a signed-in admin.
+- **Admin Home on an iPhone jumped back to the top** while scrolling fast,
+  with Phone picked (the user, Nov 5, live and preview). Not reproduced:
+  Chrome at phone size scrolls to the bottom and stays. Fixed the likeliest
+  cause: the preview beside the settings, hidden on a phone, still loaded the
+  whole home page and loaded it again after each edit. It now loads only on a
+  screen wide enough to show it. Try it on the commit's preview on the iPhone.
 - **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
   only closes it. The click is swallowed until it comes, up to 0.6s after
   the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the

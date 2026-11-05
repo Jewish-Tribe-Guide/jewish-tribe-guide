@@ -18,6 +18,7 @@ import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import SaveBar, { useLeaveGuard } from './SaveBar'
 import { AdminBox, AdminField, AdminPreviewButton, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
+import { useIsDesktop } from '@/lib/useIsMobile'
 import ImageUploadField from '@/components/ImageUploadField'
 import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/lib/siteSettings'
 
@@ -87,6 +88,10 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  // The preview beside shows from lg up; narrower, it isn't loaded at all.
+  // Hidden, it still loaded the whole home page, and again after each edit
+  // (the user, Nov 5: on an iPhone the page kept jumping back to the top).
+  const roomy = useIsDesktop('(max-width: 1023px)')
   // The full-size preview has its own history entry, as Category pages' and
   // Forms' do, so browser Back closes it rather than leaving the page, and
   // Forward opens it again (the user, Nov 4). Forward shows what's typed
@@ -384,7 +389,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} />
+          {roomy && <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} />}
         </aside>
       </div>
 
