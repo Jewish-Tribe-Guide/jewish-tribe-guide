@@ -325,7 +325,7 @@ The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
 cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-16
-adding a field, 17-19 a listing's boxes, 20 a place before it's opened; earlier drafts and the field map are off the canvas;
+adding a field, 17-19 a listing's boxes, 20-23 a place before it's opened; earlier drafts and the field map are off the canvas;
 reviewed Nov 5 at the user's ask: the Denomination board shows the one
 list as one choice, Nusach is on Synagogues and in the ready-made list,
 the page's "Kind" tag is gone (a copied page brings its kind, one made
@@ -387,7 +387,16 @@ places?" and "Upvotes". The visitors' button says Upvote too (the user
 changed their mind, Nov 5): its label and hover were "Recommend Goldie,
 12 recommend it" / "Recommend", now "Upvote Goldie, 12 upvotes" /
 "Upvote this place", like the inline button (UpvoteButton.tsx). On
-screen it was only ever a thumb and a count. The user's rule, Nov 5: admins
+screen it was only ever a thumb and a count. Boards 20-23, Nov 5 (the
+user: what happens when you click First line, Second line): each line
+opened on its own board with its part of the sample card lit; Third
+line's "+ Show a field" picks from the page's fields (board 23). Same
+day, four boards brought in line: Make your own page (3) starts with Top
+and Contact, "Nothing in it yet", and Before it's opened (First line
+Name, Third line Not confirmed by anyone yet); Food's listing preview (5)
+follows the boxes' order; the field screens (13-15) lost "Show it before
+a place is opened?" and gained a Box list (Top ticked), and board 18's
+list has Top and Contact too. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
