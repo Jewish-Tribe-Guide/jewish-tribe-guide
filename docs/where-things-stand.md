@@ -345,10 +345,13 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   (the "+ Add" box is site-wide; always on), the Map switch (a page is
   on the map when its places have an address), Groups, web address (set
   from the name when the page is made), link-preview words.
-- Each place: the built-in fields as rows (Address, puts the page on the
-  map; Phone; the rest), then the page's own fields, each saying where
-  it shows: "Filter · in the list", "In the list", "When a place is
-  opened".
+- Each place: Address (puts the page on the map), Phone, Hours, Website,
+  Photo first, each with its own switch, so an admin can turn any off;
+  then the page's own fields, each saying where it shows: "Filter · in
+  the list", "In the list", "When a place is opened". Today only Address
+  and Phone are real switches (`has_address`, `has_phone`); Hours,
+  Website and Photo are ordinary fields most pages have (live: no Hours
+  on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
 - A field's Questions, in the user's words (Nov 5): "Is it a required
   field?", "Should it be part of the filter?", "Show it before a place is
   opened?", and for choices "Can a place be both Meat and Dairy?" (built
