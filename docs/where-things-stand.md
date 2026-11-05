@@ -323,9 +323,9 @@ for that exact change, in the same conversation. Show the dry run first.
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
-waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 1b, 1d, 1f, 2d, 3d, 4b, 5l, 5m, 5j, 5k, 5n, 5h, 6e, 7 are
-current; 1c, 1e, 2c, 3c, 5e, 5f, 5g, 5i, 6d kept to compare). The user's rule, Nov 5: admins
+waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
+cleared Nov 5 to the 13 screens going ahead: 1-6 a category page, 7-13
+adding a field; earlier drafts and the field map are off the canvas). The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
@@ -368,7 +368,7 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   ("All pages", or one page: Hospitals shows only the fields Hospitals
   has), then one scrolling list of every field live on any page, once
   each, alphabetical, each with the pages it's on and its choices or
-  kind. Each row opens the field first (board 5n): the pages it's on, and
+  kind. Each row opens the field first (board 11): the pages it's on, and
   how it looks in the list, in the filter and on Add a place, then one
   button, "Add to <page>". No "+ Add" on the rows. Kosher Certification
   brings "Everything here is kosher" with it. "+ Make your own field"
@@ -381,7 +381,8 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   a community could only add its own choices to it.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
-- Board 7 maps each kind to the questions it asks: required (not Yes or
+- Each kind of field asks only its own questions (was a map board,
+  now just this list): required (not Yes or
   no, not Photo), part of the filter (Choices, Yes or no, Hours as "Open
   now"), show before opened (Choices, Yes or no, a list's count, Text's
   line, Link's button; Hours, Address, Photo always show), both X and Y
