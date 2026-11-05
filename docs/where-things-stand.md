@@ -2515,9 +2515,9 @@ Still open:
     first version wrote Suggest a Listing's `card_ids` as `'{}'` (jsonb's
     empty object), which broke every page build; the file now writes `'[]'`
     and a rerun repairs it, and the store reads a non-array as no cards.
-  - Prod needs 093 (this corrected file) before this deploys: without it a
-    save of any home row fails and the home loses Suggest a Listing. Prod
-    only with a yes.
+  - 093 (the corrected file) is on prod too: checked Nov 4, `shares_row`
+    is there and Suggest a Listing's `card_ids` is `[]`. Nothing to run
+    before this deploys.
   - Taking a card out of a box and letting it go anywhere between two boxes
     gives it a row of its own (the user found that spot hard to hit): the
     drop lines are measured from where the rows sat when the drag began,
