@@ -322,10 +322,26 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Up next: Site → Category pages, organised and cleaned up
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". Not started. Start by
-looking at the screen as it stands (and what Home page settled: one screen,
-Computer / Phone, boxes in the order the page reads, the preview beside),
-then draw it before building.
+"organized better and just cleaned up in general". **Drawn Nov 5, waiting
+on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
+boards 1-5). Agreed before drawing: no Computer / Phone switch (only the
+preview needs one); Map and Candle Lighting leave the list for their own
+rows on Site; the visitor switches stay (all five are read by the site),
+named by what a visitor sees. On the drawing:
+
+- The list is rows: line glyph, name, places count, "Hidden" when off,
+  chevron. Delete moves inside the page.
+- A page's boxes run as the page reads: Top of the page (name, icon,
+  banner, Ask box), The list (question card, groups, Recommend button),
+  Each place (fields), An opened place (four rows with their value, the
+  long explanations gone), Map, Bottom of the list ("Not listed here?"),
+  What visitors can do (Add a place, Correct a place, Ask to take a place
+  off), Its link (web address, link preview words), Delete this page.
+- Kind is a tag by the name. Checked: no setting in the editor depends on
+  the kind today, so nothing hides by kind.
+
+Still to fix when building: `/philly/admin/categories/restaurant` (no
+`cat:`) silently shows the list.
 
 ## Small open decisions
 
