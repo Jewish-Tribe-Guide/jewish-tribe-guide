@@ -309,7 +309,7 @@ Then "times", one entry per prayer time:
 - For "week": every time has "date", from the days above.
 - Dates are calendar days, midnight to midnight, not Jewish days that start at nightfall. Friday night's Mincha, Maariv or Kabbalas Shabbos is on the Friday.
 - "time" exactly as written, with am/pm when you can tell it ("9:00am", "5:59pm", "30 min before shkiah", "at candle lighting"). Never work a time out or move it.
-- "notes": anything the message says about that one minyan ("following Kiddush"), else leave it out.
+- "notes": anything the message says about that one minyan ("following Kiddush"), else leave it out. When its own line or name says how it's held, say that too: "Online-Only Friday Night Services" gives "Online only", "Hybrid Shabbat Morning Services" gives "Hybrid".
 - "season": "summer" or "winter" for a time held in one season only (a "Summer" or "Winter" label beside it, "during daylight saving time"), else leave it out. A minyan with a summer time and a winter time is two entries, one for each season, each with its own time exactly as written.
 - "signUp": true when the message says this minyan is held only if enough people come or sign up ("held when there is sufficient interest", "if we have a minyan", "please confirm you're coming"). A footnote marked with * applies to the times it marks, and only those. Otherwise leave it out.
 - "signUpLink": when the message gives a link to the group or form this minyan's people sign up or check in on (a WhatsApp group, a GroupMe, a sign-up form), that link exactly as written, the whole address. One link the message gives for its sign-up minyanim in general goes on each of them. Else leave it out.
@@ -371,6 +371,32 @@ export function clipNote(note: string, max: number): string {
 }
 const noteOf = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? clipNote(v, max) : null)
 
+// How a dated service is held, when its own line says: Kol Tzedek's
+// calendar, Nov 5, gave "Online-Only Friday Night Kabbalat Shabbat
+// Services" and "Hybrid Shabbat Morning Services", and the AI took those
+// words for the services' names, so the week said neither. Each: what the
+// line says, what a note that already says it has, and the note.
+const HELD_AS: [RegExp, RegExp, string][] = [
+  [/\b(?:online|virtual|zoom)[\s-]*only\b/i, /\b(?:online|virtual|zoom)\b/i, 'Online only'],
+  [/\bhybrid\b/i, /\bhybrid\b/i, 'Hybrid'],
+  [/\bin[\s-]*person[\s-]*only\b/i, /\bin[\s-]*person\b/i, 'In person only'],
+]
+
+/** A time's note with how its line says it's held, ahead of the rest:
+ *  "Online only; until 8:00 PM". */
+export function heldAsNote(line: string | null, notes: string | null): string | null {
+  if (!line) return notes
+  const add = HELD_AS.filter(([says, has]) => says.test(line) && !has.test(notes ?? '')).map(([, , as]) => as)
+  return add.length ? [...add, notes].filter(Boolean).join('; ') : notes
+}
+
+/** The message's line a time was read from, when it's one service's line
+ *  (a calendar's): a paragraph about several says nothing of one. */
+function lineOf(written: string | null, quote: string): string | null {
+  const q = ` ${plain(quote)} `
+  return written?.split('\n').find((l) => l.length <= 200 && ` ${plain(l)} `.includes(q)) ?? null
+}
+
 /**
  * What the AI said about a shul's regular times, kept to what holds up: a
  * known tefillah, real weekdays or a date among the days ahead, a time,
@@ -405,7 +431,10 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     // ("Winter only", seasonFromNotes), unless the note already says.
     const said = noteOf(x.notes, 120)
     const season = x.season === 'summer' || x.season === 'winter' ? x.season : null
-    const notes = season && !/\b(?:summer|winter)\s+only\b/i.test(said ?? '') ? `${season === 'summer' ? 'Summer' : 'Winter'} only${said ? `- ${said}` : ''}` : said
+    const seasoned = season && !/\b(?:summer|winter)\s+only\b/i.test(said ?? '') ? `${season === 'summer' ? 'Summer' : 'Winter'} only${said ? `- ${said}` : ''}` : said
+    // A dated service held online only, or hybrid, says so when its own
+    // line does (heldAsNote).
+    const notes = date ? heldAsNote(lineOf(written, quote), seasoned) : seasoned
     // What a website says that isn't its weekly davening, read as if it
     // were, whatever the AI was told (the Oct 21 dry run: a monthly young
     // families service, the OU's daily Tehillim call, a Tuesday class).

@@ -710,24 +710,17 @@ export function applyUpdate(
       day: r.day as DayKey,
     })
   }
-  /** A dated row as a schedule's minyan, sign-up with its group. One that
-   *  is a usual minyan that day, at its time or a new one, is sign-up or
-   *  online as that one is: a week's page gives the time, not the group
-   *  (Mikveh Israel's calendar, Oct 27). */
+  /** A dated row as a schedule's minyan: its own group and join link,
+   *  when the message gives them, and never the usual minyan's (the user,
+   *  Nov 5: "no borrowing"). One it says is sign-up with no group is
+   *  still sign-up, for an admin to give the group. */
   const onDate = (r: UpdateRow) => {
-    const weekday = weekdayOf(r.day)
-    const usual = r.rowId ? current.find((m) => m.id === r.rowId && m.tefillah === r.tefillah && m.days.includes(weekday)) : undefined
-    const signUp = signUpOf(r, weekday, usual)
-    const joinLink = r.joinLink ?? usual?.joinLink?.trim()
-    // What came from the usual minyan, not the message: said so.
-    const borrowed = [
-      ...(signUp && !r.signUpLink && (!r.signUp || Object.values(signUp).some(Boolean)) ? ['signUp' as const] : []),
-      ...(joinLink && !r.joinLink ? ['joinLink' as const] : []),
-    ]
+    const signUp = r.signUpLink ? { link: r.signUpLink } : r.signUp ? {} : undefined
+    const joinLink = r.joinLink
     // A date isn't a season: Mekor's Friday 4:35pm in November paired with
     // its usual Friday time, and came out "Summer only".
     const notes = r.notes?.replace(SEASON_NOTE, '').trim()
-    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(notes ? { notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}), ...(borrowed.length ? { borrowed } : {}) }
+    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(notes ? { notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
   }
 
   const weekly = (r: UpdateRow) => (DAY_KEYS as readonly string[]).includes(r.day)

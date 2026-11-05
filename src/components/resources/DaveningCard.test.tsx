@@ -369,9 +369,10 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
   })
 
-  // Oct 19: every usual weekday minyan at Mekor is in its WhatsApp group;
-  // the week's box gave the same minyanim without it.
-  it('the week’s minyanim keep the usual ones’ sign-up group', () => {
+  // Oct 19: every usual weekday minyan at Mekor is in its WhatsApp group,
+  // and the week's box took it. The user, Nov 5: "no borrowing". A week's
+  // minyan is sign-up only when the week says so.
+  it('the week’s minyanim take no sign-up group from the usual ones', () => {
     const group = { link: 'https://chat.whatsapp.com/Mekor' }
     const signUpUsual = [
       ...usual.filter((u) => u.days.includes('sat') || u.days.includes('fri')),
@@ -390,8 +391,8 @@ describe('this week’s schedule (Oct 6)', () => {
     const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: signUpUsual, minyanim_schedules: [weekdays] })
     renderWithProviders(<DaveningCard item={shul} minyanim={signUpUsual} schedules={[weekdays]} category={shuls} />, { content: { categories: [shuls] } })
     const box = screen.getByTestId('davening-this-week')
-    expect(within(box).getByTestId('sign-up-box')).toHaveTextContent(/^All this week’s times: check the group first/)
-    expect(within(box).getByRole('link', { name: 'Say you’re coming' })).toHaveAttribute('href', group.link)
+    expect(within(box).queryByTestId('sign-up-box')).not.toBeInTheDocument()
+    expect(within(box).queryByRole('link', { name: 'Say you’re coming' })).not.toBeInTheDocument()
     expect(within(box).queryByTestId('sign-up-time')).not.toBeInTheDocument()
   })
 
@@ -911,11 +912,11 @@ describe('a minyan people can join from home (Oct 22)', () => {
     expect(links[0].closest('.grid')).toHaveTextContent('Shacharis8:10 AMJoin on Zoom')
   })
 
-  it('a week that gives the time alone keeps its usual minyan’s link; not a different time that day', () => {
+  // It used to take the usual minyan's link; the user, Nov 5: "no borrowing".
+  it('a week that gives the time alone has no join link, even at the usual minyan’s time', () => {
     show([usual[0], { ...usual[1], joinLink: ZOOM }], [week([{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am' }, { id: 'w3', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:00am' }])])
     const box = screen.getByTestId('davening-this-week')
-    expect(within(box).getAllByRole('link', { name: 'Join on Zoom' })).toHaveLength(1)
-    expect(within(box).getByRole('link', { name: 'Join on Zoom' }).closest('.grid')).toHaveTextContent('8:10 AM')
+    expect(within(box).queryByRole('link', { name: 'Join on Zoom' })).not.toBeInTheDocument()
   })
 
   it('in the usual weekday table: under it, naming the minyan; and on a Shabbos line', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, usualJoinLink, resolveDay, sendsWeekly, shabbosIsOver, signUpGroup, thisWeeksDays, weekByDates, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, resolveDay, sendsWeekly, shabbosIsOver, signUpGroup, thisWeeksDays, weekByDates, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -110,8 +110,9 @@ describe('what a shul has on a date', () => {
 
   // Oct 19: Mekor's week, Sunday to Thursday, approved as "Shabbat
   // Schedule". The Minyanim list called Monday's Maariv "Shabbat Schedule
-  // times", and left off the WhatsApp group every usual weekday one has.
-  it('a week the shul sent out: “this week’s”, its minyanim under the usual ones’ sign-up', () => {
+  // times". It then took the WhatsApp group every usual weekday one has;
+  // the user, Nov 5: "no borrowing".
+  it('a week the shul sent out: “this week’s”, its minyanim with no usual one’s sign-up', () => {
     const group = { link: 'https://chat.whatsapp.com/Mekor' }
     const usual: Minyan[] = [
       { ...m('u1', 'mincha_maariv', ['sun', 'mon', 'tue', 'wed', 'thu'], '15 min before Sunset'), season: 'summer', signUp: group },
@@ -134,8 +135,8 @@ describe('what a shul has on a date', () => {
     const day = resolveDay(usual, [week], mon)
     expect(day.posting).toEqual({ kind: 'schedule', name: 'Shabbat Schedule', thisWeek: true })
     expect(day.rows.map((r) => [r.id, r.signUp?.link ?? null])).toEqual([
-      ['w1', group.link],
-      ['w2', group.link],
+      ['w1', null],
+      ['w2', null],
       ['w3', null],
     ])
     // Just a Shabbos is this week's too, though its card keeps the name
@@ -470,21 +471,11 @@ describe('editing this week’s schedule', () => {
   })
 })
 
-// Oct 22: a week a calendar or newsletter gives may have the time alone,
-// and the usual minyan its Zoom link.
-describe('usualJoinLink', () => {
+// Oct 22: a week a calendar or newsletter gives may have the time alone.
+// It used to take the usual minyan's Zoom link; the user, Nov 5: "no
+// borrowing".
+describe('a week’s join link', () => {
   const ZOOM = 'https://upenn.zoom.us/j/97084263584'
-  const usual: Minyan[] = [{ id: 't', tefillah: 'shacharis', days: ['thu'], time: '8:10 AM', joinLink: ZOOM }]
-  it('its own, else the usual minyan’s that weekday at that time', () => {
-    expect(usualJoinLink(usual, { tefillah: 'shacharis', time: '8:10am', joinLink: 'https://zoom.us/j/1' }, ['thu'])).toBe('https://zoom.us/j/1')
-    expect(usualJoinLink(usual, { tefillah: 'shacharis', time: '8:10am' }, ['thu'])).toBe(ZOOM)
-  })
-  it('not another time, day or tefillah, which may be in the room only', () => {
-    expect(usualJoinLink(usual, { tefillah: 'shacharis', time: '7:00am' }, ['thu'])).toBeUndefined()
-    expect(usualJoinLink(usual, { tefillah: 'shacharis', time: '8:10am' }, ['mon'])).toBeUndefined()
-    expect(usualJoinLink(usual, { tefillah: 'mincha', time: '8:10am' }, ['thu'])).toBeUndefined()
-    expect(usualJoinLink(usual, { tefillah: 'shacharis', time: 'At sunset' }, ['thu'])).toBeUndefined()
-  })
   it('a schedule’s summary says it, for the moderator', () => {
     const week: SpecialSchedule = { id: 'w', name: 'Times for Oct 18 – Oct 24', from: '2026-10-22', to: '2026-10-24', mode: 'replace', minyanim: [{ id: 'a', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am', joinLink: ZOOM }] }
     expect(formatSchedulesSummary([week])).toContain('Shacharis · Thu Oct 22 · 8:10am · Online: upenn.zoom.us/j/97084263584')

@@ -169,6 +169,36 @@ describe('reading a shul’s regular times', () => {
     expect(system.content).toContain('"joinLink"')
   })
 
+  // Kol Tzedek's calendar, Nov 5: the AI took "Online-Only" and "Hybrid"
+  // for the services' names, and the week said neither.
+  it('keeps how a dated service is held when its own line says so', () => {
+    const text = 'Events\n2026-10-09 (Fri) 6:30 PM–8:00 PM: Online-Only Friday Night Kabbalat Shabbat Services\n2026-10-10 (Sat) 10:00 AM–12:30 PM: Hybrid Shabbat Morning Services\n2026-10-11 (Sun) 9:00 AM Shacharit'
+    const r = tidyRegularReading(
+      {
+        kind: 'week',
+        from: '2026-10-09',
+        to: '2026-10-11',
+        times: [
+          { tefillah: 'kabbalas_shabbos', date: '2026-10-09', time: '6:30pm', quote: '2026-10-09 (Fri) 6:30 PM', notes: 'until 8:00 PM' },
+          { tefillah: 'shacharis', date: '2026-10-10', time: '10:00am', quote: '2026-10-10 (Sat) 10:00 AM', notes: 'Hybrid' },
+          { tefillah: 'shacharis', date: '2026-10-11', time: '9:00am', quote: '2026-10-11 (Sun) 9:00 AM' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => t.notes ?? null)).toEqual(['Online only; until 8:00 PM', 'Hybrid', null])
+    const [system] = regularMessages({ text }, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toContain('"Online-Only Friday Night Services" gives "Online only"')
+  })
+
+  it('leaves a usual time’s note as the AI read it', () => {
+    const text = 'Our Shabbat morning services are hybrid. Shabbat Shacharit 10:00 AM'
+    const r = tidyRegularReading({ kind: 'schedule', times: [{ tefillah: 'shacharis', days: ['sat'], time: '10:00am', quote: 'Shabbat Shacharit 10:00 AM' }] }, { text }, DAYS, id)
+    expect(r.times.map((t) => t.notes ?? null)).toEqual([null])
+  })
+
   it('tells the AI the dates ahead and what they’re called', () => {
     const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
     expect(system.content).toContain('2026-10-10 (Sat Oct 10): Parashat Bereshit')

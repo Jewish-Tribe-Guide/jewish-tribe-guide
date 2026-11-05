@@ -2314,19 +2314,24 @@ Oct 30" runs to Oct 31 and ends on its own.
   address behind a WhatsApp, GroupMe, sign-up form or Zoom button, on a
   shul's page and in a newsletter, and keeps one only if it's written there.
   Pages with such a button change fingerprint, so they're read again once.
-- **Borrowing is still on, and marked.** A week's minyan with no link of its
-  own still gets the usual minyan's. The queue card and To do say so in
-  amber: "Sign-up group from their usual times, not this page".
+- **No borrowing (the user, Nov 5).** A week's minyan never takes the usual
+  minyan's sign-up group or join link: not in the reader, not in To do, not
+  on the public site. A week without its own link shows none. A sign-up
+  minyan with no group of its own is still marked sign-up, for an admin to
+  give the group.
   - Why the links weren't found (checked on live, Nov 5): they are on the
     shul's site, just not on the page the week comes from. Mikveh Israel's
     two WhatsApp groups are on its home page, and its week is from its
     calendar. Mekor's group is on its davening page (the usual times).
     Rodeph Shalom's Zoom is on its calendar and was already read. BZBI's
     week's Zoom isn't on its worship page.
-  - The user's call: keep borrowing or not. One idea: check a borrowed link
-    against the shul's other watched pages and say where it was found.
-  - The public site still shows the usual minyan's group or Zoom on a week
-    with none (`usualJoinLink`, `usualSignUp`). Not changed.
+  - Weeks already posted on the live site may still carry a copied group or
+    link. Cleaning them is a live write: needs the user's yes.
+- **The reader keeps "Online only" and "Hybrid".** When a dated service's
+  own line says so ("Online-Only Friday Night Kabbalat Shabbat Services"),
+  its note does too. Kol Tzedek's Nov 13 and 14 had lost both.
+- **Five live shul suggestions to file again** once this is live (Leyv
+  Ha-Ir, South Philadelphia Shtiebel, BZBI, Kol Tzedek, Rodeph Shalom). Re-run the dry run first; writing needs the user's yes.
 - **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
   only closes it. The click is swallowed until it comes, up to 0.6s after
   the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the

@@ -24,14 +24,10 @@ export type ScheduleDay = 'yom_tov' | 'chol_hamoed' | DayKey | string
 
 // A week's minyan may say it runs only when enough people sign up (Mekor's
 // newsletter: "held when there is sufficient interest", the user, Oct 23),
-// with the group its usual minyan uses (signUpGroup). Absent, a week's
-// minyan runs under its usual one's (usualSignUp).
+// with the group the week's own message gives. It never takes its usual
+// minyan's group or join link (the user, Nov 5: "no borrowing").
 export type ScheduleMinyan = Omit<Minyan, 'days'> & {
   on: ScheduleDay[]
-  /** What it took from the usual minyan it is, its page giving none: its
-   *  sign-up group, its join link. Shown to the admin as such (the user,
-   *  Nov 5: "if we're borrowing I want it to be extremely clear"). */
-  borrowed?: ('signUp' | 'joinLink')[]
 }
 
 export type SpecialSchedule = {
@@ -175,14 +171,14 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   const notAmong = (held: readonly Pick<Minyan, 'tefillah' | 'time'>[], rows: ScheduledMinyan[]) => rows.filter((r) => !held.some((m) => m.tefillah === r.tefillah && sameClock(m.time, r.time)))
   const notUsual = (rows: ScheduledMinyan[]) => notAmong(usual, rows)
   // Every addition but the one covering the day, if it's one.
-  const alsoAdded = (covering && !isOneDayAddition(covering) ? additions : additions.slice(1)).flatMap((s) => rowsOn(s, regular, d))
+  const alsoAdded = (covering && !isOneDayAddition(covering) ? additions : additions.slice(1)).flatMap((s) => rowsOn(s, d))
   const added = notUsual(alsoAdded)
   const festival = d.yomTov || d.cholHamoed ? (d.festival ?? d.name) : null
   // A shul that already tags regular rows "Yom Tov" has posted for it.
   const taggedYomTov = d.yomTov === true && regular.some((m) => m.days.includes('yom_tov'))
   if (covering) {
     const week = covering.kind === 'week'
-    const rows = covering.mode === 'replace' ? rowsOn(covering, regular, d) : notUsual(rowsOn(covering, regular, d))
+    const rows = covering.mode === 'replace' ? rowsOn(covering, d) : notUsual(rowsOn(covering, d))
     // Nor one of a week's own times again: BZBI's pasted week gave that
     // Shabbos 9:30 beside the newsletter's one-day 9:30 (the user, Oct 23).
     // Every week the shul sent out is "This week's times", a Shabbos-only one
@@ -221,14 +217,12 @@ export function isOneDayAddition(s: SpecialSchedule): boolean {
 }
 
 /** A schedule's minyanim held on the date, keyed to it. */
-function rowsOn(s: SpecialSchedule, regular: readonly Minyan[], d: DateFacts): ScheduledMinyan[] {
-  const week = s.kind === 'week'
+function rowsOn(s: SpecialSchedule, d: DateFacts): ScheduledMinyan[] {
   return s.minyanim
     .filter((m) => heldOn(m, d))
     .map(({ on: _on, ...m }): ScheduledMinyan => {
       void _on
-      const signUp = week ? usualSignUp(regular, m, [d.weekday]) : undefined
-      return { ...m, ...(signUp ? { signUp } : {}), days: [dateKey(d.date)], schedule: s.name }
+      return { ...m, days: [dateKey(d.date)], schedule: s.name }
     })
 }
 
@@ -287,16 +281,6 @@ export function scheduleDayText(on: ScheduleDay): string {
  * gives the regular times. Every property a person wrote is in it, so a
  * changed time is a changed line (SubmissionCard.test's schedule guard).
  */
-/** "Sign-up group from their usual times, not this page": what a week's
- *  minyan took from the usual one, its page giving none (the user, Nov 5:
- *  "if we're borrowing I want it to be extremely clear on the admin site
- *  that we're doing that"). Null when it took nothing. */
-export function borrowedText(m: Pick<ScheduleMinyan, 'borrowed'>): string | null {
-  const what = (m.borrowed ?? []).map((b) => (b === 'signUp' ? 'sign-up group' : 'join link'))
-  if (!what.length) return null
-  const said = what.join(' and ')
-  return `${said[0].toUpperCase()}${said.slice(1)} from their usual times, not this page`
-}
 
 export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): string {
   if (schedules.length === 0) return '—'
@@ -305,7 +289,7 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
       const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.whole ? (s.minyanim.length ? 'their whole week' : 'no minyan') : s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
       const lines = [...s.minyanim]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
-        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes, borrowedText(m)].filter(Boolean).join(' · '))
+        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))
       return [head, ...lines.map((l) => `  ${l}`)].join('\n')
     })
     .join('\n')
@@ -402,16 +386,6 @@ export function weekByDates(post: Pick<SpecialSchedule, 'name' | 'from' | 'to'>)
  *  can head its Friday with: as a name it showed "Fri Oct 30, Oct 30". */
 const ONLY_DATES = /^(?=.*\d)(?:[\s\d,.\/–-]|(?:sun|mon|tue|wed|thu|fri|sat)[a-z]*|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)+$/i
 
-/** The sign-up a week's minyan runs under: its own, else that of the usual
- *  minyan it stands in for, the same tefillah on one of its weekdays, in
- *  either season. A newsletter gives the times, not the WhatsApp group, so
- *  Mekor's week showed its weekday minyanim without the group every usual
- *  one has (the user, Oct 19). */
-export function usualSignUp(regular: readonly Minyan[], m: { tefillah: Minyan['tefillah']; signUp?: Minyan['signUp'] }, weekdays: readonly DayKey[]): Minyan['signUp'] {
-  if (m.signUp) return m.signUp
-  return regular.find((r) => r.signUp && r.tefillah === m.tefillah && weekdays.some((d) => r.days.includes(d)))?.signUp
-}
-
 const SAME_CROWD: Partial<Record<Minyan['tefillah'], Minyan['tefillah'][]>> = {
   mincha_maariv: ['mincha', 'maariv'],
   mincha: ['mincha_maariv'],
@@ -429,18 +403,6 @@ export const sameCrowd = (a: Minyan['tefillah'], b: Minyan['tefillah']) => a ===
 export function signUpGroup(regular: readonly Minyan[], tefillah: Minyan['tefillah'], weekdays: readonly DayKey[]): NonNullable<Minyan['signUp']> {
   const on = (r: Minyan) => !!r.signUp && weekdays.some((d) => r.days.includes(d))
   return regular.find((r) => on(r) && r.tefillah === tefillah)?.signUp ?? regular.find((r) => on(r) && sameCrowd(tefillah, r.tefillah))?.signUp ?? {}
-}
-
-/** The join link a week's minyan has: its own, else that of the usual
- *  minyan it is, the same tefillah on one of its weekdays at the same
- *  time. A calendar or newsletter may give the time without the Zoom link
- *  the usual minyan has; a different time that day may be a minyan in the
- *  room only. */
-export function usualJoinLink(regular: readonly Minyan[], m: Pick<Minyan, 'tefillah' | 'time' | 'joinLink'>, weekdays: readonly DayKey[]): string | undefined {
-  if (m.joinLink) return m.joinLink
-  const at = parseTimeToMinutes(m.time)
-  if (!Number.isFinite(at)) return undefined
-  return regular.find((r) => r.joinLink && r.tefillah === m.tefillah && weekdays.some((d) => r.days.includes(d)) && parseTimeToMinutes(r.time) === at)?.joinLink
 }
 
 /** A week post's minyanim as rows on weekdays, the way its box shows them
