@@ -2333,11 +2333,15 @@ Oct 30" runs to Oct 31 and ends on its own.
 - **Five live shul suggestions to file again** once this is live (Leyv
   Ha-Ir, South Philadelphia Shtiebel, BZBI, Kol Tzedek, Rodeph Shalom). Re-run the dry run first; writing needs the user's yes.
 - **Admin Home on an iPhone jumped back to the top** while scrolling fast,
-  with Phone picked (the user, Nov 5, live and preview). Not reproduced:
-  Chrome at phone size scrolls to the bottom and stays. Fixed the likeliest
-  cause: the preview beside the settings, hidden on a phone, still loaded the
-  whole home page and loaded it again after each edit. It now loads only on a
-  screen wide enough to show it. Try it on the commit's preview on the iPhone.
+  with Phone picked (the user, Nov 5, live and preview). Fixed, and checked
+  by the user on the iPhone. An on-screen log on a debug preview showed the
+  cause: the short page was pulled past its bottom, the browser bar's height
+  flickered a pixel during the bounce, and that resize dropped the scroll to
+  0. No touch, click or script was involved. Admin pages no longer bounce past
+  their ends (`overscroll-behavior-y: none`, admin only). The user finds it "a
+  little stark", but it works. Pull-to-refresh in the admin probably goes with
+  it. The hidden preview no longer loading on a phone (f6b64619) was not the
+  cause, but stays.
 - **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
   only closes it. The click is swallowed until it comes, up to 0.6s after
   the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the

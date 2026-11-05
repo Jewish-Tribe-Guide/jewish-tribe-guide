@@ -142,7 +142,7 @@ export default function AdminFrame({
     // --admin-tabs: how tall the phone's tabs are (58px, measured, over
     // their bottom padding), so a bar pinned to the bottom of a screen (Save,
     // a change's answers) sits just above them.
-    <div className="flex-1 flex w-full min-w-0 [--admin-tabs:0px] max-md:[--admin-tabs:calc(58px_+_max(10px,env(safe-area-inset-bottom)))]">
+    <div data-admin-frame className="flex-1 flex w-full min-w-0 [--admin-tabs:0px] max-md:[--admin-tabs:calc(58px_+_max(10px,env(safe-area-inset-bottom)))]">
       <nav
         aria-label="Admin"
         className="hidden md:flex w-60 shrink-0 flex-col gap-1 bg-white border-r border-slate-200 px-3 py-5 sticky top-0 h-dvh overflow-y-auto"

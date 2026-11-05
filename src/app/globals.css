@@ -32,6 +32,14 @@
  * map's edge-to-edge band, `w-screen` + `left-1/2` + `-translate-x-1/2` in
  * ResourceMapView) — that trick centers an element that's exactly 100vw wide,
  * so it never actually extends past the viewport edge either. */
+/* The admin's pages don't bounce past their ends. On an iPhone, a short one
+ * (Site → Home page, Phone) pulled past its bottom jumped back to the top:
+ * the browser bar's height flickers a pixel during the bounce, and that
+ * resize drops the scroll to 0 (the user, Nov 5, read off an on-screen log). */
+html:has([data-admin-frame]) {
+  overscroll-behavior-y: none;
+}
+
 html {
   /* On <html> only, and `hidden` deliberately — both halves are load-bearing.
    *

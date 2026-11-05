@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
@@ -185,5 +186,18 @@ describe('AdminFrame', () => {
     fireEvent.click(bar.getByRole('link', { name: 'To do' }))
     expect(heard).toHaveBeenCalledTimes(1)
     window.removeEventListener(ADMIN_AREA_TAPPED, heard)
+  })
+
+  // The user, Nov 5: on an iPhone, Site → Home page with Phone picked jumped
+  // back to the top. Read off an on-screen log: the page was pulled past its
+  // bottom, the browser bar's height flickered a pixel, and that resize
+  // dropped the scroll to 0. The admin doesn't bounce past its ends now. The
+  // swipe itself can't be automated; this holds the rule and its hook.
+  it('keeps the admin from bouncing past its ends, and only the admin', () => {
+    const css = readFileSync('src/app/globals.css', 'utf8')
+    expect(css).toMatch(/html:has\(\[data-admin-frame\]\)\s*\{\s*overscroll-behavior-y:\s*none;?\s*\}/)
+    expect(css.match(/overscroll-behavior-y/g)).toHaveLength(1)
+    show('/philly/admin/site/home')
+    expect(document.querySelectorAll('[data-admin-frame]')).toHaveLength(1)
   })
 })
