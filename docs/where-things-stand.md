@@ -325,7 +325,7 @@ The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
 cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-16
-adding a field, 17-18 a listing's boxes; earlier drafts and the field map are off the canvas;
+adding a field, 17-19 a listing's boxes; earlier drafts and the field map are off the canvas;
 reviewed Nov 5 at the user's ask: the Denomination board shows the one
 list as one choice, Nusach is on Synagogues and in the ready-made list,
 the page's "Kind" tag is gone (a copied page brings its kind, one made
@@ -341,8 +341,12 @@ is a list of the opened listing's boxes, in the order a visitor sees
 them, drawn on Hospitals: Top (Photo), Who to call, Kosher food, A place
 to stay, This Shabbos, Rides, Also, Contact (Address, Phone, Hours,
 Website, Refuah Link). Each is a row with its fields as its line; a tap
-opens it in place, its fields as inner rows with "+ Add a field", its
-name edited in place, a boxed trash can. Top and Contact stay first and
+opens it in place, its fields as inner rows, then "+ Add a field" with
+the boxed trash can right beside it (as the header editor's RowActions
+does); its name is text until tapped, then edits in place, like a
+heading's. Board 19: "+ Add a box" lands an open "New box" before
+Contact, its name selected to type over, "Nothing in it yet", "+ Add a
+field" and the trash. Top and Contact stay first and
 last, with no handle or trash, like Categories' "Other". "+ Add a box"
 at the foot. Dragging is within one list only, as in the header editor:
 a field moves to another box from its own screen's Box list (board 18,
