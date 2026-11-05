@@ -325,7 +325,7 @@ The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
 cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-16
-adding a field; earlier drafts and the field map are off the canvas;
+adding a field, 17-18 a listing's boxes; earlier drafts and the field map are off the canvas;
 reviewed Nov 5 at the user's ask: the Denomination board shows the one
 list as one choice, Nusach is on Synagogues and in the ready-made list,
 the page's "Kind" tag is gone (a copied page brings its kind, one made
@@ -334,7 +334,18 @@ visitors see). Board 16, Nov 5: "Remove this field" opens its own step
 when places have filled it in ("Remove Kosher Certification from Food?",
 71 places lose their answer, the filter loses it; Remove it / Keep it).
 Today the same removal waits for Save and an amber warning, then wipes the
-answers. With no answers, the field just goes. The user's rule, Nov 5: admins
+answers. With no answers, the field just goes.
+Boards 17-18, Nov 5 (the user: dragging fields, but a listing has boxes):
+Fields is grouped into the opened listing's own parts, in the order a
+visitor sees them, drawn on Hospitals: Top (Photo), its five named boxes
+(Who to call, Kosher food, A place to stay, Rides, Also), This Shabbos
+among them, then Contact (Address, Phone, Hours, Website, Refuah Link).
+A named box's heading opens it (rename, remove); Top and Contact have
+none. Dragging reorders within a part or moves a field into a named box;
+"+ Add a box" under the parts. The preview's "A listing" shows the same
+boxes. Within a walk (Food, Synagogues, Hotels, Mikvah, 30 min) is its
+own box below Fields, since those aren't fields. Boards 4 (Food) and 6
+(Synagogues) still show the flat list. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
