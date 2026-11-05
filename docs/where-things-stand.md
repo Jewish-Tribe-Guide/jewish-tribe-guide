@@ -322,10 +322,10 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Up next: Site → Category pages, organised and cleaned up
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". **Third draw Nov 5,
+"organized better and just cleaned up in general". **Fourth draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 2c, 3c, 6c are current; the second draw, with 1b, 4b and 5, is kept
-to compare). The user: design it as it should be, not as the settings are
+boards 2d, 3d, 5d, 6d plus 1b and 4b are current; 2c, 3c, 6c kept to
+compare). The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
 all 16 pages; Map is off only on the three with no address (WhatsApp,
 Networking, Cemetery); no page sets Groups. On the drawing:
@@ -333,21 +333,33 @@ Networking, Cemetery); no page sets Groups. On the drawing:
 - The list is rows: line glyph, name, places count, "Hidden" when off,
   chevron; "+ New category page" beside the heading. Candle Lighting &
   Zmanim is back in the list as a row, like Eruv.
-- A page has: On the site; icon beside the name (tap the icon to change
-  it and the pin colour); Banner photo row; Each place; one "Not listed
-  here? link" row (Hospitals → Refuah, Mikvah → mikvah.org); Delete.
+- Three sections on every page, and on every field: **Basics** (a
+  page's icon, name, banner; a field's name), the details (a page's
+  fields; a field's choices), and **Questions**, each a No / Yes. The
+  user's idea, Nov 5.
+- A page's Questions: "Can visitors upvote places?" (the round thumbs-up
+  with a count on each place; it also adds a "Most upvoted" sort and
+  answers "best ..." searches) and "A link for places not listed here?"
+  (Hospitals → Refuah, Mikvah → mikvah.org).
 - Gone from the page: Search bar (always on), Add / Correct / Take off
   (the "+ Add" box is site-wide; always on), the Map switch (a page is
   on the map when its places have an address), Groups, web address (set
   from the name when the page is made), link-preview words.
 - Each place: the built-in fields as rows (Address, puts the page on the
-  map; Phone; the rest), then the page's own fields, then a "Recommend
-  button" switch (the Recommend button on each row: counts, a "Most
-  recommended" sort, and "best ..." searches).
-- A field's screen: name, choices as rows, "A filter" and "On each row"
-  switches, which places it's for, help text, must be filled in, Remove.
-  No "chip or line" choice: what decides how a field shows today is
-  whether it's a filter or on the row.
+  map; Phone; the rest), then the page's own fields, each saying where
+  it shows: "Filter · in the list", "In the list", "When a place is
+  opened".
+- A field's Questions: Must it be filled in? Can visitors filter by it?
+  Show it before a place is opened? More than one per place? Can people
+  type their own? Only for some places? (live: Food's delivery fields
+  and "What isn't kosher?") A hint for people adding it? Yes opens what
+  it needs (the choice it depends on, the hint's words).
+- Not a field question any more: "a place can note exceptions". Used
+  once, on Food's kosher certificate ("Everything here is kosher" plus
+  "What isn't kosher?", the chip turns amber); it's set by the Food kind.
+- Add a field kinds: Choices, Yes or no, A list of items, Text, Link,
+  Phone, Hours. Short and long text are one; Number (unused) is gone;
+  Davening times and Contacts come with the Shuls and Hospitals kinds.
 - No Map switch for the site either: the Map is on when the header or a
   tab links to it. Code change only.
 - The question card is chosen by the site; the four listing options are
@@ -356,6 +368,8 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   full-width round button, as on Home page.
 - Add a field: pick what kind (rows, each with a real example), then the
   field's screen.
+- Not decided: whether "Can visitors upvote places?" stays as asked, or
+  the button is renamed on the site so admin and visitor use one word.
 
 Still to fix when building: `/philly/admin/categories/restaurant` (no
 `cat:`) silently shows the list.
