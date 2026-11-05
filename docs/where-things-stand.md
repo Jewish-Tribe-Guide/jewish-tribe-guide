@@ -324,7 +324,7 @@ for that exact change, in the same conversation. Show the dry run first.
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Fourth draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 2d, 3d, 5d, 6d plus 1b and 4b are current; 2c, 3c, 6c kept to
+boards 2d, 3d, 5d, 6e plus 1b and 4b are current; 2c, 3c, 6d kept to
 compare). The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
 all 16 pages; Map is off only on the three with no address (WhatsApp,
@@ -349,11 +349,16 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   map; Phone; the rest), then the page's own fields, each saying where
   it shows: "Filter · in the list", "In the list", "When a place is
   opened".
-- A field's Questions: Must it be filled in? Can visitors filter by it?
-  Show it before a place is opened? More than one per place? Can people
-  type their own? Only for some places? (live: Food's delivery fields
-  and "What isn't kosher?") A hint for people adding it? Yes opens what
-  it needs (the choice it depends on, the hint's words).
+- A field's Questions, in the user's words (Nov 5): "Is it a required
+  field?", "Should it be part of the filter?", "Show it before a place is
+  opened?", and for choices "Can a place be both Meat and Dairy?" (built
+  from its first two choices).
+- "Other" is a row at the end of the choices with a switch ("A box to
+  type in"), not a question. The hint is "Note under it, on Add a place"
+  in Basics, shown in the Adding preview.
+- Off the community admin's field screen: "Only for some places" (live:
+  Food's two delivery fields and "What isn't kosher?"; they keep working,
+  superadmin sets it).
 - Not a field question any more: "a place can note exceptions". Used
   once, on Food's kosher certificate ("Everything here is kosher" plus
   "What isn't kosher?", the chip turns amber); it's set by the Food kind.
