@@ -122,6 +122,16 @@ describe('been there lately?', () => {
     expect(pickQuestion(grocery, rows, rows, new Set(), place)?.footnote).toBe('No one has confirmed a grocery listing yet.')
   })
 
+  // The user, Nov 4: a visitor isn't asked what something else already
+  // checks.
+  it('skips a place an outside source dated, as it does one a person confirmed', () => {
+    const rows = [
+      { ...makeListing({ id: 'a', name: 'ACME' }), confirmedAt: '2026-11-03T00:00:00Z', confirmedFrom: { from: 'Keystone-K', at: '2026-11-03T00:00:00Z' } },
+      { ...makeListing({ id: 'b', name: 'GIANT' }) },
+    ] as DirectoryResource[]
+    expect(pickQuestion(grocery, rows, rows, new Set(), place)?.item.name).toBe('GIANT')
+  })
+
   it('asks about a shul’s davening times', () => {
     const shuls = makeCategory({ questionCard: { kind: 'confirm' }, detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
     const rows = [{ ...makeListing({ name: 'Mekor Habracha' }), minyanim: [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '6:20pm' }] }] as DirectoryResource[]

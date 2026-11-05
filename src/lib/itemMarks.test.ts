@@ -122,6 +122,16 @@ describe('the item asked about', () => {
     expect(pickItemToAsk([mark('Challah', { seen: 30 }), mark('Wine', { seen: 60 })], now)?.name).toBe('Wine')
   })
 
+  // The user, Nov 4: a dish the nightly read found on its menu today was
+  // asked about, with "Last seen today." right under the question.
+  it('not one its menu had this week either, and the menu’s date counts toward the longest unseen', () => {
+    const onMenu = (name: string, days: number) => ({ ...mark(name), menuAt: new Date(now - days * day).toISOString() })
+    expect(pickItemToAsk([onMenu('Shawarma', 0), onMenu('Falafel', 1)], now)).toBeNull()
+    expect(pickItemToAsk([onMenu('Shawarma', 0), onMenu('Falafel', 30), onMenu('Kebab', 10)], now)?.name).toBe('Falafel')
+    // Seen by a person long ago, on the menu this week: not asked.
+    expect(pickItemToAsk([{ ...mark('Schnitzel', { seen: 40 }), menuAt: new Date(now - 2 * day).toISOString() }, mark('Fries', { seen: 20 })], now)?.name).toBe('Fries')
+  })
+
   it('not one seen this week, nor one already reported gone; nothing when nothing’s left', () => {
     expect(pickItemToAsk([mark('Steak', { sometimes: true, seen: 2 }), mark('Wine', { seen: 20 })], now)?.name).toBe('Wine')
     expect(pickItemToAsk([mark('Steak', { sometimes: true, gone: true }), mark('Wine', { seen: 1 })], now)).toBeNull()
