@@ -395,13 +395,21 @@ Networking, Cemetery); no page sets Groups. On the drawing:
     Synagogues (Orthodox (Ashkenazi), Other, one choice), Philly Schools
     (Orthodox, no Other, several, key `d`), Washington Synagogues and the
     template (Orthodox, Other, no Non-Denominational, several).
-    Recommended: Orthodox, Orthodox (Sephardic), Conservative, Reform,
-    Reconstructionist, Non-Denominational, Other; one choice. Live, that
-    renames 8 Philly shuls' Orthodox (Ashkenazi) to Orthodox (7 shown, 1
-    archived); the 6 schools and Washington's 0 places keep their values.
-    A saved search filtered on Orthodox (Ashkenazi) would stop matching.
-    Waiting on: the user's OK to the list, then a prod go-ahead for the
-    rename.
+    One field on every page, since it's the same question everywhere. The
+    user, Nov 5: for shuls, Ashkenazi/Sephardic is really nusach, and
+    schools don't have one. Recommended:
+    - Denomination, every page: Orthodox, Conservative, Reform,
+      Reconstructionist, Non-Denominational, Other; one choice.
+    - Nusach, a ready-made field only Synagogues use: Ashkenaz, Sefard,
+      Ari (Chabad), Sephardi (Edot HaMizrach), Other; may be left empty.
+    Live, Philly's 8 "Orthodox (Ashkenazi)" shuls (7 shown, Vilna
+    archived) and Mikveh Israel's "Orthodox (Sephardic)" become Orthodox.
+    Mikveh Israel's Nusach becomes Sephardi, from its own value. The 8
+    get no Nusach: "Ashkenazi" there isn't a nusach, and both Chabads
+    are among them. The schools' key `d` becomes `denomination`. A saved
+    search filtered on either old value would stop matching.
+    Waiting on: the user's OK to both lists, then a prod go-ahead after a
+    dry run.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Each kind of field asks only its own questions (was a map board,
