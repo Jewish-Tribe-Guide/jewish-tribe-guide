@@ -2522,8 +2522,14 @@ Still open:
     gives it a row of its own (the user found that spot hard to hit): the
     drop lines are measured from where the rows sat when the drag began,
     and the gap between boxes is 12px.
-- **20, asking visitors about something seen today:** waits on the user
-  naming the place where they saw it.
+- **20, asking visitors about something seen today: built (Nov 4).** The
+  rule: a visitor is never asked about what a person or a watch checked in
+  the last week, so questions go to what nothing else checks. A listing's
+  Quick question counted only a visitor's "still here", not the nightly menu
+  read, so a dish read that morning was asked about over "Last seen today."
+  (`pickItemToAsk`). The list's "Been there lately?" asks about no place an
+  outside source dated (`confirmedFrom`) either; box and item dates already
+  counted.
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 

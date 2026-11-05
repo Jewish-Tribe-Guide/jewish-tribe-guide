@@ -167,9 +167,11 @@ export function pickQuestion(
   }
 
   // Confirm: a place nobody has confirmed what it would ask about (its
-  // times by their own date, the user, Oct 23), in the list's order.
+  // times by their own date, the user, Oct 23), in the list's order. A date
+  // an outside source gave counts too (Keystone-K, Refuah): a visitor isn't
+  // asked what something else already checks (the user, Nov 4).
   const hasTimes = (i: DirectoryResource) => category.detailFields.some((f) => f.type === 'minyanim' && Array.isArray(i[f.key]) && (i[f.key] as unknown[]).length > 0)
-  const isConfirmed = (i: DirectoryResource) => (hasTimes(i) ? !!timesConfirmedAt(i) : confirmedAnywhere(i))
+  const isConfirmed = (i: DirectoryResource) => (hasTimes(i) ? !!timesConfirmedAt(i) : confirmedAnywhere(i) || !!i.confirmedFrom)
   const item = shown.find((i) => !isConfirmed(i) && !asked.has(i.id))
   if (!item) return null
   const itemsField = category.detailFields.find((f) => f.type === 'tags' && f.showCountInHeader)

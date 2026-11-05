@@ -219,13 +219,20 @@ export const ITEM_ASK_AFTER_DAYS = 7
 /**
  * The item a listing's one question asks about (agreed Oct 1): one that's
  * only sometimes there first, then whichever has gone longest unseen (never
- * seen counts as longest). Not one seen in the last week, nor one already
- * reported gone and waiting on an admin. Null when there's nothing worth
- * asking.
+ * seen counts as longest). Not one seen in the last week, by a person or by
+ * the nightly read of its menu (the user, Nov 4: asking about a dish its
+ * line says was seen today wastes a visitor's time, and makes the questions
+ * look thoughtless), nor one already reported gone and waiting on an admin.
+ * So the questions go to what nothing else checks. Null when there's
+ * nothing worth asking.
  */
 export function pickItemToAsk(marks: readonly ItemMark[], now: number): ItemMark | null {
-  const askable = marks.filter((m) => !m.goneAt && (!m.seenAt || now - Date.parse(m.seenAt) >= ITEM_ASK_AFTER_DAYS * 86_400_000))
-  const longestUnseen = (a: ItemMark, b: ItemMark) => (a.seenAt ? Date.parse(a.seenAt) : 0) - (b.seenAt ? Date.parse(b.seenAt) : 0)
+  const seen = (m: ItemMark) => {
+    const date = markDate(m)
+    return (date && Date.parse(date.at)) || 0
+  }
+  const askable = marks.filter((m) => !m.goneAt && now - seen(m) >= ITEM_ASK_AFTER_DAYS * 86_400_000)
+  const longestUnseen = (a: ItemMark, b: ItemMark) => seen(a) - seen(b)
   return [...askable].sort((a, b) => Number(b.sometimes) - Number(a.sometimes) || longestUnseen(a, b))[0] ?? null
 }
 
