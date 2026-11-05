@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, within, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, within, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity } from '@/test/providerFixtures'
@@ -264,8 +264,31 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(vi.mocked(writePreviewDraft).mock.lastCall![0].settings.desktopHeroHeadline).toBe(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}?`)
     expect(screen.getByTitle('Site preview')).toHaveAttribute('src', '/philly?preview=1')
     await user.click(screen.getByRole('button', { name: '← Back to editor' }))
-    expect(screen.queryByTitle('Site preview')).toBeNull()
+    await waitFor(() => expect(screen.queryByTitle('Site preview')).toBeNull())
     expect(screen.getByLabelText('Big line')).toHaveValue(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}?`)
+  })
+
+  // Browser Back closed nothing: it left the page, a step too far, and
+  // Forward after "Back to editor" did nothing (the user, Nov 4).
+  it('browser Back closes the full-size preview, and Forward opens it again', async () => {
+    const user = userEvent.setup()
+    await renderEditor()
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(history.state?.editorPreview).toBe(true)
+
+    act(() => history.back())
+    await waitFor(() => expect(screen.queryByTitle('Site preview')).toBeNull())
+    await user.type(screen.getByLabelText('Big line'), '!')
+
+    act(() => history.forward())
+    await waitFor(() => expect(screen.getByTitle('Site preview')).toBeInTheDocument())
+    // What's typed now, not what was typed when it first opened.
+    expect(vi.mocked(writePreviewDraft).mock.lastCall![0].settings.desktopHeroHeadline).toBe(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}!`)
+
+    await user.click(screen.getByRole('button', { name: '← Back to editor' }))
+    await waitFor(() => expect(screen.queryByTitle('Site preview')).toBeNull())
+    act(() => history.forward())
+    await waitFor(() => expect(screen.getByTitle('Site preview')).toBeInTheDocument())
   })
 
   // Like a screenshot here: the small one opens big (the user, Nov 4).

@@ -58,8 +58,19 @@ test('the computer preview shows the whole page, and opens full size on a click'
   expect((await shown.boundingBox())!.height).toBe(last)
   expect(last).toBeLessThan(800)
 
+  const full = page.locator('iframe[title="Site preview"]')
   await shown.click()
-  await expect(page.locator('iframe[title="Site preview"]')).toBeVisible()
+  await expect(full).toBeVisible()
   await page.getByRole('button', { name: '← Back to editor' }).click()
   await expect(shown).toBeVisible()
+
+  // Browser Back and Forward close and open it, and Back goes no further
+  // than the settings (the user, Nov 4).
+  await page.goForward()
+  await expect(full).toBeVisible()
+  await page.goBack()
+  await expect(shown).toBeVisible()
+  await expect(page).toHaveURL(/\/philly\/admin\/home$/)
+  await page.goForward()
+  await expect(full).toBeVisible()
 })

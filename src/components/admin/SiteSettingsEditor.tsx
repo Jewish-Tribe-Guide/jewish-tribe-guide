@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -87,6 +87,23 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  // The full-size preview has its own history entry, as Category pages' and
+  // Forms' do, so browser Back closes it rather than leaving the page, and
+  // Forward opens it again (the user, Nov 4). Forward shows what's typed
+  // now, not what was typed when it was first opened.
+  const shownDraft = useRef<Parameters<typeof writePreviewDraft>[0] | null>(null)
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const open = !!(e.state as { editorPreview?: boolean } | null)?.editorPreview
+      if (open && shownDraft.current) writePreviewDraft(shownDraft.current)
+      setPreviewing(open)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+  useEffect(() => {
+    shownDraft.current = draft && sectionsDraft ? { settings: draft, sections: sectionsDraft } : null
+  }, [draft, sectionsDraft])
   // The box being worked on, which the preview lights up.
   const [spot, setSpot] = useState<string | null>(null)
   const spotOn = (name: string | null) => ({ onMouseEnter: () => setSpot(name), onFocusCapture: () => setSpot(name) })
@@ -180,12 +197,13 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   // Narrower than the preview beside needs: the page full size, with what
   // hasn't been saved (board 21c), on the version picked.
   if (previewing) {
-    return <DevicePreviewFrame src={previewUrl(community.slug)} initialDevice={device === 'phone' ? 'mobile' : 'desktop'} onClose={() => setPreviewing(false)} />
+    return <DevicePreviewFrame src={previewUrl(community.slug)} initialDevice={device === 'phone' ? 'mobile' : 'desktop'} onClose={() => history.back()} />
   }
 
   const openPreview = () => {
     writePreviewDraft({ settings: draft, sections: sectionsDraft })
     setPreviewing(true)
+    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
 
   const computer = device === 'computer'

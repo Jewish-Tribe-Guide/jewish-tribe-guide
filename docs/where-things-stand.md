@@ -2332,6 +2332,9 @@ Drawn first (artifact 2sssenojcQzzeHtHAT8gnp), built as drawn:
   1,100px screen. The phone stays one screen, since the whole phone page
   would run past the window. Clicking either opens it full size, as
   Category pages' preview already did.
+- **Fix:** the full-size preview had no history entry, so browser Back left
+  the page and Forward after "Back to editor" did nothing. It has one now,
+  as Category pages' and Forms' previews do.
 
 ## Done Nov 4: the bugs and small tweaks from the user's 33 notes (on `redesign/oct18-fixes`)
 
