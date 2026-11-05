@@ -30,7 +30,17 @@ const GRIP = (
   </svg>
 )
 
-type Drag = { key: string; pointerId: number; startY: number; startTop: number; dy: number; moved: boolean }
+type Drag = {
+  key: string
+  pointerId: number
+  startY: number
+  startTop: number
+  dy: number
+  moved: boolean
+  /** With dropEdge: where each other row is passed, measured as the row was
+   *  lifted. */
+  lines?: Map<string, number>
+}
 
 export type DragRow = {
   /** The handle, first in the row. */
@@ -49,6 +59,7 @@ export default function DragList<T>({
   className = '',
   canMove,
   slotClass,
+  dropEdge,
 }: {
   items: readonly T[]
   keyOf: (item: T) => string
@@ -63,6 +74,11 @@ export default function DragList<T>({
   /** A class for the spot a row sits in, which stays put while the row is
    *  lifted: the home cards draw their rows' boxes with it. */
   slotClass?: (item: T, i: number, shown: readonly T[], dragKey: string | null) => string
+  /** Where a lifted row passes this one: its middle (undefined), or its
+   *  top or bottom edge, measured as the row is lifted. The home cards'
+   *  gaps use their outer edges, so the whole space between two boxes is
+   *  "a row of its own". */
+  dropEdge?: (item: T) => 'top' | 'bottom' | undefined
 }) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
@@ -71,9 +87,9 @@ export default function DragList<T>({
   const orderRef = useRef<string[] | null>(null)
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; pointerId: number } | null>(null)
   const swallowClick = useRef(false)
-  const latest = useRef({ items, keyOf, onReorder, canMove })
+  const latest = useRef({ items, keyOf, onReorder, canMove, dropEdge })
   useEffect(() => {
-    latest.current = { items, keyOf, onReorder, canMove }
+    latest.current = { items, keyOf, onReorder, canMove, dropEdge }
   })
 
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
@@ -109,6 +125,20 @@ export default function DragList<T>({
       const el = els.current.get(key)
       if (!el || dragRef.current) return
       const d: Drag = { key, pointerId, startY: clientY, startTop: el.offsetTop, dy: 0, moved: false }
+      const { items: all, keyOf: keyOfItem, dropEdge: edgeOf } = latest.current
+      if (edgeOf) {
+        // Measured once, as it was lifted: rows of different heights (a box
+        // shrinking as a card leaves it) would otherwise move the lines
+        // under the card mid-drag. For rows all one height it's the same.
+        d.lines = new Map()
+        for (const item of all) {
+          const k = keyOfItem(item)
+          const o = els.current.get(k)
+          if (k === key || !o) continue
+          const edge = edgeOf(item)
+          d.lines.set(k, o.offsetTop + (edge === 'top' ? 0 : edge === 'bottom' ? o.offsetHeight : o.offsetHeight / 2))
+        }
+      }
       dragRef.current = d
       orderRef.current = latest.current.items.map(latest.current.keyOf)
       setOrder(orderRef.current)
@@ -127,6 +157,8 @@ export default function DragList<T>({
       const middles = cur
         .filter((k) => k !== d.key)
         .map((k) => {
+          const line = d.lines?.get(k)
+          if (line !== undefined) return line
           const o = els.current.get(k)
           return o ? o.offsetTop + o.offsetHeight / 2 : 0
         })

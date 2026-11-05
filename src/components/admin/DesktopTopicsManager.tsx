@@ -13,9 +13,12 @@ import DragList, { addButton, InnerRow } from './DragList'
 // (see homeSectionsDraft.ts).
 //
 // Dragged up and down only, as every other list: between two rows sit two
-// thin gaps, so a card dropped just under a row joins it, one dropped
-// between the gaps has a row of its own, and one just over the next row
-// joins that. The keyboard steps through the same places.
+// gaps, so a card dropped just under a row joins it, one dropped between
+// the boxes has a row of its own, and one just over the next row joins
+// that. A gap is passed at its outer edge, not its middle, so the whole
+// space between two boxes is the own-row spot (the user, Nov 4: moving a
+// card out of a box into a row between was "not so easy"). The keyboard
+// steps through the same places.
 //
 // What a card says is fixed here: nobody had changed any of it (checked on
 // live, Nov 4), so the fields went. The site still reads the saved words.
@@ -152,10 +155,11 @@ export default function DesktopTopicsManager({
           return rowsFit(rows) && (via === 'pointer' || !sameRows(rows, cardRows(cards)))
         }}
         slotClass={slotClass}
+        dropEdge={(i) => (isCard(i) ? undefined : i.gap === 'top' || i.gap.endsWith('b') ? 'bottom' : 'top')}
         className="px-3"
       >
         {(item, row) => {
-          if (!isCard(item)) return <div className="h-1.5" aria-hidden="true" />
+          if (!isCard(item)) return <div className="h-3" aria-hidden="true" />
           const { card } = item
           return (
             <div onMouseEnter={() => onPointCard?.(card.kind)} onMouseLeave={() => onPointCard?.(null)}>

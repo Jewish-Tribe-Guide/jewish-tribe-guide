@@ -9,7 +9,7 @@ type HomeSectionRow = {
   kind: string
   title: string
   sort_order: number
-  card_ids: string[]
+  card_ids: unknown
   shares_row?: boolean | null
 }
 
@@ -29,7 +29,9 @@ function toSection(row: HomeSectionRow): HomeSection {
     // yet (blank, or read before the row existed at all).
     title: row.title || (kind === 'section' ? '' : BUILT_IN_BLOCKS[kind].title),
     sortOrder: row.sort_order,
-    cardIds: row.card_ids ?? [],
+    // jsonb, so it can hold anything: an object here once broke the build
+    // (093's first version wrote '{}', jsonb's empty object).
+    cardIds: Array.isArray(row.card_ids) ? row.card_ids : [],
     sharesRow: row.shares_row === true,
   }
 }

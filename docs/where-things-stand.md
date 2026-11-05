@@ -2470,13 +2470,17 @@ Still open:
   alone. Each card is a handle, its name and an ×; nothing opens, and the
   width and word fields are gone (the site still reads the saved words).
   Dragged up and down; the arrow keys step through the same places.
-  - Needs migration 093 (`shares_row`, the 'suggest' kind, today's rows
-    kept as they look) on the test project before admin-write or CI, and on
-    prod before this deploys: without it a save of any home row fails and
-    the home loses Suggest a Listing. Prod only with a yes.
-  - Checked in Chrome at computer and phone width with the draft preview
-    (nothing saved). Not checked: a save, or the suites, until 093 is on
-    the test project.
+  - 093 is on the test project (dev), and the suites pass against it. Its
+    first version wrote Suggest a Listing's `card_ids` as `'{}'` (jsonb's
+    empty object), which broke every page build; the file now writes `'[]'`
+    and a rerun repairs it, and the store reads a non-array as no cards.
+  - Prod needs 093 (this corrected file) before this deploys: without it a
+    save of any home row fails and the home loses Suggest a Listing. Prod
+    only with a yes.
+  - Taking a card out of a box and letting it go anywhere between two boxes
+    gives it a row of its own (the user found that spot hard to hit): the
+    drop lines are measured from where the rows sat when the drag began,
+    and the gap between boxes is 12px.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 

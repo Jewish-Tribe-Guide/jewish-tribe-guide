@@ -23,6 +23,10 @@
 -- Run once per database. Running it again changes nothing.
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- card_ids is jsonb: this file's first version wrote '{}', jsonb's empty
+-- object, which broke every page build. Rerunning it puts that right.
+update home_section set card_ids = '[]'::jsonb where kind = 'suggest' and jsonb_typeof(card_ids) <> 'array';
+
 alter table home_section add column if not exists shares_row boolean not null default false;
 
 alter table home_section drop constraint if exists home_section_kind_check;
@@ -52,7 +56,7 @@ begin
       shares_row = exists (select 1 from home_section where community_id = c.community_id and kind = 'davening')
       where community_id = c.community_id and kind = 'listings';
     insert into home_section (community_id, id, kind, title, sort_order, card_ids, shares_row)
-      values (c.community_id, 'suggest', 'suggest', 'Suggest a Listing Card', first_order + 2, '{}', true)
+      values (c.community_id, 'suggest', 'suggest', 'Suggest a Listing Card', first_order + 2, '[]'::jsonb, true)
       on conflict (community_id, id) do nothing;
   end loop;
 
