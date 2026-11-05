@@ -327,6 +327,20 @@ looking at the screen as it stands (and what Home page settled: one screen,
 Computer / Phone, boxes in the order the page reads, the preview beside),
 then draw it before building.
 
+## Later: tapping away from a menu still taps what's under it, on a phone
+
+The user, Nov 5, "not for now": with a filter menu open, tapping away
+closes it and nothing else on a computer, but on a phone the tap goes
+through to what's under it too. The fix was `AdminMenu` in
+`src/components/admin/AdminUI.tsx` (17a10ed8, Show / Category / Sort);
+the home search's results (`HeroHeading.tsx`, 4c4d4e1c) do it the same
+way and probably have the same gap. Not looked into yet. A guess, unchecked:
+both stop swallowing at `pointerup`/`mouseup` plus a zero timer, and a
+phone's click can come after that. A fix of this kind already failed once
+on real iPhones (e56fb820), and what held there was each row's own click
+handler checking a flag, not a document-wide swallow. jsdom can't show
+this, so check it on a real phone (the commit's Vercel preview).
+
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
