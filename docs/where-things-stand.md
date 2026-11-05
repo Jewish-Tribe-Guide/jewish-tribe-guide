@@ -322,36 +322,40 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Up next: Site → Category pages, organised and cleaned up
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". **Redrawn Nov 5,
+"organized better and just cleaned up in general". **Third draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 1b-4b and 5-6 are current; 1-3 are the first try, kept to compare).
-Agreed: no Computer / Phone switch (only the preview needs one); the
-visitor switches stay (all five are read by the site), named by what a
-visitor sees ("Search bar", "Add a place", "Correct a place", "Ask to take
-a place off", "Recommend a place"). On the drawing:
+boards 2c, 3c, 6c are current; the second draw, with 1b, 4b and 5, is kept
+to compare). The user: design it as it should be, not as the settings are
+today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
+all 16 pages; Map is off only on the three with no address (WhatsApp,
+Networking, Cemetery); no page sets Groups. On the drawing:
 
 - The list is rows: line glyph, name, places count, "Hidden" when off,
-  chevron; "+ New category page" beside the heading. Candle Lighting & Zmanim
-  is back in the list as a row, like Eruv.
-- No Map switch: the Map is on the site when the header or a tab links to
-  it (Home page already sets those). Code change only; the old Map row can
-  be ignored. Site keeps its rows as today.
-- A page's boxes: Top of the page (name, icon, banner, Search bar), Each
-  place (fields), Map, What visitors can do (Recommend a place is the
-  fourth switch), Links (web address, link-preview words, "Link under
-  the list" for "Not listed here?"), Delete this page.
-- Groups go: no category on dev (22) or live (16) sets `group_by` (read
-  Nov 5). The List of places box goes with them.
-- The question card is chosen by the site: the filter blank on the most
-  places, else "Been there lately?". No setting.
-- The four listing options (card first, places within a walk, boxes,
-  This Shabbos card) are set by the kind (Hotels, Hospitals use them
-  today), not shown to the community admin; superadmin can adjust.
+  chevron; "+ New category page" beside the heading. Candle Lighting &
+  Zmanim is back in the list as a row, like Eruv.
+- A page has: On the site; icon beside the name (tap the icon to change
+  it and the pin colour); Banner photo row; Each place; one "Not listed
+  here? link" row (Hospitals → Refuah, Mikvah → mikvah.org); Delete.
+- Gone from the page: Search bar (always on), Add / Correct / Take off
+  (the "+ Add" box is site-wide; always on), the Map switch (a page is
+  on the map when its places have an address), Groups, web address (set
+  from the name when the page is made), link-preview words.
+- Each place: the built-in fields as rows (Address, puts the page on the
+  map; Phone; the rest), then the page's own fields, then a "Recommend
+  button" switch (the Recommend button on each row: counts, a "Most
+  recommended" sort, and "best ..." searches).
+- A field's screen: name, choices as rows, "A filter" and "On each row"
+  switches, which places it's for, help text, must be filled in, Remove.
+  No "chip or line" choice: what decides how a field shows today is
+  whether it's a filter or on the row.
+- No Map switch for the site either: the Map is on when the header or a
+  tab links to it. Code change only.
+- The question card is chosen by the site; the four listing options are
+  set by the kind (superadmin can adjust).
 - Preview has Page · A listing · Adding. On a phone, Preview is the
   full-width round button, as on Home page.
 - Add a field: pick what kind (rows, each with a real example), then the
-  field's screen: name, choices as rows (no "value | label" box), how it
-  shows, when someone adds a place, Remove. Preview beside on Adding.
+  field's screen.
 
 Still to fix when building: `/philly/admin/categories/restaurant` (no
 `cat:`) silently shows the list.
