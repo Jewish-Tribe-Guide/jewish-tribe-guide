@@ -355,8 +355,8 @@ Networking, Cemetery); no page sets Groups. On the drawing:
 - "+ Add a field" opens with **Ready to add**: whichever of those five
   the page lacks, each "+ Add", one tap, nothing to fill in. Below it,
   **Make your own**: Choices, Yes or no, A list of items, Text, Link.
-  The ready ones ask nothing, so "required" goes for them: live,
-  Networking's Website and Cemetery's Description are required.
+  The ready ones ask nothing, so "required" goes for them: live, only
+  Networking's Website is required among the five.
 - Board 7 maps each kind to the questions it asks: required (not Yes or
   no, not Photo), part of the filter (Choices, Yes or no, Hours as "Open
   now"), show before opened (Choices, Yes or no, a list's count, Text's
