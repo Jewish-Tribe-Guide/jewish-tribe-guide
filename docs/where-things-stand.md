@@ -324,7 +324,7 @@ for that exact change, in the same conversation. Show the dry run first.
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
-cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-14
+cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-15
 adding a field; earlier drafts and the field map are off the canvas). The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
@@ -375,15 +375,25 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   sits under the list, then "What kind of field?" (Choices, Yes or no, A
   list of items, Text, Link), then the field's screen. When nothing
   matches, the list says so and offers "Make your own: <what was typed>".
-- Drawn Nov 5 (board 14), waiting on the user: a ready-made field is one
-  shared definition. Opened after adding, it says "Ready-made · The same
-  on every community's site"; name and questions show as answers, not
-  inputs; choices come in two groups, "On every site" (fixed; for Kosher
-  Certification the template's OU, Star-K, OK Kosher, cRc, Kof-K, plus
-  the typed-in Other) and "<community>'s own" (grip, ×, "+ Add a
-  choice"; Philly's IKC, Keystone-K, Cherry-K, KCL, Tartikov, Other
-  Kosher); "Remove this field" stays. Anything more different is a
-  field of your own.
+- Drawn Nov 5 (boards 14, 15), waiting on the user: a ready-made field
+  is one shared definition. Opened after adding, it says "Ready-made ·
+  The same on every community's site"; name, note and questions show as
+  answers, not inputs; "Remove this field" stays. Its choices are one of
+  two, decided per field by the ready-made definition, never split
+  inside one field (the user, Nov 5: a split by choice felt wrong;
+  hechshers are local, but Kosher Store's choices are what every admin
+  wants kept):
+  - **Each community's own** (board 14, Kosher Certification): the whole
+    list is the community's, drag, ×, "+ Add a choice", and the Other
+    switch. Live, only Kosher Certification and Hospitals' Eruv are like
+    this.
+  - **Same everywhere** (board 15, Kosher Store: Kosher Store, Kosher
+    Items, Other): a plain list, nothing to change. Every other live
+    choice field: Food Type, Store Type, Denomination, Services,
+    Cemetery's Type.
+  - Before building: Synagogues' and Schools' Denomination lists differ
+    today (Orthodox (Ashkenazi) and Other vs Orthodox and
+    Non-Denominational), so one shared list has to be picked.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Each kind of field asks only its own questions (was a map board,
