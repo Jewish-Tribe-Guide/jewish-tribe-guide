@@ -322,9 +322,9 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Up next: Site → Category pages, organised and cleaned up
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". **Fourth draw Nov 5,
+"organized better and just cleaned up in general". **Fifth draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 2d, 3d, 5e, 6e, 7 plus 1b and 4b are current; 2c, 3c, 6d kept to
+boards 1b, 1c, 1d, 2d, 3d, 4b, 5e, 6e, 7 are current; 2c, 3c, 6d kept to
 compare). The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
 all 16 pages; Map is off only on the three with no address (WhatsApp,
@@ -333,6 +333,13 @@ Networking, Cemetery); no page sets Groups. On the drawing:
 - The list is rows: line glyph, name, places count, "Hidden" when off,
   chevron; "+ New category page" beside the heading. Candle Lighting &
   Zmanim is back in the list as a row, like Eruv.
+- "+ New category page" opens **What kind of places?** as its own screen
+  (the user's idea, Nov 5; today it's a box inside the new page's
+  editor). **Ready-made**: Shuls, Food, Groceries, Mikvahs, Hotels,
+  Hospitals, each a row. **Make your own**: Start empty. Either one opens
+  the page's screen, filled from the kind or empty ("Don't make this
+  page" at the bottom until it's saved). Hospitals has no field template
+  today; its sections come with the kind.
 - Three sections on every page, and on every field: **Basics** (a
   page's icon, name, banner; a field's name), the details (a page's
   fields; a field's choices), and **Questions**, each a No / Yes. The
@@ -353,9 +360,11 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   Today only Address and Phone are switches (`has_address`,
   `has_phone`); Hours, Website and Photo are ordinary fields (live: no
   Hours on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
-- "+ Add a field" opens with **Ready to add**: whichever of those five
-  the page lacks, each "+ Add", one tap, nothing to fill in. Below it,
-  **Make your own**: Choices, Yes or no, A list of items, Text, Link.
+- "+ Add a field" works the same way: **Ready-made** first, each "+ Add",
+  one tap, nothing to fill in: the five above plus the kinds' common
+  choice fields (Kosher Certification, Denomination, with the templates'
+  choices). Below it, **Make your own**: Choices, Yes or no, A list of
+  items, Text, Link, each opening the field's screen.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Board 7 maps each kind to the questions it asks: required (not Yes or
@@ -393,8 +402,6 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   set by the kind (superadmin can adjust).
 - Preview has Page · A listing · Adding. On a phone, Preview is the
   full-width round button, as on Home page.
-- Add a field: pick what kind (rows, each with a real example), then the
-  field's screen.
 - Not decided: whether "Can visitors upvote places?" stays as asked, or
   the button is renamed on the site so admin and visitor use one word.
 
