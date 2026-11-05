@@ -328,18 +328,20 @@ boards 1b-4b and 5-6 are current; 1-3 are the first try, kept to compare).
 Agreed: no Computer / Phone switch (only the preview needs one); the
 visitor switches stay (all five are read by the site), named by what a
 visitor sees ("Search bar", "Add a place", "Correct a place", "Ask to take
-a place off", "Recommend button"). On the drawing:
+a place off", "Recommend a place"). On the drawing:
 
 - The list is rows: line glyph, name, places count, "Hidden" when off,
-  chevron; "+ New category page" under the rows. Candle Lighting & Zmanim
+  chevron; "+ New category page" beside the heading. Candle Lighting & Zmanim
   is back in the list as a row, like Eruv.
 - No Map switch: the Map is on the site when the header or a tab links to
   it (Home page already sets those). Code change only; the old Map row can
   be ignored. Site keeps its rows as today.
-- A page's boxes: Top of the page (name, icon, banner, Search bar), List
-  of places (groups, Recommend button, "Link under the list" row for
-  "Not listed here?"), Each place (fields), Map, What visitors can do,
-  Its link, Delete this page.
+- A page's boxes: Top of the page (name, icon, banner, Search bar), Each
+  place (fields), Map, What visitors can do (Recommend a place is the
+  fourth switch), Links (web address, link-preview words, "Link under
+  the list" for "Not listed here?"), Delete this page.
+- Groups go: no category on dev (22) or live (16) sets `group_by` (read
+  Nov 5). The List of places box goes with them.
 - The question card is chosen by the site: the filter blank on the most
   places, else "Been there lately?". No setting.
 - The four listing options (card first, places within a walk, boxes,
