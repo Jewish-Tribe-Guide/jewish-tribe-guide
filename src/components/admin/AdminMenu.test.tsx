@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AdminMenu } from './AdminUI'
+import { CLICK_AFTER_RELEASE_MS } from '@/lib/swallowClick'
 
 afterEach(cleanup)
 
@@ -45,6 +46,28 @@ describe('AdminMenu, a press outside', () => {
     // The swallow is for that one press only.
     await new Promise((r) => setTimeout(r, 0))
     tap(screen.getByText('A row'))
+    expect(underneath).toHaveBeenCalledTimes(1)
+  })
+
+  // Still on a real iPhone, Nov 5: there the click comes a moment after the
+  // finger lifts, by which time the swallow had already ended.
+  it('swallows a click that comes a while after the finger lifts', async () => {
+    const { underneath } = setup()
+    fireEvent.click(screen.getByRole('button', { name: /Sort/ }))
+    const row = screen.getByText('A row')
+    fireEvent.pointerDown(row)
+    fireEvent.pointerUp(row)
+    await new Promise((r) => setTimeout(r, 300))
+    fireEvent.click(row)
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(underneath).not.toHaveBeenCalled()
+
+    // A press with no click after it leaves the next tap alone once it's over.
+    fireEvent.click(screen.getByRole('button', { name: /Sort/ }))
+    fireEvent.pointerDown(row)
+    fireEvent.pointerUp(row)
+    await new Promise((r) => setTimeout(r, CLICK_AFTER_RELEASE_MS + 50))
+    tap(row)
     expect(underneath).toHaveBeenCalledTimes(1)
   })
 
