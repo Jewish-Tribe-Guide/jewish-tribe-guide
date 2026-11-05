@@ -38,7 +38,7 @@ export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'ma
  *  Order here is just documentation; actual display order always comes from
  *  sortOrder. */
 export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: string; title: string }> = {
-  browse: { id: 'browse', title: 'Categories and Search Card' },
+  browse: { id: 'browse', title: 'Categories Card' },
   davening: { id: 'davening', title: 'Davening Times Card' },
   listings: { id: 'listings', title: 'Update Listings Card' },
   map: { id: 'map', title: 'Map Card' },

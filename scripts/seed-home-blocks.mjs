@@ -39,7 +39,7 @@ const supabase = createClient(url, serviceRoleKey, { auth: { persistSession: fal
 // renumbers everything to clean multiples of 100 based on final on-screen
 // order.
 const BUILT_INS = [
-  { id: 'browse', kind: 'browse', title: 'Categories and Search Card', sort_order: -500, card_ids: [] },
+  { id: 'browse', kind: 'browse', title: 'Categories Card', sort_order: -500, card_ids: [] },
   { id: 'davening', kind: 'davening', title: 'Davening Times Card', sort_order: -400, card_ids: [] },
   { id: 'listings', kind: 'listings', title: 'Update Listings Card', sort_order: -300, card_ids: [] },
   { id: 'map', kind: 'map', title: 'Map Card', sort_order: -200, card_ids: [] },

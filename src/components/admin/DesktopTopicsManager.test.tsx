@@ -167,7 +167,9 @@ describe('DesktopTopicsManager', () => {
     const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Browse', cardIds: [], width: 'full' }
     const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
     renderManager([browse, davening])
-    await openRow(user, /^Categories and Search/)
+    // Named for what it holds: it has had no search of its own for a while.
+    expect(screen.getByRole('button', { name: 'Categories' })).toBeInTheDocument()
+    await openRow(user, /^Categories/)
     await openRow(user, /^Davening Times/)
 
     expect(screen.queryByText('Heading')).not.toBeInTheDocument()
@@ -218,7 +220,7 @@ describe('DesktopTopicsManager', () => {
     renderManager([davening])
 
     expect(screen.queryByRole('button', { name: /Add “Davening Times Card”/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add “Categories and Search Card”/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add “Categories Card”/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add “Jewish Times Card”/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Add “Map/ })).not.toBeInTheDocument()
   })
@@ -265,7 +267,7 @@ describe('DesktopTopicsManager', () => {
   // here, the handle and its keyboard (note 25: drag, not arrows).
   it('moves a card by its handle, with the arrow keys, and has no up and down buttons', async () => {
     const user = userEvent.setup()
-    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories and Search Card', cardIds: [], width: 'full' }
+    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories Card', cardIds: [], width: 'full' }
     const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([browse, davening])
 

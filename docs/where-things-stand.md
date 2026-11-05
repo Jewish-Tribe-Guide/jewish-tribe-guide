@@ -2460,7 +2460,15 @@ Built Nov 4, from the user's picks:
     no tab opens anything is refused.
   - Only checked in Chrome (computer and phone width). Not on a real phone.
 
+  - The Categories card is named "Categories" in the admin (was
+    "Categories and Search"; it has had no search of its own for a while).
+
 Still open:
+- **Home card rows (drawn Nov 4, artifact 8HpeQANzsQyGbyHVPsXrc5):** every
+  card a real card, Suggest a Listing included; drag a card beside another
+  to share a row, up to three, no width setting; Categories always alone.
+  Agreed in talk, drawing waits on the user. Needs two migrations (rows,
+  and Suggest a Listing as a card), prod only with a yes.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 
