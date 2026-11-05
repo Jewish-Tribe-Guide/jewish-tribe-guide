@@ -52,3 +52,51 @@ describe('PreviewBeside lighting a part', () => {
     expect(screen.queryByText('Not on the computer version.')).toBeNull()
   })
 })
+
+describe('PreviewBeside showing the whole page', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  // The box on the page the shrunk frame sits in.
+  function shown() {
+    return screen.getByTitle('Preview').parentElement!.parentElement!
+  }
+  function pageIs(height: number) {
+    const doc = screen.getByTitle('Preview').closest('iframe')!.contentDocument!
+    doc.body.getBoundingClientRect = () => ({ height }) as DOMRect
+    act(() => {
+      vi.advanceTimersByTime(400)
+    })
+    return doc
+  }
+
+  it('is as tall as the page, all of it', () => {
+    render(<PreviewBeside src="about:blank" wholePage />)
+    // 1,740 of 1,280 wide, shown 340 wide.
+    pageIs(1740)
+    expect(shown().style.height).toBe('462px')
+  })
+
+  it('tells the page its body needn’t fill the frame, so it can get shorter', () => {
+    render(<PreviewBeside src="about:blank" wholePage />)
+    const doc = pageIs(1740)
+    expect(doc.getElementById('preview-fit-style')?.textContent).toContain('min-height: 0')
+  })
+
+  it('is one screen when the page is shorter than one', () => {
+    render(<PreviewBeside src="about:blank" wholePage />)
+    pageIs(600)
+    expect(shown().style.height).toBe('292px')
+  })
+
+  it('is one screen without wholePage', () => {
+    render(<PreviewBeside src="about:blank" />)
+    pageIs(1740)
+    expect(shown().style.height).toBe('292px')
+  })
+})

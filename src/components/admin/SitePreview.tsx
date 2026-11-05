@@ -30,6 +30,25 @@ export const PREVIEW_PAUSE_MS = 700
 const SPOT_LOOK_MS = 200
 const SPOT_LOOKS = 15
 
+/** The tallest a whole page is shown, should one run on and on. */
+const MOST_PAGE_HEIGHT = 4000
+
+// How tall the page in the frame is, all of it. The body is at least the
+// window's height (min-h-dvh), and the frame is made as tall as the page, so
+// read as it stands the page could only ever grow: the frame's page is told
+// to be its content's height instead.
+const FIT_STYLE_ID = 'preview-fit-style'
+function pageHeight(doc: Document): number {
+  if (!doc.body) return 0
+  if (!doc.getElementById(FIT_STYLE_ID)) {
+    const style = doc.createElement('style')
+    style.id = FIT_STYLE_ID
+    style.textContent = 'body { min-height: 0 !important; }'
+    doc.head?.append(style)
+  }
+  return Math.ceil(doc.body.getBoundingClientRect().height)
+}
+
 export function PreviewBeside({
   src,
   reload = 0,
@@ -38,6 +57,7 @@ export function PreviewBeside({
   device: shownDevice,
   onOpen,
   spot = null,
+  wholePage = false,
 }: {
   /** A page of the site to show. */
   src?: string
@@ -53,6 +73,9 @@ export function PreviewBeside({
   onOpen?: () => void
   /** The part of the page to light up (see previewSpot.ts). */
   spot?: string | null
+  /** As tall as the page `src` is, all of it, rather than one screen of it
+   *  (the user, Nov 4: the computer's home page runs past one screen). */
+  wholePage?: boolean
 }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [loads, setLoads] = useState(0)
@@ -72,9 +95,34 @@ export function PreviewBeside({
     }, SPOT_LOOK_MS)
     return () => clearInterval(t)
   }, [spot, loads])
+  // How tall the whole page is; kept across loads, so a reload doesn't jump.
+  const [fitHeight, setFitHeight] = useState<number | null>(null)
+  useEffect(() => {
+    const doc = frame.current?.contentDocument
+    if (!wholePage || !doc?.body) return
+    const measure = () => {
+      const h = pageHeight(doc)
+      if (h > 0) setFitHeight(Math.min(h, MOST_PAGE_HEIGHT))
+    }
+    measure()
+    // The page draws after it loads, and its photos after that.
+    const Observer = doc.defaultView?.ResizeObserver
+    const seen = Observer ? new Observer(measure) : null
+    seen?.observe(doc.body)
+    let looks = 0
+    const t = setInterval(() => {
+      measure()
+      if (++looks >= SPOT_LOOKS) clearInterval(t)
+    }, SPOT_LOOK_MS)
+    return () => {
+      seen?.disconnect()
+      clearInterval(t)
+    }
+  }, [wholePage, loads])
   const [picked, setDevice] = useState<PreviewDevice>(initialDevice)
   const device = shownDevice ?? picked
-  const { width, height } = DEVICES[device]
+  const { width } = DEVICES[device]
+  const height = wholePage && fitHeight ? Math.max(fitHeight, DEVICES[device].height) : DEVICES[device].height
   const scale = SHOWN_WIDTH[device] / width
   const Frame = onOpen ? 'button' : 'div'
 
@@ -99,7 +147,7 @@ export function PreviewBeside({
       )}
       <Frame
         {...(onOpen && { type: 'button' as const, onClick: onOpen, 'aria-label': 'Open the preview' })}
-        className={`relative block p-0 overflow-hidden bg-white border border-slate-200 ${onOpen ? 'cursor-pointer' : ''} ${device === 'phone' ? 'rounded-[22px]' : 'rounded-[10px]'}`}
+        className={`relative block p-0 overflow-hidden bg-white border border-slate-200 ${onOpen ? 'cursor-zoom-in' : ''} ${device === 'phone' ? 'rounded-[22px]' : 'rounded-[10px]'}`}
         style={{ width: SHOWN_WIDTH[device], height: Math.round(height * scale) }}
       >
         <div
@@ -128,6 +176,7 @@ export default function SitePreview({
   sections,
   device,
   spot = null,
+  onOpen,
 }: {
   community: string
   settings: SiteSettings
@@ -135,6 +184,8 @@ export default function SitePreview({
   /** Which version of the page, picked beside it. */
   device: PreviewDevice
   spot?: string | null
+  /** Clicked, the page opens full size. */
+  onOpen?: () => void
 }) {
   // Which draft the frame shows; 0 until the first one is written, so the
   // frame never loads ahead of it and shows the saved site instead. A pause
@@ -149,5 +200,5 @@ export default function SitePreview({
     return () => clearTimeout(t)
   }, [settings, sections])
 
-  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} device={device} spot={spot} />
+  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} device={device} spot={spot} onOpen={onOpen} wholePage={device === 'computer'} />
 }

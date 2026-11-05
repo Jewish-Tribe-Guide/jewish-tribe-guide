@@ -183,6 +183,11 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     return <DevicePreviewFrame src={previewUrl(community.slug)} initialDevice={device === 'phone' ? 'mobile' : 'desktop'} onClose={() => setPreviewing(false)} />
   }
 
+  const openPreview = () => {
+    writePreviewDraft({ settings: draft, sections: sectionsDraft })
+    setPreviewing(true)
+  }
+
   const computer = device === 'computer'
   // On a box that shows on both versions.
   const alsoOn = <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{computer ? 'Also on a phone' : 'Also on a computer'}</span>
@@ -245,12 +250,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       <div className="flex items-start gap-6">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           <div className="lg:hidden">
-            <AdminPreviewButton
-              onClick={() => {
-                writePreviewDraft({ settings: draft, sections: sectionsDraft })
-                setPreviewing(true)
-              }}
-            />
+            <AdminPreviewButton onClick={openPreview} />
           </div>
           {nameAndLogo}
           {computer ? (
@@ -366,7 +366,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} />
+          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} />
         </aside>
       </div>
 

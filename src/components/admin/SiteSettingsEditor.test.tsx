@@ -268,6 +268,16 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(screen.getByLabelText('Big line')).toHaveValue(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}?`)
   })
 
+  // Like a screenshot here: the small one opens big (the user, Nov 4).
+  it('clicking the preview beside opens it full size, with what hasn’t been saved', async () => {
+    const user = userEvent.setup()
+    await renderEditor()
+    await user.type(screen.getByLabelText('Big line'), '?')
+    await user.click(await screen.findByRole('button', { name: 'Open the preview' }, { timeout: 2000 }))
+    expect(vi.mocked(writePreviewDraft).mock.lastCall![0].settings.desktopHeroHeadline).toBe(`${SITE_SETTINGS_DEFAULTS.desktopHeroHeadline}?`)
+    expect(screen.getByTitle('Site preview')).toHaveAttribute('src', '/philly?preview=1')
+  })
+
   // The Today home is a phone's home page only.
   it('the Today home box is with the phone’s boxes', async () => {
     const user = userEvent.setup()

@@ -2327,6 +2327,11 @@ Drawn first (artifact 2sssenojcQzzeHtHAT8gnp), built as drawn:
   that box red with the reason under it: "Full: 3 cards at most", or
   "Categories has a row of its own" (Categories in or out of a box). A full
   box is still dimmed from the moment a card is lifted.
+- **The preview beside:** on a computer it's as tall as the page, all of it
+  (about 460px for Philly's home page, down to the footer), rather than one
+  1,100px screen. The phone stays one screen, since the whole phone page
+  would run past the window. Clicking either opens it full size, as
+  Category pages' preview already did.
 
 ## Done Nov 4: the bugs and small tweaks from the user's 33 notes (on `redesign/oct18-fixes`)
 
