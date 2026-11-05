@@ -47,6 +47,8 @@ export default function DragList<T>({
   onReorder,
   children,
   className = '',
+  canMove,
+  slotClass,
 }: {
   items: readonly T[]
   keyOf: (item: T) => string
@@ -54,6 +56,13 @@ export default function DragList<T>({
   onReorder: (next: T[]) => void
   children: (item: T, row: DragRow) => React.ReactNode
   className?: string
+  /** False for an order a row can't take: the lifted row skips past it.
+   *  `via` is 'key' for an arrow press, which also skips an order that
+   *  looks no different. */
+  canMove?: (next: T[], via: 'pointer' | 'key') => boolean
+  /** A class for the spot a row sits in, which stays put while the row is
+   *  lifted: the home cards draw their rows' boxes with it. */
+  slotClass?: (item: T, i: number, shown: readonly T[], dragKey: string | null) => string
 }) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
@@ -62,9 +71,9 @@ export default function DragList<T>({
   const orderRef = useRef<string[] | null>(null)
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; pointerId: number } | null>(null)
   const swallowClick = useRef(false)
-  const latest = useRef({ items, keyOf, onReorder })
+  const latest = useRef({ items, keyOf, onReorder, canMove })
   useEffect(() => {
-    latest.current = { items, keyOf, onReorder }
+    latest.current = { items, keyOf, onReorder, canMove }
   })
 
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
@@ -124,8 +133,13 @@ export default function DragList<T>({
       const to = dropIndex(middles, d.startTop + d.dy + el.offsetHeight / 2)
       const from = cur.indexOf(d.key)
       if (to !== from) {
-        orderRef.current = moveItem(cur, from, to)
-        setOrder(orderRef.current)
+        const next = moveItem(cur, from, to)
+        const { items: now, keyOf: keyFor, canMove: allowed } = latest.current
+        const byKey = new Map(now.map((i) => [keyFor(i), i]))
+        if (!allowed || allowed(next.map((k) => byKey.get(k)!), 'pointer')) {
+          orderRef.current = next
+          setOrder(next)
+        }
       }
       place()
     }
@@ -221,10 +235,16 @@ export default function DragList<T>({
               h.begin(key, e.pointerId, e.clientY)
             }}
             onKeyDown={(e) => {
-              const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : null
-              if (to === null) return
+              const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : null
+              if (step === null) return
               e.preventDefault()
-              if (to >= 0 && to < items.length) onReorder(moveItem(items, i, to))
+              // The nearest place it can go that way.
+              for (let to = i + step; to >= 0 && to < items.length; to += step) {
+                const next = moveItem(items, i, to)
+                if (canMove && !canMove(next, 'key')) continue
+                onReorder(next)
+                break
+              }
             }}
             className={`grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-md hover:bg-slate-100 ${lifted ? 'cursor-grabbing text-primary' : 'text-slate-400'}`}
           >
@@ -240,7 +260,7 @@ export default function DragList<T>({
             if ((e.nativeEvent as PointerEvent).pointerType === 'touch') e.preventDefault()
           },
         }
-        return (
+        const row = (
           <div
             key={key}
             ref={(el) => {
@@ -252,6 +272,13 @@ export default function DragList<T>({
           >
             {children(item, { handle, rowProps, lifted })}
           </div>
+        )
+        return slotClass ? (
+          <div key={key} className={slotClass(item, i, shown, drag?.key ?? null)}>
+            {row}
+          </div>
+        ) : (
+          row
         )
       })}
     </div>
@@ -430,9 +457,9 @@ export function OrderRow({
  *  handle, its name, a line under it when there's one, and an × to take it
  *  off. It doesn't open (the drawing; the user, Nov 4: "why are links like
  *  that"). */
-export function InnerRow({ row, name, line, onRemove }: { row: DragRow; name: string; line?: string; onRemove: () => void }) {
+export function InnerRow({ row, name, line, onRemove, className }: { row: DragRow; name: string; line?: string; onRemove: () => void; className?: string }) {
   return (
-    <div className={`border-b border-slate-100 bg-white last:border-b-0 ${row.lifted ? 'border-transparent' : ''}`}>
+    <div className={className ?? `border-b border-slate-100 bg-white last:border-b-0 ${row.lifted ? 'border-transparent' : ''}`}>
       <div className="flex min-h-11 items-center gap-1 pl-1 pr-1">
         {row.handle}
         <span {...row.rowProps} className="flex min-w-0 flex-1 select-none flex-col gap-0.5 py-2 text-left">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
+import { cloneElement, useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards, withEruvCount } from '@/components/home/sections'
 import { useEruvCount } from '@/lib/useEruvStatuses'
@@ -35,7 +35,7 @@ import { mentionsEruv } from '@/lib/ask'
 import { useHydrated } from '@/lib/useHydrated'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
-import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
+import { BUILT_IN_BLOCKS, cardRows, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useChangeLog } from '@/lib/changesContext'
 import { features } from '@/lib/features'
@@ -317,20 +317,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // fresh community never launches blank.
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
-    .map((s) => ({ kind: s.kind, title: s.title, width: s.width }))
+    .map((s) => ({ kind: s.kind, title: s.title, sharesRow: s.sharesRow }))
+  // With none set: Categories, then Davening Times, Kept by the Community
+  // and Suggest a Listing in one row, then a row each.
   const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'listings', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'davening', 'listings', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
-          width: 'full' as const,
+          sharesRow: kind === 'listings' || kind === 'suggest',
         }))
   // On the Today home its own blocks answer what Browse, Davening Times and
   // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
   // Suggest a listing and Stay in the loop stay below them, as the admin
   // orders them.
-  const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'subscribe') : allBuiltIns
+  const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'suggest' || b.kind === 'subscribe') : allBuiltIns
 
   // The phone's home under the search (the user, Oct 17): Right now (what's
   // open, or Shabbos), then every category as a tile, most places first
@@ -591,38 +593,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 Listings, Email Signup, Jewish Times) uses the same card
                 language (border, rounded-2xl) as this section, so the whole
                 stack reads as one family. */}
-        {/* ── The desktop gateway's cards — Categories & Search, Davening
-                Times, Update Listings, Map, Email Signup, Jewish Times, plus
-                the new Suggest a Listing — in the admin-configured order
-                (builtInOrder above), and now optionally paired side by side
-                (see homeSections.ts's own `width` doc). Each card keeps only
-                the gating it actually needs on its own merits — Davening
-                Times self-gates on having a minyanim-bearing category at all
-                (inside DaveningTimesCard), Jewish Times gates on a real
-                Zmanim pseudo-category existing (candle-lighting data has
-                nowhere to come from otherwise), and Update Listings/Email
-                Signup need neither.
+        {/* ── The desktop gateway's cards — Categories, Davening Times, Kept
+                by the Community, Suggest a Listing, Email Signup, Jewish
+                Times — in the admin's order and rows (builtInOrder above;
+                cardRows in homeSections.ts: up to three a row, Categories
+                alone). Each card keeps only the gating it actually needs on
+                its own merits — Davening Times self-gates on having a
+                minyanim-bearing category at all (inside DaveningTimesCard),
+                Jewish Times gates on a real Zmanim pseudo-category existing
+                (candle-lighting data has nowhere to come from otherwise),
+                and the rest need neither.
 
                 cardKindContent below returns just each card's own inner box
                 — no outer margin, no row wrapper — so the SAME content can
-                land either in its own full-width row or share a 2-column
-                row with a neighbor. Pairing happens AFTER gating: two
-                'half' cards are only paired if BOTH actually rendered
-                something (cardKindContent didn't return null) — a 'half'
-                card whose would-be partner is gated off that render (or is
-                itself the last card) falls back to a full-width row of its
-                own, so a lone half-width card never looks like a mistake.
-
-                Davening Times and Update Listings are the one exception to
-                that generic per-kind path: the desktop mockup (Phase 6,
-                docs/desktop-mockup-plan.md) puts them in one 3-up
-                "community" row together with Suggest a Listing (a card with
-                no `width`/kind of its own in the database — card widths
-                there are only 'full' | 'half', and kinds are fixed by a DB
-                constraint, so there's nowhere to hang a generic pairing rule
-                for a third card). See the renderedCards walk below, which
-                intercepts those two kinds specifically instead of routing
-                them through cardKindContent. */}
+                land alone in its row or share it. A row is laid out after
+                gating: a card gated off this render leaves its row to the
+                others, and a row left with none isn't drawn. */}
         {(() => {
           function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
@@ -693,10 +679,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
               </div>
             )
           }
-          // 'davening'/'listings' are NOT handled here any more — see the
-          // community-row special case in the renderedCards walk below,
-          // which merges them with Suggest a Listing into one row instead
-          // of each getting its own.
+          if (kind === 'davening') return !today && !isMobile && <DaveningTimesCard coords={coords} />
+          if (kind === 'listings') {
+            return !isMobile && <UpdateListingsCard eyebrow={settings.desktopListingsEyebrow} heading={settings.desktopListingsHeading} />
+          }
+          if (kind === 'suggest') return !isMobile && <SuggestListingCard />
           if (kind === 'subscribe') {
             // Also unconditional — SubscribeSection doesn't read zmanim
             // data either; it only used to pair visually with
@@ -742,111 +729,39 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           return null
           }
 
-          // Pairing happens AFTER gating (see the comment above) — build the
-          // rendered, non-empty cards first, THEN walk them looking for two
-          // adjacent 'half' cards to combine into one row.
-          //
-          // 'davening'/'listings' get a special case here rather than going
-          // through cardKindContent like every other kind: the desktop
-          // mockup (Phase 6, docs/desktop-mockup-plan.md) puts Davening
-          // Times, Update Listings and the new Suggest a Listing card in one
-          // 3-up "community" row instead of each kind getting its own row —
-          // Suggest a Listing has no `width`/kind of its own in the database
-          // (card widths there are only ever 'full' | 'half', and kinds are
-          // fixed by a DB constraint) to hang a generic pairing rule off of,
-          // so the row is built by hand at whichever of the two configured
-          // kinds the walk reaches FIRST, and the other is skipped when the
-          // walk reaches it. Their own `width` values are ignored for this
-          // row — same reasoning CardKindContent's half-pairing below has no
-          // say here either. Every other kind (Subscribe + Jewish Times
-          // still pair) goes through the normal path untouched.
-          const renderedCards: { kind: string; width: 'full' | 'half'; node: React.ReactElement }[] = []
-          let communityRowRendered = false
-          for (const { kind, width } of builtInOrder) {
-            if (kind === 'davening' || kind === 'listings') {
-              if (communityRowRendered) continue
-              communityRowRendered = true
-              const hasDavening = !today && builtInOrder.some((b) => b.kind === 'davening')
-              const hasListings = builtInOrder.some((b) => b.kind === 'listings')
-              const communityCards: React.ReactElement[] = []
-              if (hasDavening && !isMobile) {
-                communityCards.push(
-                  <DaveningTimesCard key="davening" coords={coords} />,
-                )
-              }
-              if (hasListings && !isMobile) {
-                communityCards.push(
-                  <UpdateListingsCard key="listings" eyebrow={settings.desktopListingsEyebrow} heading={settings.desktopListingsHeading} />,
-                )
-              }
-              // Suggest a Listing — always present, when the row renders at
-              // all (i.e. desktop, and at least one of the other two kinds
-              // is configured).
-              if (!isMobile) communityCards.push(<SuggestListingCard key="suggest" />)
-              if (communityCards.length === 0) continue
-
-              const communityRowClass =
-                communityCards.length === 3
-                  ? 'grid gap-5 min-[900px]:grid-cols-3'
-                  : communityCards.length === 2
-                    ? 'grid gap-5 min-[740px]:grid-cols-2'
-                    : 'grid gap-5'
-              renderedCards.push({
-                kind: 'community',
-                width: 'full',
-                node: <div className={communityRowClass}>{communityCards}</div>,
-              })
-              continue
-            }
-            const node = cardKindContent(kind)
-            // Truthy-narrowed, same as the old `.filter` predicate this
-            // replaced: cardKindContent's return type is the broader
-            // React.ReactNode (it can return `false` from an `isMobile &&`
-            // gate), but a truthy value here is always the real element.
-            if (node) renderedCards.push({ kind, width, node: node as React.ReactElement })
-          }
-
           const rows: { key: string; node: React.ReactNode }[] = []
-          for (let i = 0; i < renderedCards.length; i++) {
-            const cur = renderedCards[i]!
-            const next = renderedCards[i + 1]
-            if (cur.width === 'half' && next?.width === 'half') {
-              rows.push({
-                key: `${cur.kind}-${next.kind}`,
-                node: (
-                  // NOT `desktop:` (640px) — that breakpoint answers "is this
-                  // a phone", not "is there room for two half cards side by
-                  // side", and reusing it here paired them at widths where
-                  // neither card had enough room, wrapping Update Listings'
-                  // "Report" onto its own line.
-                  //
-                  // Not a fixed width tuned to the LONG labels either — that
-                  // gave up pairing at any width under ~1100px even though
-                  // ContributeButton's own @container already crunches down
-                  // to short labels ("Add a place" → "Add") well before then.
-                  // The real constraint is narrower: at what width do even
-                  // the SHORT labels stop fitting three-across? Measured
-                  // directly against a production build by sweeping the
-                  // width where the grid pairs: wraps at 730px, clear at
-                  // 735px, ~33px of margin to spare by 740px. Below 740,
-                  // both cards stack full-width instead, each getting the
-                  // whole content column — this is the actual "crunch until
-                  // it'd look bad, then give up and stack" behavior, not a
-                  // fixed guess at long-label math.
-                  <div className="grid grid-cols-1 gap-4 min-[740px]:grid-cols-2">
-                    {cur.node}
-                    {next.node}
+          for (const row of cardRows(builtInOrder)) {
+            const shown = row.flatMap((c) => {
+              const node = cardKindContent(c.kind)
+              // cardKindContent's return type is the broader React.ReactNode
+              // (it can return `false` from an `isMobile &&` gate); a truthy
+              // value is always the real element.
+              return node ? [{ kind: c.kind, node: node as React.ReactElement }] : []
+            })
+            if (shown.length === 0) continue
+            const key = shown.map((c) => c.kind).join('-')
+            rows.push({
+              key,
+              node:
+                shown.length === 1 ? (
+                  shown[0]!.node
+                ) : (
+                  // NOT `desktop:` (640px) — that breakpoint answers "is
+                  // this a phone", not "is there room for these side by
+                  // side". Measured against a production build: two cards'
+                  // short labels wrap at 730px and are clear by 740px.
+                  // Three keep the 900px the three-card row always had.
+                  // Below that they stack, each getting the whole content
+                  // column.
+                  <div className={shown.length === 3 ? 'grid gap-5 min-[900px]:grid-cols-3' : 'grid gap-5 min-[740px]:grid-cols-2'}>
+                    {shown.map((c) => cloneElement(c.node, { key: c.kind }))}
                   </div>
                 ),
-              })
-              i++ // consumed both
-            } else {
-              rows.push({ key: cur.kind, node: cur.node })
-            }
+            })
           }
 
           return rows.map((row) => (
-            <div key={row.key} data-spot={`cards ${row.key.replace('community', 'davening-listings').split('-').map((k) => `card-${k}`).join(' ')}`} className="my-8">
+            <div key={row.key} data-spot={`cards ${row.key.split('-').map((k) => `card-${k}`).join(' ')}`} className="my-8">
               {row.node}
             </div>
           ))

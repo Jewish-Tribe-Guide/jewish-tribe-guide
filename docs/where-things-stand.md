@@ -2464,11 +2464,19 @@ Built Nov 4, from the user's picks:
     "Categories and Search"; it has had no search of its own for a while).
 
 Still open:
-- **Home card rows (drawn Nov 4, artifact 8HpeQANzsQyGbyHVPsXrc5):** every
-  card a real card, Suggest a Listing included; drag a card beside another
-  to share a row, up to three, no width setting; Categories always alone.
-  Agreed in talk, drawing waits on the user. Needs two migrations (rows,
-  and Suggest a Listing as a card), prod only with a yes.
+- **Home card rows: built, not live (artifact 8HpeQANzsQyGbyHVPsXrc5).**
+  Every card is a real card, Suggest a Listing included. Cards in one box
+  share a row on the computer home, up to three; Categories is always
+  alone. Each card is a handle, its name and an ×; nothing opens, and the
+  width and word fields are gone (the site still reads the saved words).
+  Dragged up and down; the arrow keys step through the same places.
+  - Needs migration 093 (`shares_row`, the 'suggest' kind, today's rows
+    kept as they look) on the test project before admin-write or CI, and on
+    prod before this deploys: without it a save of any home row fails and
+    the home loses Suggest a Listing. Prod only with a yes.
+  - Checked in Chrome at computer and phone width with the draft preview
+    (nothing saved). Not checked: a save, or the suites, until 093 is on
+    the test project.
 - **20, asking visitors about something seen today:** waits on the user
   naming the place where they saw it.
 

@@ -30,9 +30,9 @@ import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/li
 
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   // Every field saveHomeSections actually persists (see its own `changed()`)
-  // has to be listed here too — width was once left out, so flipping a
-  // card's Full/Half toggle never marked the form dirty.
-  const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds, width }) => ({ id, title, cardIds, width }))
+  // has to be listed here too — a card's width was once left out, so
+  // changing it never marked the form dirty.
+  const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds, sharesRow }) => ({ id, title, cardIds, sharesRow }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
 }
 
@@ -241,7 +241,7 @@ export default function SiteSettingsEditor({
 
               <div {...spotOn('cards')}>
                 <AdminBox title="Cards under the search, on a computer">
-                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onSettingChange={set} onOpenCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
+                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
                 </AdminBox>
               </div>
 

@@ -143,25 +143,24 @@ describe('SiteSettingsEditor — Home page', () => {
   })
 
   // Regression: sectionsEqual once left `width` out, so flipping a card
-  // between Full and Half width never counted as a change.
-  it('a card’s width is a change', async () => {
+  // between Full and Half width never counted as a change. Its rows now.
+  it('a card moving into another’s row is a change', async () => {
     const user = userEvent.setup()
     await renderEditor('home', SITE_SETTINGS_DEFAULTS, [
-      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 0, cardIds: [], width: 'full' },
+      { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 0, cardIds: [], sharesRow: false },
+      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 1, cardIds: [], sharesRow: false },
     ])
-    await user.click(screen.getByRole('button', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading }))
-    await user.click(screen.getByRole('button', { name: 'Half width' }))
+    screen.getByRole('button', { name: 'Move Davening Times' }).focus()
+    await user.keyboard('{ArrowDown}')
     expect(within(saveBar()!).getByText('1 change')).toBeInTheDocument()
   })
 
   // The user, Nov 4: "Don't say how many people signed up".
   it('the email sign-up card says nothing about who signed up, and asks for no list', async () => {
-    const user = userEvent.setup()
     await renderEditor('home', SITE_SETTINGS_DEFAULTS, [
-      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 0, cardIds: [], width: 'full' },
+      { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', sortOrder: 0, cardIds: [], sharesRow: false },
     ])
-    await user.click(screen.getByRole('button', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading }))
-    expect(screen.getByRole('button', { name: 'Half width' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `Take ${SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading} off` })).toBeInTheDocument()
     expect(screen.queryByText(/signed up|subscri/i)).toBeNull()
     expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).includes('/api/admin/subscribers'))).toBe(false)
   })
@@ -294,7 +293,7 @@ describe('SiteSettingsEditor — Header and menus', () => {
 
 describe('countChanges', () => {
   it('counts each setting changed, and the sections as one', () => {
-    const sections = [{ id: 'a', kind: 'section' as const, title: 'A', cardIds: [], width: 'full' as const }]
+    const sections = [{ id: 'a', kind: 'section' as const, title: 'A', cardIds: [], sharesRow: false }]
     expect(countChanges(SITE_SETTINGS_DEFAULTS, SITE_SETTINGS_DEFAULTS, sections, sections)).toBe(0)
     expect(countChanges(SITE_SETTINGS_DEFAULTS, { ...SITE_SETTINGS_DEFAULTS, name: 'x', mission: 'y' }, sections, sections)).toBe(2)
     expect(countChanges(SITE_SETTINGS_DEFAULTS, SITE_SETTINGS_DEFAULTS, sections, [{ ...sections[0], title: 'B' }])).toBe(1)

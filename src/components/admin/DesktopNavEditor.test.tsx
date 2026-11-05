@@ -17,8 +17,8 @@ const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
 const bakery = makeCategory({ id: 'bakery', pluralLabel: 'Bakeries' })
 const content = { content: { categories: [grocery, bakery] } }
 
-const food: DraftHomeSection = { id: 'food', kind: 'section', title: 'Food', cardIds: ['grocery'], width: 'full' }
-const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], width: 'full' }
+const food: DraftHomeSection = { id: 'food', kind: 'section', title: 'Food', cardIds: ['grocery'], sharesRow: false }
+const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], sharesRow: false }
 
 // The editor only calls onChange; this owns the state, as the admin page does.
 function Harness({
@@ -272,7 +272,7 @@ describe('DesktopNavEditor — Categories’ headings (the groups)', () => {
   })
 
   it('+ Add a link moves a category out of another heading; a heading never offers its own', async () => {
-    const drinks: DraftHomeSection = { id: 'drinks', kind: 'section', title: 'Drinks', cardIds: [], width: 'full' }
+    const drinks: DraftHomeSection = { id: 'drinks', kind: 'section', title: 'Drinks', cardIds: [], sharesRow: false }
     const { user, onSectionsChange } = show(DEFAULT_DESKTOP_NAV_ITEMS, { sections: [food, drinks] })
     await open(user)
     await user.click(row('Drinks'))
@@ -284,7 +284,7 @@ describe('DesktopNavEditor — Categories’ headings (the groups)', () => {
   })
 
   it('a link’s × takes it out of its heading; headings move by the handle, leaving the home page’s blocks', async () => {
-    const drinks: DraftHomeSection = { id: 'drinks', kind: 'section', title: 'Drinks', cardIds: [], width: 'full' }
+    const drinks: DraftHomeSection = { id: 'drinks', kind: 'section', title: 'Drinks', cardIds: [], sharesRow: false }
     const { user, onSectionsChange } = show(DEFAULT_DESKTOP_NAV_ITEMS, { sections: [food, drinks, map] })
     await open(user)
     screen.getByRole('button', { name: 'Move Drinks' }).focus()

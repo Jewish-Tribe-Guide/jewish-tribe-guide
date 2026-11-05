@@ -1,53 +1,66 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { DraftHomeSection } from '@/lib/homeSections'
-import { SITE_SETTINGS_DEFAULTS, type SiteSettings } from '@/lib/siteSettings'
+import type { DraftHomeSection, HomeBlockKind } from '@/lib/homeSections'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import DesktopTopicsManager from './DesktopTopicsManager'
 
-// A fully controlled editor (sections/onChange, settings/onSettingChange
-// props), like HomeSectionManager — needs no providers at all, so renders
-// bare.
+// A fully controlled editor (sections/onChange props), like
+// HomeSectionManager — needs no providers at all, so renders bare.
 
-function renderManager(
-  sections: DraftHomeSection[],
-  onChange = vi.fn(),
-  settings: SiteSettings = SITE_SETTINGS_DEFAULTS,
-  onSettingChange = vi.fn(),
-) {
-  render(
-    <DesktopTopicsManager
-      sections={sections}
-      onChange={onChange}
-      settings={settings}
-      onSettingChange={onSettingChange}
-    />,
-  )
-  return { onChange, onSettingChange }
+function renderManager(sections: DraftHomeSection[], onChange = vi.fn(), onPointCard = vi.fn()) {
+  render(<DesktopTopicsManager sections={sections} onChange={onChange} settings={SITE_SETTINGS_DEFAULTS} onPointCard={onPointCard} />)
+  return { onChange, onPointCard }
 }
 
-// Same reasoning as HomeSectionManager.test.tsx's own ManagerHarness: this
-// component never holds its own copy of `sections`/`settings`, only calls
-// its onChange callbacks — typing multiple keystrokes into a controlled
-// input needs something that actually owns the state and feeds it back,
-// same as the real admin page.
-function ManagerHarness({
-  initialSections,
-  initialSettings = SITE_SETTINGS_DEFAULTS,
-}: {
-  initialSections: DraftHomeSection[]
-  initialSettings?: SiteSettings
-}) {
+// Owns the draft and feeds it back, as the admin page does, so several
+// moves in a row each start from the last one.
+function ManagerHarness({ initialSections, onChange }: { initialSections: DraftHomeSection[]; onChange: (s: DraftHomeSection[]) => void }) {
   const [sections, setSections] = useState(initialSections)
-  const [settings, setSettings] = useState(initialSettings)
-  function onSettingChange<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
-    setSettings((s) => ({ ...s, [key]: value }))
-  }
   return (
-    <DesktopTopicsManager sections={sections} onChange={setSections} settings={settings} onSettingChange={onSettingChange} />
+    <DesktopTopicsManager
+      sections={sections}
+      onChange={(next) => {
+        onChange(next)
+        setSections(next)
+      }}
+      settings={SITE_SETTINGS_DEFAULTS}
+    />
   )
+}
+
+const TITLES: Partial<Record<HomeBlockKind, string>> = {
+  browse: 'Categories Card',
+  davening: 'Davening Times Card',
+  listings: 'Update Listings Card',
+  suggest: 'Suggest a Listing Card',
+  subscribe: 'Email Signup Card',
+  jewishTimes: 'Jewish Times Card',
+}
+function card(kind: HomeBlockKind, sharesRow = false): DraftHomeSection {
+  return { id: kind, kind, title: TITLES[kind] ?? kind, cardIds: [], sharesRow }
+}
+
+const LISTINGS = SITE_SETTINGS_DEFAULTS.desktopListingsHeading
+const SUBSCRIBE = SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading
+
+/** Each row's cards by name, as the list draws them: a box per shared row. */
+function drawnRows(): string[][] {
+  const rows: string[][] = []
+  let open = false
+  for (const el of document.querySelectorAll('[data-drag-row]')) {
+    const name = el.querySelector('.font-medium')?.textContent
+    if (!name) continue
+    const slot = el.parentElement!.className
+    const inBox = slot.includes('border-x')
+    if (!inBox || slot.includes('rounded-t')) rows.push([])
+    rows.at(-1)!.push(name)
+    open = inBox && !slot.includes('rounded-b')
+  }
+  expect(open).toBe(false)
+  return rows
 }
 
 afterEach(() => {
@@ -55,252 +68,143 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-// Each card is a row that opens in place (board 7).
-async function openRow(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
-  await user.click(screen.getByRole('button', { name }))
-}
-
 describe('DesktopTopicsManager', () => {
-  // Regression: found live against the real dev database, which still had
-  // a 'map' row plus nothing else — reasonable, since 'davening'/
-  // 'listings'/'subscribe'/'jewishTimes' are new kinds replacing the old
-  // 'zmanim'/'shabbat'/'featured'. DDL only ever widens the DB's allowed
-  // kinds, never narrows (see homeSections.ts's own doc), so a row with one
-  // of those retired kinds can still be sitting in real data. This crashed
-  // the whole Desktop tab with "Cannot read properties of undefined
-  // (reading 'title')" before this fix — BUILT_IN_BLOCKS has no entry for
-  // a retired kind, and the component read its `.title` unconditionally.
-  //
-  // 'map' (the home screen's own embedded map card) has since retired too —
-  // the same "old row, still in some community's real data" story applies
-  // to it now, alongside 'zmanim'.
-  it('does not crash on a row whose kind predates the current five (e.g. the old "zmanim", or the since-retired "map")', () => {
-    const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], width: 'full' }
-    const legacyMap: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    expect(() => renderManager([legacyZmanim, legacyMap, davening])).not.toThrow()
-    expect(screen.getByText('Davening Times')).toBeInTheDocument()
+  // DDL only ever widens the DB's allowed kinds, never narrows (see
+  // homeSections.ts's own doc), so a row with a retired kind ('zmanim',
+  // 'map') can still be sitting in real data. That once crashed the whole
+  // tab: BUILT_IN_BLOCKS has no entry for a retired kind.
+  it('does not crash on a row whose kind is retired (the old "zmanim", or "map"), and lists none', () => {
+    const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], sharesRow: false }
+    expect(() => renderManager([legacyZmanim, card('map'), card('davening')])).not.toThrow()
+    expect(drawnRows()).toEqual([['Davening Times']])
     expect(screen.queryByText('Zmanim & Shabbos')).not.toBeInTheDocument()
-    expect(screen.queryByText('Map Card')).not.toBeInTheDocument()
   })
 
-  it('leaves legacy-kind rows untouched when reordering/adding/removing another card', async () => {
+  it('leaves retired-kind rows untouched when adding a card', async () => {
     const user = userEvent.setup()
-    const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], width: 'full' }
-    const legacyMap: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([legacyZmanim, legacyMap])
+    const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], sharesRow: false }
+    const { onChange } = renderManager([legacyZmanim, card('map')])
 
-    await user.click(screen.getByRole('button', { name: /Add “Davening Times Card”/ }))
+    await user.click(screen.getByRole('button', { name: '+ Add Davening Times' }))
 
-    expect(onChange).toHaveBeenCalledWith([
-      legacyZmanim,
-      legacyMap,
-      { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' },
-    ])
+    expect(onChange).toHaveBeenCalledWith([legacyZmanim, card('map'), card('davening')])
   })
 
-  it('defaults to Full width selected, and clicking Half width calls onChange with the updated card', async () => {
+  // The drawing (artifact 8HpeQANzsQyGbyHVPsXrc5): a card alone fills its
+  // row; cards that share one sit in one box.
+  it('draws cards that share a row in one box, and a card alone on its own', () => {
+    renderManager([card('browse'), card('davening'), card('listings', true), card('suggest', true), card('subscribe')])
+    expect(drawnRows()).toEqual([['Categories'], ['Davening Times', LISTINGS, 'Suggest a Listing'], [SUBSCRIBE]])
+  })
+
+  // The same rules as the home page (cardRows): a saved row can't put
+  // Categories beside anything, or a fourth card in a row.
+  it('keeps Categories alone and a row to three, whatever was saved', () => {
+    renderManager([card('browse'), card('davening', true), card('listings', true), card('suggest', true), card('subscribe', true)])
+    expect(drawnRows()).toEqual([['Categories'], ['Davening Times', LISTINGS, 'Suggest a Listing'], [SUBSCRIBE]])
+  })
+
+  // Nothing opens: each card is a handle, its name and an ×.
+  it('takes a card off with its ×, at once', async () => {
     const user = userEvent.setup()
-    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([subscribe])
-    await openRow(userEvent.setup(), /^Stay in the Loop/)
+    const { onChange } = renderManager([card('davening'), card('subscribe')])
 
-    expect(screen.getByRole('button', { name: 'Full width' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Half width' })).toHaveAttribute('aria-pressed', 'false')
-
-    await user.click(screen.getByRole('button', { name: 'Half width' }))
-
-    expect(onChange).toHaveBeenCalledWith([{ ...subscribe, width: 'half' }])
-  })
-
-  // Davening Times and Update Listings always share one row on the home with
-  // Suggest a Listing, which ignores their width (Landing.tsx).
-  it('offers no width for the two cards that always share a row', async () => {
-    const user = userEvent.setup()
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
-    renderManager([davening, listings])
-    await openRow(user, /^Davening Times/)
-    await openRow(user, new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopListingsHeading}`))
-
-    expect(screen.queryByRole('button', { name: 'Full width' })).not.toBeInTheDocument()
-  })
-
-  it('shows a hint explaining pairing only once a card is set to Half width', async () => {
-    const user = userEvent.setup()
-    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
-    render(<ManagerHarness initialSections={[subscribe]} />)
-    await openRow(user, /^Stay in the Loop/)
-
-    expect(screen.queryByText(/beside the next half-width card/i)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Half width' }))
-    expect(screen.getByText(/beside the next half-width card/i)).toBeInTheDocument()
-  })
-
-  it('lists each card as a row named by what visitors see, with one line under it', () => {
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening', cardIds: [], width: 'full' }
-    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
-    renderManager([davening, subscribe], vi.fn(), { ...SITE_SETTINGS_DEFAULTS, desktopSubscribeHeading: 'Stay in the Loop' })
-
-    const davRow = screen.getByRole('button', { name: 'Davening Times' })
-    expect(davRow).toHaveAttribute('aria-expanded', 'false')
-    expect(davRow).toHaveAccessibleDescription('The next minyan, beside the listings card')
-    expect(screen.getByRole('button', { name: 'Stay in the Loop' })).toHaveAccessibleDescription('Email sign-up')
-    // Closed, a row shows nothing else.
+    expect(screen.queryByRole('button', { expanded: false })).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
+
+    expect(onChange).toHaveBeenCalledWith([card('subscribe')])
+    expect(screen.queryByText(/off the home page\?/)).toBeNull()
   })
 
-  it('shows Eyebrow and Heading inputs for a card that has both, seeded from settings', async () => {
-    const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
-    renderManager([listings], vi.fn(), { ...SITE_SETTINGS_DEFAULTS, desktopListingsEyebrow: 'Right now', desktopListingsHeading: 'Kept by you' })
+  it('taking off the first card of a row leaves the rest of that row together', async () => {
     const user = userEvent.setup()
-    await openRow(user, /^Kept by you/)
-
-    expect(screen.getByDisplayValue('Right now')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Rename Kept by you' }))
-    expect(screen.getByDisplayValue('Kept by you')).toBeInTheDocument()
-  })
-
-  // Their titles are fixed on the site, so a field for them would change nothing.
-  it('shows no text fields for the Categories and Davening Times cards', async () => {
-    const user = userEvent.setup()
-    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Browse', cardIds: [], width: 'full' }
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    renderManager([browse, davening])
-    // Named for what it holds: it has had no search of its own for a while.
-    expect(screen.getByRole('button', { name: 'Categories' })).toBeInTheDocument()
-    await openRow(user, /^Categories/)
-    await openRow(user, /^Davening Times/)
-
-    expect(screen.queryByText('Heading')).not.toBeInTheDocument()
-    expect(screen.queryByText('Small line above')).not.toBeInTheDocument()
-    // It opens to its trash can alone, at the bottom (no width: it shares a row).
-    const opened = screen.getByRole('button', { name: 'Take Davening Times off' }).closest('[data-drag-row]')!.firstElementChild!
-    expect(opened.children[1]!.textContent).toBe('')
-    expect(within(opened.children[1] as HTMLElement).getAllByRole('button')).toHaveLength(1)
-  })
-
-  // Jewish Times has no eyebrow field at all — its real eyebrow is the
-  // computed Hebrew date + location, not static text worth overriding (see
-  // CARD_META's own doc).
-  // Its heading is its name, edited in the row (the user, Nov 4).
-  it('the Jewish Times card edits its heading in its row, with no Eyebrow field', async () => {
-    const jewishTimes: DraftHomeSection = { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', cardIds: [], width: 'full' }
-    renderManager([jewishTimes])
-    const user = userEvent.setup()
-    await openRow(user, new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`))
-    expect(screen.queryByRole('textbox')).toBeNull()
-    await user.click(screen.getByRole('button', { name: `Rename ${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}` }))
-
-    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue(SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading)
-    expect(screen.getAllByRole('textbox')).toHaveLength(1)
-    expect(screen.queryByText('Heading')).not.toBeInTheDocument()
-    expect(screen.queryByText('Small line above')).not.toBeInTheDocument()
-  })
-
-  it('editing a card\'s Heading input calls onSettingChange with the right key', async () => {
-    const user = userEvent.setup()
-    const listings: DraftHomeSection = { id: 'listings', kind: 'listings', title: 'Update Listings Card', cardIds: [], width: 'full' }
-    render(<ManagerHarness initialSections={[listings]} />)
-    await openRow(user, new RegExp(`^${SITE_SETTINGS_DEFAULTS.desktopListingsHeading}`))
-    await user.click(screen.getByRole('button', { name: `Rename ${SITE_SETTINGS_DEFAULTS.desktopListingsHeading}` }))
-
-    const headingInput = screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)
-    await user.clear(headingInput)
-    await user.type(headingInput, 'See the times')
-
-    expect(screen.getByDisplayValue('See the times')).toBeInTheDocument()
-  })
-
-  // 'map' is deliberately absent from both sides of this assertion — it's
-  // no longer offered at all (see CARD_META's own doc), not just already
-  // configured, so there's no "+ Add" button for it under any circumstance.
-  it('offers "+ Add" only for cards missing from the list, one button per missing kind — never for the retired map card', () => {
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    renderManager([davening])
-
-    expect(screen.queryByRole('button', { name: /Add “Davening Times Card”/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add “Categories Card”/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add “Jewish Times Card”/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Add “Map/ })).not.toBeInTheDocument()
-  })
-
-  it('clicking "+ Add" appends that card with its fixed id and default title', async () => {
-    const user = userEvent.setup()
-    const { onChange } = renderManager([])
-
-    await user.click(screen.getByRole('button', { name: /Add “Davening Times Card”/ }))
-
-    expect(onChange).toHaveBeenCalledWith([{ id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }])
-  })
-
-  it('taking a card off asks once, then takes it off', async () => {
-    const user = userEvent.setup()
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([davening])
-    await openRow(user, /^Davening Times/)
+    const { onChange } = renderManager([card('davening'), card('listings', true), card('suggest', true)])
 
     await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
-    expect(screen.getByText('Take Davening Times off the home page?')).toBeInTheDocument()
-    expect(onChange).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Take it off' }))
 
-    expect(onChange).toHaveBeenCalledWith([])
+    expect(onChange).toHaveBeenCalledWith([card('listings'), card('suggest', true)])
   })
 
-  it('leaves the card alone on Leave it', async () => {
-    const user = userEvent.setup()
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([davening])
-    await openRow(user, /^Davening Times/)
-
-    await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
-    await user.click(screen.getByRole('button', { name: 'Leave it' }))
-
-    expect(onChange).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
+  // 'map' is retired, so there's no "+ Add" for it under any circumstance.
+  it('offers "+ Add" for each card not in the list, Suggest a Listing included, never the map', () => {
+    renderManager([card('davening')])
+    const adds = screen.getAllByRole('button', { name: /^\+ Add / }).map((b) => b.textContent)
+    expect(adds).toEqual(['+ Add Categories', `+ Add ${LISTINGS}`, '+ Add Suggest a Listing', `+ Add ${SUBSCRIBE}`, `+ Add ${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`])
   })
 
-  // Up and down sit on each row, without opening it, and a phone's thumb
-  // can reach them (board 21c).
-  // Dragging itself needs layout, so it is in e2e-admin-write (drag.spec.ts);
-  // here, the handle and its keyboard (note 25: drag, not arrows).
-  it('moves a card by its handle, with the arrow keys, and has no up and down buttons', async () => {
+  it('"+ Add" puts the card back at the bottom, in a row of its own', async () => {
     const user = userEvent.setup()
-    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories Card', cardIds: [], width: 'full' }
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([browse, davening])
+    const { onChange } = renderManager([card('davening'), card('listings', true)])
 
-    expect(screen.queryByRole('button', { name: /^Move .* (up|down)$/ })).toBeNull()
-    const handles = screen.getAllByRole('button', { name: /^Move / })
-    expect(handles).toHaveLength(2)
-    handles[0]!.focus()
+    await user.click(screen.getByRole('button', { name: '+ Add Suggest a Listing' }))
+
+    expect(onChange).toHaveBeenCalledWith([card('davening'), card('listings', true), card('suggest')])
+  })
+
+  // Dragging needs layout, so it is in e2e-admin-write; here, the handle's
+  // keyboard, which steps through the same places a drag drops in.
+  it('moves a card by its handle with the arrow keys, past Categories, which shares with nothing', async () => {
+    const user = userEvent.setup()
+    const { onChange } = renderManager([card('browse'), card('davening')])
+
+    expect(screen.getAllByRole('button', { name: /^Move / })).toHaveLength(2)
+    screen.getByRole('button', { name: 'Move Categories' }).focus()
     await user.keyboard('{ArrowUp}')
     expect(onChange).not.toHaveBeenCalled()
     await user.keyboard('{ArrowDown}')
-    expect(onChange).toHaveBeenCalledWith([davening, browse])
+    expect(onChange).toHaveBeenCalledWith([card('davening'), card('browse')])
   })
 
-  it('an open card has a trash can in its row and no Take it off button', async () => {
-    const subscribe: DraftHomeSection = { id: 'subscribe', kind: 'subscribe', title: 'Email Signup Card', cardIds: [], width: 'full' }
-    renderManager([subscribe])
-    await openRow(userEvent.setup(), /^Stay in the Loop/)
-    expect(screen.getByRole('group', { name: 'Width' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Take Stay in the Loop off' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
+  it('each arrow press changes the rows: into the next row, along it, then a row of its own', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<ManagerHarness initialSections={[card('davening'), card('subscribe')]} onChange={onChange} />)
+
+    screen.getByRole('button', { name: 'Move Davening Times' }).focus()
+    await user.keyboard('{ArrowDown}')
+    expect(onChange).toHaveBeenLastCalledWith([card('davening'), card('subscribe', true)])
+    expect(drawnRows()).toEqual([['Davening Times', SUBSCRIBE]])
+
+    screen.getByRole('button', { name: 'Move Davening Times' }).focus()
+    await user.keyboard('{ArrowDown}')
+    expect(onChange).toHaveBeenLastCalledWith([card('subscribe'), card('davening', true)])
+
+    screen.getByRole('button', { name: 'Move Davening Times' }).focus()
+    await user.keyboard('{ArrowDown}')
+    expect(onChange).toHaveBeenLastCalledWith([card('subscribe'), card('davening')])
+    expect(drawnRows()).toEqual([[SUBSCRIBE], ['Davening Times']])
+    expect(onChange).toHaveBeenCalledTimes(3)
+  })
+
+  it('a full row of three takes no fourth: the card moving up goes over it', async () => {
+    const user = userEvent.setup()
+    const { onChange } = renderManager([card('davening'), card('listings', true), card('suggest', true), card('subscribe')])
+
+    screen.getByRole('button', { name: `Move ${SUBSCRIBE}` }).focus()
+    await user.keyboard('{ArrowUp}')
+
+    expect(onChange).toHaveBeenCalledWith([card('subscribe'), card('davening'), card('listings', true), card('suggest', true)])
+  })
+
+  // Nothing opens, so the preview lights a card while the mouse is on it.
+  it('points the preview at the card under the mouse', () => {
+    const { onPointCard } = renderManager([card('davening')])
+    const row = screen.getByText('Davening Times').closest('[data-drag-row]')!.firstElementChild!
+    fireEvent.mouseEnter(row)
+    expect(onPointCard).toHaveBeenLastCalledWith('davening')
+    fireEvent.mouseLeave(row)
+    expect(onPointCard).toHaveBeenLastCalledWith(null)
   })
 
   // The same shared draft array also carries plain category sections (see
   // DesktopNavEditor's Categories headings) — this component must never touch or reorder them.
   it('leaves a plain section entry riding along in the draft completely untouched', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery'], width: 'full' }
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
-    const { onChange } = renderManager([section, davening])
+    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery'], sharesRow: false }
+    const { onChange } = renderManager([section, card('davening')])
 
-    await openRow(user, /^Davening Times/)
     await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
-    await user.click(screen.getByRole('button', { name: 'Take it off' }))
 
     expect(onChange).toHaveBeenCalledWith([section])
     expect(screen.queryByText('Food')).not.toBeInTheDocument()

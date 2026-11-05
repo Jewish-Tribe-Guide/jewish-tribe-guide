@@ -29,8 +29,8 @@ const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: '
 const eruv = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruv Information', icon: '🧵' })
 const categories = [food, grocery, shuls, eruv]
 const sections = [
-  { id: 's1', kind: 'section', title: 'Food and Hospitality', sortOrder: 0, cardIds: ['grocery', 'restaurant'], width: 'full' },
-  { id: 's2', kind: 'section', title: 'Jewish Institutions', sortOrder: 1, cardIds: ['synagogue', 'eruv'], width: 'full' },
+  { id: 's1', kind: 'section', title: 'Food and Hospitality', sortOrder: 0, cardIds: ['grocery', 'restaurant'], sharesRow: false },
+  { id: 's2', kind: 'section', title: 'Jewish Institutions', sortOrder: 1, cardIds: ['synagogue', 'eruv'], sharesRow: false },
 ] as HomeSection[]
 const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '21:00' }]))
 const listings = [

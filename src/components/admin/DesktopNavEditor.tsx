@@ -288,7 +288,7 @@ function CategoriesHeadings({
 
   function addHeading() {
     const id = newDraftSectionId()
-    onChange([...sectionEntries, { id, kind: 'section', title: 'New heading', cardIds: [], width: 'full' }, ...builtInEntries])
+    onChange([...sectionEntries, { id, kind: 'section', title: 'New heading', cardIds: [], sharesRow: false }, ...builtInEntries])
     setOpenId(id)
     setFresh(id)
   }

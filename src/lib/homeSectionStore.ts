@@ -10,16 +10,14 @@ type HomeSectionRow = {
   title: string
   sort_order: number
   card_ids: string[]
-  width: string | null
+  shares_row?: boolean | null
 }
 
 // row.kind ?? 'section': the same "read before this migration ran" fallback
 // every other widened site_settings/home_section column in this codebase
 // uses — a row selected via `select('*')` before the column existed simply
-// won't have the key at all. `width` gets the identical treatment: any value
-// other than the literal 'half' (missing column, null, a future/garbage
-// value) reads as 'full' — the always-safe, always-renders-correctly
-// default, never a crash or an unexpected pairing.
+// won't have the key at all. `shares_row` the same: anything but true (the
+// column missing, null) is a row of its own.
 function toSection(row: HomeSectionRow): HomeSection {
   const kind = (row.kind ?? 'section') as HomeBlockKind
   return {
@@ -32,7 +30,7 @@ function toSection(row: HomeSectionRow): HomeSection {
     title: row.title || (kind === 'section' ? '' : BUILT_IN_BLOCKS[kind].title),
     sortOrder: row.sort_order,
     cardIds: row.card_ids ?? [],
-    width: row.width === 'half' ? 'half' : 'full',
+    sharesRow: row.shares_row === true,
   }
 }
 
@@ -75,10 +73,8 @@ export async function createHomeSection(
     title: string
     cardIds?: string[]
     kind?: HomeBlockKind
-    /** Only meaningful for a built-in block — see HomeSection's own doc.
-     *  Defaults to 'full', same as every existing row before this field
-     *  existed. */
-    width?: 'full' | 'half'
+    /** Only meaningful for a built-in block — see HomeSection's own doc. */
+    sharesRow?: boolean
   },
 ): Promise<HomeSection> {
   const supabase = getAdminClient()
@@ -96,7 +92,7 @@ export async function createHomeSection(
       title: BUILT_IN_BLOCKS[kind].title,
       sort_order: ((count ?? 0) + 1) * 100,
       card_ids: [],
-      width: input.width === 'half' ? 'half' : 'full',
+      shares_row: input.sharesRow === true,
     }
     const { data, error } = await supabase
       .from('home_section')
@@ -150,7 +146,7 @@ export async function createHomeSection(
 export async function updateHomeSection(
   community: string,
   id: string,
-  patch: { title?: string; cardIds?: string[]; sortOrder?: number; width?: 'full' | 'half' },
+  patch: { title?: string; cardIds?: string[]; sortOrder?: number; sharesRow?: boolean },
 ): Promise<HomeSection | null> {
   const supabase = getAdminClient()
 
@@ -158,7 +154,7 @@ export async function updateHomeSection(
   if (patch.title !== undefined) row.title = patch.title.trim()
   if (patch.cardIds !== undefined) row.card_ids = patch.cardIds
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
-  if (patch.width !== undefined) row.width = patch.width
+  if (patch.sharesRow !== undefined) row.shares_row = patch.sharesRow
 
   if (Object.keys(row).length === 0) {
     const { data } = await supabase

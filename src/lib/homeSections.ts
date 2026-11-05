@@ -26,7 +26,7 @@
 // load; Landing.tsx's ordered walk just no longer has a branch for it, so it
 // silently renders nothing until reseeded (see seed-home-blocks.mjs) or
 // removed by hand.
-export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'map' | 'subscribe' | 'jewishTimes'
+export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'suggest' | 'map' | 'subscribe' | 'jewishTimes'
 
 /** The built-ins' fixed identity — id doubles as `kind` (there can only ever
  *  be one of each). `title` is only ever used as this row's fallback label
@@ -41,6 +41,7 @@ export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: st
   browse: { id: 'browse', title: 'Categories Card' },
   davening: { id: 'davening', title: 'Davening Times Card' },
   listings: { id: 'listings', title: 'Update Listings Card' },
+  suggest: { id: 'suggest', title: 'Suggest a Listing Card' },
   map: { id: 'map', title: 'Map Card' },
   subscribe: { id: 'subscribe', title: 'Email Signup Card' },
   jewishTimes: { id: 'jewishTimes', title: 'Jewish Times Card' },
@@ -57,22 +58,16 @@ export type HomeSection = {
    *  'medical') — which cards belong here, and in what order. Always empty
    *  for a built-in block; they aren't card groups. */
   cardIds: string[]
-  /** Desktop only, and only meaningful for a built-in card (kind !==
-   *  'section' — plain sections have their own layout, this doesn't apply).
-   *  'full' (the default) is its own row, edge to edge. Two 'half' cards
-   *  that land next to each other in sortOrder pair into one 2-column row —
-   *  see Landing.tsx's own row-pairing walk. A 'half' card with no 'half'
-   *  neighbor (the one before or after it in order is 'full', or it's first/
-   *  last) falls back to rendering full width alone, so a single unpaired
-   *  half-width card never looks like a mistake. */
-  width: 'full' | 'half'
+  /** Desktop only, and only for a built-in card: true puts it in the row of
+   *  the card before it (cardRows below). */
+  sharesRow: boolean
 }
 
 /** The Home page tab's in-progress, unsaved copy of a section — order is
  *  implied by array position (no `sortOrder` yet), and `id` may be a
  *  temporary client-only placeholder (see `NEW_SECTION_PREFIX`) for a
  *  section that doesn't exist on the server yet. */
-export type DraftHomeSection = Pick<HomeSection, 'id' | 'kind' | 'title' | 'cardIds' | 'width'>
+export type DraftHomeSection = Pick<HomeSection, 'id' | 'kind' | 'title' | 'cardIds' | 'sharesRow'>
 
 /** Prefix marking a draft section's id as client-only (not yet created on the
  *  server) — see saveHomeSections in homeSectionsDraft.ts, which creates a
@@ -83,4 +78,34 @@ export const NEW_SECTION_PREFIX = 'new:'
 
 export function newDraftSectionId(): string {
   return `${NEW_SECTION_PREFIX}${crypto.randomUUID()}`
+}
+
+// The computer home's cards in rows (the user, Nov 4; drawn as artifact
+// 8HpeQANzsQyGbyHVPsXrc5): a card sharing the row of the one before it joins
+// that row, up to three; Categories always has a row to itself. One card
+// fills its row, two split it, three take a third each. Pure.
+
+export const MAX_CARDS_IN_ROW = 3
+
+type RowCard = { kind: string; sharesRow: boolean }
+
+/** Whether `card` can join `row`. */
+export function canShareRow(row: readonly RowCard[], card: RowCard): boolean {
+  return row.length < MAX_CARDS_IN_ROW && card.kind !== 'browse' && !row.some((c) => c.kind === 'browse')
+}
+
+/** The cards, in order, as rows. */
+export function cardRows<T extends RowCard>(cards: readonly T[]): T[][] {
+  const rows: T[][] = []
+  for (const card of cards) {
+    const last = rows.at(-1)
+    if (card.sharesRow && last && canShareRow(last, card)) last.push(card)
+    else rows.push([card])
+  }
+  return rows
+}
+
+/** Rows back to cards in order, each saying whether it shares a row. */
+export function fromCardRows<T extends RowCard>(rows: readonly (readonly T[])[]): T[] {
+  return rows.flatMap((row) => row.map((card, i) => ({ ...card, sharesRow: i > 0 })))
 }
