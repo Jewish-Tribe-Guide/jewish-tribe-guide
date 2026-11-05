@@ -319,6 +319,14 @@ for that exact change, in the same conversation. Show the dry run first.
    A daily Mekor watch, shaped like Keystone-K's, is proposed as its own
    piece of work; its first run would file the above in the queue.
 
+## Up next: Site → Category pages, organised and cleaned up
+
+The user, Nov 4, after Home page became one screen: Category pages is next,
+"organized better and just cleaned up in general". Not started. Start by
+looking at the screen as it stands (and what Home page settled: one screen,
+Computer / Phone, boxes in the order the page reads, the preview beside),
+then draw it before building.
+
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
