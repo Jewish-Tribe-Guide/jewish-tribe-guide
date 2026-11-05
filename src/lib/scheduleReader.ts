@@ -1,6 +1,8 @@
 import { formatAnchorRule, parseTimeToMinutes, RELATIVE_ELIGIBLE, TEFILLAH_LABELS, TEFILLAH_ORDER, type Tefillah, type ZmanAnchor } from './davening'
 import { datesBetween, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
 import { DEFAULT_READER_MODEL } from './readQuestion'
+import { isGroupLink, linkFromMessage } from './minyanLinks'
+import { isJoinLink } from './calendarFeed'
 import { dateText, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Festival } from './festivals'
 
@@ -310,12 +312,14 @@ Then "times", one entry per prayer time:
 - "notes": anything the message says about that one minyan ("following Kiddush"), else leave it out.
 - "season": "summer" or "winter" for a time held in one season only (a "Summer" or "Winter" label beside it, "during daylight saving time"), else leave it out. A minyan with a summer time and a winter time is two entries, one for each season, each with its own time exactly as written.
 - "signUp": true when the message says this minyan is held only if enough people come or sign up ("held when there is sufficient interest", "if we have a minyan", "please confirm you're coming"). A footnote marked with * applies to the times it marks, and only those. Otherwise leave it out.
+- "signUpLink": when the message gives a link to the group or form this minyan's people sign up or check in on (a WhatsApp group, a GroupMe, a sign-up form), that link exactly as written, the whole address. One link the message gives for its sign-up minyanim in general goes on each of them. Else leave it out.
+- "joinLink": when the message gives a link to join this minyan from home (Zoom, Google Meet, a livestream), that link exactly as written, the whole address. Else leave it out. Never a link the message doesn't write out.
 - "where": when the message says this minyan is held somewhere other than the shul itself (at another shul, at another address), that place exactly as written ("1818 Market or Mikveh Israel"). A room in the shul's own building ("in the chapel", "downstairs") is the shul itself: leave it out.
 - "quote": a few words copied exactly from the message where you read this time.
 - "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. Otherwise leave it out.
 - Only times the message gives. Never add one it doesn't.
 
-Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "namesDates": false, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "signUp": true, "where": "...", "quote": "...", "unsure": "..."}]}`
+Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "namesDates": false, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "signUp": true, "signUpLink": "...", "joinLink": "...", "where": "...", "quote": "...", "unsure": "..."}]}`
   const intro = `The shul: ${shulName}. Its message:`
   const content = messageContent(intro, source)
   return [
@@ -380,6 +384,9 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
   const ahead = new Set(days.filter((d) => d.date >= today).map((d) => d.date))
   const yearOn = new Date(Date.parse(`${today}T12:00:00Z`) + 366 * 86_400_000).toISOString().slice(0, 10)
   const text = 'text' in source ? ` ${plain(source.text)} ` : null
+  // A link is checked against the words as written: a picture's or a
+  // PDF's can't be, so neither gives one.
+  const written = 'text' in source ? source.text : null
   const times: ReadRegularTime[] = []
   for (const t of Array.isArray(body.times) ? body.times.slice(0, 80) : []) {
     if (!t || typeof t !== 'object') continue
@@ -406,7 +413,11 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     if (tefillah === 'other' && NOT_DAVENING.test(`${quote} ${notes ?? ''}`)) continue
     const unsure = str(x.unsure, 200)
     const occasion = date ? str(x.occasion, 40) : null
-    const signUp = x.signUp === true
+    // Its links, only as the message writes them (minyanLinks.ts): a
+    // group link is a sign-up minyan's.
+    const signUpLink = linkFromMessage(x.signUpLink, written, isGroupLink)
+    const joinLink = linkFromMessage(x.joinLink, written, isJoinLink)
+    const signUp = x.signUp === true || !!signUpLink
     const where = str(x.where, 80)
     // The same time given twice (a page's summary and its detail) is one
     // time on all the days either gives, not a second minyan.
@@ -416,6 +427,8 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     if (twin) {
       twin.days = [...new Set([...twin.days, ...(date ? [] : weekdays)])]
       if (signUp) twin.signUp = true
+      if (signUpLink && !twin.signUpLink) twin.signUpLink = signUpLink
+      if (joinLink && !twin.joinLink) twin.joinLink = joinLink
       if (where && !twin.where) twin.where = where
       continue
     }
@@ -431,6 +444,8 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
       checked: text !== null,
       ...(unsure ? { unsure } : {}),
       ...(signUp ? { signUp: true as const } : {}),
+      ...(signUpLink ? { signUpLink } : {}),
+      ...(joinLink ? { joinLink } : {}),
       ...(where ? { where } : {}),
     })
   }
@@ -475,6 +490,8 @@ function joinEvening(times: ReadRegularTime[]): void {
       ...(notes ? { notes } : {}),
       ...(rest.some((t) => t.unsure) && !keep.unsure ? { unsure: rest.find((t) => t.unsure)!.unsure } : {}),
       ...(group.some((t) => t.signUp) ? { signUp: true } : {}),
+      ...(!keep.signUpLink && rest.some((t) => t.signUpLink) ? { signUpLink: rest.find((t) => t.signUpLink)!.signUpLink } : {}),
+      ...(!keep.joinLink && rest.some((t) => t.joinLink) ? { joinLink: rest.find((t) => t.joinLink)!.joinLink } : {}),
       ...(!keep.where && rest.some((t) => t.where) ? { where: rest.find((t) => t.where)!.where } : {}),
     })
     for (const t of rest) times.splice(times.indexOf(t), 1)

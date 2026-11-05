@@ -26,7 +26,13 @@ export type ScheduleDay = 'yom_tov' | 'chol_hamoed' | DayKey | string
 // newsletter: "held when there is sufficient interest", the user, Oct 23),
 // with the group its usual minyan uses (signUpGroup). Absent, a week's
 // minyan runs under its usual one's (usualSignUp).
-export type ScheduleMinyan = Omit<Minyan, 'days'> & { on: ScheduleDay[] }
+export type ScheduleMinyan = Omit<Minyan, 'days'> & {
+  on: ScheduleDay[]
+  /** What it took from the usual minyan it is, its page giving none: its
+   *  sign-up group, its join link. Shown to the admin as such (the user,
+   *  Nov 5: "if we're borrowing I want it to be extremely clear"). */
+  borrowed?: ('signUp' | 'joinLink')[]
+}
 
 export type SpecialSchedule = {
   id: string
@@ -281,6 +287,17 @@ export function scheduleDayText(on: ScheduleDay): string {
  * gives the regular times. Every property a person wrote is in it, so a
  * changed time is a changed line (SubmissionCard.test's schedule guard).
  */
+/** "Sign-up group from their usual times, not this page": what a week's
+ *  minyan took from the usual one, its page giving none (the user, Nov 5:
+ *  "if we're borrowing I want it to be extremely clear on the admin site
+ *  that we're doing that"). Null when it took nothing. */
+export function borrowedText(m: Pick<ScheduleMinyan, 'borrowed'>): string | null {
+  const what = (m.borrowed ?? []).map((b) => (b === 'signUp' ? 'sign-up group' : 'join link'))
+  if (!what.length) return null
+  const said = what.join(' and ')
+  return `${said[0].toUpperCase()}${said.slice(1)} from their usual times, not this page`
+}
+
 export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): string {
   if (schedules.length === 0) return '—'
   return schedules
@@ -288,7 +305,7 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
       const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.whole ? (s.minyanim.length ? 'their whole week' : 'no minyan') : s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
       const lines = [...s.minyanim]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
-        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))
+        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes, borrowedText(m)].filter(Boolean).join(' · '))
       return [head, ...lines.map((l) => `  ${l}`)].join('\n')
     })
     .join('\n')

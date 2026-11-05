@@ -328,4 +328,24 @@ describe('join links: a service’s Zoom or livestream, from its calendar', () =
     const newsletter = week({ postedBy: undefined })
     expect(withJoinLinks([newsletter], joins)).toEqual({ schedules: [newsletter], changes: [] })
   })
+
+  // Nov 5: a link the calendar gives is its own, not the usual minyan's,
+  // even when it's the same one.
+  it('a borrowed join link the calendar gives is no longer borrowed', () => {
+    const joins = [{ date: '2026-10-22', time: '8:10 AM', link: ZOOM }]
+    const borrowed = (joinLink: string): SpecialSchedule => ({
+      id: 'w',
+      name: 'Times for Oct 18 – Oct 24',
+      from: '2026-10-22',
+      to: '2026-10-24',
+      mode: 'replace',
+      kind: 'week',
+      postedBy: 'website',
+      minyanim: [{ id: 'a', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am', joinLink, borrowed: ['joinLink', 'signUp'] }],
+    })
+    for (const link of [ZOOM, 'https://zoom.us/j/1']) {
+      const [m] = withJoinLinks([borrowed(link)], joins).schedules[0].minyanim
+      expect(m).toMatchObject({ joinLink: ZOOM, borrowed: ['signUp'] })
+    }
+  })
 })

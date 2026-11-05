@@ -1038,6 +1038,14 @@ describe('readListingPage: a page with a calendar', () => {
     expect(got?.text).toBe(`${CALENDAR_HEADING}\n2026-10-23 (Fri) 6:00 PM: Shabbat Evening Service\n\nExport Month view`)
   })
 
+  // Nov 5: a "Join our WhatsApp group" button, its address only behind it.
+  it('gives the reader a WhatsApp group’s address beside its words', async () => {
+    const { readListingPage } = await import('./listingPageRun')
+    const times = 'Weekday Shacharis 6:45am and 7:30am. Mincha 1:30pm. Shabbos Shacharis 9:00am, Mincha 20 minutes before candle lighting. '.repeat(2)
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: `<p>${times}Maariv 8:00pm, if we have ten. <a href="https://chat.whatsapp.com/Ab12Cd34Ef56Gh">Join our WhatsApp group</a> <a href="/about">About</a></p>` })
+    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('Maariv 8:00pm, if we have ten. Join our WhatsApp group (https://chat.whatsapp.com/Ab12Cd34Ef56Gh) About')
+  })
+
   it('reads a watch whose address is the feed itself, and an event list in the page’s scripts', async () => {
     const { readListingPage } = await import('./listingPageRun')
     m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: feed })

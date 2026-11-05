@@ -295,10 +295,18 @@ export function withJoinLinks(schedules: readonly SpecialSchedule[], joins: read
       if (m.on.length !== 1) return m
       const at = parseTimeToMinutes(m.time)
       const join = joins.find((j) => j.date === m.on[0] && parseTimeToMinutes(j.time) === at)
-      if (!join || m.joinLink === join.link) return m
+      if (!join) return m
+      // The calendar's own link: not the usual minyan's, even when it's
+      // the same one.
+      const own = { ...m, joinLink: join.link, borrowed: m.borrowed?.filter((b) => b !== 'joinLink') }
+      if (!own.borrowed?.length) delete own.borrowed
+      if (m.joinLink === join.link) {
+        if (m.borrowed?.includes('joinLink')) touched = true
+        return m.borrowed?.includes('joinLink') ? own : m
+      }
       touched = true
       changes.push(`${s.name}: ${TEFILLAH_LABELS[m.tefillah]}, ${dateText(join.date, { weekday: true })}, ${m.time} · ${joinText(join.link)}`)
-      return { ...m, joinLink: join.link }
+      return own
     })
     return touched ? { ...s, minyanim } : s
   })

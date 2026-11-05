@@ -123,7 +123,7 @@ function timesBoxes(f: Finding): WaitBox[] | null {
         const row: WaitRow =
           r.status === 'gone'
             ? { name: r.what, right: r.was ?? undefined, mark: 'gone' }
-            : { name: r.what, ...(r.note ? { sub: r.note } : {}), ...(r.says ? { flag: r.says } : {}), ...(r.struck.length ? { struck: r.struck } : {}), right: r.when, ...(r.was ? { was: r.was } : {}), mark: r.status }
+            : { name: r.what, ...(r.note ? { sub: r.note } : {}), ...(r.says || r.borrowed ? { flag: [r.says, r.borrowed].filter(Boolean).join(' · ') } : {}), ...(r.struck.length ? { struck: r.struck } : {}), right: r.when, ...(r.was ? { was: r.was } : {}), mark: r.status }
         days.set(r.day, [...(days.get(r.day) ?? []), row])
       }
       return { name: w.title, ...tag, groups: [...days].map(([head, rows]) => ({ head, rows })) }

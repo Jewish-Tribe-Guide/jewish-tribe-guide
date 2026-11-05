@@ -2,6 +2,8 @@ import { DAY_KEYS, type DayKey } from './hours'
 import { formatAnchorRule, parseTimeToMinutes, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah, type ZmanAnchor } from './davening'
 import { dateText, saturdayOf, signUpGroup, weekKeepsHeading, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Season } from './season'
+import { isJoinLink } from './calendarFeed'
+import { isGroupLink } from './minyanLinks'
 
 // ── Updating a shul's times from what it sent (agreed Oct 1) ────────────────
 // The user's words: a shul that redoes its times doesn't want to "go one by
@@ -51,6 +53,10 @@ export type ReadRegularTime = {
   /** It runs only when enough people come ("held when there is sufficient
    *  interest", Mekor's newsletter, Oct 23): a sign-up minyan. */
   signUp?: true
+  /** The group or form its people sign up on, as the message links it. */
+  signUpLink?: string
+  /** Where to join it from home, as the message links it. */
+  joinLink?: string
   /** Where it's held, as written, when that isn't the shul itself ("at
    *  1818 Market or Mikveh Israel"): another shul's minyan the guide has
    *  already is left out (heldElsewhere.ts); else it's the shul's own,
@@ -111,6 +117,9 @@ export type UpdateRow = {
   season?: Season
   /** The message says it runs only when enough people sign up. */
   signUp?: true
+  /** Its sign-up group and join link, as the message links them. */
+  signUpLink?: string
+  joinLink?: string
 }
 
 export type TimesUpdate = {
@@ -238,7 +247,7 @@ function pairDay(
       continue
     }
     const [c] = cur.splice(i, 1)
-    out.push({ ...rowFrom(c.row, day, newId), ...datedNotes(r), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...timeOf(r, c.row) })
+    out.push({ ...rowFrom(c.row, day, newId), ...datedNotes(r), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...linksOf(r), ...timeOf(r, c.row) })
   }
   left.sort((a, b) => sortKey(a, zm) - sortKey(b, zm))
   cur.sort((a, b) => sortKey(a.row, zm) - sortKey(b.row, zm))
@@ -256,6 +265,7 @@ function pairDay(
       ...(r.unsure ? { unsure: r.unsure } : {}),
       ...(r.occasion ? { occasion: r.occasion } : {}),
       ...(r.signUp ? { signUp: true as const } : {}),
+      ...linksOf(r),
     })
   }
   for (const c of cur) out.push({ ...rowFrom(c.row, day, newId), status: complete ? 'gone' : 'kept' })
@@ -267,6 +277,8 @@ function pairDay(
  *  user, Nov 5). Kol Tzedek's calendar has Fri Nov 13 online only, on
  *  Zoom, and came out with the usual Friday's "hybrid, tea and cookies". */
 const datedNotes = (r: ReadRegularTime): { notes?: string } => (r.date ? { notes: r.notes || undefined } : {})
+
+const linksOf = (r: Pick<ReadRegularTime, 'signUpLink' | 'joinLink'>) => ({ ...(r.signUpLink ? { signUpLink: r.signUpLink } : {}), ...(r.joinLink ? { joinLink: r.joinLink } : {}) })
 
 /** A matched time shows as the message gives it when that's a clock time
  *  for a date (6:12 PM this Friday), and as the shul's rule otherwise. */
@@ -382,7 +394,7 @@ export function compareTimes(
 
 /** A row, whatever its id: the same in both seasons' passes is all year. */
 const rowKey = (r: UpdateRow) =>
-  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null, r.signUp ?? null])
+  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null, r.signUp ?? null, r.signUpLink ?? null, r.joinLink ?? null])
 
 /** Whether any time was read from what was sent: a read time is the same
  *  as one the guide has, a change to one or a new one. With none, the
@@ -685,7 +697,8 @@ export function applyUpdate(
   // A sign-up minyan whose time changes is still a sign-up minyan: the
   // message gives its new time, not how it gets its ten. One the message
   // says is sign-up signs up where the usual one does (signUpGroup).
-  const signUpOf = (r: UpdateRow, weekday: DayKey, was?: Pick<Minyan, 'signUp'>) => was?.signUp ?? (r.signUp ? signUpGroup(current, r.tefillah, [weekday]) : undefined)
+  // Its own link, when the message gives one (minyanLinks.ts).
+  const signUpOf = (r: UpdateRow, weekday: DayKey, was?: Pick<Minyan, 'signUp'>) => (r.signUpLink ? { link: r.signUpLink } : (was?.signUp ?? (r.signUp ? signUpGroup(current, r.tefillah, [weekday]) : undefined)))
   const add = (r: UpdateRow, season: Season | null, was?: DaySlot) => {
     const signUp = signUpOf(r, r.day as DayKey, was)
     slots.push({
@@ -705,11 +718,16 @@ export function applyUpdate(
     const weekday = weekdayOf(r.day)
     const usual = r.rowId ? current.find((m) => m.id === r.rowId && m.tefillah === r.tefillah && m.days.includes(weekday)) : undefined
     const signUp = signUpOf(r, weekday, usual)
-    const joinLink = usual?.joinLink?.trim()
+    const joinLink = r.joinLink ?? usual?.joinLink?.trim()
+    // What came from the usual minyan, not the message: said so.
+    const borrowed = [
+      ...(signUp && !r.signUpLink && (!r.signUp || Object.values(signUp).some(Boolean)) ? ['signUp' as const] : []),
+      ...(joinLink && !r.joinLink ? ['joinLink' as const] : []),
+    ]
     // A date isn't a season: Mekor's Friday 4:35pm in November paired with
     // its usual Friday time, and came out "Summer only".
     const notes = r.notes?.replace(SEASON_NOTE, '').trim()
-    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(notes ? { notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
+    return { id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(notes ? { notes } : {}), ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}), ...(borrowed.length ? { borrowed } : {}) }
   }
 
   const weekly = (r: UpdateRow) => (DAY_KEYS as readonly string[]).includes(r.day)
@@ -878,6 +896,8 @@ export function cleanUpdate(raw: unknown, now = Date.now()): Omit<TimesUpdate, '
       ...(y.keep === true ? { keep: true } : {}),
       ...(y.everyWeek === true ? { everyWeek: true } : {}),
       ...(y.signUp === true ? { signUp: true as const } : {}),
+      ...(typeof y.signUpLink === 'string' && isGroupLink(y.signUpLink) ? { signUpLink: y.signUpLink } : {}),
+      ...(typeof y.joinLink === 'string' && isJoinLink(y.joinLink) ? { joinLink: y.joinLink } : {}),
     })
   }
   return {

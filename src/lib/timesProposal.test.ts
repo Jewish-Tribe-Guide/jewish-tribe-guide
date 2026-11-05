@@ -216,11 +216,11 @@ describe('weekChanges', () => {
           // The whole week, each as it is or what changes (the user, Oct
           // 27: "the whole schedule with the new ones highlighted").
           rows: [
-            { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', note: null, status: 'same', was: null, says: null, struck: [] },
-            { what: 'Shacharis', day: 'Mon, Oct 26', when: '8:15 AM', note: null, status: 'changed', was: '8 AM', says: null, struck: [] },
-            { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', note: null, status: 'same', was: null, says: null, struck: [] },
-            { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', note: null, status: 'new', was: null, says: null, struck: [] },
-            { what: 'Maariv', day: 'Tue, Oct 27', when: 'Taken off', note: null, status: 'gone', was: '9 PM', says: null, struck: [] },
+            { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', note: null, status: 'same', was: null, says: null, struck: [], borrowed: null },
+            { what: 'Shacharis', day: 'Mon, Oct 26', when: '8:15 AM', note: null, status: 'changed', was: '8 AM', says: null, struck: [], borrowed: null },
+            { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', note: null, status: 'same', was: null, says: null, struck: [], borrowed: null },
+            { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', note: null, status: 'new', was: null, says: null, struck: [], borrowed: null },
+            { what: 'Maariv', day: 'Tue, Oct 27', when: 'Taken off', note: null, status: 'gone', was: '9 PM', says: null, struck: [], borrowed: null },
           ],
         },
       ],
@@ -234,9 +234,9 @@ describe('weekChanges', () => {
   it('a week it hasn’t got, or has with nothing in it: the whole week, all new', () => {
     const read = week('w', [minyan('1', 'shacharis', '2026-10-26', '6:45am'), minyan('2', 'shacharis', '2026-10-27', '7:00am'), minyan('3', 'mincha', '2026-10-27', '5:45pm')])
     const rows = [
-      { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', note: null, status: 'new', was: null, says: null, struck: [] },
-      { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', note: null, status: 'new', was: null, says: null, struck: [] },
-      { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', note: null, status: 'new', was: null, says: null, struck: [] },
+      { what: 'Shacharis', day: 'Mon, Oct 26', when: '6:45 AM', note: null, status: 'new', was: null, says: null, struck: [], borrowed: null },
+      { what: 'Shacharis', day: 'Tue, Oct 27', when: '7 AM', note: null, status: 'new', was: null, says: null, struck: [], borrowed: null },
+      { what: 'Mincha', day: 'Tue, Oct 27', when: '5:45 PM', note: null, status: 'new', was: null, says: null, struck: [], borrowed: null },
     ]
     expect(weekChanges([], [read]).weeks).toEqual([{ title: 'This week’s schedule, Oct 25 – Oct 31', had: null, total: 3, same: 0, none: false, rows }])
     // The Shtiebel's, Oct 27: the listing had the week, empty.
@@ -254,7 +254,7 @@ describe('weekChanges', () => {
   it('a minyan whose sign-up or link changes is changed, saying so', () => {
     const had = week('w', [minyan('1', 'shacharis', '2026-10-26', '7:15am')])
     const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), signUp: { link: 'https://chat.whatsapp.com/MI' } }])
-    expect(weekChanges([had], [read]).weeks[0].rows).toEqual([{ what: 'Shacharis', day: 'Mon, Oct 26', when: '7:15 AM', note: 'Sign-up: chat.whatsapp.com/MI', status: 'changed', was: null, says: 'Sign-up added', struck: [] }])
+    expect(weekChanges([had], [read]).weeks[0].rows).toEqual([{ what: 'Shacharis', day: 'Mon, Oct 26', when: '7:15 AM', note: 'Sign-up: chat.whatsapp.com/MI', status: 'changed', was: null, says: 'Sign-up added', struck: [], borrowed: null }])
   })
 
   // The user, Nov 5: "Either just mark the note as new and we don't need
@@ -269,17 +269,24 @@ describe('weekChanges', () => {
       minyan('3', 'mincha', '2026-10-31', '1:00pm'),
     ])
     const rows = weekChanges([had], [read]).weeks[0].rows
-    expect(rows.map(({ when, note, status, was, says, struck }) => ({ when, note, status, was, says, struck }))).toEqual([
-      { when: '5:30 PM', note: null, status: 'new', was: null, says: null, struck: [] },
-      { when: '6 PM', note: 'Online only, on Zoom', status: 'changed', was: null, says: 'Note added', struck: [] },
-      { when: '9 AM', note: 'In the chapel', status: 'changed', was: null, says: 'Note changed', struck: ['In the sanctuary'] },
-      { when: '1 PM', note: null, status: 'changed', was: null, says: 'Note taken off', struck: ['After kiddush'] },
+    expect(rows.map(({ when, note, status, was, says, struck, borrowed }) => ({ when, note, status, was, says, struck, borrowed }))).toEqual([
+      { when: '5:30 PM', note: null, status: 'new', was: null, says: null, struck: [], borrowed: null },
+      { when: '6 PM', note: 'Online only, on Zoom', status: 'changed', was: null, says: 'Note added', struck: [], borrowed: null },
+      { when: '9 AM', note: 'In the chapel', status: 'changed', was: null, says: 'Note changed', struck: ['In the sanctuary'], borrowed: null },
+      { when: '1 PM', note: null, status: 'changed', was: null, says: 'Note taken off', struck: ['After kiddush'], borrowed: null },
     ])
+  })
+
+  // The user, Nov 5: "if we're borrowing I want it to be extremely clear
+  // on the admin site that we're doing that".
+  it('says on a minyan what it took from the usual times', () => {
+    const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), signUp: { link: 'https://chat.whatsapp.com/MI' }, borrowed: ['signUp'] }])
+    expect(weekChanges([], [read]).weeks[0].rows[0]).toMatchObject({ note: 'Sign-up: chat.whatsapp.com/MI', borrowed: 'Sign-up group from their usual times, not this page' })
   })
 
   it('a minyan whose time changes shows the old time, and its note only when that changes too', () => {
     const had = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:00am'), notes: 'Upstairs' }])
     const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), notes: 'Upstairs' }])
-    expect(weekChanges([had], [read]).weeks[0].rows).toMatchObject([{ when: '7:15 AM', note: 'Upstairs', was: '7 AM', says: null, struck: [] }])
+    expect(weekChanges([had], [read]).weeks[0].rows).toMatchObject([{ when: '7:15 AM', note: 'Upstairs', was: '7 AM', says: null, struck: [], borrowed: null }])
   })
 })

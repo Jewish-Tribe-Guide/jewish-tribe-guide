@@ -1,7 +1,7 @@
 import { TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, joinText, signUpText, type Minyan } from './davening'
 import { minyanimForBox } from './minyanimBox'
 import { PART_ORDER, clockMinutes, noteText, shabbosPartOf, timeText } from './minyanText'
-import { dateText, scheduleDayText, type ScheduleMinyan, type SpecialSchedule } from './schedules'
+import { borrowedText, dateText, scheduleDayText, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import { seasonFromNotes, weekdayOf } from './scheduleUpdate'
 
 // ── What a shul's website proposes its times should be (the user, Oct 21) ───
@@ -341,6 +341,9 @@ export type WeekChangeRow = {
   says: string | null
   /** The listing's note, sign-up or join link it replaces or takes off. */
   struck: string[]
+  /** What it took from the usual minyan, the page giving none
+   *  (borrowedText): "Sign-up group from their usual times, not this page". */
+  borrowed: string | null
 }
 export type WeekChange = {
   title: string
@@ -415,8 +418,8 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
         const time = timeText(m)
         const row: WeekChangeRow =
           status === 'gone'
-            ? { what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when: 'Taken off', note: null, status, was: dayLine(m), says: null, struck: [] }
-            : { what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when: time, note: extrasLine(m), status, was: old && timeText(old) !== time ? timeText(old) : null, ...(old ? extrasChange(old, m) : { says: null, struck: [] }) }
+            ? { what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when: 'Taken off', note: null, status, was: dayLine(m), says: null, struck: [], borrowed: null }
+            : { what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when: time, note: extrasLine(m), status, was: old && timeText(old) !== time ? timeText(old) : null, ...(old ? extrasChange(old, m) : { says: null, struck: [] }), borrowed: borrowedText(m) }
         rows.push({ ...row, on, tefillah: m.tefillah, at: clockMinutes(m.time) ?? 24 * 60 })
       }
       let same = 0
@@ -453,7 +456,7 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
       }
       if (own?.minyanim.length && rows.every((r) => r.status === 'same')) return []
       rows.sort((a, b) => a.on.localeCompare(b.on) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || a.at - b.at)
-      return [{ ...base, had: own ? own.minyanim.reduce((n, m) => n + m.on.length, 0) : null, same, rows: rows.map(({ on: _on, tefillah: _t, at: _at, ...row }) => row) }]
+      return [{ ...base, had: own ? own.minyanim.reduce((n, m) => n + m.on.length, 0) : null, same, rows: rows.map((r): WeekChangeRow => ({ what: r.what, day: r.day, when: r.when, note: r.note, status: r.status, was: r.was, says: r.says, struck: r.struck, borrowed: r.borrowed })) }]
     })
   const kept = new Set(proposed.map((s) => s.id))
   return { weeks, gone: current.filter((s) => !kept.has(s.id) && !mine.has(s.id)).map((s) => s.name) }

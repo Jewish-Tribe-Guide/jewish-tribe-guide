@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import type { SpecialSchedule } from './schedules'
+import { formatSchedulesSummary, type SpecialSchedule } from './schedules'
 import { applyUpdate, changesAnything, cleanUpdate, compareTimes, datesHeldOverWebsite, mergeSchedule, readWeekLines, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
 
 // Mekor Habracha's times as the guide has them (test copy, Oct 1): the
@@ -611,6 +611,45 @@ describe('a minyan that only runs when enough sign up', () => {
       // The same time with nothing said: nothing, not the usual note.
       const bare = compareTimes(usual, { ...read, times: [t({ tefillah: 'kabbalas_shabbos', date: '2026-11-13', time: '6:00pm' })] }, { season: null, newId })
       expect(applyUpdate(usual, [], bare, { newId, evenIfSame: true }).schedules[0].minyanim[0].notes).toBeUndefined()
+    })
+
+    // Nov 5: its own group and link when the page gives them; else the
+    // usual one's, said so (the user: "if we're borrowing I want it to be
+    // extremely clear on the admin site that we're doing that").
+    it('this week’s minyan has the page’s own group and link, and says when it borrowed the usual one’s', () => {
+      const join = 'https://zoom.us/j/1'
+      const usual: Minyan[] = [
+        { id: 'sh', tefillah: 'shacharis', days: ['mon', 'tue'], time: '7:15am', signUp },
+        { id: 'mi', tefillah: 'mincha', days: ['mon', 'tue'], time: '2:00pm', joinLink: join },
+      ]
+      const own = 'https://chat.whatsapp.com/ThisWeek12345'
+      const read: RegularReading = {
+        ...week,
+        from: '2026-10-26',
+        to: '2026-10-27',
+        times: [
+          t({ tefillah: 'shacharis', date: '2026-10-26', time: '7:15am', signUp: true, signUpLink: own }),
+          t({ tefillah: 'mincha', date: '2026-10-26', time: '2:00pm', joinLink: 'https://zoom.us/j/2' }),
+          t({ tefillah: 'shacharis', date: '2026-10-27', time: '7:15am' }),
+          t({ tefillah: 'mincha', date: '2026-10-27', time: '2:00pm' }),
+        ],
+      }
+      const u = compareTimes(usual, read, { season: null, newId })
+      const { schedules } = applyUpdate(usual, [], u, { newId, evenIfSame: true })
+      expect(schedules[0].minyanim.map((m) => [m.on[0], m.tefillah, m.signUp ?? null, m.joinLink ?? null, m.borrowed ?? null])).toEqual(
+        expect.arrayContaining([
+          ['2026-10-26', 'shacharis', { link: own }, null, null],
+          ['2026-10-26', 'mincha', null, 'https://zoom.us/j/2', null],
+          ['2026-10-27', 'shacharis', signUp, null, ['signUp']],
+          ['2026-10-27', 'mincha', null, join, ['joinLink']],
+        ]),
+      )
+      // And said wherever the admin sees the week.
+      expect(formatSchedulesSummary(schedules)).toContain('Sign-up group from their usual times, not this page')
+      expect(formatSchedulesSummary(schedules)).toContain('Join link from their usual times, not this page')
+      // The admin's copy comes back with its links.
+      const back = cleanUpdate(JSON.parse(JSON.stringify(u)), Date.parse('2026-10-25T12:00:00Z'))
+      expect(back?.rows.filter((r) => r.signUpLink || r.joinLink).map((r) => r.signUpLink ?? r.joinLink)).toEqual([own, 'https://zoom.us/j/2'])
     })
 
     it('is kept when the admin’s copy comes back to be applied', () => {

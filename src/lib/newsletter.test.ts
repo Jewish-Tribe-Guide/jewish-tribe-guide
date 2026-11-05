@@ -82,6 +82,13 @@ describe('newsletterText', () => {
     expect(newsletterText(mailchimp)).toBe('Shabbos Times\nView this email in your browser\n\nMincha 6:05pm\nShacharis 9:00am')
   })
 
+  // Nov 5: a sign-up minyan's WhatsApp group, or its Zoom, is the
+  // newsletter's own link for it, and the reader gives it to the minyan.
+  it('keeps a WhatsApp group’s and a Zoom’s address', () => {
+    const text = 'Maariv 8pm, sign up ( https://chat.whatsapp.com/Ab12Cd34Ef56Gh ) <https://yioc.org/r?u=tracking>\nMincha on Zoom [https://us02web.zoom.us/j/8123456789]'
+    expect(newsletterText(text)).toBe('Maariv 8pm, sign up  https://chat.whatsapp.com/Ab12Cd34Ef56Gh\nMincha on Zoom  https://us02web.zoom.us/j/8123456789')
+  })
+
   it('cuts a long one to the window', () => {
     expect(newsletterText('a'.repeat(20_000))).toHaveLength(8_000)
   })

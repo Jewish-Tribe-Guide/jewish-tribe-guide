@@ -38,6 +38,7 @@ import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContac
 import { sendWatchDigest } from '@/lib/email'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { jobPageFor } from '@/lib/watchFindings'
+import { withMinyanLinks } from '@/lib/minyanLinks'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -174,7 +175,9 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
       ? { from: first, to: last, next: icsEntries(feedBody, communityConfig.timezone, after(1), after(NEXT_SERVICE_DAYS)).find((e) => isServiceTitle(e.title)) ?? null }
       : null
   entries = await withEventJoins(entries, today, last, opts.fetchImpl)
-  const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
+  // Its WhatsApp groups and Zoom links with their addresses, so the
+  // reader can give a minyan its own (minyanLinks.ts).
+  const text = htmlToText(withMinyanLinks(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' ')))
   // Its phones and emails, read by code (contactRead.ts): in its words and
   // its tel: and mailto: links, its menus' included.
   const contacts = pageContacts(htmlToText(page.body), page.body)
