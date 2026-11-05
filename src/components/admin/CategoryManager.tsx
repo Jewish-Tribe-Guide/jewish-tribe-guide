@@ -10,6 +10,9 @@ import { adminBase } from '@/lib/adminNav'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { MapFoldIcon } from '@/components/icons'
 import { CategoryEditor } from './CategoryEditor'
+import NewPagePicker from './NewPagePicker'
+import { useReadyMade } from './useReadyMade'
+import { pageToCopy } from '@/lib/readyMade'
 import CategoryPreview from './CategoryPreview'
 import EruvimManager from './EruvimManager'
 import DeletePage from './DeletePage'
@@ -26,11 +29,14 @@ import { ERUV_SCREEN, SITE_SCREENS, screenState, type SiteScreen } from '@/lib/s
 
 
 // editingId is opaque to the admin page's history plumbing — encoded here as
-// 'cat:<id>' or 'cat:new', and 'screen:<kind>' for the Eruv, Candle Lighting
+// 'cat:<id>', 'cat:new' (the ready-made pages), 'cat:new:own' or
+// 'cat:new:<ready-made id>', and 'screen:<kind>' for the Eruv, Candle Lighting
 // and the Map, which may have no row yet. Places are added from Places (Nov
 // 3), which offers hidden categories too; an old 'listing:<id>' address lands
 // on the list.
 const CAT_PREFIX = 'cat:'
+const NEW_PREFIX = 'cat:new:'
+const OWN_PAGE = 'own'
 const SCREEN_PREFIX = 'screen:'
 
 /** The line under a screen's row, where a category's says its places. */
@@ -138,21 +144,28 @@ export default function CategoryManager({
     void load()
   }
 
+  // + New category page (board 2): pick a page to start from, or start
+  // empty (board 3). 'cat:new:own' is the empty one, 'cat:new:<id>' a copy.
   if (editingId === `${CAT_PREFIX}new`) {
     return (
-      <CategoryEditor
+      <NewPagePicker
         token={token}
-        initial={null}
-        siblings={categories}
-        onSaved={async (id) => {
-          // Made: open it, saying so.
-          await load()
-          savedHandOff = id
-          onOpenEditor(`${CAT_PREFIX}${id}`)
-        }}
-        onCancel={onCloseEditor}
+        own={categories}
+        onBack={onCloseEditor}
+        onPick={(page) => onOpenEditor(`${NEW_PREFIX}${page.id}`)}
+        onOpenOwn={(id) => onOpenEditor(`${CAT_PREFIX}${id}`)}
+        onMakeOwn={() => onOpenEditor(`${NEW_PREFIX}${OWN_PAGE}`)}
       />
     )
+  }
+  if (editingId?.startsWith(NEW_PREFIX)) {
+    const from = editingId.slice(NEW_PREFIX.length)
+    return <NewPageEditor key={from} token={token} from={from} categories={categories} onSaved={async (id) => {
+      // Made: open it, saying so.
+      await load()
+      savedHandOff = id
+      onOpenEditor(`${CAT_PREFIX}${id}`)
+    }} onCancel={() => onOpenEditor(`${CAT_PREFIX}new`)} />
   }
 
   // The Map, Candle Lighting, and an Eruv with no row yet: the page's own
@@ -253,6 +266,32 @@ export default function CategoryManager({
       )}
     </div>
   )
+}
+
+/** A new page's editor: empty, or a copy of a ready-made page once the
+ *  ready-made pages have loaded (opened straight from its address too). */
+function NewPageEditor({
+  token,
+  from,
+  categories,
+  onSaved,
+  onCancel,
+}: {
+  token: string
+  from: string
+  categories: CategoryConfig[] | null
+  onSaved: (id: string) => void
+  onCancel: () => void
+}) {
+  const community = useCommunitySlug()
+  const { pages, error } = useReadyMade(token, community)
+  const own = from === OWN_PAGE
+  const source = own ? null : (pages?.filter((p) => p.category.id === from).sort((a, b) => Number(b.community === community) - Number(a.community === community))[0]?.category ?? null)
+  if (!own && !source) {
+    if (error) return <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
+    return <p className="text-sm text-muted">{pages ? 'No ready-made page here.' : 'Loading…'}</p>
+  }
+  return <CategoryEditor token={token} initial={null} seed={source && pageToCopy(source)} siblings={categories} onSaved={onSaved} onCancel={onCancel} backLabel="What kind of places?" />
 }
 
 /** A page's "On the site" switch, in its own box. */

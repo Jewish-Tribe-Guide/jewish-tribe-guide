@@ -553,6 +553,23 @@ after the deploy, dry run first, and needs its own go-ahead.
   and the question card are off the page too, waiting for Before it's
   opened (step 4); saved values keep working. Places within a walk and
   On each listing stay as they were until step 3.
+- **Step 2 BUILT Nov 5** (redesign/oct18-fixes): "+ New category page"
+  opens What kind of places? (search, every community's listing pages
+  with fields of their own, by name, the first three as the line,
+  "Already a page" opening this community's own), then "+ Make your own
+  page". A copy starts with its fields and kind; one made from nothing is
+  Plain. The kind radios are gone. "+ Add a field" opens Add a field
+  (search, "All pages" or one page, every field once by name with its
+  pages and choices; Address, Hours, Phone, Website as "Most pages").
+  A row opens the field: the pages it's on, In the list, In the filter,
+  On Add a place, "Add to <page>". Nothing matching offers "Make your
+  own: <typed>"; Make your own picks a kind, then opens the new field's
+  screen. Read through `/api/admin/ready-made` (an admin of any
+  community).
+- Not on the drawing, in step 2: a ready-made field is copied as it is,
+  choices included, until boards 14-15 (shared or local choices) are
+  decided. A new page's icon is its emoji until it has a line glyph.
+  Test pages in the shared dev/test project show in the list on dev.
 
 ## Small open decisions
 

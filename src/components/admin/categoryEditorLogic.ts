@@ -29,8 +29,8 @@ export type Draft = {
   id: string
   label: string
   pluralLabel: string
-  /** What kind of place it holds (placeKinds.ts); '' on a new category
-   *  until one is picked. Saved only when it differs from what the slug
+  /** What kind of place it holds (placeKinds.ts): a copied page's, or Plain
+   *  for one made from nothing. Saved only when it differs from what the slug
    *  implies, so a database without migration 088 still saves Philly's. */
   placeKind: PlaceKind | ''
   /** One emoji shown on the card (home grid, map legend, admin list). */
@@ -137,7 +137,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
     id: c?.id ?? '',
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
-    placeKind: c ? (c.placeKind ?? placeKindFromSlug(c.id)) : '',
+    placeKind: c ? (c.placeKind ?? placeKindFromSlug(c.id)) : 'plain',
     icon: c?.icon ?? '',
     iconImageUrl: c?.iconImageUrl ?? '',
     description: c?.description ?? '',
@@ -256,7 +256,6 @@ export function fieldShows(f: CategoryField): string {
 
 export function validateDraft(draft: Draft): string[] {
   const errs: string[] = []
-  if (!draft.placeKind) errs.push('Pick what kind of places it holds.')
   if (!draft.pluralLabel.trim()) errs.push('Category name is required.')
   const slugError = slugRejectionReason(draft.id)
   if (slugError) errs.push(slugError)

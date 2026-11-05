@@ -57,7 +57,7 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // category (Sukkahs, ahead of Sukkot) is meant to sit in.
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
-  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
+  await visible(page.getByRole('button', { name: 'Make your own page' })).click()
   await visible(page.getByLabel('Name', { exact: true })).fill(categoryName)
   await visible(page.getByRole('switch', { name: 'On the site', exact: true })).click()
   await visible(page.getByRole('button', { name: 'Create category' })).click()

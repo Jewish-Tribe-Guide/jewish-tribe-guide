@@ -8,7 +8,6 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsToSave } from '@/lib/listingParts'
-import { PLACE_KINDS, PLACE_KIND_INFO } from '@/lib/placeKinds'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -22,6 +21,7 @@ import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminRows, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
 import DeletePage from './DeletePage'
+import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -46,6 +46,11 @@ type Props = {
   justSaved?: boolean
   /** Deleted from its own "Delete this page". */
   onDeleted?: () => void
+  /** A new page's ready-made page to start from (board 2). */
+  seed?: CategoryConfig | null
+  /** Where Back goes: "Category pages", or a new page's "What kind of
+   *  places?". */
+  backLabel?: string
 }
 
 export function CategoryEditor(props: Props) {
@@ -70,6 +75,8 @@ function CategoryEditorScreen({
   onCancel,
   justSaved = false,
   onDeleted,
+  seed = null,
+  backLabel = 'Category pages',
   onUndo,
 }: Props & { onUndo: () => void }) {
   const isNew = initial === null
@@ -78,6 +85,10 @@ function CategoryEditorScreen({
   // The field whose own screen is open (board "Field"), by its place in
   // draft.fields.
   const [openField, setOpenField] = useState<number | null>(null)
+  // "+ Add a field"'s screens (boards 7-12), when one is open.
+  const [adding, setAdding] = useState<FieldPickerScreen | null>(null)
+  // Back from a field or the picker, the Fields box is still open on a phone.
+  const [fieldsOpen, setFieldsOpen] = useState(false)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
@@ -109,9 +120,9 @@ function CategoryEditorScreen({
     set,
     setName,
     setCap,
-    pickKind,
     updateField,
-    addField,
+    addReadyField,
+    addOwnField,
     removeField,
     addAudienceGroup,
     isPlainHoursField,
@@ -125,7 +136,7 @@ function CategoryEditorScreen({
     managedHoursIndex,
     managedWebsiteIndex,
     managedPhotoIndex,
-  } = useCategoryFieldEditing(initial)
+  } = useCategoryFieldEditing(initial, seed)
 
   const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
     draft,
@@ -139,7 +150,7 @@ function CategoryEditorScreen({
   // A new category's bar always shows, to create it; leaving asks only once
   // something's been filled in.
   const changes = isNew ? 1 : changedKeys(draft, toDraft(initial))
-  const dirty = isNew ? changedKeys(draft, toDraft(null)) > 0 : changes > 0
+  const dirty = isNew ? changedKeys(draft, toDraft(seed)) > 0 : changes > 0
   useLeaveGuard(dirty)
 
   // The preview and a field's screen each get their own history entry, so
@@ -148,9 +159,10 @@ function CategoryEditorScreen({
   // the category list.
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { editorPreview?: boolean; editorField?: number } | null
+      const state = e.state as { editorPreview?: boolean; editorField?: number; editorAdd?: FieldPickerScreen } | null
       setPreviewing(!!state?.editorPreview)
       setOpenField(state?.editorField ?? null)
+      setAdding(state?.editorAdd ?? null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -162,9 +174,30 @@ function CategoryEditorScreen({
   }
 
   function showField(i: number) {
+    setFieldsOpen(true)
     setOpenField(i)
     history.pushState({ ...(window.history.state ?? {}), editorField: i }, '')
     window.scrollTo?.(0, 0)
+  }
+
+  function showAdding(next: FieldPickerScreen) {
+    setFieldsOpen(true)
+    setAdding(next)
+    history.pushState({ ...(window.history.state ?? {}), editorAdd: next }, '')
+    window.scrollTo?.(0, 0)
+  }
+
+  // Added: back to the page, past the picker's screens (the list, and the
+  // field looked at or the kind picked). Make your own opens the new
+  // field's screen, to name it.
+  function added(i: number | null) {
+    const back = adding?.at === 'list' ? 1 : 2
+    const after = () => {
+      window.removeEventListener('popstate', after)
+      if (i !== null) showField(i)
+    }
+    window.addEventListener('popstate', after)
+    history.go(-back)
   }
 
   function leave() {
@@ -204,7 +237,7 @@ function CategoryEditorScreen({
 
   if (previewing) return <CategoryPreview category={previewCategory} onClose={() => history.back()} />
 
-  const name = draft.pluralLabel.trim() || (isNew ? 'New category' : initial!.pluralLabel)
+  const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
   const field = openField !== null ? draft.fields[openField] : undefined
 
@@ -217,7 +250,30 @@ function CategoryEditorScreen({
   )
 
   let screen: React.ReactNode
-  if (field && openField !== null) {
+  if (adding) {
+    screen = (
+      <FieldPicker
+        token={token}
+        pageName={name}
+        pageLabel={draft.label}
+        page={{ hasAddress: draft.hasAddress, hasPhone: draft.hasPhone, fields: draft.fields }}
+        screen={adding}
+        onScreen={showAdding}
+        onBack={() => history.back()}
+        onAdd={(row) => {
+          if (row.basic === 'address') {
+            set('hasAddress', true)
+            setCap('map', true)
+          } else if (row.basic === 'phone') set('hasPhone', true)
+          else if (row.basic === 'hours') toggleHoursField(true)
+          else if (row.basic === 'website') toggleWebsiteField(true)
+          else if (row.field) addReadyField(row.field, row.companions)
+          added(null)
+        }}
+        onMakeOwn={(type, label) => added(addOwnField(type, label))}
+      />
+    )
+  } else if (field && openField !== null) {
     // A field's own screen (board "Field").
     const i = openField
     screen = (
@@ -275,7 +331,7 @@ function CategoryEditorScreen({
 
     screen = (
       <>
-        <AdminBack back={{ label: 'Category pages', onClick: leave }} title={name} />
+        <AdminBack back={{ label: backLabel, onClick: leave }} title={name} />
         {/* On a phone the page beside has no room: Preview opens it full
             size (board 21b). */}
         {!wide && (
@@ -302,30 +358,6 @@ function CategoryEditorScreen({
           </span>
         </div>
 
-        {isNew ? (
-          <AdminBox title="What kind of places?">
-            <div role="radiogroup" aria-label="What kind of places?">
-              {PLACE_KINDS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.placeKind === k}
-                  onClick={() => pickKind(k)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-b border-slate-100 last:border-b-0 text-left cursor-pointer ${
-                    draft.placeKind === k ? 'bg-blue-50' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <span className={`h-4 w-4 shrink-0 rounded-full border-2 ${draft.placeKind === k ? 'border-primary bg-primary shadow-[inset_0_0_0_3px_white]' : 'border-slate-400'}`} />
-                  <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[15px] font-semibold text-slate-900">{PLACE_KIND_INFO[k].label}</span>
-                    <span className="text-[13px] text-slate-600">{PLACE_KIND_INFO[k].line}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </AdminBox>
-        ) : null}
 
         <AdminBox title="Basics" foldOnPhone summary={`${draft.pluralLabel || 'No name'} · ${bandImageFor(previewCategory) ? 'Banner photo' : 'No banner photo'}`}>
           <Basics
@@ -362,6 +394,7 @@ function CategoryEditorScreen({
         <AdminBox
           title="Fields"
           foldOnPhone
+          defaultOpen={fieldsOpen}
           summary={fieldsSummary([draft.hasAddress ? 'Address' : '', draft.hasPhone ? 'Phone' : '', ...rows.map(({ f }) => normalizeField(f).label)])}
           action={
             <span className="flex items-center gap-4">
@@ -376,10 +409,7 @@ function CategoryEditorScreen({
               )}
               <button
                 type="button"
-                onClick={() => {
-                  addField()
-                  showField(draft.fields.length)
-                }}
+                onClick={() => showAdding({ at: 'list' })}
                 className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer"
               >
                 + Add a field

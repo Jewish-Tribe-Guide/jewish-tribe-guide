@@ -7,31 +7,24 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
-import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
 import { slugify } from '@/lib/routes'
-import { PLACE_KIND_INFO, type PlaceKind } from '@/lib/placeKinds'
 import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEditorLogic'
 
 // ── The draft state behind CategoryEditor and every mutation of it: naming,
-// capabilities, template application, and the field-schema editing (add /
+// capabilities, and the field-schema editing (add /
 // remove / reorder / toggle / audience groups). Kept separate from the save
 // workflow (useCategorySaveWorkflow) and the confirmation gates, which only
 // ever read this draft, never own it. ──
 
-export function useCategoryFieldEditing(initial: CategoryConfig | null) {
+/** `seed` is the ready-made page a new one starts from (board 2). */
+export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: CategoryConfig | null = null) {
   const isNew = initial === null
-  const [draft, setDraft] = useState<Draft>(() => toDraft(initial))
+  const [draft, setDraft] = useState<Draft>(() => toDraft(initial ?? seed))
   // Whether the admin has directly edited the id field on a NEW category —
   // once true, typing a name no longer overwrites whatever they chose. Only
   // matters for isNew: an existing category's id already exists and never
   // auto-follows the name, touched or not.
   const [idTouched, setIdTouched] = useState(false)
-  // The most recently applied template, if any — stays visible/pickable
-  // afterward (see CategoryEditor's render) so switching to a different one is
-  // just another click. Tracked so a *second* apply can tell "still the first
-  // template's name/icon, safe to swap in the new one" apart from "the admin
-  // already customized this," which should be left alone.
-  const [lastAppliedTemplate, setLastAppliedTemplate] = useState<CategoryTemplate | null>(null)
   // The "+ Add audience group" mini-form's own draft state — separate from
   // `draft` since it's discarded on cancel and only ever produces a batch of
   // new fields, never edits an existing one.
@@ -80,81 +73,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
     setDraft((d) => ({ ...d, capabilities: { ...d.capabilities, [key]: value } }))
   }
 
-  // Pre-fills the draft's fields/capabilities from a starter template — only
-  // offered on a brand-new category (see CategoryEditor's render); a category
-  // with real listings already has data under specific field keys, so
-  // templates don't retrofit onto those. Stays pickable after applying one, so
-  // trying a different template is just another click — re-applying always
-  // replaces fields/capabilities, but name/icon/description/card image are
-  // only swapped in if they still match the *previous* template's own values
-  // (i.e. the admin hasn't customized them); anything typed by hand, before or
-  // after, is left alone.
-  function applyTemplate(templateId: string) {
-    const template = CATEGORY_TEMPLATES.find((t) => t.id === templateId)
-    if (!template) return
-    setDraft((d) => ({
-      ...d,
-      pluralLabel: lastAppliedTemplate
-        ? (d.pluralLabel === lastAppliedTemplate.pluralLabel ? template.pluralLabel : d.pluralLabel)
-        : (d.pluralLabel || template.pluralLabel),
-      label: lastAppliedTemplate
-        ? (d.label === singularize(lastAppliedTemplate.pluralLabel) ? singularize(template.pluralLabel) : d.label)
-        : (d.label || singularize(template.pluralLabel)),
-      icon: lastAppliedTemplate
-        ? (d.icon === (lastAppliedTemplate.icon ?? '') ? (template.icon ?? '') : d.icon)
-        : (d.icon || template.icon || ''),
-      description: lastAppliedTemplate
-        ? (d.description === (lastAppliedTemplate.categoryDescription ?? '') ? (template.categoryDescription ?? '') : d.description)
-        : (d.description || template.categoryDescription || ''),
-      cardImageUrl: lastAppliedTemplate
-        ? (d.cardImageUrl === (lastAppliedTemplate.cardImageUrl ?? '') ? (template.cardImageUrl ?? '') : d.cardImageUrl)
-        : (d.cardImageUrl || template.cardImageUrl || ''),
-      hasAddress: template.hasAddress ?? d.hasAddress,
-      hasPhone: template.hasPhone ?? d.hasPhone,
-      upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,
-      capabilities: { ...d.capabilities, ...template.capabilities },
-      // A template's own field list replaces the draft's wholesale (same as
-      // Hours/Website silently going along for the ride) — re-seed Photo the
-      // same way toDraft does, so applying a template doesn't quietly turn
-      // this checkbox off.
-      fields: (() => {
-        const f = template.fields.map((field) => ({ ...field }))
-        if (!f.some((field) => field.type === 'image')) {
-          f.splice(photoInsertIndex(f), 0, { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image', renderAs: 'row' })
-        }
-        return f
-      })(),
-    }))
-    setLastAppliedTemplate(template)
-  }
-
-  // A kind picked for a new category (board 6's kind box): it brings its
-  // template's fields, as picking that template did. A kind with none
-  // (Hospitals, Plain) puts back a new category's own fields, in case
-  // another kind's had been picked first; a name typed by hand stays.
-  function pickKind(kind: PlaceKind) {
-    const template = PLACE_KIND_INFO[kind].template
-    if (template) applyTemplate(template)
-    else if (lastAppliedTemplate) {
-      const fresh = toDraft(null)
-      setDraft((d) => ({
-        ...d,
-        ...(d.pluralLabel === lastAppliedTemplate.pluralLabel && { pluralLabel: '', label: '', ...(!idTouched && { id: '' }) }),
-        icon: d.icon === (lastAppliedTemplate.icon ?? '') ? '' : d.icon,
-        description: d.description === (lastAppliedTemplate.categoryDescription ?? '') ? '' : d.description,
-        cardImageUrl: d.cardImageUrl === (lastAppliedTemplate.cardImageUrl ?? '') ? '' : d.cardImageUrl,
-        hasAddress: fresh.hasAddress,
-        hasPhone: fresh.hasPhone,
-        upvotesEnabled: fresh.upvotesEnabled,
-        capabilities: fresh.capabilities,
-        fields: fresh.fields,
-      }))
-      setLastAppliedTemplate(null)
-    }
-    // The slug follows the name a template brought, as it follows a typed one.
-    setDraft((d) => ({ ...d, placeKind: kind, id: isNew && !idTouched ? slugify(d.pluralLabel) : d.id }))
-  }
-
   function updateField(i: number, patch: Partial<CategoryField>) {
     setDraft((d) => ({
       ...d,
@@ -162,11 +80,36 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
     }))
   }
 
-  function addField() {
-    setDraft((d) => ({
-      ...d,
-      fields: [...d.fields, { key: '', label: '', type: 'text' as FieldType, renderAs: 'row' }],
-    }))
+  // A ready-made field (board 11's Add): copied as it is on its page, under
+  // its own key unless this page already uses it, with its caveat's flag and
+  // note. Returns where it landed.
+  function addReadyField(field: CategoryField, companions: CategoryField[] = []): number {
+    const used = [...draft.fields, ...draft.hiddenFields]
+    const key = nextFieldKey(used, [], field.key || slugifyFieldKey(field.label))
+    used.push({ key } as CategoryField)
+    const renamed = new Map<string, string>()
+    const extra = companions.map((c) => {
+      const k = nextFieldKey(used, [], c.key)
+      used.push({ key: k } as CategoryField)
+      renamed.set(c.key, k)
+      return { ...c, key: k }
+    })
+    const added: CategoryField = {
+      ...field,
+      key,
+      ...(field.caveat && { caveat: { flagField: renamed.get(field.caveat.flagField) ?? field.caveat.flagField, noteField: renamed.get(field.caveat.noteField) ?? field.caveat.noteField } }),
+    }
+    const hidden = extra.map((c) => (c.showIf && renamed.has(c.showIf.field) ? { ...c, showIf: { ...c.showIf, field: renamed.get(c.showIf.field)! } } : c))
+    setDraft((d) => ({ ...d, fields: [...d.fields, added], hiddenFields: [...d.hiddenFields, ...hidden] }))
+    return draft.fields.length
+  }
+
+  // Board 12's Make your own: a field of the picked kind, named as typed. One
+  // with no name yet takes its key from the name typed on its screen.
+  function addOwnField(type: FieldType, label = ''): number {
+    const key = label.trim() ? nextFieldKey(draft.fields, draft.hiddenFields, slugifyFieldKey(label)) : ''
+    setDraft((d) => ({ ...d, fields: [...d.fields, { key, label, type, renderAs: 'row' }] }))
+    return draft.fields.length
   }
 
   function removeField(i: number) {
@@ -378,17 +321,15 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
   return {
     draft,
     setDraft,
-    lastAppliedTemplate,
     groupForm,
     setGroupForm,
     set,
     setName,
     setId,
     setCap,
-    applyTemplate,
-    pickKind,
     updateField,
-    addField,
+    addReadyField,
+    addOwnField,
     removeField,
     addAudienceGroup,
     isPlainHoursField,

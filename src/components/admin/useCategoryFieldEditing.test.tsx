@@ -2,7 +2,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
-import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 
 // Direct coverage for the draft-mutation logic behind CategoryEditor — split
@@ -63,43 +62,61 @@ describe('useCategoryFieldEditing — new-category naming', () => {
   })
 })
 
-describe('useCategoryFieldEditing — applyTemplate', () => {
-  const template = CATEGORY_TEMPLATES[0]
-
-  it('fills in blank fields but leaves anything already typed by hand alone, on first apply', () => {
-    const { result } = renderHook(() => useCategoryFieldEditing(null))
-    act(() => result.current.setName('My Custom Name'))
-    act(() => result.current.applyTemplate(template.id))
-    // Already typed by hand before applying — left alone.
-    expect(result.current.draft.pluralLabel).toBe('My Custom Name')
-    // Blank before applying — filled from the template.
-    expect(result.current.draft.icon).toBe(template.icon ?? '')
-    expect(result.current.draft.fields.length).toBeGreaterThan(0)
+// Boards 2, 11 and 12: a new page from a ready-made one, and fields added
+// from the ready-made list or made from nothing.
+describe('useCategoryFieldEditing — ready-made', () => {
+  it('starts a new page from a ready-made one, still new', () => {
+    const seed = baseCategory({ detailFields: [field({ key: 'kosher', label: 'Kosher' })] })
+    const { result } = renderHook(() => useCategoryFieldEditing(null, seed))
+    expect(result.current.draft).toMatchObject({ id: 'grocery', pluralLabel: 'Groceries' })
+    expect(result.current.draft.fields.map((f) => f.key)).toContain('kosher')
+    // Still new: a name typed renames its address.
+    act(() => result.current.setName('Kosher Markets'))
+    expect(result.current.draft.id).toBe('kosher-markets')
   })
 
-  it('swaps in a second template\'s values only where the draft still matches the first template\'s own values', () => {
-    const other = CATEGORY_TEMPLATES.find((t) => t.id !== template.id)!
-    const { result } = renderHook(() => useCategoryFieldEditing(null))
-    act(() => result.current.applyTemplate(template.id))
-    // Admin customizes the icon after the first apply — this must survive a second apply.
-    act(() => result.current.set('icon', '🎯'))
-    act(() => result.current.applyTemplate(other.id))
-    expect(result.current.draft.icon).toBe('🎯')
-    // Untouched fields (still exactly what the first template set) do swap to the new template's values.
-    expect(result.current.draft.pluralLabel).toBe(other.pluralLabel)
+  it('adds a ready-made field under its own key, or a free one', () => {
+    const initial = baseCategory({ detailFields: [field({ key: 'type', label: 'Store Type' })] })
+    const { result } = renderHook(() => useCategoryFieldEditing(initial))
+    let at = -1
+    act(() => {
+      at = result.current.addReadyField(field({ key: 'denomination', label: 'Denomination', type: 'select' }))
+    })
+    expect(result.current.draft.fields[at]).toMatchObject({ key: 'denomination', label: 'Denomination', type: 'select' })
+    act(() => {
+      at = result.current.addReadyField(field({ key: 'type', label: 'Type' }))
+    })
+    expect(result.current.draft.fields[at]!.key).toBe('type2')
   })
 
-  it('auto-adds a Photo field when the template does not define an image field itself', () => {
-    const { result } = renderHook(() => useCategoryFieldEditing(null))
-    act(() => result.current.applyTemplate(template.id))
-    expect(result.current.draft.fields.some((f) => f.type === 'image')).toBe(true)
+  it('brings a ready-made field’s caveat flag and note, keyed to it', () => {
+    const initial = baseCategory({ detailFields: [field({ key: 'kosherPartial', label: 'Taken' })] })
+    const { result } = renderHook(() => useCategoryFieldEditing(initial))
+    act(() => {
+      result.current.addReadyField(field({ key: 'kosher', label: 'Kosher', type: 'select', caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' } }), [
+        field({ key: 'kosherPartial', type: 'boolean', renderAs: 'hidden' }),
+        field({ key: 'kosherNote', type: 'textarea', renderAs: 'hidden', showIf: { field: 'kosherPartial', equals: true } }),
+      ])
+    })
+    const added = result.current.draft.fields.find((f) => f.key === 'kosher')!
+    expect(added.caveat).toEqual({ flagField: 'kosherPartial2', noteField: 'kosherNote' })
+    expect(result.current.draft.hiddenFields.map((f) => [f.key, f.showIf?.field])).toEqual([
+      ['kosherPartial2', undefined],
+      ['kosherNote', 'kosherPartial2'],
+    ])
   })
 
-  it('does nothing for an unknown template id', () => {
+  it('makes a field of the kind picked, named as searched or left to be named', () => {
     const { result } = renderHook(() => useCategoryFieldEditing(null))
-    const before = result.current.draft
-    act(() => result.current.applyTemplate('not-a-real-template'))
-    expect(result.current.draft).toBe(before)
+    let at = -1
+    act(() => {
+      at = result.current.addOwnField('boolean', 'Parking')
+    })
+    expect(result.current.draft.fields[at]).toMatchObject({ key: 'parking', label: 'Parking', type: 'boolean' })
+    act(() => {
+      at = result.current.addOwnField('tags')
+    })
+    expect(result.current.draft.fields[at]).toMatchObject({ key: '', label: '', type: 'tags' })
   })
 })
 
@@ -109,14 +126,6 @@ describe('useCategoryFieldEditing — applyTemplate', () => {
 // look the target field up by key rather than assuming a raw index, so they
 // don't silently start asserting on the Photo field instead.
 describe('useCategoryFieldEditing — field list CRUD', () => {
-  it('adds a blank text field', () => {
-    const { result } = renderHook(() => useCategoryFieldEditing(null))
-    const before = result.current.draft.fields.length
-    act(() => result.current.addField())
-    expect(result.current.draft.fields.length).toBe(before + 1)
-    expect(result.current.draft.fields.at(-1)).toMatchObject({ key: '', label: '', type: 'text' })
-  })
-
   it('updates one field by index without touching the others', () => {
     const initial = baseCategory({ detailFields: [field({ key: 'a', label: 'A' }), field({ key: 'b', label: 'B' })] })
     const { result } = renderHook(() => useCategoryFieldEditing(initial))

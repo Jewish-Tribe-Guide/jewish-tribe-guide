@@ -113,6 +113,21 @@ export async function listCategoriesUncached(community: string): Promise<Categor
   return (data as CategoryRow[]).map(toConfig)
 }
 
+/** Every community's listing pages that are on the site, for Category
+ *  pages' ready-made lists (a new page, + Add a field). Uncached, like the
+ *  admin's own list. */
+export async function listListingPagesEverywhere(): Promise<{ community: string; category: CategoryConfig }[]> {
+  const { data, error } = await getAdminClient()
+    .from('category')
+    .select('*')
+    .eq('kind', 'listing')
+    .eq('active', true)
+    .order('plural_label', { ascending: true })
+
+  if (error) throw new Error(`Failed to load categories: ${error.message}`)
+  return (data as (CategoryRow & { community_id: string })[]).map((row) => ({ community: row.community_id, category: toConfig(row) }))
+}
+
 // Same as listCategoriesUncached, but cached for the public site — and
 // filtered to active categories only. An inactive one is invisible here
 // (and everywhere downstream that resolves a category through this

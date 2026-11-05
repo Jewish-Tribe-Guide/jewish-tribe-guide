@@ -15,6 +15,7 @@ export function AdminBox({
   action,
   foldOnPhone = false,
   summary,
+  defaultOpen = false,
   children,
 }: {
   title?: string
@@ -26,9 +27,11 @@ export function AdminBox({
   foldOnPhone?: boolean
   /** Under the folded row's title, what's inside (board 6b). */
   summary?: string
+  /** Starts open on a phone: back from a screen it led to. */
+  defaultOpen?: boolean
   children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const heading = (
     <>
       <h2 className="flex-1 m-0 text-base font-bold text-slate-900">{title}</h2>
@@ -442,5 +445,30 @@ export function AdminMenu<V extends string>({
         </div>
       )}
     </div>
+  )
+}
+
+/** A search box over a list (Category pages' ready-made lists). */
+export function SearchBox({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900 max-w-[760px]">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5" />
+        <path d="M10.5 10.5L14 14" />
+      </svg>
+      <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={label} aria-label={label} className="min-w-0 flex-1 border-0 bg-transparent outline-none" />
+    </label>
+  )
+}
+
+/** The "+ Make your own …" line under a ready-made list. */
+export function MakeOwnLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="self-start inline-flex items-center gap-2 min-h-11 text-[15px] font-semibold text-primary hover:underline cursor-pointer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      {children}
+    </button>
   )
 }

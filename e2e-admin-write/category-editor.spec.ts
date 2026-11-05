@@ -56,7 +56,7 @@ test('creating a category through the real editor makes it live, and deleting it
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
-  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
+  await visible(page.getByRole('button', { name: 'Make your own page' })).click()
   await visible(page.getByLabel('Name', { exact: true })).fill(name)
   await visible(page.getByRole('button', { name: 'Create category' })).click()
 
@@ -64,6 +64,16 @@ test('creating a category through the real editor makes it live, and deleting it
   // name typed, so it shows before the save lands); back to the list.
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
   await expect(page).toHaveURL(/\/philly\/admin\/categories\/cat:e2e-admin-write-/)
+
+  // + Add a field: the ready-made list loads (boards 7 and 11), and a field
+  // from it is saved onto the page.
+  await visible(page.getByRole('button', { name: '+ Add a field' })).click()
+  await visible(page.getByRole('button', { name: /^Hours/ })).click()
+  await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
+  await expect(visible(page.getByRole('checkbox', { name: 'Hours' }))).toBeChecked()
+  await visible(page.getByRole('button', { name: 'Save' })).click()
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   // One row per page, saying how many places it has (board 1).
   const row = visible(page.getByRole('button', { name }))
@@ -73,11 +83,12 @@ test('creating a category through the real editor makes it live, and deleting it
   const supabase = getAdminClient()
   const { data: created } = await supabase
     .from('category')
-    .select('id, plural_label, kind')
+    .select('id, plural_label, kind, fields')
     .eq('plural_label', name)
     .maybeSingle()
   expect(created, 'the category should exist in the database after Create').not.toBeNull()
   expect(created!.kind).toBe('listing')
+  expect((created!.fields as { type: string }[]).some((f) => f.type === 'hours'), 'the ready-made Hours field should be saved').toBe(true)
 
   // Delete it back out through the same real UI, from the foot of its page.
   await row.click()
@@ -105,7 +116,7 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
-  await visible(page.getByRole('radio', { name: /^Plain/ })).click()
+  await visible(page.getByRole('button', { name: 'Make your own page' })).click()
   await visible(page.getByLabel('Name', { exact: true })).fill(categoryName)
   // No address on this category — sidesteps the real Google Places
   // autocomplete AddressInput uses, which this suite doesn't drive anywhere
