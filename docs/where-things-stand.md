@@ -383,7 +383,8 @@ and 20); First line opens like the others to Photo (trash: initials
 instead), Name, Where it is, Upvotes, all but Photo automatic, and no
 "+ Show a field" (the line is full). The user, Nov 5: people know
 "upvote", not "recommend", so the admin boards say "Can visitors upvote
-places?" and "Upvotes"; the visitors' button still says Recommend today. The user's rule, Nov 5: admins
+places?" and "Upvotes". The visitors' button keeps "Recommend" (decided
+Nov 5): beside the thumb it says what the tap means. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
