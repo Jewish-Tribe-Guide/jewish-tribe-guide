@@ -12,7 +12,7 @@ import { adminBase } from '@/lib/adminNav'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
-import SitePreview from './SitePreview'
+import SitePreview, { type PreviewDevice } from './SitePreview'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import SaveBar, { useLeaveGuard } from './SaveBar'
@@ -21,12 +21,13 @@ import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import { DEFAULT_MOBILE_TABS, MAX_BEFORE_CANDLE_ITEMS, TODAY_BLOCKS } from '@/lib/siteSettings'
 
-// Site's Home page and Header and menus tabs (the admin redesign's step 4,
-// boards 7 and 8): the settings sorted by the screen they change, not by
-// device, each named by what a visitor sees, with the screen itself in a
-// small preview beside them. Both tabs are one component instance sharing
-// one draft and one Save bar (see SiteSettingsLayout), so stepping between
-// them never drops a half-finished edit. Nothing goes live until Save.
+// Site's Home page (the drawing 2sssenojcQzzeHtHAT8gnp): the home page and
+// the header over it, each named by what a visitor sees, with the page itself
+// in a small preview beside them. Computer or Phone at the top picks which
+// the boxes and the preview are of, in the order the page reads; a box on
+// both says so. It used to be two tabs, Home page and Header and menus, which
+// left Home page nearly all computer and the header's tab previewing the same
+// home page (the user, Nov 4). Nothing goes live until Save.
 
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   // Every field saveHomeSections actually persists (see its own `changed()`)
@@ -74,15 +75,10 @@ function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange
   )
 }
 
-export default function SiteSettingsEditor({
-  token,
-  section,
-}: {
-  token: string
-  /** Which tab is showing: the Home page, or Header and menus. */
-  section: 'home' | 'menus'
-}) {
+export default function SiteSettingsEditor({ token }: { token: string }) {
   const { community } = useActiveCommunity()
+  // Which version of the page the boxes and the preview are of.
+  const [device, setDevice] = useState<PreviewDevice>('computer')
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
   const [sections, setSections] = useState<HomeSection[] | null>(null)
@@ -95,8 +91,7 @@ export default function SiteSettingsEditor({
   const [spot, setSpot] = useState<string | null>(null)
   const spotOn = (name: string | null) => ({ onMouseEnter: () => setSpot(name), onFocusCapture: () => setSpot(name) })
   // ImageUploadField's memory of "the real original behind `value`", kept
-  // here so it survives the field unmounting when the tab switches (this
-  // component stays mounted across both tabs; the fields don't).
+  // here so it survives the field unmounting when Computer or Phone changes.
   const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
   const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
 
@@ -122,7 +117,7 @@ export default function SiteSettingsEditor({
 
   const changes = settings && draft && sections && sectionsDraft ? countChanges(settings, draft, sections, sectionsDraft) : 0
   const base = adminBase(community.slug)
-  const stays = useCallback((path: string) => path === `${base}/home` || path === `${base}/menus`, [base])
+  const stays = useCallback((path: string) => path === `${base}/home`, [base])
   useLeaveGuard(changes > 0, stays)
 
   function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
@@ -183,67 +178,129 @@ export default function SiteSettingsEditor({
   }
 
   // Narrower than the preview beside needs: the page full size, with what
-  // hasn't been saved (board 21c).
-  if (previewing) return <DevicePreviewFrame src={previewUrl(community.slug)} onClose={() => setPreviewing(false)} />
+  // hasn't been saved (board 21c), on the version picked.
+  if (previewing) {
+    return <DevicePreviewFrame src={previewUrl(community.slug)} initialDevice={device === 'phone' ? 'mobile' : 'desktop'} onClose={() => setPreviewing(false)} />
+  }
+
+  const computer = device === 'computer'
+  // On a box that shows on both versions.
+  const alsoOn = <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{computer ? 'Also on a phone' : 'Also on a computer'}</span>
+
+  const nameAndLogo = (
+    <div {...spotOn(null)}>
+      <AdminBox title="Name and logo" action={alsoOn}>
+        <div className="flex flex-col gap-4 p-4">
+          <AdminField label="Name">
+            <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={adminInputClass} />
+          </AdminField>
+          <div>
+            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Logo</span>
+            <ImageUploadField
+              value={draft.logoUrl ?? ''}
+              onChange={(url) => set('logoUrl', url || null)}
+              uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
+              token={token}
+              shape="square"
+              originalSource={logoOriginal}
+              onOriginalSourceChange={setLogoOriginal}
+            />
+          </div>
+        </div>
+      </AdminBox>
+    </div>
+  )
+
+  const searchBox = (
+    <div {...spotOn('top')}>
+      <AdminBox title="Search box" action={alsoOn}>
+        <div className="p-4">
+          <input aria-label="Words in the search box" value={draft.searchPlaceholder} onChange={(e) => set('searchPlaceholder', e.target.value)} className={adminInputClass} />
+        </div>
+      </AdminBox>
+    </div>
+  )
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* Full width on a phone, like the Preview button under it (the user,
+          Nov 4); beside the boxes on a computer, as drawn. */}
+      <div role="group" aria-label="Show the page on" className="flex lg:self-start lg:inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
+        {(['computer', 'phone'] as const).map((d) => (
+          <button
+            key={d}
+            type="button"
+            aria-pressed={device === d}
+            onClick={() => setDevice(d)}
+            className={`flex-1 lg:flex-none min-h-10 px-4 rounded-md text-sm font-semibold cursor-pointer ${device === d ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+          >
+            {d === 'computer' ? 'Computer' : 'Phone'}
+          </button>
+        ))}
+      </div>
       <div className="flex items-start gap-6">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
-          {section === 'home' ? (
+          <div className="lg:hidden">
+            <AdminPreviewButton
+              onClick={() => {
+                writePreviewDraft({ settings: draft, sections: sectionsDraft })
+                setPreviewing(true)
+              }}
+            />
+          </div>
+          {nameAndLogo}
+          {computer ? (
             <>
-              <div className="lg:hidden">
-                <AdminPreviewButton
-                  onClick={() => {
-                    writePreviewDraft({ settings: draft, sections: sectionsDraft })
-                    setPreviewing(true)
-                  }}
-                />
+              <div {...spotOn(null)}>
+                <AdminBox title="Header">
+                  <DesktopNavEditor
+                    items={draft.desktopNavItems}
+                    onChange={(items) => set('desktopNavItems', items)}
+                    sections={sectionsDraft}
+                    onSectionsChange={setHomeSections}
+                  />
+                </AdminBox>
               </div>
-              <div {...spotOn('top')}>
-              <AdminBox title="Top of the page">
-                <div className="flex flex-col gap-4 p-4">
-                  <AdminField label="Big line">
-                    <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  <AdminField label="Line under it">
-                    <input value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  <AdminField label="Search box">
-                    <input value={draft.searchPlaceholder} onChange={(e) => set('searchPlaceholder', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  <div>
-                    <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
-                    <ImageUploadField
-                      value={draft.desktopHeroImage?.url ?? ''}
-                      onChange={(url) => set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)}
-                      uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
-                      token={token}
-                      shape="square"
-                      aspect={11 / 6}
-                      originalSource={heroOriginal}
-                      onOriginalSourceChange={setHeroOriginal}
-                    />
-                  </div>
-                  {draft.desktopHeroImage?.url && (
-                    <AdminField label="Photo description, for screen readers">
-                      <input
-                        value={draft.desktopHeroImage.alt}
-                        onChange={(e) => draft.desktopHeroImage && set('desktopHeroImage', { ...draft.desktopHeroImage, alt: e.target.value })}
-                        className={adminInputClass}
-                      />
-                    </AdminField>
-                  )}
-                </div>
-              </AdminBox>
 
+              <div {...spotOn('top')}>
+                <AdminBox title="Top of the page">
+                  <div className="flex flex-col gap-4 p-4">
+                    <AdminField label="Big line">
+                      <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={adminInputClass} />
+                    </AdminField>
+                    {/* Wraps, so the whole line shows (the user, Nov 4). */}
+                    <AdminField label="Line under it">
+                      <textarea rows={2} value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={adminInputClass} />
+                    </AdminField>
+                    {/* No description: the photo is decoration (HeroHeading). */}
+                    <div>
+                      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
+                      <ImageUploadField
+                        value={draft.desktopHeroImage?.url ?? ''}
+                        onChange={(url) => set('desktopHeroImage', url ? { url, alt: '' } : null)}
+                        uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+                        token={token}
+                        shape="square"
+                        aspect={11 / 6}
+                        originalSource={heroOriginal}
+                        onOriginalSourceChange={setHeroOriginal}
+                      />
+                    </div>
+                  </div>
+                </AdminBox>
               </div>
+
+              {searchBox}
 
               <div {...spotOn('cards')}>
-                <AdminBox title="Cards under the search, on a computer">
+                <AdminBox title="Cards under the search">
                   <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
                 </AdminBox>
               </div>
+            </>
+          ) : (
+            <>
+              {searchBox}
 
               {/* Held back from the site for now (see features.ts). */}
               {features.todayHome && (
@@ -292,67 +349,18 @@ export default function SiteSettingsEditor({
                 </AdminBox>
               )}
 
-              <div {...spotOn(null)}>
-              <AdminBox title="When the link is shared">
-                <div className="flex flex-col gap-4 p-4">
-                  <AdminField label="Title">
-                    <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  <AdminField label="Description">
-                    <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  {/* How a message or a search result shows it. */}
-                  <div data-testid="link-sample" className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3">
-                    <p className="m-0 text-[15px] font-semibold text-slate-900">{draft.heroTitle}</p>
-                    <p className="m-0 mt-0.5 text-[13px] text-slate-600 line-clamp-2">{draft.mission}</p>
-                  </div>
-                </div>
-              </AdminBox>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Back from Settings (the user, Nov 4): they're the header's. */}
-              <AdminBox title="Name and logo">
-                <div className="flex flex-col gap-4 p-4">
-                  <AdminField label="Name">
-                    <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={adminInputClass} />
-                  </AdminField>
-                  <div>
-                    <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Logo</span>
-                    <ImageUploadField
-                      value={draft.logoUrl ?? ''}
-                      onChange={(url) => set('logoUrl', url || null)}
-                      uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
-                      token={token}
-                      shape="square"
-                      originalSource={logoOriginal}
-                      onOriginalSourceChange={setLogoOriginal}
-                    />
-                  </div>
-                </div>
-              </AdminBox>
-
-              <AdminBox title="Top of the page, on a computer">
-                <DesktopNavEditor
-                  items={draft.desktopNavItems}
-                  onChange={(items) => set('desktopNavItems', items)}
-                  sections={sectionsDraft}
-                  onSectionsChange={setHomeSections}
-                />
-              </AdminBox>
-
               {/* No count beside the title (the user, Nov 4); five at most says so when it's reached. */}
-              <AdminBox title="Tabs, on a phone">
-                <MobileTabsEditor tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS} onChange={(tabs) => set('mobileTabs', tabs)} />
-              </AdminBox>
-
+              <div {...spotOn(null)}>
+                <AdminBox title="Tabs">
+                  <MobileTabsEditor tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS} onChange={(tabs) => set('mobileTabs', tabs)} />
+                </AdminBox>
+              </div>
             </>
           )}
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} spot={section === 'home' ? spot : null} />
+          <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} />
         </aside>
       </div>
 

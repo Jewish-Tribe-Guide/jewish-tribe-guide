@@ -62,14 +62,16 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
   })
 
   // The phone home (the user, Oct 17): no headline and no mission on show.
-  // heroTitle stays the page's one <h1>, for screen readers and search
-  // engines, and the trust line takes the top.
-  it('mobile: heroTitle is the page heading for screen readers only; no mission; the trust line on top', () => {
+  // The big line is the page's <h1> for screen readers and search engines,
+  // and the trust line takes the top. (It was the separate heroTitle until
+  // that field left the admin, Nov 4.)
+  it('mobile: the big line is the page heading for screen readers only; no mission; the trust line on top', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} trust={<div data-testid="trust-stub" />} />)
 
-    const h1sWithHeroTitle = screen.getAllByRole('heading', { level: 1 }).filter((h) => h.textContent === settings.heroTitle)
-    expect(h1sWithHeroTitle).toHaveLength(1)
-    expect(h1sWithHeroTitle[0]).toHaveClass('sr-only')
+    const phoneHeading = within(screen.getByTestId('phone-hero')).getByRole('heading', { level: 1 })
+    expect(phoneHeading).toHaveTextContent(settings.desktopHeroHeadline)
+    expect(phoneHeading).toHaveClass('sr-only')
+    expect(screen.queryByText(settings.heroTitle)).not.toBeInTheDocument()
     expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
     const hero = screen.getByTestId('phone-hero')
     expect(hero.firstElementChild?.nextElementSibling).toBe(screen.getByTestId('trust-stub'))
@@ -131,10 +133,10 @@ describe('HeroHeading — Phase 3 desktop details', () => {
   })
 })
 
-// The hero's photo panel — desktopHeroImage is admin-editable (Desktop tab's
-// Hero card). Two things matter here: a real photo gets a real, describable
-// alt (never aria-hidden — that combination is exactly the axe violation
-// this file's placeholder already shipped once), and a deployment with
+// The hero's photo panel — desktopHeroImage is admin-editable (Site's Home
+// page). Two things matter here: a real photo is decoration, an empty alt a
+// screen reader passes by (the user, Nov 4: no "Photo description" to fill
+// in; the big line beside it says what the page is), and a deployment with
 // nothing set still renders instead of breaking.
 describe('HeroHeading — the photo panel', () => {
   const settings = {
@@ -146,8 +148,9 @@ describe('HeroHeading — the photo panel', () => {
     desktopHeroSubhead: '',
   }
 
-  it('renders the configured photo with a real alt, not aria-hidden', () => {
-    render(
+  // A description saved before Nov 4 is still in the row; it isn't read.
+  it('renders the configured photo as decoration, with an empty alt, whatever description was saved', () => {
+    const { container } = render(
       <HeroHeading
         settings={{ ...settings, desktopHeroImage: { url: 'https://images.unsplash.com/photo-test', alt: 'A test skyline' } }}
         query=""
@@ -155,9 +158,9 @@ describe('HeroHeading — the photo panel', () => {
       />,
     )
 
-    const img = screen.getByAltText('A test skyline')
-    expect(img).toBeTruthy()
-    expect(img.closest('[aria-hidden]')).toBeNull()
+    const img = container.querySelector('img[src*="photo-test"]')!
+    expect(img.getAttribute('alt')).toBe('')
+    expect(screen.queryByAltText('A test skyline')).toBeNull()
   })
 
   it('falls back to the aria-hidden placeholder when no photo is configured', () => {

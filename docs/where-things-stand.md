@@ -2295,6 +2295,36 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 4, later: Site's Home page is one screen (on `redesign/oct18-fixes`)
+
+Drawn first (artifact 2sssenojcQzzeHtHAT8gnp), built as drawn:
+- **Home page** and **Header and menus** are one tab, Home page. A
+  Computer / Phone switch at the top picks which version's boxes show and
+  which the preview beside them shows; it runs full width on a phone, like
+  the Preview button. Computer: Name and logo, Header, Top of the page,
+  Search box, Cards under the search. Phone: Name and logo, Search box,
+  Today home (while held back, not shown), Tabs. Boxes on both say "Also
+  on a phone" / "Also on a computer". `/admin/menus` lands on Home page.
+- **Not as drawn:** the drawing's "Header links" / "+ Add a link" is
+  "Header" / "+ Add a tab", since header items are tabs holding links or
+  headings (decided earlier Nov 4).
+- **Line under it** wraps (a textarea).
+- **The photo has no description to fill in**; it's decoration (empty alt).
+  Replaces note 24 below.
+- **"When the link is shared" is gone.** A shared link's description is the
+  big line and the line under it (`shareDescription`), on every page that
+  used the old description. Its Title was never shown anywhere a visitor
+  could see (the shared title is the site's name). The phone's hidden page
+  heading is the big line too.
+- **Fix:** Watches' "N things need fixing" and "Broken checks" opened To do
+  on All. A link from another admin page sets its address only after To do
+  first renders, so `?show=broken` was missed, then stripped. It's read again
+  after that first render now.
+- **Cards under the search:** a card held over a box it can't join turns
+  that box red with the reason under it: "Full: 3 cards at most", or
+  "Categories has a row of its own" (Categories in or out of a box). A full
+  box is still dimmed from the moment a card is lifted.
+
 ## Done Nov 4: the bugs and small tweaks from the user's 33 notes (on `redesign/oct18-fixes`)
 
 The user sent 33 notes on Nov 4, mostly about the admin screens, and said

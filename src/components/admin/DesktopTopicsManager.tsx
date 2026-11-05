@@ -18,7 +18,9 @@ import DragList, { addButton, InnerRow } from './DragList'
 // that. A gap is passed at its outer edge, not its middle, so the whole
 // space between two boxes is the own-row spot (the user, Nov 4: moving a
 // card out of a box into a row between was "not so easy"). The keyboard
-// steps through the same places.
+// steps through the same places. A card held over a box it can't join
+// (a full one, or Categories in or out of one) turns that box red with the
+// reason under it (the user, Nov 4: "make that clear on the drag").
 //
 // What a card says is fixed here: nobody had changed any of it (checked on
 // live, Nov 4), so the fields went. The site still reads the saved words.
@@ -87,6 +89,18 @@ function runAt(items: readonly Item[], i: number): Card[] | null {
   return items.slice(start, end + 1).map((it) => (it as { card: Card }).card)
 }
 
+/** The box the lifted card was held at and couldn't join, and why. */
+function turnedDown(refused: readonly Item[], liftedId: string): { ids: Set<string>; why: string } | null {
+  const at = refused.findIndex((it) => isCard(it) && it.card.id === liftedId)
+  const run = at < 0 ? null : runAt(refused, at)
+  if (!run) return null
+  const lifted = run.find((c) => c.id === liftedId)!
+  const box = run.filter((c) => c.id !== liftedId)
+  if (!box.length) return null
+  const why = lifted.kind === 'browse' || box.some((c) => c.kind === 'browse') ? 'Categories has a row of its own' : `Full: ${MAX_CARDS_IN_ROW} cards at most`
+  return { ids: new Set(box.map((c) => c.id)), why }
+}
+
 export default function DesktopTopicsManager({
   sections,
   onChange,
@@ -124,21 +138,25 @@ export default function DesktopTopicsManager({
 
   // A row's box, drawn on the spots its cards sit in, so it stays put while
   // one of them is lifted.
-  function slotClass(item: Item, i: number, shown: readonly Item[], dragKey: string | null) {
-    if (!isCard(item)) return ''
+  function slot(item: Item, i: number, shown: readonly Item[], dragKey: string | null, refused: readonly Item[] | null) {
+    if (!isCard(item)) return { className: '' }
     const run = runAt(shown, i)!
-    if (run.length < 2) return ''
+    const no = refused && dragKey ? turnedDown(refused, dragKey) : null
+    const blocked = !!no?.ids.has(item.card.id)
+    if (run.length < 2 && !blocked) return { className: '' }
     const first = run[0] === item.card
     const last = run.at(-1) === item.card
     const holdsLifted = dragKey !== null && run.some((c) => c.id === dragKey)
     const full = dragKey !== null && !holdsLifted && run.length >= MAX_CARDS_IN_ROW
-    return [
+    const className = [
       'border-x px-1.5',
-      holdsLifted ? 'border-primary bg-blue-50' : 'border-slate-200 bg-slate-50',
+      blocked ? 'border-red-300 bg-red-50' : holdsLifted ? 'border-primary bg-blue-50' : 'border-slate-200 bg-slate-50',
       first ? 'rounded-t-[10px] border-t pt-1.5' : '',
       last ? 'rounded-b-[10px] border-b pb-1.5' : 'pb-1.5',
-      full ? 'opacity-50' : '',
+      full && !blocked ? 'opacity-50' : '',
     ].join(' ')
+    const note = blocked && last ? <p className="m-0 px-1 pt-1.5 text-[13px] font-semibold text-red-700">{no!.why}</p> : undefined
+    return { className, note }
   }
 
   return (
@@ -154,7 +172,7 @@ export default function DesktopTopicsManager({
           // two gaps under a row changes nothing on the page.
           return rowsFit(rows) && (via === 'pointer' || !sameRows(rows, cardRows(cards)))
         }}
-        slotClass={slotClass}
+        slot={slot}
         dropEdge={(i) => (isCard(i) ? undefined : i.gap === 'top' || i.gap.endsWith('b') ? 'bottom' : 'top')}
         className="px-3"
       >

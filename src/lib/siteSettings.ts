@@ -18,12 +18,13 @@ import { community } from '@/community.config'
 export type SiteSettings = {
   /** Site name — the header title, footer name, and copyright line. */
   name: string
-  /** The big heading on the home screen, e.g. "What are you looking for?". */
+  /** The Today home's heading (held back, features.ts). Not edited in the
+   *  admin since Nov 4: the phone's heading for screen readers is the big
+   *  line now. */
   heroTitle: string
-  /** Mobile tab's "Subhead" field — shown under the home screen heading on
-   *  mobile, and reused as the footer blurb and &lt;meta description&gt;.
-   *  Desktop has its own separate hero headline/subhead (Desktop tab's Hero
-   *  card) and no longer reads this for anything shown on screen. */
+  /** What a shared link said under the name until Nov 4, and still does
+   *  while the big line and the line under it are both empty (see
+   *  shareDescription). Not edited in the admin any more. */
   mission: string
   /** A pasted image URL shown in the header instead of the built-in Star of
    *  David mark. Null/empty keeps the default mark. */
@@ -236,6 +237,16 @@ export function defaultHeroSplit(mission: string): { headline: string; subhead: 
   return { headline: trimmed.slice(0, i).trim(), subhead: trimmed.slice(i + 3).trim() }
 }
 const heroSplit = defaultHeroSplit(community.mission)
+
+/** What a shared link says under the site's name, and the page's meta
+ *  description: the home page's big line and the line under it, so the same
+ *  words aren't kept in two places (the user, Nov 4). */
+export function shareDescription(s: Pick<SiteSettings, 'desktopHeroHeadline' | 'desktopHeroSubhead' | 'mission'>): string {
+  const headline = s.desktopHeroHeadline.trim()
+  const subhead = s.desktopHeroSubhead.trim()
+  if (!headline || !subhead) return headline || subhead || s.mission.trim()
+  return /[.!?:;—-]$/.test(headline) ? `${headline} ${subhead}` : `${headline}. ${subhead}`
+}
 
 /** The code-configured defaults — used as the client fallback (if the API is
  *  unreachable) and whenever no row exists yet in `site_settings`. */

@@ -150,11 +150,13 @@ describe('Landing', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     renderLanding(
       undefined,
-      { content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' } } },
+      { content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, desktopHeroHeadline: 'Welcome to the directory', mission: 'Everything nearby' } } },
       [makeListing({ id: 'g1', category: 'grocery' }), makeListing({ id: 'g2', category: 'grocery' })],
     )
     const hero = screen.getByTestId('phone-hero')
     expect(within(hero).getByTestId('trust-band')).toHaveTextContent('Kept up by the community2 places')
+    // The page's heading is the big line, as on a computer (heroTitle is no
+    // longer edited in the admin, Nov 4); hidden, for screen readers.
     expect(within(hero).getByRole('heading', { level: 1, name: 'Welcome to the directory' })).toHaveClass('sr-only')
     expect(screen.queryByText('Everything nearby')).not.toBeInTheDocument()
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)

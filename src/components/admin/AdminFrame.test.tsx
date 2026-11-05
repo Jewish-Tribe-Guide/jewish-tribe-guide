@@ -56,10 +56,10 @@ describe('AdminFrame', () => {
   })
 
   it("shows the open area's pages as tabs under the heading, the current one lit", () => {
-    show('/philly/admin/menus')
+    show('/philly/admin/categories')
     const tabs = within(screen.getByRole('navigation', { name: 'Site' })).getAllByRole('link')
-    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Header and menus', 'Campaigns'])
-    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page', null])
+    expect(tabs.map((a) => a.textContent)).toEqual(['Home page', 'Category pages', 'Campaigns'])
+    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, 'page', null])
   })
 
   // Step 2: To do is one list. Its other pages open from it, headed by

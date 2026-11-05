@@ -192,9 +192,12 @@ const nextConfig: NextConfig = {
       // On a computer tab held the home page's words, On a phone its tabs.
       // (/admin/site, the old Basics, is Site's list of screens now.)
       { source: '/:community((?!api\\b).*)/admin/desktop', destination: '/:community/admin/home', permanent: false },
-      { source: '/:community((?!api\\b).*)/admin/mobile', destination: '/:community/admin/menus', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/mobile', destination: '/:community/admin/home', permanent: false },
       // The name and logo were Settings' Community tab until Nov 4.
-      { source: '/:community((?!api\\b).*)/admin/community', destination: '/:community/admin/menus', permanent: false },
+      { source: '/:community((?!api\\b).*)/admin/community', destination: '/:community/admin/home', permanent: false },
+      // Header and menus joined the Home page (Nov 4): one screen, on a
+      // computer or a phone.
+      { source: '/:community((?!api\\b).*)/admin/menus', destination: '/:community/admin/home', permanent: false },
     ];
   },
 };

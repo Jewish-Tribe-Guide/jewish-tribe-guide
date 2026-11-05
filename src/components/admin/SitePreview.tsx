@@ -35,6 +35,7 @@ export function PreviewBeside({
   reload = 0,
   children,
   initialDevice = 'computer',
+  device: shownDevice,
   onOpen,
   spot = null,
 }: {
@@ -45,6 +46,9 @@ export function PreviewBeside({
   /** Or a tree to draw, given the device it's drawn for. */
   children?: (device: PreviewDevice) => React.ReactNode
   initialDevice?: PreviewDevice
+  /** Given, the page is always on this one, picked outside, and there's no
+   *  Computer and Phone of its own. */
+  device?: PreviewDevice
   /** Given, the shrunk page is a button that opens it full size. */
   onOpen?: () => void
   /** The part of the page to light up (see previewSpot.ts). */
@@ -68,13 +72,15 @@ export function PreviewBeside({
     }, SPOT_LOOK_MS)
     return () => clearInterval(t)
   }, [spot, loads])
-  const [device, setDevice] = useState<PreviewDevice>(initialDevice)
+  const [picked, setDevice] = useState<PreviewDevice>(initialDevice)
+  const device = shownDevice ?? picked
   const { width, height } = DEVICES[device]
   const scale = SHOWN_WIDTH[device] / width
   const Frame = onOpen ? 'button' : 'div'
 
   return (
     <div className="flex flex-col gap-3">
+      {!shownDevice && (
       <div role="group" aria-label="Preview on" className="self-start inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
         {(Object.keys(DEVICES) as PreviewDevice[]).map((d) => (
           <button
@@ -90,6 +96,7 @@ export function PreviewBeside({
           </button>
         ))}
       </div>
+      )}
       <Frame
         {...(onOpen && { type: 'button' as const, onClick: onOpen, 'aria-label': 'Open the preview' })}
         className={`relative block p-0 overflow-hidden bg-white border border-slate-200 ${onOpen ? 'cursor-pointer' : ''} ${device === 'phone' ? 'rounded-[22px]' : 'rounded-[10px]'}`}
@@ -119,13 +126,14 @@ export default function SitePreview({
   community,
   settings,
   sections,
-  initialDevice = 'computer',
+  device,
   spot = null,
 }: {
   community: string
   settings: SiteSettings
   sections: DraftHomeSection[]
-  initialDevice?: PreviewDevice
+  /** Which version of the page, picked beside it. */
+  device: PreviewDevice
   spot?: string | null
 }) {
   // Which draft the frame shows; 0 until the first one is written, so the
@@ -141,5 +149,5 @@ export default function SitePreview({
     return () => clearTimeout(t)
   }, [settings, sections])
 
-  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} initialDevice={initialDevice} spot={spot} />
+  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} device={device} spot={spot} />
 }

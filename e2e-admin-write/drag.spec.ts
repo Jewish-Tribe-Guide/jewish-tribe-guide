@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
-// The lists on Site → Header and menus are put in order by dragging (notes
+// The lists on Site → Home page are put in order by dragging (notes
 // 25-28): by the handle with a mouse, or on a phone by holding the row.
 // Only a real browser lays the rows out and hit-tests them, so it's here
 // and not in the unit suite. Never saves, so it writes nothing.
@@ -14,8 +14,9 @@ async function middle(l: Locator) {
 
 test('a row dragged by its handle lands where it is dropped', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
-  await page.goto('/philly/admin/menus')
-  const tabs = page.getByRole('region', { name: 'Tabs, on a phone' })
+  await page.goto('/philly/admin/home')
+  await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
+  const tabs = page.getByRole('region', { name: 'Tabs' })
   const handles = tabs.getByRole('button', { name: /^Move / })
   await expect(handles.nth(1)).toBeVisible({ timeout: 20_000 })
   await tabs.scrollIntoViewIfNeeded()
@@ -44,8 +45,9 @@ test.describe('on a phone', () => {
   }
 
   test('holding a row lifts it to drag; a tap still opens it', async ({ page }) => {
-    await page.goto('/philly/admin/menus')
-    const tabs = page.getByRole('region', { name: 'Tabs, on a phone' })
+    await page.goto('/philly/admin/home')
+    await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).tap()
+    const tabs = page.getByRole('region', { name: 'Tabs' })
     const rows = tabs.locator('[data-drag-row]')
     await expect(rows.nth(1)).toBeVisible({ timeout: 20_000 })
     await rows.last().scrollIntoViewIfNeeded()
@@ -93,7 +95,7 @@ test.describe('the home page cards', () => {
     // never ends the drag.
     await page.setViewportSize({ width: 1400, height: 1400 })
     await page.goto('/philly/admin/home')
-    const box = page.getByRole('region', { name: 'Cards under the search, on a computer' })
+    const box = page.getByRole('region', { name: 'Cards under the search' })
     await expect(box.getByRole('button', { name: /^Move / }).nth(1)).toBeVisible({ timeout: 20_000 })
     await box.scrollIntoViewIfNeeded()
     return box
@@ -129,21 +131,45 @@ test.describe('the home page cards', () => {
     await expect.poll(async () => (await rows(box)).at(-1)).toEqual([...above, last])
   })
 
-  test('a full row takes no fourth card, and is dimmed while one is lifted', async ({ page }) => {
+  test('a full row takes no fourth card, is dimmed while one is lifted, and says so when one is held over it', async ({ page }) => {
     const box = await open(page)
     const before = await rows(box)
     const full = before.findIndex((row) => row.length === 3)
     const mover = before.find((row, i) => i > full && !row.includes('Categories'))?.[0]
     test.skip(full < 0 || !mover, 'no full row with a card below it')
 
+    const fullSlot = box.locator('[data-drag-row]').filter({ hasText: before[full]![0]! }).locator('..')
+    const handle = box.getByRole('button', { name: `Move ${mover}` })
+    const from = await middle(handle)
     const onto = await middle(box.locator('[data-drag-row]').filter({ hasText: before[full]![1]! }))
-    const drop = await drag(page, box, box.getByRole('button', { name: `Move ${mover}` }), onto.y)
-    await expect(box.locator('[data-drag-row]').filter({ hasText: before[full]![0]! }).locator('..')).toHaveClass(/opacity-50/)
+    // Just lifted: the full row is dimmed, and says nothing yet.
+    const drop = await drag(page, box, handle, from.y - 4)
+    await expect(fullSlot).toHaveClass(/opacity-50/)
+    await expect(box.getByText('Full: 3 cards at most')).toHaveCount(0)
+    // Held over it (the user, Nov 4: "make that clear on the drag").
+    await page.mouse.move(from.x, onto.y, { steps: 16 })
+    await expect(box.getByText('Full: 3 cards at most')).toBeVisible()
+    await expect(fullSlot).toHaveClass(/border-red-300/)
     await drop()
+    await expect(box.getByText('Full: 3 cards at most')).toHaveCount(0)
 
     const after = await rows(box)
     expect(after.find((row) => row.includes(before[full]![0]!))).toEqual(before[full])
     expect(after.every((row) => row.length <= 3)).toBe(true)
+  })
+
+  test('Categories held over another card says it has a row of its own, and stays put', async ({ page }) => {
+    const box = await open(page)
+    const before = await rows(box)
+    const at = before.findIndex((row) => row.includes('Categories'))
+    test.skip(at < 0 || !before[at + 1], 'no Categories card with a row below it')
+
+    const onto = await middle(box.locator('[data-drag-row]').filter({ hasText: before[at + 1]![0]! }))
+    const drop = await drag(page, box, box.getByRole('button', { name: 'Move Categories' }), onto.y)
+    await expect(box.getByText('Categories has a row of its own')).toBeVisible()
+    await drop()
+    await expect(box.getByText('Categories has a row of its own')).toHaveCount(0)
+    expect((await rows(box)).find((row) => row.includes('Categories'))).toEqual(['Categories'])
   })
 
   // The user, Nov 4: moving a card out of the box of three into a row of

@@ -46,7 +46,7 @@ describe('desktop hero photo', () => {
 
   it('is lazy with high fetch priority, and adds no unconditional <head> preload', () => {
     const { container } = render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
-    const hero = imgs(container).find((i) => i.alt === 'A street')!
+    const hero = imgs(container).find((i) => i.src.includes('photo-hero'))!
 
     // Default lazy loading is what makes the browser skip it inside the
     // `hidden` (phone) subtree; fetchpriority keeps it winning on desktop.

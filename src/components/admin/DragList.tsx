@@ -6,7 +6,7 @@ import { Chevron } from './AdminUI'
 
 // One list put in order by dragging (the user, Nov 4: "Could this be drag
 // instead of arrows?"; drawing KdHT8Tci1ufXSXobnnSfEm). Used by every list
-// on Site → Header and menus: the cards, the groups and their cards, the
+// on Site → Home page: the cards, the groups and their cards, the
 // top of the page and its dropdowns, and the phone's tabs.
 //
 // A row is dragged by its handle, or on a phone by pressing and holding the
@@ -58,7 +58,7 @@ export default function DragList<T>({
   children,
   className = '',
   canMove,
-  slotClass,
+  slot,
   dropEdge,
 }: {
   items: readonly T[]
@@ -71,9 +71,11 @@ export default function DragList<T>({
    *  `via` is 'key' for an arrow press, which also skips an order that
    *  looks no different. */
   canMove?: (next: T[], via: 'pointer' | 'key') => boolean
-  /** A class for the spot a row sits in, which stays put while the row is
-   *  lifted: the home cards draw their rows' boxes with it. */
-  slotClass?: (item: T, i: number, shown: readonly T[], dragKey: string | null) => string
+  /** The spot a row sits in, which stays put while the row is lifted: its
+   *  class, and a note under the row. The home cards draw their rows' boxes
+   *  with it. `refused` is the order the lifted row was last held at and
+   *  canMove turned down, while it's still held there; null otherwise. */
+  slot?: (item: T, i: number, shown: readonly T[], dragKey: string | null, refused: readonly T[] | null) => { className: string; note?: React.ReactNode }
   /** Where a lifted row passes this one: its middle (undefined), or its
    *  top or bottom edge, measured as the row is lifted. The home cards'
    *  gaps use their outer edges, so the whole space between two boxes is
@@ -82,6 +84,8 @@ export default function DragList<T>({
 }) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
+  // Where the lifted row is held and can't go (see `slot`).
+  const [refused, setRefused] = useState<string[] | null>(null)
   const els = useRef(new Map<string, HTMLDivElement>())
   const dragRef = useRef<Drag | null>(null)
   const orderRef = useRef<string[] | null>(null)
@@ -94,6 +98,7 @@ export default function DragList<T>({
 
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
   const shown = order ? order.map((k) => byKey.get(k)).filter((i): i is T => i !== undefined) : items
+  const refusedItems = refused && drag ? refused.map((k) => byKey.get(k)).filter((i): i is T => i !== undefined) : null
 
   // The handlers are made once: a window listener added on one render is
   // removed by the same function on another.
@@ -164,6 +169,7 @@ export default function DragList<T>({
         })
       const to = dropIndex(middles, d.startTop + d.dy + el.offsetHeight / 2)
       const from = cur.indexOf(d.key)
+      let turnedDown: string[] | null = null
       if (to !== from) {
         const next = moveItem(cur, from, to)
         const { items: now, keyOf: keyFor, canMove: allowed } = latest.current
@@ -171,8 +177,9 @@ export default function DragList<T>({
         if (!allowed || allowed(next.map((k) => byKey.get(k)!), 'pointer')) {
           orderRef.current = next
           setOrder(next)
-        }
+        } else turnedDown = next
       }
+      setRefused((was) => (was?.join('\n') === turnedDown?.join('\n') ? was : turnedDown))
       place()
     }
     function end(e: PointerEvent) {
@@ -193,6 +200,7 @@ export default function DragList<T>({
       orderRef.current = null
       setDrag(null)
       setOrder(null)
+      setRefused(null)
     }
     function cancelHold() {
       if (!hold.current) return
@@ -305,12 +313,13 @@ export default function DragList<T>({
             {children(item, { handle, rowProps, lifted })}
           </div>
         )
-        return slotClass ? (
-          <div key={key} className={slotClass(item, i, shown, drag?.key ?? null)}>
+        if (!slot) return row
+        const { className: slotClassName, note } = slot(item, i, shown, drag?.key ?? null, refusedItems)
+        return (
+          <div key={key} className={slotClassName}>
             {row}
+            {note}
           </div>
-        ) : (
-          row
         )
       })}
     </div>
