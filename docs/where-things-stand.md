@@ -345,9 +345,10 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   (the "+ Add" box is site-wide; always on), the Map switch (a page is
   on the map when its places have an address), Groups, web address (set
   from the name when the page is made), link-preview words.
-- Each place: Address (puts the page on the map), Phone, Hours, Website,
-  Photo first, each with an × to remove it, nothing to set (the user,
-  Nov 5). Then the page's own fields, each saying where it shows:
+- Each place: every field is the same row, the five ready-made ones
+  (Address, Phone, Hours, Website, Photo) included: drag to reorder, tap
+  to open, Remove inside (the user, Nov 5: they shouldn't look
+  different). Each row says where it shows:
   "Filter · in the list", "In the list", "When a place is opened".
   Today only Address and Phone are switches (`has_address`,
   `has_phone`); Hours, Website and Photo are ordinary fields (live: no
