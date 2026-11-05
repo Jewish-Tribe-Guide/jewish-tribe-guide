@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 4, 2026.
+Last updated: Nov 5, 2026.
 
 ## The branch
 
@@ -326,29 +326,6 @@ The user, Nov 4, after Home page became one screen: Category pages is next,
 looking at the screen as it stands (and what Home page settled: one screen,
 Computer / Phone, boxes in the order the page reads, the preview beside),
 then draw it before building.
-
-## Later: tapping away from a menu still taps what's under it, on a phone
-
-The user, Nov 5, "not for now": with a filter menu open, tapping away
-closes it and nothing else on a computer, but on a phone the tap goes
-through to what's under it too. The fix was `AdminMenu` in
-`src/components/admin/AdminUI.tsx` (17a10ed8, Show / Category / Sort);
-the home search's results (`HeroHeading.tsx`, 4c4d4e1c) do it the same
-way and probably have the same gap. Not looked into yet. A guess, unchecked:
-both stop swallowing at `pointerup`/`mouseup` plus a zero timer, and a
-phone's click can come after that. A fix of this kind already failed once
-on real iPhones (e56fb820), and what held there was each row's own click
-handler checking a flag, not a document-wide swallow. jsdom can't show
-this, so check it on a real phone (the commit's Vercel preview).
-
-## Later: Settings shows a lone "Team" tab
-
-The user, Nov 5, "for later": Settings has Team as its only tab, so get rid
-of it. `AdminFrame.tsx` shows an area's tab row when it has more than one
-tab or its one tab is named differently from the area; Settings' one tab is
-"Team", so the row shows (Reports' is "Reports", so its row doesn't). A
-superadmin also gets Communities there, so the row should stay for them.
-The likely fix is hiding the row whenever an area has one tab.
 
 ## Small open decisions
 
@@ -2325,6 +2302,50 @@ simpler ("it really shouldn't be that complicated").
 **Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
+
+## Done Nov 5 (on `redesign/oct18-fixes`)
+
+- **Contact box** is dated by the website that checked the phone (5e2fbe3d).
+- **A shul's week keeps its own notes.** A dated time never takes the note
+  of the usual time it lines up with (Kol Tzedek's online-only Nov 13 came
+  out "hybrid, tea and cookies"). A change to a note alone is one line:
+  "Note added", "Note changed", "Note taken off".
+- **The reader takes a minyan's links from the page.** It now sees the
+  address behind a WhatsApp, GroupMe, sign-up form or Zoom button, on a
+  shul's page and in a newsletter, and keeps one only if it's written there.
+  Pages with such a button change fingerprint, so they're read again once.
+- **Borrowing is still on, and marked.** A week's minyan with no link of its
+  own still gets the usual minyan's. The queue card and To do say so in
+  amber: "Sign-up group from their usual times, not this page".
+  - Why the links weren't found (checked on live, Nov 5): they are on the
+    shul's site, just not on the page the week comes from. Mikveh Israel's
+    two WhatsApp groups are on its home page, and its week is from its
+    calendar. Mekor's group is on its davening page (the usual times).
+    Rodeph Shalom's Zoom is on its calendar and was already read. BZBI's
+    week's Zoom isn't on its worship page.
+  - The user's call: keep borrowing or not. One idea: check a borrowed link
+    against the shul's other watched pages and say where it was found.
+  - The public site still shows the usual minyan's group or Zoom on a week
+    with none (`usualJoinLink`, `usualSignUp`). Not changed.
+- **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
+  only closes it. The click is swallowed until it comes, up to 0.6s after
+  the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the
+  next tick, when the old swallow had already ended. That's a guess jsdom
+  can't check: try it on the commit's preview. The home search's results
+  (`HeroHeading.tsx`) still do it the old way.
+- **Settings has no lone Team tab.** An area's tab row shows only with two
+  tabs or more; the site owner still gets Team and Communities.
+- **Citizens Bank Park's page check lost its Contact line.** The page is its
+  website and its menu, read on one watch. On a night the page hadn't
+  changed, the menu's check was saved as the watch's, so the page's own
+  (its Contact line, what it last compared) was gone. The watch now keeps
+  the page's check only (`sharedPageWatch.ts`); the menu's read is kept on
+  the listing. The live watch holds the menu's check today, so the first
+  nightly run after this deploys reads the page once with the AI and the
+  Contact line comes back. Nothing to write on live.
+- **Waiting for a yes:** the five shul suggestions waiting on live were
+  filed before the note fix and carry usual-time notes. Refiling them is a
+  live write.
 
 ## Done Nov 4, later: Site's Home page is one screen (on `redesign/oct18-fixes`)
 
