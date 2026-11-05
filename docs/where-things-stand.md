@@ -335,17 +335,21 @@ when places have filled it in ("Remove Kosher Certification from Food?",
 71 places lose their answer, the filter loses it; Remove it / Keep it).
 Today the same removal waits for Save and an amber warning, then wipes the
 answers. With no answers, the field just goes.
-Boards 17-18, Nov 5 (the user: dragging fields, but a listing has boxes):
-Fields is grouped into the opened listing's own parts, in the order a
-visitor sees them, drawn on Hospitals: Top (Photo), its five named boxes
-(Who to call, Kosher food, A place to stay, Rides, Also), This Shabbos
-among them, then Contact (Address, Phone, Hours, Website, Refuah Link).
-A named box's heading opens it (rename, remove); Top and Contact have
-none. Dragging reorders within a part or moves a field into a named box;
-"+ Add a box" under the parts. The preview's "A listing" shows the same
-boxes. Within a walk (Food, Synagogues, Hotels, Mikvah, 30 min) is its
-own box below Fields, since those aren't fields. Boards 4 (Food) and 6
-(Synagogues) still show the flat list. The user's rule, Nov 5: admins
+Boards 17-18, Nov 5 (the user: dragging fields, but a listing has boxes;
+then: make it work like the header editor's tabs and headings). Fields
+is a list of the opened listing's boxes, in the order a visitor sees
+them, drawn on Hospitals: Top (Photo), Who to call, Kosher food, A place
+to stay, This Shabbos, Rides, Also, Contact (Address, Phone, Hours,
+Website, Refuah Link). Each is a row with its fields as its line; a tap
+opens it in place, its fields as inner rows with "+ Add a field", its
+name edited in place, a boxed trash can. Top and Contact stay first and
+last, with no handle or trash, like Categories' "Other". "+ Add a box"
+at the foot. Dragging is within one list only, as in the header editor:
+a field moves to another box from its own screen's Box list (board 18,
+Food packages: Kosher food ticked). The preview's "A listing" shows the
+same boxes. Within a walk (Food, Synagogues, Hotels, Mikvah, 30 min) is
+its own box below Fields, since those aren't fields. Boards 4 (Food) and
+6 (Synagogues) still show the flat list. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
