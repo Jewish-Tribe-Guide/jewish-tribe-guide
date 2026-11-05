@@ -349,8 +349,9 @@ Contact, its name selected to type over, "Nothing in it yet", "+ Add a
 field" and the trash. Top and Contact stay first and
 last, with no handle or trash, like Categories' "Other". "+ Add a box"
 at the foot. Dragging is within one list only, as in the header editor:
-a field moves to another box from its own screen's Box list (board 18,
-Food packages: Kosher food ticked). The preview's "A listing" shows the
+a field moves to another box by dragging it onto that box's row (board
+18; the user, Nov 5: a field goes in the box it was added from, so no
+field screen has a Box list). The preview's "A listing" shows the
 same boxes. Within a walk (Food, Synagogues, Hotels, Mikvah, 30 min) is
 its own box below Fields, since those aren't fields. Boards 4 (Food) and
 6 (Synagogues) redrawn the same way, Nov 5, Top open on each. Food: Top
@@ -396,7 +397,11 @@ and Contact, "Nothing in it yet", and Before it's opened (First line
 Name, Third line Not confirmed by anyone yet); Food's listing preview (5)
 follows the boxes' order; the field screens (13-15) lost "Show it before
 a place is opened?" and gained a Box list (Top ticked), and board 18's
-list has Top and Contact too. The user's rule, Nov 5: admins
+list has Top and Contact too. Then (the user) the Box lists came off
+every field screen, and taking a field off a card line is an x, not a
+trash can. On the phone the page opens folded (board 6b): Basics, Fields,
+Before it's opened and Questions are rows with what's in them; the
+computer keeps them open beside the preview. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
