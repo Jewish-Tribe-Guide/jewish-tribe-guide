@@ -353,7 +353,15 @@ a field moves to another box from its own screen's Box list (board 18,
 Food packages: Kosher food ticked). The preview's "A listing" shows the
 same boxes. Within a walk (Food, Synagogues, Hotels, Mikvah, 30 min) is
 its own box below Fields, since those aren't fields. Boards 4 (Food) and
-6 (Synagogues) still show the flat list. The user's rule, Nov 5: admins
+6 (Synagogues) redrawn the same way, Nov 5, Top open on each. Food: Top
+(Photo, Short Description, Food Type, Store Type, Kosher Certification,
+its URL as the Certification button), Delivery, What isn't kosher, Main
+dishes, then Contact (Address, Phone, Hours, Website) and About
+(Description). Synagogues: Top (Photo, Denomination, Nusach), Davening
+times, Contact (Address, Phone, Website). A fixed box (Top, Contact,
+About) opens to its fields and "+ Add a field", with no handle, rename or
+trash. Neither page has saved listing parts live today, so these are the
+order the listing already shows. The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
