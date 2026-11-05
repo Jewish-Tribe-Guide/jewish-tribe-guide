@@ -395,10 +395,10 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
   })
 
-  // Oct 15: a recommendation is worth giving wherever the place was found.
+  // Oct 15: an upvote is worth giving wherever the place was found.
   // The map passes no `upvote` of its own, so the detail supplies one, on
   // the directory's gate: the category's setting and the site's.
-  it('offers Recommend on the map where the category takes upvotes, and not otherwise', () => {
+  it('offers Upvote on the map where the category takes upvotes, and not otherwise', () => {
     const render = (upvotesEnabled: boolean) =>
       renderWithProviders(
         <PinnedProvider>
@@ -406,11 +406,11 @@ describe('MapPlaceDetail', () => {
         </PinnedProvider>,
       )
     render(true)
-    expect(screen.getByRole('button', { name: /^Recommend Goldi Market/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Upvote Goldi Market/ })).toBeInTheDocument()
     cleanup()
     render(false)
     expect(screen.getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Recommend/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Upvote/ })).not.toBeInTheDocument()
   })
 
   // The directory's sheet passes its own (wired to re-sort its list), or
@@ -421,6 +421,6 @@ describe('MapPlaceDetail', () => {
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory({ upvotesEnabled: true })} color="#000" upvote={null} />
       </PinnedProvider>,
     )
-    expect(screen.queryByRole('button', { name: /^Recommend/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Upvote/ })).not.toBeInTheDocument()
   })
 })

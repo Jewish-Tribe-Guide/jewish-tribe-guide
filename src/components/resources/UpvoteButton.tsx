@@ -68,7 +68,7 @@ export default function UpvoteButton({
   /** `recommend`: the small outline thumbs-up beside an opened listing's
    *  name, with the count only once there is one. */
   variant?: 'box' | 'inline' | 'recommend'
-  /** The listing's name, for a screen reader: "Recommend Judah". */
+  /** The listing's name, for a screen reader: "Upvote Judah". */
   name?: string
 }) {
   const [count, setCount] = useState(initialCount)
@@ -170,8 +170,8 @@ export default function UpvoteButton({
         onClick={handleClick}
         disabled={busy}
         aria-pressed={voted}
-        aria-label={`Recommend${name ? ` ${name}` : ''}${count > 0 ? `, ${count} recommend${count === 1 ? 's' : ''} it` : ''}`}
-        title={voted ? 'You recommend this' : 'Recommend'}
+        aria-label={`Upvote${name ? ` ${name}` : ''}${count > 0 ? `, ${count} upvote${count === 1 ? '' : 's'}` : ''}`}
+        title={title}
         className={[
           'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border text-sm font-bold transition-colors cursor-pointer disabled:opacity-60',
           count > 0 ? 'px-3' : 'w-9',
