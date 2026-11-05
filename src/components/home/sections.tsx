@@ -369,13 +369,16 @@ export function CategoryTileRow({
 // The grouping shown on the home page — admin-editable (title + which cards, in
 // what order) via the Sections tab in /admin; see src/lib/homeSections.ts and
 // useHomeSections.ts. A card not listed in any section (a category with no
-// assigned home yet, or any future custom form) falls into a trailing "More"
-// section instead of silently disappearing from the home screen.
+// assigned home yet, or any future custom form) falls into a trailing "Other"
+// section (the user, Nov 4) instead of silently disappearing from the home screen.
 
 export type CardSectionDef = { title: string; cards: CardDef[] }
 
+/** Where a card in no section lands, and new categories with it. */
+export const LEFTOVER_SECTION = 'Other'
+
 /** Sorts cards into the given sections (in each section's own listed order),
- *  then a trailing untitled "More" section for anything left over — never
+ *  then a trailing "Other" section for anything left over — never
  *  drops a card just because it has no assigned section. Takes just
  *  title/cardIds (not the full `HomeSection`) so the admin preview can pass
  *  its in-progress draft — which has no `sortOrder` yet — straight through. */
@@ -395,7 +398,7 @@ export function groupCardsIntoSections(
     .filter((s) => s.cards.length > 0)
 
   const leftover = cards.filter((c) => !(c.id && used.has(c.id)))
-  if (leftover.length > 0) grouped.push({ title: 'More', cards: leftover })
+  if (leftover.length > 0) grouped.push({ title: LEFTOVER_SECTION, cards: leftover })
 
   return grouped
 }

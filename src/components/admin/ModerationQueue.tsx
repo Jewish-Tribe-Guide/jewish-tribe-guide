@@ -66,7 +66,9 @@ const SHOWS: readonly TodoFilter[] = ['changes', 'new', 'broken', 'feedback']
 
 /** A link's `?show=broken` (Watches' "N things need fixing", Nov 4): To do
  *  opens on it. Taken off the address once read, so it isn't kept in every
- *  address after it. */
+ *  address after it. Read again after the first render too: a link from
+ *  another admin page puts its address in only after To do has rendered
+ *  once, so the first read sees the page it came from. */
 function viewFromAddress(): TodoView {
   if (typeof window === 'undefined') return TODO_START
   const shows = (new URLSearchParams(window.location.search).get('show') ?? '').split(',')
@@ -97,6 +99,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
   useEffect(() => {
     const url = new URL(window.location.href)
     if (!url.searchParams.has('show')) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the address isn't the new page's until after the first render (see viewFromAddress)
+    setView(viewFromAddress())
     url.searchParams.delete('show')
     window.history.replaceState(window.history.state, '', url)
   }, [])

@@ -4,26 +4,31 @@ import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems,
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
-// Recursive shape check — a 'link' item needs a target, a 'more-menu' item
-// needs its own valid `items` (never nested further than one level), and
-// every item needs a non-empty id/label. Mirrors what
-// siteSettingsStore.ts's toDesktopNavItem already tolerates on read, just
-// enforced here so a malformed save doesn't silently write junk the reader
-// then has to fall back away from.
-function validDesktopNavItem(item: unknown, allowNested: boolean): item is DesktopNavItem {
+// Recursive shape check — a 'link' item needs a target, a tab ('more-menu')
+// holds all links or all headings, a heading holds links, nothing goes
+// deeper (lib/navTabs.ts), and every item needs a non-empty id/label.
+// Mirrors what siteSettingsStore.ts's toDesktopNavItem already tolerates on
+// read, just enforced here so a malformed save doesn't silently write junk
+// the reader then has to fall back away from.
+type NavLevel = 'top' | 'tab' | 'heading'
+function validDesktopNavItem(item: unknown, level: NavLevel): item is DesktopNavItem {
   if (!item || typeof item !== 'object') return false
   const { id, label, kind, target, items } = item as Record<string, unknown>
   if (typeof id !== 'string' || !id.trim() || typeof label !== 'string' || !label.trim()) return false
-  if (kind === 'categories-menu') return true
+  if (kind === 'categories-menu') return level === 'top'
   if (kind === 'link') return typeof target === 'string' && target.trim().length > 0
-  if (kind === 'more-menu' && allowNested) {
-    return Array.isArray(items) && items.every((i) => validDesktopNavItem(i, false))
+  if (!Array.isArray(items)) return false
+  if (kind === 'more-menu' && level === 'top') {
+    const inner = items.every((i) => (i as { kind?: unknown })?.kind === 'heading') ? 'tab' : 'heading'
+    // A tab's headings or links; 'heading' as the level refuses a heading.
+    return items.every((i) => validDesktopNavItem(i, inner))
   }
+  if (kind === 'heading' && level === 'tab') return items.every((i) => validDesktopNavItem(i, 'heading'))
   return false
 }
 
 function validDesktopNavItems(items: unknown): items is DesktopNavItem[] {
-  return Array.isArray(items) && items.length > 0 && items.every((i) => validDesktopNavItem(i, true))
+  return Array.isArray(items) && items.length > 0 && items.every((i) => validDesktopNavItem(i, 'top'))
 }
 
 // GET /api/admin/site-settings — the current settings, for the admin editor.
@@ -84,12 +89,18 @@ export async function PATCH(request: Request) {
         { status: 400 },
       )
     }
-    if (tabs.some((t) => !t?.id?.trim() || !t?.label?.trim() || !t?.target?.trim())) {
-      return Response.json({ ok: false, errors: ['Every mobile tab needs a label and a destination.'] }, { status: 400 })
+    // A tab with nothing in it yet (a blank target) saves, and isn't shown,
+    // like an empty tab at the top of the page on a computer.
+    if (tabs.some((t) => !t?.id?.trim() || !t?.label?.trim() || typeof t?.target !== 'string')) {
+      return Response.json({ ok: false, errors: ['Every mobile tab needs a label.'] }, { status: 400 })
+    }
+    const targets = tabs.map((t) => t.target.trim()).filter(Boolean)
+    if (targets.length === 0) {
+      return Response.json({ ok: false, errors: ['The mobile tab bar needs at least one tab that opens something.'] }, { status: 400 })
     }
     // Two tabs pointing at the same screen would both light up as active — the
     // bar would look broken rather than merely redundant.
-    if (new Set(tabs.map((t) => t.target)).size !== tabs.length) {
+    if (new Set(targets).size !== targets.length) {
       return Response.json({ ok: false, errors: ['Two mobile tabs cannot share a destination.'] }, { status: 400 })
     }
   }

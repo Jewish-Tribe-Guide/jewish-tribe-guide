@@ -30,13 +30,34 @@ export const PREVIEW_PAUSE_MS = 700
 const SPOT_LOOK_MS = 200
 const SPOT_LOOKS = 15
 
+/** The tallest a whole page is shown, should one run on and on. */
+const MOST_PAGE_HEIGHT = 4000
+
+// How tall the page in the frame is, all of it. The body is at least the
+// window's height (min-h-dvh), and the frame is made as tall as the page, so
+// read as it stands the page could only ever grow: the frame's page is told
+// to be its content's height instead.
+const FIT_STYLE_ID = 'preview-fit-style'
+function pageHeight(doc: Document): number {
+  if (!doc.body) return 0
+  if (!doc.getElementById(FIT_STYLE_ID)) {
+    const style = doc.createElement('style')
+    style.id = FIT_STYLE_ID
+    style.textContent = 'body { min-height: 0 !important; }'
+    doc.head?.append(style)
+  }
+  return Math.ceil(doc.body.getBoundingClientRect().height)
+}
+
 export function PreviewBeside({
   src,
   reload = 0,
   children,
   initialDevice = 'computer',
+  device: shownDevice,
   onOpen,
   spot = null,
+  wholePage = false,
 }: {
   /** A page of the site to show. */
   src?: string
@@ -45,10 +66,16 @@ export function PreviewBeside({
   /** Or a tree to draw, given the device it's drawn for. */
   children?: (device: PreviewDevice) => React.ReactNode
   initialDevice?: PreviewDevice
+  /** Given, the page is always on this one, picked outside, and there's no
+   *  Computer and Phone of its own. */
+  device?: PreviewDevice
   /** Given, the shrunk page is a button that opens it full size. */
   onOpen?: () => void
   /** The part of the page to light up (see previewSpot.ts). */
   spot?: string | null
+  /** As tall as the page `src` is, all of it, rather than one screen of it
+   *  (the user, Nov 4: the computer's home page runs past one screen). */
+  wholePage?: boolean
 }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [loads, setLoads] = useState(0)
@@ -68,13 +95,40 @@ export function PreviewBeside({
     }, SPOT_LOOK_MS)
     return () => clearInterval(t)
   }, [spot, loads])
-  const [device, setDevice] = useState<PreviewDevice>(initialDevice)
-  const { width, height } = DEVICES[device]
+  // How tall the whole page is; kept across loads, so a reload doesn't jump.
+  const [fitHeight, setFitHeight] = useState<number | null>(null)
+  useEffect(() => {
+    const doc = frame.current?.contentDocument
+    if (!wholePage || !doc?.body) return
+    const measure = () => {
+      const h = pageHeight(doc)
+      if (h > 0) setFitHeight(Math.min(h, MOST_PAGE_HEIGHT))
+    }
+    measure()
+    // The page draws after it loads, and its photos after that.
+    const Observer = doc.defaultView?.ResizeObserver
+    const seen = Observer ? new Observer(measure) : null
+    seen?.observe(doc.body)
+    let looks = 0
+    const t = setInterval(() => {
+      measure()
+      if (++looks >= SPOT_LOOKS) clearInterval(t)
+    }, SPOT_LOOK_MS)
+    return () => {
+      seen?.disconnect()
+      clearInterval(t)
+    }
+  }, [wholePage, loads])
+  const [picked, setDevice] = useState<PreviewDevice>(initialDevice)
+  const device = shownDevice ?? picked
+  const { width } = DEVICES[device]
+  const height = wholePage && fitHeight ? Math.max(fitHeight, DEVICES[device].height) : DEVICES[device].height
   const scale = SHOWN_WIDTH[device] / width
   const Frame = onOpen ? 'button' : 'div'
 
   return (
     <div className="flex flex-col gap-3">
+      {!shownDevice && (
       <div role="group" aria-label="Preview on" className="self-start inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
         {(Object.keys(DEVICES) as PreviewDevice[]).map((d) => (
           <button
@@ -90,9 +144,10 @@ export function PreviewBeside({
           </button>
         ))}
       </div>
+      )}
       <Frame
         {...(onOpen && { type: 'button' as const, onClick: onOpen, 'aria-label': 'Open the preview' })}
-        className={`relative block p-0 overflow-hidden bg-white border border-slate-200 ${onOpen ? 'cursor-pointer' : ''} ${device === 'phone' ? 'rounded-[22px]' : 'rounded-[10px]'}`}
+        className={`relative block p-0 overflow-hidden bg-white border border-slate-200 ${onOpen ? 'cursor-zoom-in' : ''} ${device === 'phone' ? 'rounded-[22px]' : 'rounded-[10px]'}`}
         style={{ width: SHOWN_WIDTH[device], height: Math.round(height * scale) }}
       >
         <div
@@ -119,17 +174,18 @@ export default function SitePreview({
   community,
   settings,
   sections,
-  initialDevice = 'computer',
+  device,
   spot = null,
-  page = '',
+  onOpen,
 }: {
   community: string
   settings: SiteSettings
   sections: DraftHomeSection[]
-  initialDevice?: PreviewDevice
+  /** Which version of the page, picked beside it. */
+  device: PreviewDevice
   spot?: string | null
-  /** A page other than the home page, for what shows only there. */
-  page?: string
+  /** Clicked, the page opens full size. */
+  onOpen?: () => void
 }) {
   // Which draft the frame shows; 0 until the first one is written, so the
   // frame never loads ahead of it and shows the saved site instead. A pause
@@ -144,5 +200,5 @@ export default function SitePreview({
     return () => clearTimeout(t)
   }, [settings, sections])
 
-  return <PreviewBeside src={version > 0 ? previewUrl(community, page) : undefined} reload={version} initialDevice={initialDevice} spot={spot} />
+  return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} device={device} spot={spot} onOpen={onOpen} wholePage={device === 'computer'} />
 }

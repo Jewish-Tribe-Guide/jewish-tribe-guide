@@ -42,7 +42,7 @@ const addButton = 'inline-flex items-center justify-center min-h-11 px-3.5 round
 
 /** A list goes by whose it is, with what it's read for under it. */
 const OUTSIDE: Partial<Record<NightKindId, { name: string; about: string }>> = {
-  kosher: { name: 'Keystone-K and Mekor Habracha', about: 'Kosher certification' },
+  kosher: { name: 'Keystone-K, Mekor Habracha and KCL', about: 'Kosher certification' },
   hospitals: { name: 'Refuah', about: 'Hospitals' },
 }
 

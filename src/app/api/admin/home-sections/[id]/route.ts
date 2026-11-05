@@ -8,7 +8,7 @@ type PatchBody = {
   title?: string
   cardIds?: string[]
   sortOrder?: number
-  width?: 'full' | 'half'
+  sharesRow?: boolean
 }
 
 // PATCH /api/admin/home-sections/:id — rename a section, change its card
@@ -31,8 +31,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   if (body.title !== undefined && !body.title.trim()) {
     return Response.json({ ok: false, errors: ['Section title cannot be empty.'] }, { status: 400 })
   }
-  if (body.width !== undefined && body.width !== 'full' && body.width !== 'half') {
-    return Response.json({ ok: false, errors: ['Invalid width.'] }, { status: 400 })
+  if (body.sharesRow !== undefined && typeof body.sharesRow !== 'boolean') {
+    return Response.json({ ok: false, errors: ['Invalid row.'] }, { status: 400 })
   }
 
   try {

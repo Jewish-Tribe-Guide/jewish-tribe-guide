@@ -26,7 +26,7 @@ const hospital = makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 
 const eruvPage = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
 const categories = [hospital, grocery, food, eruvPage]
 // The admin's order: Food, then Grocery; Hospitals in no section.
-const sections = [{ id: 's1', kind: 'section', title: 'Food and Hospitality', sortOrder: 0, cardIds: ['restaurant', 'grocery'], width: 'full' }] as HomeSection[]
+const sections = [{ id: 's1', kind: 'section', title: 'Food and Hospitality', sortOrder: 0, cardIds: ['restaurant', 'grocery'], sharesRow: false }] as HomeSection[]
 const centre = { lat: 0, lng: 0 }
 const place = (id: string, category: string, lat: number | null) => makeListing({ id, name: id, category, geo: lat === null ? undefined : { lat, lng: 0 } })
 const listings = [place('Far Grocery', 'grocery', 0.02), place('Near Grocery', 'grocery', 0.001), place('Lunch Spot', 'restaurant', 0.005), place('Jefferson', 'hospital', null), place('Gone', 'grocery', 0.001)]

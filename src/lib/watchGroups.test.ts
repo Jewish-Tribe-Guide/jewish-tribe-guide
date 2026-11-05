@@ -30,6 +30,7 @@ function watch(over: Partial<Watch>): Watch {
 
 const keystone = watch({ id: 'keystone', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', createdBy: 'migration 070' })
 const mekor = watch({ id: 'mekor', url: 'https://www.mekorhabracha.org/center-city/' })
+const kcl = watch({ id: 'kcl', url: 'https://www.kclkashrus.org/', label: 'KCL’s list' })
 const refuah = watch({ id: 'refuah', url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: 'h1' })
 const menu = watch({ id: 'menu', url: 'https://judah.example/menu', resourceId: 'f1', createdBy: 'menu links' })
 const newsletter = watch({ id: 'news', url: 'mailto:info@lms.org', resourceId: 's1', createdBy: 'shul newsletters' })
@@ -41,6 +42,8 @@ describe('watchGroupOf', () => {
   it('sorts each watch into what it keeps current', () => {
     expect(watchGroupOf(keystone)).toBe('kosher')
     expect(watchGroupOf(mekor)).toBe('kosher')
+    // It went under Other until Nov 4.
+    expect(watchGroupOf(kcl)).toBe('kosher')
     expect(watchGroupOf(refuah)).toBe('hospital')
     expect(watchGroupOf(menu)).toBe('menu')
     // A shul's times, from its website or its newsletter, are one (Oct 20).

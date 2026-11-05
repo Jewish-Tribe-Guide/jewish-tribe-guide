@@ -39,13 +39,11 @@ export type AdminTab =
   | 'places'
   | 'home'
   | 'forms'
-  | 'menus'
   | 'pages'
   | 'campaigns'
   | 'metrics'
   | 'watches'
   | 'team'
-  | 'community'
   | 'communities'
 
 export type AdminTabLink = { tab: AdminTab; href: string; label: string }
@@ -91,15 +89,13 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'site',
       label: 'Site',
       // Screen by screen, each tab the screen it changes (step 4). Home page
-      // and Header and menus share one draft and one Save (see
-      // SiteSettingsLayout). About and Privacy is one copy for every
+      // has the header too (Nov 4). About and Privacy is one copy for every
       // community, so only the site owner has it.
       tabs: [
         { tab: 'home', href: `${base}/home`, label: 'Home page' },
         { tab: 'categories', href: `${base}/categories`, label: 'Category pages' },
         // Held back for now (see features.ts).
         ...(features.formsTab ? [{ tab: 'forms' as const, href: `${base}/forms`, label: 'Forms' }] : []),
-        { tab: 'menus', href: `${base}/menus`, label: 'Header and menus' },
         { tab: 'campaigns', href: `${base}/campaigns`, label: 'Campaigns' },
         ...(isSuperAdmin ? [{ tab: 'pages' as const, href: `${base}/pages`, label: 'About and Privacy' }] : []),
       ],
@@ -119,7 +115,6 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       label: 'Settings',
       tabs: [
         { tab: 'team', href: `${base}/team`, label: 'Team' },
-        { tab: 'community', href: `${base}/community`, label: 'Community' },
         ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
       ],
     },

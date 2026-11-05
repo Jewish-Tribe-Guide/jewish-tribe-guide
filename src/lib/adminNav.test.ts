@@ -78,12 +78,12 @@ describe('adminAreas', () => {
     expect(shape(true)).toEqual([
       ['To do', ['To do', 'Feedback']],
       ['Places', ['Places', 'Watches']],
-      ['Site', ['Home page', 'Category pages', 'Header and menus', 'Campaigns', 'About and Privacy']],
+      ['Site', ['Home page', 'Category pages', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Reports']],
-      ['Settings', ['Team', 'Community', 'Communities']],
+      ['Settings', ['Team', 'Communities']],
     ])
-    expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Community']])
-    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Header and menus', 'Campaigns']])
+    expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
+    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Campaigns']])
   })
 
   it('puts every tab in exactly one area, whatever is switched on', () => {
@@ -126,13 +126,11 @@ describe('adminNavPosition', () => {
     // No tab of its own while it's held back; its page still has a place.
     ['/philly/admin/forms', 'site', 'categories'],
     ['/philly/admin/forms/form:abc', 'site', 'categories'],
-    ['/philly/admin/menus', 'site', 'menus'],
     ['/philly/admin/pages', 'site', 'pages'],
     ['/philly/admin/metrics', 'reports', 'metrics'],
     ['/philly/admin/history/approved', 'reports', 'metrics'],
     ['/philly/admin/history/rejected', 'reports', 'metrics'],
     ['/philly/admin/team', 'settings', 'team'],
-    ['/philly/admin/community', 'settings', 'community'],
     ['/philly/admin/communities', 'settings', 'communities'],
   ]
   it.each(cases)('%s opens %s, with %s lit', (path, area, tab) => {

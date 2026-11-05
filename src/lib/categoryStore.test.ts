@@ -40,6 +40,7 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
+  categoryDeleteCounts,
   renameCategoryId,
 } = await import('./categoryStore')
 
@@ -549,6 +550,51 @@ describe('updateCategory', () => {
 
 // ── deleteCategory ───────────────────────────────────────────────────────────
 
+describe('deleteCategory — the Eruv (Nov 4)', () => {
+  // Eruvim and their website watches live in their own tables: deleting the
+  // Eruv category without them left every eruv behind with nothing to show it.
+  function eruvTables(deleted: string[]) {
+    mockFrom.mockImplementation((table: string) => {
+      const counts: Record<string, number> = { resource: 0, eruv: 4, watch: 3 }
+      const b = chainable(table === 'category' ? { data: { kind: 'eruv' }, error: null } : { count: counts[table], data: null, error: null })
+      b.delete = vi.fn(() => {
+        deleted.push(table)
+        return b
+      })
+      return b
+    })
+  }
+
+  it('takes every eruv and its website watch with it, before the category', async () => {
+    const deleted: string[] = []
+    eruvTables(deleted)
+    expect(await deleteCategory('philly', 'eruv-information')).toEqual({ listings: 0, eruvim: 4, watches: 3 })
+    expect(deleted).toEqual(['resource', 'watch', 'eruv', 'category'])
+  })
+
+  it('a dry count deletes nothing', async () => {
+    const deleted: string[] = []
+    eruvTables(deleted)
+    expect(await categoryDeleteCounts('philly', 'eruv-information')).toEqual({ listings: 0, eruvim: 4, watches: 3 })
+    expect(deleted).toEqual([])
+  })
+
+  it('another category leaves the eruvim alone', async () => {
+    const deleted: string[] = []
+    eruvTables(deleted)
+    mockFrom.mockImplementation((table: string) => {
+      const b = chainable(table === 'category' ? { data: { kind: 'listing' }, error: null } : { count: 2, data: null, error: null })
+      b.delete = vi.fn(() => {
+        deleted.push(table)
+        return b
+      })
+      return b
+    })
+    expect(await deleteCategory('philly', 'synagogue')).toEqual({ listings: 2, eruvim: 0, watches: 0 })
+    expect(deleted).toEqual(['resource', 'category'])
+  })
+})
+
 describe('deleteCategory', () => {
   it('deletes the listings before the category (no DB cascade), returning the listing count', async () => {
     const calls: string[] = []
@@ -560,16 +606,16 @@ describe('deleteCategory', () => {
 
     const result = await deleteCategory('philly', 'synagogue')
 
-    expect(result).toEqual({ listings: 3 })
+    expect(result).toEqual({ listings: 3, eruvim: 0, watches: 0 })
     // resource must be touched (count + delete) before category is deleted.
-    expect(calls.indexOf('category')).toBeGreaterThan(calls.lastIndexOf('resource'))
+    expect(calls.lastIndexOf('category')).toBeGreaterThan(calls.lastIndexOf('resource'))
   })
 
   it('defaults to 0 listings when count is null', async () => {
     mockFrom.mockImplementation((table: string) =>
       table === 'resource' ? chainable({ count: null, error: null, data: null }) : chainable({ error: null }),
     )
-    expect(await deleteCategory('philly', 'synagogue')).toEqual({ listings: 0 })
+    expect(await deleteCategory('philly', 'synagogue')).toEqual({ listings: 0, eruvim: 0, watches: 0 })
   })
 
   it('throws and stops before deleting the category if removing its listings fails', async () => {
@@ -579,8 +625,12 @@ describe('deleteCategory', () => {
         const b = chainable({ count: 1, error: { message: 'fk violation' }, data: null })
         return b
       }
-      categoryDeleteCalled = true
-      return chainable({ error: null })
+      const b = chainable({ error: null, data: null })
+      b.delete = vi.fn(() => {
+        categoryDeleteCalled = true
+        return b
+      })
+      return b
     })
 
     await expect(deleteCategory('philly', 'synagogue')).rejects.toThrow(

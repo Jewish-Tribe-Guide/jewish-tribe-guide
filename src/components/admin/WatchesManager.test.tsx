@@ -172,7 +172,7 @@ describe('WatchesManager', () => {
     expect(within(screen.getByRole('region', { name: 'Websites' })).getByRole('link', { name: /times/ })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Email' })).getByRole('link', { name: /newsletters/ })).toBeInTheDocument()
     const lists = screen.getByRole('region', { name: 'Outside lists' })
-    expect(within(lists).getByRole('link', { name: /Keystone-K and Mekor Habracha/ })).toHaveTextContent('Kosher certification ·')
+    expect(within(lists).getByRole('link', { name: /Keystone-K, Mekor Habracha and KCL/ })).toHaveTextContent('Kosher certification ·')
     expect(within(lists).getByRole('link', { name: /Refuah/ })).toHaveTextContent('Hospitals ·')
     expect(within(screen.getByRole('region', { name: 'Link check' })).getByRole('link', { name: /links/ })).toBeInTheDocument()
   })

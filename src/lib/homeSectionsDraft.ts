@@ -5,7 +5,7 @@ async function patchSection(
   token: string,
   community: string,
   id: string,
-  patch: Partial<Pick<HomeSection, 'title' | 'cardIds' | 'sortOrder' | 'width'>>,
+  patch: Partial<Pick<HomeSection, 'title' | 'cardIds' | 'sortOrder' | 'sharesRow'>>,
 ): Promise<HomeSection> {
   const res = await fetch(withCommunity(`/api/admin/home-sections/${id}`, community), {
     method: 'PATCH',
@@ -23,16 +23,16 @@ async function createSection(
   title: string,
   cardIds: string[],
   kind: HomeBlockKind,
-  width: 'full' | 'half',
+  sharesRow: boolean,
 ): Promise<HomeSection> {
   // A built-in block's own title/cardIds are fixed server-side (see
-  // createHomeSection) — sent along anyway is harmless, just ignored. width
-  // isn't meaningful for a plain section (kind === 'section'), so it's only
-  // sent alongside kind.
+  // createHomeSection) — sent along anyway is harmless, just ignored.
+  // sharesRow isn't meaningful for a plain section (kind === 'section'), so
+  // it's only sent alongside kind.
   const res = await fetch(withCommunity('/api/admin/home-sections', community), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(kind === 'section' ? { title, cardIds } : { kind, width }),
+    body: JSON.stringify(kind === 'section' ? { title, cardIds } : { kind, sharesRow }),
   })
   const body = await res.json()
   if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create a section.')
@@ -48,13 +48,13 @@ async function deleteSection(token: string, community: string, id: string): Prom
   if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not delete a section.')
 }
 
-/** True if the two sections' saved fields (title/cardIds/width) differ —
+/** True if the two sections' saved fields (title/cardIds/sharesRow) differ —
  *  ignores sortOrder, which is reconciled separately (see below). */
 function changed(original: HomeSection, draft: DraftHomeSection): boolean {
   return (
     original.title !== draft.title ||
     JSON.stringify(original.cardIds) !== JSON.stringify(draft.cardIds) ||
-    original.width !== draft.width
+    original.sharesRow !== draft.sharesRow
   )
 }
 
@@ -84,10 +84,10 @@ export async function saveHomeSections(
   for (const d of draft) {
     const existing = originalById.get(d.id)
     if (!existing) {
-      savedInOrder.push(await createSection(token, community, d.title, d.cardIds, d.kind, d.width))
+      savedInOrder.push(await createSection(token, community, d.title, d.cardIds, d.kind, d.sharesRow))
     } else if (changed(existing, d)) {
       savedInOrder.push(
-        await patchSection(token, community, d.id, { title: d.title, cardIds: d.cardIds, width: d.width }),
+        await patchSection(token, community, d.id, { title: d.title, cardIds: d.cardIds, sharesRow: d.sharesRow }),
       )
     } else {
       savedInOrder.push(existing)

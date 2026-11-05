@@ -41,8 +41,8 @@ describe('isPreviewMode', () => {
 describe('draftSectionsAsHomeSections', () => {
   it('rebuilds sortOrder from array position, which is the editor’s source of truth', () => {
     const sections = draftSectionsAsHomeSections([
-      { id: 'b', kind: 'section', title: 'Food', cardIds: ['grocery'], width: 'full' },
-      { id: 'a', kind: 'section', title: 'Places to Stay', cardIds: ['hotel'], width: 'full' },
+      { id: 'b', kind: 'section', title: 'Food', cardIds: ['grocery'], sharesRow: false },
+      { id: 'a', kind: 'section', title: 'Places to Stay', cardIds: ['hotel'], sharesRow: false },
     ])
     expect(sections.map((s) => [s.title, s.sortOrder])).toEqual([
       ['Food', 0],
@@ -51,7 +51,7 @@ describe('draftSectionsAsHomeSections', () => {
   })
 
   it('keeps the title and cards untouched', () => {
-    const [section] = draftSectionsAsHomeSections([{ id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery', 'restaurant'], width: 'full' }])
+    const [section] = draftSectionsAsHomeSections([{ id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery', 'restaurant'], sharesRow: false }])
     expect(section.id).toBe('a')
     expect(section.cardIds).toEqual(['grocery', 'restaurant'])
   })

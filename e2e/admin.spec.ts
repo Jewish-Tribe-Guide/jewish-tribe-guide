@@ -90,38 +90,32 @@ test.describe('admin console', () => {
     await expect(page).toHaveURL(/\/philly\/admin\/categories$/)
   })
 
-  // Site is settings by screen (admin redesign, board 7): the home page's
-  // fields on one tab, the header's on another.
-  test('the Home page tab shows the real saved search placeholder and link-preview title', async ({ page, request }) => {
+  // Site's Home page is the home page and the header over it, on one
+  // screen (drawing 2sssenojcQzzeHtHAT8gnp): Computer or Phone at the top
+  // picks which version's settings show.
+  test('the Home page shows the real saved name and search box words', async ({ page, request }) => {
     const res = await request.get('/api/site-settings')
-    const settings = (await res.json()).settings as { searchPlaceholder: string; heroTitle: string }
+    const settings = (await res.json()).settings as { name: string; searchPlaceholder: string }
 
     await page.goto('/philly/admin/home')
     await expect(page.getByRole('heading', { name: 'Top of the page' })).toBeVisible()
-    await expect(page.getByLabel('Search box')).toHaveValue(settings.searchPlaceholder)
-    await expect(page.getByLabel('Title', { exact: true })).toHaveValue(settings.heroTitle)
-    await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
-  })
-
-  test('Settings → Community shows the real saved site name', async ({ page, request }) => {
-    const res = await request.get('/api/site-settings')
-    const settings = (await res.json()).settings as { name: string }
-
-    await page.goto('/philly/admin/community')
-    await expect(page.getByRole('heading', { name: 'Name and logo' })).toBeVisible()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue(settings.name)
+    await expect(page.getByLabel('Words in the search box')).toHaveValue(settings.searchPlaceholder)
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
-  test('the Header and menus tab shows the computer’s and the phone’s menus', async ({ page }) => {
-    await page.goto('/philly/admin/menus')
-    await expect(page.getByRole('heading', { name: 'Top of the page, on a computer' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Tabs, on a phone' })).toBeVisible()
+  test('the Home page shows the computer’s header, and the phone’s tabs on Phone', async ({ page }) => {
+    await page.goto('/philly/admin/home')
+    await expect(page.getByRole('heading', { name: 'Header', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Tabs', exact: true })).toHaveCount(0)
+    await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
+    await expect(page.getByRole('heading', { name: 'Tabs', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Header', exact: true })).toHaveCount(0)
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
   test('the old Site addresses land on the new tabs', async ({ page }) => {
-    for (const [from, to] of [['desktop', 'home'], ['mobile', 'menus']]) {
+    for (const [from, to] of [['desktop', 'home'], ['mobile', 'home'], ['community', 'home'], ['menus', 'home']]) {
       await page.goto(`/philly/admin/${from}`)
       await expect(page).toHaveURL(new RegExp(`/philly/admin/${to}$`))
     }
@@ -153,8 +147,11 @@ test.describe('admin console', () => {
     // page's DOM, so assert via Playwright's frame API.
     await expect(preview.locator('iframe')).toHaveAttribute('src', '/philly?preview=1')
     await expect(page.frameLocator('iframe[title="Preview"]').locator('header').first()).toBeVisible()
-    await preview.getByRole('button', { name: 'Phone' }).click()
-    await expect(preview.getByRole('button', { name: 'Phone' })).toHaveAttribute('aria-pressed', 'true')
+    // The Computer/Phone switch at the top is the preview's too.
+    const phone = page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' })
+    await phone.click()
+    await expect(phone).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(async () => (await preview.locator('iframe').boundingBox())?.width).toBeLessThan(500)
     await expect(page.frameLocator('iframe[title="Preview"]').locator('body')).toBeVisible()
   })
 })

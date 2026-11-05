@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { iconVersion } from './siteSettings'
+import { iconVersion, shareDescription } from './siteSettings'
 
 // The home-screen icon is generated from the admin's logo, and its URL used to
 // be constant — so uploading a new logo left phones showing the old icon
@@ -33,5 +33,29 @@ describe('iconVersion', () => {
 
   it('ignores surrounding whitespace, which the admin field can carry', () => {
     expect(iconVersion('  https://x.test/a.png  ')).toBe(iconVersion('https://x.test/a.png'))
+  })
+})
+
+// A shared link says the home page's big line and the line under it (the
+// user, Nov 4), instead of a Description kept apart from them.
+describe('shareDescription', () => {
+  const words = (desktopHeroHeadline: string, desktopHeroSubhead: string, mission = 'The old description') => ({ desktopHeroHeadline, desktopHeroSubhead, mission })
+
+  it('is the big line, then the line under it, as two sentences', () => {
+    expect(shareDescription(words('Your guide to Jewish Philadelphia', 'Kept current by you'))).toBe('Your guide to Jewish Philadelphia. Kept current by you')
+  })
+
+  it('adds no full stop after a big line that already ends in one', () => {
+    expect(shareDescription(words('Your guide!', 'Kept current by you'))).toBe('Your guide! Kept current by you')
+    expect(shareDescription(words('Your guide.', 'Kept current by you'))).toBe('Your guide. Kept current by you')
+  })
+
+  it('is either line alone when the other is empty', () => {
+    expect(shareDescription(words(' Your guide ', ''))).toBe('Your guide')
+    expect(shareDescription(words('', 'Kept current by you'))).toBe('Kept current by you')
+  })
+
+  it('falls back to the old description only when both are empty', () => {
+    expect(shareDescription(words(' ', ''))).toBe('The old description')
   })
 })

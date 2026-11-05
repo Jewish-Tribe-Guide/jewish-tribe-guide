@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson } from '@/lib/fetchJson'
@@ -15,9 +16,10 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
-// Board XSuFCMdLQmBYNJqfWaEM3A (Oct 27): a group per kind, each row its
-// name, why and when; a row opens with its last try and next, Read it now
-// and Stop trying; Stopped trying at the foot.
+// Board XSuFCMdLQmBYNJqfWaEM3A (Oct 27), as one list since Nov 4 ("all in
+// one list with filters and search"): each row its name, kind, why and
+// when; a row opens with its last try and next, Read it now and Stop
+// trying; Kind and Trying menus and a search narrow it.
 
 const item = (over: Partial<LookItem>): LookItem => ({ kind: 'google', id: 'g', name: 'The Kosher Grill', why: 'Never looked for', note: null, lastTry: null, found: null, stopped: null, ...over })
 const ITEMS = [
@@ -51,19 +53,37 @@ afterEach(() => {
 })
 
 describe('LookAgainPage', () => {
-  it('a group per kind, each row its why and when, and what it left out', async () => {
+  it('one list, each row its kind, why and when, and what it left out', async () => {
     await renderPage({ available: true, items: ITEMS, leftOut: ['Young Professionals Philly', 'Kosher Deals WhatsApp'], runs: [] })
     expect(screen.getByTestId('look-tonight')).toHaveTextContent(/Tonight, \d{1,2}:00 AM · 2 due/)
     expect(screen.getByTestId('look-tonight')).toHaveTextContent('3 in all')
-    expect(within(screen.getAllByRole('region', { name: 'Eruv status page' })[0]).getAllByRole('button', { name: /Elkins Park Eruv/ })[0]).toHaveTextContent('No status page on yiep.org')
-    expect(within(screen.getAllByRole('region', { name: 'Menus that couldn’t be read' })[0]).getAllByRole('button', { name: /Shlomo/ })[0]).toHaveTextContent('Oct 24 · next Nov 23')
-    const google = screen.getAllByRole('region', { name: 'Not on Google' })[0]
-    expect(within(google).getAllByRole('button', { name: /The Kosher Grill/ })[0]).toHaveTextContent('Not tried yet · tonight')
+    const list = screen.getByRole('region', { name: 'Look again' })
+    expect(within(list).getAllByRole('button', { name: /Elkins Park Eruv/ })[0]).toHaveTextContent('Eruv status · No status page on yiep.org')
+    expect(within(list).getAllByRole('button', { name: /Shlomo/ })[0]).toHaveTextContent('Menu · Not a menu')
+    expect(within(list).getAllByRole('button', { name: /Shlomo/ })[0]).toHaveTextContent('Oct 24 · next Nov 23')
+    expect(within(list).getAllByRole('button', { name: /The Kosher Grill/ })[0]).toHaveTextContent('Google · Never looked for')
+    expect(within(list).getAllByRole('button', { name: /The Kosher Grill/ })[0]).toHaveTextContent('Not tried yet · tonight')
+    expect(within(list).queryByText('CKids Philly')).toBeNull()
     // Left out opens to name them (board Main).
-    fireEvent.click(within(google).getByRole('button', { name: /Left out: 2 groups, not places/ }))
-    expect(google).toHaveTextContent('Young Professionals Philly · Kosher Deals WhatsApp')
-    expect(within(google).queryByText('CKids Philly')).toBeNull()
-    expect(within(screen.getByRole('region', { name: 'Stopped trying' })).getByText('1')).toBeInTheDocument()
+    const left = screen.getByRole('region', { name: 'Left out' })
+    fireEvent.click(within(left).getByRole('button', { name: /Left out: 2 groups, not places/ }))
+    expect(left).toHaveTextContent('Young Professionals Philly · Kosher Deals WhatsApp')
+  })
+
+  it('narrowed by kind and by name', async () => {
+    const user = userEvent.setup()
+    await renderPage({ available: true, items: ITEMS, leftOut: ['Young Professionals Philly'], runs: [] })
+    await user.click(screen.getByRole('button', { name: /^Kind/ }))
+    expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).toEqual(['All kinds', 'Eruv status page (1)', 'Menus that couldn’t be read (1)', 'Not on Google (1)'])
+    await user.click(screen.getByRole('menuitemradio', { name: /^Menus/ }))
+    const list = screen.getByRole('region', { name: 'Look again' })
+    expect(within(list).getAllByRole('button', { name: /Shlomo/ })[0]).toHaveTextContent(/^Shlomo’s MarketNot a menu/)
+    expect(within(list).queryByText('The Kosher Grill')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Left out' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /^Kind/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'All kinds' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Find one by name' }), 'elkins')
+    expect(within(screen.getByRole('region', { name: 'Look again' })).getAllByRole('button').map((b) => b.textContent)).toEqual([expect.stringMatching(/^Elkins Park Eruv/)])
   })
 
   it('a row opens in place: its last try in full, its next, Read it now and Stop trying', async () => {
@@ -89,8 +109,10 @@ describe('LookAgainPage', () => {
   })
 
   it('one stopped starts again from Stopped trying', async () => {
+    const user = userEvent.setup()
     await renderPage({ available: true, items: ITEMS, leftOut: [], runs: [] })
-    fireEvent.click(within(screen.getByRole('region', { name: 'Stopped trying' })).getByRole('button', { name: /Stopped trying/ }))
+    await user.click(screen.getByRole('button', { name: /^Trying/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: /^Stopped trying \(1\)/ }))
     fireEvent.click(screen.getByRole('button', { name: /CKids Philly/ }))
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start trying again' })))
     expect(posts.map((p) => p.body)).toEqual([{ action: 'resume', kind: 'google', id: 'cc' }])

@@ -6,6 +6,8 @@ const m = vi.hoisted(() => ({
   getAdminUserForCommunity: vi.fn(),
   resolveCommunity: vi.fn(),
   updateCategory: vi.fn(),
+  deleteCategory: vi.fn(),
+  categoryDeleteCounts: vi.fn(),
   revalidatePublicContent: vi.fn(),
 }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -13,11 +15,11 @@ vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
   resolveCommunity: m.resolveCommunity,
 }))
-vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: vi.fn(), renameCategoryId: vi.fn() }))
+vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts, renameCategoryId: vi.fn() }))
 vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: vi.fn(), applyFieldOptionRenames: vi.fn() }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
-const { PATCH } = await import('./route')
+const { PATCH, DELETE } = await import('./route')
 const patch = (body: unknown) =>
   PATCH(
     new Request('http://x/api/admin/categories/synagogue?community=philly', { method: 'PATCH', body: JSON.stringify(body) }) as unknown as NextRequest,
@@ -134,5 +136,28 @@ describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
     const res = await patch({ listingParts: { shabbos: { fields: ['eruv'] } } })
     expect(res.status).toBe(502)
     expect((await res.json()).errors[0]).toMatch(/n’t set up on this site yet/)
+  })
+})
+
+// The Eruv's confirm says how many eruvim and watches go with it (Nov 4).
+describe('DELETE /api/admin/categories/:id', () => {
+  const del = (q = '') =>
+    DELETE(
+      new Request(`http://x/api/admin/categories/eruv-information?community=philly${q}`, { method: 'DELETE' }) as unknown as NextRequest,
+      { params: Promise.resolve({ id: 'eruv-information' }) },
+    )
+
+  it('?dry=1 only counts what would go', async () => {
+    m.categoryDeleteCounts.mockResolvedValue({ listings: 0, eruvim: 4, watches: 3 })
+    expect(await (await del('&dry=1')).json()).toEqual({ ok: true, listings: 0, eruvim: 4, watches: 3 })
+    expect(m.deleteCategory).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+
+  it('deletes, and says what went', async () => {
+    m.deleteCategory.mockResolvedValue({ listings: 0, eruvim: 4, watches: 3 })
+    expect(await (await del()).json()).toEqual({ ok: true, listings: 0, eruvim: 4, watches: 3 })
+    expect(m.deleteCategory).toHaveBeenCalledWith('philly', 'eruv-information')
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 })

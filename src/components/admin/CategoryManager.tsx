@@ -137,6 +137,26 @@ export default function CategoryManager({
     }
   }
 
+  // The Eruv's confirm says how many eruvim and watches go with it, so it
+  // asks first.
+  const [eruvDeleteCounts, setEruvDeleteCounts] = useState<{ eruvim: number; watches: number } | null>(null)
+  async function askDeleteEruv(id: string) {
+    setError(null)
+    setEruvDeleteCounts(null)
+    setConfirmDeleteId(id)
+    try {
+      const counts = await fetchJson<{ eruvim: number; watches: number }>(
+        withCommunity(`/api/admin/categories/${id}?dry=1`, community),
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Couldn’t count its eruvim.',
+      )
+      setEruvDeleteCounts({ eruvim: counts.eruvim, watches: counts.watches })
+    } catch (err) {
+      setConfirmDeleteId(null)
+      setError(err instanceof Error ? err.message : 'Couldn’t count its eruvim.')
+    }
+  }
+
   async function deleteCategory(id: string) {
     setError(null)
     setDeletingId(id)
@@ -259,6 +279,14 @@ export default function CategoryManager({
               toggling={switching === 'eruv'}
               onEdit={eruv.row ? () => onOpenEditor(`${CAT_PREFIX}${eruv.row!.id}`) : null}
               onToggleActive={(on) => void switchScreen(ERUV_SCREEN, on)}
+              del={eruv.row ? {
+                confirming: confirmDeleteId === eruv.row.id,
+                counts: eruvDeleteCounts,
+                deleting: deletingId === eruv.row.id,
+                onAsk: () => void askDeleteEruv(eruv.row!.id),
+                onCancel: () => setConfirmDeleteId(null),
+                onConfirm: () => void deleteCategory(eruv.row!.id),
+              } : null}
             />
           ) : c && (
             <CategoryRow
@@ -312,21 +340,32 @@ function VisibilityToggle({
 }
 
 // The Eruv among the categories: shown or hidden like them, and Edit opens
-// its eruvim. No places to add and nothing to delete — hiding it is how it
-// goes. Before it has a row, showing it makes one, and Edit waits for that.
+// its eruvim. Delete takes every eruv and its website's watch with it (the
+// user, Nov 4); it stays on the list, hidden, to start again. Before it has
+// a row, showing it makes one, and Edit and Delete wait for that.
 function EruvRow({
   label,
   on,
   toggling,
   onEdit,
   onToggleActive,
+  del,
 }: {
   label: string
   on: boolean
   toggling: boolean
   onEdit: (() => void) | null
   onToggleActive: (active: boolean) => void
+  del: {
+    confirming: boolean
+    counts: { eruvim: number; watches: number } | null
+    deleting: boolean
+    onAsk: () => void
+    onCancel: () => void
+    onConfirm: () => void
+  } | null
 }) {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   return (
     <div data-testid="category-row-eruv" className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -344,8 +383,46 @@ function EruvRow({
               Edit
             </button>
           )}
+          {del && (
+            <button onClick={del.onAsk} className="text-xs font-medium text-red-600 hover:underline cursor-pointer">
+              Delete
+            </button>
+          )}
         </div>
       </div>
+
+      {del?.confirming && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+            <p className="text-sm text-red-800">
+              {del.counts ? (
+                <>
+                  Permanently delete <span className="font-semibold">{label}</span>, its{' '}
+                  {plural(del.counts.eruvim, 'eruv', 'eruvim')} and {plural(del.counts.watches, 'website watch', 'website watches')}? This can’t be undone.
+                </>
+              ) : (
+                'Counting its eruvim…'
+              )}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={del.onConfirm}
+                disabled={del.deleting || !del.counts}
+                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                {del.deleting ? 'Deleting…' : 'Delete category & eruvim'}
+              </button>
+              <button
+                onClick={del.onCancel}
+                disabled={del.deleting}
+                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

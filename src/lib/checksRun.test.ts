@@ -36,6 +36,7 @@ describe('what kind of check a watch is', () => {
   it('the kosher lists, Refuah, an eruv’s website and a menu', () => {
     expect(kind({ kind: 'keystone_list' })).toBe('kosher')
     expect(kind({ url: 'https://www.mekorhabracha.org/center-city' })).toBe('kosher')
+    expect(kind({ url: 'https://www.kclkashrus.org/' })).toBe('kosher')
     expect(kind({ url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: 'hosp' })).toBe('hospitals')
     expect(kind({ createdBy: ERUV_WEBSITE_CREATOR })).toBe('eruv')
     expect(kind({ createdBy: MENU_WATCH_CREATOR, resourceId: 'food' })).toBe('menus')

@@ -158,7 +158,7 @@ export default function HeroHeading({
   if (heroImage) {
     const { props } = getImageProps({
       src: heroImage.url,
-      alt: heroImage.alt,
+      alt: '',
       fill: true,
       sizes: '58vw',
       unoptimized: !isOptimizableImage(heroImage.url),
@@ -261,11 +261,12 @@ export default function HeroHeading({
       {/* Mobile: who keeps the guide right (TrustBand), then the search
           and what to try. No headline and no mission (the user, Oct 17):
           the header already names the guide, and a returning visitor came
-          to find something, not to be told what this is. The title stays
-          as the page's heading for screen readers and search engines. */}
+          to find something, not to be told what this is. The big line stays
+          as the page's heading for screen readers and search engines (the
+          admin's separate Title for it went, Nov 4). */}
       {!today && (
       <section className="pt-4 desktop:hidden" data-testid="phone-hero" data-spot="top">
-        <h1 className="sr-only">{settings.heroTitle}</h1>
+        <h1 className="sr-only">{headline || settings.heroTitle}</h1>
         {trust}
         {ui.search.landing && (
           <div ref={phoneShellRef} className={trust ? 'mt-3' : undefined}>
@@ -350,11 +351,12 @@ export default function HeroHeading({
             reference exactly instead of approximating it with a gradient. */}
         <div className="absolute inset-y-0 right-0 -z-10 w-[58%]">
           {heroImage ? (
-            // A real photo: it has content to describe, so it's a genuine
-            // `alt`, not aria-hidden — the opposite of the placeholder below.
+            // Decoration: the big line beside it says what the page is, so
+            // the photo has an empty alt and a screen reader passes it by.
+            // (The admin's "Photo description" went, the user, Nov 4.)
             <Image
               src={heroImage.url}
-              alt={heroImage.alt}
+              alt=""
               fill
               sizes="58vw"
               // object-top, not object-cover's default (center): even

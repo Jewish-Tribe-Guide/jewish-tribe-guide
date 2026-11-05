@@ -1,6 +1,12 @@
-// Exists only so /admin/home resolves to a route — the content is rendered
-// by the shared (site) route-group layout (see ../layout.tsx), which reads
-// the URL itself to decide 'home' vs. 'menus'.
+'use client'
+
+import { useAdminSession } from '@/components/admin/AdminAuthGate'
+import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
+
+// Site's Home page: the home page and the header over it, on a computer or a
+// phone. (Header and menus was a tab of its own until Nov 4; its old address
+// is a redirect in next.config.ts.)
 export default function AdminHomePage() {
-  return null
+  const session = useAdminSession()
+  return <SiteSettingsEditor token={session.access_token} />
 }

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, ready, serverMarkup } from './helpers'
+import { shareDescription, type SiteSettings } from '../src/lib/siteSettings'
+import { defaultCommunity, defaultCommunitySlug, dismissLocationPrompt, ready, serverMarkup } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A question's own page, /philly/ask/<question>: its link preview answers
@@ -76,4 +77,18 @@ test('a link with no readable question opens the plain home page', async ({ page
 
 test('an unknown community’s shared question is still a 404', async ({ request }) => {
   expect((await request.get('/no-such-community/ask/kosher-wine')).status()).toBe(404)
+})
+
+// The home page's own link preview says what its top says: the big line and
+// the line under it (the user, Nov 4). The admin's separate "When the link
+// is shared" box went; what it held was never what a shared link showed.
+test('a shared home page link says the big line and the line under it', async ({ request }) => {
+  const community = await defaultCommunitySlug(request)
+  const settings = (await (await request.get(`/api/site-settings?community=${community}`, { timeout: 45_000 })).json()).settings as SiteSettings
+  const expected = shareDescription(settings)
+  expect(expected).not.toBe('')
+  const html = await (await request.get(`/${community}`)).text()
+  const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+  expect(decode(html.match(/<meta property="og:description" content="([^"]*)"/)?.[1] ?? '')).toBe(expected)
+  expect(decode(html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '')).toBe(expected)
 })

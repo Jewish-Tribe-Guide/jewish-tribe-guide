@@ -45,6 +45,14 @@ describe('listHomeSectionsUncached', () => {
     expect(section.sortOrder).toBe(100)
   })
 
+  // card_ids is jsonb: migration 093's first version wrote '{}', an empty
+  // object, and every page that read it failed to build.
+  it('reads card_ids that are not an array as no cards', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, card_ids: {} }, { ...rawRow, id: 'b', card_ids: 'x' }], error: null }))
+    const sections = await listHomeSectionsUncached('philly')
+    expect(sections.map((s) => s.cardIds)).toEqual([[], []])
+  })
+
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(listHomeSectionsUncached('philly')).rejects.toThrow('Failed to load home sections: boom')

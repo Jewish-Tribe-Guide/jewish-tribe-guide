@@ -5,7 +5,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorker from '@/components/ServiceWorker'
 import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
-import { iconVersion, SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { iconVersion, SITE_SETTINGS_DEFAULTS, shareDescription } from '@/lib/siteSettings'
 import './globals.css'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
@@ -13,7 +13,7 @@ import { getDefaultCommunity } from '@/lib/communityStore'
 // own until the redesign's one look, step 2.)
 const figtree = Figtree({ subsets: ['latin'] })
 
-// Reads the admin-edited site name/mission for the tab title and meta
+// Reads the admin-edited site name and home page words for the tab title and meta
 // description. Falls back to the community.config defaults on any failure
 // (e.g. the site_settings table not migrated yet) — a settings hiccup must
 // never break metadata generation for the whole page.
@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: settings.name,
-    description: settings.mission,
+    description: shareDescription(settings),
     manifest: '/manifest.webmanifest',
     // Proves ownership to Google Search Console — per-deployment (a template
     // fork's own site needs its own code), so it's an env var, not hardcoded.

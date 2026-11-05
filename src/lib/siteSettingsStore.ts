@@ -72,10 +72,11 @@ function toMobileTabs(raw: unknown): MobileTabConfig[] {
     if (!entry || typeof entry !== 'object') return []
     const { id, label, target } = entry as Record<string, unknown>
     if (typeof id !== 'string' || typeof label !== 'string' || typeof target !== 'string') return []
-    if (!id.trim() || !label.trim() || !target.trim()) return []
-    return [{ id, label, target }]
+    // A blank target is a tab with nothing in it yet: kept, not shown.
+    if (!id.trim() || !label.trim()) return []
+    return [{ id, label, target: target.trim() }]
   })
-  return tabs.length ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
+  return tabs.some((t) => t.target) ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
 }
 
 // Same shape as toMobileTabs above: jsonb comes back as whatever was
@@ -86,9 +87,9 @@ function toDesktopNavItem(entry: unknown): DesktopNavItem | null {
   if (!entry || typeof entry !== 'object') return null
   const { id, label, kind, target, items } = entry as Record<string, unknown>
   if (typeof id !== 'string' || !id.trim() || typeof label !== 'string' || !label.trim()) return null
-  if (kind !== 'categories-menu' && kind !== 'more-menu' && kind !== 'link') return null
+  if (kind !== 'categories-menu' && kind !== 'more-menu' && kind !== 'link' && kind !== 'heading') return null
   if (kind === 'link' && (typeof target !== 'string' || !target.trim())) return null
-  if (kind === 'more-menu') {
+  if (kind === 'more-menu' || kind === 'heading') {
     const subItems = Array.isArray(items) ? items.flatMap((i) => toDesktopNavItem(i) ?? []) : []
     return { id, label, kind, items: subItems }
   }

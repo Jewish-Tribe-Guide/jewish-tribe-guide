@@ -112,10 +112,29 @@ describe('CategoryManager', () => {
     show([shul])
     const row = await screen.findByTestId('category-row-eruv')
     expect(within(row).queryByRole('button', { name: 'Edit' })).toBeNull()
+    expect(within(row).queryByRole('button', { name: 'Delete' })).toBeNull()
     await user.click(within(row).getByRole('button', { name: 'Hidden' }))
     await waitFor(() => expect(fetchJson).toHaveBeenCalled())
     const [, init] = vi.mocked(fetchJson).mock.calls[0]
     expect(init?.method).toBe('POST')
     expect(JSON.parse(String(init?.body))).toMatchObject({ kind: 'eruv' })
+  })
+
+  // The user, Nov 4: "Eruv should be able to be deleted as a category".
+  it('deletes the Eruv once its confirm says how many eruvim and watches go with it', async () => {
+    const user = userEvent.setup()
+    show([shul, eruv])
+    vi.mocked(fetchJson).mockResolvedValueOnce({ ok: true, listings: 0, eruvim: 4, watches: 1 })
+    const row = await screen.findByTestId('category-row-eruv')
+    await user.click(within(row).getByRole('button', { name: 'Delete' }))
+    expect(await within(row).findByText(/its 4 eruvim and 1 website watch\?/)).toBeTruthy()
+    const [dryUrl, dryInit] = vi.mocked(fetchJson).mock.calls[0]
+    expect(String(dryUrl)).toContain('/api/admin/categories/eruv-information?dry=1')
+    expect(dryInit?.method).toBe('DELETE')
+    await user.click(within(row).getByRole('button', { name: 'Delete category & eruvim' }))
+    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(2))
+    const [url, init] = vi.mocked(fetchJson).mock.calls[1]
+    expect(String(url)).toMatch(/\/api\/admin\/categories\/eruv-information(\?community=[^&]*)?$/)
+    expect(init?.method).toBe('DELETE')
   })
 })

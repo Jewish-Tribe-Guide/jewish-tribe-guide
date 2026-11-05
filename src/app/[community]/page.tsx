@@ -6,7 +6,7 @@ import { listChangeLog } from '@/lib/changesStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
-import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { SITE_SETTINGS_DEFAULTS, shareDescription } from '@/lib/siteSettings'
 import { features } from '@/lib/features'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
@@ -54,7 +54,7 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
   // the page's own <title>/description.
   const communityRow = communities.find((c) => c.slug === community)
   const name = settings.name || communityRow?.name || community
-  const description = settings.mission || communityRow?.mission || ''
+  const description = shareDescription(settings) || communityRow?.mission || ''
 
   // WebSite structured data, home page only (not every screen under this
   // layout) — the standard place for it, and the one signal in this change

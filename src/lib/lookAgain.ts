@@ -44,10 +44,12 @@ export const LOOK_AGAIN_MS = 30 * 86_400_000
 /** Tried a night, at most: a menu is a page or a few and an AI read. */
 export const LOOKS_PER_NIGHT = 5
 
-export const LOOK_GROUPS: { kind: LookKind; title: string }[] = [
-  { kind: 'eruv', title: 'Eruv status page' },
-  { kind: 'menu', title: 'Menus that couldn’t be read' },
-  { kind: 'google', title: 'Not on Google' },
+/** Each kind: its name in the Kind menu, and in a row when the list shows
+ *  every kind. */
+export const LOOK_GROUPS: { kind: LookKind; title: string; short: string }[] = [
+  { kind: 'eruv', title: 'Eruv status page', short: 'Eruv status' },
+  { kind: 'menu', title: 'Menus that couldn’t be read', short: 'Menu' },
+  { kind: 'google', title: 'Not on Google', short: 'Google' },
 ]
 
 const host = (url: string) => {
@@ -155,7 +157,9 @@ export type LookView = {
   tonight: string
   /** Still tried, waiting or not. */
   total: number
-  groups: { kind: LookKind; title: string; rows: LookShown[] }[]
+  /** One list (the user, Nov 4: "all in one list with filters and
+   *  search"), tonight's first. */
+  rows: LookShown[]
   stopped: LookShown[]
 }
 
@@ -172,13 +176,7 @@ export function lookView(items: readonly LookItem[], nextRun: number, perNight =
   return {
     tonight: `Tonight, ${time} · ${Math.min(queue.length, perNight)} due`,
     total: live.length,
-    groups: LOOK_GROUPS.map((g) => ({
-      ...g,
-      rows: live
-        .filter((i) => i.kind === g.kind)
-        .sort((a, b) => rank(a) - rank(b) || dueAt(a) - dueAt(b) || a.name.localeCompare(b.name))
-        .map(shown),
-    })).filter((g) => g.rows.length > 0),
+    rows: [...live].sort((a, b) => rank(a) - rank(b) || dueAt(a) - dueAt(b) || a.name.localeCompare(b.name)).map(shown),
     stopped: items.filter((i) => i.stopped).sort((a, b) => a.name.localeCompare(b.name)).map(shown),
   }
 }
@@ -191,6 +189,12 @@ export function pickFound<T extends { name: string }>(results: readonly T[], nam
 /** The first page found that an admin hasn't turned down. */
 export function pickPage<T extends { url: string }>(pages: readonly T[], notThese: readonly string[]): T | null {
   return pages.find((p) => !notThese.includes(p.url)) ?? null
+}
+
+/** What the Kind menu and the search leave in. */
+export function filterLooks<T extends LookItem>(rows: readonly T[], kind: LookKind | '', query: string): T[] {
+  const q = query.trim().toLowerCase()
+  return rows.filter((r) => (!kind || r.kind === kind) && (!q || r.name.toLowerCase().includes(q)))
 }
 
 export const isFoundPage = (f: FoundPage | FoundPlace): f is FoundPage => 'url' in f

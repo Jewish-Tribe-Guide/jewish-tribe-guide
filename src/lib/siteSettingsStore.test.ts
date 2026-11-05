@@ -149,6 +149,16 @@ describe('getSiteSettingsUncached', () => {
       expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
     })
 
+    it('keeps a tab with nothing in it yet (a blank target)', async () => {
+      const tabs = [
+        { id: 'home', label: 'Home', target: '/' },
+        { id: 'm', label: 'Map', target: '' },
+      ]
+      mockFrom.mockReturnValue(chainable({ data: { ...rawRow, mobile_tabs: tabs }, error: null }))
+      const settings = await getSiteSettingsUncached('philly')
+      expect(settings.mobileTabs).toEqual(tabs)
+    })
+
     it('falls back to the default trio when every entry is malformed (not a half-broken bar)', async () => {
       mockFrom.mockReturnValue(chainable({ data: { ...rawRow, mobile_tabs: [{}] }, error: null }))
       const settings = await getSiteSettingsUncached('philly')
@@ -161,6 +171,19 @@ describe('getSiteSettingsUncached', () => {
       const settings = await getSiteSettingsUncached('philly')
       expect(settings.mobileTabs.length).toBeLessThan(many.length)
     })
+  })
+
+  // A tab can hold headings (lib/navTabs.ts); reading one must keep them.
+  it('reads a tab of headings, each with its links', async () => {
+    const tab = {
+      id: 't',
+      label: 'Info',
+      kind: 'more-menu',
+      items: [{ id: 'h', label: 'Pages', kind: 'heading', items: [{ id: 'a', label: 'About', kind: 'link', target: 'about' }] }],
+    }
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_nav_items: [tab] }, error: null }))
+    const settings = await getSiteSettingsUncached('philly')
+    expect(settings.desktopNavItems).toEqual([tab])
   })
 })
 

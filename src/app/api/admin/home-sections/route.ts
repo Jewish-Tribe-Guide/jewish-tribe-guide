@@ -29,9 +29,9 @@ type CreateBody = {
    *  ignored server-side when set (see createHomeSection), so the client
    *  doesn't need to send real values for either. */
   kind?: HomeBlockKind
-  /** Only meaningful alongside `kind` (a built-in block) — see
-   *  homeSections.ts's own doc on side-by-side layout. */
-  width?: 'full' | 'half'
+  /** Only meaningful alongside `kind` (a built-in block): it shares the row
+   *  of the card before it (homeSections.ts's cardRows). */
+  sharesRow?: boolean
 }
 
 const BUILT_IN_KINDS = Object.keys(BUILT_IN_BLOCKS) as HomeBlockKind[]
@@ -56,8 +56,8 @@ export async function POST(request: Request) {
   if (!body.kind && !body.title?.trim()) {
     return Response.json({ ok: false, errors: ['Section title is required.'] }, { status: 400 })
   }
-  if (body.width !== undefined && body.width !== 'full' && body.width !== 'half') {
-    return Response.json({ ok: false, errors: ['Invalid width.'] }, { status: 400 })
+  if (body.sharesRow !== undefined && typeof body.sharesRow !== 'boolean') {
+    return Response.json({ ok: false, errors: ['Invalid row.'] }, { status: 400 })
   }
 
   try {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       title: body.title ?? '',
       cardIds: body.cardIds,
       kind: body.kind,
-      width: body.width,
+      sharesRow: body.sharesRow,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

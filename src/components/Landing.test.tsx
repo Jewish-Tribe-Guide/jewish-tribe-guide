@@ -7,6 +7,7 @@ import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import type { HomeBlockKind } from '@/lib/homeSections'
 import { LocationProvider } from '@/lib/locationContext'
 import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import { ListingsProvider } from '@/lib/listingsContext'
@@ -149,11 +150,13 @@ describe('Landing', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     renderLanding(
       undefined,
-      { content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' } } },
+      { content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, desktopHeroHeadline: 'Welcome to the directory', mission: 'Everything nearby' } } },
       [makeListing({ id: 'g1', category: 'grocery' }), makeListing({ id: 'g2', category: 'grocery' })],
     )
     const hero = screen.getByTestId('phone-hero')
     expect(within(hero).getByTestId('trust-band')).toHaveTextContent('Kept up by the community2 places')
+    // The page's heading is the big line, as on a computer (heroTitle is no
+    // longer edited in the admin, Nov 4); hidden, for screen readers.
     expect(within(hero).getByRole('heading', { level: 1, name: 'Welcome to the directory' })).toHaveClass('sr-only')
     expect(screen.queryByText('Everything nearby')).not.toBeInTheDocument()
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
@@ -176,7 +179,7 @@ describe('Landing', () => {
       title: `Section ${n}`,
       sortOrder: n,
       cardIds,
-      width: 'full' as const,
+      sharesRow: false,
     })
     renderLanding(
       undefined,
@@ -508,75 +511,100 @@ describe('Landing', () => {
     expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
   })
 
-  // Phase 6a of the desktop mockup rework: Davening Times, Update Listings
-  // and the new Suggest a Listing card share ONE row (the "community row")
-  // instead of each getting its own — see Landing.tsx's own community-row
-  // doc for why this is a special case rather than the generic half-width
-  // pairing every other kind goes through.
-  describe('the community row (Davening / Update Listings / Suggest a Listing)', () => {
-    it('renders all three, in order, when both Davening and Update Listings are configured', () => {
+  // The admin sets the cards in rows (the user, Nov 4; artifact
+  // 8HpeQANzsQyGbyHVPsXrc5): sharesRow puts a card in the row of the one
+  // before it, up to three a row, Categories always alone (cardRows).
+  describe('the cards in rows', () => {
+    const cats = [
+      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
+      // SubscribeSection self-gates on having at least one real (kind:
+      // 'listing') category to offer in its picker.
+      makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
+    ]
+    const row = (kind: HomeBlockKind, sortOrder: number, sharesRow = false) => ({ id: kind, kind, title: kind, sortOrder, cardIds: [], sharesRow })
+    const subscribeHeading = () => screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
+    const timesHeading = () => screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
+    const spots = (container: HTMLElement) => [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
+
+    it('three cards in one row, in order', () => {
       const { container } = renderLanding(undefined, {
-        content: {
-          categories: [makeCategory()],
-          homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' },
-            { id: 'listings', kind: 'listings', title: 'Update Listings Card', sortOrder: 200, cardIds: [], width: 'full' },
-          ],
-        },
+        content: { categories: cats, homeSections: [row('davening', 100), row('listings', 200, true), row('suggest', 300, true)] },
       })
 
-      const daveningStub = screen.getByTestId('davening-stub')
-      const listingsHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })
-      const suggestHeading = screen.getByRole('heading', { name: 'Suggest a Listing' })
+      const grid = screen.getByTestId('davening-stub').closest('.grid')!
+      expect(grid).toHaveClass('min-[900px]:grid-cols-3')
+      expect(grid).toContainElement(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading }))
+      expect(grid).toContainElement(screen.getByRole('heading', { name: 'Suggest a Listing' }))
+      expect(spots(container)).toEqual(['cards card-davening card-listings card-suggest'])
 
-      const row = daveningStub.closest('.grid')!
-      expect(row).not.toBeNull()
-      expect(row).toContainElement(listingsHeading)
-      expect(row).toContainElement(suggestHeading)
-      expect(row).toHaveClass('min-[900px]:grid-cols-3')
-
-      // Only one shared row wrapper for all three, not one per card.
-      expect(container.querySelectorAll('.my-8').length).toBe(1)
-
-      // Document order: Davening, then Update Listings, then Suggest.
       const html = container.innerHTML
       expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading))
       expect(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)).toBeLessThan(html.indexOf('Suggest a Listing'))
     })
 
-    it('renders Update Listings + Suggest (no Davening slot) once Davening is not configured', () => {
-      renderLanding(undefined, {
-        content: {
-          categories: [makeCategory()],
-          homeSections: [
-            { id: 'listings', kind: 'listings', title: 'Update Listings Card', sortOrder: 100, cardIds: [], width: 'full' },
-          ],
-        },
+    it('two cards in one row', () => {
+      const { container } = renderLanding(undefined, {
+        content: { categories: cats, homeSections: [row('subscribe', 100), row('jewishTimes', 200, true)] },
       })
 
-      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
-      const listingsHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })
-      const suggestHeading = screen.getByRole('heading', { name: 'Suggest a Listing' })
-
-      const row = listingsHeading.closest('.grid')!
-      expect(row).not.toBeNull()
-      expect(row).toContainElement(suggestHeading)
-      expect(row).toHaveClass('min-[740px]:grid-cols-2')
+      const grid = subscribeHeading().closest('.grid')!
+      expect(grid).toHaveClass('min-[740px]:grid-cols-2')
+      expect(grid).toContainElement(timesHeading())
+      expect(spots(container)).toEqual(['cards card-subscribe card-jewishTimes'])
     })
 
-    it('renders nothing for the community row when neither kind is configured', () => {
+    it('a card that shares no row fills its own', () => {
+      const { container } = renderLanding(undefined, {
+        content: { categories: cats, homeSections: [row('subscribe', 100), row('jewishTimes', 200)] },
+      })
+
+      expect(subscribeHeading().closest('.grid')).toBeNull()
+      expect(timesHeading().closest('.grid')).toBeNull()
+      expect(spots(container)).toEqual(['cards card-subscribe', 'cards card-jewishTimes'])
+    })
+
+    it('a card left alone in its row, the other gated off, fills the row', () => {
+      // No zmanim category: Jewish Times renders nothing.
       renderLanding(undefined, {
+        content: { categories: [cats[1]!], homeSections: [row('subscribe', 100), row('jewishTimes', 200, true)] },
+      })
+
+      expect(subscribeHeading().closest('.grid')).toBeNull()
+      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })).not.toBeInTheDocument()
+    })
+
+    it('Categories stays alone, and no row holds a fourth card, whatever was saved', () => {
+      const { container } = renderLanding(undefined, {
         content: {
-          categories: [makeCategory()],
-          homeSections: [
-            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'full' },
-          ],
+          categories: cats,
+          homeSections: [row('browse', 100), row('davening', 200, true), row('listings', 300, true), row('suggest', 400, true), row('subscribe', 500, true)],
         },
       })
 
-      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).not.toBeInTheDocument()
+      expect(spots(container)).toEqual([
+        'cards card-browse',
+        'cards card-davening card-listings card-suggest',
+        'cards card-subscribe',
+      ])
+    })
+
+    // A card of its own now, so the admin can take it off.
+    it('Suggest a Listing shows only where it has a row', () => {
+      renderLanding(undefined, { content: { categories: cats, homeSections: [row('listings', 100)] } })
+
+      expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading }).closest('.grid')).toBeNull()
       expect(screen.queryByRole('heading', { name: 'Suggest a Listing' })).not.toBeInTheDocument()
+    })
+
+    it('with no rows saved, the home is as it was: Davening Times, Kept by the Community and Suggest a Listing share a row', () => {
+      const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
+
+      expect(spots(container)).toEqual([
+        'cards card-browse',
+        'cards card-davening card-listings card-suggest',
+        'cards card-subscribe',
+        'cards card-jewishTimes',
+      ])
     })
   })
 
@@ -596,8 +624,8 @@ describe('Landing', () => {
         content: {
           categories: withZmanim,
           homeSections: [
-            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 100, cardIds: [], width: 'full' },
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 100, cardIds: [], sharesRow: false },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], sharesRow: false },
           ],
         },
       })
@@ -617,7 +645,7 @@ describe('Landing', () => {
       renderLanding(undefined, {
         content: {
           categories: withZmanim,
-          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
+          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], sharesRow: false }],
         },
       })
 
@@ -625,85 +653,6 @@ describe('Landing', () => {
       // Jewish Times has no row of its own here, so it doesn't render at
       // all — configuring one kind doesn't implicitly configure the rest.
       expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
-    })
-  })
-
-  describe('side-by-side cards (width: half)', () => {
-    const withMapAndZmanim = [
-      makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
-      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
-      // SubscribeSection self-gates on having at least one real (kind:
-      // 'listing') category to offer in its picker — without one it
-      // renders null, same as this suite's own jewishTimes/zmanim gate.
-      makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
-    ]
-
-    // davening/map used to be this suite's own example pair — davening no
-    // longer generically pairs with anything (it's always pulled into the
-    // community row alongside Update Listings/Suggest a Listing instead,
-    // see Landing.tsx's own community-row doc), so these are rewritten
-    // against subscribe/jewishTimes, the pair the plan explicitly keeps
-    // pairing generically.
-    it('pairs two adjacent half-width cards into one row', () => {
-      const { container } = renderLanding(undefined, {
-        content: {
-          categories: withMapAndZmanim,
-          homeSections: [
-            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'half' },
-          ],
-        },
-      })
-
-      // Both cards share the same grid row — a direct parent with grid
-      // classes containing both, not two separate my-8 rows.
-      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
-      const jewishTimesHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
-      const row = subscribeHeading.closest('.grid')
-      expect(row).not.toBeNull()
-      expect(row).toContainElement(jewishTimesHeading)
-      // Only one shared outer spacing wrapper for the pair, not one each.
-      expect(container.querySelectorAll('.my-8').length).toBe(1)
-    })
-
-    it('a half-width card with no half-width neighbor falls back to its own full-width row', () => {
-      const { container } = renderLanding(undefined, {
-        content: {
-          categories: withMapAndZmanim,
-          homeSections: [
-            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'full' },
-          ],
-        },
-      })
-
-      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
-      // Not inside a grid — its own row, same as a full-width card.
-      expect(subscribeHeading.closest('.grid')).toBeNull()
-      expect(container.querySelectorAll('.my-8').length).toBe(2)
-    })
-
-    it('a half-width card whose neighbor was gated off this render still falls back to full width', () => {
-      // subscribe/jewishTimes both 'half', but no zmanim category — subscribe
-      // is unconditional (mocked to always render), jewishTimes self-gates
-      // on zmanimCategory; drop the zmanim category so jewishTimes renders
-      // nothing at all, leaving subscribe the only real card.
-      renderLanding(undefined, {
-        content: {
-          categories: [
-            makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
-            makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
-          ], // no zmanim category
-          homeSections: [
-            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'half' },
-          ],
-        },
-      })
-
-      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
-      expect(subscribeHeading.closest('.grid')).toBeNull()
-      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })).not.toBeInTheDocument()
     })
   })
 

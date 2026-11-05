@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Session } from '@supabase/supabase-js'
+import { useLayoutEffect } from 'react'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -642,7 +643,7 @@ describe('ModerationQueue — Set up your guide', () => {
       ['Your first categoryPick a kind, then add its places', 'false'],
       ['The home page’s wordsThe big line and the line under it', 'false'],
     ])
-    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/community', '/team', '/categories/cat:new', '/home'])
+    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/home', '/team', '/categories/cat:new', '/home'])
     expect(screen.getByText('Nothing else to do.')).toBeInTheDocument()
     expect(screen.queryByText('Nothing to do')).toBeNull()
   })
@@ -692,7 +693,10 @@ describe('ModerationQueue — a place opened', () => {
   })
   const notOnGoogle = { id: 'shul-1', name: 'Mekor Habracha', category: 'synagogue', matched: false, notOnGoogle: null }
 
-  function renderRouted({ submissions = [], responses = [], google = [] }: { submissions?: EnrichedSubmission[]; responses?: unknown[]; google?: unknown[] }) {
+  function renderRouted(
+    { submissions = [], responses = [], google = [] }: { submissions?: EnrichedSubmission[]; responses?: unknown[]; google?: unknown[] },
+    wrap: (ui: React.ReactElement) => React.ReactElement = (ui) => ui,
+  ) {
     vi.mocked(fetch).mockImplementation(async (url, init) => (init?.method === 'PATCH' ? new Response(JSON.stringify({ ok: true }), { status: 200 }) : ({ ...fakeResponse(200), url: String(url) } as Response)))
     vi.mocked(parseOkJson).mockImplementation(async (res) => {
       const url = String((res as Response).url)
@@ -701,7 +705,7 @@ describe('ModerationQueue — a place opened', () => {
       if (url.includes('/api/admin/setup')) return { setup: null }
       return { submissions }
     })
-    return renderWithProviders(<ModerationQueue session={session()} />, { content: { categories: [shul, makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } })
+    return renderWithProviders(wrap(<ModerationQueue session={session()} />), { content: { categories: [shul, makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } })
   }
   const tabs = () => screen.getAllByRole('tab').map((t) => t.textContent)
   let wide = false
@@ -733,6 +737,22 @@ describe('ModerationQueue — a place opened', () => {
   it('opens on Broken checks from Watches’ link', async () => {
     window.history.replaceState(null, '', '/?show=broken')
     renderRouted({ submissions: [submission()], google: [notOnGoogle] })
+    await findRow('Mekor Habracha')
+    expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('Broken checks')
+    expect(screen.queryByRole('button', { name: 'Open Acme Grocery' })).toBeNull()
+    expect(window.location.search).toBe('')
+  })
+
+  // A link from inside the admin (Watches is a page of it): the router
+  // puts the new address in only after To do's first render, so the filter
+  // has to be read after it (the user, Nov 4: "it doesn't apply the filter").
+  it('opens on Broken checks when the link came from another admin page', async () => {
+    window.history.replaceState(null, '', '/watches')
+    function AddressAfterRender({ children }: { children: React.ReactNode }) {
+      useLayoutEffect(() => window.history.pushState(null, '', '/?show=broken'), [])
+      return <>{children}</>
+    }
+    renderRouted({ submissions: [submission()], google: [notOnGoogle] }, (ui) => <AddressAfterRender>{ui}</AddressAfterRender>)
     await findRow('Mekor Habracha')
     expect(screen.getByRole('button', { name: /^Show/ })).toHaveTextContent('Broken checks')
     expect(screen.queryByRole('button', { name: 'Open Acme Grocery' })).toBeNull()

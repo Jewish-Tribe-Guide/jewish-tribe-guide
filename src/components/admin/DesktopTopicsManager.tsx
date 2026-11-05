@@ -1,270 +1,197 @@
 'use client'
 
-import { useState } from 'react'
-import { BUILT_IN_BLOCKS, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
+import { BUILT_IN_BLOCKS, canShareRow, cardRows, fromCardRows, MAX_CARDS_IN_ROW, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
-import SubscriberManager from './SubscriberManager'
-import { Chevron } from './AdminUI'
+import DragList, { addButton, InnerRow } from './DragList'
 
-// ── The desktop home screen's five singleton cards — Categories & Search,
-// Davening Times, Update Listings, Email Signup, and Jewish Times —
-// reorderable and removable, same shared draft/Save pipeline as
-// HomeSectionManager's category sections (see homeSectionsDraft.ts). Each
-// row is labeled by its fixed admin name (CARD_META below), not a
-// renameable "title" the way the old 'featured'/'map'/'zmanim' blocks were
-// — none of the five has a live-rendered `title` any more (see
-// homeSections.ts's own doc); every one has its own dedicated eyebrow/
-// heading fields in SiteSettings instead, edited inline on its own row here.
-// 'map' used to be a sixth card here (the map embedded on the home screen) —
-// retired, the user's own call: the map only ever lives at its own
-// full-screen route now. Not offered here any more, so no admin can add it
-// back; Landing.tsx silently renders nothing for a leftover 'map' row, same
-// as any other retired kind (see BUILT_IN_BLOCKS's own doc).
+// ── The computer home's cards under the search, in rows (the user, Nov 4;
+// drawn as artifact 8HpeQANzsQyGbyHVPsXrc5). A card on its own fills its
+// row; cards in one box share a row, up to three, and Categories is always
+// alone (cardRows in homeSections.ts). Each card is a handle, its name and
+// an ×: nothing opens, and there is no width. A card taken off comes back
+// from "+ Add". Same shared draft/Save pipeline as the category sections
+// (see homeSectionsDraft.ts).
 //
-// Lives under the Desktop tab, not the Site tab's plain "Home page
-// sections": mobile never shows any of these five (see Landing.tsx — all
-// five are desktop-only), so they belong with the other desktop-only
-// settings, not mixed in with the cross-device category-section list.
+// Dragged up and down only, as every other list: between two rows sit two
+// gaps, so a card dropped just under a row joins it, one dropped between
+// the boxes has a row of its own, and one just over the next row joins
+// that. A gap is passed at its outer edge, not its middle, so the whole
+// space between two boxes is the own-row spot (the user, Nov 4: moving a
+// card out of a box into a row between was "not so easy"). The keyboard
+// steps through the same places. A card held over a box it can't join
+// (a full one, or Categories in or out of one) turns that box red with the
+// reason under it (the user, Nov 4: "make that clear on the drag").
 //
-// `sections` (the draft prop) actually holds every home_section row —
-// carefully only ever reads/reorders the kind!=='section' subset here,
-// leaving any plain category sections in the draft untouched (see
-// cardEntries/sectionEntries below) — HomeSectionManager owns those. ──────
+// What a card says is fixed here: nobody had changed any of it (checked on
+// live, Nov 4), so the fields went. The site still reads the saved words.
+//
+// `sections` (the draft prop) holds every home_section row — this only ever
+// reads/reorders the cards, leaving plain category sections and retired
+// kinds in the draft untouched.
 
-type CardKind = Exclude<HomeBlockKind, 'section'>
+type CardKind = Exclude<HomeBlockKind, 'section' | 'map'>
 
-type CardMeta = {
-  kind: CardKind
-  description: string
-  eyebrowKey?: keyof SiteSettings
-  /** Absent when the card's title is fixed on the site. */
-  headingKey?: keyof SiteSettings
-  /** Davening Times and Update Listings always share one row with Suggest a
-   *  Listing, so their width does nothing. */
-  sharedRow?: true
-}
-
-// Order here is just documentation, same as BUILT_IN_BLOCKS — actual
-// display order always comes from sortOrder (topicEntries below).
-const CARD_META: CardMeta[] = [
-  {
-    kind: 'browse',
-    description: 'A tile per category',
-  },
-  {
-    kind: 'davening',
-    description: 'The next minyan, beside the listings card',
-    sharedRow: true,
-  },
-  {
-    kind: 'listings',
-    description: 'Add, edit or report a listing, beside the davening card',
-    eyebrowKey: 'desktopListingsEyebrow',
-    headingKey: 'desktopListingsHeading',
-    sharedRow: true,
-  },
-  {
-    kind: 'subscribe',
-    description: 'Email sign-up',
-    eyebrowKey: 'desktopSubscribeEyebrow',
-    headingKey: 'desktopSubscribeHeading',
-  },
-  {
-    kind: 'jewishTimes',
-    description: 'This week’s candle lighting, when there’s a Zmanim category',
-    headingKey: 'desktopJewishTimesHeading',
-  },
-]
-const CARD_META_BY_KIND = new Map(CARD_META.map((m) => [m.kind, m]))
-const CARD_KINDS = CARD_META.map((m) => m.kind)
+/** The cards offered, in the order "+ Add" lists them. 'map' (the map on the
+ *  home screen) is retired: Landing.tsx renders nothing for a leftover row. */
+const CARD_KINDS: CardKind[] = ['browse', 'davening', 'listings', 'suggest', 'subscribe', 'jewishTimes']
 const CARD_KIND_SET = new Set<string>(CARD_KINDS)
 
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+/** The setting that names a card on the site, where it has one. */
+const HEADING_KEY: Partial<Record<CardKind, keyof SiteSettings>> = {
+  listings: 'desktopListingsHeading',
+  subscribe: 'desktopSubscribeHeading',
+  jewishTimes: 'desktopJewishTimesHeading',
+}
+
+type Card = DraftHomeSection & { kind: CardKind }
+type Item = { card: Card } | { gap: string }
+const isCard = (i: Item): i is { card: Card } => 'card' in i
+
+/** The cards as the list shows them: a gap above, two between rows, one
+ *  below. */
+function toItems(cards: Card[]): Item[] {
+  const items: Item[] = [{ gap: 'top' }]
+  cardRows(cards).forEach((row, r) => {
+    if (r > 0) items.push({ gap: `${r}a` }, { gap: `${r}b` })
+    items.push(...row.map((card) => ({ card })))
+  })
+  items.push({ gap: 'end' })
+  return items
+}
+
+/** The rows the list now holds: the cards between gaps. */
+function itemRows(items: readonly Item[]): Card[][] {
+  const rows: Card[][] = [[]]
+  for (const item of items) {
+    if (isCard(item)) rows.at(-1)!.push(item.card)
+    else if (rows.at(-1)!.length) rows.push([])
+  }
+  return rows.filter((row) => row.length)
+}
+
+/** Every row one the home page can draw. */
+function rowsFit(rows: Card[][]): boolean {
+  return rows.every((row) => row.every((card, i) => i === 0 || canShareRow(row.slice(0, i), card)))
+}
+
+function sameRows(a: Card[][], b: Card[][]): boolean {
+  const key = (rows: Card[][]) => rows.map((row) => row.map((c) => c.id).join(',')).join('|')
+  return key(a) === key(b)
+}
+
+/** The run of cards item `i` is in, or null for a gap. */
+function runAt(items: readonly Item[], i: number): Card[] | null {
+  if (!isCard(items[i]!)) return null
+  let start = i
+  while (start > 0 && isCard(items[start - 1]!)) start--
+  let end = i
+  while (end < items.length - 1 && isCard(items[end + 1]!)) end++
+  return items.slice(start, end + 1).map((it) => (it as { card: Card }).card)
+}
+
+/** The box the lifted card was held at and couldn't join, and why. */
+function turnedDown(refused: readonly Item[], liftedId: string): { ids: Set<string>; why: string } | null {
+  const at = refused.findIndex((it) => isCard(it) && it.card.id === liftedId)
+  const run = at < 0 ? null : runAt(refused, at)
+  if (!run) return null
+  const lifted = run.find((c) => c.id === liftedId)!
+  const box = run.filter((c) => c.id !== liftedId)
+  if (!box.length) return null
+  const why = lifted.kind === 'browse' || box.some((c) => c.kind === 'browse') ? 'Categories has a row of its own' : `Full: ${MAX_CARDS_IN_ROW} cards at most`
+  return { ids: new Set(box.map((c) => c.id)), why }
+}
 
 export default function DesktopTopicsManager({
   sections,
   onChange,
   settings,
-  onSettingChange,
-  token,
-  onOpenCard,
+  onPointCard,
 }: {
   sections: DraftHomeSection[]
   onChange: (sections: DraftHomeSection[]) => void
-  /** The draft SiteSettings — read-only here, for each card's own
-   *  eyebrow/heading values. */
+  /** The draft SiteSettings, read-only here: a card's name on the site. */
   settings: SiteSettings
-  /** SiteSettingsEditor's own `set` function — writes one field onto its
-   *  draft, same as every other input on that page. */
-  onSettingChange: <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) => void
-  /** For the email sign-up card's list of who signed up; without it the
-   *  list isn't shown. */
-  token?: string
-  /** A row opened, or null when closed: the preview lights that card up. */
-  onOpenCard?: (kind: string | null) => void
+  /** The mouse on a card, or null off it: the preview lights that card. */
+  onPointCard?: (kind: string | null) => void
 }) {
-  // The home page's cards, in order, as rows (board 7): a row opens in
-  // place to its words, width and order; taking one off asks once.
-  const [openId, setOpenId] = useState<string | null>(null)
-  const [removing, setRemoving] = useState<string | null>(null)
-  const cardEntries = sections.filter(
-    (s): s is DraftHomeSection & { kind: CardKind } => s.kind !== 'section' && CARD_KIND_SET.has(s.kind),
-  )
-  const sectionEntries = sections.filter((s) => s.kind === 'section')
-  const legacyEntries = sections.filter((s) => s.kind !== 'section' && !CARD_KIND_SET.has(s.kind))
-  const missingCards = CARD_KINDS.filter((k) => !cardEntries.some((c) => c.kind === k))
+  const cards = sections.filter((s): s is Card => s.kind !== 'section' && CARD_KIND_SET.has(s.kind))
+  const others = sections.filter((s) => s.kind === 'section' || !CARD_KIND_SET.has(s.kind))
+  const missing = CARD_KINDS.filter((k) => !cards.some((c) => c.kind === k))
+  const items = toItems(cards)
+
+  // What a visitor sees it called: its heading, or the card's name.
+  function nameOf(kind: CardKind) {
+    const key = HEADING_KEY[kind]
+    return (key && (settings[key] as string)) || BUILT_IN_BLOCKS[kind].title.replace(/ Card$/, '')
+  }
+
+  const save = (rows: Card[][]) => onChange([...others, ...fromCardRows(rows)])
 
   function addCard(kind: CardKind) {
     const b = BUILT_IN_BLOCKS[kind]
-    onChange([
-      ...sectionEntries,
-      ...legacyEntries,
-      ...cardEntries,
-      { id: b.id, kind, title: b.title, cardIds: [], width: 'full' },
-    ])
+    save([...cardRows(cards), [{ id: b.id, kind, title: b.title, cardIds: [], sharesRow: false }]])
   }
 
   function removeCard(id: string) {
-    setRemoving(null)
-    setOpenId(null)
-    onChange(sections.filter((s) => s.id !== id))
+    save(cardRows(cards).map((row) => row.filter((c) => c.id !== id)).filter((row) => row.length))
   }
 
-  function setWidth(id: string, width: 'full' | 'half') {
-    onChange(sections.map((s) => (s.id === id ? { ...s, width } : s)))
+  // A row's box, drawn on the spots its cards sit in, so it stays put while
+  // one of them is lifted.
+  function slot(item: Item, i: number, shown: readonly Item[], dragKey: string | null, refused: readonly Item[] | null) {
+    if (!isCard(item)) return { className: '' }
+    const run = runAt(shown, i)!
+    const no = refused && dragKey ? turnedDown(refused, dragKey) : null
+    const blocked = !!no?.ids.has(item.card.id)
+    if (run.length < 2 && !blocked) return { className: '' }
+    const first = run[0] === item.card
+    const last = run.at(-1) === item.card
+    const holdsLifted = dragKey !== null && run.some((c) => c.id === dragKey)
+    const full = dragKey !== null && !holdsLifted && run.length >= MAX_CARDS_IN_ROW
+    const className = [
+      'border-x px-1.5',
+      blocked ? 'border-red-300 bg-red-50' : holdsLifted ? 'border-primary bg-blue-50' : 'border-slate-200 bg-slate-50',
+      first ? 'rounded-t-[10px] border-t pt-1.5' : '',
+      last ? 'rounded-b-[10px] border-b pb-1.5' : 'pb-1.5',
+      full && !blocked ? 'opacity-50' : '',
+    ].join(' ')
+    const note = blocked && last ? <p className="m-0 px-1 pt-1.5 text-[13px] font-semibold text-red-700">{no!.why}</p> : undefined
+    return { className, note }
   }
-
-  function moveCard(index: number, dir: -1 | 1) {
-    const other = index + dir
-    if (other < 0 || other >= cardEntries.length) return
-    const reordered = [...cardEntries]
-    ;[reordered[index], reordered[other]] = [reordered[other], reordered[index]]
-    onChange([...sectionEntries, ...legacyEntries, ...reordered])
-  }
-
-  const arrow = 'w-10 h-10 shrink-0 grid place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:text-slate-300 disabled:hover:bg-white cursor-pointer disabled:cursor-default'
-  const quiet = 'min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 cursor-pointer'
 
   return (
     <div>
-      {cardEntries.map((c, i) => {
-        const meta = CARD_META_BY_KIND.get(c.kind)
-        // What a visitor sees it called: its heading, or the card's name.
-        const label = (meta?.headingKey && (settings[meta.headingKey] as string)) || BUILT_IN_BLOCKS[c.kind].title.replace(/ Card$/, '')
-        const open = openId === c.id
-        return (
-          <div key={c.id} className="border-b border-slate-100 last:border-b-0">
-            {/* Up and down on the row itself, rather than dragging, which a
-                phone does badly (board 21c). */}
-            <div className="flex items-center gap-2 pr-3">
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-describedby={meta ? `${c.id}-line` : undefined}
-                onClick={() => {
-                  setOpenId(open ? null : c.id)
-                  onOpenCard?.(open ? null : c.kind)
-                }}
-                className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-2.5 min-h-[56px] text-left hover:bg-slate-50 cursor-pointer"
-              >
-                <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                  <span className="text-[15px] font-semibold text-slate-900">{label}</span>
-                  {meta && <span id={`${c.id}-line`} aria-hidden className="text-[13px] text-slate-600">{meta.description}</span>}
-                </span>
-                <span className={open ? 'rotate-90' : ''}>
-                  <Chevron />
-                </span>
-              </button>
-              <button type="button" onClick={() => moveCard(i, -1)} disabled={i === 0} className={arrow} aria-label={`Move ${label} up`}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                  <path d="M4 10l4-4 4 4" />
-                </svg>
-              </button>
-              <button type="button" onClick={() => moveCard(i, 1)} disabled={i === cardEntries.length - 1} className={arrow} aria-label={`Move ${label} down`}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                  <path d="M4 6l4 4 4-4" />
-                </svg>
-              </button>
+      <DragList
+        items={items}
+        keyOf={(i) => (isCard(i) ? i.card.id : `gap:${i.gap}`)}
+        nameOf={(i) => (isCard(i) ? nameOf(i.card.kind) : '')}
+        onReorder={(next) => save(itemRows(next))}
+        canMove={(next, via) => {
+          const rows = itemRows(next)
+          // An arrow press always changes the rows: the step between the
+          // two gaps under a row changes nothing on the page.
+          return rowsFit(rows) && (via === 'pointer' || !sameRows(rows, cardRows(cards)))
+        }}
+        slot={slot}
+        dropEdge={(i) => (isCard(i) ? undefined : i.gap === 'top' || i.gap.endsWith('b') ? 'bottom' : 'top')}
+        className="px-3"
+      >
+        {(item, row) => {
+          if (!isCard(item)) return <div className="h-3" aria-hidden="true" />
+          const { card } = item
+          return (
+            <div onMouseEnter={() => onPointCard?.(card.kind)} onMouseLeave={() => onPointCard?.(null)}>
+              <InnerRow row={row} name={nameOf(card.kind)} onRemove={() => removeCard(card.id)} className="rounded-[10px] border border-slate-200 bg-white" />
             </div>
-            {open && (
-              <div className="flex flex-col gap-3 px-4 pb-4">
-                {meta?.headingKey && (
-                  <div className={`grid grid-cols-1 gap-2 ${meta.eyebrowKey ? 'sm:grid-cols-2' : ''}`}>
-                    {meta.eyebrowKey && (
-                      <label className="block">
-                        <span className="block text-[13px] font-semibold text-slate-700 mb-1">Small line above</span>
-                        <input
-                          value={settings[meta.eyebrowKey] as string}
-                          onChange={(e) => onSettingChange(meta.eyebrowKey!, e.target.value as SiteSettings[typeof meta.eyebrowKey])}
-                          className={inputClass}
-                        />
-                      </label>
-                    )}
-                    <label className="block">
-                      <span className="block text-[13px] font-semibold text-slate-700 mb-1">Heading</span>
-                      <input
-                        value={settings[meta.headingKey!] as string}
-                        onChange={(e) => onSettingChange(meta.headingKey!, e.target.value as SiteSettings[NonNullable<typeof meta.headingKey>])}
-                        className={inputClass}
-                      />
-                    </label>
-                  </div>
-                )}
-                {!meta?.sharedRow && (
-                  <div role="group" aria-label="Width" className="self-start inline-flex gap-0.5 rounded-lg border border-slate-300 p-0.5">
-                    {(['full', 'half'] as const).map((w) => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() => setWidth(c.id, w)}
-                        aria-pressed={c.width === w}
-                        className={`min-h-9 px-3 text-[13px] font-semibold rounded-md cursor-pointer ${
-                          c.width === w ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {w === 'full' ? 'Full width' : 'Half width'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {!meta?.sharedRow && c.width === 'half' && (
-                  <p className="m-0 text-[13px] text-slate-600">Sits beside the next half-width card.</p>
-                )}
-                {c.kind === 'subscribe' && token && <SubscriberManager token={token} />}
-                {removing === c.id ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="m-0 flex-1 text-sm font-semibold text-slate-900">Take {label} off the home page?</p>
-                    <button type="button" onClick={() => removeCard(c.id)} className="min-h-10 px-3 rounded-lg bg-red-600 text-white text-sm font-semibold cursor-pointer">
-                      Take it off
-                    </button>
-                    <button type="button" onClick={() => setRemoving(null)} className={quiet}>
-                      Leave it
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => setRemoving(c.id)} className={quiet}>
-                      Take it off
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })}
+          )
+        }}
+      </DragList>
 
-      {missingCards.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-slate-100">
-          {missingCards.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => addCard(k)}
-              className="min-h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-primary hover:bg-slate-50 cursor-pointer"
-            >
-              + Add “{BUILT_IN_BLOCKS[k].title}”
+      {missing.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-3 pt-1.5 pb-3">
+          {missing.map((k) => (
+            <button key={k} type="button" onClick={() => addCard(k)} className={addButton}>
+              + Add {nameOf(k)}
             </button>
           ))}
         </div>

@@ -2295,6 +2295,47 @@ simpler ("it really shouldn't be that complicated").
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
 
+## Done Nov 4, later: Site's Home page is one screen (on `redesign/oct18-fixes`)
+
+Drawn first (artifact 2sssenojcQzzeHtHAT8gnp), built as drawn:
+- **Home page** and **Header and menus** are one tab, Home page. A
+  Computer / Phone switch at the top picks which version's boxes show and
+  which the preview beside them shows; it runs full width on a phone, like
+  the Preview button. Computer: Name and logo, Header, Top of the page,
+  Search box, Cards under the search. Phone: Name and logo, Search box,
+  Today home (while held back, not shown), Tabs. Boxes on both say "Also
+  on a phone" / "Also on a computer". `/admin/menus` lands on Home page.
+- **Not as drawn:** the drawing's "Header links" / "+ Add a link" is
+  "Header" / "+ Add a tab", since header items are tabs holding links or
+  headings (decided earlier Nov 4).
+- **Line under it** wraps (a textarea).
+- **The logo and the photo upload as a listing's photo does:** no hint under
+  the buttons, and the image's address behind a "Paste URL" button instead
+  of always showing.
+- **The photo has no description to fill in**; it's decoration (empty alt).
+  Replaces note 24 below.
+- **"When the link is shared" is gone.** A shared link's description is the
+  big line and the line under it (`shareDescription`), on every page that
+  used the old description. Its Title was never shown anywhere a visitor
+  could see (the shared title is the site's name). The phone's hidden page
+  heading is the big line too.
+- **Fix:** Watches' "N things need fixing" and "Broken checks" opened To do
+  on All. A link from another admin page sets its address only after To do
+  first renders, so `?show=broken` was missed, then stripped. It's read again
+  after that first render now.
+- **Cards under the search:** a card held over a box it can't join turns
+  that box red with the reason under it: "Full: 3 cards at most", or
+  "Categories has a row of its own" (Categories in or out of a box). A full
+  box is still dimmed from the moment a card is lifted.
+- **The preview beside:** on a computer it's as tall as the page, all of it
+  (about 460px for Philly's home page, down to the footer), rather than one
+  1,100px screen. The phone stays one screen, since the whole phone page
+  would run past the window. Clicking either opens it full size, as
+  Category pages' preview already did.
+- **Fix:** the full-size preview had no history entry, so browser Back left
+  the page and Forward after "Back to editor" did nothing. It has one now,
+  as Category pages' and Forms' previews do.
+
 ## Done Nov 4: the bugs and small tweaks from the user's 33 notes (on `redesign/oct18-fixes`)
 
 The user sent 33 notes on Nov 4, mostly about the admin screens, and said
@@ -2384,13 +2425,105 @@ Then "the small tweaks", each with a test that failed against the old code:
   The Kosher box used to name every non-Keystone list "Mekor Habracha's
   list"; it now uses each list's own name, and "On neither list" became
   "Not on a kosher list".
-  - Live needs the watch added (the user's yes): kind `website`, URL
-    `https://www.kclkashrus.org/`, label "KCL's list".
+  - Live: merged in PR 375 and deployed; the watch was added on live Nov 4
+    with the user's yes (kind `website`, `https://www.kclkashrus.org/`,
+    "KCL's list"). Its first read is the next nightly run.
+  - Fixed Nov 4 (the user: "I don't see the KCL check in watches"): three
+    copies of "is this a kosher list" named only Keystone-K and Mekor, so
+    KCL's watch went under Other on Watches, ran with the plain websites
+    and was counted as one. Now one test (`kosherListWatch.ts`) for all
+    three; the Watches row reads "Keystone-K, Mekor Habracha and KCL".
   - Not done: Add's "Read now" lookup (`kosherLookup`) still only checks
     Keystone-K and Mekor.
 
+Built Nov 4, from the user's picks:
+- **22:** the site's name and logo are on Site → Header and menus, in a
+  "Name and logo" box first. Settings is Team (and Communities for the
+  site owner); the old Settings → Community address goes to Header and
+  menus (10298b7a).
+- **23:** the Eruv category has Delete. Its confirm says how many eruvim
+  and website watches go with it, and deleting removes all of them. The
+  Eruv stays on the list, hidden, to start again. This reverses the Nov 3
+  Hidden only rule (e2de0cf9).
+- **18/19:** Look again is one list, like To do and Places: a name search,
+  a Kind menu with counts, and Still trying / Stopped trying. Each row
+  names its kind while all kinds show. Watches is unchanged (4e65f1fd).
+- **To do's Sort starts on Newest first unlit:** Newest first is now the
+  menu's first choice, so the start isn't shown as narrowed (blue).
+- **25-28, reordering:** built as drawn (KdHT8Tci1ufXSXobnnSfEm v4). All
+  four lists (Cards under the search, Groups on the Browse page, Top of
+  the page, Tabs on a phone) are one kind of row (`DragList.tsx`): a
+  handle to drag, press and hold on a phone, arrow keys on the handle, and
+  a tap opens the row. The arrows are gone. Groups and Top of the page are
+  rows that open, with their cards or links as inner rows with an ×.
+  Every "Remove" and "Delete" here is "Take it off".
+  - Not in the drawing: a dropdown's links also open (Name, Opens), so
+    they can still be renamed. Groups keep the "In More, at the end" line.
+  - Only checked in Chrome, including a simulated touch. Not tried on a
+    real phone yet.
+
+- **Top of the page: tabs, links and headings:** built as drawn
+  (KdHT8Tci1ufXSXobnnSfEm v15). Links and dropdowns are one thing, a tab
+  (`navTabs.ts`): one link in it shows as a link, two as a dropdown.
+  - What goes in first decides: "+ Add a tab" adds an empty "New tab", its
+    name selected, with "+ Add a link" and "+ Add a heading". With links in
+    it, only links; with headings, only headings, and links go inside
+    each. Nothing goes deeper (the save route refuses it). An empty tab or
+    heading says "Nothing in it yet" in its row and isn't on the site.
+  - An open row edits its name in place, a trash can beside its chevron.
+    The same row now on Tabs on a phone and Cards under the search (the
+    user, Nov 4): no Name box, no Take it off button.
+  - The groups are Categories' headings, and the "Groups on the Browse
+    page" box is gone from the Home page (`HomeSectionManager` deleted).
+    The leftover group is "Other" (was "More"), the last row, with no
+    handle or trash; new categories land there.
+  - Taking off a card or a Categories heading still asks once ("Its links
+    move to Other"); a tab, heading or link goes at once.
+  - The user's notes, Nov 4, same day: an open row drops its line (what it
+    summed up shows under it); its name reads as text until tapped, then
+    edits in a box; a tap anywhere else in the row closes it; the trash
+    can is boxed, beside the name. Links don't open (as drawn): a name and
+    an ×, named as the site calls it ("You", not "You (saved places and
+    searches)"), with "Opens …" only for an older link named otherwise.
+  - Later notes, Nov 4: typing a name, a press elsewhere only finishes the
+    typing (no row opens or closes on that press); the trash can sits at
+    the bottom of an open row, right after its Adds (not off at the far
+    end), on all three lists; phone tabs don't ask where they go once
+    added (take it off and add another) and have no count by their title;
+    Stay in the Loop no longer lists or counts its subscribers (the user:
+    "Don't say how many people signed up"). That list was the admin's only
+    way to see or remove one (`SubscriberManager` deleted with its tests
+    and its e2e spec); `/api/admin/subscribers` stays, unused for now.
+  - A phone tab opens like a tab on a computer (the user: "Why would this
+    work differently than the You tab"): its link inside, a name and an ×.
+    The × empties it ("Nothing in it yet"), then "+ Add a link" sits by the
+    trash can. An empty phone tab saves and isn't on the bar; a bar where
+    no tab opens anything is refused.
+  - Only checked in Chrome (computer and phone width). Not on a real phone.
+
+  - The Categories card is named "Categories" in the admin (was
+    "Categories and Search"; it has had no search of its own for a while).
+
 Still open:
-- The ones that need a drawing or a decision: 25-28, 18/19, 20, 22, 23.
+- **Home card rows: built, not live (artifact 8HpeQANzsQyGbyHVPsXrc5).**
+  Every card is a real card, Suggest a Listing included. Cards in one box
+  share a row on the computer home, up to three; Categories is always
+  alone. Each card is a handle, its name and an ×; nothing opens, and the
+  width and word fields are gone (the site still reads the saved words).
+  Dragged up and down; the arrow keys step through the same places.
+  - 093 is on the test project (dev), and the suites pass against it. Its
+    first version wrote Suggest a Listing's `card_ids` as `'{}'` (jsonb's
+    empty object), which broke every page build; the file now writes `'[]'`
+    and a rerun repairs it, and the store reads a non-array as no cards.
+  - 093 (the corrected file) is on prod too: checked Nov 4, `shares_row`
+    is there and Suggest a Listing's `card_ids` is `[]`. Nothing to run
+    before this deploys.
+  - Taking a card out of a box and letting it go anywhere between two boxes
+    gives it a row of its own (the user found that spot hard to hit): the
+    drop lines are measured from where the rows sat when the drag began,
+    and the gap between boxes is 12px.
+- **20, asking visitors about something seen today:** waits on the user
+  naming the place where they saw it.
 
 ## Done Nov 2: To do is one row per place, each place as drawn (on `redesign/oct18-fixes`)
 

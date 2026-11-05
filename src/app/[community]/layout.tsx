@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
-import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { SITE_SETTINGS_DEFAULTS, shareDescription } from '@/lib/siteSettings'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { loadCommunityContent } from '@/lib/loadCommunityContent'
@@ -45,11 +45,11 @@ export async function generateMetadata(props: LayoutProps<'/[community]'>): Prom
   const { community } = await resolveFromPath(slug)
   if (!community) return {}
 
-  // Admin-edited name/mission win; the community row is the fallback, and the
+  // Admin-edited name and home page words win; the community row is the fallback, and the
   // built-in defaults cover a settings table that hasn't been migrated yet.
   const settings = await getSiteSettings(community.slug).catch(() => SITE_SETTINGS_DEFAULTS)
   const title = settings.name || community.name
-  const description = settings.mission || community.mission
+  const description = shareDescription(settings) || community.mission
 
   return {
     title,
