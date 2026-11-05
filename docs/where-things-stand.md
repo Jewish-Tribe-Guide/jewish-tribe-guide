@@ -391,9 +391,17 @@ Networking, Cemetery); no page sets Groups. On the drawing:
     Items, Other): a plain list, nothing to change. Every other live
     choice field: Food Type, Store Type, Denomination, Services,
     Cemetery's Type.
-  - Before building: Synagogues' and Schools' Denomination lists differ
-    today (Orthodox (Ashkenazi) and Other vs Orthodox and
-    Non-Denominational), so one shared list has to be picked.
+  - Denomination gets one list (agreed Nov 5). Four differ today: Philly
+    Synagogues (Orthodox (Ashkenazi), Other, one choice), Philly Schools
+    (Orthodox, no Other, several, key `d`), Washington Synagogues and the
+    template (Orthodox, Other, no Non-Denominational, several).
+    Recommended: Orthodox, Orthodox (Sephardic), Conservative, Reform,
+    Reconstructionist, Non-Denominational, Other; one choice. Live, that
+    renames 8 Philly shuls' Orthodox (Ashkenazi) to Orthodox (7 shown, 1
+    archived); the 6 schools and Washington's 0 places keep their values.
+    A saved search filtered on Orthodox (Ashkenazi) would stop matching.
+    Waiting on: the user's OK to the list, then a prod go-ahead for the
+    rename.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Each kind of field asks only its own questions (was a map board,
