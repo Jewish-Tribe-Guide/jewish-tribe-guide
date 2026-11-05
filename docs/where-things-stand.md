@@ -2309,6 +2309,9 @@ Drawn first (artifact 2sssenojcQzzeHtHAT8gnp), built as drawn:
   "Header" / "+ Add a tab", since header items are tabs holding links or
   headings (decided earlier Nov 4).
 - **Line under it** wraps (a textarea).
+- **The logo and the photo upload as a listing's photo does:** no hint under
+  the buttons, and the image's address behind a "Paste URL" button instead
+  of always showing.
 - **The photo has no description to fill in**; it's decoration (empty alt).
   Replaces note 24 below.
 - **"When the link is shared" is gone.** A shared link's description is the

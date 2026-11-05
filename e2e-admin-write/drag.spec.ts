@@ -125,6 +125,9 @@ test.describe('the home page cards', () => {
 
     const above = (await rows(box)).at(-2)!
     test.skip(above.length >= 3 || above.includes('Categories'), 'the row above has no room')
+    // The drop left a change, so the Save bar is up along the bottom of the
+    // window: bring the box clear of it before pressing a handle.
+    await box.evaluate((el) => el.scrollIntoView({ block: 'center' }))
     // Just under the row's last card, inside its box.
     const into = await middle(box.locator('[data-drag-row]').filter({ hasText: above.at(-1)! }))
     await (await drag(page, box, handle, into.bottom - 4))()

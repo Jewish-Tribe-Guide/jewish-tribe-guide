@@ -202,6 +202,10 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
               uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
               token={token}
               shape="square"
+              // As a listing's photo (the user, Nov 4): no hint, the address
+              // behind a "Paste URL" button.
+              showRepositionHint={false}
+              collapseUrlInput
               originalSource={logoOriginal}
               onOriginalSourceChange={setLogoOriginal}
             />
@@ -282,6 +286,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                         token={token}
                         shape="square"
                         aspect={11 / 6}
+                        showRepositionHint={false}
+                        collapseUrlInput
                         originalSource={heroOriginal}
                         onOriginalSourceChange={setHeroOriginal}
                       />

@@ -160,9 +160,25 @@ describe('SiteSettingsEditor — Home page', () => {
   // (HeroHeading gives it an empty alt).
   it('the photo can be repositioned, and asks for no description', async () => {
     await renderEditor({ ...SITE_SETTINGS_DEFAULTS, desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: 'City Hall' } })
-    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Top of the page' })).getByRole('button', { name: 'Adjust photo' })).toBeInTheDocument()
     expect(screen.queryByLabelText(/description/i)).toBeNull()
     expect(screen.queryByDisplayValue('City Hall')).toBeNull()
+  })
+
+  // The user, Nov 4: the logo and the photo upload as a listing's photo
+  // does: no hint under the buttons, and the address behind "Paste URL"
+  // rather than always open.
+  it('the logo and the photo upload as a listing’s photo does', async () => {
+    const user = userEvent.setup()
+    await renderEditor({ ...SITE_SETTINGS_DEFAULTS, logoUrl: 'https://example.com/logo.png', desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: '' } })
+    expect(screen.queryByText('Click the preview to reposition/re-zoom it')).toBeNull()
+    expect(screen.queryByText('…or paste an image URL directly')).toBeNull()
+    expect(screen.queryByDisplayValue('https://example.com/logo.png')).toBeNull()
+    for (const box of ['Name and logo', 'Top of the page']) {
+      expect(within(screen.getByRole('region', { name: box })).getByRole('button', { name: 'Paste URL' })).toHaveAttribute('aria-pressed', 'false')
+    }
+    await user.click(within(screen.getByRole('region', { name: 'Name and logo' })).getByRole('button', { name: 'Paste URL' }))
+    expect(screen.getByLabelText('Image URL')).toHaveValue('https://example.com/logo.png')
   })
 
   it('has no Save bar until something changes, then says how much', async () => {
