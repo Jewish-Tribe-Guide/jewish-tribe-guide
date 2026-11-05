@@ -5,7 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { formatDays, isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, shabbosComesFirst, thisWeeksDays, usualJoinLink, usualSignUp, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, shabbosComesFirst, thisWeeksDays, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
 import { isShabbosRow } from '@/lib/minyanText'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
@@ -117,17 +117,13 @@ export default function DaveningCard({
   // or their calendar's week with no minyan in it (SpecialSchedule.whole).
   const post = thisWeek.posts[0] ?? thisWeek.none ?? undefined
   const waiting = !post && !!todayDate && sendsWeekly(schedules, todayDate)
-  // A week's minyanim, each with the sign-up of the usual minyan it stands
-  // in for (usualSignUp); a one-day addition is its own. And its usual
-  // minyan's join link, when the week gives none (usualJoinLink).
+  // A week's minyanim as the week gives them: never with the usual
+  // minyan's sign-up group or join link (the user, Nov 5: "no borrowing").
   const weekRows = thisWeek.days.map((d) => ({
     ...d,
-    rows: d.minyanim.map(({ minyan: { on: _on, ...m }, from }): Minyan => {
+    rows: d.minyanim.map(({ minyan: { on: _on, ...m } }): Minyan => {
       void _on
-      const weekday = weekdayOf(d.date)
-      const signUp = from.kind === 'week' ? usualSignUp(rows, m, [weekday]) : undefined
-      const joinLink = usualJoinLink(rows, m, [weekday])
-      return { ...m, days: [weekday], ...(signUp ? { signUp } : {}), ...(joinLink ? { joinLink } : {}) }
+      return { ...m, days: [weekdayOf(d.date)] }
     }),
   }))
   // The weekdays a week replaces the usual times on, gone by or not (not

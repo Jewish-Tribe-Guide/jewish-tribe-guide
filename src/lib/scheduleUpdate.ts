@@ -2,6 +2,8 @@ import { DAY_KEYS, type DayKey } from './hours'
 import { formatAnchorRule, parseTimeToMinutes, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah, type ZmanAnchor } from './davening'
 import { dateText, saturdayOf, signUpGroup, weekKeepsHeading, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Season } from './season'
+import { isJoinLink } from './calendarFeed'
+import { isGroupLink } from './minyanLinks'
 
 // ── Updating a shul's times from what it sent (agreed Oct 1) ────────────────
 // The user's words: a shul that redoes its times doesn't want to "go one by
@@ -51,6 +53,10 @@ export type ReadRegularTime = {
   /** It runs only when enough people come ("held when there is sufficient
    *  interest", Mekor's newsletter, Oct 23): a sign-up minyan. */
   signUp?: true
+  /** The group or form its people sign up on, as the message links it. */
+  signUpLink?: string
+  /** Where to join it from home, as the message links it. */
+  joinLink?: string
   /** Where it's held, as written, when that isn't the shul itself ("at
    *  1818 Market or Mikveh Israel"): another shul's minyan the guide has
    *  already is left out (heldElsewhere.ts); else it's the shul's own,
@@ -111,6 +117,9 @@ export type UpdateRow = {
   season?: Season
   /** The message says it runs only when enough people sign up. */
   signUp?: true
+  /** Its sign-up group and join link, as the message links them. */
+  signUpLink?: string
+  joinLink?: string
 }
 
 export type TimesUpdate = {
@@ -238,7 +247,7 @@ function pairDay(
       continue
     }
     const [c] = cur.splice(i, 1)
-    out.push({ ...rowFrom(c.row, day, newId), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...timeOf(r, c.row) })
+    out.push({ ...rowFrom(c.row, day, newId), ...datedNotes(r), status: 'same', quote: r.quote, ...(r.unsure ? { unsure: r.unsure } : {}), ...(r.signUp ? { signUp: true as const } : {}), ...linksOf(r), ...timeOf(r, c.row) })
   }
   left.sort((a, b) => sortKey(a, zm) - sortKey(b, zm))
   cur.sort((a, b) => sortKey(a.row, zm) - sortKey(b.row, zm))
@@ -249,18 +258,27 @@ function pairDay(
       day,
       tefillah: r.tefillah,
       ...pickTime(r),
-      ...(r.notes ? { notes: r.notes } : c?.row.notes ? { notes: c.row.notes } : {}),
+      ...(r.notes ? { notes: r.notes } : !r.date && c?.row.notes ? { notes: c.row.notes } : {}),
       status: c ? 'changed' : 'new',
       ...(c ? { was: c.row.time, rowId: c.row.id } : {}),
       quote: r.quote,
       ...(r.unsure ? { unsure: r.unsure } : {}),
       ...(r.occasion ? { occasion: r.occasion } : {}),
       ...(r.signUp ? { signUp: true as const } : {}),
+      ...linksOf(r),
     })
   }
   for (const c of cur) out.push({ ...rowFrom(c.row, day, newId), status: complete ? 'gone' : 'kept' })
   return out
 }
+
+/** A dated time's note is what its own date says, never the usual
+ *  minyan's it matched: a week and the usual times are two things (the
+ *  user, Nov 5). Kol Tzedek's calendar has Fri Nov 13 online only, on
+ *  Zoom, and came out with the usual Friday's "hybrid, tea and cookies". */
+const datedNotes = (r: ReadRegularTime): { notes?: string } => (r.date ? { notes: r.notes || undefined } : {})
+
+const linksOf = (r: Pick<ReadRegularTime, 'signUpLink' | 'joinLink'>) => ({ ...(r.signUpLink ? { signUpLink: r.signUpLink } : {}), ...(r.joinLink ? { joinLink: r.joinLink } : {}) })
 
 /** A matched time shows as the message gives it when that's a clock time
  *  for a date (6:12 PM this Friday), and as the shul's rule otherwise. */
@@ -376,7 +394,7 @@ export function compareTimes(
 
 /** A row, whatever its id: the same in both seasons' passes is all year. */
 const rowKey = (r: UpdateRow) =>
-  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null, r.signUp ?? null])
+  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null, r.signUp ?? null, r.signUpLink ?? null, r.joinLink ?? null])
 
 /** Whether any time was read from what was sent: a read time is the same
  *  as one the guide has, a change to one or a new one. With none, the
@@ -570,6 +588,15 @@ export function readWeekLines(before: SpecialSchedule | undefined, after: Specia
     const left = on(before, d).filter((o) => !on(after, d).some((m) => same(o, m)))
     const right = on(after, d).filter((m) => !on(before, d).some((o) => same(o, m)))
     for (const m of right) {
+      // The same time with another note: the note is what changes, said
+      // so (the user, Nov 5), never "was" the same time.
+      const k = left.findIndex((o) => o.tefillah === m.tefillah && o.time === m.time)
+      if (k >= 0) {
+        const o = left.splice(k, 1)[0]
+        const at = `${m.tefillah.replace(/_/g, ' ')} · ${dateText(d, { weekday: true })} · ${m.time}`
+        lines.push(`${after.name}: ${at}, ${!o.notes ? `note added: “${m.notes}”` : !m.notes ? `note taken off: “${o.notes}”` : `note now “${m.notes}”, was “${o.notes}”`}`)
+        continue
+      }
       const i = left.findIndex((o) => o.tefillah === m.tefillah)
       if (i >= 0) lines.push(`${after.name}: ${text(m, d)}, was ${left.splice(i, 1)[0].time}`)
       else lines.push(`${after.name}: new, ${text(m, d)}`)
@@ -670,7 +697,8 @@ export function applyUpdate(
   // A sign-up minyan whose time changes is still a sign-up minyan: the
   // message gives its new time, not how it gets its ten. One the message
   // says is sign-up signs up where the usual one does (signUpGroup).
-  const signUpOf = (r: UpdateRow, weekday: DayKey, was?: Pick<Minyan, 'signUp'>) => was?.signUp ?? (r.signUp ? signUpGroup(current, r.tefillah, [weekday]) : undefined)
+  // Its own link, when the message gives one (minyanLinks.ts).
+  const signUpOf = (r: UpdateRow, weekday: DayKey, was?: Pick<Minyan, 'signUp'>) => (r.signUpLink ? { link: r.signUpLink } : (was?.signUp ?? (r.signUp ? signUpGroup(current, r.tefillah, [weekday]) : undefined)))
   const add = (r: UpdateRow, season: Season | null, was?: DaySlot) => {
     const signUp = signUpOf(r, r.day as DayKey, was)
     slots.push({
@@ -682,15 +710,13 @@ export function applyUpdate(
       day: r.day as DayKey,
     })
   }
-  /** A dated row as a schedule's minyan, sign-up with its group. One that
-   *  is a usual minyan that day, at its time or a new one, is sign-up or
-   *  online as that one is: a week's page gives the time, not the group
-   *  (Mikveh Israel's calendar, Oct 27). */
+  /** A dated row as a schedule's minyan: its own group and join link,
+   *  when the message gives them, and never the usual minyan's (the user,
+   *  Nov 5: "no borrowing"). One it says is sign-up with no group is
+   *  still sign-up, for an admin to give the group. */
   const onDate = (r: UpdateRow) => {
-    const weekday = weekdayOf(r.day)
-    const usual = r.rowId ? current.find((m) => m.id === r.rowId && m.tefillah === r.tefillah && m.days.includes(weekday)) : undefined
-    const signUp = signUpOf(r, weekday, usual)
-    const joinLink = usual?.joinLink?.trim()
+    const signUp = r.signUpLink ? { link: r.signUpLink } : r.signUp ? {} : undefined
+    const joinLink = r.joinLink
     // A date isn't a season: Mekor's Friday 4:35pm in November paired with
     // its usual Friday time, and came out "Summer only".
     const notes = r.notes?.replace(SEASON_NOTE, '').trim()
@@ -863,6 +889,8 @@ export function cleanUpdate(raw: unknown, now = Date.now()): Omit<TimesUpdate, '
       ...(y.keep === true ? { keep: true } : {}),
       ...(y.everyWeek === true ? { everyWeek: true } : {}),
       ...(y.signUp === true ? { signUp: true as const } : {}),
+      ...(typeof y.signUpLink === 'string' && isGroupLink(y.signUpLink) ? { signUpLink: y.signUpLink } : {}),
+      ...(typeof y.joinLink === 'string' && isJoinLink(y.joinLink) ? { joinLink: y.joinLink } : {}),
     })
   }
   return {

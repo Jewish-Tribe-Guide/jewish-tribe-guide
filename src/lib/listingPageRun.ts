@@ -38,6 +38,7 @@ import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContac
 import { sendWatchDigest } from '@/lib/email'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { jobPageFor } from '@/lib/watchFindings'
+import { withMinyanLinks } from '@/lib/minyanLinks'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -174,7 +175,9 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
       ? { from: first, to: last, next: icsEntries(feedBody, communityConfig.timezone, after(1), after(NEXT_SERVICE_DAYS)).find((e) => isServiceTitle(e.title)) ?? null }
       : null
   entries = await withEventJoins(entries, today, last, opts.fetchImpl)
-  const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
+  // Its WhatsApp groups and Zoom links with their addresses, so the
+  // reader can give a minyan its own (minyanLinks.ts).
+  const text = htmlToText(withMinyanLinks(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' ')))
   // Its phones and emails, read by code (contactRead.ts): in its words and
   // its tel: and mailto: links, its menus' included.
   const contacts = pageContacts(htmlToText(page.body), page.body)
@@ -811,10 +814,13 @@ export async function runListingPageWatch(
   const stillAgrees = watch.lastCheck?.result === 'agrees' && !listingMoved
   const dated = async (o: WatchOutcome, agrees: boolean): Promise<WatchOutcome> => {
     // What it read, and only that (pageReadBoxes): its phone and email too
-    // when the page gives them and they agree.
+    // when the page gives them and they agree. Those whatever else differs
+    // (the user, Nov 5): the Kosher Grill's page gave its phone as listed
+    // every night, and its Contact box stayed "Not confirmed yet" because
+    // the same page listed dishes the listing didn't have.
     const contactAgrees = !!contactReading && Object.keys(contactReading.changes).length === 0
-    const boxes = pageReadBoxes(category, listing as unknown as Record<string, unknown>, reads, contactAgrees)
-    if (o.ok && agrees) await confirmFromSource(watch.communityId, [listing.id], listing.name, boxes, new Date(opts.now ?? Date.now()).toISOString())
+    const boxes = agrees ? pageReadBoxes(category, listing as unknown as Record<string, unknown>, reads, contactAgrees) : contactAgrees ? [CONTACT_SECTION] : []
+    if (o.ok && boxes.length) await confirmFromSource(watch.communityId, [listing.id], listing.name, boxes, new Date(opts.now ?? Date.now()).toISOString())
     return o
   }
   // Else the first read sets the baseline; an unchanged page is left alone.
@@ -839,12 +845,12 @@ export async function runListingPageWatch(
   }
   // Hours Google keeps on this listing are Google's to check, not the website's.
   const ownReads: PageReads = reads.kind === 'hours' ? { ...reads, keys: reads.keys.filter((k) => !(k === 'hours' && googleKeeps(listing, 'hours'))) } : reads
-  if (ownReads.kind === 'hours' && !ownReads.keys.length && !ownReads.notes.length) return merge({ ok: true, filed: 0, pageHash })
-  if (blocked && !opts.full) return merge({ ok: true, filed: 0 })
+  if (ownReads.kind === 'hours' && !ownReads.keys.length && !ownReads.notes.length) return dated(merge({ ok: true, filed: 0, pageHash }), false)
+  if (blocked && !opts.full) return dated(merge({ ok: true, filed: 0 }), false)
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
   if (!apiKey) {
-    if (!opts.full) return merge({ ok: true, filed: 0 })
-    return merge({ ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source, { pictures: !!source.pictures?.length }), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } })
+    if (!opts.full) return dated(merge({ ok: true, filed: 0 }), false)
+    return dated(merge({ ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source, { pictures: !!source.pictures?.length }), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } }), false)
   }
   // Read again only because the listing moved: the page said nothing new,
   // so a standing difference is the listing being newer (a newsletter, an
@@ -856,7 +862,7 @@ export async function runListingPageWatch(
     if (reads.kind === 'times' && (budget.timesReads ?? 0) > 0) budget.timesReads!--
     else {
       const left = compareOnly ? (budget.compares ?? 0) : budget.aiReads
-      if (left <= 0) return merge({ ok: true, filed: 0, skipped: true })
+      if (left <= 0) return dated(merge({ ok: true, filed: 0, skipped: true }), false)
       if (compareOnly) budget.compares = left - 1
       else budget.aiReads--
     }

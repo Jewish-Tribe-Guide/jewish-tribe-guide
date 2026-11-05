@@ -326,13 +326,21 @@ export type WeekChangeRow = {
   what: string
   /** "Mon, Oct 26". */
   day: string
-  /** Its time and note as proposed; "Taken off" for one gone. */
+  /** Its time as proposed; "Taken off" for one gone. */
   when: string
+  /** Its note, sign-up and join link, in a line: "Online: zoom.us/j/1". */
+  note: string | null
   /** Against the listing's own copy of the week; every one new in a
    *  week it hasn't got. */
   status: 'new' | 'changed' | 'gone' | 'same'
-  /** What the listing's week says. */
+  /** The time the listing's week has, when this changes it; for one
+   *  gone, its whole line. */
   was: string | null
+  /** What changed besides the time, said: "Note added" (the user, Nov 5:
+   *  "clear that it's the note that's changing"). */
+  says: string | null
+  /** The listing's note, sign-up or join link it replaces or takes off. */
+  struck: string[]
 }
 export type WeekChange = {
   title: string
@@ -346,8 +354,27 @@ export type WeekChange = {
   rows: WeekChangeRow[]
 }
 
+/** A minyan's note, sign-up and join link, each as shown. */
+const extras = (m: ScheduleMinyan) => ({ note: noteText(m.notes), 'sign-up': m.signUp ? signUpText(m.signUp) : null, 'join link': m.joinLink?.trim() ? joinText(m.joinLink) : null })
+const extrasLine = (m: ScheduleMinyan) => Object.values(extras(m)).filter(Boolean).join(' · ') || null
 /** One minyan on one day, in a line: "8:15 AM · Sign-up: chat.whatsapp.com/MI". */
-const dayLine = (m: ScheduleMinyan) => [timeText(m), noteText(m.notes), m.signUp && signUpText(m.signUp), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ')
+const dayLine = (m: ScheduleMinyan) => [timeText(m), extrasLine(m)].filter(Boolean).join(' · ')
+
+/** What a changed minyan changes besides its time: "Note added", "Join
+ *  link changed", and the listing's ones it replaces or takes off. */
+function extrasChange(old: ScheduleMinyan, m: ScheduleMinyan): { says: string | null; struck: string[] } {
+  const a = extras(old)
+  const b = extras(m)
+  const said: string[] = []
+  const struck: string[] = []
+  for (const k of Object.keys(a) as (keyof typeof a)[]) {
+    if (a[k] === b[k]) continue
+    said.push(`${k} ${!a[k] ? 'added' : !b[k] ? 'taken off' : 'changed'}`)
+    if (a[k]) struck.push(a[k]!)
+  }
+  const says = said.join(', ')
+  return { says: says ? says[0].toUpperCase() + says.slice(1) : null, struck }
+}
 const byClock = (a: ScheduleMinyan, b: ScheduleMinyan) => (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60)
 const dayLabel = (on: string) => (isDate(on) ? shortDay(on) : scheduleDayText(on))
 
@@ -384,11 +411,17 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
       const total = s.minyanim.reduce((n, m) => n + m.on.length, 0)
       const base = { title, total, none: !!s.whole && !s.minyanim.length }
       const rows: (WeekChangeRow & { on: string; tefillah: Minyan['tefillah']; at: number })[] = []
-      const push = (on: string, m: ScheduleMinyan, status: WeekChangeRow['status'], was: string | null, when = dayLine(m)) =>
-        rows.push({ what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when, status, was, on, tefillah: m.tefillah, at: clockMinutes(m.time) ?? 24 * 60 })
+      const push = (on: string, m: ScheduleMinyan, status: WeekChangeRow['status'], old: ScheduleMinyan | null = null) => {
+        const time = timeText(m)
+        const row: WeekChangeRow =
+          status === 'gone'
+            ? { what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when: 'Taken off', note: null, status, was: dayLine(m), says: null, struck: [] }
+            : { what: TEFILLAH_LABELS[m.tefillah], day: dayLabel(on), when: time, note: extrasLine(m), status, was: old && timeText(old) !== time ? timeText(old) : null, ...(old ? extrasChange(old, m) : { says: null, struck: [] }) }
+        rows.push({ ...row, on, tefillah: m.tefillah, at: clockMinutes(m.time) ?? 24 * 60 })
+      }
       let same = 0
       if (!own?.minyanim.length) {
-        for (const m of s.minyanim) for (const on of m.on) push(on, m, 'new', null)
+        for (const m of s.minyanim) for (const on of m.on) push(on, m, 'new')
       } else {
         const before = byDayTefillah(own)
         const after = byDayTefillah(s)
@@ -400,19 +433,27 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
             const i = left.findIndex((o) => dayLine(o) === dayLine(m))
             if (i >= 0) {
               left.splice(i, 1)
-              push(on, m, 'same', null)
+              push(on, m, 'same')
               same++
             } else right.push(m)
           }
+          // The same time with another note is that minyan, its note
+          // changed; what's left pairs in time order.
+          const rest: ScheduleMinyan[] = []
+          for (const m of right) {
+            const i = left.findIndex((o) => timeText(o) === timeText(m))
+            if (i >= 0) push(on, m, 'changed', left.splice(i, 1)[0])
+            else rest.push(m)
+          }
           left.sort(byClock)
-          right.sort(byClock)
-          right.forEach((m, i) => (left[i] ? push(on, m, 'changed', dayLine(left[i])) : push(on, m, 'new', null)))
-          for (const o of left.slice(right.length)) push(on, o, 'gone', dayLine(o), 'Taken off')
+          rest.sort(byClock)
+          rest.forEach((m, i) => (left[i] ? push(on, m, 'changed', left[i]) : push(on, m, 'new')))
+          for (const o of left.slice(rest.length)) push(on, o, 'gone')
         }
       }
       if (own?.minyanim.length && rows.every((r) => r.status === 'same')) return []
       rows.sort((a, b) => a.on.localeCompare(b.on) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || a.at - b.at)
-      return [{ ...base, had: own ? own.minyanim.reduce((n, m) => n + m.on.length, 0) : null, same, rows: rows.map(({ what, day, when, status, was }) => ({ what, day, when, status, was })) }]
+      return [{ ...base, had: own ? own.minyanim.reduce((n, m) => n + m.on.length, 0) : null, same, rows: rows.map((r): WeekChangeRow => ({ what: r.what, day: r.day, when: r.when, note: r.note, status: r.status, was: r.was, says: r.says, struck: r.struck })) }]
     })
   const kept = new Set(proposed.map((s) => s.id))
   return { weeks, gone: current.filter((s) => !kept.has(s.id) && !mine.has(s.id)).map((s) => s.name) }

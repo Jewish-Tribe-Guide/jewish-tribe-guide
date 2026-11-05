@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { swallowClickAfterPress } from '@/lib/swallowClick'
 
 // The console's one look for boxes, rows and empty screens (the admin
 // redesign's step 1): white boxes with a quiet border, one row style with a
@@ -316,19 +317,11 @@ export function AdminMenu<V extends string>({
     if (!open) return
     // A press outside only closes the menu. It used to go on to whatever was
     // under it too, so tapping away from an open Sort opened a row (the
-    // user, Nov 4). The click that follows that press is swallowed; a press
-    // that turns into a scroll has no click, so the swallow ends with it.
+    // user, Nov 4). The click that follows that press is swallowed.
     const onDown = (e: PointerEvent) => {
       if (box.current?.contains(e.target as Node)) return
       setOpen(false)
-      const swallow = (c: MouseEvent) => {
-        c.preventDefault()
-        c.stopPropagation()
-      }
-      document.addEventListener('click', swallow, { capture: true, once: true })
-      const end = () => setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 0)
-      document.addEventListener('pointerup', end, { capture: true, once: true })
-      document.addEventListener('pointercancel', end, { capture: true, once: true })
+      swallowClickAfterPress()
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)

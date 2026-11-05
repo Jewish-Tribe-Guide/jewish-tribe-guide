@@ -366,6 +366,17 @@ describe('submissionStore (integration)', () => {
     const { data: after } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
     expect(after!.phone).toBe('(215) 555-0123')
     expect(after!.details).toMatchObject({ kept: 'changed since' })
+    // No source named, no box dated by one.
+    expect(after!.details.sectionFrom?.contact).toBeUndefined()
+
+    // Named, as the website reader files it (the user, Nov 5): the Contact
+    // box is dated by it, past the approval's item dates.
+    const named = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), phone: '(215) 555-0145', details: listed, source: { readBy: 'ai', from: 'its website', named: name, section: { section: 'contact', keys: ['phone'] } } } as ResourceSubmission, null, null)
+    pendingSubmissionIds.push(named.id)
+    await approveSubmission(named.id)
+    const { data: dated } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(dated!.details.sectionFrom?.contact).toEqual({ from: name, at: dated!.details.sectionConfirmed?.contact })
+    expect(dated!.details.sectionConfirmed?.contact).toBe(dated!.details.confirmedAt)
 
     // Edit: the admin's number, not the page's.
     const edited = await contact('(215) 555-0199')
@@ -373,6 +384,14 @@ describe('submissionStore (integration)', () => {
     const { data: last } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
     expect(last!.phone).toBe('(215) 555-0177')
     expect(last!.details).toMatchObject({ kept: 'changed since' })
+
+    // Named but fixed by the admin first: the number is theirs, so the box
+    // keeps the date the website gave it before.
+    const fixedRead = await submitListingUpdate('philly', created!.id, { ...listingPayload(category.id, name), phone: '(215) 555-0188', details: listed, source: { readBy: 'ai', from: 'its website', named: name, section: { section: 'contact', keys: ['phone'] } } } as ResourceSubmission, null, null)
+    pendingSubmissionIds.push(fixedRead.id)
+    await approveSubmission(fixedRead.id, undefined, 'admin@example.org', { phone: '(215) 555-0166', details: {} })
+    const { data: fixed } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(fixed!.details.sectionConfirmed?.contact).toBe(dated!.details.sectionConfirmed?.contact)
   })
 
   it('a pending suggestion is said again better in place; one decided meanwhile is left as decided', async () => {

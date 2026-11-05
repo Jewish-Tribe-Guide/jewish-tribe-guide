@@ -29,13 +29,15 @@ export function joinPageHash(page: string | null, menu: string | null): string {
 /** The watch's outcome is its page's: a menu that couldn't be read on a
  *  page that loaded isn't a website that failed. Its fingerprint stays,
  *  so it's read again the next night. A read that saved no fingerprint
- *  (it read nothing) keeps its old one. */
+ *  (it read nothing) keeps its old one. The check is the page's alone:
+ *  the page reader goes by its last one (its Contact line, what it last
+ *  compared), and the menu's read is kept on the listing (menuWatchRun). */
 export function mergeSharedPage(old: PageHashes, page: WatchOutcome, menu: WatchOutcome): WatchOutcome {
   const pageHash = page.ok ? page.pageHash : undefined
   const menuHash = menu.ok ? menu.pageHash : undefined
   const hash = pageHash === undefined && menuHash === undefined ? {} : { pageHash: joinPageHash(pageHash ?? old.page, menuHash ?? old.menu) }
   if (!page.ok) return page
-  const check = page.check ?? menu.check
+  const check = page.check
   return {
     ok: true,
     filed: page.filed + (menu.ok ? menu.filed : 0),

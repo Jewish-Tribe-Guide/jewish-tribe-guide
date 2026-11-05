@@ -90,3 +90,21 @@ export function confirmedAnywhere(item: DirectoryResource): boolean {
 /** Whether anything on the place carries a date: anything confirmed, or
  *  Google's. */
 export const hasAnyDate = (item: DirectoryResource): boolean => confirmedAnywhere(item) || !!item.googleSyncedAt
+
+/** An approved change an outside source filed dates the box it changed,
+ *  by that source (the user, Nov 5): approving the Kosher Grill's phone
+ *  off its website dated only the whole listing, and a date a source gave
+ *  the whole listing is no box's (personConfirmedAt), so its Contact box
+ *  still said "Not confirmed yet". A mikvah's section or the contact box
+ *  (`section`), a shul's part of its times (`part`). */
+export function withSourceBoxDated(
+  details: Record<string, unknown>,
+  source: { named?: string; part?: { part: string }; section?: { section: string } },
+  now: string,
+): Record<string, unknown> {
+  const key = source.section?.section ?? source.part?.part
+  if (!source.named || !key) return details
+  const dates = (details.sectionConfirmed as Record<string, string> | undefined) ?? {}
+  const from = (details.sectionFrom as Record<string, ConfirmedFrom> | undefined) ?? {}
+  return { ...details, sectionConfirmed: { ...dates, [key]: now }, sectionFrom: { ...from, [key]: { from: source.named, at: now } } }
+}

@@ -153,9 +153,11 @@ describe('AdminFrame', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('offers Communities under Settings to the site owner only', () => {
+  // The user, Nov 5: a lone Team tab is a row of one, so it goes.
+  it('offers Communities under Settings to the site owner only, and no lone Team tab', () => {
     show('/philly/admin/team')
-    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Team'])
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Settings')
+    expect(screen.queryByRole('navigation', { name: 'Settings' })).toBeNull()
     cleanup()
     show('/philly/admin/team', true)
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual([

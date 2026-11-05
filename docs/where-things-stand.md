@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Nov 4, 2026.
+Last updated: Nov 5, 2026.
 
 ## The branch
 
@@ -318,6 +318,14 @@ for that exact change, in the same conversation. Show the dry run first.
      and Keystone-K page).
    A daily Mekor watch, shaped like Keystone-K's, is proposed as its own
    piece of work; its first run would file the above in the queue.
+
+## Up next: Site → Category pages, organised and cleaned up
+
+The user, Nov 4, after Home page became one screen: Category pages is next,
+"organized better and just cleaned up in general". Not started. Start by
+looking at the screen as it stands (and what Home page settled: one screen,
+Computer / Phone, boxes in the order the page reads, the preview beside),
+then draw it before building.
 
 ## Small open decisions
 
@@ -2294,6 +2302,61 @@ simpler ("it really shouldn't be that complicated").
 **Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
 are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
 Oct 30" runs to Oct 31 and ends on its own.
+
+## Done Nov 5 (on `redesign/oct18-fixes`)
+
+- **Contact box** is dated by the website that checked the phone (5e2fbe3d).
+- **A shul's week keeps its own notes.** A dated time never takes the note
+  of the usual time it lines up with (Kol Tzedek's online-only Nov 13 came
+  out "hybrid, tea and cookies"). A change to a note alone is one line:
+  "Note added", "Note changed", "Note taken off".
+- **The reader takes a minyan's links from the page.** It now sees the
+  address behind a WhatsApp, GroupMe, sign-up form or Zoom button, on a
+  shul's page and in a newsletter, and keeps one only if it's written there.
+  Pages with such a button change fingerprint, so they're read again once.
+- **No borrowing (the user, Nov 5).** A week's minyan never takes the usual
+  minyan's sign-up group or join link: not in the reader, not in To do, not
+  on the public site. A week without its own link shows none. A sign-up
+  minyan with no group of its own is still marked sign-up, for an admin to
+  give the group.
+  - Why the links weren't found (checked on live, Nov 5): they are on the
+    shul's site, just not on the page the week comes from. Mikveh Israel's
+    two WhatsApp groups are on its home page, and its week is from its
+    calendar. Mekor's group is on its davening page (the usual times).
+    Rodeph Shalom's Zoom is on its calendar and was already read. BZBI's
+    week's Zoom isn't on its worship page.
+  - Weeks already posted on the live site may still carry a copied group or
+    link. Cleaning them is a live write: needs the user's yes.
+- **The reader keeps "Online only" and "Hybrid".** When a dated service's
+  own line says so ("Online-Only Friday Night Kabbalat Shabbat Services"),
+  its note does too. Kol Tzedek's Nov 13 and 14 had lost both.
+- **Five live shul suggestions to file again** once this is live (Leyv
+  Ha-Ir, South Philadelphia Shtiebel, BZBI, Kol Tzedek, Rodeph Shalom). Re-run the dry run first; writing needs the user's yes.
+- **Admin Home on an iPhone jumped back to the top** while scrolling fast,
+  with Phone picked (the user, Nov 5, live and preview). Not reproduced:
+  Chrome at phone size scrolls to the bottom and stays. Fixed the likeliest
+  cause: the preview beside the settings, hidden on a phone, still loaded the
+  whole home page and loaded it again after each edit. It now loads only on a
+  screen wide enough to show it. Try it on the commit's preview on the iPhone.
+- **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
+  only closes it. The click is swallowed until it comes, up to 0.6s after
+  the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the
+  next tick, when the old swallow had already ended. That's a guess jsdom
+  can't check: try it on the commit's preview. The home search's results
+  (`HeroHeading.tsx`) still do it the old way.
+- **Settings has no lone Team tab.** An area's tab row shows only with two
+  tabs or more; the site owner still gets Team and Communities.
+- **Citizens Bank Park's page check lost its Contact line.** The page is its
+  website and its menu, read on one watch. On a night the page hadn't
+  changed, the menu's check was saved as the watch's, so the page's own
+  (its Contact line, what it last compared) was gone. The watch now keeps
+  the page's check only (`sharedPageWatch.ts`); the menu's read is kept on
+  the listing. The live watch holds the menu's check today, so the first
+  nightly run after this deploys reads the page once with the AI and the
+  Contact line comes back. Nothing to write on live.
+- **Waiting for a yes:** the five shul suggestions waiting on live were
+  filed before the note fix and carry usual-time notes. Refiling them is a
+  live write.
 
 ## Done Nov 4, later: Site's Home page is one screen (on `redesign/oct18-fixes`)
 

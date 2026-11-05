@@ -21,6 +21,7 @@
 // it). newsletterRun.ts files them.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { isMinyanLink } from './minyanLinks'
 import type { TimesUpdate } from './scheduleUpdate'
 import type { Watch } from './watches'
 
@@ -87,11 +88,14 @@ export function isIgnoredSender(w: Pick<Watch, 'createdBy' | 'url'>): boolean {
  * the window.
  */
 export function newsletterText(text: string): string {
+  // A WhatsApp group's or a Zoom's stays, its address bare: the reader
+  // gives a minyan its own (minyanLinks.ts).
+  const keep = (whole: string, link: string) => (isMinyanLink(link) ? ` ${link} ` : '')
   return text
-    .replace(/\(\s*https?:\/\/[^)\s]*\s*\)/gi, '')
-    .replace(/<https?:\/\/[^>\s]*>/gi, '')
-    .replace(/\[https?:\/\/[^\]\s]*\]/gi, '')
-    .replace(/https?:\/\/\S{60,}/gi, '')
+    .replace(/\(\s*(https?:\/\/[^)\s]*)\s*\)/gi, keep)
+    .replace(/<(https?:\/\/[^>\s]*)>/gi, keep)
+    .replace(/\[(https?:\/\/[^\]\s]*)\]/gi, keep)
+    .replace(/https?:\/\/\S{60,}/gi, (link) => (isMinyanLink(link) ? link : ''))
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

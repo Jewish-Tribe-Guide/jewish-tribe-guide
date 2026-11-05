@@ -85,7 +85,8 @@ export default function AdminFrame({
   const main = areas.filter((a) => a.area !== 'settings')
   const settings = areas.find((a) => a.area === 'settings')!
   const siteHref = `/${community}`
-  const showTabs = open && open.area !== 'todo' && open.area !== 'places' && (open.tabs.length > 1 || open.tabs[0].label !== open.label)
+  // A row of one tab is no choice (Settings' lone Team, the user, Nov 5).
+  const showTabs = open && open.area !== 'todo' && open.area !== 'places' && open.tabs.length > 1
   // One of To do's other pages: headed by its own name, with the way back.
   const todoPage = open?.area === 'todo' && position?.tab !== 'queue' ? open.tabs.find((t) => t.tab === position?.tab) : undefined
   const count = useTodoCount(token, community)

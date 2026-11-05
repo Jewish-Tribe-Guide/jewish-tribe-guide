@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { applyUpdate, changesAnything, cleanUpdate, compareTimes, datesHeldOverWebsite, mergeSchedule, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
+import { applyUpdate, changesAnything, cleanUpdate, compareTimes, datesHeldOverWebsite, mergeSchedule, readWeekLines, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
 
 // Mekor Habracha's times as the guide has them (test copy, Oct 1): the
 // seasons are in the notes, not the season field.
@@ -538,15 +538,16 @@ describe('a minyan that only runs when enough sign up', () => {
     }
     const u = compareTimes(shul, week, { season: null, newId })
 
-    it('this week’s minyan gets sign-up, with the group their usual Maariv has', () => {
+    // The user, Nov 5: "no borrowing". A week's minyan the message says is
+    // sign-up is sign-up, and its group is the one the message gives.
+    it('this week’s minyan gets sign-up, with no group the message doesn’t give', () => {
       expect(u.rows.filter((r) => r.signUp).map((r) => `${r.day} ${r.tefillah}`)).toEqual(['2026-10-12 shacharis', '2026-10-12 mincha_maariv'])
       const { schedules, changes } = applyUpdate(shul, [], u, { newId })
       const got = schedules[0].minyanim.map((m) => [m.on[0], m.tefillah, m.signUp])
       expect(got).toEqual(
         expect.arrayContaining([
-          // Mincha & Maariv: the same crowd as the usual Maariv.
-          ['2026-10-12', 'mincha_maariv', signUp],
-          // No usual Shacharis group that day: sign-up with no group yet.
+          // Not the usual Maariv's group: sign-up, for an admin to give it.
+          ['2026-10-12', 'mincha_maariv', {}],
           ['2026-10-12', 'shacharis', {}],
           ['2026-10-13', 'mincha', undefined],
         ]),
@@ -554,31 +555,72 @@ describe('a minyan that only runs when enough sign up', () => {
       expect(changes.join('\n')).toContain('5:45pm · only if enough sign up')
     })
 
-    // Mikveh Israel, Oct 27: its week read off the calendar, each of its
-    // usual sign-up minyanim in it, and none with its WhatsApp group.
-    it('this week’s minyan is sign-up, or online, as the usual one it is', () => {
+    // Mikveh Israel, Oct 27, then the user, Nov 5: "no borrowing". A week's
+    // minyan that is a usual sign-up or online one takes neither its group
+    // nor its Zoom: only what the week's own page gives.
+    it('this week’s minyan has only the page’s own group and link, never the usual one’s', () => {
       const join = 'https://zoom.us/j/1'
       const usual: Minyan[] = [
-        { id: 'sh', tefillah: 'shacharis', days: ['mon', 'thu'], time: '7:15am', signUp },
+        { id: 'sh', tefillah: 'shacharis', days: ['mon', 'tue'], time: '7:15am', signUp },
         { id: 'mi', tefillah: 'mincha', days: ['mon', 'tue'], time: '2:00pm', joinLink: join },
       ]
+      const own = 'https://chat.whatsapp.com/ThisWeek12345'
       const read: RegularReading = {
         ...week,
         from: '2026-10-26',
         to: '2026-10-27',
-        times: [t({ tefillah: 'shacharis', date: '2026-10-26', time: '7:15am' }), t({ tefillah: 'mincha', date: '2026-10-26', time: '2:00pm' }), t({ tefillah: 'mincha', date: '2026-10-27', time: '2:30pm' }), t({ tefillah: 'shacharis', date: '2026-10-27', time: '7:15am' })],
+        times: [
+          t({ tefillah: 'shacharis', date: '2026-10-26', time: '7:15am', signUp: true, signUpLink: own }),
+          t({ tefillah: 'mincha', date: '2026-10-26', time: '2:00pm', joinLink: 'https://zoom.us/j/2' }),
+          t({ tefillah: 'shacharis', date: '2026-10-27', time: '7:15am' }),
+          t({ tefillah: 'mincha', date: '2026-10-27', time: '2:00pm' }),
+        ],
       }
-      const { schedules } = applyUpdate(usual, [], compareTimes(usual, read, { season: null, newId }), { newId, evenIfSame: true })
+      const u = compareTimes(usual, read, { season: null, newId })
+      const { schedules } = applyUpdate(usual, [], u, { newId, evenIfSame: true })
       expect(schedules[0].minyanim.map((m) => [m.on[0], m.tefillah, m.signUp ?? null, m.joinLink ?? null])).toEqual(
         expect.arrayContaining([
-          ['2026-10-26', 'shacharis', signUp, null],
-          ['2026-10-26', 'mincha', null, join],
-          // A new time for the usual Mincha: still online.
-          ['2026-10-27', 'mincha', null, join],
-          // Not a day the usual Shacharis is.
+          ['2026-10-26', 'shacharis', { link: own }, null],
+          ['2026-10-26', 'mincha', null, 'https://zoom.us/j/2'],
           ['2026-10-27', 'shacharis', null, null],
+          ['2026-10-27', 'mincha', null, null],
         ]),
       )
+      // The admin's copy comes back with its links.
+      const back = cleanUpdate(JSON.parse(JSON.stringify(u)), Date.parse('2026-10-25T12:00:00Z'))
+      expect(back?.rows.filter((r) => r.signUpLink || r.joinLink).map((r) => r.signUpLink ?? r.joinLink)).toEqual([own, 'https://zoom.us/j/2'])
+    })
+
+    // Kol Tzedek, Nov 5: its calendar's Fri Nov 13 Kabbalat Shabbat is
+    // online only; the usual Friday's is "hybrid, tea and cookies".
+    it('a dated time’s note is its own, never the usual minyan’s it matches', () => {
+      const usual: Minyan[] = [
+        { id: 'ks', tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm', notes: 'Hybrid, tea and cookies after' },
+        { id: 'sh', tefillah: 'shacharis', days: ['sat'], time: '10:00am', notes: 'In the sanctuary' },
+      ]
+      const read: RegularReading = {
+        ...week,
+        from: '2026-11-13',
+        to: '2026-11-14',
+        times: [
+          t({ tefillah: 'kabbalas_shabbos', date: '2026-11-13', time: '6:00pm', notes: 'Online only, on Zoom' }),
+          // A different time, nothing said about it: no note.
+          t({ tefillah: 'shacharis', date: '2026-11-14', time: '10:30am' }),
+        ],
+      }
+      const u = compareTimes(usual, read, { season: null, newId })
+      expect(u.rows.filter((r) => r.status !== 'kept').map((r) => [r.day, r.tefillah, r.notes ?? null])).toEqual([
+        ['2026-11-13', 'kabbalas_shabbos', 'Online only, on Zoom'],
+        ['2026-11-14', 'shacharis', null],
+      ])
+      const { schedules } = applyUpdate(usual, [], u, { newId, evenIfSame: true })
+      expect(schedules[0].minyanim.map((m) => [m.on[0], m.tefillah, m.notes ?? null])).toEqual([
+        ['2026-11-13', 'kabbalas_shabbos', 'Online only, on Zoom'],
+        ['2026-11-14', 'shacharis', null],
+      ])
+      // The same time with nothing said: nothing, not the usual note.
+      const bare = compareTimes(usual, { ...read, times: [t({ tefillah: 'kabbalas_shabbos', date: '2026-11-13', time: '6:00pm' })] }, { season: null, newId })
+      expect(applyUpdate(usual, [], bare, { newId, evenIfSame: true }).schedules[0].minyanim[0].notes).toBeUndefined()
     })
 
     it('is kept when the admin’s copy comes back to be applied', () => {
@@ -593,5 +635,20 @@ describe('a minyan that only runs when enough sign up', () => {
       const { minyanim } = applyUpdate(shul, [], v, { newId })
       expect(minyanim.find((m) => m.time === '6:00pm')).toMatchObject({ tefillah: 'mincha_maariv', days: ['tue'], signUp })
     })
+  })
+})
+
+// The user, Nov 5, of a week whose note alone changed: "clear that it's
+// the note that's changing", never "was" the same time.
+describe('the change lines for a week read again', () => {
+  const wk = (minyanim: SpecialSchedule['minyanim']): SpecialSchedule => ({ id: 'w', name: 'Times for Nov 8 – Nov 14', from: '2026-11-13', to: '2026-11-13', mode: 'replace', kind: 'week', minyanim })
+  const ks = (notes?: string, time = '6:00pm') => ({ id: 'k', tefillah: 'kabbalas_shabbos' as const, on: ['2026-11-13'], time, ...(notes ? { notes } : {}) })
+  it('says what the note does when only the note changes', () => {
+    expect(readWeekLines(wk([ks()]), wk([ks('Online only')]))).toEqual(['Times for Nov 8 – Nov 14: kabbalas shabbos · Fri Nov 13 · 6:00pm, note added: “Online only”'])
+    expect(readWeekLines(wk([ks('Hybrid')]), wk([ks('Online only')]))).toEqual(['Times for Nov 8 – Nov 14: kabbalas shabbos · Fri Nov 13 · 6:00pm, note now “Online only”, was “Hybrid”'])
+    expect(readWeekLines(wk([ks('Hybrid')]), wk([ks()]))).toEqual(['Times for Nov 8 – Nov 14: kabbalas shabbos · Fri Nov 13 · 6:00pm, note taken off: “Hybrid”'])
+  })
+  it('a new time still says what it was', () => {
+    expect(readWeekLines(wk([ks()]), wk([ks(undefined, '6:15pm')]))).toEqual(['Times for Nov 8 – Nov 14: kabbalas shabbos · Fri Nov 13 · 6:15pm, was 6:00pm'])
   })
 })

@@ -14,6 +14,7 @@ import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
 import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
 import { isCommunityEdit, statedSource, submissionSource } from './submissionSource'
+import { withSourceBoxDated } from './boxDates'
 import { rebasePart } from './timesParts'
 import { rebaseSection } from './hoursSections'
 import { schedulesKey } from './schedules'
@@ -1122,7 +1123,11 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
       now,
       menuOf(submission.payload),
     )
-    payload.details = dated.details
+    // After the item dates, which keep the listing's box dates as they were.
+    // Not when the admin fixed it first: what goes on is theirs, not the
+    // source's.
+    const fixed = !!(payload as { reviewEdit?: { fields?: string[] } }).reviewEdit?.fields?.length
+    payload.details = fixed ? dated.details : withSourceBoxDated(dated.details, submissionSource(submission), now)
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })

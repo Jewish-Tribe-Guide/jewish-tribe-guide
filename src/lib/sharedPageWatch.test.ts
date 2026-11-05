@@ -36,7 +36,12 @@ describe('mergeSharedPage', () => {
     expect(out).toEqual({ ok: true, filed: 0, pageHash: joinPageHash(A, B), check: { what: 'hours' } })
   })
 
-  it('keeps the page’s skip, and the menu’s check when the page has none', () => {
-    expect(mergeSharedPage({ page: A, menu: B }, { ok: true, filed: 0, skipped: true }, { ok: true, filed: 0, check: { what: 'dishes' } as never })).toEqual({ ok: true, filed: 0, skipped: true, check: { what: 'dishes' } })
+  // Citizens Bank Park's Kosher Grill, Nov 5: a night its page hadn't
+  // changed saved the menu's check as the watch's, so the page's own (its
+  // Contact line, what it last compared) was gone, and the page reader
+  // took the menu's dishes for what the page had said.
+  it('keeps the page’s skip, and never the menu’s check in the page’s place', () => {
+    expect(mergeSharedPage({ page: A, menu: B }, { ok: true, filed: 0, skipped: true }, { ok: true, filed: 0, check: { what: 'dishes' } as never })).toEqual({ ok: true, filed: 0, skipped: true })
+    expect(mergeSharedPage({ page: A, menu: B }, { ok: true, filed: 0, pageHash: A }, { ok: true, filed: 1, pageHash: B, check: { what: 'dishes' } as never })).toEqual({ ok: true, filed: 1, pageHash: joinPageHash(A, B) })
   })
 })
