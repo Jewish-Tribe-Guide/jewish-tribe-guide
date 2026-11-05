@@ -324,8 +324,8 @@ for that exact change, in the same conversation. Show the dry run first.
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 1b, 1d, 1f, 2d, 3d, 4b, 5i, 5j, 5k, 5h, 6e, 7 are current; 1c, 1e,
-2c, 3c, 5e, 5f, 5g, 6d kept to compare). The user's rule, Nov 5: admins
+boards 1b, 1d, 1f, 2d, 3d, 4b, 5l, 5m, 5j, 5k, 5n, 5h, 6e, 7 are
+current; 1c, 1e, 2c, 3c, 5e, 5f, 5g, 5i, 6d kept to compare). The user's rule, Nov 5: admins
 shouldn't reinvent the wheel, and visitors shouldn't see different things
 between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
@@ -364,15 +364,17 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   Today only Address and Phone are switches (`has_address`,
   `has_phone`); Hours, Website and Photo are ordinary fields (live: no
   Hours on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
-- "+ Add a field" is the same shape: a search box ("Search fields or
-  pages", so typing "Food" finds Food's fields; no separate filter), one
-  scrolling list of every field live on any page, once each, alphabetical,
-  each with the pages it's on and its choices or kind, and "+ Add" (one
-  tap; Kosher Certification brings "Everything here is kosher" with it).
-  "+ Make your own field" sits under the list, then "What kind of field?"
-  (Choices, Yes or no, A list of items, Text, Link), then the field's
-  screen. When nothing matches, the list says so and offers "Make your
-  own: <what was typed>".
+- "+ Add a field" is the same shape: a search box plus one page menu
+  ("All pages", or one page: Hospitals shows only the fields Hospitals
+  has), then one scrolling list of every field live on any page, once
+  each, alphabetical, each with the pages it's on and its choices or
+  kind. Each row opens the field first (board 5n): the pages it's on, and
+  how it looks in the list, in the filter and on Add a place, then one
+  button, "Add to <page>". No "+ Add" on the rows. Kosher Certification
+  brings "Everything here is kosher" with it. "+ Make your own field"
+  sits under the list, then "What kind of field?" (Choices, Yes or no, A
+  list of items, Text, Link), then the field's screen. When nothing
+  matches, the list says so and offers "Make your own: <what was typed>".
 - Not decided: some ready-made choices are Philly's own (Hospitals' Eruv
   list, Kosher Certification's IKC and Keystone-K). For pages to look the
   same everywhere, a ready-made field would be one shared definition, and
