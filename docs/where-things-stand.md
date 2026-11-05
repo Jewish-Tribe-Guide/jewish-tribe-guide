@@ -2332,6 +2332,9 @@ Oct 30" runs to Oct 31 and ends on its own.
   its note does too. Kol Tzedek's Nov 13 and 14 had lost both.
 - **Five live shul suggestions to file again** once this is live (Leyv
   Ha-Ir, South Philadelphia Shtiebel, BZBI, Kol Tzedek, Rodeph Shalom). Re-run the dry run first; writing needs the user's yes.
+- **Open: admin Home on a phone, with Phone picked, scrolls back to the
+  top** while you scroll down (the user, Nov 5). Not found yet: nothing in
+  the Home editor scrolls the page; reproducing it needs a signed-in admin.
 - **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
   only closes it. The click is swallowed until it comes, up to 0.6s after
   the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the
