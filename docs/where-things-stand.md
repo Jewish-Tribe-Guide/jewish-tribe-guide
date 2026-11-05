@@ -324,7 +324,7 @@ for that exact change, in the same conversation. Show the dry run first.
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Fourth draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM:
-boards 2d, 3d, 5d, 6e plus 1b and 4b are current; 2c, 3c, 6d kept to
+boards 2d, 3d, 5e, 6e, 7 plus 1b and 4b are current; 2c, 3c, 6d kept to
 compare). The user: design it as it should be, not as the settings are
 today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
 all 16 pages; Map is off only on the three with no address (WhatsApp,
@@ -346,13 +346,17 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   on the map when its places have an address), Groups, web address (set
   from the name when the page is made), link-preview words.
 - Each place: Address (puts the page on the map), Phone, Hours, Website,
-  Photo first, as plain rows you open and remove (no switches, the user
-  Nov 5); a removed one comes back through "+ Add a field". Then the
-  page's own fields, each saying where it shows: "Filter · in the list",
-  "In the list", "When a place is opened". Today only Address and Phone
-  are switches (`has_address`, `has_phone`); Hours, Website and Photo are
-  ordinary fields (live: no Hours on Synagogues, Hotels, Cemetery; no
-  Website on WhatsApp).
+  Photo first, each with an × to remove it, nothing to set (the user,
+  Nov 5). Then the page's own fields, each saying where it shows:
+  "Filter · in the list", "In the list", "When a place is opened".
+  Today only Address and Phone are switches (`has_address`,
+  `has_phone`); Hours, Website and Photo are ordinary fields (live: no
+  Hours on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
+- "+ Add a field" opens with **Ready to add**: whichever of those five
+  the page lacks, each "+ Add", one tap, nothing to fill in. Below it,
+  **Make your own**: Choices, Yes or no, A list of items, Text, Link.
+  The ready ones ask nothing, so "required" goes for them: live,
+  Networking's Website and Cemetery's Description are required.
 - Board 7 maps each kind to the questions it asks: required (not Yes or
   no, not Photo), part of the filter (Choices, Yes or no, Hours as "Open
   now"), show before opened (Choices, Yes or no, a list's count, Text's
@@ -377,9 +381,11 @@ Networking, Cemetery); no page sets Groups. On the drawing:
 - Not a field question any more: "a place can note exceptions". Used
   once, on Food's kosher certificate ("Everything here is kosher" plus
   "What isn't kosher?", the chip turns amber); it's set by the Food kind.
-- Add a field kinds: Choices, Yes or no, A list of items, Text, Link,
-  Phone, Hours. Short and long text are one; Number (unused) is gone;
-  Davening times and Contacts come with the Shuls and Hospitals kinds.
+- Make your own kinds: Choices, Yes or no, A list of items, Text, Link.
+  Short and long text are one; Number (unused) is gone; Phone and Hours
+  are ready-made (a second set, like the Mikvah's Women's Hours, comes
+  with the kind); Davening times and Contacts come with the Shuls and
+  Hospitals kinds.
 - No Map switch for the site either: the Map is on when the header or a
   tab links to it. Code change only.
 - The question card is chosen by the site; the four listing options are
