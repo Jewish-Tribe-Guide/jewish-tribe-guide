@@ -7,7 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { fetchJson } from '@/lib/fetchJson'
-import type { CategoryConfig } from '@/lib/categories'
+import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig } from '@/lib/categories'
 
 // This component is ~1000 lines doing template application, field-schema
 // editing, and two separate destructive-change confirmation workflows
@@ -50,9 +50,12 @@ beforeEach(() => {
 })
 
 /** Saves through the Save bar, which shows once something changed: when
- *  nothing has, a word added to the link-preview line is the change. */
+ *  nothing has, flipping the upvotes question is the change. */
 async function saveNow(user: ReturnType<typeof userEvent.setup>) {
-  if (!screen.queryByRole('button', { name: 'Save' })) await user.type(screen.getByLabelText('In link previews'), ' x')
+  if (!screen.queryByRole('button', { name: 'Save' })) {
+    const upvotes = screen.getByRole('radiogroup', { name: 'Can visitors upvote places?' })
+    await user.click(within(upvotes).getAllByRole('radio').find((r) => r.getAttribute('aria-checked') === 'false')!)
+  }
   await user.click(screen.getByRole('button', { name: 'Save' }))
 }
 
@@ -63,9 +66,9 @@ afterEach(() => {
 
 describe('CategoryEditor — new category', () => {
   it('shows "New category" and asks what kind of places it holds', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByRole('heading', { name: 'New category' })).toBeInTheDocument()
-    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual([
+    expect(within(screen.getByRole('region', { name: 'What kind of places?' })).getAllByRole('radio').map((r) => r.textContent)).toEqual([
       'ShulsDavening times, every weekday and Shabbos',
       'FoodMenus, kosher lists and main dishes',
       'GroceriesKosher items and hours',
@@ -78,7 +81,7 @@ describe('CategoryEditor — new category', () => {
 
   it('won’t create one until a kind is picked', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     await user.type(screen.getByLabelText('Name'), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
     expect(screen.getByText('Pick what kind of places it holds.')).toBeInTheDocument()
@@ -87,7 +90,7 @@ describe('CategoryEditor — new category', () => {
 
   it('blocks save without a name', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
@@ -98,7 +101,7 @@ describe('CategoryEditor — new category', () => {
   it('creates the category via POST once a name is given', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="tok" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="tok" initial={null} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('radio', { name: /^Plain/ }))
     await user.type(screen.getByLabelText('Name'), 'Pharmacies')
@@ -120,13 +123,12 @@ describe('CategoryEditor — new category', () => {
   it('brings a kind’s fields and name, and Plain puts them back', async () => {
     const user = userEvent.setup()
     const shul = CATEGORY_TEMPLATES.find((t) => t.id === 'synagogue')!
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('radio', { name: /^Shuls/ }))
 
     expect(screen.getByRole('radio', { name: /^Shuls/ })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByLabelText('Name')).toHaveValue(shul.pluralLabel)
-    expect(screen.getByLabelText('Web address')).toHaveValue(shul.pluralLabel.toLowerCase())
     expect(screen.getByRole('button', { name: /^Davening Times/ })).toBeInTheDocument()
 
     await user.click(screen.getByRole('radio', { name: /^Plain/ }))
@@ -136,7 +138,7 @@ describe('CategoryEditor — new category', () => {
 
   it('sends a kind its web address doesn’t already give', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     await user.click(screen.getByRole('radio', { name: /^Food/ }))
     await user.clear(screen.getByLabelText('Name'))
     await user.type(screen.getByLabelText('Name'), 'Eat')
@@ -149,7 +151,7 @@ describe('CategoryEditor — new category', () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('Name already in use.'))
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('radio', { name: /^Plain/ }))
     await user.type(screen.getByLabelText('Name'), 'Pharmacies')
@@ -163,7 +165,7 @@ describe('CategoryEditor — new category', () => {
 describe('CategoryEditor — the "every listing also has" checkboxes', () => {
   it('Hours/Website/Photo toggles add and remove a managed field', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     const hours = screen.getByLabelText('Hours')
     expect(hours).not.toBeChecked()
@@ -181,19 +183,16 @@ describe('CategoryEditor — editing an existing category', () => {
         token="t"
         initial={baseCategory()}
         siblings={null}
-        hasMapCategory={false}
         onSaved={vi.fn()}
         onCancel={vi.fn()}
       />,
     )
     expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
-    // Its kind, from its web address.
-    expect(within(screen.getByRole('region', { name: 'Kind' })).getByText('Groceries')).toBeInTheDocument()
   })
 
   it('has nothing to save until something changes, then counts it, and Undo puts it back', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Name'), ' and more')
     await user.click(screen.getByLabelText('An address'))
@@ -206,7 +205,7 @@ describe('CategoryEditor — editing an existing category', () => {
   it('takes it off the site with the switch', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
     const onSite = screen.getByRole('switch', { name: 'On the site' })
     expect(onSite).toHaveAttribute('aria-checked', 'true')
     await user.click(onSite)
@@ -222,7 +221,6 @@ describe('CategoryEditor — editing an existing category', () => {
         token="t"
         initial={baseCategory({ detailFields: [{ key: 'kosher', label: 'Kosher certification', type: 'select', renderAs: 'badge', options: [{ value: 'OU', label: 'OU' }] }] })}
         siblings={null}
-        hasMapCategory={false}
         onSaved={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -232,14 +230,14 @@ describe('CategoryEditor — editing an existing category', () => {
     await user.click(row)
     expect(screen.getByRole('heading', { name: 'Kosher certification' })).toBeInTheDocument()
     expect(screen.getByText('A field on Groceries')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Name and look' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Basics' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '‹ Groceries' }))
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Name and look' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Basics' })).toBeInTheDocument())
   })
 
   it('shows the page beside the settings, as they are being typed', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     const preview = screen.getByRole('complementary', { name: 'Preview' })
     expect(within(preview).getByRole('button', { name: 'Computer' })).toHaveAttribute('aria-pressed', 'true')
     await user.type(screen.getByLabelText('Name'), ' and more')
@@ -258,7 +256,7 @@ describe('CategoryEditor — editing an existing category', () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     renderWithProviders(
-      <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+      <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
     await saveNow(user)
@@ -271,6 +269,67 @@ describe('CategoryEditor — editing an existing category', () => {
     )
   })
 
+  // Board 4's Questions: each a No/Yes, not a switch.
+  it('asks about upvotes and the not-listed link with No and Yes, and sends the answers', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    const upvotes = screen.getByRole('radiogroup', { name: 'Can visitors upvote places?' })
+    expect(within(upvotes).getByRole('radio', { name: 'No' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(within(upvotes).getByRole('radio', { name: 'Yes' }))
+    const link = screen.getByRole('radiogroup', { name: 'A link for places not listed here?' })
+    expect(screen.queryByLabelText('Words')).not.toBeInTheDocument()
+    await user.click(within(link).getByRole('radio', { name: 'Yes' }))
+    await user.type(screen.getByLabelText('Words'), 'Find more')
+    await user.type(screen.getByLabelText('Link'), 'https://example.org')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.upvotesEnabled).toBe(true)
+    expect(body.externalLink).toEqual({ label: 'Find more', url: 'https://example.org' })
+  })
+
+  it('takes the not-listed link off with No, keeping what was typed', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <CategoryEditor token="t" initial={baseCategory({ externalLink: { label: 'Find more', url: 'https://example.org' } })} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
+    )
+    const link = screen.getByRole('radiogroup', { name: 'A link for places not listed here?' })
+    expect(screen.getByLabelText('Words')).toHaveValue('Find more')
+    await user.click(within(link).getByRole('radio', { name: 'No' }))
+    expect(screen.queryByLabelText('Words')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).externalLink ?? null).toBeNull()
+  })
+
+  // No map switch: a page is on the map when its places have an address.
+  it('puts the page on the map with its address, as one change', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ hasAddress: false, capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, map: false } })} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await user.click(screen.getByLabelText('An address'))
+    expect(within(screen.getByRole('region', { name: 'Save' })).getByText('1 change')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).capabilities.map).toBe(true)
+  })
+
+  it('deletes the page from its foot, once asked', async () => {
+    const onDeleted = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} onDeleted={onDeleted} />)
+    await user.click(screen.getByRole('button', { name: 'Delete this page' }))
+    expect(screen.getByText('Delete Groceries and every place on it?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep it' }))
+    expect(fetchJson).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Delete this page' }))
+    await user.click(screen.getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled())
+    expect(fetchJson).toHaveBeenCalledWith('/api/admin/categories/grocery?community=test-community', expect.objectContaining({ method: 'DELETE' }), 'Delete failed.')
+  })
+
   // The field-removal cleanup workflow: turning off "An address" on a
   // category that already has listings with addresses must check first, and
   // block the save behind an explicit confirmation — the whole reason this
@@ -281,7 +340,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -302,7 +361,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -319,7 +378,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -339,7 +398,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -377,7 +436,6 @@ describe('CategoryEditor — editing an existing category', () => {
           token="t"
           initial={categoryWithSelectField()}
           siblings={null}
-          hasMapCategory={false}
           onSaved={vi.fn()}
           onCancel={vi.fn()}
         />,
@@ -409,7 +467,6 @@ describe('CategoryEditor — editing an existing category', () => {
           token="t"
           initial={categoryWithSelectField()}
           siblings={null}
-          hasMapCategory={false}
           onSaved={onSaved}
           onCancel={vi.fn()}
         />,
@@ -433,212 +490,6 @@ describe('CategoryEditor — editing an existing category', () => {
   })
 })
 
-describe('pin colour', () => {
-  // Regression: the field was wired into the preview object rather than the
-  // save payload, so the picker rendered, previewed correctly, and the PATCH
-  // went out with no pinColor at all — returning 200 and silently keeping the
-  // old colour. Asserting on the request body is the only thing that catches
-  // that; the UI looked entirely correct.
-  it('sends the chosen colour in the save request', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
-    await user.click(screen.getByRole('button', { name: '#b63167' }))
-    await saveNow(user)
-
-    await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls.at(-1)!
-    expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBe('#b63167')
-  })
-
-  it('sends null for Automatic, so the positional fallback applies', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor
-        token="t"
-        initial={{ ...baseCategory(), pinColor: '#b63167' }}
-        siblings={null}
-        hasMapCategory={false}
-        onSaved={onSaved}
-        onCancel={vi.fn()}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
-    await user.click(screen.getByRole('button', { name: 'Automatic' }))
-    await saveNow(user)
-
-    await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls.at(-1)!
-    expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBeNull()
-  })
-})
-
-// A colour picked blind is how two categories end up with matching pins, which
-// the admin could previously only discover by opening the preview and
-// comparing them by eye. The swatch row names who already holds each colour.
-describe('CategoryEditor — pin colour clashes', () => {
-  const siblings = [
-    baseCategory(),
-    baseCategory({ id: 'shul', label: 'Synagogue', pluralLabel: 'Synagogues', pinColor: '#2c8c47' }),
-  ]
-
-  /** Renders the editor with its pin colours open. */
-  async function withPins(ui: React.ReactElement) {
-    const user = userEvent.setup()
-    renderWithProviders(ui)
-    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
-    return user
-  }
-
-  it('labels a swatch another category already holds', async () => {
-    await withPins(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByRole('button', { name: '#2c8c47 — already used by Synagogues' })).toBeInTheDocument()
-    // A free one keeps the bare hex, so "taken" is what stands out.
-    expect(screen.getByRole('button', { name: '#7a36bf' })).toBeInTheDocument()
-  })
-
-  it('warns after picking a colour that is already taken, and stops once a free one is picked', async () => {
-    const user = await withPins(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: /^#2c8c47 —/ }))
-    expect(screen.getByText(/Same colour as Synagogues/)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '#7a36bf' }))
-    expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
-  })
-
-  it('never reports the category being edited as clashing with itself', async () => {
-    const self = baseCategory({ pinColor: '#2657bf' })
-    await withPins(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '#2657bf' })).toBeInTheDocument()
-  })
-})
-
-// How the category page groups its list (listGroups.ts). Sent only when
-// changed, so every other save keeps working on a database that doesn't
-// have migration 059's column yet.
-describe('CategoryEditor — grouping the list', () => {
-  const shuls = baseCategory({
-    id: 'synagogue',
-    pluralLabel: 'Synagogues',
-    detailFields: [
-      { key: 'hours', label: 'Hours', type: 'hours' },
-      { key: 'denomination', label: 'Denomination', type: 'select', options: [{ value: 'Reform', label: 'Reform' }] },
-    ],
-  })
-  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
-
-  it('offers the groupings the category’s fields allow, and none for a new category', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    const select = screen.getByRole('combobox', { name: 'Group the list' })
-    expect([...(select as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'open', 'distance', 'field:denomination'])
-    cleanup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.queryByRole('combobox', { name: 'Group the list' })).not.toBeInTheDocument()
-  })
-
-  it('sends the grouping when it changed, and leaves it out when it didn’t', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
-
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload())).not.toHaveProperty('groupBy')
-
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Group the list' }), 'field:denomination')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
-    expect(JSON.parse(payload()).groupBy).toEqual({ kind: 'field', key: 'denomination' })
-  })
-
-  it('shows the saved grouping, and clearing it sends null', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor token="t" initial={{ ...shuls, groupBy: { kind: 'open' } }} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-    )
-    const select = screen.getByRole('combobox', { name: 'Group the list' })
-    expect(select).toHaveValue('open')
-    await user.selectOptions(select, '')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload()).groupBy).toBeNull()
-  })
-})
-
-// The one question the category page asks (questionCards.ts). Sent only when
-// changed, like the grouping, for migration 060.
-describe('CategoryEditor — the question card', () => {
-  const food = baseCategory({
-    id: 'restaurant',
-    pluralLabel: 'Food',
-    detailFields: [
-      {
-        key: 't',
-        label: 'Food Type',
-        type: 'select',
-        options: [
-          { value: 'Meat', label: 'Meat' },
-          { value: 'Dairy', label: 'Dairy' },
-          { value: 'Parve', label: 'Parve' },
-        ],
-      },
-      { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean' },
-      { key: 'notes', label: 'Notes', type: 'text' },
-    ],
-  })
-  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
-
-  it('offers "Been there lately?" and each yes/no or short pick-list, worded as the page asks it', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    const select = screen.getByRole('combobox', { name: 'Question card' }) as HTMLSelectElement
-    expect([...select.options].map((o) => o.value)).toEqual(['', 'confirm', 'field:t', 'field:shabbatFriendly'])
-    expect(within(select).getByRole('option', { name: /meat, dairy or parve\?/ })).toBeInTheDocument()
-    cleanup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.queryByRole('combobox', { name: 'Question card' })).not.toBeInTheDocument()
-  })
-
-  it('sends the question when it changed, and leaves it out when it didn’t', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
-
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload())).not.toHaveProperty('questionCard')
-
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Question card' }), 'field:t')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
-    expect(JSON.parse(payload()).questionCard).toEqual({ kind: 'field', key: 't' })
-  })
-
-  it('shows the saved question, and clearing it sends null', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor token="t" initial={{ ...food, questionCard: { kind: 'confirm' } }} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-    )
-    const select = screen.getByRole('combobox', { name: 'Question card' })
-    expect(select).toHaveValue('confirm')
-    await user.selectOptions(select, '')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload()).questionCard).toBeNull()
-  })
-})
-
-// Other categories' places within a walk (walkList.ts). Sent only when
-// changed, for migration 061.
 describe('CategoryEditor — places within a walk', () => {
   const hotels = baseCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', detailFields: [] })
   const shuls = baseCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [] })
@@ -655,7 +506,7 @@ describe('CategoryEditor — places within a walk', () => {
   const siblings = [hotels, shuls, food, groups]
   const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
   const editor = (initial: typeof hotels | null, onSaved = vi.fn()) =>
-    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={siblings} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={siblings} onSaved={onSaved} onCancel={vi.fn()} />)
   const save = async (user: ReturnType<typeof userEvent.setup>, onSaved: ReturnType<typeof vi.fn>, times: number) => {
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(times))
@@ -730,7 +581,7 @@ describe('CategoryEditor — on each listing', () => {
   })
   const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
   const editor = (initial = hospitals, onSaved = vi.fn()) =>
-    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={[initial]} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={[initial]} onSaved={onSaved} onCancel={vi.fn()} />)
 
   it('sends a titled main card of ticked fields and a Shabbos card, only once changed', async () => {
     const onSaved = vi.fn()

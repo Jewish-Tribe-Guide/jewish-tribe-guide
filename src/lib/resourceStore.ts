@@ -152,6 +152,21 @@ export async function listResourcesForAdmin(community: string): Promise<Resource
   return data as ResourceRow[]
 }
 
+/** How many places each category has on the site, for Category pages' rows
+ *  ("71 places"). Uncached, like Places. */
+export async function countApprovedByCategory(community: string): Promise<Record<string, number>> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('category')
+    .eq('community_id', community)
+    .eq('status', 'approved')
+
+  if (error) throw new Error(`Failed to count listings: ${error.message}`)
+  const counts: Record<string, number> = {}
+  for (const { category } of (data ?? []) as { category: string }[]) counts[category] = (counts[category] ?? 0) + 1
+  return counts
+}
+
 /** A listing as Places lists it. `takesAddress`: whether its category asks
  *  for an address at all, so a WhatsApp group never shows as missing one. */
 export function toAdminPlace(row: ResourceRow, takesAddress: boolean): AdminPlace {

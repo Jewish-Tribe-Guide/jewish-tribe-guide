@@ -529,8 +529,30 @@ Networking, Cemetery); no page sets Groups. On the drawing:
 - Not decided: whether "Can visitors upvote places?" stays as asked, or
   the button is renamed on the site so admin and visitor use one word.
 
-Still to fix when building: `/philly/admin/categories/restaurant` (no
-`cat:`) silently shows the list.
+**Building, the user's go-ahead Nov 5** ("Yes, start building"), in five
+steps, each tested and pushed: 1 the list and a page's layout, 2
+ready-made pages and fields first, 3 fields in boxes (Address and Phone
+become rows, drag between boxes, ListingParts goes), 4 Before it's
+opened (needs a DB change to part "on the card" from "a filter"), 5
+removing a filled-in field. The Denomination/Nusach prod change comes
+after the deploy, dry run first, and needs its own go-ahead.
+
+- **Step 1 BUILT Nov 5** (redesign/oct18-fixes): the list is one box of
+  rows (glyph, name, "N places" or "Eruv page" / "Times page" / "Map
+  page", Hidden), "+ New category page" beside the heading. A page has
+  On the site, Basics (icon beside the name, Banner photo row),
+  Fields, Questions (two No / Yes) and "Delete this page" at its foot
+  (the Eruv's counts its eruvim and watches first). On a phone Basics,
+  Fields and Questions open folded, each with its line. Ticking "An
+  address" puts the page on the map. `/categories/restaurant` (no
+  `cat:`) opens the page now.
+- Not on the drawing, in step 1: the Map has no drawn place yet, so for
+  now it's a row ("Map page") opening its On the site switch, until the
+  header/tab links decide it (a public-site change). Pin colour is off
+  the page (not drawn); a saved colour keeps working. Group the list
+  and the question card are off the page too, waiting for Before it's
+  opened (step 4); saved values keep working. Places within a walk and
+  On each listing stay as they were until step 3.
 
 ## Small open decisions
 

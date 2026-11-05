@@ -54,10 +54,10 @@ test('creating a category through the real editor makes it live, and deleting it
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
   await page.goto('/philly/admin/categories')
-  await visible(page.getByRole('button', { name: '+ New category' })).click()
+  await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
   await visible(page.getByRole('radio', { name: /^Plain/ })).click()
-  await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(name)
+  await visible(page.getByLabel('Name', { exact: true })).fill(name)
   await visible(page.getByRole('button', { name: 'Create category' })).click()
 
   // Creating opens the new category's own page, saved (its heading is the
@@ -65,8 +65,10 @@ test('creating a category through the real editor makes it live, and deleting it
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
   await expect(page).toHaveURL(/\/philly\/admin\/categories\/cat:e2e-admin-write-/)
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
-  const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: name })
+  // One row per page, saying how many places it has (board 1).
+  const row = visible(page.getByRole('button', { name }))
   await expect(row).toBeVisible({ timeout: 30_000 })
+  await expect(row).toContainText(`${name}0 places`)
 
   const supabase = getAdminClient()
   const { data: created } = await supabase
@@ -77,9 +79,12 @@ test('creating a category through the real editor makes it live, and deleting it
   expect(created, 'the category should exist in the database after Create').not.toBeNull()
   expect(created!.kind).toBe('listing')
 
-  // Delete it back out through the same real UI.
-  await row.getByRole('button', { name: 'Delete' }).click()
-  await row.getByRole('button', { name: 'Delete category & listings' }).click()
+  // Delete it back out through the same real UI, from the foot of its page.
+  await row.click()
+  await visible(page.getByRole('button', { name: 'Delete this page' })).click()
+  await expect(visible(page.getByText(`Delete ${name} and every place on it?`))).toBeVisible()
+  await visible(page.getByRole('button', { name: 'Delete it' })).click()
+  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible({ timeout: 30_000 })
   await expect(row).not.toBeVisible()
 
   const { data: afterDelete } = await supabase
@@ -98,10 +103,10 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
   await page.goto('/philly/admin/categories')
-  await visible(page.getByRole('button', { name: '+ New category' })).click()
+  await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
   await visible(page.getByRole('radio', { name: /^Plain/ })).click()
-  await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(categoryName)
+  await visible(page.getByLabel('Name', { exact: true })).fill(categoryName)
   // No address on this category — sidesteps the real Google Places
   // autocomplete AddressInput uses, which this suite doesn't drive anywhere
   // else; a plain name-only listing is enough to prove the direct-add path.
@@ -116,9 +121,9 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
 
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
-  const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: categoryName })
+  const row = visible(page.getByRole('button', { name: categoryName }))
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await expect(row.getByRole('button', { name: 'Hidden' })).toBeVisible()
+  await expect(row).toContainText('Hidden')
 
   const supabase = getAdminClient()
   const { data: created } = await supabase

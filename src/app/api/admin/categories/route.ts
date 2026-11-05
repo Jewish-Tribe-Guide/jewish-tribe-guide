@@ -2,6 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
+import { countApprovedByCategory } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import { isValidPinColor } from '@/lib/categoryColor'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
@@ -17,8 +18,13 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const categories = await listCategoriesUncached(community.slug)
-    return Response.json({ ok: true, categories })
+    // ?counts=1: how many places each has, for Category pages' rows.
+    const withCounts = new URL(request.url).searchParams.get('counts') === '1'
+    const [categories, placeCounts] = await Promise.all([
+      listCategoriesUncached(community.slug),
+      withCounts ? countApprovedByCategory(community.slug) : undefined,
+    ])
+    return Response.json({ ok: true, categories, ...(placeCounts && { placeCounts }) })
   } catch (err) {
     console.error('[admin/categories] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load categories.'] }, { status: 502 })

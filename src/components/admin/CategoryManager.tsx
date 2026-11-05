@@ -1,38 +1,47 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CATEGORY_CAPABILITY_KEYS, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { adminBase } from '@/lib/adminNav'
+import { CategoryGlyph } from '@/lib/categoryIcons'
+import { MapFoldIcon } from '@/components/icons'
 import { CategoryEditor } from './CategoryEditor'
 import CategoryPreview from './CategoryPreview'
 import EruvimManager from './EruvimManager'
+import DeletePage from './DeletePage'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
-import { CAPABILITY_LABELS } from './categoryEditorLogic'
-import { AdminBox, AdminEmpty, AdminSwitch } from './AdminUI'
-import { ERUV_SCREEN, screenState, siteScreenState, type SiteScreen } from '@/lib/siteScreens'
+import { AdminBack, AdminBox, AdminEmpty, AdminRow, AdminSwitch } from './AdminUI'
+import { ERUV_SCREEN, SITE_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
 
-// ── The categories manager: Site's Category pages tab — the categories that
-// hold places (Grocery Stores, Synagogues, …, each with its own detail fields
-// and capabilities), and the Eruv among them, with the Map and Candle
-// Lighting as bare switches above (the user, Oct 31 and Nov 3: neither has
-// anything to change). Writes go through /api/admin/categories. ──
+// ── The categories manager: Site's Category pages tab (the Category pages
+// redesign's board 1) — one list of every page by name: the categories that
+// hold places (Grocery Stores, Synagogues, …, each with its own fields), the
+// Eruv, Candle Lighting and the Map. Each row opens its page, where it's
+// switched on or off and deleted. Writes go through /api/admin/categories. ──
 
 
 // editingId is opaque to the admin page's history plumbing — encoded here as
-// 'cat:<id>' or 'cat:new'. Places are added from Places (Nov 3), which offers
-// hidden categories too; an old 'listing:<id>' address lands on the list.
+// 'cat:<id>' or 'cat:new', and 'screen:<kind>' for the Eruv, Candle Lighting
+// and the Map, which may have no row yet. Places are added from Places (Nov
+// 3), which offers hidden categories too; an old 'listing:<id>' address lands
+// on the list.
 const CAT_PREFIX = 'cat:'
+const SCREEN_PREFIX = 'screen:'
+
+/** The line under a screen's row, where a category's says its places. */
+const SCREEN_LINES: Record<SiteScreen['kind'], string> = { eruv: 'Eruv page', zmanim: 'Times page', map: 'Map page' }
 
 /** The category a save just moved to: see `justSaved` below. */
 let savedHandOff: string | null = null
 
 export default function CategoryManager({
   token,
-  editingId,
+  editingId: rawEditingId,
   onOpenEditor,
   onCloseEditor,
 }: {
@@ -41,13 +50,14 @@ export default function CategoryManager({
   onOpenEditor: (id: string) => void
   onCloseEditor: () => void
 }) {
+  // A page's own address without the prefix (/categories/restaurant) opens
+  // it too; it used to fall through to the list.
+  const editingId = rawEditingId && !rawEditingId.includes(':') ? `${CAT_PREFIX}${rawEditingId}` : rawEditingId
   const community = useCommunitySlug()
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
+  const [placeCounts, setPlaceCounts] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [switching, setSwitching] = useState<string | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
   // The category just saved, and how many saves there have been: its screen
   // starts again from the saved settings, and its Save bar says "Saved."
   // A save that moves to another address (made, or a new web address) lands
@@ -67,9 +77,10 @@ export default function CategoryManager({
   const load = useCallback(async () => {
     setError(null)
     try {
-      const catRes = await fetch(withCommunity('/api/admin/categories', community), { headers: { Authorization: `Bearer ${token}` } })
-      const catBody = await parseOkJson<{ categories: CategoryConfig[] }>(catRes, 'Failed to load categories.')
+      const catRes = await fetch(withCommunity('/api/admin/categories?counts=1', community), { headers: { Authorization: `Bearer ${token}` } })
+      const catBody = await parseOkJson<{ categories: CategoryConfig[]; placeCounts?: Record<string, number> }>(catRes, 'Failed to load categories.')
       setCategories(catBody.categories)
+      setPlaceCounts(catBody.placeCounts ?? {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -77,16 +88,25 @@ export default function CategoryManager({
 
   useLoadOnMount(load)
 
-  // The categories that hold places, and the Eruv in its place among them by
-  // name — with or without a row yet (switching it on makes one).
+  // Every page in one list by name (board 1): the categories that hold
+  // places, and the Eruv, Candle Lighting and the Map, with or without a row
+  // yet (switching one on makes it).
   const entries = useMemo(() => {
     if (!categories) return null
-    const eruv = screenState(categories, ERUV_SCREEN)
+    const screens = [ERUV_SCREEN, ...SITE_SCREENS].map((screen) => {
+      const st = screenState(categories, screen)
+      return { key: `${SCREEN_PREFIX}${screen.kind}`, label: st.row?.pluralLabel ?? screen.label, on: st.on, line: SCREEN_LINES[screen.kind], glyph: screen.kind }
+    })
     return [
-      ...categories.filter((c) => c.kind === 'listing').map((c) => ({ key: `cat:${c.id}`, label: c.pluralLabel, category: c, eruv: null })),
-      { key: 'eruv', label: eruv.row?.pluralLabel ?? ERUV_SCREEN.label, category: null, eruv },
+      ...categories
+        .filter((c) => c.kind === 'listing')
+        .map((c) => {
+          const n = placeCounts[c.id] ?? 0
+          return { key: `${CAT_PREFIX}${c.id}`, label: c.pluralLabel, on: c.active !== false, line: `${n} ${n === 1 ? 'place' : 'places'}`, glyph: c.id, icon: c.icon }
+        }),
+      ...screens,
     ].sort((a, b) => a.label.localeCompare(b.label))
-  }, [categories])
+  }, [categories, placeCounts])
 
   // On makes the screen's row the first time and shows it after that; off
   // hides the row, so its name and photo are still there when it comes back.
@@ -113,69 +133,10 @@ export default function CategoryManager({
     }
   }
 
-  // Flips a category's (or singleton's) public visibility immediately — no
-  // need to open the full editor. Same PATCH endpoint the editor itself
-  // uses; `active` is just one more field in the patch.
-  async function toggleCategoryActive(id: string, active: boolean) {
-    setError(null)
-    setTogglingId(id)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/categories/${id}`, community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ active }),
-        },
-        'Could not update visibility.',
-      )
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update visibility.')
-    } finally {
-      setTogglingId(null)
-    }
+  const deleted = () => {
+    onCloseEditor()
+    void load()
   }
-
-  // The Eruv's confirm says how many eruvim and watches go with it, so it
-  // asks first.
-  const [eruvDeleteCounts, setEruvDeleteCounts] = useState<{ eruvim: number; watches: number } | null>(null)
-  async function askDeleteEruv(id: string) {
-    setError(null)
-    setEruvDeleteCounts(null)
-    setConfirmDeleteId(id)
-    try {
-      const counts = await fetchJson<{ eruvim: number; watches: number }>(
-        withCommunity(`/api/admin/categories/${id}?dry=1`, community),
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Couldn’t count its eruvim.',
-      )
-      setEruvDeleteCounts({ eruvim: counts.eruvim, watches: counts.watches })
-    } catch (err) {
-      setConfirmDeleteId(null)
-      setError(err instanceof Error ? err.message : 'Couldn’t count its eruvim.')
-    }
-  }
-
-  async function deleteCategory(id: string) {
-    setError(null)
-    setDeletingId(id)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/categories/${id}`, community),
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Delete failed.',
-      )
-      setConfirmDeleteId(null)
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed.')
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  const hasMap = !!categories?.some((c) => c.kind === 'map' && c.active !== false)
 
   if (editingId === `${CAT_PREFIX}new`) {
     return (
@@ -183,7 +144,6 @@ export default function CategoryManager({
         token={token}
         initial={null}
         siblings={categories}
-        hasMapCategory={hasMap}
         onSaved={async (id) => {
           // Made: open it, saying so.
           await load()
@@ -195,23 +155,40 @@ export default function CategoryManager({
     )
   }
 
+  // The Map, Candle Lighting, and an Eruv with no row yet: the page's own
+  // switch and nothing else (neither has anything to change, Nov 3).
+  if (editingId?.startsWith(SCREEN_PREFIX)) {
+    const screen = [ERUV_SCREEN, ...SITE_SCREENS].find((sc) => `${SCREEN_PREFIX}${sc.kind}` === editingId)
+    if (!categories || !screen) return <p className="text-sm text-muted">Loading…</p>
+    const st = screenState(categories, screen)
+    // The Eruv has its eruvim to keep once it has a row.
+    if (screen.kind === 'eruv' && st.row) {
+      return <SingletonEditor token={token} category={st.row} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
+    }
+    return (
+      <div className="flex flex-col gap-4">
+        <AdminBack back={{ label: 'Category pages', onClick: onCloseEditor }} title={st.row?.pluralLabel ?? screen.label} />
+        {error && <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}
+        <OnTheSite on={st.on} onChange={(on) => void switchScreen(screen, on)} />
+      </div>
+    )
+  }
+
   if (editingId?.startsWith(CAT_PREFIX)) {
     const id = editingId.slice(CAT_PREFIX.length)
     const initial = categories?.find((c) => c.id === id) ?? null
     if (!initial) return <p className="text-sm text-muted">Loading…</p>
-    // Map/Zmanim/Eruv only offer the lightweight icon/background editor
-    // — everything else is a real category.
+    // An old address of the Eruv, the Map or Candle Lighting.
     if (initial.kind !== 'listing') {
+      const screen = [ERUV_SCREEN, ...SITE_SCREENS].find((sc) => sc.kind === initial.kind)
+      if (screen?.kind === 'eruv') {
+        return <SingletonEditor token={token} category={initial} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
+      }
       return (
-        <SingletonEditor
-          token={token}
-          category={initial}
-          onSaved={() => {
-            onCloseEditor()
-            load()
-          }}
-          onCancel={onCloseEditor}
-        />
+        <div className="flex flex-col gap-4">
+          <AdminBack back={{ label: 'Category pages', onClick: onCloseEditor }} title={initial.pluralLabel} />
+          {screen && <OnTheSite on={initial.active !== false} onChange={(on) => void switchScreen(screen, on)} />}
+        </div>
       )
     }
     return (
@@ -221,7 +198,6 @@ export default function CategoryManager({
         token={token}
         initial={initial}
         siblings={categories}
-        hasMapCategory={hasMap}
         justSaved={justSaved === initial.id}
         onSaved={async (savedId) => {
           await load()
@@ -233,295 +209,58 @@ export default function CategoryManager({
           }
         }}
         onCancel={onCloseEditor}
+        onDeleted={deleted}
       />
     )
   }
 
   return (
-    <div>
-      {error && (
-        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
-      )}
+    <div className="flex flex-col gap-4">
+      <AdminBack
+        phoneOnly
+        back={{ label: 'Site', href: `${adminBase(community)}/site` }}
+        title="Category pages"
+        right={
+          <button
+            type="button"
+            onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
+            className="shrink-0 min-h-10 px-3.5 rounded-lg border border-slate-300 bg-white text-[13px] font-semibold text-primary hover:bg-slate-50 cursor-pointer"
+          >
+            + New category page
+          </button>
+        }
+      />
 
-      {categories && (
-        <div className="mb-4">
-          <AdminBox title="On the site">
-            {siteScreenState(categories).map(({ screen, row, on }) => (
-              <div key={screen.kind} data-testid={`site-screen-${screen.kind}`} className="flex items-center gap-3 pr-4 border-b border-slate-100 last:border-b-0">
-                <span className="flex-1 min-w-0 pl-4 py-2.5 min-h-[52px] flex items-center text-[15px] font-semibold text-slate-900">{row?.pluralLabel ?? screen.label}</span>
-                <AdminSwitch checked={on} label={row?.pluralLabel ?? screen.label} onChange={(next) => void switchScreen(screen, next)} />
-              </div>
-            ))}
-          </AdminBox>
-        </div>
-      )}
-
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-          className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-        >
-          + New category
-        </button>
-      </div>
+      {error && <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}
 
       {entries === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : entries.length === 0 ? (
         <AdminEmpty>Nothing here yet.</AdminEmpty>
       ) : (
-        <div className="space-y-2">
-          {entries.map(({ key, label, category: c, eruv }) => eruv ? (
-            <EruvRow
-              key={key}
-              label={label}
-              on={eruv.on}
-              toggling={switching === 'eruv'}
-              onEdit={eruv.row ? () => onOpenEditor(`${CAT_PREFIX}${eruv.row!.id}`) : null}
-              onToggleActive={(on) => void switchScreen(ERUV_SCREEN, on)}
-              del={eruv.row ? {
-                confirming: confirmDeleteId === eruv.row.id,
-                counts: eruvDeleteCounts,
-                deleting: deletingId === eruv.row.id,
-                onAsk: () => void askDeleteEruv(eruv.row!.id),
-                onCancel: () => setConfirmDeleteId(null),
-                onConfirm: () => void deleteCategory(eruv.row!.id),
-              } : null}
-            />
-          ) : c && (
-            <CategoryRow
-              key={key}
-              category={c}
-              confirmingDelete={confirmDeleteId === c.id}
-              deleting={deletingId === c.id}
-              toggling={togglingId === c.id}
-              onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
-              onAskDelete={() => setConfirmDeleteId(c.id)}
-              onCancelDelete={() => setConfirmDeleteId(null)}
-              onConfirmDelete={() => deleteCategory(c.id)}
-              onToggleActive={(active) => toggleCategoryActive(c.id, active)}
+        <AdminBox>
+          {entries.map((e) => (
+            <AdminRow
+              key={e.key}
+              onClick={() => onOpenEditor(e.key)}
+              icon={e.glyph === 'map' ? <MapFoldIcon className="h-5 w-5" /> : <CategoryGlyph categoryId={e.glyph} icon={'icon' in e ? (e.icon ?? '') : ''} className="h-5 w-5" />}
+              name={e.label}
+              line={e.line}
+              aside={!e.on && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Hidden</span>}
             />
           ))}
-        </div>
+        </AdminBox>
       )}
     </div>
   )
 }
 
-// ── List rows ─────────────────────────────────────────────────────────────────
-
-const TYPE_BADGE = 'text-[10px] font-medium uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0'
-
-// Flips public visibility right from the list — no need to open the full
-// editor just to hide something.
-function VisibilityToggle({
-  active,
-  toggling,
-  onToggle,
-}: {
-  active: boolean
-  toggling: boolean
-  onToggle: (active: boolean) => void
-}) {
+/** A page's "On the site" switch, in its own box. */
+function OnTheSite({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
-    <button
-      onClick={() => onToggle(!active)}
-      disabled={toggling}
-      title={active ? 'Visible on the site — click to hide' : 'Hidden from the site — click to show'}
-      className={`text-xs font-medium rounded px-3 py-1.5 border transition-colors disabled:opacity-60 cursor-pointer ${
-        active
-          ? 'border-slate-300 text-slate-600 hover:bg-slate-50'
-          : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
-      }`}
-    >
-      {toggling ? '…' : active ? 'Visible' : 'Hidden'}
-    </button>
-  )
-}
-
-// The Eruv among the categories: shown or hidden like them, and Edit opens
-// its eruvim. Delete takes every eruv and its website's watch with it (the
-// user, Nov 4); it stays on the list, hidden, to start again. Before it has
-// a row, showing it makes one, and Edit and Delete wait for that.
-function EruvRow({
-  label,
-  on,
-  toggling,
-  onEdit,
-  onToggleActive,
-  del,
-}: {
-  label: string
-  on: boolean
-  toggling: boolean
-  onEdit: (() => void) | null
-  onToggleActive: (active: boolean) => void
-  del: {
-    confirming: boolean
-    counts: { eruvim: number; watches: number } | null
-    deleting: boolean
-    onAsk: () => void
-    onCancel: () => void
-    onConfirm: () => void
-  } | null
-}) {
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-  return (
-    <div data-testid="category-row-eruv" className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
-          <span className={`${TYPE_BADGE} bg-slate-100 text-slate-600`}>Eruv</span>
-          <span>{label}</span>
-        </p>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <VisibilityToggle active={on} toggling={toggling} onToggle={onToggleActive} />
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              Edit
-            </button>
-          )}
-          {del && (
-            <button onClick={del.onAsk} className="text-xs font-medium text-red-600 hover:underline cursor-pointer">
-              Delete
-            </button>
-          )}
-        </div>
-      </div>
-
-      {del?.confirming && (
-        <div className="mt-3 border-t border-slate-200 pt-3">
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-            <p className="text-sm text-red-800">
-              {del.counts ? (
-                <>
-                  Permanently delete <span className="font-semibold">{label}</span>, its{' '}
-                  {plural(del.counts.eruvim, 'eruv', 'eruvim')} and {plural(del.counts.watches, 'website watch', 'website watches')}? This can’t be undone.
-                </>
-              ) : (
-                'Counting its eruvim…'
-              )}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={del.onConfirm}
-                disabled={del.deleting || !del.counts}
-                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                {del.deleting ? 'Deleting…' : 'Delete category & eruvim'}
-              </button>
-              <button
-                onClick={del.onCancel}
-                disabled={del.deleting}
-                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function CategoryRow({
-  category: c,
-  confirmingDelete,
-  deleting,
-  toggling,
-  onEdit,
-  onAskDelete,
-  onCancelDelete,
-  onConfirmDelete,
-  onToggleActive,
-}: {
-  category: CategoryConfig
-  confirmingDelete: boolean
-  deleting: boolean
-  toggling: boolean
-  onEdit: () => void
-  onAskDelete: () => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
-  onToggleActive: (active: boolean) => void
-}) {
-  const caps = resolveCapabilities(c.capabilities)
-  const on = [
-    ...CATEGORY_CAPABILITY_KEYS.filter((k) => caps[k]).map((k) => CAPABILITY_LABELS[k]),
-    ...(c.upvotesEnabled ? ['Upvotes'] : []),
-  ]
-  return (
-    <div data-testid={`category-row-${c.id}`} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-      {/* On a phone the buttons go under the name, not squeezed beside it. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
-            <span className={`${TYPE_BADGE} bg-blue-50 text-blue-600`}>Listing</span>
-            <span>
-              <span className="mr-1">{c.icon}</span>
-              {c.pluralLabel}
-            </span>
-            <span className="font-normal text-xs text-muted">{c.id}</span>
-          </p>
-          <p className="text-xs text-muted mt-1">
-            {(() => {
-              // Count only visible details (hidden ones aren't editable here).
-              const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
-              const filters = shown.filter((f) => f.filterable).length
-              return (
-                `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
-                (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
-              )
-            })()}
-            {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
-          <button
-            onClick={onEdit}
-            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Edit
-          </button>
-          <button
-            onClick={onAskDelete}
-            className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {confirmingDelete && (
-        <div className="mt-3 border-t border-slate-200 pt-3">
-          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-            <p className="text-sm text-red-800">
-              Permanently delete <span className="font-semibold">{c.pluralLabel}</span> and every
-              listing in it? This can’t be undone.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={onConfirmDelete}
-                disabled={deleting}
-                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                {deleting ? 'Deleting…' : 'Delete category & listings'}
-              </button>
-              <button
-                onClick={onCancelDelete}
-                disabled={deleting}
-                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px]">
+      <span aria-hidden="true" className="flex-1 text-[15px] font-semibold text-slate-900">On the site</span>
+      <AdminSwitch checked={on} onChange={onChange} label="On the site" />
     </div>
   )
 }
@@ -536,11 +275,16 @@ export function SingletonEditor({
   category,
   onSaved,
   onCancel,
+  onToggleActive,
+  onDeleted,
 }: {
   token: string
   category: CategoryConfig
   onSaved: () => void
   onCancel: () => void
+  /** The page's "On the site" switch, saved at once. */
+  onToggleActive?: (on: boolean) => void
+  onDeleted?: () => void
 }) {
   const community = useCommunitySlug()
   const [name, setName] = useState(category.pluralLabel)
@@ -623,55 +367,45 @@ export function SingletonEditor({
   }
 
   return (
-    <div>
-      <button
-        onClick={onCancel}
-        className="text-sm text-muted hover:text-slate-700 underline mb-4 cursor-pointer"
-      >
-        ← Back to categories
-      </button>
-      <h2 className="text-lg font-semibold text-slate-900 mb-1">
-        Edit “{category.pluralLabel}”
-        <span className="ml-2 text-xs font-normal text-muted">{category.id}</span>
-      </h2>
-      <p className="text-xs text-muted mb-4">
-        This is a fixed, code-driven card — only its name, icon and home-screen appearance are editable here.
-      </p>
+    <div className="flex flex-col gap-4">
+      <AdminBack back={{ label: 'Category pages', onClick: onCancel }} title={category.pluralLabel} />
+      {onToggleActive && <OnTheSite on={category.active !== false} onChange={onToggleActive} />}
 
-      <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Name</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+      <AdminBox title="Basics">
+        <div className="flex flex-col gap-4 p-4">
+          <label className="block">
+            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </label>
+          <IconField icon={icon} onChange={setIcon} iconImageUrl={iconImageUrl} onIconImageUrl={setIconImageUrl} token={token} />
+          <CardBackgroundField
+            cardImageUrl={cardImageUrl}
+            onCardImageUrl={setCardImageUrl}
           />
-          <span className="block text-[11px] text-muted mt-1">The card&rsquo;s title on the home screen.</span>
-        </label>
-        <IconField icon={icon} onChange={setIcon} iconImageUrl={iconImageUrl} onIconImageUrl={setIconImageUrl} token={token} />
-        <CardBackgroundField
-          cardImageUrl={cardImageUrl}
-          onCardImageUrl={setCardImageUrl}
-        />
-        <CardBandImageField
-          cardBandImageUrl={cardBandImageUrl}
-          onCardBandImageUrl={setCardBandImageUrl}
-          fallbackImageUrl={cardImageUrl}
-          previewIcon={icon}
-          previewColor={getCategoryColor([category], category.id)}
-          token={token}
-        />
-      </section>
+          <CardBandImageField
+            cardBandImageUrl={cardBandImageUrl}
+            onCardBandImageUrl={setCardBandImageUrl}
+            fallbackImageUrl={cardImageUrl}
+            previewIcon={icon}
+            previewColor={getCategoryColor([category], category.id)}
+            token={token}
+          />
+        </div>
+      </AdminBox>
 
       {errors.length > 0 && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-3 space-y-1">
+        <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-1">
           {errors.map((e) => (
             <p key={e} className="text-sm text-red-700">{e}</p>
           ))}
         </div>
       )}
 
-      <div className="mt-4 flex gap-2">
+      <div className="flex gap-2">
         {previewSupported && (
           <button
             onClick={openPreview}
@@ -699,10 +433,12 @@ export function SingletonEditor({
       {/* The eruvim themselves, each saved on its own: what was the Eruvim
           tab until Oct 22, so everything about the Eruv page is here. */}
       {category.kind === 'eruv' && (
-        <div className="mt-8 border-t border-slate-200 pt-6">
+        <div className="mt-4 border-t border-slate-200 pt-6">
           <EruvimManager token={token} />
         </div>
       )}
+
+      {onDeleted && <DeletePage token={token} category={category} onDeleted={onDeleted} />}
     </div>
   )
 }

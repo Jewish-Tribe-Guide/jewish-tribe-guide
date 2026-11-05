@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CATEGORY_CAPABILITY_KEYS, DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
-import { groupByFromKey, groupByKey, groupByOptions } from '@/lib/listGroups'
-import { questionCardFromKey, questionCardKey, questionCardOptions } from '@/lib/questionCards'
+import { groupByFromKey } from '@/lib/listGroups'
+import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsToSave } from '@/lib/listingParts'
 import { PLACE_KINDS, PLACE_KIND_INFO } from '@/lib/placeKinds'
@@ -14,17 +14,17 @@ import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ListingPartsEditor, WalkListsEditor } from './ListingPartsEditor'
 import CategoryPreview from './CategoryPreview'
-import { CardBackgroundField, CardBandImageField, IconField, PinColorField } from './CategoryFormFields'
+import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
-import { CAPABILITY_LABELS, fieldShows, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
+import { fieldShows, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
-import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminRows, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminRows, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
+import DeletePage from './DeletePage'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { routes } from '@/lib/routes'
 
 // One category page's settings (the admin redesign's boards 6 and 6b): its
 // kind, name and look, what each place shows (a row per field, each opening
@@ -39,15 +39,13 @@ type Props = {
    *  currently resolves to — that fallback is positional, so it can only be
    *  computed against the whole list. Null while they're still loading. */
   siblings: CategoryConfig[] | null
-  /** Whether a Map pseudo-category currently exists — the map switch only
-   *  makes sense (and is only offered) when there's a map for it to send
-   *  this category's places to. */
-  hasMapCategory: boolean
   /** Given the id it was saved under. */
   onSaved: (id: string) => void
   onCancel: () => void
   /** Just saved: the Save bar says so until the next change. */
   justSaved?: boolean
+  /** Deleted from its own "Delete this page". */
+  onDeleted?: () => void
 }
 
 export function CategoryEditor(props: Props) {
@@ -57,9 +55,8 @@ export function CategoryEditor(props: Props) {
 }
 
 /** Draft keys that move with another, so one edit counts once: the
- *  singular follows the name, and the "Not listed here?" line is on when
- *  both its boxes are filled. */
-const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'externalLinkEnabled'])
+ *  singular follows the name, and the map follows the address. */
+const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'capabilities'])
 
 function changedKeys(draft: Draft, saved: Draft): number {
   return (Object.keys(draft) as (keyof Draft)[]).filter((k) => !FOLLOWING_KEYS.has(k) && JSON.stringify(draft[k]) !== JSON.stringify(saved[k])).length
@@ -69,10 +66,10 @@ function CategoryEditorScreen({
   token,
   initial,
   siblings,
-  hasMapCategory,
   onSaved,
   onCancel,
   justSaved = false,
+  onDeleted,
   onUndo,
 }: Props & { onUndo: () => void }) {
   const isNew = initial === null
@@ -111,7 +108,6 @@ function CategoryEditorScreen({
     setGroupForm,
     set,
     setName,
-    setId,
     setCap,
     pickKind,
     updateField,
@@ -198,7 +194,7 @@ function CategoryEditorScreen({
     walkList: walkListFromKey(draft.walkList),
     listingParts: listingPartsToSave(draft.listingParts) ?? undefined,
     externalLink:
-      draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
+      draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
         ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
         : null,
     cardImageUrl: draft.cardImageUrl.trim() || null,
@@ -276,7 +272,6 @@ function CategoryEditorScreen({
       // thing. A second field of the same shape is not the box's, and keeps
       // its row.
       .filter(({ i }) => i !== managedHoursIndex && i !== managedWebsiteIndex && i !== managedPhotoIndex)
-    const kind = draft.placeKind ? PLACE_KIND_INFO[draft.placeKind] : null
 
     screen = (
       <>
@@ -330,47 +325,26 @@ function CategoryEditorScreen({
               ))}
             </div>
           </AdminBox>
-        ) : (
-          kind && (
-            <section aria-label="Kind" className="bg-white border border-slate-200 rounded-[10px] px-4 py-3.5">
-              <p className="m-0 text-[13px] text-slate-600">Kind</p>
-              <p className="m-0 text-[15px] font-semibold text-slate-900">{kind.label}</p>
-              <p className="m-0 text-[13px] text-slate-600">{kind.line}</p>
-            </section>
-          )
-        )}
+        ) : null}
 
-        <AdminBox title="Name and look">
-          <div className="flex flex-col gap-4 p-4">
-            <AdminField label="Name">
-              <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={adminInputClass} placeholder="e.g. Schools" />
-            </AdminField>
-            <AdminField label="In link previews">
-              <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={adminInputClass} />
-            </AdminField>
-            <div>
-              <AdminField label="Web address">
-                <input value={draft.id} onChange={(e) => setId(e.target.value)} className={adminInputClass} />
-              </AdminField>
-              <span className="block mt-1 text-[13px] text-slate-600">{routes.slug(community, draft.id || '…')}</span>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <ChangeRow
-                label="Icon"
-                look={
-                  <CategoryIcon
-                    icon={draft.icon || DEFAULT_CATEGORY_ICON}
-                    categoryId={initial?.id}
-                    iconImageUrl={draft.iconImageUrl.trim() || undefined}
-                    color={pinColor}
-                    className="h-11 w-11 text-2xl"
-                    sizePx={44}
-                  />
-                }
-              >
-                <IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />
-              </ChangeRow>
-              <ChangeRow label="Banner photo" look={<BannerThumb url={bandImageFor(previewCategory)} />}>
+        <AdminBox title="Basics" foldOnPhone summary={`${draft.pluralLabel || 'No name'} · ${bandImageFor(previewCategory) ? 'Banner photo' : 'No banner photo'}`}>
+          <Basics
+            name={draft.pluralLabel}
+            onName={setName}
+            icon={
+              <CategoryIcon
+                icon={draft.icon || DEFAULT_CATEGORY_ICON}
+                categoryId={initial?.id}
+                iconImageUrl={draft.iconImageUrl.trim() || undefined}
+                color={pinColor}
+                className="h-11 w-11 text-2xl"
+                sizePx={44}
+              />
+            }
+            iconFields={<IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />}
+            banner={bandImageFor(previewCategory)}
+            bannerFields={
+              <>
                 <CardBandImageField
                   cardBandImageUrl={draft.cardBandImageUrl}
                   onCardBandImageUrl={(v) => set('cardBandImageUrl', v)}
@@ -380,13 +354,15 @@ function CategoryEditorScreen({
                   token={token}
                 />
                 <CardBackgroundField cardImageUrl={draft.cardImageUrl} onCardImageUrl={(v) => set('cardImageUrl', v)} />
-              </ChangeRow>
-            </div>
-          </div>
+              </>
+            }
+          />
         </AdminBox>
 
         <AdminBox
-          title="What each place shows"
+          title="Fields"
+          foldOnPhone
+          summary={fieldsSummary([draft.hasAddress ? 'Address' : '', draft.hasPhone ? 'Phone' : '', ...rows.map(({ f }) => normalizeField(f).label)])}
           action={
             <span className="flex items-center gap-4">
               {draft.fields.some((f) => f.type === 'boolean') && (
@@ -413,7 +389,15 @@ function CategoryEditorScreen({
         >
           <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 border-b border-slate-100">
             <legend className="float-left mr-1 text-[13px] font-semibold text-slate-700">Every place has</legend>
-            <Check label="An address" checked={draft.hasAddress} onChange={(on) => set('hasAddress', on)} />
+            <Check
+              label="An address"
+              checked={draft.hasAddress}
+              onChange={(on) => {
+                set('hasAddress', on)
+                // A page is on the map when its places have an address.
+                setCap('map', on)
+              }}
+            />
             <Check label="A phone number" checked={draft.hasPhone} onChange={(on) => set('hasPhone', on)} />
             <Check label="Hours" checked={draft.fields.some(isPlainHoursField)} onChange={toggleHoursField} />
             <Check label="A website" checked={draft.fields.some(isWebsiteField)} onChange={toggleWebsiteField} />
@@ -474,98 +458,43 @@ function CategoryEditorScreen({
           )}
         </AdminBox>
 
-        <AdminBox title="Map">
-          <div className="flex flex-col gap-4 p-4">
-            {hasMapCategory && draft.hasAddress && (
-              <label className="flex items-center gap-3 text-[15px] text-slate-900">
-                <AdminSwitch checked={draft.capabilities.map} onChange={(on) => setCap('map', on)} label="Map beside the list, and on the site’s map" />
-                <span aria-hidden="true">Map beside the list, and on the site&rsquo;s map</span>
-              </label>
-            )}
-            <ChangeRow label="Pin colour" look={<span className="block h-6 w-6 rounded-full" style={{ backgroundColor: pinColor }} />} inline>
-              <PinColorField
-                value={draft.pinColor}
-                onChange={(v) => set('pinColor', v)}
-                fallback={fallbackPinColor}
-                icon={draft.icon}
-                categoryId={initial?.id}
-                iconImageUrl={draft.iconImageUrl}
-                siblings={siblings}
-              />
-            </ChangeRow>
-          </div>
-        </AdminBox>
-
-        <AdminBox title="“Not listed here?” line">
-          <div className="flex flex-col gap-4 p-4">
-            <AdminField label="Words">
-              <input
-                value={draft.externalLinkLabel}
-                onChange={(e) => {
-                  set('externalLinkLabel', e.target.value)
-                  set('externalLinkEnabled', !!(e.target.value.trim() && draft.externalLinkUrl.trim()))
-                }}
-                className={adminInputClass}
-                placeholder="Find more kosher food"
-              />
-            </AdminField>
-            <AdminField label="Link">
-              <input
-                value={draft.externalLinkUrl}
-                onChange={(e) => {
-                  set('externalLinkUrl', e.target.value)
-                  set('externalLinkEnabled', !!(draft.externalLinkLabel.trim() && e.target.value.trim()))
-                }}
-                className={adminInputClass}
-                placeholder="https://"
-              />
-            </AdminField>
-          </div>
-        </AdminBox>
-
-        {/* Not on the drawing, kept: how the list is grouped and the one
-            question it asks. Only on an existing category: the choices come
-            from its saved fields. */}
-        {!isNew && (
-          <AdminBox title="The list">
-            <div className="flex flex-col gap-4 p-4">
-              <AdminField label="Group the list">
-                <select value={draft.groupBy} onChange={(e) => set('groupBy', e.target.value)} className={adminInputClass}>
-                  <option value="">One list, no groups</option>
-                  {groupByOptions({ ...initial!, hasAddress: draft.hasAddress, detailFields: draft.fields.map(normalizeField) }).map((o) => (
-                    <option key={groupByKey(o.value)} value={groupByKey(o.value)}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </AdminField>
-              <AdminField label="Question card">
-                <select value={draft.questionCard} onChange={(e) => set('questionCard', e.target.value)} className={adminInputClass}>
-                  <option value="">No question card</option>
-                  {questionCardOptions({ ...initial!, detailFields: draft.fields.map(normalizeField) }).map((o) => (
-                    <option key={questionCardKey(o.value)} value={questionCardKey(o.value)}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </AdminField>
-            </div>
-          </AdminBox>
-        )}
-
-        {/* Not on the drawing, kept: other categories' places within a walk,
-            and what each opened place adds. */}
+        {/* Other categories' places within a walk, and what each opened place
+            adds (until a listing's boxes are Fields, step 3). */}
         {!isNew && draft.hasAddress && <WalkListsEditor value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
         {!isNew && <ListingPartsEditor value={draft.listingParts} onChange={(v) => set('listingParts', v)} fields={draft.fields.map(normalizeField)} />}
 
-        {/* Not on the drawing, kept: the per-category switches under the
-            site-wide ones. */}
-        <AdminBox title="What visitors can do">
-          {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map').map((k) => (
-            <SwitchRow key={k} label={CAPABILITY_LABELS[k]} checked={draft.capabilities[k]} onChange={(on) => setCap(k, on)} />
-          ))}
-          <SwitchRow label="Upvotes" checked={draft.upvotesEnabled} onChange={(on) => set('upvotesEnabled', on)} />
+        <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
+          <AdminYesNo question="Can visitors upvote places?" value={draft.upvotesEnabled} onChange={(yes) => set('upvotesEnabled', yes)} />
+          <AdminYesNo question="A link for places not listed here?" value={draft.externalLinkEnabled} onChange={(yes) => set('externalLinkEnabled', yes)} />
+          {draft.externalLinkEnabled && (
+            <div className="flex flex-col gap-4 p-4 border-t border-slate-100">
+              <AdminField label="Words">
+                <input
+                  value={draft.externalLinkLabel}
+                  onChange={(e) => set('externalLinkLabel', e.target.value)}
+                  className={adminInputClass}
+                  placeholder="Find more kosher food"
+                />
+              </AdminField>
+              <AdminField label="Link">
+                <input
+                  value={draft.externalLinkUrl}
+                  onChange={(e) => set('externalLinkUrl', e.target.value)}
+                  className={adminInputClass}
+                  placeholder="https://"
+                />
+              </AdminField>
+            </div>
+          )}
         </AdminBox>
+
+        {isNew ? (
+          <button type="button" onClick={leave} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
+            Don&rsquo;t make this page
+          </button>
+        ) : (
+          onDeleted && <DeletePage token={token} category={initial!} onDeleted={onDeleted} />
+        )}
       </>
     )
   }
@@ -609,33 +538,65 @@ function CategoryEditorScreen({
   )
 }
 
-/** Something with a look and a "Change" that opens its settings in place
- *  (board 6b's Icon, Banner photo and Pin colour). */
-function ChangeRow({ label, look, inline = false, children }: { label: string; look: React.ReactNode; inline?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const change = (
-    <button type="button" aria-expanded={open} aria-label={`${open ? 'Done with' : 'Change'} ${label.toLowerCase()}`} onClick={() => setOpen((o) => !o)} className="self-start min-h-8 text-[15px] font-semibold text-primary hover:underline cursor-pointer">
-      {open ? 'Done' : 'Change'}
-    </button>
-  )
+/** "Address, Phone, Hours and 3 more" under the folded Fields row. */
+export function fieldsSummary(labels: string[]): string {
+  const named = labels.filter(Boolean)
+  if (named.length === 0) return 'No fields yet'
+  if (named.length <= 3) return named.join(', ')
+  return `${named.slice(0, 3).join(', ')} and ${named.length - 3} more`
+}
+
+/** A page's Basics (board 4): its icon beside its name, each opening its
+ *  settings in place, then the banner photo as a row. */
+function Basics({
+  name,
+  onName,
+  icon,
+  iconFields,
+  banner,
+  bannerFields,
+}: {
+  name: string
+  onName: (name: string) => void
+  icon: React.ReactNode
+  iconFields: React.ReactNode
+  banner: string | null
+  bannerFields: React.ReactNode
+}) {
+  const [open, setOpen] = useState<'icon' | 'banner' | null>(null)
+  const flip = (which: 'icon' | 'banner') => setOpen((o) => (o === which ? null : which))
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      <div className="flex items-center gap-3">
-        {look}
-        {inline ? (
-          <>
-            <span className="text-[15px] text-slate-900">{label}</span>
-            {change}
-          </>
-        ) : (
-          <span className="flex flex-col">
-            <span className="text-[13px] font-semibold text-slate-700">{label}</span>
-            {change}
+    <>
+      <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
+        <div className="flex items-end gap-3">
+          <span className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-semibold text-slate-700">Icon</span>
+            <button type="button" aria-expanded={open === 'icon'} aria-label="Change the icon" onClick={() => flip('icon')} className="rounded-[10px] cursor-pointer">
+              {icon}
+            </button>
           </span>
-        )}
+          <span className="flex-1 min-w-0">
+            <AdminField label="Name">
+              <input value={name} onChange={(e) => onName(e.target.value)} className={adminInputClass} placeholder="Name" />
+            </AdminField>
+          </span>
+        </div>
+        {open === 'icon' && <div className="flex flex-col gap-3">{iconFields}</div>}
       </div>
-      {open && <div className="flex flex-col gap-3">{children}</div>}
-    </div>
+      <button
+        type="button"
+        aria-expanded={open === 'banner'}
+        onClick={() => flip('banner')}
+        className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[60px] text-left cursor-pointer hover:bg-slate-50"
+      >
+        <span className="flex-1 text-[15px] font-semibold text-slate-900">Banner photo</span>
+        <BannerThumb url={banner} />
+        <span className={open === 'banner' ? 'rotate-90' : ''}>
+          <Chevron />
+        </span>
+      </button>
+      {open === 'banner' && <div className="flex flex-col gap-3 px-4 pb-4">{bannerFields}</div>}
+    </>
   )
 }
 
@@ -644,9 +605,9 @@ function BannerThumb({ url }: { url: string | null }) {
   // own note on not optimising it.
   return url ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" className="h-11 w-[72px] rounded-md object-cover" />
+    <img src={url} alt="" className="h-9 w-[72px] rounded-md object-cover" />
   ) : (
-    <span className="block h-11 w-[72px] rounded-md bg-slate-200" />
+    <span className="grid h-9 w-[72px] place-items-center rounded-md bg-slate-200 text-xs font-semibold text-slate-600">None</span>
   )
 }
 
@@ -656,16 +617,5 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
       {label}
     </label>
-  )
-}
-
-function SwitchRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-b border-slate-100 last:border-b-0">
-      <span className="flex-1 text-[15px] text-slate-900" aria-hidden="true">
-        {label}
-      </span>
-      <AdminSwitch checked={checked} onChange={onChange} label={label} />
-    </div>
   )
 }

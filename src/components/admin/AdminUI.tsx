@@ -14,6 +14,7 @@ export function AdminBox({
   count,
   action,
   foldOnPhone = false,
+  summary,
   children,
 }: {
   title?: string
@@ -23,6 +24,8 @@ export function AdminBox({
   /** On a phone the box is one row, its title and count, and opens in
    *  place (board 2); on a computer it's always open. */
   foldOnPhone?: boolean
+  /** Under the folded row's title, what's inside (board 6b). */
+  summary?: string
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -36,17 +39,24 @@ export function AdminBox({
   return (
     <section aria-label={title} className="bg-white border border-slate-200 rounded-[10px]">
       {title && foldOnPhone && (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-          className={`sm:hidden w-full flex items-center gap-2.5 px-4 py-3.5 min-h-[52px] text-left cursor-pointer ${open ? 'border-b border-slate-100' : ''}`}
-        >
-          {heading}
-          <span className={open ? 'rotate-90' : ''}>
-            <Chevron />
-          </span>
-        </button>
+        <div className={`sm:hidden flex items-center gap-2.5 pr-4 ${open ? 'border-b border-slate-100' : ''}`}>
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="flex-1 min-w-0 flex items-center gap-2.5 pl-4 py-2.5 min-h-[56px] text-left cursor-pointer"
+          >
+            <span className="flex-1 min-w-0 flex flex-col">
+              <span className="text-base font-bold text-slate-900">{title}</span>
+              {summary && !open && <span className="text-[13px] text-slate-500 truncate">{summary}</span>}
+            </span>
+            {count !== undefined && <AdminCount n={count} />}
+            <span className={open ? 'rotate-90' : ''}>
+              <Chevron />
+            </span>
+          </button>
+          {open && action}
+        </div>
       )}
       {title && <div className={`${foldOnPhone ? 'hidden sm:flex' : 'flex'} items-center gap-2.5 px-4 py-3.5 border-b border-slate-100`}>{heading}</div>}
       {foldOnPhone ? <div className={open ? '' : 'hidden sm:block'}>{children}</div> : children}
@@ -184,6 +194,7 @@ export function AdminRow({
   name,
   line,
   aside,
+  icon,
 }: {
   href?: string
   onClick?: () => void
@@ -192,9 +203,12 @@ export function AdminRow({
   name: React.ReactNode
   line?: React.ReactNode
   aside?: React.ReactNode
+  /** A glyph in a grey square before the name (Category pages' rows). */
+  icon?: React.ReactNode
 }) {
   const inside = (
     <>
+      {icon && <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-slate-100 text-slate-700">{icon}</span>}
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
         <span className="text-[15px] font-semibold">{name}</span>
         {line && <span className="text-[13px] text-slate-600">{line}</span>}
@@ -283,6 +297,31 @@ export function AdminSwitch({ checked, onChange, label }: { checked: boolean; on
     >
       <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
+  )
+}
+
+/** A question answered No or Yes, as a row (a category page's Questions). */
+export function AdminYesNo({ question, value, onChange }: { question: string; value: boolean; onChange: (yes: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 min-h-[60px] border-b border-slate-100 last:border-b-0">
+      <span aria-hidden="true" className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900">
+        {question}
+      </span>
+      <span role="radiogroup" aria-label={question} className="inline-flex shrink-0 rounded-[10px] border border-slate-300 bg-white p-0.5">
+        {([false, true] as const).map((yes) => (
+          <button
+            key={String(yes)}
+            type="button"
+            role="radio"
+            aria-checked={value === yes}
+            onClick={() => onChange(yes)}
+            className={`min-h-9 w-16 rounded-lg text-[14px] font-semibold cursor-pointer ${value === yes ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+          >
+            {yes ? 'Yes' : 'No'}
+          </button>
+        ))}
+      </span>
+    </div>
   )
 }
 
