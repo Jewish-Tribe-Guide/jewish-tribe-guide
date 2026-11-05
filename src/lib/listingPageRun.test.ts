@@ -1591,6 +1591,8 @@ describe('runListingPageWatch: a page’s phone and email', () => {
     expect(payload).toMatchObject({ phone: '(215) 555-0100', source: { section: { section: 'contact', keys: ['phone'] } } })
     expect(note).toContain('Phone')
     expect(by).toEqual({ name: LISTING_PAGE_WATCH_NAME })
+    // A phone that differs dates nothing.
+    expect(m.confirmFromSource).not.toHaveBeenCalled()
     // Waiting already, as read: not filed again.
     m.submitListingUpdate.mockClear()
     m.pending = [{ id: 'p1', payload: { ...payload } }]
@@ -1616,6 +1618,20 @@ describe('runListingPageWatch: a page’s phone and email', () => {
     const out = await runListingPageWatch({ ...watch, resourceId: 'r1', pageHash: 'old' }, undefined, { apiKey: 'k' })
     expect(m.readMessage).not.toHaveBeenCalled()
     expect(out).toMatchObject({ ok: true, filed: 0, pageHash: await hashOf(body), check: { what: 'hours', result: 'nothing', contact: { same: ['phone'], changes: [] } } })
+    // Its phone agreed, so its Contact box is dated by it (the user, Nov 5).
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['r1'], 'Chalavita', ['contact'], expect.any(String))
+  })
+
+  // The Kosher Grill's page, Nov 5: its phone as listed every night, and
+  // dishes the listing didn't have on the same page, so nothing it read
+  // "agreed" and its Contact box said "Not confirmed yet".
+  it('dates the Contact box by a phone that agrees, whatever else on the page differs', async () => {
+    m.getResourceRowById.mockResolvedValue(leyv)
+    const body = withPhone('Call 215.629.1995.')
+    m.fetchPublic.mockResolvedValue({ ...page, body })
+    const differs = { ...lastCheck, result: 'differs' as const, differences: ['Not on the listing: Deli Sandwiches'], contact: { same: ['phone'], changes: [] } }
+    await runListingPageWatch({ ...watch, pageHash: await hashOf(body), lastCheck: differs }, undefined, { apiKey: 'k', now: NOW })
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', ['s1'], shul.name, ['contact'], new Date(NOW).toISOString())
   })
   // Oct 25 (the user): every kind of place. A hotel has no hours to read,
   // so its page is read for its phone and email alone, by code.

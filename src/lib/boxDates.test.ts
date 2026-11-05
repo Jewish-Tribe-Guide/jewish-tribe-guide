@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeListing } from '@/test/providerFixtures'
-import { boxDate, confirmedAnywhere, confirmedByFor, hasAnyDate, sectionConfirmedAt, sectionSource, timesConfirmedAt } from './boxDates'
+import { boxDate, confirmedAnywhere, confirmedByFor, hasAnyDate, sectionConfirmedAt, sectionSource, timesConfirmedAt, withSourceBoxDated } from './boxDates'
 
 // The user, Oct 23: "We're dating what we're checking. We're not dating a
 // whole listing." Each box shows the date of what it shows.
@@ -51,5 +51,27 @@ describe('whether a place carries a date at all', () => {
     expect(confirmedAnywhere(makeListing({ googleSyncedAt: OCT(1) }))).toBe(false)
     expect(hasAnyDate(makeListing({ googleSyncedAt: OCT(1) }))).toBe(true)
     expect(hasAnyDate(makeListing({}))).toBe(false)
+  })
+})
+
+// The user, Nov 5: the Kosher Grill's phone, read off its website and
+// approved that morning, and its Contact box said "Not confirmed yet".
+describe('an approved change from an outside source', () => {
+  const before = { sectionConfirmed: { kosher: OCT(1) }, sectionFrom: { kosher: { from: 'Keystone-K', at: OCT(1) } } }
+
+  it('dates the box it changed, by that source, and keeps the others', () => {
+    const after = withSourceBoxDated(before, { named: 'The Kosher Grill', section: { section: 'contact' } }, OCT(5))
+    expect(boxDate(makeListing(after), 'contact')).toEqual({ confirmedAt: OCT(5), source: { from: 'The Kosher Grill', at: OCT(5) }, by: undefined })
+    expect(sectionConfirmedAt(makeListing(after), 'kosher')).toBe(OCT(1))
+  })
+
+  it('a shul’s part dates that part’s box', () => {
+    const after = withSourceBoxDated({}, { named: 'Kol Tzedek', part: { part: 'week' } }, OCT(5))
+    expect(sectionConfirmedAt(makeListing(after), 'week')).toBe(OCT(5))
+  })
+
+  it('a person’s change, or one that names no box, dates no box', () => {
+    expect(withSourceBoxDated(before, { section: { section: 'contact' } }, OCT(5))).toBe(before)
+    expect(withSourceBoxDated(before, { named: 'Refuah' }, OCT(5))).toBe(before)
   })
 })
