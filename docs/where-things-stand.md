@@ -486,8 +486,12 @@ Networking, Cemetery); no page sets Groups. On the drawing:
     get no Nusach: "Ashkenazi" there isn't a nusach, and both Chabads
     are among them. The schools' key `d` becomes `denomination`. A saved
     search filtered on either old value would stop matching.
-    Waiting on: the user's OK to both lists, then a prod go-ahead after a
-    dry run.
+    Dry run ready Nov 5 (`scripts/denomination-nusach.mjs`): live is 17
+    rows, 3 pages (Philly Synagogues, Philly Schools, Washington
+    Synagogues), 13 places, and the pending edit #1315 (South Philadelphia
+    Shtiebel, which carries "Orthodox (Ashkenazi)"). Template and seed match
+    already. Waiting on: the user's go-ahead for `--prod --apply`, then a
+    revalidate.
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Each kind of field asks only its own questions (was a map board,

@@ -116,6 +116,7 @@ for (const s of synagogues) {
     details: {
       legacyId: s.id,
       denomination: s.denomination,
+      ...(s.nusach ? { nusach: s.nusach } : {}),
       davening: daveningText,
       ...(whatsappUrl ? { whatsapp: whatsappUrl } : {}),
       ...(geo ? { geo } : {}),
