@@ -345,6 +345,10 @@ export function listingActions(item: DirectoryResource, category: CategoryConfig
 
 export type LeadBox = { title: string; field: CategoryField; href: string | null; text: CategoryField | null }
 
+/** What isn't kosher's heading on the listing: the admin's name for it,
+ *  set on the hechsher's caveat (Site → Category pages, its box's row). */
+export const caveatTitle = (fields: readonly CategoryField[]) => fields.find((f) => f.caveat)?.caveat?.title?.trim() || 'What isn’t kosher'
+
 /** The box an admin set a link to lead with (CategoryField.leadBox), when
  *  this listing has its link or its text: Mike's Chicken's "Delivery", its
  *  drop-off and cutoff, then Join the group. None where the link isn't

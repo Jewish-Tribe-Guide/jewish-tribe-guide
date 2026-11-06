@@ -110,6 +110,17 @@ describe('ListingView — who and whether', () => {
     expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
   })
 
+  it('heads what isn’t kosher with the name the admin gave its box', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const named = food.detailFields.map((f) => (f.caveat ? { ...f, caveat: { ...f.caveat, title: 'Not kosher here' } } : f))
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'] }, category: makeCategory({ ...food, detailFields: [...named, dishes] }) })
+    expect(within(screen.getByTestId('listing-caveat-box')).getByRole('heading', { name: 'Not kosher here' })).toBeInTheDocument()
+    // A grocery's says it in the details.
+    cleanup()
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' }, category: makeCategory({ ...food, detailFields: named }) })
+    expect(within(screen.getByTestId('listing-details')).getByText('Not kosher here')).toBeInTheDocument()
+  })
+
   // Board 4's handles: the listing's own boxes in the order the admin put them.
   it('puts the dishes and what isn’t kosher in the order the admin saved', () => {
     const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }

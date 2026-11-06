@@ -33,6 +33,7 @@ import {
   listingFacts,
   listingKind,
   leadBox,
+  caveatTitle,
   mainThing,
   nearbyListings,
   primaryLink,
@@ -431,7 +432,7 @@ export default function ListingView({ item, category, color, place = null, upvot
 
   const caveatBox = caveatFirst && (
     <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
-      <h2 className="text-base font-extrabold text-caution">What isn’t kosher</h2>
+      <h2 className="text-base font-extrabold text-caution">{caveatTitle(category.detailFields)}</h2>
       <p className="mt-0.5 text-[15px] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
     </section>
   )
@@ -591,7 +592,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
         <Row>
-          <span className="block text-[13px] font-semibold text-caution">What isn’t kosher</span>
+          <span className="block text-[13px] font-semibold text-caution">{caveatTitle(category.detailFields)}</span>
           <span className="text-caution" data-testid="listing-caveat-note">{caveat.title}</span>
         </Row>
       )}

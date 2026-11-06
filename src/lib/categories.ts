@@ -206,7 +206,13 @@ export type CategoryField = {
    *  explanation — on hover (desktop) and in the expanded card (mobile). Used
    *  for food establishments that carry a hechsher but aren't entirely kosher
    *  (the note says what isn't). The note is authored per listing, not generic. */
-  caveat?: { flagField: string; noteField: string }
+  caveat?: {
+    flagField: string
+    noteField: string
+    /** The listing's box for it, when the admin renamed it ("What isn’t
+     *  kosher" otherwise). */
+    title?: string
+  }
   /** Ties this field to one of the category's own filterable boolean fields
    *  (its `key`), e.g. a "Women's Hours" field tagged with the "Women's
    *  Tevillah" boolean's key. Groups audience-specific fields (a mikvah's

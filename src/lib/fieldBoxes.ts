@@ -1,6 +1,6 @@
 import type { CategoryField } from './categories'
 import { cardFieldChoices, LEAD_SLOTS, type LeadSlot, type ListingParts } from './listingParts'
-import { isCertificateLink } from './listingView'
+import { caveatTitle, isCertificateLink } from './listingView'
 
 // ── A page's fields, as its opened listing's boxes (Category pages step 3,
 // boards 17-19) ─────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const slot = (lead: LeadSlot) => (b: FieldBox): FieldBox => ({ ...b, moves: true, lead })
   const slots: Record<LeadSlot, FieldBox[]> = {
     link: prefixed('lead:', (k) => byKey.get(k)?.leadBox?.title.trim() || label(k)).map(slot('link')),
-    caveat: listing('caveat', 'What isn’t kosher').map(slot('caveat')),
+    caveat: listing('caveat', caveatTitle(fields)).map(slot('caveat')),
     main: [
       ...(main ? [{ id: 'main', title: parts.main!.title, kind: 'admin' as const, moves: false, fields: main }] : []),
       ...listing('minyanim', 'Davening times'),
@@ -142,6 +142,46 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
     basics.length || homes.get('contact')?.length ? [{ id: 'contact', title: 'Contact', kind: 'fixed', moves: false, fields: homes.get('contact') ?? [], basics }] : []
   const about: FieldBox[] = homes.get('about')?.length ? [{ id: 'about', title: 'About', kind: 'fixed', moves: false, fields: homes.get('about')! }] : []
   return [top, ...before, ...zone, ...contact, ...about, ...listing('hidden', 'Not on the listing')]
+}
+
+/** Whether a box's name is changed in place: the admin's, and the boxes the
+ *  listing makes itself, each named by a field (renameListingBox). Not the
+ *  Shabbos card, Top, Contact or About, which every listing has, nor the
+ *  davening times, whose boxes are named by what's in them. */
+export const boxRenames = (box: FieldBox) =>
+  box.kind === 'admin' ? box.id !== 'shabbos' : box.kind === 'listing' && box.id !== 'minyanim' && box.id !== 'hidden'
+
+/** A renamed box's name as it's typed: what's saved, which can be empty
+ *  while it's retyped, and what the listing says when it is. */
+export function boxName(page: FieldPage, box: FieldBox): { value: string; placeholder: string } {
+  const field = page.fields.find((f) => f.key === renameListingBox(page, box.id, '')?.key)
+  if (!field || box.kind === 'admin') return { value: box.title, placeholder: 'New box' }
+  if (box.id.startsWith('lead:')) return { value: field.leadBox?.title ?? '', placeholder: field.label }
+  if (box.id === 'caveat') return { value: field.caveat?.title ?? 'What isn’t kosher', placeholder: 'What isn’t kosher' }
+  if (box.id.startsWith('audience:')) return { value: field.filterLabel ?? field.label, placeholder: field.label }
+  return { value: field.label, placeholder: 'New box' }
+}
+
+/** Renaming a box the listing makes itself renames the field it's named by:
+ *  a link's own box ("Delivery"), the items ("Main dishes"), a list of
+ *  contacts, an audience's section, what isn't kosher. */
+export function renameListingBox(page: FieldPage, id: string, title: string): { key: string; patch: Partial<CategoryField> } | null {
+  const field = (key: string) => page.fields.find((f) => f.key === key)
+  if (id.startsWith('lead:')) {
+    const f = field(id.slice(5))
+    return f?.leadBox ? { key: f.key, patch: { leadBox: { ...f.leadBox, title } } } : null
+  }
+  if (id.startsWith('contacts:')) return field(id.slice(9)) ? { key: id.slice(9), patch: { label: title } } : null
+  if (id.startsWith('audience:')) return field(id.slice(9)) ? { key: id.slice(9), patch: { filterLabel: title } } : null
+  if (id === 'items') {
+    const f = page.fields.find((o) => homeOf(o, page) === 'items')
+    return f ? { key: f.key, patch: { label: title } } : null
+  }
+  if (id === 'caveat') {
+    const f = page.fields.find((o) => o.caveat)
+    return f ? { key: f.key, patch: { caveat: { ...f.caveat!, title } } } : null
+  }
+  return null
 }
 
 /** A box's line: its fields' names, the address and phone first. */

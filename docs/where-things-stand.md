@@ -661,6 +661,15 @@ after the deploy, dry run first, and needs its own go-ahead.
   a mikvah's sections) drag among each other, saved as `ListingParts.lead`
   (link, caveat, main; unset is that order), and the listing and its
   preview draw them in that order. No migration: it's in `listing_parts`.
+- **Renamed in place too, Nov 5** (the user: "even ones that could be
+  moved like Delivery"): the listing's own boxes take a new name where the
+  name comes from (`renameListingBox`). Delivery: the link's box title.
+  Main dishes and a list of contacts: the field's name. A mikvah's
+  section: its yes/no's filter word, so the filter chip says it too. What
+  isn't kosher: a new `caveat.title` on the hechsher, which the listing's
+  heading reads (`caveatTitle`). Not renamed: Davening times (the listing
+  heads its boxes Usual weekday times, This week's schedule, and so on),
+  This Shabbos, Top, Contact, About.
 - Not on the drawing, in the handles: they stay above the admin's boxes,
   and a mikvah's sections move as one (the listing draws them together).
   The main thing is one slot, so Main dishes and Davening times on one

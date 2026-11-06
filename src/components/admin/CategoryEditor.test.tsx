@@ -1012,3 +1012,45 @@ describe('CategoryEditor — + Add a field', () => {
     expect(await screen.findByRole('heading', { name: /^Parking\s*Yes or no$/ })).toBeInTheDocument()
   })
 })
+
+// The user, Nov 5: the boxes that move are renamed in place too, the new
+// name saved on the field it comes from.
+describe('CategoryEditor — renaming the listing’s own boxes', () => {
+  const food = baseCategory({
+    id: 'restaurant',
+    label: 'Food',
+    pluralLabel: 'Food',
+    detailFields: [
+      { key: 'kosherCert', label: 'Kosher Certification', type: 'select', renderAs: 'badge', filterable: true, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' }, options: [{ value: 'IKC', label: 'IKC' }] },
+      { key: 'kosherPartial', label: 'Everything here is kosher', type: 'boolean', renderAs: 'hidden' },
+      { key: 'kosherNote', label: 'What isn’t kosher?', type: 'textarea', renderAs: 'hidden' },
+      { key: 'delivery_whatsapp_group', label: 'Delivery WhatsApp Group', type: 'url', leadBox: { title: 'Delivery', text: 'delivery_details' } },
+      { key: 'delivery_details', label: 'Delivery Details', type: 'textarea' },
+      { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true },
+    ],
+  })
+  const fields = () => JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryConfig['detailFields']
+  const rename = async (user: ReturnType<typeof userEvent.setup>, from: string, to: string) => {
+    await openBox(user, from)
+    await user.click(screen.getByRole('button', { name: `Rename ${from}` }))
+    const name = within(screen.getByRole('region', { name: 'Fields' })).getByRole('textbox', { name: 'Name' })
+    await user.clear(name)
+    await user.type(name, `${to}{Enter}`)
+    await user.click(screen.getByRole('button', { name: to, expanded: true }))
+  }
+
+  it('renames Delivery, What isn’t kosher and Main dishes, and saves each on its field', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await rename(user, 'Delivery', 'Get it delivered')
+    await rename(user, 'What isn’t kosher', 'Not kosher here')
+    await rename(user, 'Main dishes', 'Dishes')
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const by = new Map(fields().map((f) => [f.key, f]))
+    expect(by.get('delivery_whatsapp_group')!.leadBox).toEqual({ title: 'Get it delivered', text: 'delivery_details' })
+    expect(by.get('kosherCert')!.caveat).toEqual({ flagField: 'kosherPartial', noteField: 'kosherNote', title: 'Not kosher here' })
+    expect(by.get('dishes')!.label).toBe('Dishes')
+  })
+})

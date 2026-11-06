@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, boxLine, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -278,5 +278,53 @@ describe('the admin’s boxes', () => {
   it('adds a field to a box, and follows a field’s key when its name changes', () => {
     expect(addToBox(hospitalParts, 'box:3', 'r').boxes![3].fields).toEqual(['transportation', 'r'])
     expect(renameKey(hospitalParts, 'eruv', 'eruvs').shabbos!.fields).toEqual(['eruvs', 'sukkah'])
+  })
+})
+
+// The user, Nov 5: "even ones that could be moved like Delivery". A box the
+// listing makes itself is renamed where its name comes from.
+describe('renaming the listing’s own boxes', () => {
+  it('renames every box that moves but the davening times, and none every listing has', () => {
+    const named = (page: FieldPage, parts: ListingParts = {}) => fieldBoxes(page, parts).filter(boxRenames).map((b) => b.title)
+    expect(named(food)).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
+    expect(named(shuls, { shabbos: { fields: ['denomination'] } })).toEqual([])
+    expect(named(hospital, hospitalParts)).toEqual(['Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also'])
+  })
+
+  it('says each one’s new name on the field it comes from', () => {
+    expect(renameListingBox(food, 'lead:delivery_whatsapp_group', 'Get it delivered')).toEqual({
+      key: 'delivery_whatsapp_group',
+      patch: { leadBox: { title: 'Get it delivered', text: 'delivery_details' } },
+    })
+    expect(renameListingBox(food, 'items', 'Dishes')).toEqual({ key: 'dishes', patch: { label: 'Dishes' } })
+    expect(renameListingBox(food, 'caveat', 'Not kosher here')).toEqual({
+      key: 'kosherCert',
+      patch: { caveat: { flagField: 'kosherPartial', noteField: 'kosherNote', title: 'Not kosher here' } },
+    })
+    expect(renameListingBox(food, 'box:0', 'x')).toBeNull()
+    const mikvah: FieldPage = {
+      fields: [
+        { key: 'women', label: 'Women’s Tevillah', type: 'boolean', filterLabel: 'Women’s' },
+        { key: 'womenHours', label: 'Women’s Hours', type: 'hours', audienceKey: 'women' },
+        contacts('liaisons', 'Liaisons'),
+      ],
+      hasAddress: true,
+      hasPhone: false,
+    }
+    expect(renameListingBox(mikvah, 'audience:women', 'Women')).toEqual({ key: 'women', patch: { filterLabel: 'Women' } })
+    expect(renameListingBox(mikvah, 'contacts:liaisons', 'Who to call')).toEqual({ key: 'liaisons', patch: { label: 'Who to call' } })
+  })
+
+  it('is typed over as saved, empty while it’s retyped', () => {
+    const box = (page: FieldPage, id: string) => fieldBoxes(page, {}).find((b) => b.id === id)!
+    expect(boxName(food, box(food, 'caveat'))).toEqual({ value: 'What isn’t kosher', placeholder: 'What isn’t kosher' })
+    const cleared: FieldPage = { ...food, fields: food.fields.map((f) => (f.leadBox ? { ...f, leadBox: { ...f.leadBox, title: '' } } : f)) }
+    expect(boxName(cleared, box(cleared, 'lead:delivery_whatsapp_group'))).toEqual({ value: '', placeholder: 'Delivery WhatsApp Group' })
+    expect(boxName(food, box(food, 'items'))).toEqual({ value: 'Main dishes', placeholder: 'New box' })
+  })
+
+  it('heads what isn’t kosher with its new name', () => {
+    const renamed = { ...food, fields: food.fields.map((f) => (f.caveat ? { ...f, caveat: { ...f.caveat, title: 'Not kosher here' } } : f)) }
+    expect(fieldBoxes(renamed, {}).map((b) => b.title)).toContain('Not kosher here')
   })
 })

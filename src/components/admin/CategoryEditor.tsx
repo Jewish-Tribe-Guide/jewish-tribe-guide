@@ -8,7 +8,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, fieldBoxes, removeBox, renameBox, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, fieldBoxes, removeBox, renameBox, renameListingBox, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -631,7 +631,11 @@ function CategoryEditorScreen({
               set('listingParts', listingPartsKey(next))
               if (order) set('fields', order.map((k) => draftFieldByKey.get(k)!))
             }}
-            onRename={(id, title) => set('listingParts', listingPartsKey(renameBox(parts, id, title)))}
+            onRename={(id, title) => {
+              const named = renameListingBox(fieldPage, id, title)
+              if (named) set('fields', draft.fields.map((f, i) => (pageFields[i]?.key === named.key ? { ...f, ...named.patch } : f)))
+              else set('listingParts', listingPartsKey(renameBox(parts, id, title)))
+            }}
             onRemoveBox={(id) => {
               set('listingParts', listingPartsKey(removeBox(parts, id)))
               setOpenBox(null)

@@ -111,7 +111,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     const added: CategoryField = {
       ...field,
       key,
-      ...(field.caveat && { caveat: { flagField: renamed.get(field.caveat.flagField) ?? field.caveat.flagField, noteField: renamed.get(field.caveat.noteField) ?? field.caveat.noteField } }),
+      ...(field.caveat && { caveat: { ...field.caveat, flagField: renamed.get(field.caveat.flagField) ?? field.caveat.flagField, noteField: renamed.get(field.caveat.noteField) ?? field.caveat.noteField } }),
     }
     const hidden = extra.map((c) => (c.showIf && renamed.has(c.showIf.field) ? { ...c, showIf: { ...c.showIf, field: renamed.get(c.showIf.field)! } } : c))
     setDraft((d) => ({ ...d, fields: [...d.fields, added], hiddenFields: [...d.hiddenFields, ...hidden], listingParts: inBox(d, box, key) }))
