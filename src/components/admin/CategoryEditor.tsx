@@ -16,7 +16,7 @@ import FieldBoxes from './FieldBoxes'
 import WalkBox from './WalkBox'
 import CardBox, { ShowOnLine, type CardLine } from './CardBox'
 import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
-import CategoryPreview from './CategoryPreview'
+import CategoryPreview, { type PreviewView } from './CategoryPreview'
 import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
@@ -91,6 +91,8 @@ function CategoryEditorScreen({
   const isNew = initial === null
   const community = useCommunitySlug()
   const [previewing, setPreviewing] = useState(false)
+  // Page, A listing or Adding, beside the settings and opened full size.
+  const [previewView, setPreviewView] = useState<PreviewView>('page')
   // The field whose own screen is open (board "Field"), by its place in
   // draft.fields, or the page's address or phone.
   const [openField, setOpenField] = useState<OpenField | null>(null)
@@ -307,7 +309,15 @@ function CategoryEditorScreen({
     pinColor: draft.pinColor || null,
   }
 
-  if (previewing) return <CategoryPreview category={previewCategory} onClose={() => history.back()} />
+  // Page, A listing or Adding (boards 4 and 5): the page on a computer, the
+  // other two as a phone shows them. No Adding where visitors can't add.
+  const views: { view: PreviewView; label: string }[] = [
+    { view: 'page', label: 'Page' },
+    { view: 'listing', label: 'A listing' },
+    ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
+  ]
+  const shownView = views.some((v) => v.view === previewView) ? previewView : 'page'
+  if (previewing) return <CategoryPreview category={previewCategory} view={shownView} onClose={() => history.back()} />
 
   const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
@@ -316,8 +326,25 @@ function CategoryEditorScreen({
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
   const preview = wide && (
-    <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start">
-      <PreviewBeside onOpen={openPreview}>{() => <CategoryPreview inline category={previewCategory} onClose={() => {}} onListings={setPlaceCount} />}</PreviewBeside>
+    <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
+      {(
+        <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+          {views.map((v) => (
+            <button
+              key={v.view}
+              type="button"
+              aria-pressed={shownView === v.view}
+              onClick={() => setPreviewView(v.view)}
+              className={`flex-1 min-h-10 rounded-md text-sm font-semibold cursor-pointer ${shownView === v.view ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
+        {() => <CategoryPreview inline view={shownView} category={previewCategory} onClose={() => {}} onListings={setPlaceCount} />}
+      </PreviewBeside>
     </aside>
   )
 

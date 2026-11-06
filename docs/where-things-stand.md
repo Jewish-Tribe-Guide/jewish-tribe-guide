@@ -647,10 +647,23 @@ after the deploy, dry run first, and needs its own go-ahead.
   filter chip solid, and "Make your own" titling the kinds.
 - Not on the drawing, in those fixes: the page menu stays the width Places'
   menus are (170px, the board's is as wide as its words).
-- Waiting on the user: whether to build the two drawn pieces still
-  missing, handles on the listing's own boxes (Delivery, What isn't kosher,
-  Main dishes; it needs their order saved and the listing to follow it)
-  and the preview's Page · A listing · Adding (board 5).
+- **Preview BUILT Nov 5** (the user: "Yes, build both"): beside a page's
+  settings, Page · A listing · Adding (boards 4, 5). A listing opens the
+  page's fullest place (the most fields answered, `fullestListing.ts`);
+  Adding is the real Add form, sending nothing. No Adding on a page
+  visitors can't add to. Tapping it opens that one full size.
+- Not on the drawing, in the preview: Page is a computer's, A listing and
+  Adding a phone's; Computer · Phone is gone.
+- Building next: handles on the listing's own boxes (Delivery, What isn't
+  kosher, Main dishes), their order saved and the listing following it.
+- Missed until the user's Nov 5 note ("new field still doesn't look like
+  the screens"): a field's own screen (boards 13-15) was never built.
+  A new field, and every saved one, still opens the old form (Type
+  dropdown, "value | label" lines, Show as, a Required checkbox). To build
+  after the handles.
+- The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
+  the listing puts a field in them by its kind, so one added there wouldn't
+  stay. Not drawn.
 
 ## Small open decisions
 

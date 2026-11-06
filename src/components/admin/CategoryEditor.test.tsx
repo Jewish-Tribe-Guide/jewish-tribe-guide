@@ -23,8 +23,10 @@ vi.mock('@/lib/fetchJson', async (original) => ({ ...(await original<typeof impo
 // The page beside the settings: the draft it's given, not the page itself
 // (that needs the whole site's providers).
 vi.mock('./CategoryPreview', () => ({
-  default: ({ category, inline }: { category: CategoryConfig; inline?: boolean }) => (
-    <p data-testid={inline ? 'preview-beside' : 'preview'}>{category.pluralLabel}</p>
+  default: ({ category, inline, view }: { category: CategoryConfig; inline?: boolean; view?: string }) => (
+    <p data-testid={inline ? 'preview-beside' : 'preview'} data-view={view}>
+      {category.pluralLabel}
+    </p>
   ),
 }))
 vi.mock('next/navigation', () => ({
@@ -263,13 +265,13 @@ describe('CategoryEditor — editing an existing category', () => {
     const user = userEvent.setup()
     renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     const preview = screen.getByRole('complementary', { name: 'Preview' })
-    expect(within(preview).getByRole('button', { name: 'Computer' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(preview).getByRole('button', { name: 'Page' })).toHaveAttribute('aria-pressed', 'true')
     await user.type(screen.getByLabelText('Name'), ' and more')
     // Drawn into the preview's own frame.
     const frame = preview.querySelector('iframe')!
     await waitFor(() => expect(frame.contentDocument!.body).toHaveTextContent('Groceries and more'))
-    // The page opens full size; Computer and Phone stay buttons of their
-    // own, never inside it (a button in a button doesn't hydrate).
+    // The page opens full size; the Page · A listing · Adding buttons stay
+    // their own, never inside it (a button in a button doesn't hydrate).
     const open = within(preview).getByRole('button', { name: 'Open the preview' })
     expect(within(open).queryAllByRole('button')).toEqual([])
     await user.click(open)
@@ -574,6 +576,36 @@ describe('CategoryEditor — editing an existing category', () => {
       const body = JSON.parse((secondCall[1] as RequestInit).body as string)
       expect(body.applyOptionRenames).toBeUndefined()
     })
+  })
+})
+
+// Boards 4 and 5: beside the settings, the page, one of its places
+// opened, or the form for adding one.
+describe('CategoryEditor — Page · A listing · Adding', () => {
+  const computer = () => vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+  const tabs = () => within(screen.getByRole('group', { name: 'Preview of' })).getAllByRole('button').map((b) => b.textContent)
+  // Drawn into the preview's own frame.
+  const shown = () => screen.getByRole('complementary', { name: 'Preview' }).querySelector('iframe')!.contentDocument!.querySelector('[data-testid="preview-beside"]')?.getAttribute('data-view')
+
+  it('switches what the preview shows, and opens that one full size', async () => {
+    computer()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: true } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(tabs()).toEqual(['Page', 'A listing', 'Adding'])
+    await waitFor(() => expect(shown()).toBe('page'))
+    await user.click(screen.getByRole('button', { name: 'A listing' }))
+    expect(screen.getByRole('button', { name: 'A listing' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(shown()).toBe('listing'))
+    await user.click(screen.getByRole('button', { name: 'Adding' }))
+    await waitFor(() => expect(shown()).toBe('adding'))
+    await user.click(screen.getByRole('button', { name: 'Open the preview' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
+  })
+
+  it('has no Adding where visitors can’t add', () => {
+    computer()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: false } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(tabs()).toEqual(['Page', 'A listing'])
   })
 })
 

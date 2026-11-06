@@ -21,6 +21,8 @@ import { PreviewCategoryProvider } from '@/lib/contentContext'
 import { PreviewSendProvider } from '@/lib/previewSend'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import ListingEditorScreen from './ListingEditorScreen'
+import ListingView from '@/components/resources/ListingView'
+import { fullestListing } from '@/lib/fullestListing'
 
 // A preview of the real directory page for a category — the exact same
 // GenericDirectory/ListingEditor components a visitor sees, driven
@@ -43,6 +45,10 @@ import ListingEditorScreen from './ListingEditorScreen'
 // colour, icon and chip label are the ones the editor is showing rather than
 // the ones still in the database.
 
+/** Which part of the page (board 5): the list, its most filled-in place
+ *  opened, or the form for adding one. */
+export type PreviewView = 'page' | 'listing' | 'adding'
+
 type Action =
   | { mode: 'edit'; listing: DirectoryResource }
   | { mode: 'map'; query?: string; filters?: MapFilters }
@@ -52,6 +58,7 @@ export default function CategoryPreview({
   onClose,
   inline = false,
   onListings,
+  view = 'page',
 }: {
   /** The draft, packaged as a full CategoryConfig — never saved. */
   category: CategoryConfig
@@ -62,6 +69,7 @@ export default function CategoryPreview({
   /** How many places the category has, once loaded: the editor's
    *  "N places". */
   onListings?: (count: number) => void
+  view?: PreviewView
 }) {
   const [realListings, setRealListings] = useState<DirectoryResource[] | null>(null)
   // Listings added/edited during this preview session — client-only, never
@@ -189,8 +197,17 @@ export default function CategoryPreview({
         />
       </ListingsProvider>
     )
+  } else if (view === 'adding') {
+    content = <ListingEditorScreen key="adding" heading={`Add to ${category.pluralLabel}`} category={category} onClose={onClose} backLabel={category.pluralLabel} />
   } else if (realListings === null) {
     content = <p className="text-sm text-muted p-4">Loading…</p>
+  } else if (view === 'listing') {
+    const fullest = fullestListing([...localListings, ...realListings], category)
+    content = fullest ? (
+      <ListingView item={fullest} category={category} color={getCategoryColor([category], category.id)} path="" foot={null} />
+    ) : (
+      <p className="text-sm text-muted p-4">No places on this page yet.</p>
+    )
   } else {
     // A locally added/edited listing shadows any real listing with the same id.
     const localIds = new Set(localListings.map((l) => l.id))
