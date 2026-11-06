@@ -618,6 +618,17 @@ after the deploy, dry run first, and needs its own go-ahead.
   "+ Show the photo" brings it back once it's off (not drawn). A field's
   screen still has "Also show on the collapsed card", which sets the same
   thing. The preview stays beside Show on the line, as on every sub-screen.
+- **Step 5 BUILT Nov 5** (redesign/oct18-fixes): "Remove this field" on a
+  saved field counts its answers first. With some, it opens Remove <field>
+  from <page>? (board 16): "N places lose their answer", "<page>'s filter
+  loses <field>" when it's a filter, Remove it / Keep it. Remove it goes
+  back to the page with one change; Save then clears the answers without
+  the amber warning. With none, or a field only this draft has, it just
+  goes. Address and Phone ask the same way. The amber warning at Save is
+  left only for when the count couldn't be had.
+- Not on the drawing, in step 5: Address's step also says "<page> comes
+  off the map". The field screen's own button still says "Remove" (the
+  boards say "Remove this field", as Address and Phone do).
 
 ## Small open decisions
 

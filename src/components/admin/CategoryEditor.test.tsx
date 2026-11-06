@@ -346,89 +346,139 @@ describe('CategoryEditor — editing an existing category', () => {
     expect(fetchJson).toHaveBeenCalledWith('/api/admin/categories/grocery?community=test-community', expect.objectContaining({ method: 'DELETE' }), 'Delete failed.')
   })
 
-  // The field-removal cleanup workflow: turning off "An address" on a
-  // category that already has listings with addresses must check first, and
-  // block the save behind an explicit confirmation — the whole reason this
-  // component needs coverage before it gets split apart.
-  describe('the field-removal cleanup confirmation', () => {
-    it('checks field-usage, then blocks the save behind a confirmation when listings have data', async () => {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
-      const onSaved = vi.fn()
+  // "Remove this field" on one places have answered (board 16): its own
+  // step says what goes, and once it's answered there Save doesn't ask
+  // again. Save's own gate is left for when the count couldn't be had.
+  describe('removing a field places have filled in', () => {
+    const usage = (u: { address?: number; phone?: number; fields?: Record<string, number> }) => ({ usage: { address: 0, phone: 0, fields: {}, ...u } })
+    const call = (n: number) => vi.mocked(fetchJson).mock.calls[n]!
+    const body = (n: number) => JSON.parse((call(n)[1] as RequestInit).body as string)
+
+    it('asks first, saying what goes, and Keep it changes nothing', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({ address: 3 }))
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+      await openBox(user, 'Contact')
+      await user.click(screen.getByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
 
-      await removeAddress(user)
-      await saveNow(user)
+      expect(await screen.findByRole('heading', { name: 'Remove Address from Groceries?' })).toBeInTheDocument()
+      expect(screen.getByText('3 places').parentElement).toHaveTextContent('3 places lose their answer')
+      expect(screen.getByText('Groceries comes off the map')).toBeInTheDocument()
+      expect(call(0)[0]).toBe('/api/admin/categories/grocery/field-usage?community=test-community')
+      expect(body(0)).toEqual({ address: true, phone: false, fieldKeys: [] })
 
-      expect(await screen.findByText('This will permanently clear data from existing listings')).toBeInTheDocument()
-      expect(screen.getByText(/Address — 3 listings/)).toBeInTheDocument()
-      expect(onSaved).not.toHaveBeenCalled()
-      expect(fetchJson).toHaveBeenCalledWith(
-        '/api/admin/categories/grocery/field-usage?community=test-community',
-        expect.objectContaining({ method: 'POST' }),
-        'Could not check existing listings.',
-      )
+      await user.click(screen.getByRole('button', { name: 'Keep it' }))
+      expect(await screen.findByRole('button', { name: 'Remove this field' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
-    it('proceeds straight to save when no listings have data in the removed field', async () => {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: {} } })
+    it('Remove it goes back to the page, and Save clears the answers without asking again', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({ address: 3 }))
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await openBox(user, 'Contact')
+      await user.click(screen.getByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await user.click(await screen.findByRole('button', { name: 'Remove it' }))
 
-      await removeAddress(user)
+      expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Address/ })).not.toBeInTheDocument()
       await saveNow(user)
-
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
       expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
-      // Off the map with it.
-      const body = JSON.parse((vi.mocked(fetchJson).mock.calls[1]![1] as RequestInit).body as string)
-      expect(body).toMatchObject({ hasAddress: false, capabilities: { map: false } })
+      expect(fetchJson).toHaveBeenCalledTimes(2)
+      expect(body(1)).toMatchObject({ hasAddress: false, capabilities: { map: false }, clearFields: { address: true, phone: false, keys: [] } })
     })
 
-    it('"Clear and save" confirms the cleanup and completes the save', async () => {
-      vi.mocked(fetchJson)
-        .mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
-        .mockResolvedValueOnce({ ok: true })
+    it('a field that is a filter says the filter loses it too', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({ fields: { hechsher: 71 } }))
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
+      const initial = baseCategory({
+        pluralLabel: 'Food',
+        detailFields: [{ key: 'hechsher', label: 'Kosher Certification', type: 'select', filterable: true, options: [{ value: 'IKC', label: 'IKC' }] }],
+      })
+      renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await openBox(user, 'Contact')
+      await user.click(screen.getByRole('button', { name: /^Kosher Certification/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove' }))
 
-      await removeAddress(user)
+      expect(await screen.findByRole('heading', { name: 'Remove Kosher Certification from Food?' })).toBeInTheDocument()
+      expect(screen.getByText('71 places').parentElement).toHaveTextContent('71 places lose their answer')
+      expect(screen.getByText('Food’s filter loses Kosher Certification')).toBeInTheDocument()
+      expect(body(0)).toEqual({ address: false, phone: false, fieldKeys: ['hechsher'] })
+      await user.click(screen.getByRole('button', { name: 'Remove it' }))
+      await screen.findByRole('heading', { name: 'Food' })
       await saveNow(user)
-      await screen.findByText('This will permanently clear data from existing listings')
-
-      await user.click(screen.getByRole('button', { name: /clear and save/i }))
-
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-      const secondCall = vi.mocked(fetchJson).mock.calls[1]!
-      const body = JSON.parse((secondCall[1] as RequestInit).body as string)
-      expect(body.clearFields).toEqual({ address: true, phone: false, keys: [] })
+      expect(fetchJson).toHaveBeenCalledTimes(2)
+      expect(body(1).clearFields).toEqual({ address: false, phone: false, keys: ['hechsher'] })
+      expect(body(1).fields.map((f: { key: string }) => f.key)).not.toContain('hechsher')
     })
 
-    it('Cancel backs out of the cleanup confirmation without saving', async () => {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
+    it('with no answers it just goes', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({}))
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
-
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
       await removeAddress(user)
+      expect(screen.queryByRole('button', { name: 'Remove it' })).not.toBeInTheDocument()
       await saveNow(user)
-      await screen.findByText('This will permanently clear data from existing listings')
+      await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+      expect(fetchJson).toHaveBeenCalledTimes(2)
+      expect(body(1)).toMatchObject({ hasAddress: false, capabilities: { map: false } })
+    })
 
-      await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+    it('a field this draft added just goes, without counting', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [] }))))
+      const user = userEvent.setup()
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ hasAddress: false, capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, map: false } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+      await openBox(user, 'Top')
+      await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+      await user.click(await screen.findByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+      await screen.findByRole('heading', { name: 'Groceries' })
+      vi.mocked(fetchJson).mockClear()
+      await user.click(screen.getByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await screen.findByRole('heading', { name: 'Groceries' })
+      expect(fetchJson).not.toHaveBeenCalled()
+    })
 
-      expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
-      expect(onSaved).not.toHaveBeenCalled()
-      expect(fetchJson).toHaveBeenCalledTimes(1)
+    describe('when the count could not be had, Save asks as it always has', () => {
+      beforeEach(() => {
+        vi.mocked(fetchJson)
+          .mockRejectedValueOnce(new Error('offline'))
+          .mockResolvedValueOnce(usage({ address: 3 }))
+      })
+
+      it('"Clear and save" confirms the cleanup and completes the save', async () => {
+        const onSaved = vi.fn()
+        const user = userEvent.setup()
+        renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+        await removeAddress(user)
+        await saveNow(user)
+        expect(await screen.findByText(/Address — 3 listings/)).toBeInTheDocument()
+        expect(onSaved).not.toHaveBeenCalled()
+        await user.click(screen.getByRole('button', { name: /clear and save/i }))
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+        expect(body(2).clearFields).toEqual({ address: true, phone: false, keys: [] })
+      })
+
+      it('Cancel backs out of the cleanup confirmation without saving', async () => {
+        const onSaved = vi.fn()
+        const user = userEvent.setup()
+        renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+        await removeAddress(user)
+        await saveNow(user)
+        await screen.findByText('This will permanently clear data from existing listings')
+        await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+        expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
+        expect(onSaved).not.toHaveBeenCalled()
+        expect(fetchJson).toHaveBeenCalledTimes(2)
+      })
     })
   })
 

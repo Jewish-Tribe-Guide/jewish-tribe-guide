@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -26,6 +26,7 @@ import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
 import { addButton } from './DragList'
 import DeletePage from './DeletePage'
+import RemoveField, { type Removing } from './RemoveField'
 import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
@@ -109,6 +110,11 @@ function CategoryEditorScreen({
   const [openLine, setOpenLine] = useState<CardLine | null>(null)
   const [showLine, setShowLine] = useState<'second' | 'third' | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
+  // "Remove this field" on one places have answered: its own step first
+  // (board 16), and the removals answered there, so Save doesn't ask again.
+  const [removing, setRemoving] = useState<Removing | null>(null)
+  const [confirmed, setConfirmed] = useState<ReadonlySet<string>>(new Set())
+  const counting = useRef(false)
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
   // count them here.
@@ -150,12 +156,13 @@ function CategoryEditorScreen({
     moveField,
   } = useCategoryFieldEditing(initial, seed)
 
-  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
+  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
     draft,
     initial,
     isNew,
     token,
     community,
+    confirmed,
     onSaved,
   })
 
@@ -171,11 +178,18 @@ function CategoryEditorScreen({
   // the category list.
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { editorPreview?: boolean; editorField?: OpenField; editorAdd?: FieldPickerScreen; editorLine?: 'second' | 'third' } | null
+      const state = e.state as {
+        editorPreview?: boolean
+        editorField?: OpenField
+        editorAdd?: FieldPickerScreen
+        editorLine?: 'second' | 'third'
+        editorRemove?: Removing
+      } | null
       setPreviewing(!!state?.editorPreview)
       setOpenField(state?.editorField ?? null)
       setAdding(state?.editorAdd ?? null)
       setShowLine(state?.editorLine ?? null)
+      setRemoving(state?.editorRemove ?? null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -211,6 +225,48 @@ function CategoryEditorScreen({
     }
     window.addEventListener('popstate', after)
     history.go(-back)
+  }
+
+  const confirmKey = (t: Removing['target']) => (typeof t === 'object' ? `field:${t.field}` : t)
+
+  function takeOff(target: Removing['target']) {
+    if (target === 'address') {
+      set('hasAddress', false)
+      setCap('map', false)
+    } else if (target === 'phone') set('hasPhone', false)
+    else {
+      const i = draft.fields.findIndex((f) => f.key === target.field)
+      if (i >= 0) removeField(i)
+    }
+  }
+
+  // A field only this draft has, or one no place has answered, just goes;
+  // otherwise its own step says what goes with it. When the count can't be
+  // had, it goes too, and Save asks as it always has.
+  async function askRemove(target: Removing['target'], label: string, filter: boolean) {
+    const saved =
+      !isNew &&
+      (target === 'address' ? initial!.hasAddress !== false : target === 'phone' ? initial!.hasPhone !== false : initial!.detailFields.some((f) => f.key === target.field))
+    // A second tap while it counts does nothing.
+    if (counting.current) return
+    counting.current = true
+    let count: number | null = 0
+    try {
+      if (saved) count = await countAnswers(target)
+    } finally {
+      counting.current = false
+    }
+    if (!count) {
+      // Nothing to lose is answered too; not knowing leaves it to Save.
+      setConfirmed((c) => (count === 0 ? new Set(c).add(confirmKey(target)) : new Set([...c].filter((k) => k !== confirmKey(target)))))
+      takeOff(target)
+      history.back()
+      return
+    }
+    const next: Removing = { target, label, count, filter }
+    setRemoving(next)
+    history.pushState({ ...(window.history.state ?? {}), editorRemove: next }, '')
+    window.scrollTo?.(0, 0)
   }
 
   function leave() {
@@ -289,7 +345,21 @@ function CategoryEditorScreen({
   }
 
   let screen: React.ReactNode
-  if (showLine) {
+  if (removing) {
+    screen = (
+      <RemoveField
+        removing={removing}
+        page={name}
+        onKeep={() => history.back()}
+        onRemove={() => {
+          takeOff(removing.target)
+          setConfirmed((c) => new Set(c).add(confirmKey(removing.target)))
+          // Past the field's screen too, to the page.
+          history.go(-2)
+        }}
+      />
+    )
+  } else if (showLine) {
     screen = (
       <ShowOnLine
         line={showLine}
@@ -337,13 +407,7 @@ function CategoryEditorScreen({
         <AdminBack back={{ label: name, onClick: () => history.back() }} title={address ? 'Address' : 'Phone'} />
         <button
           type="button"
-          onClick={() => {
-            if (address) {
-              set('hasAddress', false)
-              setCap('map', false)
-            } else set('hasPhone', false)
-            history.back()
-          }}
+          onClick={() => void askRemove(openField, address ? 'Address' : 'Phone', false)}
           className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer"
         >
           Remove this field
@@ -384,8 +448,11 @@ function CategoryEditorScreen({
             .map((other) => ({ key: other.key, label: other.label }))}
           onChange={(patch) => updateField(i, patch)}
           onRemove={() => {
-            removeField(i)
-            history.back()
+            if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
+            else {
+              removeField(i)
+              history.back()
+            }
           }}
           onMove={(dir) => {
             moveField(i, dir)
