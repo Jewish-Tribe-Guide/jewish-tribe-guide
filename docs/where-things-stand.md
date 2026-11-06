@@ -673,7 +673,8 @@ after the deploy, dry run first, and needs its own go-ahead.
   the old form as it was (only for some places, an audience, a link's own
   box, a badge in place of another, What isn't kosher, the order), so
   nothing a saved field uses is lost; it repeats Name and the choices. A
-  community admin can't reach those settings now. The Adding preview
+  community admin can't reach those settings now. Kept that way (the
+  user, Nov 5: "Keep under More"). The Adding preview
   doesn't outline the field being edited. Boards 14-15 (a ready-made
   field, fixed or local) are still waiting on the user, so no
   "Ready-made" pill yet.
