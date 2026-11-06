@@ -16,8 +16,7 @@ import { pageToCopy } from '@/lib/readyMade'
 import CategoryPreview from './CategoryPreview'
 import EruvimManager from './EruvimManager'
 import DeletePage from './DeletePage'
-import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
-import { getCategoryColor } from '@/lib/categoryColor'
+import { CardBandImageField, IconField } from './CategoryFormFields'
 import { AdminBack, AdminBox, AdminEmpty, AdminRow, AdminSwitch } from './AdminUI'
 import { ERUV_SCREEN, SITE_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
 
@@ -421,18 +420,18 @@ export function SingletonEditor({
             />
           </label>
           <IconField icon={icon} onChange={setIcon} iconImageUrl={iconImageUrl} onIconImageUrl={setIconImageUrl} token={token} />
-          <CardBackgroundField
-            cardImageUrl={cardImageUrl}
-            onCardImageUrl={setCardImageUrl}
-          />
-          <CardBandImageField
-            cardBandImageUrl={cardBandImageUrl}
-            onCardBandImageUrl={setCardBandImageUrl}
-            fallbackImageUrl={cardImageUrl}
-            previewIcon={icon}
-            previewColor={getCategoryColor([category], category.id)}
-            token={token}
-          />
+          <div>
+            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Banner photo</span>
+            <CardBandImageField
+              cardBandImageUrl={cardBandImageUrl}
+              cardImageUrl={cardImageUrl}
+              onChange={(band, card) => {
+                setCardBandImageUrl(band)
+                setCardImageUrl(card)
+              }}
+              token={token}
+            />
+          </div>
         </div>
       </AdminBox>
 

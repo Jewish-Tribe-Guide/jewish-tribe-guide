@@ -58,7 +58,7 @@ export default function FieldPicker({
         <button
           type="button"
           onClick={() => onAdd(row)}
-          className="self-start min-h-11 px-5 rounded-lg bg-primary text-white text-[15px] font-semibold hover:bg-primary/90 cursor-pointer"
+          className="self-start min-h-12 px-[22px] rounded-[10px] bg-primary text-white text-[15px] font-bold hover:bg-primary/90 cursor-pointer"
         >
           Add to {pageName}
         </button>
@@ -70,7 +70,7 @@ export default function FieldPicker({
     return (
       <div className="flex flex-col gap-4 [&>section]:max-w-[760px]">
         <AdminBack back={{ label: 'Add a field', onClick: onBack }} title="What kind of field?" />
-        <AdminBox>
+        <AdminBox title="Make your own">
           {MAKE_OWN_KINDS.map((k) => (
             <AdminRow key={k.type} onClick={() => onMakeOwn(k.type, screen.name ?? '')} name={k.label} line={k.like} />
           ))}
@@ -102,9 +102,12 @@ export default function FieldPicker({
       ) : (
         shown.length > 0 && (
           <AdminBox>
-            {shown.map((r) => (
-              <AdminRow key={r.id} onClick={() => onScreen({ at: 'look', id: r.id })} name={r.label} line={r.line} />
-            ))}
+            {/* Scrolls in its box, so Make your own stays in sight (board 7). */}
+            <div className="max-h-[620px] overflow-y-auto rounded-[10px]">
+              {shown.map((r) => (
+                <AdminRow key={r.id} onClick={() => onScreen({ at: 'look', id: r.id })} name={r.label} line={r.line} />
+              ))}
+            </div>
           </AdminBox>
         )
       )}
@@ -113,7 +116,7 @@ export default function FieldPicker({
   )
 }
 
-const chip = 'rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[13px] text-slate-700'
+const chip = 'rounded-full bg-slate-100 px-2.5 py-[3px] text-xs font-semibold text-slate-700'
 
 /** Board 11: the field as a page shows it, in the list, the filter and on
  *  Add a place. */
@@ -127,8 +130,8 @@ function Samples({ field, pageName, pageLabel }: { field: CategoryField; pageNam
     <div className="flex flex-wrap gap-3 max-w-[760px]">
       {onRow && (
         <Pane title="In the list">
-          <div className="flex items-center gap-2.5">
-            <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-[13px] font-bold text-slate-700">
+          <div className="flex items-center gap-2.5 rounded-[10px] border border-slate-100 p-2.5">
+            <span aria-hidden="true" className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-indigo-100 text-[13px] font-bold text-indigo-800">
               {pageName.charAt(0).toUpperCase()}
             </span>
             <span className="flex-1 min-w-0 flex flex-col gap-1">
@@ -144,7 +147,7 @@ function Samples({ field, pageName, pageLabel }: { field: CategoryField; pageNam
           <b className="text-sm">{f.label}</b>
           <div className="flex flex-wrap gap-1.5">
             {filterChips.map((c, i) => (
-              <span key={c} className={i === 0 ? 'rounded-full border border-primary bg-blue-50 px-2.5 py-0.5 text-[13px] text-primary' : chip}>
+              <span key={c} className={i === 0 ? `${chip} !bg-primary !text-white` : chip}>
                 {c}
               </span>
             ))}
@@ -178,8 +181,8 @@ function Samples({ field, pageName, pageLabel }: { field: CategoryField; pageNam
 
 function Pane({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section aria-label={title} className="flex-[1_1_220px] min-w-0 flex flex-col gap-2 rounded-[10px] border border-slate-200 bg-white p-3.5">
-      <h3 className="m-0 text-xs font-bold uppercase tracking-wide text-slate-500">{title}</h3>
+    <section aria-label={title} className="flex-[1_1_100%] min-w-0 flex flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-3.5">
+      <h3 className="m-0 text-xs font-bold uppercase tracking-[.04em] text-slate-500">{title}</h3>
       {children}
     </section>
   )

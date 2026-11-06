@@ -17,7 +17,7 @@ import WalkBox from './WalkBox'
 import CardBox, { ShowOnLine, type CardLine } from './CardBox'
 import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview from './CategoryPreview'
-import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
+import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
 import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
@@ -113,6 +113,9 @@ function CategoryEditorScreen({
   // "Remove this field" on one places have answered: its own step first
   // (board 16), and the removals answered there, so Save doesn't ask again.
   const [removing, setRemoving] = useState<Removing | null>(null)
+  // The banner picker's memory of the photo behind its crop, kept here: the
+  // picker unmounts whenever the Banner photo row closes.
+  const [bannerOriginal, setBannerOriginal] = useState<File | string | null>(null)
   const [confirmed, setConfirmed] = useState<ReadonlySet<string>>(new Set())
   const counting = useRef(false)
   const wide = useIsDesktop('(max-width: 1023px)')
@@ -512,17 +515,17 @@ function CategoryEditorScreen({
             iconFields={<IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />}
             banner={bandImageFor(previewCategory)}
             bannerFields={
-              <>
-                <CardBandImageField
-                  cardBandImageUrl={draft.cardBandImageUrl}
-                  onCardBandImageUrl={(v) => set('cardBandImageUrl', v)}
-                  fallbackImageUrl={draft.cardImageUrl}
-                  previewIcon={draft.icon}
-                  previewColor={pinColor}
-                  token={token}
-                />
-                <CardBackgroundField cardImageUrl={draft.cardImageUrl} onCardImageUrl={(v) => set('cardImageUrl', v)} />
-              </>
+              <CardBandImageField
+                cardBandImageUrl={draft.cardBandImageUrl}
+                cardImageUrl={draft.cardImageUrl}
+                onChange={(band, card) => {
+                  set('cardBandImageUrl', band)
+                  set('cardImageUrl', card)
+                }}
+                token={token}
+                originalSource={bannerOriginal}
+                onOriginalSourceChange={setBannerOriginal}
+              />
             }
           />
         </AdminBox>
@@ -690,7 +693,8 @@ function CategoryEditorScreen({
             <CleanupConfirm cleanup={pendingCleanup} initial={initial} saving={saving} onCancel={cancelCleanup} onConfirm={() => save()} />
           ) : null}
         </div>
-        {preview}
+        {/* Not beside Add a field or a removal (boards 7-12, 16). */}
+        {!adding && !removing && preview}
       </div>
 
       {!(pendingIdRename || pendingRename || pendingCleanup) && (

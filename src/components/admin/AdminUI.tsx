@@ -145,7 +145,13 @@ export function AdminHead({
           {inner}
         </button>
       )}
-      <h1 className="flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:order-last md:basis-full md:whitespace-normal md:text-[26px]">{title}</h1>
+      {/* Under the way back on a computer, or beside what's `right` of it
+          when the way back is the phone's alone (board 1). */}
+      <h1
+        className={`flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:whitespace-normal md:text-[26px] ${phoneOnly ? '' : 'md:order-last md:basis-full'}`}
+      >
+        {title}
+      </h1>
       {right}
     </header>
   )

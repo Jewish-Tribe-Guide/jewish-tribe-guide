@@ -207,6 +207,22 @@ describe('CategoryEditor — editing an existing category', () => {
     expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
   })
 
+  // The Home page's photo picker (the user, Nov 5), not a banner upload
+  // with a preview beside it and a second pasted address under it.
+  it('has one banner photo, the older pasted one standing in until it is removed', async () => {
+    const user = userEvent.setup()
+    const photo = 'https://example.com/old.jpg'
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ cardImageUrl: photo })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: /^Banner photo/ }))
+    expect(screen.queryByText('Desktop directory banner (optional)')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Paste URL' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await saveNow(user)
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body).toMatchObject({ cardImageUrl: null, cardBandImageUrl: null })
+  })
+
   it('takes it off the site with the switch', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
@@ -864,6 +880,20 @@ describe('CategoryEditor — + Add a field', () => {
     expect(screen.getByText('Hours')).toBeInTheDocument()
   })
 
+  // Boards 7-12 have the picker to themselves: board 11 is its own preview.
+  it('takes the page from beside it, and puts it back after', async () => {
+    const user = userEvent.setup()
+    // A computer: the page sits beside the settings.
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    await openAdd(user)
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+    await screen.findByRole('heading', { name: 'Groceries' })
+    expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
+  })
+
   it('narrows to one page’s fields from the page menu', async () => {
     const user = userEvent.setup()
     await openAdd(user)
@@ -905,6 +935,7 @@ describe('CategoryEditor — + Add a field', () => {
     await user.type(screen.getByRole('searchbox', { name: 'Search fields' }), 'parking')
     expect(screen.getByText('No ready-made field called “parking”')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Make your own: Parking' }))
+    expect(screen.getByRole('region', { name: 'Make your own' })).toBeInTheDocument()
     expect(listed()).toEqual([
       'ChoicesLike Food Type: Meat, Dairy, Parve',
       'Yes or noLike Shabbat friendly',

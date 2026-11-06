@@ -633,6 +633,24 @@ after the deploy, dry run first, and needs its own go-ahead.
 - Not on the drawing, in step 5: Address's step also says "<page> comes
   off the map". The field screen's own button still says "Remove" (the
   boards say "Remove this field", as Address and Phone do).
+- **The user's notes on the build, Nov 5**, fixed the same day: "+ New
+  category page" sits right of the heading on a computer, level with it
+  (board 1; it had been above the heading). Banner photo opens to the Home
+  page photo's picker (Upload image, Paste image, Paste URL, Remove, a wide
+  crop), in place of the banner upload with its own preview and a second
+  pasted-address box; a page's older pasted photo shows there until a new
+  one is chosen, and choosing or removing one clears it, so a page has one
+  photo. The Map and Eruv pages' Basics use the same picker. Add a field
+  matches boards 7-12: no page beside it (or beside a removal, board 16),
+  the list scrolls in its own box with Make your own field under it, a
+  field's samples stacked one per row with filled chips, the first
+  filter chip solid, and "Make your own" titling the kinds.
+- Not on the drawing, in those fixes: the page menu stays the width Places'
+  menus are (170px, the board's is as wide as its words).
+- Waiting on the user: whether to build the two drawn pieces still
+  missing, handles on the listing's own boxes (Delivery, What isn't kosher,
+  Main dishes; it needs their order saved and the listing to follow it)
+  and the preview's Page · A listing · Adding (board 5).
 
 ## Small open decisions
 

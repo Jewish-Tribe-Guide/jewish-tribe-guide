@@ -54,6 +54,12 @@ test('creating a category through the real editor makes it live, and deleting it
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
   await page.goto('/philly/admin/categories')
+  // Board 1: on a computer the button is level with the heading, at its right.
+  const heading = await visible(page.getByRole('heading', { name: 'Category pages', level: 1 })).boundingBox()
+  const add = await visible(page.getByRole('button', { name: '+ New category page' })).boundingBox()
+  expect(add!.y + add!.height / 2).toBeGreaterThan(heading!.y)
+  expect(add!.y + add!.height / 2).toBeLessThan(heading!.y + heading!.height)
+  expect(add!.x).toBeGreaterThan(heading!.x + heading!.width / 2)
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
   await visible(page.getByRole('button', { name: 'Make your own page' })).click()
