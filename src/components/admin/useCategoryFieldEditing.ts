@@ -7,6 +7,8 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
+import { addToBox, renameKey } from '@/lib/fieldBoxes'
+import { listingPartsFromKey, listingPartsKey } from '@/lib/listingParts'
 import { slugify } from '@/lib/routes'
 import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEditorLogic'
 
@@ -73,17 +75,29 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     setDraft((d) => ({ ...d, capabilities: { ...d.capabilities, [key]: value } }))
   }
 
+  // A field's key follows its name until it's named (CategoryFieldEditor),
+  // and the boxes it's in follow the key. One not named yet is in its box
+  // by its place, `#<i>`.
   function updateField(i: number, patch: Partial<CategoryField>) {
-    setDraft((d) => ({
-      ...d,
-      fields: d.fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)),
-    }))
+    setDraft((d) => {
+      const from = d.fields[i]?.key || `#${i}`
+      const moved = patch.key !== undefined && (patch.key || `#${i}`) !== from
+      return {
+        ...d,
+        fields: d.fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)),
+        ...(moved && { listingParts: listingPartsKey(renameKey(listingPartsFromKey(d.listingParts), from, patch.key || `#${i}`)) }),
+      }
+    })
   }
+
+  // A field added from one of the admin's boxes goes in it (board 17).
+  const inBox = (d: Draft, box: string | null | undefined, key: string) =>
+    box ? listingPartsKey(addToBox(listingPartsFromKey(d.listingParts), box, key)) : d.listingParts
 
   // A ready-made field (board 11's Add): copied as it is on its page, under
   // its own key unless this page already uses it, with its caveat's flag and
   // note. Returns where it landed.
-  function addReadyField(field: CategoryField, companions: CategoryField[] = []): number {
+  function addReadyField(field: CategoryField, companions: CategoryField[] = [], box?: string | null): number {
     const used = [...draft.fields, ...draft.hiddenFields]
     const key = nextFieldKey(used, [], field.key || slugifyFieldKey(field.label))
     used.push({ key } as CategoryField)
@@ -100,15 +114,15 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
       ...(field.caveat && { caveat: { flagField: renamed.get(field.caveat.flagField) ?? field.caveat.flagField, noteField: renamed.get(field.caveat.noteField) ?? field.caveat.noteField } }),
     }
     const hidden = extra.map((c) => (c.showIf && renamed.has(c.showIf.field) ? { ...c, showIf: { ...c.showIf, field: renamed.get(c.showIf.field)! } } : c))
-    setDraft((d) => ({ ...d, fields: [...d.fields, added], hiddenFields: [...d.hiddenFields, ...hidden] }))
+    setDraft((d) => ({ ...d, fields: [...d.fields, added], hiddenFields: [...d.hiddenFields, ...hidden], listingParts: inBox(d, box, key) }))
     return draft.fields.length
   }
 
   // Board 12's Make your own: a field of the picked kind, named as typed. One
   // with no name yet takes its key from the name typed on its screen.
-  function addOwnField(type: FieldType, label = ''): number {
+  function addOwnField(type: FieldType, label = '', box?: string | null): number {
     const key = label.trim() ? nextFieldKey(draft.fields, draft.hiddenFields, slugifyFieldKey(label)) : ''
-    setDraft((d) => ({ ...d, fields: [...d.fields, { key, label, type, renderAs: 'row' }] }))
+    setDraft((d) => ({ ...d, fields: [...d.fields, { key, label, type, renderAs: 'row' }], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
     return draft.fields.length
   }
 

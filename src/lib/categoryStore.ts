@@ -231,6 +231,9 @@ export async function createCategory(community: string, input: {
    *  what the slug implies, so creating a category works on a database
    *  without migration 088. */
   placeKind?: PlaceKind
+  /** A page copied from another community's keeps its boxes (readyMade.ts).
+   *  Saved only when there are any, so creating works without migration 066. */
+  listingParts?: ListingParts | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'listing'
@@ -290,6 +293,7 @@ export async function createCategory(community: string, input: {
     icon_image_url: input.iconImageUrl?.trim() || null,
     active: input.active ?? true,
     ...(input.placeKind && { place_kind: input.placeKind }),
+    ...(input.listingParts && hasListingParts(input.listingParts) && { listing_parts: input.listingParts }),
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()

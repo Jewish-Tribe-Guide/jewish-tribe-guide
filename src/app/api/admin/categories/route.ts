@@ -1,5 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
+import { parseListingParts, type ListingParts } from '@/lib/listingParts'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
 import { countApprovedByCategory } from '@/lib/resourceStore'
@@ -51,6 +52,8 @@ type CreateBody = {
   pinColor?: string | null
   active?: boolean
   placeKind?: PlaceKind
+  /** A copied page's boxes (listingParts.ts). */
+  listingParts?: ListingParts | null
 }
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
       pinColor: body.pinColor,
       active: body.active,
       placeKind: isPlaceKind(body.placeKind) ? body.placeKind : undefined,
+      listingParts: body.listingParts ? parseListingParts(body.listingParts) : undefined,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

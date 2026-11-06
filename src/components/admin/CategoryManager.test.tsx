@@ -184,7 +184,8 @@ describe('CategoryManager', () => {
       const open = vi.fn()
       show([shul], { editingId: 'cat:new:school', everywhere, onOpenEditor: open })
       expect(await screen.findByRole('heading', { name: 'Schools' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /^Denomination/ })).toBeInTheDocument()
+      // Its fields, in the boxes they show in.
+      expect(screen.getAllByText(/Denomination/).length).toBeGreaterThan(0)
       await user.click(screen.getByRole('button', { name: /What kind of places\?/ }))
       expect(open).toHaveBeenLastCalledWith('cat:new')
     })

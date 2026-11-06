@@ -246,6 +246,8 @@ export function useCategorySaveWorkflow({
         ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList).length ? walkListFromKey(draft.walkList) : null }),
         // And for migration 066.
         ...(!isNew && draft.listingParts !== toDraft(initial).listingParts && { listingParts: listingPartsToSave(draft.listingParts) }),
+        // A new page's boxes, when it has any (a copy of Hospitals).
+        ...(isNew && listingPartsToSave(draft.listingParts) && { listingParts: listingPartsToSave(draft.listingParts) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),

@@ -65,12 +65,15 @@ test('creating a category through the real editor makes it live, and deleting it
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
   await expect(page).toHaveURL(/\/philly\/admin\/categories\/cat:e2e-admin-write-/)
 
-  // + Add a field: the ready-made list loads (boards 7 and 11), and a field
-  // from it is saved onto the page.
+  // + Add a field, from a box of Fields (board 17): the ready-made list
+  // loads (boards 7 and 11), and a field from it is saved onto the page, in
+  // the box it shows in, opened.
+  await visible(page.getByRole('button', { name: 'Top', exact: true })).click()
   await visible(page.getByRole('button', { name: '+ Add a field' })).click()
   await visible(page.getByRole('button', { name: /^Hours/ })).click()
   await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
-  await expect(visible(page.getByRole('checkbox', { name: 'Hours' }))).toBeChecked()
+  await expect(visible(page.getByRole('button', { name: 'Contact', expanded: true }))).toBeVisible()
+  await expect(visible(page.getByRole('button', { name: /^Hours/ }))).toBeVisible()
   await visible(page.getByRole('button', { name: 'Save' })).click()
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
 
@@ -121,7 +124,11 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   // No address on this category — sidesteps the real Google Places
   // autocomplete AddressInput uses, which this suite doesn't drive anywhere
   // else; a plain name-only listing is enough to prove the direct-add path.
-  await visible(page.getByLabel('An address')).uncheck()
+  // A press while typing only puts the keyboard away, so leave the name first.
+  await visible(page.getByLabel('Name', { exact: true })).blur()
+  await visible(page.getByRole('button', { name: 'Contact', exact: true })).click()
+  await visible(page.getByRole('button', { name: /^Address/ })).click()
+  await visible(page.getByRole('button', { name: 'Remove this field' })).click()
   // The create-time visibility toggle this test exists to cover — see
   // AGENTS.md's testing conventions: this failed against the pre-fix
   // CategoryEditor (no such control existed; every category was created

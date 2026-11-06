@@ -543,8 +543,8 @@ after the deploy, dry run first, and needs its own go-ahead.
   On the site, Basics (icon beside the name, Banner photo row),
   Fields, Questions (two No / Yes) and "Delete this page" at its foot
   (the Eruv's counts its eruvim and watches first). On a phone Basics,
-  Fields and Questions open folded, each with its line. Ticking "An
-  address" puts the page on the map. `/categories/restaurant` (no
+  Fields and Questions open folded, each with its line. Adding Address
+  puts the page on the map (a tick until step 3). `/categories/restaurant` (no
   `cat:`) opens the page now.
 - Not on the drawing, in step 1: the Map has no drawn place yet, so for
   now it's a row ("Map page") opening its On the site switch, until the
@@ -570,6 +570,32 @@ after the deploy, dry run first, and needs its own go-ahead.
   choices included, until boards 14-15 (shared or local choices) are
   decided. A new page's icon is its emoji until it has a line glyph.
   Test pages in the shared dev/test project show in the list on dev.
+- **Step 3 BUILT Nov 5** (redesign/oct18-fixes): Fields is the opened
+  listing's boxes in a visitor's order (`fieldBoxes.ts`, read the way
+  ListingView lays them out): Top, then the boxes the listing makes itself
+  (Food's Delivery, What isn't kosher, Main dishes, Davening times), the
+  admin's boxes with This Shabbos among them, lists of contacts in no box,
+  Contact, About. A row opens in place to its fields; Address and Phone
+  are rows in Contact, each opening a screen with "Remove this field" (the
+  "Every place has" ticks are gone; Hours, Website and Photo are fields
+  like any other). The admin's boxes drag, rename in place and have the
+  trash; a field moves by dragging it onto another box's row (dashed blue,
+  or red with why when it can't go there), or with the arrow keys on its
+  handle. "+ Add a box" opens a New box, its name selected. A field added
+  from one of the admin's boxes goes in it, and the box a new field lands
+  in opens. Within a walk is its own box ("+ Add a page", rows "Food · Up
+  to 30 min · by Food Type" opening in place). Copying a page now saves
+  its boxes too (the create never sent them). ListingPartsEditor is gone.
+- Not on the drawing, in step 3: the boxes the listing makes itself have
+  no handle, since nothing saved can move them (the drawing gives
+  Delivery, What isn't kosher and Main dishes one). A main card and a
+  Shabbos card can be taken off but not added (no drawn way); "+ Add
+  audience group" sits beside "+ Add a box". A New box left empty isn't
+  saved. Within a walk shows on every page with an address, "None" when
+  it has none (boards 4 and 6 leave it out, but it's the only way to add
+  one). The preview's Page · A listing · Adding tabs aren't built; it's
+  still Computer · Phone. A press while a name is being typed only puts
+  the keyboard away, so the first tap on a row after typing doesn't open it.
 
 ## Small open decisions
 

@@ -7,19 +7,22 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
-import { listingPartsToSave } from '@/lib/listingParts'
+import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
+import { addBox, fieldBoxes, removeBox, renameBox, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
-import { ListingPartsEditor, WalkListsEditor } from './ListingPartsEditor'
+import FieldBoxes from './FieldBoxes'
+import WalkBox from './WalkBox'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
-import { fieldShows, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
+import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
-import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminRows, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
+import { addButton } from './DragList'
 import DeletePage from './DeletePage'
 import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
@@ -31,6 +34,9 @@ import { useCommunitySlug } from '@/lib/communityContext'
 // to its own screen, board "Field"), the map, and the "Not listed here?"
 // line, with the page itself beside them on a computer or a phone and one
 // Save bar. A new category starts by picking its kind (brief, question 8).
+
+/** A field's screen: its place in draft.fields, or the address or phone. */
+type OpenField = number | 'address' | 'phone'
 
 type Props = {
   token: string
@@ -83,12 +89,20 @@ function CategoryEditorScreen({
   const community = useCommunitySlug()
   const [previewing, setPreviewing] = useState(false)
   // The field whose own screen is open (board "Field"), by its place in
-  // draft.fields.
-  const [openField, setOpenField] = useState<number | null>(null)
-  // "+ Add a field"'s screens (boards 7-12), when one is open.
+  // draft.fields, or the page's address or phone.
+  const [openField, setOpenField] = useState<OpenField | null>(null)
+  // "+ Add a field"'s screens (boards 7-12), when one is open, and the box
+  // it was opened from.
   const [adding, setAdding] = useState<FieldPickerScreen | null>(null)
-  // Back from a field or the picker, the Fields box is still open on a phone.
+  const [addingTo, setAddingTo] = useState<string | null>(null)
+  // Back from a field or the picker, the Fields box is still open on a phone,
+  // with the box it was in (boards 17-19).
   const [fieldsOpen, setFieldsOpen] = useState(false)
+  const [openBox, setOpenBox] = useState<string | null>(null)
+  // A box just added, its name selected to type over (board 19).
+  const [freshBox, setFreshBox] = useState<string | null>(null)
+  // The fields there were before an add, to find the one added.
+  const [landing, setLanding] = useState<ReadonlySet<string> | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
@@ -125,17 +139,10 @@ function CategoryEditorScreen({
     addOwnField,
     removeField,
     addAudienceGroup,
-    isPlainHoursField,
-    isWebsiteField,
-    isPhotoField,
     toggleHoursField,
     toggleWebsiteField,
-    togglePhotoField,
     toggleFieldCaveat,
     moveField,
-    managedHoursIndex,
-    managedWebsiteIndex,
-    managedPhotoIndex,
   } = useCategoryFieldEditing(initial, seed)
 
   const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
@@ -159,7 +166,7 @@ function CategoryEditorScreen({
   // the category list.
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { editorPreview?: boolean; editorField?: number; editorAdd?: FieldPickerScreen } | null
+      const state = e.state as { editorPreview?: boolean; editorField?: OpenField; editorAdd?: FieldPickerScreen } | null
       setPreviewing(!!state?.editorPreview)
       setOpenField(state?.editorField ?? null)
       setAdding(state?.editorAdd ?? null)
@@ -173,7 +180,7 @@ function CategoryEditorScreen({
     history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
 
-  function showField(i: number) {
+  function showField(i: OpenField) {
     setFieldsOpen(true)
     setOpenField(i)
     history.pushState({ ...(window.history.state ?? {}), editorField: i }, '')
@@ -239,7 +246,7 @@ function CategoryEditorScreen({
 
   const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
-  const field = openField !== null ? draft.fields[openField] : undefined
+  const field = typeof openField === 'number' ? draft.fields[openField] : undefined
 
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
@@ -248,6 +255,26 @@ function CategoryEditorScreen({
       <PreviewBeside onOpen={openPreview}>{() => <CategoryPreview inline category={previewCategory} onClose={() => {}} onListings={setPlaceCount} />}</PreviewBeside>
     </aside>
   )
+
+  // Fields, as the listing's boxes (fieldBoxes.ts). A field not named yet
+  // has no key: it goes by its place.
+  const pageFields = draft.fields.map((f, i) => ({ ...normalizeField(f), key: f.key || `#${i}` }))
+  const draftFieldByKey = new Map(pageFields.map((f, i) => [f.key, draft.fields[i]]))
+  const fieldPage: FieldPage = { fields: pageFields, hiddenFields: draft.hiddenFields, hasAddress: draft.hasAddress, hasPhone: draft.hasPhone }
+  const parts = listingPartsFromKey(draft.listingParts)
+  const boxes = fieldBoxes(fieldPage, parts)
+  // Just added: the box it landed in opens, its row there to see.
+  if (landing) {
+    const key = pageFields.find((f) => !landing.has(f.key))?.key
+    const box = key !== undefined && boxes.find((b) => b.fields.includes(key))
+    setLanding(null)
+    if (box) setOpenBox(box.id)
+  }
+  // A hechsher's caveat is set on the hechsher's own screen.
+  const fieldIndex = (key: string) => {
+    const i = pageFields.findIndex((f) => f.key === key)
+    return i >= 0 ? i : draft.fields.findIndex((f) => f.caveat && (f.caveat.flagField === key || f.caveat.noteField === key))
+  }
 
   let screen: React.ReactNode
   if (adding) {
@@ -261,19 +288,45 @@ function CategoryEditorScreen({
         onScreen={showAdding}
         onBack={() => history.back()}
         onAdd={(row) => {
+          if (row.basic === 'address' || row.basic === 'phone') setOpenBox('contact')
+          else setLanding(new Set(pageFields.map((f) => f.key)))
           if (row.basic === 'address') {
             set('hasAddress', true)
             setCap('map', true)
           } else if (row.basic === 'phone') set('hasPhone', true)
           else if (row.basic === 'hours') toggleHoursField(true)
           else if (row.basic === 'website') toggleWebsiteField(true)
-          else if (row.field) addReadyField(row.field, row.companions)
+          else if (row.field) addReadyField(row.field, row.companions, addingTo)
           added(null)
         }}
-        onMakeOwn={(type, label) => added(addOwnField(type, label))}
+        onMakeOwn={(type, label) => {
+          setLanding(new Set(pageFields.map((f) => f.key)))
+          added(addOwnField(type, label, addingTo))
+        }}
       />
     )
-  } else if (field && openField !== null) {
+  } else if (openField === 'address' || openField === 'phone') {
+    // The page's address or phone (board 17's Contact): on, or taken off.
+    const address = openField === 'address'
+    screen = (
+      <>
+        <AdminBack back={{ label: name, onClick: () => history.back() }} title={address ? 'Address' : 'Phone'} />
+        <button
+          type="button"
+          onClick={() => {
+            if (address) {
+              set('hasAddress', false)
+              setCap('map', false)
+            } else set('hasPhone', false)
+            history.back()
+          }}
+          className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer"
+        >
+          Remove this field
+        </button>
+      </>
+    )
+  } else if (field && typeof openField === 'number') {
     // A field's own screen (board "Field").
     const i = openField
     screen = (
@@ -321,14 +374,6 @@ function CategoryEditorScreen({
       </>
     )
   } else {
-    const rows = draft.fields
-      .map((f, i) => ({ f, i }))
-      // The one Hours/Website/Photo field each "Every place has" box owns
-      // doesn't get a row — like address and phone, the box is the whole
-      // thing. A second field of the same shape is not the box's, and keeps
-      // its row.
-      .filter(({ i }) => i !== managedHoursIndex && i !== managedWebsiteIndex && i !== managedPhotoIndex)
-
     screen = (
       <>
         <AdminBack back={{ label: backLabel, onClick: leave }} title={name} />
@@ -391,58 +436,7 @@ function CategoryEditorScreen({
           />
         </AdminBox>
 
-        <AdminBox
-          title="Fields"
-          foldOnPhone
-          defaultOpen={fieldsOpen}
-          summary={fieldsSummary([draft.hasAddress ? 'Address' : '', draft.hasPhone ? 'Phone' : '', ...rows.map(({ f }) => normalizeField(f).label)])}
-          action={
-            <span className="flex items-center gap-4">
-              {draft.fields.some((f) => f.type === 'boolean') && (
-                <button
-                  type="button"
-                  onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
-                  className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer"
-                >
-                  + Add audience group
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => showAdding({ at: 'list' })}
-                className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer"
-              >
-                + Add a field
-              </button>
-            </span>
-          }
-        >
-          <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 border-b border-slate-100">
-            <legend className="float-left mr-1 text-[13px] font-semibold text-slate-700">Every place has</legend>
-            <Check
-              label="An address"
-              checked={draft.hasAddress}
-              onChange={(on) => {
-                set('hasAddress', on)
-                // A page is on the map when its places have an address.
-                setCap('map', on)
-              }}
-            />
-            <Check label="A phone number" checked={draft.hasPhone} onChange={(on) => set('hasPhone', on)} />
-            <Check label="Hours" checked={draft.fields.some(isPlainHoursField)} onChange={toggleHoursField} />
-            <Check label="A website" checked={draft.fields.some(isWebsiteField)} onChange={toggleWebsiteField} />
-            {managedWebsiteIndex !== -1 && (
-              // The website field that box owns has no row, so its "show as
-              // a button" setting needs a way in from here.
-              <Check
-                label="Website as a button on the row"
-                checked={!!draft.fields[managedWebsiteIndex].showInHeader}
-                onChange={(on) => updateField(managedWebsiteIndex, { showInHeader: on })}
-              />
-            )}
-            <Check label="A photo" checked={draft.fields.some(isPhotoField)} onChange={togglePhotoField} />
-          </fieldset>
-
+        <AdminBox title="Fields" foldOnPhone defaultOpen={fieldsOpen} summary={fieldsSummary(boxes.map((b) => b.title))}>
           {groupForm && (
             <div className="flex flex-col gap-3 p-4 border-b border-slate-100 bg-blue-50/50">
               <div className="grid sm:grid-cols-2 gap-3">
@@ -479,19 +473,59 @@ function CategoryEditorScreen({
             </div>
           )}
 
-          {rows.length === 0 ? (
-            <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Just a name, address and phone.</p>
-          ) : (
-            <AdminRows items={rows} shown={8}>
-              {({ f, i }) => <AdminRow key={i} onClick={() => showField(i)} name={f.label || 'New field'} line={fieldShows(f)} />}
-            </AdminRows>
-          )}
+          <FieldBoxes
+            page={fieldPage}
+            boxes={boxes}
+            parts={parts}
+            openId={openBox}
+            freshId={freshBox}
+            onOpen={(id) => {
+              setOpenBox(id)
+              setFreshBox(null)
+            }}
+            onChange={(next, order) => {
+              set('listingParts', listingPartsKey(next))
+              if (order) set('fields', order.map((k) => draftFieldByKey.get(k)!))
+            }}
+            onRename={(id, title) => set('listingParts', listingPartsKey(renameBox(parts, id, title)))}
+            onRemoveBox={(id) => {
+              set('listingParts', listingPartsKey(removeBox(parts, id)))
+              setOpenBox(null)
+            }}
+            onAddField={(id) => {
+              setAddingTo(id)
+              showAdding({ at: 'list' })
+            }}
+            onShowField={(key) => showField(fieldIndex(key))}
+            onShowBasic={showField}
+          />
+
+          <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                const { parts: next, id } = addBox(parts)
+                set('listingParts', listingPartsKey(next))
+                setOpenBox(id)
+                setFreshBox(id)
+              }}
+              className={addButton}
+            >
+              + Add a box
+            </button>
+            {draft.fields.some((f) => f.type === 'boolean') && (
+              <button
+                type="button"
+                onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
+                className={addButton}
+              >
+                + Add audience group
+              </button>
+            )}
+          </div>
         </AdminBox>
 
-        {/* Other categories' places within a walk, and what each opened place
-            adds (until a listing's boxes are Fields, step 3). */}
-        {!isNew && draft.hasAddress && <WalkListsEditor value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
-        {!isNew && <ListingPartsEditor value={draft.listingParts} onChange={(v) => set('listingParts', v)} fields={draft.fields.map(normalizeField)} />}
+        {!isNew && draft.hasAddress && <WalkBox value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
 
         <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
           <AdminYesNo question="Can visitors upvote places?" value={draft.upvotesEnabled} onChange={(yes) => set('upvotesEnabled', yes)} />

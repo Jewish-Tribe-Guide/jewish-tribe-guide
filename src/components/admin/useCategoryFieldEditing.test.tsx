@@ -126,6 +126,34 @@ describe('useCategoryFieldEditing — ready-made', () => {
 // look the target field up by key rather than assuming a raw index, so they
 // don't silently start asserting on the Photo field instead.
 describe('useCategoryFieldEditing — field list CRUD', () => {
+  // Board 17: a field added from one of the admin's boxes goes in it, and
+  // stays in it while its key follows the name being typed.
+  it('keeps a field added to a box in it as its key follows its name', () => {
+    const { result } = renderHook(() => useCategoryFieldEditing(baseCategory({ detailFields: [field({ key: 'liaisons', type: 'contacts' })], listingParts: { boxes: [{ title: 'Who to call', fields: ['liaisons'] }] } })))
+    const inBox = () => JSON.parse(result.current.draft.listingParts).boxes[0].fields.slice(1)
+    let i = -1
+    act(() => {
+      i = result.current.addOwnField('text', '', 'box:0')
+    })
+    expect(inBox()).toEqual([`#${i}`])
+    act(() => result.current.updateField(i, { label: 'N', key: 'n' }))
+    act(() => result.current.updateField(i, { label: 'Night line', key: 'night_line' }))
+    expect(inBox()).toEqual(['night_line'])
+    act(() => result.current.updateField(i, { label: 'Night line (24h)' }))
+    expect(inBox()).toEqual(['night_line'])
+  })
+
+  it('puts a ready-made field added from a box in it, and one added elsewhere where it goes', () => {
+    const { result } = renderHook(() => useCategoryFieldEditing(baseCategory({ detailFields: [field({ key: 'packages', type: 'contacts' })], listingParts: { boxes: [{ title: 'Kosher food', fields: ['packages'] }] } })))
+    act(() => {
+      result.current.addReadyField(field({ key: 'pantry', label: 'Pantry', type: 'contacts' }), [], 'box:0')
+    })
+    act(() => {
+      result.current.addReadyField(field({ key: 'eruv', label: 'Eruv' }), [], 'contact')
+    })
+    expect(JSON.parse(result.current.draft.listingParts).boxes).toEqual([{ title: 'Kosher food', fields: ['packages', 'pantry'] }])
+  })
+
   it('updates one field by index without touching the others', () => {
     const initial = baseCategory({ detailFields: [field({ key: 'a', label: 'A' }), field({ key: 'b', label: 'B' })] })
     const { result } = renderHook(() => useCategoryFieldEditing(initial))
