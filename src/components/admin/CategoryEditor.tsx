@@ -19,6 +19,8 @@ import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview, { type PreviewView } from './CategoryPreview'
 import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
+import FieldScreen from './FieldScreen'
+import { useIsSuperAdmin } from './AdminAuthGate'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
 import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
@@ -93,6 +95,7 @@ function CategoryEditorScreen({
   const [previewing, setPreviewing] = useState(false)
   // Page, A listing or Adding, beside the settings and opened full size.
   const [previewView, setPreviewView] = useState<PreviewView>('page')
+  const superAdmin = useIsSuperAdmin()
   // The field whose own screen is open (board "Field"), by its place in
   // draft.fields, or the page's address or phone.
   const [openField, setOpenField] = useState<OpenField | null>(null)
@@ -160,6 +163,13 @@ function CategoryEditorScreen({
     toggleFieldCaveat,
     moveField,
   } = useCategoryFieldEditing(initial, seed)
+
+  // A field opened shows where it's filled in: Adding (board 13).
+  const [seenField, setSeenField] = useState(openField)
+  if (openField !== seenField) {
+    setSeenField(openField)
+    if (typeof openField === 'number' && draft.capabilities.add) setPreviewView('adding')
+  }
 
   const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
     draft,
@@ -445,54 +455,67 @@ function CategoryEditorScreen({
       </>
     )
   } else if (field && typeof openField === 'number') {
-    // A field's own screen (board "Field").
+    // A field's own screen (board 13). What the board leaves off (only for
+    // some places, an audience, a link's own box, a badge in place of
+    // another, the order) is a superadmin's, under More.
     const i = openField
+    const removeIt = () => {
+      if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
+      else {
+        removeField(i)
+        history.back()
+      }
+    }
     screen = (
-      <>
-        <AdminBack back={{ label: name, onClick: () => history.back() }} title={field.label || 'New field'} />
-        <p className="m-0 -mt-3 text-[15px] text-slate-600 max-md:mt-0">A field on {name}</p>
-        <FieldEditor
-          field={field}
-          index={i}
-          total={draft.fields.length}
-          // "Required" only matters if people can add or edit listings.
-          canRequire={draft.capabilities.add || draft.capabilities.edit}
-          // Boolean fields make sense as an "audience" a field is scoped to
-          // (e.g. "Women's Tevillah") — a field can't be scoped to itself.
-          audienceOptions={draft.fields
-            .filter((other) => other.type === 'boolean' && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label }))}
-          // Choice fields make sense as a "show only when this equals that
-          // option" trigger — a field can't be scoped to itself.
-          showIfOptions={draft.fields
-            .filter((other) => other.type === 'select' && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
-          // Yes/No and Choice fields are the ones that can render as a badge
-          // — a field can't replace its own badge.
-          badgeFieldOptions={draft.fields
-            .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label }))}
-          // Words a link's own box could say (CategoryField.leadBox).
-          textFieldOptions={draft.fields
-            .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label }))}
-          onChange={(patch) => updateField(i, patch)}
-          onRemove={() => {
-            if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
-            else {
-              removeField(i)
-              history.back()
-            }
-          }}
-          onMove={(dir) => {
-            moveField(i, dir)
-            setOpenField(i + dir)
-            history.replaceState({ ...(window.history.state ?? {}), editorField: i + dir }, '')
-          }}
-          hasCaveat={!!field.caveat}
-          onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
-        />
-      </>
+      <FieldScreen
+        key={i}
+        field={field}
+        pageName={name}
+        // "Required" only matters if people can add or edit listings.
+        canRequire={draft.capabilities.add || draft.capabilities.edit}
+        onChange={(patch) => updateField(i, patch)}
+        onRemove={removeIt}
+        onBack={() => history.back()}
+        more={
+          superAdmin ? (
+            <FieldEditor
+              field={field}
+              index={i}
+              total={draft.fields.length}
+              // "Required" only matters if people can add or edit listings.
+              canRequire={draft.capabilities.add || draft.capabilities.edit}
+              // Boolean fields make sense as an "audience" a field is scoped to
+              // (e.g. "Women's Tevillah") — a field can't be scoped to itself.
+              audienceOptions={draft.fields
+                .filter((other) => other.type === 'boolean' && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label }))}
+              // Choice fields make sense as a "show only when this equals that
+              // option" trigger — a field can't be scoped to itself.
+              showIfOptions={draft.fields
+                .filter((other) => other.type === 'select' && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
+              // Yes/No and Choice fields are the ones that can render as a badge
+              // — a field can't replace its own badge.
+              badgeFieldOptions={draft.fields
+                .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label }))}
+              // Words a link's own box could say (CategoryField.leadBox).
+              textFieldOptions={draft.fields
+                .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label }))}
+              onChange={(patch) => updateField(i, patch)}
+              onRemove={removeIt}
+              onMove={(dir) => {
+                moveField(i, dir)
+                setOpenField(i + dir)
+                history.replaceState({ ...(window.history.state ?? {}), editorField: i + dir }, '')
+              }}
+              hasCaveat={!!field.caveat}
+              onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
+            />
+          ) : undefined
+        }
+      />
     )
   } else {
     screen = (

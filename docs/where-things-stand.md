@@ -660,11 +660,23 @@ after the deploy, dry run first, and needs its own go-ahead.
   and a mikvah's sections move as one (the listing draws them together).
   The main thing is one slot, so Main dishes and Davening times on one
   page couldn't be split (no live page has both).
-- Missed until the user's Nov 5 note ("new field still doesn't look like
-  the screens"): a field's own screen (boards 13-15) was never built.
-  A new field, and every saved one, still opens the old form (Type
-  dropdown, "value | label" lines, Show as, a Required checkbox). To build
-  after the handles.
+- A field's own screen BUILT Nov 5 (board 13, `FieldScreen.tsx`), after the
+  user's note that it still opened the old form: its name and kind beside
+  it, Basics (Name, the note under it on Add a place, a link's button
+  words), Choices as rows with handles and ×, "+ Add a choice" and the
+  Other switch, then only the questions its kind asks as No / Yes
+  (required, part of the filter, both at once), and "Remove this field".
+  Opening a field turns the preview beside to Adding. A choice is renamed
+  by removing it and adding the new one; Save still offers to update the
+  places that had the old one.
+- Not on the drawing, in the field screen: a superadmin also gets "More",
+  the old form as it was (only for some places, an audience, a link's own
+  box, a badge in place of another, What isn't kosher, the order), so
+  nothing a saved field uses is lost; it repeats Name and the choices. A
+  community admin can't reach those settings now. The Adding preview
+  doesn't outline the field being edited. Boards 14-15 (a ready-made
+  field, fixed or local) are still waiting on the user, so no
+  "Ready-made" pill yet.
 - The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
   the listing puts a field in them by its kind, so one added there wouldn't
   stay. Not drawn.

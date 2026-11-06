@@ -254,11 +254,11 @@ describe('CategoryEditor — editing an existing category', () => {
     const row = screen.getByRole('button', { name: /^Kosher certification/ })
     expect(row).toHaveTextContent('Filter')
     await user.click(row)
-    expect(screen.getByRole('heading', { name: 'Kosher certification' })).toBeInTheDocument()
-    expect(screen.getByText('A field on Groceries')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Basics' })).not.toBeInTheDocument()
+    // Its name, and its kind beside it (board 13).
+    expect(screen.getByRole('heading', { name: /^Kosher certification\s*Choices$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Fields' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '‹ Groceries' }))
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Basics' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Fields' })).toBeInTheDocument())
   })
 
   it('shows the page beside the settings, as they are being typed', async () => {
@@ -421,7 +421,7 @@ describe('CategoryEditor — editing an existing category', () => {
       renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
       await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Kosher Certification/ }))
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
 
       expect(await screen.findByRole('heading', { name: 'Remove Kosher Certification from Food?' })).toBeInTheDocument()
       expect(screen.getByText('71 places').parentElement).toHaveTextContent('71 places lose their answer')
@@ -530,10 +530,9 @@ describe('CategoryEditor — editing an existing category', () => {
 
       await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Type/ }))
-      const optionsBox = screen.getByLabelText(/choices/i)
-      await user.clear(optionsBox)
-      await user.type(optionsBox, 'Glatt Kosher')
-      await user.tab()
+      await user.click(screen.getByRole('button', { name: 'Remove Kosher' }))
+      await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+      await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Glatt Kosher{Enter}')
       await saveNow(user)
 
       expect(await screen.findByText('Update existing listings to match this rename?')).toBeInTheDocument()
@@ -562,10 +561,9 @@ describe('CategoryEditor — editing an existing category', () => {
 
       await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Type/ }))
-      const optionsBox = screen.getByLabelText(/choices/i)
-      await user.clear(optionsBox)
-      await user.type(optionsBox, 'Glatt Kosher')
-      await user.tab()
+      await user.click(screen.getByRole('button', { name: 'Remove Kosher' }))
+      await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+      await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Glatt Kosher{Enter}')
       await saveNow(user)
       await screen.findByText('Update existing listings to match this rename?')
 
@@ -600,6 +598,25 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     await waitFor(() => expect(shown()).toBe('adding'))
     await user.click(screen.getByRole('button', { name: 'Open the preview' }))
     expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
+  })
+
+  // Board 13: a field opened, the preview shows where it's filled in.
+  it('shows Adding when a field opens, and only its own screen’s settings', async () => {
+    computer()
+    const user = userEvent.setup()
+    const initial = baseCategory({
+      capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: true },
+      detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'Kosher', label: 'Kosher' }] }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await waitFor(() => expect(shown()).toBe('page'))
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: /^Type/ }))
+    await waitFor(() => expect(shown()).toBe('adding'))
+    expect(screen.getByRole('button', { name: 'Adding' })).toHaveAttribute('aria-pressed', 'true')
+    // The old form's settings are a superadmin's, under More.
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('has no Adding where visitors can’t add', () => {
@@ -757,7 +774,7 @@ describe('CategoryEditor — Fields, in boxes', () => {
     await user.type(await screen.findByRole('searchbox', { name: 'Search fields' }), 'Night line')
     await user.click(screen.getByRole('button', { name: 'Make your own: Night line' }))
     await user.click(screen.getByRole('button', { name: /^Text/ }))
-    await screen.findByRole('heading', { name: 'Night line' })
+    await screen.findByRole('heading', { name: /^Night line/ })
     history.back()
     await screen.findByRole('heading', { name: 'Hospitals' })
     expect(screen.getByRole('button', { name: /^Night line/ })).toBeInTheDocument()
@@ -976,7 +993,6 @@ describe('CategoryEditor — + Add a field', () => {
       'LinkLike Join group',
     ])
     await user.click(screen.getByRole('button', { name: /^Yes or no/ }))
-    expect(await screen.findByRole('heading', { name: 'Parking' })).toBeInTheDocument()
-    expect(screen.getByText('A field on Groceries')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^Parking\s*Yes or no$/ })).toBeInTheDocument()
   })
 })
