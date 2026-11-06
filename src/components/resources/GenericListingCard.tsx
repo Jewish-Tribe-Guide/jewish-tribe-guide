@@ -27,6 +27,7 @@ import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
 import { initialsOf, listingRowFacts, listingRowNote, type RowNote } from '@/lib/listingRow'
+import { photoOnCard, thirdLineFields } from '@/lib/cardLines'
 import { FACT_TONE } from './rowFactTone'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -298,8 +299,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // forcing one would cut it off after a handful of words. line-clamp's own
   // ellipsis is the "…" that invites opening the card for the rest, not a
   // separate affordance drawn on top of it.
-  const headerTextFields = fields
-    .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
+  const headerTextFields = thirdLineFields(fields)
     .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
     .filter((x): x is { f: CategoryField; text: string } => !!x.text)
   // Not a `line-clamp-3` className on the same element as `hidden
@@ -326,9 +326,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     setExpanded(false)
     onExpandedChange?.(false)
   }
-  // The listing's own photo, for the row's picture.
+  // The listing's own photo, for the row's picture, unless the admin chose
+  // initials (cardLines.ts).
   const ownPhoto =
-    typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
+    photoOnCard(fields) && typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
 
   // What a search matched here, named on the row (see `found`).
   const matchedChips = found?.items.length ? found.items : null

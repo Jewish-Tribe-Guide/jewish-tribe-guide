@@ -183,6 +183,19 @@ describe('listingRowFacts', () => {
   })
 })
 
+describe('the card’s second line, as the admin chose it (Category pages step 4)', () => {
+  it('shows a field put on the card that isn’t a filter, and leaves off a filter taken off it', () => {
+    const style: CategoryField = { key: 'style', label: 'Style', type: 'select', renderAs: 'row', options: [{ value: 'sit', label: 'Sit-down' }] }
+    const category = makeCategory({ detailFields: [{ ...type, onCard: false }, { ...style, onCard: true }] })
+    expect(texts(listingRowFacts(makeListing({ type: 'parve', style: 'sit' }), category, null))).toEqual(['Sit-down'])
+  })
+
+  it('keeps the page’s order among the fields on it', () => {
+    const category = makeCategory({ detailFields: [cert, type] })
+    expect(texts(listingRowFacts(makeListing({ type: 'parve', cert: 'IKC' }), category, null))).toEqual(['IKC', 'Parve'])
+  })
+})
+
 describe('a restaurant’s dishes stay off the row (the user, Oct 10)', () => {
   const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
   const listing = makeListing({ type: 'meat', cert: 'OU', dishes: ['Shawarma', 'Falafel', 'Schnitzel', 'Kebabs', 'Hummus'] })
@@ -243,6 +256,12 @@ describe('listingRowNote: a third line only for an exception', () => {
       title: 'Only the bakery case',
     })
     expect(listingRowNote(makeListing({ ...confirmed, cert: 'IKC' }), category, FRIDAY_2PM)).toBeNull()
+  })
+
+  it('says so even when the hechsher is off the second line', () => {
+    const category = makeCategory({ detailFields: [{ ...cert, onCard: false }, partial] })
+    const item = makeListing({ ...confirmed, cert: 'IKC', partial: true })
+    expect(listingRowNote(item, category, FRIDAY_2PM)?.text).toBe('Not everything here is kosher')
   })
 
   it('says nobody has confirmed a listing, only where the category flags it', () => {

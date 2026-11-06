@@ -533,7 +533,7 @@ Networking, Cemetery); no page sets Groups. On the drawing:
 steps, each tested and pushed: 1 the list and a page's layout, 2
 ready-made pages and fields first, 3 fields in boxes (Address and Phone
 become rows, drag between boxes, ListingParts goes), 4 Before it's
-opened (needs a DB change to part "on the card" from "a filter"), 5
+opened (built without a DB change, on the fields themselves), 5
 removing a filled-in field. The Denomination/Nusach prod change comes
 after the deploy, dry run first, and needs its own go-ahead.
 
@@ -596,6 +596,28 @@ after the deploy, dry run first, and needs its own go-ahead.
   one). The preview's Page · A listing · Adding tabs aren't built; it's
   still Computer · Phone. A press while a name is being typed only puts
   the keyboard away, so the first tap on a row after typing doesn't open it.
+- **Step 4 BUILT Nov 5** (redesign/oct18-fixes): Before it's opened sits
+  between Within a walk and Questions: a sample card (the page's first
+  choice of each field, "Neighborhood", "Open until 8 PM", the line being
+  opened outlined), then First, Second and Third line, each opening in
+  place (`cardLines.ts`). What the card works out says "Automatic" and
+  stays first; a chosen field has a handle and an ×; "+ Show a field"
+  opens Show on the second (or third) line, those on the card marked "On
+  the card". No DB change: a choice's `onCard`, the photo's `onCard:
+  false` (initials instead) and a short line's `showInHeader` are on the
+  fields. A field never set keeps the old rule (a badge with a filter),
+  so no live page changes; read on dev (22 pages) and live (16), the old
+  and new second lines match on every one. Taking a field off the card
+  leaves its filter; reordering a line moves only that line's fields.
+  "Not everything here is kosher" now shows for a caveat field even when
+  it's off the second line.
+- Not on the drawing, in step 4: Synagogues' boards list Next minyan and
+  the minyan's note, but a shul's category row shows neither (the user's
+  Oct 15 decision), so they aren't listed. A grocery's items line isn't
+  listed either. The photo row has no handle (it's always first), and
+  "+ Show the photo" brings it back once it's off (not drawn). A field's
+  screen still has "Also show on the collapsed card", which sets the same
+  thing. The preview stays beside Show on the line, as on every sub-screen.
 
 ## Small open decisions
 

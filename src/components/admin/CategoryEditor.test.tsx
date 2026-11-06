@@ -681,6 +681,101 @@ describe('CategoryEditor — Fields, in boxes', () => {
   })
 })
 
+// Boards 20-23: the card a place is listed on, a row for each of its lines.
+describe('CategoryEditor — Before it’s opened', () => {
+  const opt = (...labels: string[]) => labels.map((l) => ({ value: l.toLowerCase(), label: l }))
+  const food = baseCategory({
+    id: 'restaurant',
+    label: 'Restaurant',
+    pluralLabel: 'Restaurants',
+    upvotesEnabled: true,
+    detailFields: [
+      { key: 'photo', label: 'Photo', type: 'image', renderAs: 'row' },
+      { key: 'short', label: 'Short Description', type: 'text', renderAs: 'row', showInHeader: true, headerMaxLength: 27 },
+      { key: 'food', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true, options: opt('Meat', 'Dairy', 'Parve') },
+      { key: 'store', label: 'Store Type', type: 'select', renderAs: 'badge', filterable: true, options: opt('Restaurant', 'Bakery') },
+      { key: 'delivery', label: 'Delivery Details', type: 'text', renderAs: 'row' },
+      { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true },
+    ],
+  })
+  const fields = () => JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryConfig['detailFields']
+  const editor = (onSaved = vi.fn()) =>
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+  const card = () => within(screen.getByRole('region', { name: 'Before it’s opened' }))
+
+  it('sums up each line, and opens one to what the card works out and what was chosen', async () => {
+    const user = userEvent.setup()
+    editor()
+    expect(card().getByRole('button', { name: 'First line' })).toHaveAccessibleDescription('Photo, Name · where it is, upvotes')
+    expect(card().getByRole('button', { name: 'Second line' })).toHaveAccessibleDescription('Open or opens at, Distance, Food Type, Store Type')
+    expect(card().getByRole('button', { name: 'Third line' })).toHaveAccessibleDescription('Not confirmed by anyone yet, Short Description')
+    await user.click(card().getByRole('button', { name: 'Second line' }))
+    expect(card().getAllByText('Automatic')).toHaveLength(2)
+    expect(card().getByText('Meat, Dairy, Parve')).toBeInTheDocument()
+    expect(card().queryByRole('button', { name: 'Move Distance' })).not.toBeInTheDocument()
+  })
+
+  it('takes a field off the card and leaves it a filter', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'Second line' }))
+    await user.click(card().getByRole('button', { name: 'Take Food Type off' }))
+    expect(card().queryByText('Meat, Dairy, Parve')).not.toBeInTheDocument()
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().find((f) => f.key === 'food')).toMatchObject({ onCard: false, filterable: true })
+  })
+
+  it('moves a field up the line, never above what the card works out', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'Second line' }))
+    card().getByRole('button', { name: 'Move Store Type' }).focus()
+    await user.keyboard('{ArrowUp}{ArrowUp}')
+    const rows = card()
+      .getAllByText(/^(Distance|Store Type|Food Type)$/)
+      .map((el) => el.textContent)
+    expect(rows).toEqual(['Distance', 'Store Type', 'Food Type'])
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().map((f) => f.key).filter((k) => k !== 'photo')).toEqual(['short', 'store', 'food', 'delivery', 'hours'])
+  })
+
+  it('shows another short line on the third line, from the page’s own (board 23)', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'Third line' }))
+    await user.click(card().getByRole('button', { name: '+ Show a field' }))
+    await screen.findByRole('heading', { name: 'Show on the third line' })
+    expect(screen.getByText('On the card')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Short Description/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
+    await screen.findByRole('heading', { name: 'Restaurants' })
+    expect(card().getByRole('button', { name: 'Take Delivery Details off' })).toBeInTheDocument()
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().find((f) => f.key === 'delivery')).toMatchObject({ showInHeader: true })
+  })
+
+  it('takes the photo off for initials, and puts it back', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'First line' }))
+    await user.click(card().getByRole('button', { name: 'Take Photo off' }))
+    expect(card().getByRole('button', { name: 'First line' })).toBeInTheDocument()
+    expect(card().getByRole('button', { name: '+ Show the photo' })).toBeInTheDocument()
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().find((f) => f.key === 'photo')).toMatchObject({ onCard: false })
+    await user.click(card().getByRole('button', { name: '+ Show the photo' }))
+    expect(card().getByRole('button', { name: 'Take Photo off' })).toBeInTheDocument()
+  })
+})
+
 // Boards 7-12: + Add a field lists every page's fields to look at and add,
 // or a kind to make one of.
 describe('CategoryEditor — + Add a field', () => {

@@ -14,6 +14,8 @@ import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
 import FieldBoxes from './FieldBoxes'
 import WalkBox from './WalkBox'
+import CardBox, { ShowOnLine, type CardLine } from './CardBox'
+import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
@@ -103,6 +105,9 @@ function CategoryEditorScreen({
   const [freshBox, setFreshBox] = useState<string | null>(null)
   // The fields there were before an add, to find the one added.
   const [landing, setLanding] = useState<ReadonlySet<string> | null>(null)
+  // Before it's opened: the line open, and board 23's screen for one.
+  const [openLine, setOpenLine] = useState<CardLine | null>(null)
+  const [showLine, setShowLine] = useState<'second' | 'third' | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
@@ -166,10 +171,11 @@ function CategoryEditorScreen({
   // the category list.
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { editorPreview?: boolean; editorField?: OpenField; editorAdd?: FieldPickerScreen } | null
+      const state = e.state as { editorPreview?: boolean; editorField?: OpenField; editorAdd?: FieldPickerScreen; editorLine?: 'second' | 'third' } | null
       setPreviewing(!!state?.editorPreview)
       setOpenField(state?.editorField ?? null)
       setAdding(state?.editorAdd ?? null)
+      setShowLine(state?.editorLine ?? null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -276,8 +282,26 @@ function CategoryEditorScreen({
     return i >= 0 ? i : draft.fields.findIndex((f) => f.caveat && (f.caveat.flagField === key || f.caveat.noteField === key))
   }
 
+  const cardPage: CardPage = { fields: pageFields, hasAddress: draft.hasAddress, upvotes: draft.upvotesEnabled }
+  const putOnCard = (key: string, on: boolean) => {
+    const i = pageFields.findIndex((f) => f.key === key)
+    if (i >= 0) updateField(i, cardPatch(pageFields[i], on))
+  }
+
   let screen: React.ReactNode
-  if (adding) {
+  if (showLine) {
+    screen = (
+      <ShowOnLine
+        line={showLine}
+        fields={pageFields}
+        back={{ label: name, onClick: () => history.back() }}
+        onPick={(key) => {
+          putOnCard(key, true)
+          history.back()
+        }}
+      />
+    )
+  } else if (adding) {
     screen = (
       <FieldPicker
         token={token}
@@ -527,6 +551,20 @@ function CategoryEditorScreen({
 
         {!isNew && draft.hasAddress && <WalkBox value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
 
+        <CardBox
+          page={cardPage}
+          sampleName={sampleName(draft.label, draft.pluralLabel)}
+          open={openLine}
+          onOpen={setOpenLine}
+          onField={putOnCard}
+          onOrder={(keys) => set('fields', reorderLine(pageFields, keys).map((f) => draftFieldByKey.get(f.key)!))}
+          onShow={(line) => {
+            setShowLine(line)
+            history.pushState({ ...(window.history.state ?? {}), editorLine: line }, '')
+            window.scrollTo?.(0, 0)
+          }}
+        />
+
         <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
           <AdminYesNo question="Can visitors upvote places?" value={draft.upvotesEnabled} onChange={(yes) => set('upvotesEnabled', yes)} />
           <AdminYesNo question="A link for places not listed here?" value={draft.externalLinkEnabled} onChange={(yes) => set('externalLinkEnabled', yes)} />
@@ -600,6 +638,13 @@ function CategoryEditorScreen({
       )}
     </div>
   )
+}
+
+/** The sample card's place: "A restaurant", or "A place" for a page
+ *  whose name is no one place's ("Food"). */
+export function sampleName(label: string, plural: string): string {
+  const one = label.trim()
+  return one && one.toLowerCase() !== plural.trim().toLowerCase() ? `A ${one.toLowerCase()}` : 'A place'
 }
 
 /** "Address, Phone, Hours and 3 more" under the folded Fields row. */

@@ -150,6 +150,11 @@ export type CategoryField = {
    *  (e.g. "Sit-down glatt kosher steakhouse, under IKC supervision") — see
    *  headerTextFields in GenericListingCard.tsx. */
   showInHeader?: boolean
+  /** On the card a place is listed on, before it's opened (cardLines.ts):
+   *  a yes/no or choice field on its second line; the photo, `false`, gone
+   *  for the place's initials. Unset follows the rule from before: a badge
+   *  with a filter is on it. */
+  onCard?: boolean
   /** For `type: 'text'` with `showInHeader`: caps the submission form's input
    *  at this many characters (a plain `<input maxLength>`, so a newline can't
    *  sneak in the way it could through a `textarea`) — guaranteeing the value
