@@ -220,6 +220,46 @@ describe('dragging', () => {
   })
 })
 
+// Board 4: Delivery, What isn't kosher and Main dishes have handles, and
+// the listing follows their order.
+describe('the listing’s own boxes', () => {
+  const foodBoxes = fieldBoxes(food, {})
+
+  it('move among each other, and the order is kept', () => {
+    const items = fieldItems(foodBoxes, null)
+    expect(keys(items)).toEqual(['box:top', 'box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items', 'box:contact', 'box:about'])
+    expect(foodBoxes.filter((b) => b.moves).map((b) => b.title)).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
+    // Main dishes first.
+    const next = drop(items, 'box:items', 1)
+    expect(orderProblem(items, next, food)).toBeNull()
+    const { parts } = readOrder(items, next, {}, food)
+    expect(parts.lead).toEqual(['main', 'link', 'caveat'])
+    expect(fieldBoxes(food, parts).map((b) => b.title).slice(0, 4)).toEqual(['Top', 'Main dishes', 'Delivery', 'What isn’t kosher'])
+    // Back as it was: nothing saved.
+    const moved = fieldItems(fieldBoxes(food, parts), null)
+    expect(readOrder(moved, drop(moved, 'box:items', 3), parts, food).parts.lead).toBeUndefined()
+  })
+
+  it('stay above the admin’s boxes and below Top, and a mikvah’s sections move together', () => {
+    const items = fieldItems(fieldBoxes(food, { boxes: [{ title: 'Also', fields: ['short_description'] }] }), null)
+    expect(orderProblem(items, drop(items, 'box:lead:delivery_whatsapp_group', 4), food)).toEqual({})
+    expect(orderProblem(items, drop(items, 'box:items', 0), food)).toEqual({})
+    const mikvah: FieldPage = {
+      fields: [
+        { key: 'join', label: 'Join', type: 'url', leadBox: { title: 'Book' } },
+        { key: 'women', label: 'Women’s Hours', type: 'hours', audienceKey: 'women' },
+        { key: 'men', label: 'Men’s Hours', type: 'hours', audienceKey: 'men' },
+      ],
+      hasAddress: true,
+      hasPhone: false,
+    }
+    const m = fieldItems(fieldBoxes(mikvah, {}), null)
+    expect(keys(m).slice(0, 4)).toEqual(['box:top', 'box:lead:join', 'box:audience:women', 'box:audience:men'])
+    expect(orderProblem(m, drop(m, 'box:lead:join', 2), mikvah)).toEqual({})
+    expect(orderProblem(m, drop(m, 'box:lead:join', 3), mikvah)).toBeNull()
+  })
+})
+
 describe('the admin’s boxes', () => {
   it('adds a box after the others, keeping the Shabbos card where it was', () => {
     const { parts, id } = addBox(hospitalParts)

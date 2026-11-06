@@ -590,15 +590,12 @@ after the deploy, dry run first, and needs its own go-ahead.
   in opens. Within a walk is its own box ("+ Add a page", rows "Food · Up
   to 30 min · by Food Type" opening in place). Copying a page now saves
   its boxes too (the create never sent them). ListingPartsEditor is gone.
-- Not on the drawing, in step 3: the boxes the listing makes itself have
-  no handle, since nothing saved can move them (the drawing gives
-  Delivery, What isn't kosher and Main dishes one). A main card and a
+- Not on the drawing, in step 3: A main card and a
   Shabbos card can be taken off but not added (no drawn way); "+ Add
   audience group" sits beside "+ Add a box". A New box left empty isn't
   saved. Within a walk shows on every page with an address, "None" when
   it has none (boards 4 and 6 leave it out, but it's the only way to add
-  one). The preview's Page · A listing · Adding tabs aren't built; it's
-  still Computer · Phone. A press while a name is being typed only puts
+  one). A press while a name is being typed only puts
   the keyboard away, so the first tap on a row after typing doesn't open it.
 - **Step 4 BUILT Nov 5** (redesign/oct18-fixes): Before it's opened sits
   between Within a walk and Questions: a sample card (the page's first
@@ -654,8 +651,15 @@ after the deploy, dry run first, and needs its own go-ahead.
   visitors can't add to. Tapping it opens that one full size.
 - Not on the drawing, in the preview: Page is a computer's, A listing and
   Adding a phone's; Computer · Phone is gone.
-- Building next: handles on the listing's own boxes (Delivery, What isn't
-  kosher, Main dishes), their order saved and the listing following it.
+- **Handles BUILT Nov 5**: the listing's own boxes before the admin's
+  (Delivery, What isn't kosher, Main dishes, Davening times, a named card,
+  a mikvah's sections) drag among each other, saved as `ListingParts.lead`
+  (link, caveat, main; unset is that order), and the listing and its
+  preview draw them in that order. No migration: it's in `listing_parts`.
+- Not on the drawing, in the handles: they stay above the admin's boxes,
+  and a mikvah's sections move as one (the listing draws them together).
+  The main thing is one slot, so Main dishes and Davening times on one
+  page couldn't be split (no live page has both).
 - Missed until the user's Nov 5 note ("new field still doesn't look like
   the screens"): a field's own screen (boards 13-15) was never built.
   A new field, and every saved one, still opens the old form (Type

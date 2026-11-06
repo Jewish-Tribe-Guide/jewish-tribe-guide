@@ -18,16 +18,26 @@ import type { CategoryConfig, CategoryField } from './categories'
 //                 "A place to stay", "Rides"). The listing leads with them.
 //                 The Shabbos card can sit among them (shabbos.after: how
 //                 many boxes come before it).
+//   lead          the order of the boxes the listing makes itself, before
+//                 the admin's (Nov 5, board 4's handles): a link's own box
+//                 ("Delivery"), what isn't kosher, and the main thing ("Main
+//                 dishes", the davening times, the card above). Unset, that
+//                 order.
 //
 // Stored as it came from the database and read through parseListingParts,
 // so an unknown shape means none of them rather than an error.
 
 export type ListingBox = { title: string; fields: string[] }
 
+/** The boxes the listing makes itself, before the admin's. */
+export const LEAD_SLOTS = ['link', 'caveat', 'main'] as const
+export type LeadSlot = (typeof LEAD_SLOTS)[number]
+
 export type ListingParts = {
   main?: { title: string; fields: string[] }
   shabbos?: { fields: string[]; after?: number }
   boxes?: ListingBox[]
+  lead?: LeadSlot[]
 }
 
 export function parseListingParts(raw: unknown): ListingParts {
@@ -53,7 +63,23 @@ export function parseListingParts(raw: unknown): ListingParts {
       })
     : []
   if (boxes.length > 0) parts.boxes = boxes
+  const lead = leadOf(r.lead)
+  if (lead) parts.lead = lead
   return parts
+}
+
+/** A saved lead order: each slot once, the known ones, the missing ones
+ *  after in their usual order. Null when it's the usual order anyway. */
+function leadOf(raw: unknown): LeadSlot[] | null {
+  if (!Array.isArray(raw)) return null
+  const known = [...new Set(raw.filter((s): s is LeadSlot => (LEAD_SLOTS as readonly unknown[]).includes(s)))]
+  const order = [...known, ...LEAD_SLOTS.filter((s) => !known.includes(s))]
+  return order.join() === LEAD_SLOTS.join() ? null : order
+}
+
+/** The order the listing shows its own boxes in. */
+export function leadOrderOf(category: Pick<CategoryConfig, 'listingParts'>): readonly LeadSlot[] {
+  return parseListingParts(category.listingParts).lead ?? LEAD_SLOTS
 }
 
 function keys(raw: unknown): string[] {
@@ -62,7 +88,7 @@ function keys(raw: unknown): string[] {
 
 /** Whether there's anything to store: none of them is null in the column. */
 export function hasListingParts(parts: ListingParts): boolean {
-  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length
+  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length || !!parts.lead
 }
 
 /** The named main thing: its title and its fields, in the category's
@@ -129,6 +155,7 @@ export function listingPartsFromKey(key: string): ListingParts {
       // Kept while the admin fills one in: a box with no title or fields yet
       // stays in the draft.
       ...(boxes.length > 0 ? { boxes: boxes.map((b) => ({ title: title(b?.title), fields: keys(b?.fields) })) } : {}),
+      ...(leadOf(r.lead) ? { lead: leadOf(r.lead)! } : {}),
     }
   } catch {
     return {}

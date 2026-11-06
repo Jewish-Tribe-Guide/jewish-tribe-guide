@@ -1,5 +1,5 @@
 import type { CategoryField } from './categories'
-import { cardFieldChoices, type ListingParts } from './listingParts'
+import { cardFieldChoices, LEAD_SLOTS, type LeadSlot, type ListingParts } from './listingParts'
 import { isCertificateLink } from './listingView'
 
 // ── A page's fields, as its opened listing's boxes (Category pages step 3,
@@ -13,7 +13,8 @@ import { isCertificateLink } from './listingView'
 //                 certificate's button. Always there; never moved.
 //   the listing's own sections, where its fields put them: a link's own box
 //                 ("Delivery"), what isn't kosher, the davening times, the
-//                 items ("Main dishes"), a mikvah's sections.
+//                 items ("Main dishes"), a mikvah's sections. Dragged among
+//                 each other (board 4), saved as ListingParts.lead.
 //   the admin's   the card it opens with, the boxes ("Who to call"), the
 //                 Shabbos card among them: named, moved, taken off, and
 //                 any field a card can show dropped into them
@@ -34,8 +35,12 @@ export type FieldBox = {
   /** 'fixed': Top, Contact, About. 'listing': where the listing puts its
    *  own fields. 'admin': the admin's own, named and changed here. */
   kind: 'fixed' | 'listing' | 'admin'
-  /** The admin's boxes and the Shabbos card: dragged among each other. */
+  /** The admin's boxes and the Shabbos card: dragged among each other.
+   *  So are the listing's own boxes before them, by their `lead`. */
   moves: boolean
+  /** Which of the listing's own boxes before the admin's it is: a mikvah's
+   *  sections are one, its main thing, and move together. */
+  lead?: LeadSlot
   /** Field keys, in the order the box shows them. */
   fields: string[]
   /** Contact's address and phone, first, which are the page's own. */
@@ -103,14 +108,18 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const label = (key: string) => byKey.get(key)?.label ?? key
 
   const top: FieldBox = { id: 'top', title: 'Top', kind: 'fixed', moves: false, fields: homes.get('top') ?? [] }
-  const before = [
-    ...prefixed('lead:', (k) => byKey.get(k)?.leadBox?.title.trim() || label(k)),
-    ...listing('caveat', 'What isn’t kosher'),
-    ...(main ? [{ id: 'main', title: parts.main!.title, kind: 'admin' as const, moves: false, fields: main }] : []),
-    ...listing('minyanim', 'Davening times'),
-    ...listing('items', label(homes.get('items')?.[0] ?? '')),
-    ...prefixed('audience:', (k) => byKey.get(k)?.filterLabel ?? label(k)),
-  ]
+  const slot = (lead: LeadSlot) => (b: FieldBox): FieldBox => ({ ...b, moves: true, lead })
+  const slots: Record<LeadSlot, FieldBox[]> = {
+    link: prefixed('lead:', (k) => byKey.get(k)?.leadBox?.title.trim() || label(k)).map(slot('link')),
+    caveat: listing('caveat', 'What isn’t kosher').map(slot('caveat')),
+    main: [
+      ...(main ? [{ id: 'main', title: parts.main!.title, kind: 'admin' as const, moves: false, fields: main }] : []),
+      ...listing('minyanim', 'Davening times'),
+      ...listing('items', label(homes.get('items')?.[0] ?? '')),
+      ...prefixed('audience:', (k) => byKey.get(k)?.filterLabel ?? label(k)),
+    ].map(slot('main')),
+  }
+  const before = (parts.lead ?? LEAD_SLOTS).flatMap((s) => slots[s])
   // The admin's boxes, then lists of contacts in none, with the Shabbos card
   // after `after` of them, or after them all.
   const zone: FieldBox[] = [
@@ -189,6 +198,7 @@ function owners(items: readonly FieldItem[]): Map<string, string | null> {
 
 /** 0 before the admin's boxes, 1 among them, 2 after. */
 function zoneOf(box: FieldBox): number {
+  if (box.lead) return 0
   if (box.moves || box.id.startsWith('contacts:')) return 1
   if (box.id === 'contact' || box.id === 'about' || box.id === 'hidden') return 2
   return 0
@@ -211,6 +221,9 @@ export function orderProblem(prev: readonly FieldItem[], next: readonly FieldIte
     if (zones.some((z, n) => n > 0 && z < zones[n - 1])) return {}
     const firstList = boxIds.findIndex((id) => id.startsWith('contacts:'))
     if (firstList >= 0 && boxIds.slice(firstList).some((id) => id.startsWith('box:'))) return {}
+    // The listing's own boxes move as theirs do: a mikvah's sections together.
+    const leads = boxes.flatMap((b) => (b.lead ? [b.lead] : []))
+    if (leads.some((l, n) => n > 0 && l !== leads[n - 1] && leads.indexOf(l) < n)) return {}
     for (const [k, box] of now) if (was.get(k) !== box) return {}
     return null
   }
@@ -261,6 +274,15 @@ export function readOrder(
   if (parts.boxes) {
     const order = boxIds.filter((id) => id.startsWith('box:')).map((id) => Number(id.slice(4)))
     out.boxes = order.map((n) => ({ ...parts.boxes![n], fields: fieldsOf(`box:${n}`, parts.boxes![n].fields) }))
+  }
+  // The listing's own boxes, when they moved: their order, unless it's the
+  // usual one.
+  const leads = [...new Set(next.flatMap((i) => ('box' in i && i.box.lead ? [i.box.lead] : [])))]
+  const prevLeads = [...new Set(prev.flatMap((i) => ('box' in i && i.box.lead ? [i.box.lead] : [])))]
+  if (leads.join() !== prevLeads.join()) {
+    const order = [...leads, ...(parts.lead ?? LEAD_SLOTS).filter((l) => !leads.includes(l))]
+    if (order.join() === LEAD_SLOTS.join()) delete out.lead
+    else out.lead = order
   }
   // The Shabbos card, when it moved: after however many of the boxes and
   // lists of contacts come before it. After them all stays "after them all".

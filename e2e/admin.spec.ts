@@ -74,12 +74,8 @@ test.describe('admin console', () => {
     test.skip(!listingCategory, 'no listing-kind category configured')
 
     await page.goto('/philly/admin/categories')
-    // Scoped to the row's own card (CategoryRow's outer element — see
-    // CategoryManager.tsx) rather than any div containing the text, which
-    // matched ancestor containers wrapping the whole list and made `.last()`
-    // land on something with no Edit button in it at all.
-    const row = page.locator('div.rounded-lg.shadow-sm', { hasText: listingCategory!.pluralLabel }).first()
-    await row.getByRole('button', { name: 'Edit' }).click()
+    // One row per page, the whole row a button that opens it (board 1).
+    await page.getByRole('button', { name: listingCategory!.pluralLabel }).first().click()
 
     // The editor's own heading (AdminBack's bar, an h1 since boards 19–21c).
     await expect(page.getByRole('heading', { level: 1, name: listingCategory!.pluralLabel })).toBeVisible()

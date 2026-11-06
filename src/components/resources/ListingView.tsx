@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useContext, useState, type ReactNode } from 'react'
+import { Fragment, Suspense, useContext, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
@@ -41,7 +41,7 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { boxesOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -429,6 +429,13 @@ export default function ListingView({ item, category, color, place = null, upvot
     </Card>
   )
 
+  const caveatBox = caveatFirst && (
+    <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
+      <h2 className="text-base font-extrabold text-caution">What isn’t kosher</h2>
+      <p className="mt-0.5 text-[15px] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
+    </section>
+  )
+
   // ── 3 · The main thing ─────────────────────────────────────────────────
   let mainSection: ReactNode = null
   const named = main === 'section' ? mainCardOf(category) : null
@@ -726,14 +733,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       {foundBox}
       <TappedMinyanBox item={item} category={category} />
       {actions}
-      {leadBoxView}
-      {caveatFirst && (
-        <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
-          <h2 className="text-base font-extrabold text-caution">What isn’t kosher</h2>
-          <p className="mt-0.5 text-[15px] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
-        </section>
-      )}
-      {mainSection}
+      {/* A link's own box, what isn't kosher and the main thing, in the
+          order the admin put them (ListingParts.lead). */}
+      {leadOrderOf(category).map((slot) => (
+        <Fragment key={slot}>{slot === 'link' ? leadBoxView : slot === 'caveat' ? caveatBox : mainSection}</Fragment>
+      ))}
       {shabbosFirst && shabbos}
       {boxesAndShabbos}
       {/* A hotel's walk list is its main thing; anywhere else, the places
