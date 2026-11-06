@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import type { CategoryField } from './categories'
+import type { CategoryField, FieldType } from './categories'
 import { listLine, matchesSearch, pageMenu, pageToCopy, readyMadeFields, readyMadePages } from './readyMade'
 
 const denomination = (options: string[]): CategoryField => ({
@@ -78,7 +78,7 @@ describe('readyMadeFields', () => {
     const rows = readyMadeFields(everywhere, bare)
     expect(rows.map((r) => [r.label, r.line])).toEqual([
       ['Address', 'Most pages · puts the page on the map'],
-      ['Davening Times (Minyanim)', 'Synagogues'],
+      ['Davening Times (Minyanim)', 'Synagogues · davening times'],
       ['Denomination', 'Schools, Synagogues · Orthodox, Conservative, Reform and 1 more'],
       ['Hours', 'Most pages'],
       ['Kosher Certification', 'Food · IKC'],
@@ -107,6 +107,27 @@ describe('readyMadeFields', () => {
   it('names up to three pages on a field’s line', () => {
     const page = (n: string) => ({ community: 'dc', category: makeCategory({ id: n, pluralLabel: n, detailFields: [{ key: 'd', label: 'Description', type: 'textarea' }] }) })
     expect(readyMadeFields(['A', 'B', 'C', 'D', 'E'].map(page), bare).find((r) => r.label === 'Description')!.line).toBe('A, B, C and 2 more · text')
+  })
+
+  // Keyed on FieldType, so a new kind is a compile error until it has its
+  // word. image is a basic (Photo), never a row of its own.
+  it('says every kind on a field’s line', () => {
+    const words: Record<Exclude<FieldType, 'image'>, string> = {
+      select: 'choices',
+      boolean: 'yes or no',
+      tags: 'a list of items',
+      url: 'link',
+      contacts: 'contacts',
+      text: 'text',
+      textarea: 'text',
+      number: 'a number',
+      hours: 'hours',
+      tel: 'phone',
+      minyanim: 'davening times',
+    }
+    const detailFields = Object.keys(words).map((type) => ({ key: `k_${type}`, label: `F ${type}`, type: type as FieldType }))
+    const rows = readyMadeFields([{ community: 'dc', category: makeCategory({ id: 'mikvah', pluralLabel: 'Mikvah', detailFields }) }], bare)
+    for (const [type, word] of Object.entries(words)) expect(rows.find((r) => r.label === `F ${type}`)?.line).toBe(`Mikvah · ${word}`)
   })
 
   it('names the page menu’s pages once each', () => {

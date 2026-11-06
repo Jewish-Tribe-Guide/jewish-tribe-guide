@@ -61,20 +61,28 @@ export function listLine(items: string[], shown = 3): string {
   return `${items.slice(0, shown).join(', ')} and ${items.length - shown} more`
 }
 
-const KIND_WORDS: Partial<Record<FieldType, string>> = {
+// Every kind has its word, so no field's line is only its pages (the user,
+// Nov 5: Men's Hours, a phone, Davening Times and Email said nothing).
+const KIND_WORDS: Record<FieldType, string> = {
+  select: 'choices',
   boolean: 'yes or no',
   tags: 'a list of items',
   url: 'link',
   contacts: 'contacts',
+  text: 'text',
   textarea: 'text',
   number: 'a number',
+  hours: 'hours',
+  tel: 'phone',
+  minyanim: 'davening times',
+  image: 'a photo',
 }
 
 /** What a field holds, after the pages on its line. */
-export function fieldKindWord(f: CategoryField): string | null {
-  if (f.type === 'select') return (f.options ?? []).length ? listLine((f.options ?? []).map((o) => o.label)) : 'choices'
+export function fieldKindWord(f: CategoryField): string {
+  if (f.type === 'select' && (f.options ?? []).length) return listLine((f.options ?? []).map((o) => o.label))
   if ((f.type === 'text' || f.type === 'textarea') && f.showInHeader) return 'a line under the name'
-  return KIND_WORDS[f.type] ?? null
+  return KIND_WORDS[f.type]
 }
 
 function shownFields(c: CategoryConfig): CategoryField[] {
@@ -153,10 +161,9 @@ export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onP
     }
   }
   const fields = [...found.values()].map((r) => {
-    const word = fieldKindWord(r.field!)
     const sorted = [...r.pages].sort((a, b) => a.localeCompare(b))
     const where = sorted.length > 3 ? `${sorted.slice(0, 3).join(', ')} and ${sorted.length - 3} more` : sorted.join(', ')
-    return { ...r, line: word ? `${where} · ${word}` : where }
+    return { ...r, line: `${where} · ${fieldKindWord(r.field!)}` }
   })
   const basics = BASICS.filter((b) => !pageHasBasic(page, b.kind))
     // On one page's menu, only the basics that page has.

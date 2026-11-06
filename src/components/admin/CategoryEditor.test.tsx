@@ -967,6 +967,22 @@ describe('CategoryEditor — + Add a field', () => {
     expect(screen.getByRole('button', { name: /^Fields/, expanded: true })).toBeInTheDocument()
   })
 
+  // The user, Nov 5: an hours field said only its page, and looked like an
+  // empty text box before adding it.
+  it('says what kind an hours field is, and draws the week to fill in', async () => {
+    const user = userEvent.setup()
+    const mikvah = { community: 'other', category: baseCategory({ id: 'mikvah', pluralLabel: 'Mikvah', detailFields: [{ key: 'w_hours', label: 'Women’s Hours', type: 'hours', renderAs: 'row' }] }) }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [mikvah] }))))
+    renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    expect(await screen.findByText('Mikvah · hours')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Women’s Hours/ }))
+    const adding = screen.getByRole('region', { name: 'On Add a place' })
+    expect(within(adding).getByText('Sunday')).toBeInTheDocument()
+    expect(within(adding).getAllByText('Opens – Closes')).toHaveLength(3)
+  })
+
   it('adds a basic as its own setting', async () => {
     const user = userEvent.setup()
     await openAdd(user)

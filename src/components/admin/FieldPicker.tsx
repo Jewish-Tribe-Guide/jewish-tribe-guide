@@ -156,27 +156,75 @@ function Samples({ field, pageName, pageLabel }: { field: CategoryField; pageNam
       )}
       <Pane title="On Add a place">
         <b className="text-sm">{f.label}</b>
-        {f.type === 'select' ? (
-          <div className="flex flex-col gap-1.5 text-[13px]">
-            {options.slice(0, 4).map((o) => (
-              <span key={o} className="flex items-center gap-2">
-                <span aria-hidden="true" className={`h-4 w-4 border-[1.5px] border-slate-400 ${f.multiSelect ? 'rounded-[4px]' : 'rounded-full'}`} />
-                {o}
-              </span>
-            ))}
-            {options.length > 4 && <span className="text-slate-500">and {options.length - 4} more</span>}
-          </div>
-        ) : f.type === 'boolean' ? (
-          <div className="flex gap-1.5">
-            <span className={chip}>No</span>
-            <span className={chip}>Yes</span>
-          </div>
-        ) : (
-          <span aria-hidden="true" className={`block rounded-md border border-slate-300 bg-white ${f.type === 'textarea' ? 'h-14' : 'h-8'}`} />
-        )}
+        <AddSample field={f} options={options} />
       </Pane>
     </div>
   )
+}
+
+// How a place fills it in, drawn by its kind (the user, Nov 5: hours, a
+// phone and davening times were all an empty box).
+const box = 'block rounded-md border border-slate-300 bg-white'
+function AddSample({ field: f, options }: { field: CategoryField; options: string[] }) {
+  const rows = (names: readonly string[], cell: string) => (
+    <div className="flex flex-col gap-1.5 text-[13px]">
+      {names.map((n) => (
+        <span key={n} className="flex items-center gap-2">
+          <span className="w-24 shrink-0">{n}</span>
+          <span className={`${box} h-7 flex-1 px-2 leading-7 text-slate-400`}>{cell}</span>
+        </span>
+      ))}
+    </div>
+  )
+  switch (f.type) {
+    case 'select':
+      return (
+        <div className="flex flex-col gap-1.5 text-[13px]">
+          {options.slice(0, 4).map((o) => (
+            <span key={o} className="flex items-center gap-2">
+              <span aria-hidden="true" className={`h-4 w-4 border-[1.5px] border-slate-400 ${f.multiSelect ? 'rounded-[4px]' : 'rounded-full'}`} />
+              {o}
+            </span>
+          ))}
+          {options.length > 4 && <span className="text-slate-500">and {options.length - 4} more</span>}
+        </div>
+      )
+    case 'boolean':
+      return (
+        <div className="flex gap-1.5">
+          <span className={chip}>No</span>
+          <span className={chip}>Yes</span>
+        </div>
+      )
+    case 'hours':
+      return rows(['Sunday', 'Monday', 'Friday'], 'Opens – Closes')
+    case 'minyanim':
+      return rows(['Shacharis', 'Mincha', 'Maariv'], 'Time · days')
+    case 'contacts':
+      return rows(['Name', 'Phone'], '')
+    case 'tel':
+      return <span className={`${box} h-8 px-2 text-[13px] leading-8 text-slate-400`}>A phone number</span>
+    case 'url':
+      return (
+        <>
+          <span className={`${box} h-8 px-2 text-[13px] leading-8 text-slate-400`}>https://</span>
+          <span className="self-start rounded-full border border-slate-300 px-3 py-1 text-[13px] font-semibold text-primary">{f.linkLabel || 'Open the link'}</span>
+        </>
+      )
+    case 'tags':
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {(options.length ? options.slice(0, 3) : []).map((o) => (
+            <span key={o} className={chip}>
+              {o}
+            </span>
+          ))}
+          <span className={`${chip} !bg-white border border-dashed border-slate-300`}>+ Add an item</span>
+        </div>
+      )
+    default:
+      return <span aria-hidden="true" className={`${box} ${f.type === 'textarea' ? 'h-14' : 'h-8'}`} />
+  }
 }
 
 function Pane({ title, children }: { title: string; children: React.ReactNode }) {
