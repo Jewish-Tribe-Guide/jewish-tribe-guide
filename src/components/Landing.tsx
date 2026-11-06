@@ -17,6 +17,7 @@ import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
+import { linksToMap } from '@/lib/navTabs'
 import TodayBlocks from '@/components/home/TodayBlocks'
 import CategoryTiles from '@/components/home/CategoryTiles'
 import RightNow from '@/components/home/RightNow'
@@ -137,15 +138,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const isMobile = useIsMobile()
   const navTransition = useNavTransitionProps()
   const { anchor } = useLocation()
-  // The Map pseudo-category still gates whether the map shows at all — also
-  // doubles as the hero's "View Map" button gate (mapIcon below).
-  const hasMap = !!categories?.some((c) => c.kind === 'map')
-  // The Map pseudo-category's own icon — shown on the hero's "View Map"
-  // button the same way HeroHeading already accepts it. Null
-  // (not just absent) while categories haven't loaded yet or there's no Map
-  // category configured, which is what keeps the button from rendering at
-  // all (see HeroHeading's own `mapIcon != null` check).
-  const mapIcon = categories?.find((c) => c.kind === 'map')?.icon ?? null
+  // The hero's "View Map" shows wherever the header or a tab links to the
+  // Map, the same rule as those links.
+  const showMap = linksToMap(settings)
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
   // Same as the real Zmanim & Shabbos category page (FindResources' own
   // locationLabel) — the visitor's typed address, or the community's region,
@@ -508,7 +503,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           query={query}
           onQueryChange={changeQuery}
           onSearchSubmit={submit}
-          mapIcon={hasMap ? mapIcon : null}
+          showMap={showMap}
           onViewMap={() => onNavigate(null, 'map')}
           onBrowseCategories={() => {
             // Also expands the row (the same thing the "More" tile's own
@@ -536,7 +531,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 banner "near the top" on both. Not part of builtInOrder/
                 cardKindContent: it isn't admin-orderable among those cards,
                 just a plain "is one active" check, same shape as
-                hasMap/zmanimCategory above.
+                showMap/zmanimCategory above.
 
                 Hidden on mobile while actively searching (`isMobile && q`):
                 mobile has no HeroSearchDropdown of its own — typing re-filters

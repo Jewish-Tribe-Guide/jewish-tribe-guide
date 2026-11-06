@@ -113,9 +113,11 @@ describe('HeaderNav — Map', () => {
     expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute('href', '/test-community/map')
   })
 
-  it('is absent when the community has no Map pseudo-category', () => {
+  // The link is what puts the Map on the site; Category pages has no Map
+  // row to switch (board 1, Nov 5).
+  it('links to the map with no Map pseudo-category too', () => {
     renderWithProviders(<HeaderNav />, { content: { categories: [grocery] } })
-    expect(screen.queryByRole('link', { name: 'Map' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute('href', '/test-community/map')
   })
 })
 

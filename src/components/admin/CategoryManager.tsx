@@ -18,7 +18,7 @@ import EruvimManager from './EruvimManager'
 import DeletePage from './DeletePage'
 import { CardBandImageField, IconField } from './CategoryFormFields'
 import { AdminBack, AdminBox, AdminEmpty, AdminRow, AdminSwitch } from './AdminUI'
-import { ERUV_SCREEN, SITE_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
+import { LISTED_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
 
 // ── The categories manager: Site's Category pages tab (the Category pages
 // redesign's board 1) — one list of every page by name: the categories that
@@ -94,11 +94,11 @@ export default function CategoryManager({
   useLoadOnMount(load)
 
   // Every page in one list by name (board 1): the categories that hold
-  // places, and the Eruv, Candle Lighting and the Map, with or without a row
-  // yet (switching one on makes it).
+  // places, and the Eruv and Candle Lighting, with or without a row yet
+  // (switching one on makes it).
   const entries = useMemo(() => {
     if (!categories) return null
-    const screens = [ERUV_SCREEN, ...SITE_SCREENS].map((screen) => {
+    const screens = LISTED_SCREENS.map((screen) => {
       const st = screenState(categories, screen)
       return { key: `${SCREEN_PREFIX}${screen.kind}`, label: st.row?.pluralLabel ?? screen.label, on: st.on, line: SCREEN_LINES[screen.kind], glyph: screen.kind }
     })
@@ -167,11 +167,13 @@ export default function CategoryManager({
     }} onCancel={() => onOpenEditor(`${CAT_PREFIX}new`)} />
   }
 
-  // The Map, Candle Lighting, and an Eruv with no row yet: the page's own
-  // switch and nothing else (neither has anything to change, Nov 3).
-  if (editingId?.startsWith(SCREEN_PREFIX)) {
-    const screen = [ERUV_SCREEN, ...SITE_SCREENS].find((sc) => `${SCREEN_PREFIX}${sc.kind}` === editingId)
-    if (!categories || !screen) return <p className="text-sm text-muted">Loading…</p>
+  // Candle Lighting, and an Eruv with no row yet: the page's own switch and
+  // nothing else (neither has anything to change, Nov 3). The Map's old
+  // address is the list: it has no page (board 1).
+  const listedScreen = LISTED_SCREENS.find((sc) => `${SCREEN_PREFIX}${sc.kind}` === editingId)
+  if (listedScreen) {
+    const screen = listedScreen
+    if (!categories) return <p className="text-sm text-muted">Loading…</p>
     const st = screenState(categories, screen)
     // The Eruv has its eruvim to keep once it has a row.
     if (screen.kind === 'eruv' && st.row) {
@@ -186,13 +188,14 @@ export default function CategoryManager({
     )
   }
 
-  if (editingId?.startsWith(CAT_PREFIX)) {
-    const id = editingId.slice(CAT_PREFIX.length)
+  const catId = editingId?.startsWith(CAT_PREFIX) ? editingId.slice(CAT_PREFIX.length) : null
+  if (catId !== null && categories?.find((c) => c.id === catId)?.kind !== 'map') {
+    const id = catId
     const initial = categories?.find((c) => c.id === id) ?? null
     if (!initial) return <p className="text-sm text-muted">Loading…</p>
-    // An old address of the Eruv, the Map or Candle Lighting.
+    // An old address of the Eruv or Candle Lighting (the Map's is the list).
     if (initial.kind !== 'listing') {
-      const screen = [ERUV_SCREEN, ...SITE_SCREENS].find((sc) => sc.kind === initial.kind)
+      const screen = LISTED_SCREENS.find((sc) => sc.kind === initial.kind)
       if (screen?.kind === 'eruv') {
         return <SingletonEditor token={token} category={initial} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
       }

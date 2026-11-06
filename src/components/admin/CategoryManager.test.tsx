@@ -62,9 +62,9 @@ describe('CategoryManager', () => {
       'Childcare0 placesHidden',
       'EruvEruv pageHidden',
       'Food1 place',
-      'MapMap page',
       'Synagogues16 places',
     ])
+    // The Map has no page of its own (board 1): the header and tabs link it.
     expect(screen.queryByText('Jewish Medical Resources')).toBeNull()
     expect(screen.queryByRole('switch')).toBeNull()
   })
@@ -81,8 +81,6 @@ describe('CategoryManager', () => {
     show([shul, map], { onOpenEditor: open })
     await user.click((await screen.findByText('Synagogues')).closest('button')!)
     expect(open).toHaveBeenLastCalledWith('cat:synagogue')
-    await user.click(screen.getByText('Map page').closest('button')!)
-    expect(open).toHaveBeenLastCalledWith('screen:map')
     await user.click(screen.getByRole('button', { name: '+ New category page' }))
     expect(open).toHaveBeenLastCalledWith('cat:new')
   })
@@ -93,15 +91,10 @@ describe('CategoryManager', () => {
     expect(await screen.findByRole('heading', { name: 'Food' })).toBeInTheDocument()
   })
 
-  it('hides the Map from its page, keeping its name and photo', async () => {
-    const user = userEvent.setup()
-    show([shul, map], { editingId: 'screen:map' })
-    await user.click(await screen.findByRole('switch', { name: 'On the site' }))
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const [url, init] = vi.mocked(fetchJson).mock.calls[0]
-    expect(String(url)).toContain('/api/admin/categories/map')
-    expect(init?.method).toBe('PATCH')
-    expect(JSON.parse(String(init?.body))).toEqual({ active: false })
+  it.each(['screen:map', 'cat:map'])('has no Map page, even at its old address %s', async (editingId) => {
+    show([shul, map], { editingId })
+    expect(await screen.findByText('Synagogues')).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'On the site' })).toBeNull()
   })
 
   it('makes Candle Lighting’s row the first time it’s switched on', async () => {

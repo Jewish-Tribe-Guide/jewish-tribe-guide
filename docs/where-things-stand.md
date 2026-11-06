@@ -525,7 +525,12 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   with the kind); Davening times and Contacts come with the Shuls and
   Hospitals kinds.
 - No Map switch for the site either: the Map is on when the header or a
-  tab links to it. Code change only.
+  tab links to it. Code change only. BUILT Nov 5 (`linksToMap`, navTabs.ts):
+  the header and phone tabs link the Map with or without its row, the
+  home's View Map shows wherever it's linked, and Category pages has no
+  Map row (its old addresses open the list). Its row stays, holding the
+  zoom radius. Live: only Philly, Map on and linked, so nothing changes
+  there; dev's Riverton (no Map row, linked by default) gains one.
 - The question card is chosen by the site; the four listing options are
   set by the kind (superadmin can adjust).
 - Preview has Page · A listing · Adding. On a phone, Preview is the
@@ -550,9 +555,9 @@ after the deploy, dry run first, and needs its own go-ahead.
   Fields and Questions open folded, each with its line. Adding Address
   puts the page on the map (a tick until step 3). `/categories/restaurant` (no
   `cat:`) opens the page now.
-- Not on the drawing, in step 1: the Map has no drawn place yet, so for
-  now it's a row ("Map page") opening its On the site switch, until the
-  header/tab links decide it (a public-site change). Pin colour is off
+- Not on the drawing, in step 1: the Map was a row ("Map page") opening
+  its On the site switch until the header/tab links decided it; gone
+  Nov 5 (above). Pin colour is off
   the page (not drawn); a saved colour keeps working. Group the list
   and the question card are off the page too, waiting for Before it's
   opened (step 4); saved values keep working. Places within a walk and
@@ -678,6 +683,9 @@ after the deploy, dry run first, and needs its own go-ahead.
   doesn't outline the field being edited. Boards 14-15 (a ready-made
   field, fixed or local) are still waiting on the user, so no
   "Ready-made" pill yet.
+- Add a field says every field's kind on its line (hours, phone,
+  davening times and text said only their page) and draws each as it's
+  filled in, not an empty box (the user, Nov 5). BUILT ff32ea7b.
 - The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
   the listing puts a field in them by its kind, so one added there wouldn't
   stay. Not drawn.

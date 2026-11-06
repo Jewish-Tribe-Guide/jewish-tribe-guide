@@ -108,7 +108,7 @@ describe('HeroHeading — Phase 3 desktop details', () => {
 
   it('the desktop View Map button renders plain text — no icon, and not the raw admin-set emoji string, next to the label', () => {
     const { container } = render(
-      <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />,
+      <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap onViewMap={vi.fn()} />,
     )
 
     // Scoped to the `desktop:block` section rather than asserting on every
@@ -126,7 +126,7 @@ describe('HeroHeading — Phase 3 desktop details', () => {
   // removed since mobile already reaches the map through its own tab
   // (MobileTabBar), making the hero's copy redundant.
   it('renders no "View Map" button on mobile, even when a Map category is configured', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />)
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap onViewMap={vi.fn()} />)
 
     const buttons = screen.getAllByRole('button', { name: /View Map/ })
     expect(buttons).toHaveLength(1)
@@ -435,7 +435,7 @@ describe('HeroHeading — the Today home', () => {
   const dayLine = 'Tuesday, Oct 6 · 25 Tishrei · sunset 6:35 PM'
 
   it('puts the day over the title on both devices, and drops the mission, the subhead and the Browse and Map buttons', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" today={{ dayLine }} />)
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap today={{ dayLine }} />)
     expect(screen.getAllByText(dayLine)).toHaveLength(2)
     expect(screen.getByTestId('today-hero')).toHaveTextContent(`${dayLine}${settings.heroTitle}`)
     expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
@@ -445,7 +445,7 @@ describe('HeroHeading — the Today home', () => {
   })
 
   it('the classic home is unchanged', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" />)
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap />)
     expect(screen.queryByTestId('today-hero')).not.toBeInTheDocument()
     expect(screen.getByTestId('phone-hero')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Browse Categories' })).toBeInTheDocument()

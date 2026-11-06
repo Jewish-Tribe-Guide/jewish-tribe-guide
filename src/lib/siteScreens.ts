@@ -21,6 +21,11 @@ export const SITE_SCREENS: readonly SiteScreen[] = [
 
 export const ERUV_SCREEN: SiteScreen = { kind: 'eruv', label: 'Eruv', icon: '🧵' }
 
+/** The screens with a row in Category pages' list: the Eruv and Candle
+ *  Lighting. Not the Map (board 1): it shows wherever the header or a tab
+ *  links to it (navTabs.ts linksToMap), so it has nothing to switch. */
+export const LISTED_SCREENS: readonly SiteScreen[] = [ERUV_SCREEN, ...SITE_SCREENS.filter((s) => s.kind !== 'map')]
+
 /** A screen, its row if it has one, and whether it's on. */
 export function screenState(categories: readonly CategoryConfig[], screen: SiteScreen) {
   const row = categories.find((c) => c.kind === screen.kind)
