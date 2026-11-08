@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { slugifyFieldKey, TYPE_IS_FILTERABLE, type CategoryField, type FieldType } from '@/lib/categories'
-import { fieldAbout } from '@/lib/fieldAbout'
+import { fieldAbout, fieldRules } from '@/lib/fieldAbout'
+import { KOSHER_CAVEAT } from '@/lib/kosherQuestions'
 import { AdminBack, AdminBox, AdminField, AdminSwitch, AdminYesNo } from './AdminUI'
 import DragList from './DragList'
 
@@ -46,6 +47,7 @@ export default function FieldScreen({
   onRemove,
   onBack,
   more,
+  onKosherQuestions,
 }: {
   field: CategoryField
   pageName: string
@@ -56,8 +58,10 @@ export default function FieldScreen({
   onBack: () => void
   /** A superadmin's other settings. */
   more?: React.ReactNode
+  /** Turns a hechsher's questions on or off, with the page's hidden fields. */
+  onKosherQuestions?: (on: boolean) => void
 }) {
-  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} />
+  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} onKosherQuestions={onKosherQuestions} />
   return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} />
 }
 
@@ -94,12 +98,12 @@ function RemoveFrom({ pageName, onRemove }: { pageName: string; onRemove: () => 
   )
 }
 
-function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more }: ScreenProps) {
+function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, onKosherQuestions }: ScreenProps) {
   return (
     <>
       <AdminBack back={{ label: pageName, onClick: onBack }} title={<FieldTitle field={f} />} />
       <WhatThisIs field={f} />
-      <FieldChanges field={f} canRequire={canRequire} onChange={onChange} />
+      <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} />
       <More more={more} />
       <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
@@ -159,11 +163,15 @@ export function FieldChanges({
   canRequire,
   onChange,
   fixed = false,
+  onKosherQuestions,
 }: {
   field: CategoryField
   canRequire: boolean
   onChange: (patch: Partial<CategoryField>) => void
   fixed?: boolean
+  /** Added already: the page's hidden fields change with it. Before adding,
+   *  the caveat alone, and adding brings its questions. */
+  onKosherQuestions?: (on: boolean) => void
 }) {
   const [adding, setAdding] = useState<string | null>(null)
   const options = f.options ?? []
@@ -177,10 +185,12 @@ export function FieldChanges({
   // list, contacts or davening times aren't a thing a place can't do without.
   const required = !fixed && canRequire && !NEVER_REQUIRED.has(f.type)
   const filter = !fixed && TYPE_IS_FILTERABLE(f.type)
-  const choices = !fixed && f.type === 'select'
+  const rules = fieldRules(f)
+  const choices = !fixed && f.type === 'select' && !rules.choicesSet
+  const kosher = !fixed && !!rules.asksEverythingKosher
   return (
     <AdminBox title="What you can change">
-      {!required && !filter && !choices && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
+      {!required && !filter && !choices && !kosher && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
       {required && (
         <Change label="Required" hint="A place can’t be added without it">
           <AdminSwitch checked={!!f.required} onChange={(on) => onChange({ required: on })} label="Required" />
@@ -196,6 +206,15 @@ export function FieldChanges({
             // A choice in the filter shows at the top of a place, as a chip.
             onChange={(on) => onChange(on && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: on })}
             label={f.type === 'hours' ? 'Open now in the filter' : 'In the filter'}
+          />
+        </Change>
+      )}
+      {kosher && (
+        <Change label="Everything here is kosher?" hint="Asks whether anything at a place isn’t kosher">
+          <AdminSwitch
+            checked={!!f.caveat}
+            onChange={(on) => (onKosherQuestions ? onKosherQuestions(on) : onChange({ caveat: on ? { ...KOSHER_CAVEAT } : undefined }))}
+            label="Everything here is kosher?"
           />
         </Change>
       )}

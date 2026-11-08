@@ -8,6 +8,8 @@ import {
   type FieldType,
 } from '@/lib/categories'
 import { addToBox, renameKey } from '@/lib/fieldBoxes'
+import { fieldRules } from '@/lib/fieldAbout'
+import { KOSHER_CAVEAT, kosherQuestions } from '@/lib/kosherQuestions'
 import { listingPartsFromKey, listingPartsKey } from '@/lib/listingParts'
 import { slugify } from '@/lib/routes'
 import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEditorLogic'
@@ -102,7 +104,10 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     const key = nextFieldKey(used, [], field.key || slugifyFieldKey(field.label))
     used.push({ key } as CategoryField)
     const renamed = new Map<string, string>()
-    const extra = companions.map((c) => {
+    // A hechsher's questions come with it when they're on, and not when a
+    // page turned them off before adding it.
+    const asks = !field.caveat ? [] : companions.length ? companions : kosherQuestions(field.caveat.flagField, field.caveat.noteField)
+    const extra = asks.map((c) => {
       const k = nextFieldKey(used, [], c.key)
       used.push({ key: k } as CategoryField)
       renamed.set(c.key, k)
@@ -287,6 +292,16 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
         }
       }
       if (field.caveat) return d
+      // A hechsher's are its own two questions, as Food asks them.
+      if (fieldRules(field).asksEverythingKosher) {
+        const flagField = nextFieldKey(d.fields, d.hiddenFields, KOSHER_CAVEAT.flagField)
+        const noteField = nextFieldKey(d.fields, [...d.hiddenFields, { key: flagField } as CategoryField], KOSHER_CAVEAT.noteField)
+        return {
+          ...d,
+          fields: d.fields.map((f, idx) => (idx === i ? { ...f, caveat: { flagField, noteField } } : f)),
+          hiddenFields: [...d.hiddenFields, ...kosherQuestions(flagField, noteField)],
+        }
+      }
       const flagField = nextFieldKey(d.fields, d.hiddenFields, `${field.key}Partial`)
       const noteField = nextFieldKey(d.fields, [...d.hiddenFields, { key: flagField } as CategoryField], `${field.key}Note`)
       const flag: CategoryField = {

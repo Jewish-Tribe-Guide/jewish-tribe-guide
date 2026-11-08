@@ -60,7 +60,8 @@ describe('FieldScreen — a ready-made field', () => {
 
   it('takes a choice of the page’s own, which only it can remove', async () => {
     const user = userEvent.setup()
-    render(<Screen field={foodType} />)
+    const storeType = { ...foodType, key: 'storeType', label: 'Store Type' }
+    render(<Screen field={storeType} />)
     await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
     await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Fish{Enter}')
     expect(saved().options).toEqual([...foodType.options!, { value: 'Fish', label: 'Fish', own: true }])
@@ -88,6 +89,37 @@ describe('FieldScreen — a ready-made field', () => {
     render(<Screen field={{ key: 'join', label: 'Join group', type: 'url', linkLabel: 'Join' }} />)
     expect(screen.queryByLabelText('What should the button say?')).not.toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Required' })).toBeInTheDocument()
+  })
+
+  // The user, Nov 8, field by field: Food Type's and Kosher Store's
+  // choices are set; a hechsher's kosher questions can be turned off.
+  it('has no “Your own choices” where a field’s choices are set', () => {
+    render(<Screen field={foodType} />)
+    expect(screen.queryByText('Your own choices')).toBeNull()
+    expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
+    expect(screen.getByRole('switch', { name: 'In the filter' })).toBeInTheDocument()
+    cleanup()
+    render(<Screen field={{ key: 'isKosher', label: 'Kosher Store', type: 'select', options: [{ value: 'Kosher Store', label: 'Kosher Store' }] }} />)
+    expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
+  })
+
+  it('turns a hechsher’s “Everything here is kosher?” off and on', async () => {
+    const user = userEvent.setup()
+    const cert: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', multiSelect: true, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' }, options: [{ value: 'OU', label: 'OU' }] }
+    render(<Screen field={cert} />)
+    const ask = within(box('What you can change')).getByRole('switch', { name: 'Everything here is kosher?' })
+    expect(ask).toHaveAttribute('aria-checked', 'true')
+    expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent('What isn’t kosher')
+    await user.click(ask)
+    expect(saved().caveat).toBeUndefined()
+    expect(within(box('What this is')).queryByRole('list', { name: 'Comes with' })).toBeNull()
+    expect(box('What this is')).not.toHaveTextContent('whether everything there is kosher')
+    await user.click(ask)
+    expect(saved().caveat).toEqual({ flagField: 'kosherPartial', noteField: 'kosherNote' })
+    // Only a hechsher asks it.
+    cleanup()
+    render(<Screen field={foodType} />)
+    expect(screen.queryByRole('switch', { name: 'Everything here is kosher?' })).toBeNull()
   })
 
   it('folds a superadmin’s other settings under More', async () => {

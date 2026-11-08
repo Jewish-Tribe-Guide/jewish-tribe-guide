@@ -33,11 +33,33 @@ const WRITTEN: Record<string, string> = {
   'minyanim:davening times (minyanim)': 'When the minyanim are. People adding a place fill in the usual weekday times, the usual Shabbos times, and this week’s schedule when it’s different. The listing shows each in a box of its own.',
   'image:photo': 'A photo of the place. People adding a place upload one. It shows on the place’s row and at the top of its listing.',
   'select:denomination': 'Which movement a place belongs to. People adding a place pick one, or type another. Rows show it under the name.',
-  'select:kosher certification': 'Which hechsher a place is under. People adding a place pick any that fit, or type another, and say whether everything there is kosher. When it isn’t, they say what isn’t, and the listing shows that in a box of its own.',
   'select:food type': 'Whether a place is meat, dairy or parve. People adding a place pick one. Rows show it under the name.',
   'text:address': 'Where the place is. People adding a place type the address. It puts the place on the map, and the listing shows Directions.',
   'tel:phone': 'The place’s phone number. People adding a place type it. The listing shows a Call button.',
   'url:website': 'The place’s own website. People adding a place paste the address. The listing shows a button that opens it.',
+}
+
+/** What a ready-made field lets a page change beyond its kind's switches,
+ *  and what it doesn't. The user settles these field by field (Nov 8). */
+export type FieldRules = {
+  /** Its choices are set: no "Your own choices". */
+  choicesSet?: boolean
+  /** "Everything here is kosher?" can be turned off and on. */
+  asksEverythingKosher?: boolean
+}
+
+const RULES: Record<string, FieldRules> = {
+  'select:food type': { choicesSet: true },
+  'select:kosher store': { choicesSet: true },
+  'select:kosher certification': { asksEverythingKosher: true },
+}
+
+export const fieldRules = (f: Pick<CategoryField, 'label' | 'type'>): FieldRules => RULES[idOf(f)] ?? {}
+
+/** Paragraphs that follow what a page has switched on. */
+const WRITTEN_BY_SETTINGS: Record<string, (f: CategoryField) => string> = {
+  'select:kosher certification': (f) =>
+    `Which hechsher a place is under. ${kindHow(f)}${f.caveat ? ' They also say whether everything there is kosher. When it isn’t, they say what isn’t, and the listing shows that in a box of its own.' : ''}`,
 }
 
 const KIND_LEAD: Record<FieldType, string> = {
@@ -92,7 +114,7 @@ export function fixedChoices(f: CategoryField): string[] {
 }
 
 export function fieldAbout(f: CategoryField): FieldAbout {
-  const about = WRITTEN[idOf(f)] ?? `${KIND_LEAD[f.type]} ${kindHow(f)}`
+  const about = WRITTEN[idOf(f)] ?? WRITTEN_BY_SETTINGS[idOf(f)]?.(f) ?? `${KIND_LEAD[f.type]} ${kindHow(f)}`
   if (f.type === 'select') {
     // A hechsher comes with whether everything there is kosher, and if not,
     // what isn't: two questions the listing shows as one box of its own.

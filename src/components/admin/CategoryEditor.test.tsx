@@ -8,7 +8,8 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { fetchJson } from '@/lib/fetchJson'
-import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig } from '@/lib/categories'
+import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { kosherQuestions } from '@/lib/kosherQuestions'
 
 // This component is ~1000 lines doing template application, field-schema
 // editing, and two separate destructive-change confirmation workflows
@@ -1081,5 +1082,59 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     expect(by.get('delivery_whatsapp_group')!.leadBox).toEqual({ title: 'Get it delivered', text: 'delivery_details' })
     expect(by.get('kosherCert')!.caveat).toEqual({ flagField: 'kosherPartial', noteField: 'kosherNote', title: 'Not kosher here' })
     expect(by.get('dishes')!.label).toBe('Dishes')
+  })
+})
+
+// The user, Nov 8: some communities never have a place that's only partly
+// kosher, so a hechsher's "Everything here is kosher?" can be turned off.
+describe('CategoryEditor — a hechsher’s kosher questions', () => {
+  const cert: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', renderAs: 'badge', multiSelect: true, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' }, options: [{ value: 'OU', label: 'OU' }] }
+  const [flag, note] = kosherQuestions()
+  const food = baseCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [cert, flag, note] })
+  // Without the photo every page is saved with.
+  const saved = () => (JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryField[]).filter((f) => f.type !== 'image')
+  const openCert = async (user: ReturnType<typeof userEvent.setup>) => {
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: /^Kosher Certification/ }))
+  }
+
+  it('turned off, the page stops asking both; turned on, asks them as Food does', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert'])
+    expect(saved()[0].caveat).toBeUndefined()
+  })
+
+  it('turned on where it was off, adds both questions', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const without = { ...food, detailFields: [{ ...cert, caveat: undefined }] }
+    renderWithProviders(<CategoryEditor token="t" initial={without} siblings={[without]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved()).toEqual([{ ...cert, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' } }, flag, note].map((f) => expect.objectContaining(f)))
+  })
+
+  it('turned off before adding, comes without them', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const groceries = baseCategory({ detailFields: [] })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [{ community: 'philly', category: food }] }))))
+    renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await user.click(await screen.findByRole('button', { name: /^Kosher Certification/ }))
+    await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
+    await user.click(screen.getByRole('button', { name: /^Add to / }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved().map((f) => f.label)).toEqual(['Kosher Certification'])
   })
 })

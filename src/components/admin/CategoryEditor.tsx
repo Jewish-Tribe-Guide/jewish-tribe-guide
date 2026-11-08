@@ -485,6 +485,7 @@ function CategoryEditorScreen({
         // "Required" only matters if people can add or edit listings.
         canRequire={draft.capabilities.add || draft.capabilities.edit}
         onChange={(patch) => updateField(i, patch)}
+        onKosherQuestions={(on) => toggleFieldCaveat(i, on)}
         onRemove={removeIt}
         onBack={() => history.back()}
         more={

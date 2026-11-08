@@ -723,11 +723,26 @@ after the deploy, dry run first, and needs its own go-ahead.
   kosher?" and "What isn't kosher". Those two Food fields were never hidden
   from visitors (the listing's What isn't kosher box). They're the
   hechsher's own questions and come with it when it's added.
-- Next, the user's (Nov 7, not started): go through every ready-made field,
-  its paragraph, and what's baked in vs changeable, on the review page
+- The user's field-by-field review (started Nov 8) on the review page
   (artifact TdzYKX4Y3tRFEhFpEjUspn, 47 fields on dev, 34 only described by
-  their kind). That may add new switches; the user can't say yet. The
-  switches today: Required, In the filter, Your own choices.
+  their kind). Per-field rules live in `fieldRules` (src/lib/fieldAbout.ts).
+  Done so far, BUILT Nov 8:
+  - Food Type and Kosher Store: choices are set, no "Your own choices".
+  - Kosher Store: "Other" isn't a choice. `scripts/kosher-store-no-other.mjs`
+    applied on dev. **Live waits on the user's go-ahead** (dry run: philly
+    Grocery only, no place or pending submission ever picked Other), then a
+    revalidate.
+  - Kosher Certification: "Everything here is kosher?" is a switch, since
+    some communities never have a partly kosher place (Riverton's has
+    none). Off drops both questions from the page; on adds them as Food asks
+    them (src/lib/kosherQuestions.ts). Before adding, off adds it without.
+  - Open: Hospitals' Eruv is a plain choice field with the eruv names typed
+    in by hand ("University City Eruv", "Center City Eruv", "Not inside an
+    eruv"), shown in the hospital's This Shabbos box. The user asked whether
+    it should take its choices from the Eruv page. Recommended: yes, the
+    choices are the community's eruvim plus "Not inside an eruv", and the
+    listing links to that eruv. Not built; waiting on the user.
+  - The rest of the fields: the user's, later.
 - Noted by the user, Nov 7, not for now (no changes yet): the preview beside
   a field before adding doesn't really show the new field. On Adding it's a
   "+ Denomination" link, and clicking into it makes it disappear. Maybe a
