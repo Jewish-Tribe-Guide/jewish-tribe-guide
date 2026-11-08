@@ -495,8 +495,8 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Each kind of field asks only its own questions (was a map board,
-  now just this list): required (not Yes or
-  no, not Photo), part of the filter (Choices, Yes or no, Hours as "Open
+  now just this list): required (not Photo; Yes or no can be since Nov 8,
+  meaning someone has to pick Yes or No), part of the filter (Choices, Yes or no, Hours as "Open
   now"), show before opened (Choices, Yes or no, a list's count, Text's
   line, Link's button; Hours, Address, Photo always show), both X and Y
   and the "Other" row (Choices only), note under it (all but Photo),
@@ -729,9 +729,9 @@ after the deploy, dry run first, and needs its own go-ahead.
   Done so far, BUILT Nov 8:
   - Food Type and Kosher Store: choices are set, no "Your own choices".
   - Kosher Store: "Other" isn't a choice. `scripts/kosher-store-no-other.mjs`
-    applied on dev. **Live waits on the user's go-ahead** (dry run: philly
-    Grocery only, no place or pending submission ever picked Other), then a
-    revalidate.
+    applied on dev, and live Nov 8 with the user's go-ahead (philly Grocery
+    only; no place or pending submission ever picked Other). Live's cached
+    copy updates on the next deploy or an admin save of Grocery.
   - Kosher Certification: "Everything here is kosher?" is a switch, since
     some communities never have a partly kosher place (Riverton's has
     none). Off drops both questions from the page; on adds them as Food asks
@@ -742,6 +742,37 @@ after the deploy, dry run first, and needs its own go-ahead.
     it should take its choices from the Eruv page. Recommended: yes, the
     choices are the community's eruvim plus "Not inside an eruv", and the
     listing links to that eruv. Not built; waiting on the user.
+  - Fine as they are (the user, Nov 8): Childcare Services, Sukkah Size,
+    Store Type.
+  - Yes or no can be Required (BUILT Nov 8, FieldScreen's NEVER_REQUIRED).
+    A yes or no starts unanswered, so required means someone picks one.
+  - "Type" (Restaurant / Bakery & Cafe / Ice Cream) was an old copy of
+    Store Type (same key, `foodType`) from the starter Food page
+    (src/data/categories.js, categoryTemplates.ts). Only dev's Riverton test
+    page had it, nothing filled in. Removed there Nov 8 (dev only). Live's
+    Cemetery has a different "Type" (Cemetery / Funeral Home), all 5 places
+    use it: it stays. The starter Food page still carries the old Type and
+    Dietary options; not changed.
+  - "Dietary options": also from the starter Food page. A list typed in per
+    place (Vegan, Gluten-free), shown as badges. Only Riverton has it,
+    nothing filled; Philly's Food doesn't. Recommended: remove it too.
+    Waiting on the user.
+  - Recommended, waiting on the user (the user's ideas, Nov 8):
+    - Each field's "What this is" says what keeps it up to date, read from
+      the same rules Add a place uses (src/components/admin/addSources.ts):
+      Name, Phone, Website and Hours from Google; Hours or Davening times
+      from the place's page or emails; Main dishes from its menu; Kosher
+      Certification from Keystone-K and the kosher lists; a hospital's
+      contacts from Refuah; any link by the Sunday link check. The user is
+      also rewriting the paragraphs.
+    - Kosher Certification URL comes with Kosher Certification, with a
+      switch for whether to ask for it (live: 73 of 82 Food places have
+      one). Same shape as the kosher questions switch.
+    - Delivery WhatsApp Group comes with Delivery Details, with a switch
+      (live: 5 places have a group, 6 have delivery details).
+    - Davening times: switches for sign-up minyanim, a join-from-home link
+      and summer/winter only. Days, times and zman times stay. The user is
+      looking for more like these.
   - The rest of the fields: the user's, later.
 - Noted by the user, Nov 7, not for now (no changes yet): the preview beside
   a field before adding doesn't really show the new field. On Adding it's a

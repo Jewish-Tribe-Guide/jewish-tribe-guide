@@ -79,6 +79,15 @@ describe('FieldScreen — a ready-made field', () => {
     expect(saved()).toMatchObject({ filterable: true, renderAs: 'badge' })
   })
 
+  // The user, Nov 8: a yes or no can be required too. It starts unanswered,
+  // so required means someone has to pick Yes or No.
+  it('lets a yes or no be required', async () => {
+    const user = userEvent.setup()
+    render(<Screen field={{ key: 'shabbat', label: 'Shabbat friendly', type: 'boolean', renderAs: 'row' }} />)
+    await user.click(within(box('What you can change')).getByRole('switch', { name: 'Required' }))
+    expect(saved().required).toBe(true)
+  })
+
   it('says so when a page has nothing to change', () => {
     render(<Screen field={{ key: 'minyanim', label: 'Davening Times (Minyanim)', type: 'minyanim', renderAs: 'row' }} />)
     expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent(/Usual weekday times.*Usual Shabbos times.*This week’s schedule/)

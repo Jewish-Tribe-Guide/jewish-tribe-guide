@@ -139,7 +139,7 @@ export function WhatThisIs({ field }: { field: CategoryField }) {
   )
 }
 
-const NEVER_REQUIRED: ReadonlySet<FieldType> = new Set(['boolean', 'image', 'tags', 'contacts', 'minyanim'])
+const NEVER_REQUIRED: ReadonlySet<FieldType> = new Set(['image', 'tags', 'contacts', 'minyanim'])
 
 const changeRow = 'flex min-h-[60px] items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-b-0'
 
@@ -181,8 +181,9 @@ export function FieldChanges({
     setAdding(null)
     if (label && !options.some((o) => o.label.toLowerCase() === label.toLowerCase())) onChange({ options: [...options, { value: label, label, own: true }] })
   }
-  // As the boards draw it: a yes or no is always answered, and a photo, a
-  // list, contacts or davening times aren't a thing a place can't do without.
+  // A photo, a list, contacts or davening times aren't a thing a place can't
+  // do without. A yes or no can be required (the user, Nov 8): it starts
+  // unanswered, so required means someone picks Yes or No.
   const required = !fixed && canRequire && !NEVER_REQUIRED.has(f.type)
   const filter = !fixed && TYPE_IS_FILTERABLE(f.type)
   const rules = fieldRules(f)
