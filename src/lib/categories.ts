@@ -83,6 +83,15 @@ export function selectValues(value: unknown): string[] {
   return [String(value)]
 }
 
+/** The choices someone adding a place picks from. With a typed-in Other,
+ *  a choice that's only called "Other" would be a second one (Denomination
+ *  had both; the user, Nov 7: "get rid of 'other' if we have typed in
+ *  other"). A place that picked it keeps it, as a typed-in value. */
+export function pickableOptions(field: Pick<CategoryField, 'options' | 'allowOther'>): NonNullable<CategoryField['options']> {
+  const options = field.options ?? []
+  return field.allowOther ? options.filter((o) => o.label.trim().toLowerCase() !== 'other') : options
+}
+
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
   key: string

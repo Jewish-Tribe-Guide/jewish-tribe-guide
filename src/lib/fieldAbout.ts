@@ -1,4 +1,4 @@
-import type { CategoryField, FieldType } from './categories'
+import { pickableOptions, type CategoryField, type FieldType } from './categories'
 
 // What a ready-made field is, in a few plain sentences: the first box on its
 // screen, before adding it and after (canvas row "Each kind of field", Nov 7).
@@ -33,6 +33,7 @@ const WRITTEN: Record<string, string> = {
   'minyanim:davening times (minyanim)': 'When the minyanim are. People adding a place fill in the usual weekday times, the usual Shabbos times, and this week’s schedule when it’s different. The listing shows each in a box of its own.',
   'image:photo': 'A photo of the place. People adding a place upload one. It shows on the place’s row and at the top of its listing.',
   'select:denomination': 'Which movement a place belongs to. People adding a place pick one, or type another. Rows show it under the name.',
+  'select:kosher certification': 'Which hechsher a place is under. People adding a place pick any that fit, or type another, and say whether everything there is kosher. When it isn’t, they say what isn’t, and the listing shows that in a box of its own.',
   'select:food type': 'Whether a place is meat, dairy or parve. People adding a place pick one. Rows show it under the name.',
   'text:address': 'Where the place is. People adding a place type the address. It puts the place on the map, and the listing shows Directions.',
   'tel:phone': 'The place’s phone number. People adding a place type it. The listing shows a Call button.',
@@ -87,12 +88,17 @@ function kindHow(f: CategoryField): string {
 
 /** The choices a page starts with: its own (added here) are the page's. */
 export function fixedChoices(f: CategoryField): string[] {
-  return (f.options ?? []).filter((o) => !o.own).map((o) => o.label)
+  return pickableOptions(f).filter((o) => !o.own).map((o) => o.label)
 }
 
 export function fieldAbout(f: CategoryField): FieldAbout {
   const about = WRITTEN[idOf(f)] ?? `${KIND_LEAD[f.type]} ${kindHow(f)}`
-  if (f.type === 'select') return { about, choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])] }
+  if (f.type === 'select') {
+    // A hechsher comes with whether everything there is kosher, and if not,
+    // what isn't: two questions the listing shows as one box of its own.
+    const comesWith = f.caveat ? ['Everything here is kosher?', f.caveat.title?.trim() || 'What isn’t kosher'] : undefined
+    return { about, choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])], ...(comesWith && { comesWith }) }
+  }
   if (f.type === 'minyanim') return { about, comesWith: ['Usual weekday times', 'Usual Shabbos times', 'This week’s schedule'] }
   return { about }
 }

@@ -40,6 +40,20 @@ describe('fieldAbout', () => {
     expect(fieldAbout(f).choices).toEqual(['Orthodox', 'Conservative', 'Other, typed in'])
   })
 
+  it('lists Other once: a choice only called Other goes when Other is typed in', () => {
+    const f: CategoryField = { key: 'd', label: 'Denomination', type: 'select', allowOther: true, options: [{ value: 'O', label: 'Orthodox' }, { value: 'Other', label: 'Other' }] }
+    expect(fieldAbout(f).choices).toEqual(['Orthodox', 'Other, typed in'])
+    expect(fieldAbout({ ...f, allowOther: false }).choices).toEqual(['Orthodox', 'Other'])
+  })
+
+  // The two hidden Food fields belong to the hechsher: shown on its screen.
+  it('says a hechsher comes with whether everything is kosher and what isn’t', () => {
+    const f: CategoryField = { key: 'k', label: 'Kosher Certification', type: 'select', caveat: { flagField: 'p', noteField: 'n' }, options: [{ value: 'OU', label: 'OU' }] }
+    expect(fieldAbout(f).comesWith).toEqual(['Everything here is kosher?', 'What isn’t kosher'])
+    expect(fieldAbout(f).about).toContain('Which hechsher')
+    expect(fieldAbout({ ...f, caveat: { ...f.caveat!, title: 'Not under the hechsher' } }).comesWith).toEqual(['Everything here is kosher?', 'Not under the hechsher'])
+  })
+
   it('says what davening times come with', () => {
     expect(fieldAbout({ key: 'm', label: 'Davening Times (Minyanim)', type: 'minyanim' }).comesWith).toEqual(['Usual weekday times', 'Usual Shabbos times', 'This week’s schedule'])
   })

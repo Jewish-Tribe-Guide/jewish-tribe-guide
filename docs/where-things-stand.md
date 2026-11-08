@@ -714,10 +714,24 @@ after the deploy, dry run first, and needs its own go-ahead.
   a list the page's main list. It stays with the field: on for Kosher items
   available and Main dishes, off for any other list. Only the superadmin's
   More still shows it.
-- Next, the user's (Nov 7): go through every ready-made field, its
-  paragraph, and what's baked in vs changeable. That may add new switches;
-  the user can't say yet. The switches today: Required, In the filter, Your
-  own choices.
+- Done Nov 7, from the user's notes on the review page: a choice called
+  just "Other" is left out wherever typed-in Other is on (the Add form and
+  the field screen), so Denomination says Other once. A place that picked it
+  keeps it, as typed-in text. The stored choice is still in the data; taking
+  it out of live data needs the user's go-ahead, and nothing needs it.
+  Kosher Certification's screen now says it comes with "Everything here is
+  kosher?" and "What isn't kosher". Those two Food fields were never hidden
+  from visitors (the listing's What isn't kosher box). They're the
+  hechsher's own questions and come with it when it's added.
+- Next, the user's (Nov 7, not started): go through every ready-made field,
+  its paragraph, and what's baked in vs changeable, on the review page
+  (artifact TdzYKX4Y3tRFEhFpEjUspn, 47 fields on dev, 34 only described by
+  their kind). That may add new switches; the user can't say yet. The
+  switches today: Required, In the filter, Your own choices.
+- Noted by the user, Nov 7, not for now (no changes yet): the preview beside
+  a field before adding doesn't really show the new field. On Adding it's a
+  "+ Denomination" link, and clicking into it makes it disappear. Maybe a
+  still picture of the pages rather than the live page. Undecided.
 - Open (asked Nov 7, no answer yet): renaming a ready-made field's box on
   the listing (906bc5eb) renames the field itself for Main dishes and
   contacts, which clashes with a baked-in name. Recommended: those boxes
