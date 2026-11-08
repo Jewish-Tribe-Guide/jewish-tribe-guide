@@ -698,6 +698,30 @@ after the deploy, dry run first, and needs its own go-ahead.
 - The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
   the listing puts a field in them by its kind, so one added there wouldn't
   stay. Not drawn.
+- Drawn Nov 7 (canvas row "Each kind of field", the M boards), not built: a
+  ready-made field's screen is a shop listing. Its name is baked in. One box,
+  "What this is", has a short paragraph (what it is, what people fill in,
+  what visitors see) and what it comes with. The next box, "What you can
+  change", shows each option at its default as a switch. Then Add or Remove,
+  with the preview beside. The user: everything on one page, because people
+  won't add a field they're unsure of. The paragraphs are drafts, and they
+  become the ready-made fields' descriptions (the data has none yet).
+- Decided Nov 7: "How many, on the row" is not something a page changes
+  (the user: "lock that in"). In code it is `showCountInHeader`, and it
+  does more than a count: it makes a list the page's main list (items
+  named on the row, the Items box with "Not always…", the phone home's
+  "N kosher items tracked", the question cards). So it belongs to the
+  ready-made field: on for Kosher items available and Main dishes, off for
+  any other list. Not built.
+- Next, the user's (Nov 7): go through every ready-made field, its
+  paragraph, and what's baked in vs changeable. That may add new switches;
+  the user can't say yet. The switches today: Required, In the filter, Your
+  own choices.
+- Open (asked Nov 7, no answer yet): renaming a ready-made field's box on
+  the listing (906bc5eb) renames the field itself for Main dishes and
+  contacts, which clashes with a baked-in name. Recommended: those boxes
+  show the field's name and can't be renamed; only an admin's own boxes
+  rename.
 
 ## Small open decisions
 
