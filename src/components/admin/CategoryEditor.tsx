@@ -170,6 +170,13 @@ function CategoryEditorScreen({
     setSeenField(openField)
     if (typeof openField === 'number' && draft.capabilities.add) setPreviewView('adding')
   }
+  // So does one looked at before adding: Adding is where it shows up.
+  const lookingAt = adding?.at === 'look' ? adding.id : null
+  const [seenLook, setSeenLook] = useState(lookingAt)
+  if (lookingAt !== seenLook) {
+    setSeenLook(lookingAt)
+    if (lookingAt && draft.capabilities.add) setPreviewView('adding')
+  }
 
   const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
     draft,
@@ -335,7 +342,7 @@ function CategoryEditorScreen({
 
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
-  const preview = wide && (
+  const previewOf = (category: CategoryConfig) => (
     <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
       {(
         <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
@@ -353,10 +360,11 @@ function CategoryEditorScreen({
         </div>
       )}
       <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
-        {() => <CategoryPreview inline view={shownView} category={previewCategory} onClose={() => {}} onListings={setPlaceCount} />}
+        {() => <CategoryPreview inline view={shownView} category={category} onClose={() => {}} onListings={setPlaceCount} />}
       </PreviewBeside>
     </aside>
   )
+  const preview = wide && previewOf(previewCategory)
 
   // Fields, as the listing's boxes (fieldBoxes.ts). A field not named yet
   // has no key: it goes by its place.
@@ -433,6 +441,9 @@ function CategoryEditorScreen({
           else if (row.field) addReadyField(row.field, row.companions, addingTo)
           added(null)
         }}
+        canRequire={draft.capabilities.add || draft.capabilities.edit}
+        // A field before adding: the page beside with it there.
+        besides={wide ? (f) => previewOf({ ...previewCategory, detailFields: [...previewCategory.detailFields, normalizeField({ ...f, key: f.key || 'new' })] }) : undefined}
         onMakeOwn={(type, label) => {
           setLanding(new Set(pageFields.map((f) => f.key)))
           added(addOwnField(type, label, addingTo))

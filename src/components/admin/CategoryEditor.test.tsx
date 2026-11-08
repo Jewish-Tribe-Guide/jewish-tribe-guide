@@ -421,7 +421,7 @@ describe('CategoryEditor — editing an existing category', () => {
       renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
       await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Kosher Certification/ }))
-      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
 
       expect(await screen.findByRole('heading', { name: 'Remove Kosher Certification from Food?' })).toBeInTheDocument()
       expect(screen.getByText('71 places').parentElement).toHaveTextContent('71 places lose their answer')
@@ -508,7 +508,8 @@ describe('CategoryEditor — editing an existing category', () => {
     function categoryWithSelectField(): CategoryConfig {
       return baseCategory({
         detailFields: [
-          { key: 'type', label: 'Type', type: 'select', options: [{ value: 'Kosher', label: 'Kosher' }] },
+          // Made here: a ready-made field's choices aren't the page's to rename.
+          { key: 'type', label: 'Type', type: 'select', madeHere: true, options: [{ value: 'Kosher', label: 'Kosher' }] },
         ],
       })
     }
@@ -929,15 +930,20 @@ describe('CategoryEditor — + Add a field', () => {
     expect(screen.getByText('Hours')).toBeInTheDocument()
   })
 
-  // Boards 7-12 have the picker to themselves: board 11 is its own preview.
-  it('takes the page from beside it, and puts it back after', async () => {
+  // The list has the screen to itself (board 7); a field before adding has
+  // the page beside it, with the field on it (canvas, Nov 7).
+  it('takes the page from beside the list, and shows it beside a field before adding', async () => {
     const user = userEvent.setup()
     // A computer: the page sits beside the settings.
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
     await openAdd(user)
     expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
     await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
-    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
+    // Open on Adding, where the field shows up before it's added.
+    expect(screen.getByRole('button', { name: 'Adding' })).toHaveAttribute('aria-pressed', 'true')
+    // Not board 11's drawn samples: the page itself is there.
+    expect(screen.queryByRole('region', { name: 'On Add a place' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
     await screen.findByRole('heading', { name: 'Groceries' })
     expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
@@ -956,21 +962,32 @@ describe('CategoryEditor — + Add a field', () => {
     const user = userEvent.setup()
     await openAdd(user)
     await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
-    expect(screen.getByRole('heading', { name: 'Denomination' })).toBeInTheDocument()
-    expect(screen.getByText('On Synagogues')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'In the filter' })).getByText('Conservative')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^Denomination\s*Choices$/ })).toBeInTheDocument()
+    // What it is first, then what a page can change (canvas, Nov 7).
+    const what = screen.getByRole('region', { name: 'What this is' })
+    expect(what).toHaveTextContent('Which movement a place belongs to.')
+    expect(within(what).getByRole('list', { name: 'Choices' })).toHaveTextContent('OrthodoxConservative')
+    const change = screen.getByRole('region', { name: 'What you can change' })
+    expect(within(change).getByRole('switch', { name: 'In the filter' })).toHaveAttribute('aria-checked', 'false')
+    // What's changed before adding comes with it.
+    await user.click(within(change).getByRole('switch', { name: 'In the filter' }))
     await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
     expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Denomination/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
     // On a phone, back to the Fields box still open.
     expect(screen.getByRole('button', { name: /^Fields/, expanded: true })).toBeInTheDocument()
+    // It came with the filter switched on before adding.
+    await user.click(screen.getByRole('button', { name: /^Denomination/ }))
+    expect(screen.getByRole('switch', { name: 'In the filter' })).toHaveAttribute('aria-checked', 'true')
   })
 
   // The user, Nov 5: an hours field said only its page, and looked like an
-  // empty text box before adding it.
+  // empty text box before adding it. Without room for the page beside (a
+  // phone), board 11's drawn samples stay.
   it('says what kind an hours field is, and draws the week to fill in', async () => {
     const user = userEvent.setup()
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }))
     const mikvah = { community: 'other', category: baseCategory({ id: 'mikvah', pluralLabel: 'Mikvah', detailFields: [{ key: 'w_hours', label: 'Women’s Hours', type: 'hours', renderAs: 'row' }] }) }
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [mikvah] }))))
     renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)

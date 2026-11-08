@@ -1,0 +1,107 @@
+import type { CategoryField, FieldType } from './categories'
+
+// What a ready-made field is, in a few plain sentences: the first box on its
+// screen, before adding it and after (canvas row "Each kind of field", Nov 7).
+// The user, Nov 7: a field's screen should feel like a shop listing, so you
+// see what you're getting first and what you can change second.
+//
+// Written paragraphs are drafts, by the field's name and kind, the same
+// identity the ready-made list uses (readyMade.ts's fieldId). The user means
+// to go through every field and settle these. A field without one is
+// described by its kind, from what it really does.
+
+export type FieldAbout = {
+  /** Two to four sentences: what it is, what people fill in, what visitors see. */
+  about: string
+  /** A choice field's choices, as visitors are offered them. */
+  choices?: string[]
+  /** The parts it comes with (Davening times). */
+  comesWith?: string[]
+}
+
+const norm = (s: string) => s.trim().toLowerCase()
+const idOf = (f: Pick<CategoryField, 'label' | 'type'>) => `${f.type === 'textarea' ? 'text' : f.type}:${norm(f.label)}`
+
+const WRITTEN: Record<string, string> = {
+  'boolean:shabbat friendly': 'Whether a place works over Shabbos: keys, an elevator, a walk to shul. People adding a place answer Yes or No. A place marked Yes says so on its row and its listing.',
+  'tags:kosher items available': 'The kosher food a place keeps, item by item. People adding a place type in each item, and can mark one that isn’t always in stock. Rows name a few, and the listing shows them all in a box.',
+  'tags:main dishes': 'What a place serves, dish by dish. People adding a place type in each dish, and can mark one that isn’t always on the menu. Rows name a few, and the listing shows them all in a box.',
+  'text:delivery details': 'Where a place delivers, and when. People adding a place write it in their own words. The listing shows it under About.',
+  'url:join group': 'A button that opens a group’s invite link. People adding a place paste the link. The listing shows a Join group button.',
+  'hours:hours': 'When a place is open, day by day. People adding a place set the open and closed times for each day. Rows say “Open until 8 PM” or “Closed now”.',
+  'contacts:liaisons': 'Who to call at a place, and what for. People adding a place add each person: a name, what they help with, a phone and an email. The listing shows them in a box.',
+  'minyanim:davening times (minyanim)': 'When the minyanim are. People adding a place fill in the usual weekday times, the usual Shabbos times, and this week’s schedule when it’s different. The listing shows each in a box of its own.',
+  'image:photo': 'A photo of the place. People adding a place upload one. It shows on the place’s row and at the top of its listing.',
+  'select:denomination': 'Which movement a place belongs to. People adding a place pick one, or type another. Rows show it under the name.',
+  'select:food type': 'Whether a place is meat, dairy or parve. People adding a place pick one. Rows show it under the name.',
+  'text:address': 'Where the place is. People adding a place type the address. It puts the place on the map, and the listing shows Directions.',
+  'tel:phone': 'The place’s phone number. People adding a place type it. The listing shows a Call button.',
+  'url:website': 'The place’s own website. People adding a place paste the address. The listing shows a button that opens it.',
+}
+
+const KIND_LEAD: Record<FieldType, string> = {
+  boolean: 'A yes or no.',
+  select: 'One of a set of choices.',
+  tags: 'A list.',
+  text: 'A line of text.',
+  textarea: 'Text, as long as it needs to be.',
+  url: 'A link.',
+  tel: 'A phone number.',
+  hours: 'Open and closed times, day by day.',
+  image: 'A photo of the place.',
+  minyanim: 'When the minyanim are.',
+  contacts: 'People to call.',
+  number: 'A number.',
+}
+
+/** How people fill it in, and what visitors see, by its kind and settings. */
+function kindHow(f: CategoryField): string {
+  switch (f.type) {
+    case 'boolean':
+      return 'People adding a place answer Yes or No.'
+    case 'select':
+      return `People adding a place pick ${f.multiSelect ? 'any that fit' : 'one'}${f.allowOther ? ', or type another' : ''}.`
+    case 'tags':
+      return f.showCountInHeader
+        ? 'People adding a place type in each one. Rows name a few, and the listing shows them all in a box.'
+        : 'People adding a place type in each one.'
+    case 'text':
+    case 'textarea':
+      return f.showInHeader ? 'People adding a place write it in. It shows as a line under the name.' : 'People adding a place write it in their own words.'
+    case 'url':
+      return `People adding a place paste the link. The listing shows a button${f.linkLabel ? ` that says “${f.linkLabel}”` : ' that opens it'}.`
+    case 'tel':
+      return 'People adding a place type the number. The listing shows it with the place’s other contacts.'
+    case 'hours':
+      return 'People adding a place set the open and closed times for each day.'
+    case 'image':
+      return 'People adding a place upload one.'
+    case 'minyanim':
+      return 'People adding a place fill in the usual weekday times, the usual Shabbos times, and this week’s schedule.'
+    case 'contacts':
+      return 'People adding a place add each person: a name, what they help with, a phone and an email.'
+    case 'number':
+      return 'People adding a place type it in.'
+  }
+}
+
+/** The choices a page starts with: its own (added here) are the page's. */
+export function fixedChoices(f: CategoryField): string[] {
+  return (f.options ?? []).filter((o) => !o.own).map((o) => o.label)
+}
+
+export function fieldAbout(f: CategoryField): FieldAbout {
+  const about = WRITTEN[idOf(f)] ?? `${KIND_LEAD[f.type]} ${kindHow(f)}`
+  if (f.type === 'select') return { about, choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])] }
+  if (f.type === 'minyanim') return { about, comesWith: ['Usual weekday times', 'Usual Shabbos times', 'This week’s schedule'] }
+  return { about }
+}
+
+/** A page's basics (Address, Phone, Hours, Website) aren't fields of their
+ *  own until added; this is what they are, to describe. */
+export function basicField(kind: 'address' | 'phone' | 'hours' | 'website'): CategoryField {
+  if (kind === 'address') return { key: 'address', label: 'Address', type: 'text' }
+  if (kind === 'phone') return { key: 'phone', label: 'Phone', type: 'tel' }
+  if (kind === 'hours') return { key: 'hours', label: 'Hours', type: 'hours' }
+  return { key: 'website', label: 'Website', type: 'url' }
+}

@@ -139,6 +139,15 @@ function pageHasBasic(page: PageHas, kind: BasicKind): boolean {
 /** One identity per field across pages: same name, same kind. */
 const fieldId = (f: Pick<CategoryField, 'label' | 'type'>) => `${f.type === 'textarea' ? 'text' : f.type}:${norm(f.label)}`
 
+/** A field as another page gets it: what it is, without what the page it
+ *  came from made its own (its choices added there, and having been made
+ *  there, which would leave its name open to change). */
+export function readyCopy(f: CategoryField): CategoryField {
+  const rest = { ...f }
+  delete rest.madeHere
+  return f.options ? { ...rest, options: f.options.filter((o) => !o.own) } : rest
+}
+
 /** Every field on any page, once each and by name, leaving out the ones
  *  this page already has. With `onPage`, only that page's fields. */
 export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onPage?: string): ReadyField[] {
@@ -157,7 +166,7 @@ export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onP
         continue
       }
       const companions = f.caveat ? c.detailFields.filter((h) => h.key === f.caveat!.flagField || h.key === f.caveat!.noteField) : undefined
-      found.set(id, { id, label: f.label, line: '', pages: [c.pluralLabel], field: f, ...(companions?.length && { companions }) })
+      found.set(id, { id, label: f.label, line: '', pages: [c.pluralLabel], field: readyCopy(f), ...(companions?.length && { companions }) })
     }
   }
   const fields = [...found.values()].map((r) => {

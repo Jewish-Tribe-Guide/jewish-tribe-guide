@@ -698,21 +698,22 @@ after the deploy, dry run first, and needs its own go-ahead.
 - The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
   the listing puts a field in them by its kind, so one added there wouldn't
   stay. Not drawn.
-- Drawn Nov 7 (canvas row "Each kind of field", the M boards), not built: a
-  ready-made field's screen is a shop listing. Its name is baked in. One box,
-  "What this is", has a short paragraph (what it is, what people fill in,
-  what visitors see) and what it comes with. The next box, "What you can
-  change", shows each option at its default as a switch. Then Add or Remove,
-  with the preview beside. The user: everything on one page, because people
-  won't add a field they're unsure of. The paragraphs are drafts, and they
-  become the ready-made fields' descriptions (the data has none yet).
+- BUILT Nov 7 (canvas row "Each kind of field", the M boards): a
+  ready-made field's screen reads like a shop listing, before adding it and
+  after. "What this is" has a short paragraph (what it is, what people fill
+  in, what visitors see) and its Choices or what it Comes with. Then "What
+  you can change": switches for Required, In the filter and Your own
+  choices, or "Nothing" when none apply. Then Add to / Remove from the page,
+  with the page beside it on a computer (opened on Adding). The name, note
+  and what it does are baked in. The paragraphs are drafts
+  (`src/lib/fieldAbout.ts`). A field made with Make your own is marked
+  `madeHere` and keeps the old editable screen. A choice a page adds is
+  marked `own`, and other pages don't get it with the field.
 - Decided Nov 7: "How many, on the row" is not something a page changes
-  (the user: "lock that in"). In code it is `showCountInHeader`, and it
-  does more than a count: it makes a list the page's main list (items
-  named on the row, the Items box with "Not always…", the phone home's
-  "N kosher items tracked", the question cards). So it belongs to the
-  ready-made field: on for Kosher items available and Main dishes, off for
-  any other list. Not built.
+  (the user: "lock that in"). In code it is `showCountInHeader`, which makes
+  a list the page's main list. It stays with the field: on for Kosher items
+  available and Main dishes, off for any other list. Only the superadmin's
+  More still shows it.
 - Next, the user's (Nov 7): go through every ready-made field, its
   paragraph, and what's baked in vs changeable. That may add new switches;
   the user can't say yet. The switches today: Required, In the filter, Your

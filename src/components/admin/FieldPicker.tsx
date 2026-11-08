@@ -3,9 +3,11 @@
 import { useMemo, useState } from 'react'
 import type { CategoryField, FieldType } from '@/lib/categories'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { MAKE_OWN_KINDS, listLine, matchesSearch, pageMenu, readyMadeFields, type PageHas, type ReadyField } from '@/lib/readyMade'
+import { basicField } from '@/lib/fieldAbout'
+import { MAKE_OWN_KINDS, matchesSearch, pageMenu, readyMadeFields, type PageHas, type ReadyField } from '@/lib/readyMade'
 import { AdminBack, AdminBox, AdminMenu, AdminRow, Chevron, MakeOwnLink, SearchBox } from './AdminUI'
 import { normalizeField } from './categoryEditorLogic'
+import { FieldChanges, FieldTitle, WhatThisIs } from './FieldScreen'
 import { useReadyMade } from './useReadyMade'
 
 // "+ Add a field" (boards 7-12): every field on any community's pages, once
@@ -26,6 +28,8 @@ export default function FieldPicker({
   onBack,
   onAdd,
   onMakeOwn,
+  canRequire,
+  besides,
 }: {
   token: string
   /** The page being added to: "Food". */
@@ -38,6 +42,10 @@ export default function FieldPicker({
   onBack: () => void
   onAdd: (row: ReadyField) => void
   onMakeOwn: (type: FieldType, name: string) => void
+  /** Visitors can add or edit places, so "required" means something. */
+  canRequire: boolean
+  /** The page beside, with the field on it (a computer only). */
+  besides?: (field: CategoryField) => React.ReactNode
 }) {
   const community = useCommunitySlug()
   const { pages, error } = useReadyMade(token, community)
@@ -50,20 +58,7 @@ export default function FieldPicker({
   if (screen.at === 'look') {
     const row = all?.find((r) => r.id === screen.id)
     if (!row) return <AdminBack back={{ label: 'Add a field', onClick: onBack }} title="Add a field" />
-    return (
-      <div className="flex flex-col gap-4 [&>section]:max-w-[760px]">
-        <AdminBack back={{ label: 'Add a field', onClick: onBack }} title={row.label} />
-        <p className="m-0 -mt-3 text-[15px] text-slate-600 max-md:mt-0">{row.pages.length ? `On ${listLine(row.pages, row.pages.length)}` : row.line}</p>
-        {row.field && <Samples field={row.field} pageName={pageName} pageLabel={pageLabel} />}
-        <button
-          type="button"
-          onClick={() => onAdd(row)}
-          className="self-start min-h-12 px-[22px] rounded-[10px] bg-primary text-white text-[15px] font-bold hover:bg-primary/90 cursor-pointer"
-        >
-          Add to {pageName}
-        </button>
-      </div>
-    )
+    return <Look key={row.id} row={row} pageName={pageName} pageLabel={pageLabel} canRequire={canRequire} onBack={onBack} onAdd={onAdd} besides={besides} />
   }
 
   if (screen.at === 'make') {
@@ -112,6 +107,50 @@ export default function FieldPicker({
         )
       )}
       {!(shown?.length === 0 && typed) && <MakeOwnLink onClick={() => onScreen({ at: 'make' })}>Make your own field</MakeOwnLink>}
+    </div>
+  )
+}
+
+/** A field before adding it (canvas row "Each kind of field", Nov 7): what
+ *  it is, what a page can change, each at the setting it would come with,
+ *  and Add, with the page beside showing it there. What's changed here
+ *  comes with it. Without room beside (a phone), board 11's samples. */
+function Look({
+  row,
+  pageName,
+  pageLabel,
+  canRequire,
+  onBack,
+  onAdd,
+  besides,
+}: {
+  row: ReadyField
+  pageName: string
+  pageLabel: string
+  canRequire: boolean
+  onBack: () => void
+  onAdd: (row: ReadyField) => void
+  besides?: (field: CategoryField) => React.ReactNode
+}) {
+  const [patch, setPatch] = useState<Partial<CategoryField>>({})
+  const field = row.field ? { ...row.field, ...patch } : null
+  const shown = field ?? basicField(row.basic!)
+  return (
+    <div className="flex gap-6 items-start">
+      <div className="flex-1 min-w-0 flex flex-col gap-4">
+        <AdminBack back={{ label: 'Add a field', onClick: onBack }} title={<FieldTitle field={shown} />} />
+        <WhatThisIs field={shown} />
+        <FieldChanges field={shown} canRequire={canRequire} fixed={!field} onChange={(p) => setPatch((was) => ({ ...was, ...p }))} />
+        {field && !besides && <Samples field={field} pageName={pageName} pageLabel={pageLabel} />}
+        <button
+          type="button"
+          onClick={() => onAdd(field ? { ...row, field } : row)}
+          className="self-start min-h-12 px-[22px] rounded-[10px] bg-primary text-white text-[15px] font-bold hover:bg-primary/90 cursor-pointer"
+        >
+          Add to {pageName}
+        </button>
+      </div>
+      {field && besides?.(field)}
     </div>
   )
 }

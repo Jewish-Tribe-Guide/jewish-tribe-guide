@@ -91,8 +91,14 @@ export type CategoryField = {
   required?: boolean
   placeholder?: string
   help?: string
-  /** Options for `type: 'select'`. */
-  options?: { value: string; label: string }[]
+  /** Options for `type: 'select'`. `own`: added by this community to a
+   *  ready-made field ("Your own choices"), so it's this page's to remove
+   *  and isn't offered to other communities with the field. */
+  options?: { value: string; label: string; own?: boolean }[]
+  /** Made on this page with Make your own (board 12), so its name, note and
+   *  choices are this page's to set. A field without it came ready-made:
+   *  its name and what it does are the same everywhere (the user, Nov 7). */
+  madeHere?: boolean
   /** For `type: 'tags'`: which tag vocabulary group to draw from / add to. The
    *  field's value is an array of tag labels stored on the listing's `details`. */
   tagGroup?: string

@@ -46,6 +46,7 @@ const readers = sourceFiles(SRC)
 /** Keys on these types that aren't settings an admin chooses. */
 const NOT_SETTINGS = new Set([
   'draft', // a form's unpublished copy, read back by the editor
+  'madeHere', // where a field came from, for the admin's field screen: nothing a visitor sees
 ])
 
 function unread(keys: string[]): string[] {
