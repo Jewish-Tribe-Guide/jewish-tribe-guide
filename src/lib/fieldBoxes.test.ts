@@ -284,10 +284,15 @@ describe('the admin’s boxes', () => {
 // The user, Nov 5: "even ones that could be moved like Delivery". A box the
 // listing makes itself is renamed where its name comes from.
 describe('renaming the listing’s own boxes', () => {
-  it('renames every box that moves but the davening times, and none every listing has', () => {
-    const named = (page: FieldPage, parts: ListingParts = {}) => fieldBoxes(page, parts).filter(boxRenames).map((b) => b.title)
-    expect(named(food)).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
+  // The user, Nov 7: a ready-made field's box keeps its name ("lock the
+  // name"); only a field made here, or the admin's own box, is renamed.
+  it('renames a box made here, never a ready-made field’s, nor one every listing has', () => {
+    const named = (page: FieldPage, parts: ListingParts = {}) => fieldBoxes(page, parts).filter((b) => boxRenames(b, page)).map((b) => b.title)
+    const madeHere = (page: FieldPage): FieldPage => ({ ...page, fields: page.fields.map((f) => ({ ...f, madeHere: true })) })
+    expect(named(food)).toEqual([])
+    expect(named(madeHere(food))).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
     expect(named(shuls, { shabbos: { fields: ['denomination'] } })).toEqual([])
+    // A hospital's are the admin's own boxes, holding ready-made fields.
     expect(named(hospital, hospitalParts)).toEqual(['Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also'])
   })
 

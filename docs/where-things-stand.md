@@ -732,11 +732,12 @@ after the deploy, dry run first, and needs its own go-ahead.
   a field before adding doesn't really show the new field. On Adding it's a
   "+ Denomination" link, and clicking into it makes it disappear. Maybe a
   still picture of the pages rather than the live page. Undecided.
-- Open (asked Nov 7, no answer yet): renaming a ready-made field's box on
-  the listing (906bc5eb) renames the field itself for Main dishes and
-  contacts, which clashes with a baked-in name. Recommended: those boxes
-  show the field's name and can't be renamed; only an admin's own boxes
-  rename.
+- Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
+  field's box on the listing keeps its name. Delivery, What isn't kosher,
+  Main dishes, a list of contacts and a mikvah's section have no Rename
+  unless their field was made here with Make your own. The admin's own
+  boxes (a hospital's "Who to call", "Rides"…) still rename. This takes
+  back part of 906bc5eb (Nov 5), which let every moving box rename.
 
 ## Small open decisions
 

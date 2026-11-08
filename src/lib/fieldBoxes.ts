@@ -145,11 +145,17 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
 }
 
 /** Whether a box's name is changed in place: the admin's, and the boxes the
- *  listing makes itself, each named by a field (renameListingBox). Not the
- *  Shabbos card, Top, Contact or About, which every listing has, nor the
- *  davening times, whose boxes are named by what's in them. */
-export const boxRenames = (box: FieldBox) =>
-  box.kind === 'admin' ? box.id !== 'shabbos' : box.kind === 'listing' && box.id !== 'minyanim' && box.id !== 'hidden'
+ *  listing makes itself from a field made here (renameListingBox). A
+ *  ready-made field's box keeps its name, which comes with the field (the
+ *  user, Nov 7: "lock the name"). Not the Shabbos card, Top, Contact or
+ *  About, which every listing has, nor the davening times, whose boxes are
+ *  named by what's in them. */
+export function boxRenames(box: FieldBox, page: FieldPage): boolean {
+  if (box.kind === 'admin') return box.id !== 'shabbos'
+  if (box.kind !== 'listing' || box.id === 'minyanim' || box.id === 'hidden') return false
+  const named = renameListingBox(page, box.id, '')
+  return !!named && !!page.fields.find((f) => f.key === named.key)?.madeHere
+}
 
 /** A renamed box's name as it's typed: what's saved, which can be empty
  *  while it's retyped, and what the listing says when it is. */

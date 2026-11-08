@@ -1056,10 +1056,22 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     await user.click(screen.getByRole('button', { name: to, expanded: true }))
   }
 
-  it('renames Delivery, What isn’t kosher and Main dishes, and saves each on its field', async () => {
+  // The user, Nov 7: a ready-made field's box keeps its name.
+  it('keeps a ready-made field’s box name: no Rename on Delivery, What isn’t kosher or Main dishes', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    for (const name of ['Delivery', 'What isn’t kosher', 'Main dishes']) {
+      await openBox(user, name)
+      expect(screen.getByRole('button', { name, expanded: true })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: `Rename ${name}` })).toBeNull()
+    }
+  })
+
+  it('renames the boxes of fields made here, and saves each on its field', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    const madeHere = { ...food, detailFields: food.detailFields.map((f) => ({ ...f, madeHere: true })) }
+    renderWithProviders(<CategoryEditor token="t" initial={madeHere} siblings={[madeHere]} onSaved={onSaved} onCancel={vi.fn()} />)
     await rename(user, 'Delivery', 'Get it delivered')
     await rename(user, 'What isn’t kosher', 'Not kosher here')
     await rename(user, 'Main dishes', 'Dishes')

@@ -9,8 +9,9 @@ import DragList, { addButton, OrderRow, RowActions, type DragRow } from './DragL
 // Site → Category pages → a page → Fields (boards 17-19): the boxes of one
 // of its opened listings, in the order a visitor sees them (fieldBoxes.ts).
 // A box opens in place to its fields, each opening that field's screen; the
-// admin's own and the listing's own are renamed in place, the admin's have
-// a trash can. A field moves by
+// admin's own, and the listing's own from a field made here, are renamed in
+// place (a ready-made field's keeps its name); the admin's have a trash
+// can. A field moves by
 // dragging it onto another box's row, which is drawn dashed while it's
 // over it, or red with why when that box can't take it.
 
@@ -94,7 +95,7 @@ export default function FieldBoxes({
         if ('box' in item) {
           const box = item.box
           const open = box.id === openId
-          const renames = boxRenames(box)
+          const renames = boxRenames(box, page)
           return (
             <OrderRow
               row={box.moves ? row : still(row)}
