@@ -25,6 +25,7 @@ import ListingView from '@/components/resources/ListingView'
 import ListingEditBar from '@/components/resources/ListingEditBar'
 import { ui } from '@/lib/uiConfig'
 import { fullestListing } from '@/lib/fullestListing'
+import { madeUpPlace, sampleName } from '@/lib/fieldLooks'
 
 // A preview of the real directory page for a category — the exact same
 // GenericDirectory/ListingEditor components a visitor sees, driven
@@ -151,6 +152,15 @@ export default function CategoryPreview({
     setAction(null)
   }, [])
 
+  // A page with no places yet shows a made-up one, answering every field,
+  // so the page can be seen before anyone adds a place (the user, Nov 9).
+  // Never saved; the first real or previewed place replaces it.
+  const madeUp = category.kind !== 'eruv' && category.kind !== 'zmanim' && realListings?.length === 0 && localListings.length === 0
+  // A 555 phone (never a real one); no address, which would give it
+  // directions to a real street.
+  const orMadeUp = (items: DirectoryResource[]) =>
+    items.length ? items : [{ ...madeUpPlace(category, sampleName(category.label, category.pluralLabel)), ...(category.hasPhone !== false ? { phone: '(215) 555-0100' } : {}) }]
+
   let content: React.ReactNode
   if (category.kind === 'eruv') {
     // No Add/Edit/Report action state applies here — it's a single info
@@ -209,7 +219,7 @@ export default function CategoryPreview({
   } else if (view === 'listing') {
     // An edit made here shadows the place it edited, as on the page.
     const localIds = new Set(localListings.map((l) => l.id))
-    const fullest = fullestListing([...localListings, ...realListings.filter((r) => !localIds.has(r.id))], category)
+    const fullest = fullestListing(orMadeUp([...localListings, ...realListings.filter((r) => !localIds.has(r.id))]), category)
     // Edit listing at its foot, as a visitor sees it (the user, Nov 9: "I'm
     // not seeing an edit listing option in the preview"). It opens the
     // editor here, which sends nothing (PreviewSendProvider below).
@@ -228,7 +238,7 @@ export default function CategoryPreview({
   } else {
     // A locally added/edited listing shadows any real listing with the same id.
     const localIds = new Set(localListings.map((l) => l.id))
-    const items = [...realListings.filter((r) => !localIds.has(r.id)), ...localListings]
+    const items = orMadeUp([...realListings.filter((r) => !localIds.has(r.id)), ...localListings])
     content = (
       <GenericDirectory
         category={category}
@@ -264,6 +274,12 @@ export default function CategoryPreview({
           <PinnedProvider>
             <DroppedPinsProvider>
               <HeaderCollapseProvider>
+                {/* Above the site's header: the preview's, not the page's. */}
+                {madeUp && view !== 'adding' && !action && (
+                  <p data-testid="made-up-note" className="m-0 bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900">
+                    A made-up place, until this page has real ones
+                  </p>
+                )}
                 <SiteHeader
                   onGoHome={onClose}
                   location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}

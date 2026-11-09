@@ -17,6 +17,7 @@ import WalkBox from './WalkBox'
 import CardBox, { ShowOnLine, type CardLine } from './CardBox'
 import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview, { type PreviewView } from './CategoryPreview'
+import { sampleName } from '@/lib/fieldLooks'
 import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
@@ -866,12 +867,7 @@ function CategoryEditorScreen({
   )
 }
 
-/** The sample card's place: "A restaurant", or "A place" for a page
- *  whose name is no one place's ("Food"). */
-export function sampleName(label: string, plural: string): string {
-  const one = label.trim()
-  return one && one.toLowerCase() !== plural.trim().toLowerCase() ? `A ${one.toLowerCase()}` : 'A place'
-}
+export { sampleName } from '@/lib/fieldLooks'
 
 /** "Address, Phone, Hours and 3 more" under the folded Fields row. */
 export function fieldsSummary(labels: string[]): string {

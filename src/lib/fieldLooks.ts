@@ -103,6 +103,13 @@ export function answerText(field: CategoryField, value: unknown): string {
   }
 }
 
+/** The sample card's place: "A restaurant", or "A place" for a page
+ *  whose name is no one place's ("Food"). */
+export function sampleName(label: string, plural: string): string {
+  const one = label.trim()
+  return one && one.toLowerCase() !== plural.trim().toLowerCase() ? `A ${one.toLowerCase()}` : 'A place'
+}
+
 /** A place answering every field on the page, the open one included. */
 export function madeUpPlace(category: CategoryConfig, name: string): DirectoryResource {
   const item: DirectoryResource = { id: 'made-up', category: category.id, name, anchorId: 'all', distance: 0, address: '' }

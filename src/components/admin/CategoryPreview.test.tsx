@@ -207,4 +207,35 @@ describe('CategoryPreview', () => {
     expect(screen.getByTestId('editor-open-about')).toBeInTheDocument()
     await waitFor(() => expect(editorStep()).toBe('about'))
   })
+
+  // The user, Nov 9: a new page's preview, before anyone adds a place.
+  it('shows a made-up place on a page with no places, on Page and A listing, and sends nothing', async () => {
+    const calls: { url: string; method: string }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url: String(url), method: init?.method ?? 'GET' })
+        return new Response(JSON.stringify({ ok: true, resources: [] }), { status: 200 })
+      }),
+    )
+    const page = { ...FOOD, label: 'Restaurant', pluralLabel: 'Restaurants' }
+    const { unmount } = renderWithProviders(<CategoryPreview category={page} onClose={() => {}} />)
+    expect(await screen.findByTestId('made-up-note')).toHaveTextContent('A made-up place')
+    expect(screen.getByTestId('directory')).toHaveTextContent('A restaurant · (215) 555-0100')
+    unmount()
+
+    renderWithProviders(<CategoryPreview category={page} view="listing" onClose={() => {}} />)
+    expect(await screen.findByTestId('made-up-note')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'A restaurant' })).toBeInTheDocument()
+    expect(screen.queryByText('No places on this page yet.')).toBeNull()
+    expect(calls.filter((c) => c.method !== 'GET')).toEqual([])
+  })
+
+  it('shows no made-up place once the page has a real one', async () => {
+    stubFetch()
+    renderWithProviders(<CategoryPreview category={FOOD} onClose={() => {}} />)
+    expect(await screen.findByRole('button', { name: 'Edit Sweet Box Bakery' })).toBeInTheDocument()
+    expect(screen.queryByTestId('made-up-note')).toBeNull()
+    expect(screen.getByTestId('directory')).not.toHaveTextContent('A place')
+  })
 })

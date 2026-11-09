@@ -352,6 +352,16 @@ kosher food"). Dev's pretend Riverton Food page (one pretend place) was
 deleted at the user's word, so it's no longer offered as a ready-made
 page; live never had it.
 
+Built Nov 9 (the user: "Yes, build it"): a page with no places yet shows
+a made-up one in its preview, on Page and A listing, with a strip above
+the site's header, "A made-up place, until this page has real ones". It's
+How it looks' made-up place (every field answered by type), plus a 555
+phone; no address, so no directions to a real street. Never saved; the
+first real place, or one added in the preview, replaces it
+(CategoryPreview.tsx). Seen in the admin's phone preview, not new: a page
+with one place draws its card as a tall white block running under the
+footer (Cemetery too); the real site on a phone is fine.
+
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
