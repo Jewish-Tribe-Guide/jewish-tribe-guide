@@ -330,7 +330,9 @@ adding, each on a made-up place with the field's answer filled in and the
 field outlined, its neighbours faded. A field not on the row says so, with
 Show it on a row (board 34). A field in the filter gets a fourth panel,
 In Filters, drawn as the Filters sheet (board 33b; 33 drew it under the
-row, which the site never does). See the whole page opens the full preview as
+row, which the site never does). 33c trims the faded context (no photo,
+Filters keeps only its title, one row above the field when adding) so all
+four fit a laptop screen, about 800px; the user, Nov 9: "I think it's good". See the whole page opens the full preview as
 today. Not drawn: the phone (no preview beside there today).
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
