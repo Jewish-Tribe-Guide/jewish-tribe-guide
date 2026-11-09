@@ -79,7 +79,12 @@ const sent = (method: string) =>
     .mock.calls.filter(([, init]) => init?.method === method)
     .map(([url]) => url)
 
-beforeEach(() => window.history.replaceState(null, '', '/philly/admin/places'))
+// Next's router as it behaves here: the entry written as it lands (at once).
+beforeEach(() => {
+  window.history.replaceState(null, '', '/philly/admin/places')
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
+})
 afterEach(() => {
   cleanup()
   vi.resetAllMocks()
@@ -386,18 +391,33 @@ describe('Places', () => {
 
 // The user, Oct 31: "Swiping back from a place goes to To do."
 describe('Places, the way back from a place', () => {
-  it('swiping back lands on the list, as the place is an entry in the history', async () => {
+  // Nov 9: each a page of its own to the browser, with its own address.
+  const here = () => window.location.pathname + window.location.search
+  const pop = (url: string) =>
+    act(() => {
+      window.history.replaceState({}, '', url)
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    })
+
+  it('swiping back lands on the list, as the place is an entry in the history with its own address', async () => {
     const user = userEvent.setup()
     renderPlaces()
     const before = window.history.length
     await user.click(await screen.findByRole('button', { name: 'Open Goldie' }))
     expect(screen.getByRole('heading', { name: 'Goldie' })).toBeInTheDocument()
+    await waitFor(() => expect(here()).toBe('/philly/admin/places?place=goldie'))
     expect(window.history.length).toBe(before + 1)
-    expect(window.history.state.placeOpen).toBe('goldie')
-    act(() => {
-      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
-    })
+    pop('/philly/admin/places')
     expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
+    // Forward.
+    pop('/philly/admin/places?place=goldie')
+    expect(await screen.findByRole('heading', { name: 'Goldie' })).toBeInTheDocument()
+  })
+
+  it('a reload on a place opens it', async () => {
+    window.history.replaceState(null, '', '/philly/admin/places?place=goldie')
+    renderPlaces()
+    expect(await screen.findByRole('heading', { name: 'Goldie' })).toBeInTheDocument()
   })
 
   it('tapping Places in the nav goes back to the list', async () => {

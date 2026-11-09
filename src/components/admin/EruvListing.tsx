@@ -8,7 +8,7 @@ import type { AdminEruv } from '@/lib/eruvStore'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
-import { useHistoryDepth } from '@/lib/useHistoryDepth'
+import { useStepsInAddress } from './useStepsInAddress'
 import { withCommunity } from '@/lib/useCommunityData'
 import type { CategoryConfig } from '@/lib/categories'
 import { sourceKind, sourceProblem, type WatchPurpose } from '@/lib/watchPurposes'
@@ -32,6 +32,8 @@ const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline dis
 
 type Draft = { name: string; covers: string; hotline: string; alertsUrl: string; website: string }
 type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website'
+/** Which of a source line's controls opened a screen over its row. */
+type Which = 'change' | 'start' | 'add'
 type AddEruvRow = RowId
 const WHERE_ITS_MAP = 'Where its map is'
 const draftOf = (e: AdminEruv): Draft => ({ name: e.name, covers: e.covers ?? '', hotline: e.hotline ?? '', alertsUrl: e.alertsUrl ?? '', website: e.website ?? '' })
@@ -62,10 +64,13 @@ export default function EruvListing({
   const community = useCommunitySlug()
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
   const [openRow, setOpenRow] = useState<RowId | null>(null)
-  const [screen, setScreen] = useState<{ title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
+  // `which`: the control on the open row's source line that opened it.
+  const [screen, setScreen] = useState<{ title: string; which: Which; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  // A screen asked for by the address, opened once its row is drawn.
+  const [screenAsked, setScreenAsked] = useState<Which | null>(null)
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
@@ -76,8 +81,13 @@ export default function EruvListing({
   const title = screen?.title ?? place.name
   const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onClose
   useSetScreenHeader(true, title, back)
-  // An open row, and a screen over it, are entries: a swipe back closes them.
-  useHistoryDepth('eruvStep', (openRow ? 1 : 0) + (screen ? 1 : 0), back)
+  // An open row, and a screen over it, each have an address and an entry:
+  // Back closes them, Forward and a reload open them again.
+  useStepsInAddress('row', openRow ? [openRow, ...(screen ? [screen.which] : [])] : [], ([row, which]) => {
+    setOpenRow((row as RowId | undefined) ?? null)
+    setScreen(null)
+    setScreenAsked((which as Which | undefined) ?? null)
+  })
 
   if (!eruv.active) {
     return (
@@ -130,43 +140,49 @@ export default function EruvListing({
       {words}
     </button>
   )
+  /** The screens a source line opens, by which of its controls opens them. */
+  function screensOf(source: RowSource | null | undefined): Partial<Record<Which, { title: string; which: Which; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> }>> {
+    if (!source) return {}
+    const { line } = source
+    const c = line.change
+    const s = line.start
+    const a = line.add
+    const give: Attempt | null = a
+      ? async (url) => {
+          if ('kind' in a.run) await actions.change(a.run, url)
+          else await actions.addSource(a.run, url)
+          return { failed: false }
+        }
+      : null
+    return {
+      ...(c && {
+        change: {
+          title: 'Change',
+          which: 'change' as const,
+          props: {
+            label: c.label,
+            value: c.value,
+            button: 'Save',
+            attempt: async (url: string) => {
+              await actions.change(c.act, url)
+              return { failed: false }
+            },
+            ...(c.stop ? { stop: () => actions.stopSource(c.stop!) } : {}),
+          },
+        },
+      }),
+      ...(s && { start: { title: 'Change', which: 'start' as const, props: { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) } } }),
+      ...(a && give && { add: { title: 'Add a source', which: 'add' as const, props: { label: a.label, value: '', button: 'Save', attempt: give } } }),
+    }
+  }
   function lineOf(source: RowSource | null | undefined): ReactNode {
     if (!source) return null
     const { line } = source
+    const screens = screensOf(source)
     const controls: ReactNode[] = []
-    if (line.change) {
-      const c = line.change
-      const stop = c.stop
-      controls.push(
-        control('Change', () =>
-          setScreen({
-            title: 'Change',
-            props: {
-              label: c.label,
-              value: c.value,
-              button: 'Save',
-              attempt: async (url) => {
-                await actions.change(c.act, url)
-                return { failed: false }
-              },
-              ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
-            },
-          }),
-        ),
-      )
-    }
-    if (line.start) {
-      const s = line.start
-      controls.push(control('Change', () => setScreen({ title: 'Change', props: { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) } })))
-    }
-    if (line.add) {
-      const a = line.add
-      const attempt: Attempt = async (url) => {
-        if ('kind' in a.run) await actions.change(a.run, url)
-        else await actions.addSource(a.run, url)
-        return { failed: false }
-      }
-      controls.push(control('Add a source', () => setScreen({ title: 'Add a source', props: { label: a.label, value: '', button: 'Save', attempt } })))
+    for (const which of ['change', 'start', 'add'] as const) {
+      const spec = screens[which]
+      if (spec) controls.push(control(spec.title, () => setScreen(spec)))
     }
     return <SourceWords line={line} controls={controls} />
   }
@@ -221,6 +237,12 @@ export default function EruvListing({
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() ? shortUrl(draft.alertsUrl.trim()) : 'None', source: sources.details, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() ? shortUrl(draft.website.trim()) : 'None', source: sources.website, body: input('website', 'Website') },
   ]
+
+  if (screenAsked) {
+    const spec = screensOf(rows.find((r) => r.id === openRow)?.source)[screenAsked]
+    setScreenAsked(null)
+    if (spec) setScreen(spec)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -294,7 +316,18 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
   const title = screen?.title ?? 'Add a place'
   const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onBack
   useSetScreenHeader(true, title, back)
-  useHistoryDepth('eruvAddStep', (openRow ? 1 : 0) + (screen ? 1 : 0), back)
+  /** The screen a row's Change or Add a source opens, as its line has it. */
+  function screenFor(key: 'status' | 'map') {
+    const given = key === 'status' ? draft.status : draft.map
+    const label = key === 'status' ? 'Its status page, or the address its emails come from' : WHERE_ITS_MAP
+    return { title: given.trim() ? 'Change' : 'Add a source', label, key, kind: (key === 'status' ? 'eruv' : 'hours') as WatchPurpose }
+  }
+  // An open row, and a screen over it, each have an address and an entry:
+  // Back closes them, Forward and a reload open them again.
+  useStepsInAddress('row', openRow ? [openRow, ...(screen ? [screen.key] : [])] : [], ([row, key]) => {
+    setOpenRow((row as AddEruvRow | undefined) ?? null)
+    setScreen(key === 'status' || key === 'map' ? screenFor(key) : null)
+  })
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   const post = <T,>(body: Record<string, unknown>) => fetchJson<T>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not add it.')

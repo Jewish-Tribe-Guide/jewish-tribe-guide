@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { EnrichedSubmission } from '@/types'
 import { SHUL } from '@/test/editorFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import ChangeReview from './ChangeReview'
+import { stepsIn } from '@/lib/stepAddress'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -18,10 +19,18 @@ vi.mock('next/navigation', () => ({
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 12, 12, 0))
+  // The router writes the address at once, as a landed navigation would:
+  // the screens wait for each move to land before the next (and with Date
+  // frozen, would wait for ever).
+  window.history.replaceState(null, '', '/philly/admin/todo?place=mi')
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
 })
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  mockRouter.push.mockReset()
+  mockRouter.replace.mockReset()
 })
 
 const user = () => userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) })
@@ -170,5 +179,56 @@ describe('a change with more than one part', () => {
     await user().click(screen.getByRole('button', { name: 'Leave it' }))
     expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', undefined, 'minyanim:shabbos')
     expect(screen.queryByLabelText(/Why, for whoever sent it/)).not.toBeInTheDocument()
+  })
+})
+
+// AGENTS.md: "A screen of its own is an entry in the browser's history".
+// Edit, then update, and a time opened in it, were state only: Back left
+// the change, and a reload lost the edit.
+describe('Edit, then update, is in the address', () => {
+  const here = () => window.location.pathname + window.location.search
+  const pop = (url: string) =>
+    act(() => {
+      window.history.replaceState({}, '', url)
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    })
+  const show = () =>
+    renderWithProviders(<ChangeReview submission={change(post('2026-10-11', '2026-10-17', '2026-10-12'))} category={SHUL} position={{ at: 0, total: 1, back: () => {} }} token="t" onModerate={() => {}} onUpdated={() => {}} />)
+  it('opening it, then a time in it, are an entry each; Back closes each in turn', async () => {
+    show()
+    const u = user()
+    await u.click(screen.getByRole('button', { name: 'Edit, then update' }))
+    await waitFor(() => expect(stepsIn(window.location.search, 'edit', 's1')).toEqual(['edit']))
+    const edit = here()
+    await u.click(within(screen.getByTestId('editor-open-minyans:this_week')).getByRole('button', { name: /4:45/ }))
+    await waitFor(() => expect(stepsIn(window.location.search, 'edit', 's1')).toEqual(['edit', 'minyans:this_week#0']))
+    expect(mockRouter.push).toHaveBeenCalledTimes(2)
+
+    expect(screen.getByRole('button', { name: 'Remove this minyan' })).toBeInTheDocument()
+    pop(edit)
+    expect(screen.queryByRole('button', { name: 'Remove this minyan' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /The change$/ })).toBeInTheDocument()
+    pop('/philly/admin/todo?place=mi')
+    expect(screen.getByRole('button', { name: 'Edit, then update' })).toBeInTheDocument()
+  })
+
+  it('a reload, or Forward, on a time in it opens the edit and that time', async () => {
+    const first = show()
+    const u = user()
+    await u.click(screen.getByRole('button', { name: 'Edit, then update' }))
+    await u.click(within(screen.getByTestId('editor-open-minyans:this_week')).getByRole('button', { name: /4:45/ }))
+    await waitFor(() => expect(stepsIn(window.location.search, 'edit', 's1')).toHaveLength(2))
+    const time = here()
+    pop('/philly/admin/todo?place=mi')
+    expect(screen.getByRole('button', { name: 'Edit, then update' })).toBeInTheDocument()
+    // Forward.
+    pop(time)
+    expect(await screen.findByRole('button', { name: 'Remove this minyan' })).toBeInTheDocument()
+    first.unmount()
+    // A reload.
+    show()
+    expect(await screen.findByRole('button', { name: 'Remove this minyan' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit, then update' })).not.toBeInTheDocument()
+    expect(here()).toBe(time)
   })
 })

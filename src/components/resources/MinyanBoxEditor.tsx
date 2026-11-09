@@ -64,6 +64,7 @@ export default function MinyanBoxEditor({
   nameShown,
   onChange,
   onStep,
+  reopen,
   send,
   off = [],
 }: {
@@ -95,7 +96,10 @@ export default function MinyanBoxEditor({
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
-  onStep: (step: { title: string; back: () => void } | null) => void
+  onStep: (step: { title: string; back: () => void; id?: string } | null) => void
+  /** A minyan to open, or none, asked for by the host (Back, Forward or a
+   *  reload onto it, in the admin): by its place in the list, or 'new'. */
+  reopen?: { id: string | null; n: number } | null
   /** The list's button, given how many minyanim changed. */
   send: (changes: number) => ReactNode
   /** The parts of a minyan the page doesn't ask about (its field's
@@ -105,14 +109,23 @@ export default function MinyanBoxEditor({
   const [rows, setRows] = useState<Minyan[]>(initial ?? original)
   // The minyan open: an id, 'new' for one being added, or null for the list.
   const [open, setOpen] = useState<string | null>(null)
+  const [asked, setAsked] = useState<number | null>(null)
+  if (reopen && reopen.n !== asked) {
+    setAsked(reopen.n)
+    const id = reopen.id
+    setOpen(id === null ? null : id === 'new' ? 'new' : (rows[Number(id)]?.id ?? null))
+  }
   const was = new Map(original.map((m) => [m.id, m]))
   const isChanged = (m: Minyan) => !was.has(m.id) || boxChangeCount([was.get(m.id)!], [m]) > 0
 
   const editing = open === 'new' ? null : rows.find((m) => m.id === open)
   const title = open === null ? null : open === 'new' ? 'Add a minyan' : TEFILLAH_LABELS[editing!.tefillah]
+  // Which it is, by its place in the list: what the address can say again
+  // after a reload (a stored minyan's id is given anew each time).
+  const stepId = open === null ? undefined : open === 'new' ? 'new' : String(rows.findIndex((m) => m.id === open))
   useEffect(() => {
-    onStep(title ? { title, back: () => setOpen(null) } : null)
-  }, [title, onStep])
+    onStep(title ? { title, back: () => setOpen(null), id: stepId } : null)
+  }, [title, stepId, onStep])
   useEffect(() => () => onStep(null), [onStep])
 
   const save = (next: Minyan[]) => {

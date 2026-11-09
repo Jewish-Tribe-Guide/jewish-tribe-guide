@@ -851,9 +851,27 @@ after the deploy, dry run first, and needs its own go-ahead.
   added in an effect it came after, and Back out of a page with unsaved
   changes left without asking, unless the page had been loaded directly.
   Proved in a real browser by e2e-admin-write/editor-screens.spec.ts.
-  Not done: the other admin screens that keep their own history depth
-  (a place's listing, To do's change and broken screens, an eruv, change
-  review) still use the old way.
+  The other admin screens followed later the same day (below).
+- BUILT Nov 9, later still: every other screen inside a place is in the
+  address too, so Back, Forward, a reload and Back from another tab land
+  on each. Places' open place (`?place=`, `?add=`); a row of a listing's
+  editor and a minyan or person in it (`?row=minyans%3Aweekday/0`); in a
+  place, what a read found (`?found=`), a source's Change over the listing
+  (`?over=`) and a change's Edit (`?edit=`); an eruv's row and its Change;
+  in To do, a new place's or a change's rows and minyanim, and a broken
+  check's Give (`?step=`, under the thing's own name, since a place's
+  things are mounted side by side). Closing a step on the screen steps
+  back over its entry; where the entry behind isn't the place (opened from
+  a link or a reload) it replaces this one instead, so Back never leaves
+  the admin. src/lib/stepAddress.ts is the address side,
+  useStepsInAddress.ts keeps a screen and the address in step;
+  useHistoryDepth is gone. Proved in a real browser by
+  e2e-admin-write/place-screens.spec.ts (a listing and an eruv in Places,
+  a new place and a change in To do: 4 of 4 failed on the old code).
+  Not in the address: To do's Find the place sheet, the Archive question,
+  and an eruv being added (a reload there starts it again). A broken
+  check's Give and a change's Edit are covered by unit tests only: the
+  test project has no job readings to put a broken check in To do.
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it

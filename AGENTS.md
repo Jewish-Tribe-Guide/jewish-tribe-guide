@@ -25,6 +25,12 @@ happening in other contexts").
 
 - Put the screen in the address (a path, or a query parameter as
   `src/lib/editorScreenUrl.ts` does), read it on mount and on `popstate`.
+  A step inside a place (a row, a minyan in it, a source's Change) uses
+  `useStepsInAddress` (`src/components/admin/useStepsInAddress.ts`): the
+  screen keeps its own state and says where it is as a path; the hook
+  writes it, and asks the screen to reopen it on Back, Forward or a
+  reload. One screen is one path level: a level for something already
+  showing is an entry Back seems to skip.
 - Write it through Next's router (`router.push`/`replace`), never
   `history.pushState`. An entry written behind the router's back carries
   the router's copy of the page before it, and after a reload, Back to it

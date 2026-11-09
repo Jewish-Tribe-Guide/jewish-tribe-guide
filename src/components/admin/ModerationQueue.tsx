@@ -11,6 +11,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { shownPlaces, todoPlaces, type TodoFilter } from '@/lib/todoPlaces'
 import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
 import { useTodoSplit } from './useTodoSplit'
+import { STEP_PARAMS } from '@/lib/stepAddress'
 import { useFullPane } from './AdminUI'
 import TodoList, { TODO_START, type TodoView } from './TodoList'
 import TodoPlaceScreen from './TodoPlaceScreen'
@@ -80,6 +81,8 @@ function goTo(openId: string | null, replace = false) {
   const url = new URL(window.location.href)
   if (openId) url.searchParams.set('open', openId)
   else url.searchParams.delete('open')
+  // What was open at the place before goes with it (stepAddress.ts).
+  for (const p of STEP_PARAMS) url.searchParams.delete(p)
   openedHere = openId
   window.history[replace ? 'replaceState' : 'pushState'](null, '', url)
   window.dispatchEvent(new Event(OPENED))
