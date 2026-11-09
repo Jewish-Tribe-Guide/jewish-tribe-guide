@@ -328,7 +328,9 @@ field looks like in three scenarios". Beside an opened field, in place of
 the Page / A listing / Adding preview: In the list, On the listing and When
 adding, each on a made-up place with the field's answer filled in and the
 field outlined, its neighbours faded. A field not on the row says so, with
-Show it on a row (board 34). See the whole page opens the full preview as
+Show it on a row (board 34). A field in the filter gets a fourth panel,
+In Filters, drawn as the Filters sheet (board 33b; 33 drew it under the
+row, which the site never does). See the whole page opens the full preview as
 today. Not drawn: the phone (no preview beside there today).
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
