@@ -793,6 +793,26 @@ after the deploy, dry run first, and needs its own go-ahead.
       summer or winter only (`minyanOff` on the field). Switched off, the
       minyan editors don't ask it, and More is gone when nothing is left
       under it. Days, times and zman times always stay.
+  - BUILT Nov 9 (the user: "some fields have no edit and some have edit.
+    If you can edit then you can fully edit"): a ready-made field's
+    choices are either the community's or locked. The community's
+    (fieldRules' `choicesEditable`): Kosher Certification, Hospitals' Eruv
+    and Services (decided here: childcare varies by community, nothing
+    reads its values). Those get the full Choices box: rename in place,
+    ×, drag, + Add a choice, and the Other switch. Every other ready-made
+    choice field is locked, not even added to (Sukkah Size per the user;
+    also Food Type, Kosher Store, Store Type, Denomination, Cemetery's
+    Type). This goes back to the Nov 5 boards 14 and 15, which the Nov 7
+    build had turned into fixed choices plus "Your own choices". No page
+    on dev or live had a choice of its own, so locking dropped nothing.
+    A rename changes only a choice's words (`label`), never its stored
+    `value`: everything that shows a choice looks its words up, so
+    answers follow and a watch writing the value still matches, with
+    nothing to move. A field made here renames the same way
+    (src/components/admin/ChoiceList.tsx, shared by both).
+  - "What this is" has less in it (the user, Nov 9: "seems like a lot
+    going on"): only Choices are chips, and only when locked. Comes with
+    is a sentence after the paragraph; Kept up to date by is plain lines.
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it

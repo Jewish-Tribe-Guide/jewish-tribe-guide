@@ -6,7 +6,7 @@ import { fieldAbout, fieldRules } from '@/lib/fieldAbout'
 import { partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT } from '@/lib/kosherQuestions'
 import { AdminBack, AdminBox, AdminField, AdminSwitch, AdminYesNo } from './AdminUI'
-import DragList from './DragList'
+import ChoiceList from './ChoiceList'
 
 // A field's own screen. A ready-made field's (canvas row "Each kind of
 // field", Nov 7) reads like a shop listing: "What this is" first, then
@@ -38,7 +38,6 @@ const KIND: Record<FieldType, string> = {
 export const fieldKind = (type: FieldType) => KIND[type]
 
 const input = 'w-full min-h-12 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[15px] text-slate-900 placeholder:text-slate-400'
-const row = 'flex min-h-[60px] items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-b-0'
 
 export default function FieldScreen({
   field: f,
@@ -118,29 +117,44 @@ function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, 
 
 const chip = 'rounded-full bg-slate-100 px-3 py-1 text-[14px] font-semibold text-slate-700'
 
-/** The first box: what the field is, in a few sentences, and what it holds. */
+/** "A, B and C". */
+const andList = (names: readonly string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
+
+/** The first box: what the field is, in a few sentences, and what it holds.
+ *  Only its choices are chips, since those are what a place picks; what it
+ *  comes with and what keeps it up to date are plain words (the user,
+ *  Nov 9: "seems like a lot going on"). */
 export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField; partnerOn?: boolean }) {
   const { about, choices, comesWith, watchedBy } = fieldAbout(field, { partnerOn })
-  const list = (title: string, names?: string[]) =>
-    names?.length ? (
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-semibold text-slate-500">{title}</span>
-        <ul aria-label={title} className="m-0 p-0 list-none flex flex-wrap gap-1.5">
-          {names.map((n) => (
-            <li key={n} className={chip}>
-              {n}
-            </li>
-          ))}
-        </ul>
-      </div>
-    ) : null
   return (
     <AdminBox title="What this is">
       <div className="flex flex-col gap-3.5 p-4">
-        <p className="m-0 text-[17px] leading-[1.55] text-slate-800">{about}</p>
-        {list('Choices', choices)}
-        {list('Comes with', comesWith)}
-        {list('Kept up to date by', watchedBy)}
+        <p className="m-0 text-[17px] leading-[1.55] text-slate-800">
+          {about}
+          {comesWith?.length ? ` It comes with ${andList(comesWith)}.` : null}
+        </p>
+        {choices?.length ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-semibold text-slate-500">Choices</span>
+            <ul aria-label="Choices" className="m-0 p-0 list-none flex flex-wrap gap-1.5">
+              {choices.map((n) => (
+                <li key={n} className={chip}>
+                  {n}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {watchedBy?.length ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-[13px] font-semibold text-slate-500">Kept up to date by</span>
+            <ul aria-label="Kept up to date by" className="m-0 p-0 list-none flex flex-col gap-0.5 text-[15px] leading-[1.45] text-slate-700">
+              {watchedBy.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </AdminBox>
   )
@@ -183,132 +197,79 @@ export function FieldChanges({
   /** The field that comes with it, when it has one. */
   partner?: PartnerSwitch
 }) {
-  const [adding, setAdding] = useState<string | null>(null)
-  const options = f.options ?? []
-  const own = options.filter((o) => o.own)
-  const add = () => {
-    const label = adding?.trim()
-    setAdding(null)
-    if (label && !options.some((o) => o.label.toLowerCase() === label.toLowerCase())) onChange({ options: [...options, { value: label, label, own: true }] })
-  }
   // A photo, a list, contacts or davening times aren't a thing a place can't
   // do without. A yes or no can be required (the user, Nov 8): it starts
   // unanswered, so required means someone picks Yes or No.
   const required = !fixed && canRequire && !NEVER_REQUIRED.has(f.type)
   const filter = !fixed && TYPE_IS_FILTERABLE(f.type)
   const rules = fieldRules(f)
-  const choices = !fixed && f.type === 'select' && !rules.choicesSet
+  const choices = !fixed && f.type === 'select' && !!rules.choicesEditable
   const kosher = !fixed && !!rules.asksEverythingKosher
   const partnerSays = !fixed && partner ? partnerRule(f) : undefined
   const minyan = !fixed && f.type === 'minyanim'
   const off = f.minyanOff ?? []
   return (
-    <AdminBox title="What you can change">
-      {!required && !filter && !choices && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
-      {required && (
-        <Change label="Required" hint="A place can’t be added without it">
-          <AdminSwitch checked={!!f.required} onChange={(on) => onChange({ required: on })} label="Required" />
-        </Change>
-      )}
-      {filter && (
-        <Change
-          label={f.type === 'hours' ? '“Open now” in the filter' : 'In the filter'}
-          hint={f.type === 'hours' ? 'Visitors can show only places open now' : 'Visitors can narrow the list by it'}
-        >
-          <AdminSwitch
-            checked={!!f.filterable}
-            // A choice in the filter shows at the top of a place, as a chip.
-            onChange={(on) => onChange(on && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: on })}
-            label={f.type === 'hours' ? 'Open now in the filter' : 'In the filter'}
-          />
-        </Change>
-      )}
-      {kosher && (
-        <Change label="Everything here is kosher?" hint="Asks whether anything at a place isn’t kosher">
-          <AdminSwitch
-            checked={!!f.caveat}
-            onChange={(on) => (onKosherQuestions ? onKosherQuestions(on) : onChange({ caveat: on ? { ...KOSHER_CAVEAT } : undefined }))}
-            label="Everything here is kosher?"
-          />
-        </Change>
-      )}
-      {partnerSays && partner && (
-        <Change label={partnerSays.name} hint={partnerSays.hint}>
-          <AdminSwitch checked={partner.on} onChange={partner.onChange} label={partnerSays.name} />
-        </Change>
-      )}
-      {minyan &&
-        MINYAN_PARTS.map(({ part, label, hint }) => (
-          <Change key={part} label={label} hint={hint}>
+    <>
+      <AdminBox title="What you can change">
+        {!required && !filter && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
+        {required && (
+          <Change label="Required" hint="A place can’t be added without it">
+            <AdminSwitch checked={!!f.required} onChange={(on) => onChange({ required: on })} label="Required" />
+          </Change>
+        )}
+        {filter && (
+          <Change
+            label={f.type === 'hours' ? '“Open now” in the filter' : 'In the filter'}
+            hint={f.type === 'hours' ? 'Visitors can show only places open now' : 'Visitors can narrow the list by it'}
+          >
             <AdminSwitch
-              checked={!off.includes(part)}
-              onChange={(on) => {
-                const next = on ? off.filter((p) => p !== part) : [...off, part]
-                onChange({ minyanOff: next.length ? next : undefined })
-              }}
-              label={label}
+              checked={!!f.filterable}
+              // A choice in the filter shows at the top of a place, as a chip.
+              onChange={(on) => onChange(on && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: on })}
+              label={f.type === 'hours' ? 'Open now in the filter' : 'In the filter'}
             />
           </Change>
-        ))}
-      {choices && (
-        <>
-          <Change label="Your own choices" hint="One your community uses that isn’t listed">
-            <button
-              type="button"
-              onClick={() => setAdding('')}
-              className="min-h-10 shrink-0 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-primary hover:bg-slate-50 cursor-pointer"
-            >
-              + Add a choice
-            </button>
+        )}
+        {kosher && (
+          <Change label="Everything here is kosher?" hint="Asks whether anything at a place isn’t kosher">
+            <AdminSwitch
+              checked={!!f.caveat}
+              onChange={(on) => (onKosherQuestions ? onKosherQuestions(on) : onChange({ caveat: on ? { ...KOSHER_CAVEAT } : undefined }))}
+              label="Everything here is kosher?"
+            />
           </Change>
-          {own.map((o) => (
-            <div key={o.value} className={changeRow}>
-              <span className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900">{o.label}</span>
-              <button
-                type="button"
-                aria-label={`Remove ${o.label}`}
-                onClick={() => onChange({ options: options.filter((x) => x.value !== o.value) })}
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          {adding !== null && (
-            <div className={changeRow}>
-              <input
-                autoFocus
-                aria-label="New choice"
-                value={adding}
-                onChange={(e) => setAdding(e.target.value)}
-                onBlur={add}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') add()
-                  if (e.key === 'Escape') setAdding(null)
+        )}
+        {partnerSays && partner && (
+          <Change label={partnerSays.name} hint={partnerSays.hint}>
+            <AdminSwitch checked={partner.on} onChange={partner.onChange} label={partnerSays.name} />
+          </Change>
+        )}
+        {minyan &&
+          MINYAN_PARTS.map(({ part, label, hint }) => (
+            <Change key={part} label={label} hint={hint}>
+              <AdminSwitch
+                checked={!off.includes(part)}
+                onChange={(on) => {
+                  const next = on ? off.filter((p) => p !== part) : [...off, part]
+                  onChange({ minyanOff: next.length ? next : undefined })
                 }}
-                className={input}
+                label={label}
               />
-            </div>
-          )}
-        </>
-      )}
-    </AdminBox>
+            </Change>
+          ))}
+      </AdminBox>
+      {choices && <ChoiceList field={f} onChange={onChange} markOwn />}
+    </>
   )
 }
 
 function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more }: ScreenProps) {
-  const [adding, setAdding] = useState<string | null>(null)
   // A new field's key follows its name until the name is left, then never
   // changes, so a rename never strands its answers (CategoryFieldEditor's
   // keyFrozenRef has the history).
   const keyFrozen = useRef(!!f.key)
   const choices = f.type === 'select' || (f.type === 'tags' && f.fixedVocabulary)
   const options = f.options ?? []
-  const add = () => {
-    const label = adding?.trim()
-    setAdding(null)
-    if (label && !options.some((o) => o.label.toLowerCase() === label.toLowerCase())) onChange({ options: [...options, { value: label, label }] })
-  }
   const both = options.length >= 2 ? `Can a place be both ${options[0].label} and ${options[1].label}?` : 'Can a place have more than one?'
   // A choice in the filter shows at the top of a place, as a chip.
   const filter = (yes: boolean) => onChange(yes && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: yes })
@@ -343,62 +304,7 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, on
           )}
         </div>
       </AdminBox>
-      {choices && (
-        <AdminBox
-          title="Choices"
-          action={
-            <button
-              type="button"
-              onClick={() => setAdding('')}
-              className="min-h-10 shrink-0 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-primary hover:bg-slate-50 cursor-pointer"
-            >
-              + Add a choice
-            </button>
-          }
-        >
-          <DragList items={options} keyOf={(o) => o.value} nameOf={(o) => o.label} onReorder={(next) => onChange({ options: next })}>
-            {(o, r) => (
-              <div className={row}>
-                {r.handle}
-                <span className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900">{o.label}</span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${o.label}`}
-                  onClick={() => onChange({ options: options.filter((x) => x.value !== o.value) })}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-          </DragList>
-          {adding !== null && (
-            <div className={row}>
-              <input
-                autoFocus
-                aria-label="New choice"
-                value={adding}
-                onChange={(e) => setAdding(e.target.value)}
-                onBlur={add}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') add()
-                  if (e.key === 'Escape') setAdding(null)
-                }}
-                className={input}
-              />
-            </div>
-          )}
-          {f.type === 'select' && (
-            <div className={`${row} border-t border-slate-200`}>
-              <span className="flex flex-1 min-w-0 flex-col">
-                <span className="text-[15px] font-semibold text-slate-900">Other</span>
-                <span className="text-[13px] text-slate-600">A box to type in</span>
-              </span>
-              <AdminSwitch checked={!!f.allowOther} onChange={(on) => onChange({ allowOther: on })} label="Other, a box to type in" />
-            </div>
-          )}
-        </AdminBox>
-      )}
+      {choices && <ChoiceList field={f} onChange={onChange} />}
       {(canRequire && f.type !== 'boolean' && f.type !== 'image') || TYPE_IS_FILTERABLE(f.type) || f.type === 'select' ? (
         <AdminBox title="Questions">
           {canRequire && f.type !== 'boolean' && f.type !== 'image' && (

@@ -58,17 +58,32 @@ describe('FieldScreen — a ready-made field', () => {
     expect(onRemove).toHaveBeenCalled()
   })
 
-  it('takes a choice of the page’s own, which only it can remove', async () => {
+  // The user, Nov 9: "some fields have no edit and some have edit. If you
+  // can edit then you can fully edit."
+  it('lets a page fully edit choices that are its own: rename, remove, add, Other', async () => {
     const user = userEvent.setup()
-    const storeType = { ...foodType, key: 'storeType', label: 'Store Type' }
-    render(<Screen field={storeType} />)
-    await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
-    await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Fish{Enter}')
-    expect(saved().options).toEqual([...foodType.options!, { value: 'Fish', label: 'Fish', own: true }])
-    // Not one of the field's own choices: it's listed under what you changed.
-    expect(within(box('What this is')).queryByText('Fish')).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Remove Fish' }))
-    expect(saved().options).toEqual(foodType.options)
+    const opts = ['IKC', 'Tartikov', 'OU'].map((v) => ({ value: v, label: v }))
+    render(<Screen field={{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', allowOther: true, options: opts }} />)
+    // The list is the choices box, not chips in What this is.
+    expect(within(box('What this is')).queryByRole('list', { name: 'Choices' })).toBeNull()
+    const choices = box('Choices')
+    // A rename changes only the words; places keep the stored value.
+    const name = within(choices).getByRole('textbox', { name: 'Rename IKC' })
+    await user.clear(name)
+    await user.type(name, 'IKC (Philadelphia){Enter}')
+    expect(saved().options![0]).toEqual({ value: 'IKC', label: 'IKC (Philadelphia)' })
+    // Left empty, or the same as another, it goes back.
+    const ou = within(choices).getByRole('textbox', { name: 'Rename OU' })
+    await user.clear(ou)
+    await user.type(ou, 'tartikov{Enter}')
+    expect(ou).toHaveValue('OU')
+    expect(saved().options![2]).toEqual({ value: 'OU', label: 'OU' })
+    await user.click(within(choices).getByRole('button', { name: 'Remove Tartikov' }))
+    await user.click(within(choices).getByRole('button', { name: '+ Add a choice' }))
+    await user.type(within(choices).getByRole('textbox', { name: 'New choice' }), 'Star-K{Enter}')
+    expect(saved().options).toEqual([{ value: 'IKC', label: 'IKC (Philadelphia)' }, { value: 'OU', label: 'OU' }, { value: 'Star-K', label: 'Star-K', own: true }])
+    await user.click(within(choices).getByRole('switch', { name: 'Other, a box to type in' }))
+    expect(saved().allowOther).toBe(false)
   })
 
   it('a yes or no in the filter is a chip at the top; no “required” where nobody adds', async () => {
@@ -97,7 +112,7 @@ describe('FieldScreen — a ready-made field', () => {
   it('lets a page turn off sign-up minyanim, join from home and summer or winter only', async () => {
     const user = userEvent.setup()
     render(<Screen field={{ key: 'minyanim', label: 'Davening Times (Minyanim)', type: 'minyanim', renderAs: 'row' }} />)
-    expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent(/Usual weekday times.*Usual Shabbos times.*This week’s schedule/)
+    expect(box('What this is')).toHaveTextContent('It comes with Usual weekday times, Usual Shabbos times and This week’s schedule.')
     const change = box('What you can change')
     for (const name of ['Sign-up minyanim', 'Join from home', 'Summer or winter only']) expect(within(change).getByRole('switch', { name })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(change).getByRole('switch', { name: 'Sign-up minyanim' }))
@@ -125,11 +140,11 @@ describe('FieldScreen — a ready-made field', () => {
     const onPartner = vi.fn()
     const cert: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }
     const { rerender } = render(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} partner={{ on: true, onChange: onPartner }} />)
-    expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent('Link to the certificate')
+    expect(box('What this is')).toHaveTextContent(/It comes with .*Link to the certificate\./)
     await user.click(within(box('What you can change')).getByRole('switch', { name: 'Link to the certificate' }))
     expect(onPartner).toHaveBeenCalledWith(false)
     rerender(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} partner={{ on: false, onChange: onPartner }} />)
-    expect(within(box('What this is')).queryByRole('list', { name: 'Comes with' })).toBeNull()
+    expect(box('What this is')).not.toHaveTextContent('Link to the certificate')
     expect(within(box('What you can change')).getByRole('switch', { name: 'Link to the certificate' })).toHaveAttribute('aria-checked', 'false')
   })
 
@@ -139,16 +154,17 @@ describe('FieldScreen — a ready-made field', () => {
     expect(screen.getByRole('switch', { name: 'Required' })).toBeInTheDocument()
   })
 
-  // The user, Nov 8, field by field: Food Type's and Kosher Store's
-  // choices are set; a hechsher's kosher questions can be turned off.
-  it('has no “Your own choices” where a field’s choices are set', () => {
-    render(<Screen field={foodType} />)
-    expect(screen.queryByText('Your own choices')).toBeNull()
-    expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
-    expect(screen.getByRole('switch', { name: 'In the filter' })).toBeInTheDocument()
-    cleanup()
-    render(<Screen field={{ key: 'isKosher', label: 'Kosher Store', type: 'select', options: [{ value: 'Kosher Store', label: 'Kosher Store' }] }} />)
-    expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
+  // The user, Nov 9: every other ready-made field's choices can't be
+  // changed at all, not even added to.
+  it('has nothing to change in choices that are the same everywhere', () => {
+    for (const field of [foodType, { ...foodType, key: 'size', label: 'Size' }, { ...foodType, key: 'storeType', label: 'Store Type' }]) {
+      render(<Screen field={field} />)
+      expect(screen.queryByRole('region', { name: 'Choices' })).toBeNull()
+      expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
+      expect(screen.queryByRole('textbox', { name: /^Rename/ })).toBeNull()
+      expect(screen.getByRole('switch', { name: 'In the filter' })).toBeInTheDocument()
+      cleanup()
+    }
   })
 
   it('turns a hechsher’s “Everything here is kosher?” off and on', async () => {
@@ -157,10 +173,10 @@ describe('FieldScreen — a ready-made field', () => {
     render(<Screen field={cert} />)
     const ask = within(box('What you can change')).getByRole('switch', { name: 'Everything here is kosher?' })
     expect(ask).toHaveAttribute('aria-checked', 'true')
-    expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent('What isn’t kosher')
+    expect(box('What this is')).toHaveTextContent('It comes with Everything here is kosher? and What isn’t kosher.')
     await user.click(ask)
     expect(saved().caveat).toBeUndefined()
-    expect(within(box('What this is')).queryByRole('list', { name: 'Comes with' })).toBeNull()
+    expect(box('What this is')).not.toHaveTextContent('It comes with')
     expect(box('What this is')).not.toHaveTextContent('whether everything there is kosher')
     await user.click(ask)
     expect(saved().caveat).toEqual({ flagField: 'kosherPartial', noteField: 'kosherNote' })
@@ -204,6 +220,15 @@ describe('FieldScreen — a field made here', () => {
     expect(f.multiSelect).toBe(false)
     await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
     expect(onRemove).toHaveBeenCalled()
+  })
+
+  it('renames a choice where it is, keeping what places stored', async () => {
+    const user = userEvent.setup()
+    render(<Screen field={{ key: 'level', label: 'Level', type: 'select', madeHere: true, options: [{ value: 'Beginner', label: 'Beginner' }] }} />)
+    const name = screen.getByRole('textbox', { name: 'Rename Beginner' })
+    await user.clear(name)
+    await user.type(name, 'New to it{Enter}')
+    expect(saved().options).toEqual([{ value: 'Beginner', label: 'New to it' }])
   })
 
   it('names a new field’s key after it until the name is left, and never renames a saved one’s', async () => {

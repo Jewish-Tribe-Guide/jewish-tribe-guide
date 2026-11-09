@@ -58,7 +58,7 @@ describe('fieldAbout', () => {
   // The user, Nov 9: Kosher Certification had "Other Kosher" as well as a
   // typed-in Other.
   it('drops a catch-all “Other …” choice too when Other is typed in', () => {
-    const f: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', allowOther: true, options: [{ value: 'OU', label: 'OU' }, { value: 'Other Kosher', label: 'Other Kosher' }, { value: 'Others Inc', label: 'Otherside' }] }
+    const f: CategoryField = { key: 'denomination', label: 'Denomination', type: 'select', allowOther: true, options: [{ value: 'OU', label: 'OU' }, { value: 'Other Kosher', label: 'Other Kosher' }, { value: 'Others Inc', label: 'Otherside' }] }
     expect(fieldAbout(f).choices).toEqual(['OU', 'Otherside', 'Other, typed in'])
   })
 

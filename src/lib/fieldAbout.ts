@@ -56,16 +56,21 @@ const WRITTEN: Record<string, string> = {
 /** What a ready-made field lets a page change beyond its kind's switches,
  *  and what it doesn't. The user settles these field by field (Nov 8). */
 export type FieldRules = {
-  /** Its choices are set: no "Your own choices". */
-  choicesSet?: boolean
+  /** Its choices are the community's (the user, Nov 9: "some fields have no
+   *  edit and some have edit. If you can edit then you can fully edit"):
+   *  rename, remove, reorder, add, and Other. Every other ready-made
+   *  field's choices are the same everywhere and can't be changed. */
+  choicesEditable?: boolean
   /** "Everything here is kosher?" can be turned off and on. */
   asksEverythingKosher?: boolean
 }
 
+// Hechshers and eruvim are local (the user, Nov 5). Childcare services
+// vary by community too, and nothing reads their values (decided Nov 9).
 const RULES: Record<string, FieldRules> = {
-  'select:food type': { choicesSet: true },
-  'select:kosher store': { choicesSet: true },
-  'select:kosher certification': { asksEverythingKosher: true },
+  'select:kosher certification': { choicesEditable: true, asksEverythingKosher: true },
+  'select:eruv': { choicesEditable: true },
+  'select:services': { choicesEditable: true },
 }
 
 export const fieldRules = (f: Pick<CategoryField, 'label' | 'type'>): FieldRules => RULES[idOf(f)] ?? {}
@@ -167,7 +172,9 @@ export function fieldAbout(f: CategoryField, { partnerOn = false }: { partnerOn?
   const comesWith = [...parts, ...caveat, ...(partner ? [partner] : [])]
   return {
     about,
-    ...(f.type === 'select' && { choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])] }),
+    // A list the page can change is shown as that list, under What you can
+    // change, so only a locked one is listed here.
+    ...(f.type === 'select' && !(f.madeHere || fieldRules(f).choicesEditable) && { choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])] }),
     ...(comesWith.length && { comesWith }),
     ...(watched && { watchedBy: watched }),
   }
