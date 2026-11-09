@@ -100,8 +100,8 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   await expect(title(/^Hours/)).toBeVisible()
   await at('?field=hours')
 
-  // The full preview, on top of the field.
-  await visible(page.getByRole('button', { name: 'Preview' })).click()
+  // The whole page, full size, on top of the field (from How it looks).
+  await visible(page.getByRole('button', { name: 'See the whole page' })).click()
   await at('?field=hours&preview=1')
   await page.goBack()
   await expect(title(/^Hours/)).toBeVisible()
@@ -114,7 +114,7 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   // A reload on the preview, Back to the page, a field, another tab and
   // Back (the walk that found it, Nov 9): an entry written behind the
   // router's back changed the address here and never drew the page.
-  await visible(page.getByRole('button', { name: 'Preview' })).click()
+  await visible(page.getByRole('button', { name: 'See the whole page' })).click()
   await at('?field=hours&preview=1')
   await page.reload()
   await expect(visible(page.getByRole('button', { name: '← Back to editor' }))).toBeVisible({ timeout: 30_000 })

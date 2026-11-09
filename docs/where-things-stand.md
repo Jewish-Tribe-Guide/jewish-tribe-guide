@@ -321,19 +321,25 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Up next: Site → Category pages, organised and cleaned up
 
-**Drawn Nov 9, waiting on the user: a field, how it looks** (same canvas,
-boards 33-34, row "A field, how it looks"). The user, Nov 9, on the preview
-beside a field: "a lot of noise for someone who just wants to see what the
-field looks like in three scenarios". Beside an opened field, in place of
-the Page / A listing / Adding preview: In the list, On the listing and When
-adding, each on a made-up place with the field's answer filled in and the
-field outlined, its neighbours faded. A field not on the row says so, with
-Show it on a row (board 34). A field in the filter gets a fourth panel,
-In Filters, drawn as the Filters sheet (board 33b; 33 drew it under the
-row, which the site never does). 33c trims the faded context (no photo,
-Filters keeps only its title, one row above the field when adding) so all
-four fit a laptop screen, about 800px; the user, Nov 9: "I think it's good". See the whole page opens the full preview as
-today. Not drawn: the phone (no preview beside there today).
+**Built Nov 9: a field, how it looks** (canvas boards 33c and 34, row "A
+field, how it looks"; the user, Nov 9: "build it, but with 33c"). Beside
+an opened field, and beside a field looked at in Add a field, in place of
+the Page / A listing / Adding preview (FieldLooks.tsx, fieldLooks.ts): In
+the list, In Filters (only while it's in the filter), On the listing and
+When adding, on a made-up place that answers every field by its type, the
+field outlined in blue and its neighbours faded. A field off the row says
+so, with Show it on a row (the card's picker for its line; Back returns to
+the field). See the whole page opens the full preview, on Page. The page's
+own screen keeps the Page / A listing / Adding preview. Not as drawn, from
+the site's own rules: the listing's facts are a line ("Meat · IKC"), not
+pills; Delivery Details is in its Delivery box, and Hours in Contact; the
+row before the field when adding follows the add form's order (Type comes
+before Food Type). The add form's picked choice is light blue with blue
+text (ListingEditor's ChoiceButtons), not the filter's filled blue; the
+user asked for the filter's blue on the board, and the site's own add form
+wasn't changed. Hours, minyanim, contacts and a photo show their answer as
+a line when adding, not their full editor. Phone not built (nothing beside
+a field there).
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,

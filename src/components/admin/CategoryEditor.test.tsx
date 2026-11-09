@@ -603,8 +603,9 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
   })
 
-  // Board 13: a field opened, the preview shows where it's filled in.
-  it('shows Adding when a field opens, and only its own screen’s settings', async () => {
+  // Boards 33c and 34 (Nov 9): beside a field, the field where a visitor
+  // meets it, in place of the page's switch.
+  it('shows how the field looks beside it, not the page, and only its own screen’s settings', async () => {
     computer()
     const user = userEvent.setup()
     const initial = baseCategory({
@@ -615,15 +616,17 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     await waitFor(() => expect(shown()).toBe('page'))
     await openBox(user, 'Contact')
     await user.click(screen.getByRole('button', { name: /^Type/ }))
-    await waitFor(() => expect(shown()).toBe('adding'))
-    expect(screen.getByRole('button', { name: 'Adding' })).toHaveAttribute('aria-pressed', 'true')
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    expect(within(looks).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['In the list', 'In Filters', 'On the listing', 'When adding'])
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Preview of' })).toBeNull()
     // The old form's settings are a superadmin's, under More.
     expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('combobox').filter((c) => !looks.contains(c))).toEqual([])
   })
 
   // The user, Nov 7: opened full size, the field went away.
-  it('opens on the field, beside it and full size', async () => {
+  it('opens the whole page full size from beside a field, the field on it', async () => {
     computer()
     const user = userEvent.setup()
     const initial = baseCategory({
@@ -633,11 +636,29 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     await openBox(user, 'Contact')
     await user.click(screen.getByRole('button', { name: /^Type/ }))
-    const beside = () => screen.getByRole('complementary', { name: 'Preview' }).querySelector('iframe')!.contentDocument!.querySelector('[data-testid="preview-beside"]')
-    await waitFor(() => expect(beside()).toHaveAttribute('data-focus', 'type'))
-    await user.click(screen.getByRole('button', { name: 'Open the preview' }))
-    expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
+    await user.click(screen.getByRole('button', { name: 'See the whole page' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'page')
     expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'type')
+  })
+
+  // Board 34: a field not on the row says so, and goes to the card's
+  // picker for its line; Back comes back to the field.
+  it('sends a field not on the row to the card’s line, and back', async () => {
+    computer()
+    const user = userEvent.setup()
+    const initial = baseCategory({ detailFields: [{ key: 'delivery', label: 'Delivery Details', type: 'textarea' }] })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'About')
+    await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
+    const list = within(screen.getByRole('complementary', { name: 'How it looks' })).getByRole('region', { name: 'In the list' })
+    expect(list).toHaveTextContent('Not shown in the list.')
+    await user.click(within(list).getByRole('button', { name: 'Show it on a row' }))
+    expect(await screen.findByRole('heading', { name: 'Show on the third line' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
+    // Back on the field, on the row now.
+    const after = await screen.findByRole('region', { name: 'In the list' })
+    expect(after).not.toHaveTextContent('Not shown in the list.')
+    expect(after.querySelector('mark')).toHaveTextContent('Orders by Wednesday noon')
   })
 
   it('has no Adding where visitors can’t add', () => {
@@ -952,18 +973,16 @@ describe('CategoryEditor — + Add a field', () => {
 
   // The list has the screen to itself (board 7); a field before adding has
   // the page beside it, with the field on it (canvas, Nov 7).
-  it('takes the page from beside the list, and shows it beside a field before adding', async () => {
+  it('takes the page from beside the list, and shows how a field looks before adding', async () => {
     const user = userEvent.setup()
     // A computer: the page sits beside the settings.
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
     await openAdd(user)
     expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
     await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
-    expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
-    // Open on Adding, where the field shows up before it's added.
-    expect(screen.getByRole('button', { name: 'Adding' })).toHaveAttribute('aria-pressed', 'true')
-    // Not board 11's drawn samples: the page itself is there.
-    expect(screen.queryByRole('region', { name: 'On Add a place' })).toBeNull()
+    // How it looks (boards 33c and 34), the field on a made-up place.
+    expect(screen.getByRole('complementary', { name: 'How it looks' })).toHaveTextContent('Denomination')
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
     await screen.findByRole('heading', { name: 'Groceries' })
     expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
@@ -975,7 +994,7 @@ describe('CategoryEditor — + Add a field', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
     await openAdd(user)
     await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
-    await user.click(screen.getByRole('button', { name: 'Open the preview' }))
+    await user.click(screen.getByRole('button', { name: 'See the whole page' }))
     expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'denomination')
     expect(screen.getByTestId('preview').dataset.fields!.split(' ')).toContain('denomination')
   })

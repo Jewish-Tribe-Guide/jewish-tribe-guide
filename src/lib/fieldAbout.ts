@@ -32,7 +32,7 @@ const WRITTEN: Record<string, string> = {
   'boolean:shabbat friendly': 'Whether a place works over Shabbos: keys, an elevator, a walk to shul. People adding a place answer Yes or No. A place marked Yes says so on its row and its listing.',
   'tags:kosher items available': 'The kosher food a place keeps, item by item. People adding a place type in each item, and can mark one that isn’t always in stock. Rows name a few, and the listing shows them all in a box.',
   'tags:main dishes': 'What a place serves, dish by dish. People adding a place type in each dish, and can mark one that isn’t always on the menu. Rows name a few, and the listing shows them all in a box.',
-  'text:delivery details': 'Where a place delivers, and when. People adding a place write it in their own words. The listing shows it under About.',
+  'text:delivery details': 'Where a place delivers, and when. People adding a place write it in their own words.',
   'url:join group': 'A button that opens a group’s invite link. People adding a place paste the link. The listing shows a Join group button.',
   'hours:hours': 'When a place is open, day by day. People adding a place set the open and closed times for each day. Rows say “Open until 8 PM” or “Closed now”.',
   'contacts:liaisons': 'Who to call at a place, and what for. People adding a place add each person: a name, what they help with, a phone and an email. The listing shows them in a box.',

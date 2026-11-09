@@ -217,7 +217,7 @@ const fieldLabel = editorFieldLabel
 /** A choice of a few as big buttons ("Meat", "Dairy", "Parve"), the way
  *  the minyan editor's days are: one replaces the other for a single
  *  choice, several can be on for a multi-choice. */
-function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void; labelHidden?: boolean }) {
+export function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void; labelHidden?: boolean }) {
   const chosen = selectValues(value)
   const known = new Set((field.options ?? []).map((o) => o.value))
   const options = [...(field.options ?? []), ...chosen.filter((v) => !known.has(v)).map((v) => ({ value: v, label: v }))]
@@ -251,7 +251,7 @@ function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field:
 
 /** A few choices are buttons; a long list, or one that takes "Other", the
  *  ordinary picker. */
-const asButtons = (f: CategoryField) => f.type === 'select' && !f.allowOther && (f.options?.length ?? 0) > 0 && (f.options?.length ?? 0) <= 6
+export const asButtons = (f: CategoryField) => f.type === 'select' && !f.allowOther && (f.options?.length ?? 0) > 0 && (f.options?.length ?? 0) <= 6
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 

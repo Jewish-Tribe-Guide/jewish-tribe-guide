@@ -21,6 +21,7 @@ import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
+import FieldLooks from './FieldLooks'
 import { useIsSuperAdmin } from './AdminAuthGate'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
 import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
@@ -188,20 +189,6 @@ function CategoryEditorScreen({
       setShowLine(s.line ?? null)
       setPreviewing(!!s.preview)
     }
-  }
-
-  // A field opened shows where it's filled in: Adding (board 13).
-  const [seenField, setSeenField] = useState(openField)
-  if (openField !== seenField) {
-    setSeenField(openField)
-    if (openField !== null && draft.capabilities.add) setPreviewView('adding')
-  }
-  // So does one looked at before adding: Adding is where it shows up.
-  const lookingAt = adding?.at === 'look' ? adding.id : null
-  const [seenLook, setSeenLook] = useState(lookingAt)
-  if (lookingAt !== seenLook) {
-    setSeenLook(lookingAt)
-    if (lookingAt && draft.capabilities.add) setPreviewView('adding')
   }
 
   const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
@@ -434,7 +421,31 @@ function CategoryEditorScreen({
       </PreviewBeside>
     </aside>
   )
-  const preview = wide && previewOf(focused.category, focused.focus)
+  // Beside a field, the field where a visitor meets it, on a made-up place
+  // (boards 33c and 34, FieldLooks.tsx); the whole page one link away.
+  const looksOf = (look: { category: CategoryConfig; focus?: string }, onShowOnRow?: (line: 'second' | 'third') => void) => {
+    const f = look.category.detailFields.find((x) => x.key === look.focus)
+    if (previewing || !f) return previewOf(look.category, look.focus)
+    return (
+      <FieldLooks
+        category={look.category}
+        field={f}
+        placeName={sampleName(draft.label, draft.pluralLabel)}
+        canAdd={draft.capabilities.add}
+        onShowOnRow={onShowOnRow}
+        onWholePage={() => {
+          setPreviewView('page')
+          openPreview()
+        }}
+      />
+    )
+  }
+  const showOnRow = (line: 'second' | 'third') => {
+    setShowLine(line)
+    go({ ...screenNow(), line })
+    window.scrollTo?.(0, 0)
+  }
+  const preview = wide && (typeof openField === 'number' && field ? looksOf(focused, showOnRow) : previewOf(focused.category, focused.focus))
 
   // Fields, as the listing's boxes (fieldBoxes.ts). A field not named yet
   // has no key: it goes by its place.
@@ -482,7 +493,8 @@ function CategoryEditorScreen({
       <ShowOnLine
         line={showLine}
         fields={pageFields}
-        back={{ label: name, onClick: () => void screens.back() }}
+        // From a field's How it looks, Back is to the field.
+        back={{ label: typeof openField === 'number' && field ? field.label || 'New field' : name, onClick: () => void screens.back() }}
         onPick={(key) => {
           putOnCard(key, true)
           void screens.back()
@@ -516,8 +528,7 @@ function CategoryEditorScreen({
         besides={
           wide
             ? (f) => {
-                const look = focusOn(previewCategory, normalizeField(f))
-                return previewOf(look.category, look.focus)
+                return looksOf(focusOn(previewCategory, normalizeField(f)))
               }
             : undefined
         }
