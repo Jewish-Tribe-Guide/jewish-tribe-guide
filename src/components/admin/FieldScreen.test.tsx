@@ -111,12 +111,12 @@ describe('FieldScreen — a ready-made field', () => {
   // The user, Nov 9: say which watches can keep a field up to date.
   it('says what can keep it up to date', () => {
     render(<Screen field={{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }} />)
-    expect(within(box('What this is')).getByRole('list', { name: 'Can be kept up to date by' })).toHaveTextContent(/Keystone-K.*Mekor Habracha.*KCL/)
+    expect(within(box('What this is')).getByRole('list', { name: 'Kept up to date by' })).toHaveTextContent(/Keystone-K’s list.*Mekor Habracha’s list.*KCL’s list/)
   })
 
   it('says nothing of watches for a field none can keep', () => {
     render(<Screen field={{ key: 'size', label: 'Size', type: 'select', options: [] }} />)
-    expect(screen.queryByRole('list', { name: 'Can be kept up to date by' })).toBeNull()
+    expect(screen.queryByRole('list', { name: 'Kept up to date by' })).toBeNull()
   })
 
   // The user, Nov 9: the certificate's link comes with Kosher Certification.

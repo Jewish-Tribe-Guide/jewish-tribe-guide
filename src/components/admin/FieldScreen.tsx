@@ -140,7 +140,7 @@ export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField;
         <p className="m-0 text-[17px] leading-[1.55] text-slate-800">{about}</p>
         {list('Choices', choices)}
         {list('Comes with', comesWith)}
-        {list('Can be kept up to date by', watchedBy)}
+        {list('Kept up to date by', watchedBy)}
       </div>
     </AdminBox>
   )

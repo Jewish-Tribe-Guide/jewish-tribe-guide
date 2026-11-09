@@ -80,6 +80,21 @@ describe('fieldAbout', () => {
   })
 })
 
+describe('what keeps a field up to date', () => {
+  // The user, Nov 9: "how do I enable that?" Each source says what a place
+  // needs for it, in plain words, never a job's own name.
+  const by = (f: CategoryField) => fieldAbout(f).watchedBy ?? []
+  it('says what each source needs', () => {
+    expect(by({ key: 'hours', label: 'Hours', type: 'hours' })).toEqual(['Google, for places found on Google', 'The place’s website, once its page is added in Places'])
+    expect(by({ key: 'minyanim', label: 'Davening Times', type: 'minyanim' })).toEqual(['The place’s website, once its page is added in Places', 'The shul’s emails, once they’re signed up for in Places'])
+    expect(by({ key: 'dishes', label: 'Main dishes', type: 'tags' })).toEqual(['Its menu, once its menu link is added in Places'])
+    expect(by({ key: 'menu', label: 'Menu', type: 'url' })).toEqual(['A weekly check that the link still works'])
+  })
+  it('names the kosher lists as lists', () => {
+    expect(by({ key: 'k', label: 'Kosher Certification', type: 'select' })).toEqual(['Keystone-K’s list', 'Mekor Habracha’s list', 'KCL’s list'])
+  })
+})
+
 describe('readyCopy', () => {
   it('gives another page the field without what its page made its own', () => {
     const own: CategoryField = {

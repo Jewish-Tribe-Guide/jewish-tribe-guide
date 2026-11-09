@@ -126,21 +126,26 @@ function kindHow(f: CategoryField): string {
 // which fields a watch can look after). The same jobs Add a place names for
 // each row (src/components/admin/addSources.ts); whether one runs for a page
 // is that page's setup on Watches.
-const LINK_CHECK = 'Link check'
+// Each says what it needs, so an admin can tell what to do (the user,
+// Nov 9: "how do I enable that?"). The jobs are on for every community
+// unless turned off on Watches; what a place needs is set in Places.
+const GOOGLE = 'Google, for places found on Google'
+const LINK_CHECK = 'A weekly check that the link still works'
+const SITE = 'The place’s website, once its page is added in Places'
 const WATCHED: Record<string, string[]> = {
-  'select:kosher certification': ['Keystone-K', 'Mekor Habracha', 'KCL'],
-  'url:kosher certification url': ['Keystone-K', 'Mekor Habracha', LINK_CHECK],
-  'tags:main dishes': ['Its menu'],
-  'tel:phone': ['Google'],
-  'url:website': ['Google', LINK_CHECK],
+  'select:kosher certification': ['Keystone-K’s list', 'Mekor Habracha’s list', 'KCL’s list'],
+  'url:kosher certification url': ['Keystone-K’s list', 'Mekor Habracha’s list', LINK_CHECK],
+  'tags:main dishes': ['Its menu, once its menu link is added in Places'],
+  'tel:phone': [GOOGLE],
+  'url:website': [GOOGLE, LINK_CHECK],
 }
 
 function watchedBy(f: CategoryField): string[] | undefined {
   const written = WATCHED[idOf(f)]
   if (written) return written
-  if (f.type === 'hours') return ['Google', 'Its website']
-  if (f.type === 'minyanim') return ['Its website', 'Its emails']
-  if (f.type === 'contacts') return ['Refuah']
+  if (f.type === 'hours') return [GOOGLE, SITE]
+  if (f.type === 'minyanim') return [SITE, 'The shul’s emails, once they’re signed up for in Places']
+  if (f.type === 'contacts') return ['Refuah, for hospitals on Refuah']
   if (f.type === 'url') return [LINK_CHECK]
   return undefined
 }

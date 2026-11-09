@@ -769,13 +769,18 @@ after the deploy, dry run first, and needs its own go-ahead.
     tevillah, Email, Short description (shows under the name on its row),
     Women's email (the mikvah's women's side).
   - BUILT Nov 9 (the user: "I like your recommendations in general"):
-    - Each ready-made field's "What this is" lists "Can be kept up to date
-      by": Kosher Certification by Keystone-K, Mekor Habracha and KCL; its
-      URL also by the link check; Main dishes by its menu; Phone and
-      Website by Google (Website also the link check); hours by Google and
-      its website; davening times by its website and emails; a hospital's
-      contacts by Refuah; any link by the link check. Fields nothing
-      watches say nothing.
+    - Each ready-made field's "What this is" lists "Kept up to date by",
+      each source saying what a place needs for it (reworded Nov 9 after
+      the user asked "how do I enable that?"): "Google, for places found on
+      Google", "The place's website, once its page is added in Places",
+      "The shul's emails, once they're signed up for in Places", "Its
+      menu, once its menu link is added in Places", "Refuah, for hospitals
+      on Refuah", the three kosher lists by name, and "A weekly check that
+      the link still works". Fields nothing watches say nothing. The jobs
+      are on for every community unless turned off on Watches.
+      Recommended, not drawn (the user chose a reword for now): a "Kept up
+      to date" box with, per source, whether it's on here, how many places
+      it covers, and a link to fix what's missing.
     - Partners (src/lib/fieldPartners.ts): Kosher Certification URL comes
       with Kosher Certification, Delivery WhatsApp Group with Delivery
       Details. Each has a switch on its field's screen ("Link to the
