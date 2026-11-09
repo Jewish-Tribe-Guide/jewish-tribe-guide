@@ -102,9 +102,14 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   a field isn't on the list of eruvim. These are the real eruv screens, not
   the drawn How it looks tabs a listing page's field has, so the field
   isn't outlined in them.
-- **Not yet:** Places' Add a place for an eruv (AddEruv) has its fixed
-  rows only, so a field made on the Eruv page is filled in after the eruv
-  is added, not while adding it.
+- **Places' Add a place for an eruv** has a row for each field made on the
+  Eruv page, after its own rows, and adds what they hold with it (the
+  user, Nov 9). Found on the way: typing the first letter in an empty row
+  there (Hotline, say) moved it up to the filled rows and dropped the rest
+  of what was typed; an open row now stays where it was opened.
+- **Asked, not decided (Nov 9):** visitors can't add an eruv, only Suggest
+  an edit to one (c15bfe3d). The queue has no new-eruv suggestion, and
+  the site's + Add doesn't offer the Eruv page.
 - **An admin's field is filled in** in Places (a row of its own after
   Website, saved with Update the listing) and by anyone through Suggest an
   edit, which goes to the queue; the queue and the admin email show it

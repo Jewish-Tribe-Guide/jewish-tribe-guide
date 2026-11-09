@@ -237,6 +237,7 @@ export default function PlacesList({ token }: { token: string }) {
     return (
       <AddEruv
         token={token}
+        category={eruvCategory}
         onBack={close}
         onAdded={async () => {
           await reload()

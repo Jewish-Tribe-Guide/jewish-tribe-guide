@@ -306,15 +306,15 @@ describe('Places', () => {
     const eruvCategory = makeCategory({ id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', kind: 'eruv' } as never)
     const eruv = { id: 'cc', name: 'Center City Eruv', covers: 'Center City', website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, lineUrl: null, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], statusEmail: null, statusEmailKept: null, updatedAt: day }
     const posted: unknown[] = []
-    function renderEruvs(shown: typeof eruv = eruv) {
+    function renderEruvs(shown: typeof eruv = eruv, page = eruvCategory) {
       vi.mocked(fetchJson).mockImplementation(async (url, init) => {
         if (init?.method) {
           const body = JSON.parse(String(init.body))
           posted.push(body)
           return { ok: true, eruv: { ...eruv, id: 'new-eruv', name: body.name } }
         }
-        if (String(url).includes('/api/admin/listings')) return { ok: true, places, categories: [...categories, eruvCategory] }
-        if (String(url).includes('/api/admin/categories')) return { ok: true, categories: [...categories, eruvCategory] }
+        if (String(url).includes('/api/admin/listings')) return { ok: true, places, categories: [...categories, page] }
+        if (String(url).includes('/api/admin/categories')) return { ok: true, categories: [...categories, page] }
         if (String(url).includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [shown], findings: [], watches: [] }
         throw new Error('down')
       })
@@ -393,6 +393,28 @@ describe('Places', () => {
       await user.click(screen.getByRole('button', { name: 'Add listing' }))
       expect(posted).toEqual([{ action: 'add', name: 'New Eruv' }])
       expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
+    })
+
+    // The user, Nov 9: a field made on the Eruv page is filled in while
+    // adding an eruv, not only in Places after.
+    it('Add a place has a row for each field made on the Eruv page, and adds what it holds', async () => {
+      const user = userEvent.setup()
+      const page = { ...eruvCategory, detailFields: [
+        { key: 'covers', label: 'Where it goes', type: 'textarea' },
+        { key: 'certifiedBy', label: 'Certified by', type: 'text' },
+        { key: 'checkedWeekly', label: 'Checked every week', type: 'boolean' },
+      ] } as never
+      renderEruvs(eruv, page)
+      await screen.findByRole('button', { name: 'Open Center City Eruv' })
+      await choose(/^Category/, /^Eruv/)
+      await user.click(screen.getByRole('button', { name: /Add a place/ }))
+      expect(await screen.findByTestId('editor-empty')).toHaveTextContent('Certified by')
+      await user.click(screen.getByTestId('editor-row-name'))
+      await user.type(screen.getByLabelText('Name'), 'New Eruv')
+      await user.click(screen.getByTestId('editor-add-own-certifiedBy'))
+      await user.type(screen.getByLabelText('Certified by'), 'Rabbi A')
+      await user.click(screen.getByRole('button', { name: 'Add listing' }))
+      await waitFor(() => expect(posted).toEqual([{ action: 'add', name: 'New Eruv' }, { action: 'save', id: 'new-eruv', edit: { details: { certifiedBy: 'Rabbi A' } } }]))
     })
   })
 

@@ -45,7 +45,7 @@ type Draft = { name: string; covers: string; hotline: string; alertsUrl: string;
 type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website' | `own-${string}`
 /** Which of a source line's controls opened a screen over its row. */
 type Which = 'change' | 'start' | 'add'
-type AddEruvRow = Exclude<RowId, `own-${string}`>
+type AddEruvRow = RowId
 const WHERE_ITS_MAP = 'Where its map is'
 const draftOf = (e: AdminEruv): Draft => ({ name: e.name, covers: e.covers ?? '', hotline: e.hotline ?? '', alertsUrl: e.alertsUrl ?? '', website: e.website ?? '' })
 
@@ -377,10 +377,17 @@ type StatusRead =
   | { state: 'unclear'; on: string }
 
 /** Add a place, an eruv (boards AddEruv12, EruvStatusField12, AddEruvFilled12):
- *  the same Add screen, with no Google step. What's given goes on as it's added. */
-export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () => void; onAdded: () => Promise<void> | void }) {
+ *  the same Add screen, with no Google step. What's given goes on as it's added.
+ *  After its own rows, one for each field an admin made on the Eruv page
+ *  (`category`), as Places has once it's added (Nov 9). */
+export function AddEruv({ token, category, onBack, onAdded }: { token: string; category?: CategoryConfig; onBack: () => void; onAdded: () => Promise<void> | void }) {
   const community = useCommunitySlug()
   const [draft, setDraft] = useState({ name: '', covers: '', status: '', map: '', hotline: '', alertsUrl: '', website: '' })
+  const [details, setDetails] = useState<Record<string, unknown>>({})
+  /** The open row, when it was opened from the empty ones. */
+  const [openedEmpty, setOpenedEmpty] = useState<string | null>(null)
+  const own = category ? ownEruvFields(withEruvFields(category).detailFields) : []
+  const kept = readEruvDetails(Object.fromEntries(own.map((f) => [f.key, details[f.key]]))) ?? {}
   const [openRow, setOpenRow] = useState<AddEruvRow | null>(null)
   const [screen, setScreen] = useState<{ title: string; label: string; key: 'status' | 'map'; kind: WatchPurpose } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -434,6 +441,7 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
         ...statusAt,
         ...(draft.map.trim() ? { lineUrl: draft.map.trim() } : {}),
         ...Object.fromEntries((['covers', 'hotline', 'alertsUrl', 'website'] as const).filter((k) => draft[k].trim()).map((k) => [k, draft[k].trim()])),
+        ...(Object.keys(kept).length > 0 && { details: kept }),
       }
       if (Object.keys(edit).length) await post({ action: 'save', id: eruv.id, edit })
       // A page or a map is read as it's added.
@@ -521,13 +529,24 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim(), filled: !!draft.hotline.trim(), ...websiteRead, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() && shortUrl(draft.alertsUrl.trim()), filled: !!draft.alertsUrl.trim(), ...websiteRead, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() && shortUrl(draft.website.trim()), filled: !!draft.website.trim(), ...read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />), body: input('website', 'Website') },
+    ...own.map((f) => ({
+      id: `own-${f.key}` as const,
+      title: f.label,
+      summary: ownWords(f, kept[f.key]),
+      filled: f.key in kept,
+      body: <DetailFieldInput field={f} labelHidden value={details[f.key]} onChange={(v) => setDetails((d) => ({ ...d, [f.key]: v }))} />,
+    })),
   ]
   const opened = (r: (typeof rows)[number]) => (
     <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
       {r.body}
     </EditorOpenCard>
   )
-  const empty = rows.filter((r) => !r.filled)
+  // An open row stays where it was opened: the first letter typed in an
+  // empty one would move it to the filled ones and draw it afresh there,
+  // losing what's typed after.
+  const inEmpty = (r: (typeof rows)[number]) => (r.id === openRow ? openedEmpty === r.id : !r.filled)
+  const empty = rows.filter(inEmpty)
 
   return (
     <div className="flex flex-col gap-4">
@@ -552,13 +571,20 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
           <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>
           <ul className="space-y-2">
             {rows
-              .filter((r) => r.filled)
+              .filter((r) => !inEmpty(r))
               .map((r) => (
                 <li key={r.id}>
                   {openRow === r.id ? (
                     opened(r)
                   ) : (
-                    <EditorRowCard onOpen={() => setOpenRow(r.id)} testId={`editor-row-${r.id}`} opens="here" title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
+                    <EditorRowCard
+                      onOpen={() => {
+                        setOpenedEmpty(null)
+                        setOpenRow(r.id)
+                      }}
+                      testId={`editor-row-${r.id}`}
+                      opens="here"
+                      title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
                   )}
                 </li>
               ))}
@@ -566,7 +592,11 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
           {empty.length > 0 && (
             <EditorEmptyRows>
               {empty.map((r) => (
-                <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine onOpen={() => setOpenRow(r.id)} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
+                <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine
+                      onOpen={() => {
+                        setOpenedEmpty(r.id)
+                        setOpenRow(r.id)
+                      }} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
               ))}
             </EditorEmptyRows>
           )}
