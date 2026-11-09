@@ -2,15 +2,42 @@
 
 The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
-account). Update it in the same commit as the work that changes it.
+account). Update it in the same commit as the work that changes it. How
+the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 5, 2026.
+Last updated: Nov 9, 2026.
 
 ## The branch
 
 The redesign was merged into `main` on Oct 17 at 7:24 PM (#322, at
-7d5fead6) and is live. Later work is on `redesign/map-google-sizes` until
-the next merge.
+7d5fead6) and is live. Work since is on `redesign/oct18-fixes`, which goes to
+`main` a PR at a time. The last, #379 (the Category pages redesign, Nov 5–9),
+merged Nov 9 at 2:38 PM (ffb6ca63), so as of Nov 9 the branch holds nothing
+`main` doesn't. Keep building on it, and merge `origin/main` into it before
+the next PR.
+
+**Moved to a new Claude account on Nov 9.** What didn't come along:
+
+- **The drawings.** Every canvas and artifact linked in this file
+  (claude.ai/artifact/…) belongs to the old account. The new one can open
+  them only if the old account shares them. The decisions they settled are
+  written here, so the text is what to go by. The latest is the Category
+  pages canvas, ThgexAyY2q6o6YDxg21RBM.
+- **Auto-fix on PRs.** The app's PR watcher was switched on per session.
+  Turn it on again for the next PR from the new account.
+
+Small open items from Nov 9:
+
+- `e2e/saved.spec.ts` failed in CI twice on a Saved chip that didn't show
+  within 5s: Nov 5 (:130, mobile) and Nov 9 (:104 desktop, PR #379, which
+  passed on a rerun). Both times the branch hadn't touched saving. Treat it as
+  a flake to look into, not a regression.
+- Dev's pretend Riverton community has no pages left and can be deleted
+  (dev only; no yes needed).
+- "How it looks" isn't built for the phone (nothing sits beside a field
+  there).
+- The Denomination/Nusach script is still a dry run (see "Waiting for a yes
+  to change the live site").
 
 The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
@@ -339,6 +366,36 @@ blue with a tick (ListingEditor's ChoiceButtons, the user's OK, Nov 9), on
 the site's own add form too. Hours, minyanim, contacts and a photo show their answer as
 a line when adding, not their full editor. Phone not built (nothing beside
 a field there).
+
+**Built Nov 9: How it looks as tabs** (the user, on boards 33d-34c: "I
+love ths. This is exactly it"). Copies of the boards are in
+`docs/mockups/how-it-looks-tabs/` (the canvas stays with the old Claude
+account). `FieldLooks.tsx`: the four stacked panels are tabs, List · Filters
+· A listing · Adding, in the same control as the page's Page / A listing /
+Adding. Each tab is a phone-width stretch of the screen, the field outlined
+and the rest faded:
+- List: three made-up rows, each answering the field differently (Meat,
+  Dairy, Parve), in the community's own neighbourhoods.
+- Filters: the sheet over the list, Open now first, the field's filter
+  working, the others faded.
+- A listing: header, facts line, buttons (no Directions: no address), the
+  boxes.
+- Adding: Add to Food, the row asked before the field's, then the field's
+  row open with its neighbours.
+
+Filters shows only while the field is in the filter, Adding only where
+visitors add. A sheet scrolls itself so the field is in sight. A field
+opens on the first tab it is on (Delivery Details on A listing; the user
+didn't object to that recommendation). A field asked only after an answer
+(Delivery Details, after Store Type is Scheduled Deliveries) gets that
+answer on the made-up place and is asked with Store Type. Anything else
+asked only after an answer is left off, as the site leaves it off. Places
+are named for their type only when the field is a type ("A bakery"), never
+for an answer about them ("An orthodox"). Differences from the boards, all
+from following the site: the row before Kosher in Adding is Store Type,
+not Address; Filters shows all of Food's ten hechshers, so the Show button
+is below the fold; Delivery's box names "Delivery Details" inside it, because
+it holds two fields; the delivery place is "A place", not "A caterer".
 
 Fixed Nov 9 (the user: "I don't see that for denomination"): "In the
 filter" turned off on a Choice, a Yes/No or Hours came back on with the

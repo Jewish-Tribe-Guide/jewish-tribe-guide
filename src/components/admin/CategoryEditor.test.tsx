@@ -603,8 +603,8 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
   })
 
-  // Boards 33c and 34 (Nov 9): beside a field, the field where a visitor
-  // meets it, in place of the page's switch.
+  // Boards 33d-34c (Nov 9): beside a field, the field where a visitor
+  // meets it, a tab for each place, in place of the page's switch.
   it('shows how the field looks beside it, not the page, and only its own screen’s settings', async () => {
     computer()
     const user = userEvent.setup()
@@ -617,7 +617,7 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     await openBox(user, 'Contact')
     await user.click(screen.getByRole('button', { name: /^Type/ }))
     const looks = screen.getByRole('complementary', { name: 'How it looks' })
-    expect(within(looks).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['In the list', 'In Filters', 'On the listing', 'When adding'])
+    expect(within(looks).getAllByRole('tab').map((t) => t.textContent)).toEqual(['List', 'Filters', 'A listing', 'Adding'])
     expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Preview of' })).toBeNull()
     // The old form's settings are a superadmin's, under More.
@@ -625,7 +625,7 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     expect(screen.queryAllByRole('combobox').filter((c) => !looks.contains(c))).toEqual([])
   })
 
-  // The user, Nov 9: Denomination kept its In Filters with the filter off,
+  // The user, Nov 9: Denomination kept its Filters with the filter off,
   // and saving put the filter back.
   it('takes a field out of Filters when In the filter is turned off, and saves it off', async () => {
     computer()
@@ -638,9 +638,9 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     await openBox(user, 'Top')
     await user.click(screen.getByRole('button', { name: /^Denomination/ }))
     const looks = screen.getByRole('complementary', { name: 'How it looks' })
-    expect(within(looks).getByRole('region', { name: 'In Filters' })).toBeInTheDocument()
+    expect(within(looks).getByRole('tab', { name: 'Filters' })).toBeInTheDocument()
     await user.click(screen.getByRole('switch', { name: 'In the filter' }))
-    expect(within(looks).queryByRole('region', { name: 'In Filters' })).toBeNull()
+    expect(within(looks).queryByRole('tab', { name: 'Filters' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
@@ -663,8 +663,8 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'type')
   })
 
-  // Board 34: a field not on the row says so, and goes to the card's
-  // picker for its line; Back comes back to the field.
+  // Board 34b: a field not on the row says so on the List tab, and goes to
+  // the card's picker for its line; Back comes back to the field.
   it('sends a field not on the row to the card’s line, and back', async () => {
     computer()
     const user = userEvent.setup()
@@ -672,13 +672,17 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     await openBox(user, 'About')
     await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
-    const list = within(screen.getByRole('complementary', { name: 'How it looks' })).getByRole('region', { name: 'In the list' })
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    // Off the row, it opens where it is: its listing.
+    expect(within(looks).getByRole('tabpanel')).toHaveAccessibleName('A listing')
+    await user.click(within(looks).getByRole('tab', { name: 'List' }))
+    const list = within(looks).getByRole('tabpanel', { name: 'List' })
     expect(list).toHaveTextContent('Not shown in the list.')
     await user.click(within(list).getByRole('button', { name: 'Show it on a row' }))
     expect(await screen.findByRole('heading', { name: 'Show on the third line' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
     // Back on the field, on the row now.
-    const after = await screen.findByRole('region', { name: 'In the list' })
+    const after = await screen.findByRole('tabpanel', { name: 'List' })
     expect(after).not.toHaveTextContent('Not shown in the list.')
     expect(after.querySelector('mark')).toHaveTextContent('Orders by Wednesday noon')
   })
@@ -1002,8 +1006,11 @@ describe('CategoryEditor — + Add a field', () => {
     await openAdd(user)
     expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
     await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
-    // How it looks (boards 33c and 34), the field on a made-up place.
-    expect(screen.getByRole('complementary', { name: 'How it looks' })).toHaveTextContent('Denomination')
+    // How it looks (boards 33d-34c), the field on a made-up place.
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    expect(within(looks).getByRole('tabpanel', { name: 'List' }).querySelector('mark')).toHaveTextContent('Orthodox')
+    // Places named for what they are, never for an answer about them.
+    expect(looks).not.toHaveTextContent('An orthodox')
     expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
     await screen.findByRole('heading', { name: 'Groceries' })

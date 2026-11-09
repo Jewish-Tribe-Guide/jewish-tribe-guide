@@ -432,6 +432,7 @@ function CategoryEditorScreen({
         category={look.category}
         field={f}
         placeName={sampleName(draft.label, draft.pluralLabel)}
+        askedWhen={field?.showIf}
         canAdd={draft.capabilities.add}
         onShowOnRow={onShowOnRow}
         onWholePage={() => {

@@ -50,6 +50,17 @@ type Props = {
   save?: ReactNode
 }
 
+/** The search box's words on a category page (also How it looks' phone,
+ *  FieldLooks.tsx). */
+export function askPlaceholder(category: CategoryConfig): string {
+  const plural = category.pluralLabel.toLowerCase()
+  return category.detailFields.some((f) => f.type === 'minyanim')
+    ? `Ask about ${plural} or minyanim`
+    : category.detailFields.some((f) => f.type === 'tags')
+      ? 'Ask for any item or store'
+      : `Ask anything about ${plural}`
+}
+
 export default function CategoryAsk({ category, search, onSearch, scope, onSubmit, foundNothing = false, save }: Props) {
   const communitySlug = useOptionalCommunitySlug()
   const categories = useCategories() ?? [category]
@@ -62,15 +73,8 @@ export default function CategoryAsk({ category, search, onSearch, scope, onSubmi
     foundNothing && q && communitySlug
       ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ), scope: { label: category.pluralLabel, searchAll: routes.ask(communitySlug, q) } }
       : null
-  const plural = category.pluralLabel.toLowerCase()
   const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
-  const placeholder = onMinyanim
-    ? 'Ask: mincha tonight'
-    : category.detailFields.some((f) => f.type === 'minyanim')
-    ? `Ask about ${plural} or minyanim`
-    : category.detailFields.some((f) => f.type === 'tags')
-      ? 'Ask for any item or store'
-      : `Ask anything about ${plural}`
+  const placeholder = onMinyanim ? 'Ask: mincha tonight' : askPlaceholder(category)
 
   return (
     <div className="space-y-3">
