@@ -1,6 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Link from 'next/link'
+import { adminBase } from '@/lib/adminNav'
+import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { MINYAN_PARTS, slugifyFieldKey, TYPE_IS_FILTERABLE, type CategoryField, type FieldType } from '@/lib/categories'
 import { fieldAbout, fieldRules } from '@/lib/fieldAbout'
 import { partnerRule } from '@/lib/fieldPartners'
@@ -122,24 +125,34 @@ const andList = (names: readonly string[]) => (names.length < 2 ? names.join('')
 
 /** The first box: what the field is, in a few sentences, and what it holds.
  *  Only its choices are chips, since those are what a place picks; what it
- *  comes with and what keeps it up to date are sentences in the paragraph
- *  (the user, Nov 9: "seems like a lot going on"), the second's start in
- *  bold to catch the eye. */
+ *  comes with is a sentence in the paragraph (the user, Nov 9: "seems like
+ *  a lot going on"). What keeps it up to date is a line of its own, its
+ *  start in bold, saying how often (Nov 9: "pretty explicit on what it
+ *  is"), with a way to learn what a watch is: How watches work, a screen
+ *  of its own off Watches, so Back comes back here. */
 export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField; partnerOn?: boolean }) {
   const { about, choices, comesWith, watchedBy } = fieldAbout(field, { partnerOn })
+  const community = useOptionalCommunitySlug()
   return (
     <AdminBox title="What this is">
       <div className="flex flex-col gap-3.5 p-4">
         <p className="m-0 text-[17px] leading-[1.55] text-slate-800">
           {about}
           {comesWith?.length ? ` It comes with ${andList(comesWith)}.` : null}
-          {watchedBy ? (
-            <>
-              {' '}
-              <strong className="font-semibold text-slate-900">Kept up to date by</strong> {watchedBy}
-            </>
-          ) : null}
         </p>
+        {watchedBy ? (
+          <p className="m-0 text-[17px] leading-[1.55] text-slate-800" data-testid="watched">
+            <strong className="font-semibold text-slate-900">Watched:</strong> {watchedBy}
+            {community ? (
+              <>
+                {' '}
+                <Link href={`${adminBase(community)}/watches/about`} className="font-semibold text-primary underline-offset-2 hover:underline">
+                  How watches work
+                </Link>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {choices?.length ? (
           <div className="flex flex-col gap-1.5">
             <span className="text-[13px] font-semibold text-slate-500">Choices</span>

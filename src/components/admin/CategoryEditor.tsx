@@ -34,6 +34,9 @@ import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { fieldFromRef, fieldRef, screenFromSearch, type EditorScreen } from '@/lib/editorScreenUrl'
+import { focusOn } from '@/lib/previewFocus'
+import { useScreenHistory } from './useScreenHistory'
 
 // One category page's settings (the admin redesign's boards 6 and 6b): its
 // kind, name and look, what each place shows (a row per field, each opening
@@ -166,11 +169,32 @@ function CategoryEditorScreen({
     moveField,
   } = useCategoryFieldEditing(initial, seed)
 
+  // The screen the address names, on opening: a reload, a link, or Back
+  // from another tab lands where the history says (editorScreenUrl.ts).
+  const screens = useScreenHistory()
+  const fieldsNow = useRef(draft.fields)
+  useEffect(() => {
+    fieldsNow.current = draft.fields
+  })
+  const [restored, setRestored] = useState(false)
+  if (!restored) {
+    setRestored(true)
+    if (typeof window !== 'undefined') {
+      const s = screenFromSearch(window.location.search)
+      const open = fieldFromRef(draft.fields, s.field)
+      if (open !== null || s.add) setFieldsOpen(true)
+      setOpenField(open)
+      setAdding(s.add ?? null)
+      setShowLine(s.line ?? null)
+      setPreviewing(!!s.preview)
+    }
+  }
+
   // A field opened shows where it's filled in: Adding (board 13).
   const [seenField, setSeenField] = useState(openField)
   if (openField !== seenField) {
     setSeenField(openField)
-    if (typeof openField === 'number' && draft.capabilities.add) setPreviewView('adding')
+    if (openField !== null && draft.capabilities.add) setPreviewView('adding')
   }
   // So does one looked at before adding: Adding is where it shows up.
   const lookingAt = adding?.at === 'look' ? adding.id : null
@@ -196,49 +220,55 @@ function CategoryEditorScreen({
   const dirty = isNew ? changedKeys(draft, toDraft(seed)) > 0 : changes > 0
   useLeaveGuard(dirty)
 
-  // The preview and a field's screen each get their own history entry, so
-  // browser/trackpad Back (and the preview's own Up button, which calls
-  // history.back) land back on this screen instead of skipping past it to
-  // the category list.
+  // Each screen is an entry in the history with its own address, so
+  // browser/trackpad Back and Forward (and the preview's own Up button,
+  // which calls history.back) land on it instead of skipping past it to the
+  // category list. What shows is read from the address, never kept apart
+  // from it. A removal's step holds a count read just before, kept here for
+  // Back and Forward onto it, and read again after a reload.
+  const lastRemoving = useRef<Removing | null>(null)
+  const removeStep = useRef<(ref: string | undefined) => void>(() => {})
   useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const state = e.state as {
-        editorPreview?: boolean
-        editorField?: OpenField
-        editorAdd?: FieldPickerScreen
-        editorLine?: 'second' | 'third'
-        editorRemove?: Removing
-      } | null
-      setPreviewing(!!state?.editorPreview)
-      setOpenField(state?.editorField ?? null)
-      setAdding(state?.editorAdd ?? null)
-      setShowLine(state?.editorLine ?? null)
-      setRemoving(state?.editorRemove ?? null)
+    function onPopState() {
+      const s = screenFromSearch(window.location.search)
+      setPreviewing(!!s.preview)
+      setOpenField(fieldFromRef(fieldsNow.current, s.field))
+      setAdding(s.add ?? null)
+      setShowLine(s.line ?? null)
+      if (s.remove) removeStep.current(s.field)
+      else setRemoving(null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  // Opened from the page beside a field: what that page showed, the field
-  // in it and open (the user, Nov 7: opened full size, it disappeared).
-  const [previewFull, setPreviewFull] = useState<{ category: CategoryConfig; focus?: string } | null>(null)
-  function openPreview(from?: { category: CategoryConfig; focus?: string }) {
-    setPreviewFull(from ?? null)
+  const screenNow = (): EditorScreen => ({
+    ...(openField !== null && { field: fieldRef(draft.fields, openField) }),
+    ...(adding && { add: adding }),
+    ...(showLine && { line: showLine }),
+  })
+  // Through Next's router, so the entry is one it made (editorScreenUrl.ts),
+  // one move at a time (useScreenHistory.ts).
+  function go(next: EditorScreen) {
+    void screens.push(next)
+  }
+
+  function openPreview() {
     setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+    go({ ...screenNow(), preview: true })
   }
 
   function showField(i: OpenField) {
     setFieldsOpen(true)
     setOpenField(i)
-    history.pushState({ ...(window.history.state ?? {}), editorField: i }, '')
+    go({ field: fieldRef(fieldsNow.current, i) })
     window.scrollTo?.(0, 0)
   }
 
   function showAdding(next: FieldPickerScreen) {
     setFieldsOpen(true)
     setAdding(next)
-    history.pushState({ ...(window.history.state ?? {}), editorAdd: next }, '')
+    go({ add: next })
     window.scrollTo?.(0, 0)
   }
 
@@ -246,13 +276,9 @@ function CategoryEditorScreen({
   // field looked at or the kind picked). Make your own opens the new
   // field's screen, to name it.
   function added(i: number | null) {
-    const back = adding?.at === 'list' ? 1 : 2
-    const after = () => {
-      window.removeEventListener('popstate', after)
+    void screens.back(adding?.at === 'list' ? 1 : 2).then(() => {
       if (i !== null) showField(i)
-    }
-    window.addEventListener('popstate', after)
-    history.go(-back)
+    })
   }
 
   const confirmKey = (t: Removing['target']) => (typeof t === 'object' ? `field:${t.field}` : t)
@@ -288,14 +314,43 @@ function CategoryEditorScreen({
       // Nothing to lose is answered too; not knowing leaves it to Save.
       setConfirmed((c) => (count === 0 ? new Set(c).add(confirmKey(target)) : new Set([...c].filter((k) => k !== confirmKey(target)))))
       takeOff(target)
-      history.back()
+      void screens.back()
       return
     }
     const next: Removing = { target, label, count, filter }
+    lastRemoving.current = next
     setRemoving(next)
-    history.pushState({ ...(window.history.state ?? {}), editorRemove: next }, '')
+    go({ ...screenNow(), remove: true })
     window.scrollTo?.(0, 0)
   }
+
+  // The Remove step the address names: the one held, or counted again (a
+  // reload, or Forward onto it after one), the field showing meanwhile.
+  // Nothing to lose by then: the address goes back to the field.
+  async function showRemoveStep(ref: string | undefined) {
+    const open = fieldFromRef(fieldsNow.current, ref)
+    if (open === null) return
+    const f = typeof open === 'number' ? fieldsNow.current[open] : null
+    const target: Removing['target'] = f ? { field: f.key } : (open as 'address' | 'phone')
+    const held = lastRemoving.current
+    if (held && confirmKey(held.target) === confirmKey(target)) return setRemoving(held)
+    setRemoving(null)
+    const count = await countAnswers(target)
+    const still = screenFromSearch(window.location.search)
+    if (!still.remove || still.field !== ref) return
+    if (!count) return void screens.replace({ ...still, remove: false })
+    const next: Removing = { target, label: f ? f.label || 'New field' : open === 'address' ? 'Address' : 'Phone', count, filter: !!f && !!normalizeField(f).filterable }
+    lastRemoving.current = next
+    setRemoving(next)
+  }
+  useEffect(() => {
+    removeStep.current = (ref) => void showRemoveStep(ref)
+  })
+  useEffect(() => {
+    const s = screenFromSearch(window.location.search)
+    if (s.remove) void showRemoveStep(s.field)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on opening only
+  }, [])
 
   function leave() {
     if (dirty && !window.confirm(LEAVE_QUESTION)) return
@@ -340,16 +395,24 @@ function CategoryEditorScreen({
     ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
   ]
   const shownView = views.some((v) => v.view === previewView) ? previewView : 'page'
-  if (previewing) return <CategoryPreview category={previewFull?.category ?? previewCategory} focusField={previewFull?.focus} view={shownView} onClose={() => history.back()} />
-
   const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
   const field = typeof openField === 'number' ? draft.fields[openField] : undefined
+  // The page as the preview shows it, on the field open (previewFocus.ts).
+  const focused = focusOn(previewCategory, typeof openField === 'number' ? field : (openField ?? undefined))
+  // Full size, the screen showing the field draws it, so a field Add a
+  // field is looking at (worked out there, with what's been set on it) is
+  // in it too. Every other screen: here.
+  const drawnByScreen = wide && !removing && (!adding || adding.at === 'look')
+  if (previewing && !drawnByScreen) return <CategoryPreview category={focused.category} focusField={focused.focus} view={shownView} onClose={() => void screens.back()} />
 
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
   // `focus`: the field an admin is looking at, which Adding opens on.
-  const previewOf = (category: CategoryConfig, focus?: string) => (
+  const previewOf = (category: CategoryConfig, focus?: string) =>
+    previewing ? (
+      <CategoryPreview category={category} focusField={focus} view={shownView} onClose={() => void screens.back()} />
+    ) : (
     <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
       {(
         <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
@@ -366,12 +429,12 @@ function CategoryEditorScreen({
           ))}
         </div>
       )}
-      <PreviewBeside onOpen={() => openPreview({ category, focus })} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
+      <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
         {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaceCount} />}
       </PreviewBeside>
     </aside>
   )
-  const preview = wide && previewOf(previewCategory, field?.key || undefined)
+  const preview = wide && previewOf(focused.category, focused.focus)
 
   // Fields, as the listing's boxes (fieldBoxes.ts). A field not named yet
   // has no key: it goes by its place.
@@ -405,12 +468,12 @@ function CategoryEditorScreen({
       <RemoveField
         removing={removing}
         page={name}
-        onKeep={() => history.back()}
+        onKeep={() => void screens.back()}
         onRemove={() => {
           takeOff(removing.target)
           setConfirmed((c) => new Set(c).add(confirmKey(removing.target)))
           // Past the field's screen too, to the page.
-          history.go(-2)
+          void screens.back(2)
         }}
       />
     )
@@ -419,10 +482,10 @@ function CategoryEditorScreen({
       <ShowOnLine
         line={showLine}
         fields={pageFields}
-        back={{ label: name, onClick: () => history.back() }}
+        back={{ label: name, onClick: () => void screens.back() }}
         onPick={(key) => {
           putOnCard(key, true)
-          history.back()
+          void screens.back()
         }}
       />
     )
@@ -435,7 +498,7 @@ function CategoryEditorScreen({
         page={{ hasAddress: draft.hasAddress, hasPhone: draft.hasPhone, fields: draft.fields }}
         screen={adding}
         onScreen={showAdding}
-        onBack={() => history.back()}
+        onBack={() => void screens.back()}
         onAdd={(row) => {
           if (row.basic === 'address' || row.basic === 'phone') setOpenBox('contact')
           else setLanding(new Set(pageFields.map((f) => f.key)))
@@ -450,7 +513,14 @@ function CategoryEditorScreen({
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
         // A field before adding: the page beside with it there.
-        besides={wide ? (f) => previewOf({ ...previewCategory, detailFields: [...previewCategory.detailFields, normalizeField({ ...f, key: f.key || 'new' })] }, f.key || 'new') : undefined}
+        besides={
+          wide
+            ? (f) => {
+                const look = focusOn(previewCategory, normalizeField(f))
+                return previewOf(look.category, look.focus)
+              }
+            : undefined
+        }
         onMakeOwn={(type, label) => {
           setLanding(new Set(pageFields.map((f) => f.key)))
           added(addOwnField(type, label, addingTo))
@@ -462,7 +532,7 @@ function CategoryEditorScreen({
     const address = openField === 'address'
     screen = (
       <>
-        <AdminBack back={{ label: name, onClick: () => history.back() }} title={address ? 'Address' : 'Phone'} />
+        <AdminBack back={{ label: name, onClick: () => void screens.back() }} title={address ? 'Address' : 'Phone'} />
         <button
           type="button"
           onClick={() => void askRemove(openField, address ? 'Address' : 'Phone', false)}
@@ -481,7 +551,7 @@ function CategoryEditorScreen({
       if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
       else {
         removeField(i)
-        history.back()
+        void screens.back()
       }
     }
     screen = (
@@ -495,7 +565,7 @@ function CategoryEditorScreen({
         onKosherQuestions={(on) => toggleFieldCaveat(i, on)}
         partner={partnerRule(field) ? { on: !!partnerOf(draft.fields, field), onChange: (on) => togglePartner(i, on) } : undefined}
         onRemove={removeIt}
-        onBack={() => history.back()}
+        onBack={() => void screens.back()}
         more={
           superAdmin ? (
             <FieldEditor
@@ -528,7 +598,7 @@ function CategoryEditorScreen({
               onMove={(dir) => {
                 moveField(i, dir)
                 setOpenField(i + dir)
-                history.replaceState({ ...(window.history.state ?? {}), editorField: i + dir }, '')
+                void screens.replace({ field: field.key || `#${i + dir}` })
               }}
               hasCaveat={!!field.caveat}
               onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
@@ -544,7 +614,7 @@ function CategoryEditorScreen({
         {/* On a phone the page beside has no room: Preview opens it full
             size (board 21b). */}
         {!wide && (
-          <AdminPreviewButton onClick={() => openPreview()} />
+          <AdminPreviewButton onClick={openPreview} />
         )}
         <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
           {/* A phone: "On the site" over the count, the switch on the right
@@ -704,7 +774,7 @@ function CategoryEditorScreen({
           onOrder={(keys) => set('fields', reorderLine(pageFields, keys).map((f) => draftFieldByKey.get(f.key)!))}
           onShow={(line) => {
             setShowLine(line)
-            history.pushState({ ...(window.history.state ?? {}), editorLine: line }, '')
+            go({ line })
             window.scrollTo?.(0, 0)
           }}
         />

@@ -3,6 +3,7 @@ import { Figtree } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorker from '@/components/ServiceWorker'
+import BackGuardFirst from '@/components/BackGuardFirst'
 import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { iconVersion, SITE_SETTINGS_DEFAULTS, shareDescription } from '@/lib/siteSettings'
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Analytics />
         <SpeedInsights />
         <ServiceWorker />
+        <BackGuardFirst />
       </body>
     </html>
   )

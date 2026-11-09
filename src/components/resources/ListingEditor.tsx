@@ -124,7 +124,7 @@ type Props = {
   allSections?: boolean
   /** Values to put in as if typed, each new object once: Use Google's. */
   patch?: Record<string, unknown>
-  /** The row with this field opens first: the category editor's preview
+  /** The row with this field (or 'address', 'phone') opens first: the category editor's preview
    *  beside a field, showing what people adding a place will be asked
    *  (the user, Nov 7: a "+ Denomination" link didn't show it). */
   startOpen?: string
@@ -331,7 +331,11 @@ export default function ListingEditor({
   // Once, on the first render that has its row.
   const [startTaken, setStartTaken] = useState(false)
   if (startOpen && !startTaken) {
-    const first = rows.find((r) => r.fields.some((f) => f.key === startOpen))
+    // The address or phone: its own row, or the contact row it's part of.
+    const first =
+      rows.find((r) => r.fields.some((f) => f.key === startOpen)) ??
+      rows.find((r) => r.part === startOpen) ??
+      (startOpen === 'address' || startOpen === 'phone' ? rows.find((r) => r.kind === 'contact' && !r.part) : undefined)
     if (first) {
       setStartTaken(true)
       setOpenId(first.id)

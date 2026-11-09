@@ -4,6 +4,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import FieldScreen from './FieldScreen'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import type { CategoryField } from '@/lib/categories'
 
 const foodType: CategoryField = {
@@ -123,18 +124,22 @@ describe('FieldScreen — a ready-made field', () => {
     expect(saved().minyanOff).toBeUndefined()
   })
 
-  // The user, Nov 9: say which watches can keep a field up to date.
-  it('says what can keep it up to date', () => {
-    render(<Screen field={{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }} />)
-    // Part of the paragraph, its start in bold.
-    const lead = within(box('What this is')).getByText('Kept up to date by')
-    expect(lead.tagName).toBe('STRONG')
-    expect(lead.closest('p')).toHaveTextContent(/Which hechsher.*Kept up to date by Keystone-K’s list, Mekor Habracha’s list and KCL’s list\.$/)
+  // The user, Nov 9: say which watches can keep a field up to date, on a
+  // line of its own, explicitly, with a way to learn what a watch is.
+  it('says what keeps it up to date on a line of its own, and links to How watches work', () => {
+    renderWithProviders(<Screen field={{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }} />)
+    const line = within(box('What this is')).getByTestId('watched')
+    expect(within(line).getByText('Watched:').tagName).toBe('STRONG')
+    expect(line).toHaveTextContent(/^Watched: Keystone-K’s, Mekor Habracha’s and KCL’s lists are read every night\. How watches work$/)
+    expect(within(line).getByRole('link', { name: 'How watches work' })).toHaveAttribute('href', '/test-community/admin/watches/about')
+    // Not run into what the field is.
+    expect(line.previousElementSibling).toHaveTextContent(/^Which hechsher/)
   })
 
   it('says nothing of watches for a field none can keep', () => {
-    render(<Screen field={{ key: 'size', label: 'Size', type: 'select', options: [] }} />)
-    expect(screen.queryByText('Kept up to date by')).toBeNull()
+    renderWithProviders(<Screen field={{ key: 'size', label: 'Size', type: 'select', options: [] }} />)
+    expect(screen.queryByTestId('watched')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'How watches work' })).toBeNull()
   })
 
   // The user, Nov 9: the certificate's link comes with Kosher Certification.

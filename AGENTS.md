@@ -14,6 +14,32 @@ redesign work, and update it in the same commit as anything that changes it.
 
 Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. `/admin` (no community segment, `?devToken=` works there too) is a different, standalone page — the superadmin console (`src/app/admin/page.tsx`), gated by the global `SUPERADMIN_EMAILS` list rather than any one community's `admin_email` — for cross-community actions like creating a new community. It no longer redirects to `/philly/admin`.
 
+# A screen of its own is an entry in the browser's history
+
+Anything an admin (or a visitor) would call "a new page" has to be one to
+the browser: its own address, so Back, Forward and a reload land on it. A
+screen that is only React state looks fine when clicked through and breaks
+the moment someone uses the browser's own buttons, and the user has hit
+that in more than one place (Nov 9: "I feel like that issue keeps
+happening in other contexts").
+
+- Put the screen in the address (a path, or a query parameter as
+  `src/lib/editorScreenUrl.ts` does), read it on mount and on `popstate`.
+- Write it through Next's router (`router.push`/`replace`), never
+  `history.pushState`. An entry written behind the router's back carries
+  the router's copy of the page before it, and after a reload, Back to it
+  from another page changes the address and draws nothing.
+- `router.push` writes the entry only once its navigation lands, and
+  drops one a quicker click overtakes. Queue the moves
+  (`src/components/admin/useScreenHistory.ts`).
+- A `popstate` listener added in an effect runs after Next's, capture or
+  not: Chrome runs window listeners in the order they were added, and the
+  router adds its own in an effect that runs after every effect beneath
+  it. Only module code gets in first (`src/lib/backGuard.ts`, loaded from
+  the root layout). jsdom runs capture listeners first, so a unit test
+  can't show this; prove it in a real browser
+  (`e2e-admin-write/editor-screens.spec.ts`).
+
 # Never write to production without being told to, every time
 
 `.env.local` carries `PROD_SUPABASE_URL` and `PROD_SUPABASE_SERVICE_ROLE_KEY`

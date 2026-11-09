@@ -130,45 +130,41 @@ function kindHow(f: CategoryField): string {
   }
 }
 
-// What can keep a field up to date (the user, Nov 9: an admin should know
-// which fields a watch can look after). The same jobs Add a place names for
-// each row (src/components/admin/addSources.ts); whether one runs for a page
-// is that page's setup on Watches.
-// Each says what it needs, so an admin can tell what to do (the user,
-// Nov 9: "how do I enable that?"). The jobs are on for every community
-// unless turned off on Watches; what a place needs is set in Places.
-type Source = { who: string; when?: string }
-const GOOGLE: Source = { who: 'Google', when: 'for places found on Google' }
-const LINK_CHECK: Source = { who: 'a weekly check that the link still works' }
-const SITE: Source = { who: 'the place’s website', when: 'once its page is added in Places' }
-const LISTS: Source[] = [{ who: 'Keystone-K’s list' }, { who: 'Mekor Habracha’s list' }]
-const WATCHED: Record<string, Source[]> = {
-  'select:kosher certification': [...LISTS, { who: 'KCL’s list' }],
-  'url:kosher certification url': [...LISTS, LINK_CHECK],
-  'tags:main dishes': [{ who: 'its menu', when: 'once its menu link is added in Places' }],
+// What keeps a field up to date, and how often (the user, Nov 9: an admin
+// should know which fields a watch can look after, and it should be
+// "pretty explicit on what it is"). The same jobs Add a place names for
+// each row (src/components/admin/addSources.ts), at their real schedules
+// (NIGHTLY_JOBS in jobRuns.ts): Google every night, each place's details
+// about once a week; the watches every night; the link check on Sundays.
+// Each says what a place needs for it (Nov 9: "how do I enable that?").
+// The jobs are on for every community unless turned off on Watches; what a
+// place needs is set in Places. What a watch is, is the Watches page's
+// How watches work (WatchesAbout.tsx), which the field's line links to.
+const GOOGLE = 'Google updates it about once a week, for places found on Google.'
+const LINK_CHECK = 'A check every Sunday makes sure the link still works.'
+const SITE = 'The place’s website is read every night, once its page is added in Places.'
+const WATCHED: Record<string, string[]> = {
+  'select:kosher certification': ['Keystone-K’s, Mekor Habracha’s and KCL’s lists are read every night.'],
+  'url:kosher certification url': ['Keystone-K’s and Mekor Habracha’s lists are read every night. For any other certificate, a check every Sunday makes sure the link still works.'],
+  'tags:main dishes': ['Its menu is read every night, once its menu link is added in Places.'],
   'tel:phone': [GOOGLE],
-  'url:website': [GOOGLE, LINK_CHECK],
+  // A website typed in, nothing else reads: the link check opens it.
+  'url:website': [GOOGLE, 'For places not on Google, a check every Sunday makes sure the link still works.'],
 }
 
-function sources(f: CategoryField): Source[] | undefined {
+function sources(f: CategoryField): string[] | undefined {
   const written = WATCHED[idOf(f)]
   if (written) return written
   if (f.type === 'hours') return [GOOGLE, SITE]
-  if (f.type === 'minyanim') return [SITE, { who: 'the shul’s emails', when: 'once they’re signed up for in Places' }]
-  if (f.type === 'contacts') return [{ who: 'Refuah', when: 'for hospitals on Refuah' }]
+  if (f.type === 'minyanim') return ['The shul’s website is read every night, once its page is added in Places.', 'Its emails are read as they come in, once they’re signed up for in Places.']
+  if (f.type === 'contacts') return ['Refuah’s page is read every night, for hospitals on Refuah.']
   if (f.type === 'url') return [LINK_CHECK]
   return undefined
 }
 
-/** “Google, for places found on Google, and by the place’s website, once
- *  its page is added in Places.” A source with a when gets its own “by”,
- *  so the whens don't run together. */
+/** Whole sentences: who reads it, how often, and what a place needs. */
 function watchedBy(f: CategoryField): string | undefined {
-  const list = sources(f)
-  if (!list?.length) return undefined
-  const words = list.map((x) => (x.when ? `${x.who}, ${x.when}` : x.who))
-  const joint = list.some((x) => x.when) ? ', and by ' : ' and '
-  return `${words.length < 2 ? words[0] : `${words.slice(0, -1).join(', ')}${joint}${words.at(-1)}`}.`
+  return sources(f)?.join(' ')
 }
 
 /** The choices a page starts with: its own (added here) are the page's. */

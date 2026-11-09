@@ -812,10 +812,43 @@ after the deploy, dry run first, and needs its own go-ahead.
     (src/components/admin/ChoiceList.tsx, shared by both).
   - "What this is" has less in it (the user, Nov 9: "seems like a lot
     going on"): only Choices are chips, and only when locked. Comes with
-    and Kept up to date by are sentences at the end of the paragraph, with
-    "Kept up to date by" in bold (the user's idea): "Kept up to date by
-    Google, for places found on Google, and by the place's website, once
-    its page is added in Places."
+    is a sentence at the end of the paragraph.
+  - BUILT Nov 9, later (the user: "something that's pretty explicit on
+    what it is", and a way to learn what a watch is): what keeps a field
+    up to date is a line of its own under the paragraph, "Watched:" in
+    bold, each source a sentence with how often it really runs: "Google
+    updates it about once a week, for places found on Google. For places
+    not on Google, a check every Sunday makes sure the link still works."
+    Websites, menus, the kosher lists and Refuah say "every night", shul
+    emails "as they come in". It ends in a link, How watches work: a
+    screen of its own under Watches (`/[community]/admin/watches/about`,
+    WatchesAbout.tsx), also linked from the top of Watches. It says what a
+    watch is in a sentence, what each reads and when (Google straight onto
+    the listing unless a field was typed in by hand; the rest wait on To
+    do; an eruv's up or down goes live), and what's left to the admin
+    (sources in Places, yes or no on To do, a job off on its page). A
+    test ties its "every night" and "every Sunday" to the jobs' schedules.
+    Recommended rather than a tooltip: a tooltip can't be opened on a
+    phone, and a screen of its own keeps Back working. Not a walkthrough:
+    one short screen, per "less reading".
+- BUILT Nov 9, later (the user: "these add a field pages seem to not
+  register as a new page so back and forward in the browser doesn't work
+  well"): a category page's screens are in the address and the browser's
+  history: a field (`?field=`), Add a field's list, a field looked at and
+  Make your own (`?add=`), a card line's picker (`?line=`), the preview
+  full size (`&preview=1`) and a Remove step (`&remove=1`). Back, Forward
+  and a reload land on each; a reload on a Remove step counts the places
+  again. Written through Next's router (useScreenHistory.ts), one move at
+  a time, never history.pushState, which after a reload left Back from
+  another tab changing the address without drawing the page. The leave
+  guard ("Leave without saving?") moved to src/lib/backGuard.ts, loaded
+  from the root layout so its Back listener comes before the router's:
+  added in an effect it came after, and Back out of a page with unsaved
+  changes left without asking, unless the page had been loaded directly.
+  Proved in a real browser by e2e-admin-write/editor-screens.spec.ts.
+  Not done: the other admin screens that keep their own history depth
+  (a place's listing, To do's change and broken screens, an eruv, change
+  review) still use the old way.
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
@@ -831,7 +864,11 @@ after the deploy, dry run first, and needs its own go-ahead.
   field's row, so it shows what people adding a place fill in. Full size
   keeps the same copy, the field included, still open on it. That row is
   not an entry in the browser's history, so Back goes back to the field
-  screen rather than closing it. A still picture was not needed.
+  screen rather than closing it. A still picture was not needed. Nov 9,
+  later (the user: "when you click on the adding screen the field isn't
+  there"): Adding opened on the first field, and a new field not named
+  yet wasn't found at all. It now opens on the field the screen is on,
+  including one just made (previewFocus.ts), beside and full size.
 - Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
   field's box on the listing keeps its name. Delivery, What isn't kosher,
   Main dishes, a list of contacts and a mikvah's section have no Rename

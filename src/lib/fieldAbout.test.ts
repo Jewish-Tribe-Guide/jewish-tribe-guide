@@ -81,18 +81,22 @@ describe('fieldAbout', () => {
 })
 
 describe('what keeps a field up to date', () => {
-  // The user, Nov 9: "how do I enable that?" Each source says what a place
-  // needs for it, in plain words, never a job's own name.
+  // The user, Nov 9: "how do I enable that?", and then: say it explicitly,
+  // how often. Each source is a sentence: who reads it, when, and what a
+  // place needs for it, never a job's own name.
   const by = (f: CategoryField) => fieldAbout(f).watchedBy
-  it('says what each source needs, as the rest of one sentence', () => {
-    expect(by({ key: 'hours', label: 'Hours', type: 'hours' })).toBe('Google, for places found on Google, and by the place’s website, once its page is added in Places.')
-    expect(by({ key: 'minyanim', label: 'Davening Times', type: 'minyanim' })).toBe('the place’s website, once its page is added in Places, and by the shul’s emails, once they’re signed up for in Places.')
-    expect(by({ key: 'dishes', label: 'Main dishes', type: 'tags' })).toBe('its menu, once its menu link is added in Places.')
-    expect(by({ key: 'menu', label: 'Menu', type: 'url' })).toBe('a weekly check that the link still works.')
-    expect(by({ key: 'site', label: 'Website', type: 'url' })).toBe('Google, for places found on Google, and by a weekly check that the link still works.')
+  it('says who reads it, how often, and what a place needs', () => {
+    expect(by({ key: 'hours', label: 'Hours', type: 'hours' })).toBe('Google updates it about once a week, for places found on Google. The place’s website is read every night, once its page is added in Places.')
+    expect(by({ key: 'minyanim', label: 'Davening Times', type: 'minyanim' })).toBe('The shul’s website is read every night, once its page is added in Places. Its emails are read as they come in, once they’re signed up for in Places.')
+    expect(by({ key: 'dishes', label: 'Main dishes', type: 'tags' })).toBe('Its menu is read every night, once its menu link is added in Places.')
+    expect(by({ key: 'menu', label: 'Menu', type: 'url' })).toBe('A check every Sunday makes sure the link still works.')
+    expect(by({ key: 'phone', label: 'Phone', type: 'tel' })).toBe('Google updates it about once a week, for places found on Google.')
+  })
+  it('says the link check is for a website Google doesn’t give', () => {
+    expect(by({ key: 'site', label: 'Website', type: 'url' })).toBe('Google updates it about once a week, for places found on Google. For places not on Google, a check every Sunday makes sure the link still works.')
   })
   it('names the kosher lists as lists', () => {
-    expect(by({ key: 'k', label: 'Kosher Certification', type: 'select' })).toBe('Keystone-K’s list, Mekor Habracha’s list and KCL’s list.')
+    expect(by({ key: 'k', label: 'Kosher Certification', type: 'select' })).toBe('Keystone-K’s, Mekor Habracha’s and KCL’s lists are read every night.')
   })
   it('says nothing for a field nothing keeps', () => {
     expect(by({ key: 'size', label: 'Size', type: 'select' })).toBeUndefined()

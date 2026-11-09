@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { CategoryEditor } from './CategoryEditor'
 import { forgetReadyMade } from './useReadyMade'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { mockRouter } from '@/test/nextNavigationMock'
+import { historyRouter } from '@/test/nextNavigationMock'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { fetchJson } from '@/lib/fetchJson'
 import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -31,7 +31,7 @@ vi.mock('./CategoryPreview', () => ({
   ),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
+  useRouter: () => historyRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -81,8 +81,9 @@ afterEach(() => {
   vi.clearAllMocks()
   vi.unstubAllGlobals()
   forgetReadyMade()
-  // A screen's history entry left by one test isn't the next one's page.
-  history.replaceState(null, '')
+  // A screen's history entry, and its address, left by one test isn't the
+  // next one's page.
+  history.replaceState(null, '', '/')
 })
 
 describe('CategoryEditor — new category', () => {
@@ -1225,5 +1226,49 @@ describe('CategoryEditor — a hechsher’s kosher questions', () => {
       forgetReadyMade()
       vi.mocked(fetchJson).mockClear()
     }
+  })
+})
+
+// Each screen has its own address, so a reload or a Back from another tab
+// lands on it (the user, Nov 9: "these add a field pages seem to not
+// register as a new page"). The browser's own ordering is proved in
+// e2e-admin-write/editor-screens.spec.ts; this is what the editor reads.
+describe('CategoryEditor — the screen is in the address', () => {
+  const kosher = baseCategory({ detailFields: [{ key: 'kosher', label: 'Kosher certification', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'OU', label: 'OU' }] }] })
+  const open = (search: string) => {
+    history.replaceState(null, '', `/philly/admin/categories/cat:grocery${search}`)
+    renderWithProviders(<CategoryEditor token="t" initial={kosher} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+  }
+
+  it('opens on the field, Add a field or the preview its address names', async () => {
+    open('?field=kosher')
+    expect(screen.getByRole('heading', { name: /^Kosher certification/ })).toBeInTheDocument()
+    cleanup()
+    open('?add=list')
+    expect(await screen.findByRole('searchbox', { name: 'Search fields' })).toBeInTheDocument()
+    cleanup()
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    open('?field=kosher&preview=1')
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'kosher')
+  })
+
+  it('writes each screen it opens into the address, and Back goes by it', async () => {
+    const user = userEvent.setup()
+    open('')
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: /^Kosher certification/ }))
+    await waitFor(() => expect(location.search).toBe('?field=kosher'))
+    history.back()
+    expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+    expect(location.search).toBe('')
+    history.forward()
+    expect(await screen.findByRole('heading', { name: /^Kosher certification/ })).toBeInTheDocument()
+  })
+
+  it('reloaded on a Remove step, counts again and shows it', async () => {
+    vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: { kosher: 12 } } })
+    open('?field=kosher&remove=1')
+    expect(await screen.findByRole('heading', { name: 'Remove Kosher certification from Groceries?' })).toBeInTheDocument()
+    expect(screen.getByText('12 places').parentElement).toHaveTextContent('12 places lose their answer')
   })
 })
