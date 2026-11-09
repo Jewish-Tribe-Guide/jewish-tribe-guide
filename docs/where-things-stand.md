@@ -334,10 +334,9 @@ own screen keeps the Page / A listing / Adding preview. Not as drawn, from
 the site's own rules: the listing's facts are a line ("Meat · IKC"), not
 pills; Delivery Details is in its Delivery box, and Hours in Contact; the
 row before the field when adding follows the add form's order (Type comes
-before Food Type). The add form's picked choice is light blue with blue
-text (ListingEditor's ChoiceButtons), not the filter's filled blue; the
-user asked for the filter's blue on the board, and the site's own add form
-wasn't changed. Hours, minyanim, contacts and a photo show their answer as
+before Food Type). The add form's picked choice is now the filter's filled
+blue with a tick (ListingEditor's ChoiceButtons, the user's OK, Nov 9), on
+the site's own add form too. Hours, minyanim, contacts and a photo show their answer as
 a line when adding, not their full editor. Phone not built (nothing beside
 a field there).
 

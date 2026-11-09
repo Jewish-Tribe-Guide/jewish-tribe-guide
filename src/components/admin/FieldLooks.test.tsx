@@ -42,7 +42,13 @@ describe('FieldLooks: a field, how it looks (boards 33c and 34)', () => {
     expect(within(panel('In Filters')).getByRole('button', { name: 'Dairy' })).toHaveAttribute('aria-pressed', 'false')
     const adding = within(panel('When adding')).getByRole('button', { name: 'Meat' })
     expect(adding).toHaveAttribute('aria-pressed', 'true')
-    expect(adding.className).toContain('text-primary')
+    // The add form's own picked choice, the same filled blue with a tick.
+    for (const picked of [meat, adding]) {
+      expect(picked.className).toMatch(/(^| )bg-primary( |$)/)
+      expect(picked.className).toContain('text-white')
+      expect(picked.querySelector('svg path')).toHaveAttribute('d', 'M20 6 9 17l-5-5')
+    }
+    expect(within(panel('When adding')).getByRole('button', { name: 'Dairy' }).className).not.toMatch(/(^| )bg-primary( |$)/)
   })
 
   it('has no Filters while it isn’t in the filter, and no adding where visitors can’t add', () => {

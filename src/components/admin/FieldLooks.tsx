@@ -199,7 +199,7 @@ function Adding({ category, field, item }: { category: CategoryConfig; field: Ca
   return (
     <Panel title="When adding">
       <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
-        <span className="font-semibold">{before.label}</span>
+        <span className="shrink-0 font-semibold">{before.label}</span>
         <span className="truncate">{before.text || 'Add'}</span>
       </div>
       <div className={`${OUTLINE} mt-2 p-2.5`}>

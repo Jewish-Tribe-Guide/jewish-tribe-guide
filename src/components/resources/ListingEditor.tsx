@@ -238,8 +238,16 @@ export function ChoiceButtons({ field, value, onChange, labelHidden = false }: {
               type="button"
               aria-pressed={on}
               onClick={() => pick(o.value)}
-              className={`h-10 cursor-pointer rounded-full border-[1.5px] px-4 text-[14.5px] font-bold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`}
+              // Picked, filled blue with a tick, as a picked filter is
+              // (FilterChip; the user, Nov 9: "align that with blue of
+              // filter select").
+              className={`flex h-10 cursor-pointer items-center gap-1 rounded-full border-[1.5px] text-[14.5px] font-bold ${on ? 'border-primary bg-primary pl-3 pr-4 text-white' : 'border-slate-300 bg-white px-4 text-slate-600'}`}
             >
+              {on && (
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              )}
               {o.label}
             </button>
           )
