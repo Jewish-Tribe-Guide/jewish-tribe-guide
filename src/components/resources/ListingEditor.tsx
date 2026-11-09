@@ -748,6 +748,7 @@ export default function ListingEditor({
           writing={minyanWriting}
           dayChoices={weekPostDays(week)}
           onStep={stepFor[f.key]}
+          off={f.minyanOff}
           onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { id: crypto.randomUUID(), now: new Date().toISOString() }))}
           send={() => null}
         />
@@ -766,6 +767,7 @@ export default function ListingEditor({
           nameShown={!!hosted}
           writing={minyanWriting}
           onStep={stepFor[f.key]}
+          off={f.minyanOff}
           onChange={(list) => setDetail(f.key, mergeMinyanimBox(all, r.box!, list))}
           send={() => null}
         />

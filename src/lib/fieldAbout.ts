@@ -1,4 +1,5 @@
 import { pickableOptions, type CategoryField, type FieldType } from './categories'
+import { partnerRule } from './fieldPartners'
 
 // What a ready-made field is, in a few plain sentences: the first box on its
 // screen, before adding it and after (canvas row "Each kind of field", Nov 7).
@@ -17,6 +18,8 @@ export type FieldAbout = {
   choices?: string[]
   /** The parts it comes with (Davening times). */
   comesWith?: string[]
+  /** The watches that can keep it up to date, when any can. */
+  watchedBy?: string[]
 }
 
 const norm = (s: string) => s.trim().toLowerCase()
@@ -36,6 +39,17 @@ const WRITTEN: Record<string, string> = {
   'select:food type': 'Whether a place is meat, dairy or parve. People adding a place pick one. Rows show it under the name.',
   'text:address': 'Where the place is. People adding a place type the address. It puts the place on the map, and the listing shows Directions.',
   'tel:phone': 'The place’s phone number. People adding a place type it. The listing shows a Call button.',
+  // The user, Nov 9: what these are, in their words or close to them.
+  'select:kosher store': 'Whether a store is fully kosher, or isn’t but carries some kosher items. Mostly for grocery stores. People adding a store pick one. Rows show it under the name.',
+  'select:services': 'What kind of care a place gives: early childhood, or after school. People adding a place pick one. Rows show it under the name.',
+  'select:size': 'How big a sukkah is: small, medium or large. People adding a sukkah pick one. Rows show it under the name.',
+  'select:store type': 'What kind of food place it is: a restaurant, a bakery, ice cream, catering or a food truck. Scheduled Deliveries is a place from out of town that brings group orders in. People adding a place pick any that fit. Rows show it under the name.',
+  'boolean:keilim': 'Whether a mikvah has a keilim mikvah, for toveling dishes and utensils. People adding a mikvah answer Yes or No. A mikvah marked Yes shows it on its row and listing.',
+  "boolean:men's tevillah": 'Whether men can use the mikvah. People adding a mikvah answer Yes or No. A mikvah marked Yes shows it on its row and listing.',
+  "boolean:women's tevillah": 'Whether women can use the mikvah for tevillah. People adding a mikvah answer Yes or No. A mikvah marked Yes shows it on its row and listing, with its own section for the women’s hours, phone and email.',
+  'text:email': 'The place’s email address. People adding a place type it in. The listing shows it.',
+  'text:short description': 'A few words about a place, shown under its name on its row. People adding a place write it in, up to 27 letters.',
+  'text:women’s email': 'The email for a mikvah’s women’s side, for appointments and questions. People adding a mikvah type it in. The listing shows it in the women’s section.',
   'url:website': 'The place’s own website. People adding a place paste the address. The listing shows a button that opens it.',
 }
 
@@ -108,21 +122,50 @@ function kindHow(f: CategoryField): string {
   }
 }
 
+// What can keep a field up to date (the user, Nov 9: an admin should know
+// which fields a watch can look after). The same jobs Add a place names for
+// each row (src/components/admin/addSources.ts); whether one runs for a page
+// is that page's setup on Watches.
+const LINK_CHECK = 'Link check'
+const WATCHED: Record<string, string[]> = {
+  'select:kosher certification': ['Keystone-K', 'Mekor Habracha', 'KCL'],
+  'url:kosher certification url': ['Keystone-K', 'Mekor Habracha', LINK_CHECK],
+  'tags:main dishes': ['Its menu'],
+  'tel:phone': ['Google'],
+  'url:website': ['Google', LINK_CHECK],
+}
+
+function watchedBy(f: CategoryField): string[] | undefined {
+  const written = WATCHED[idOf(f)]
+  if (written) return written
+  if (f.type === 'hours') return ['Google', 'Its website']
+  if (f.type === 'minyanim') return ['Its website', 'Its emails']
+  if (f.type === 'contacts') return ['Refuah']
+  if (f.type === 'url') return [LINK_CHECK]
+  return undefined
+}
+
 /** The choices a page starts with: its own (added here) are the page's. */
 export function fixedChoices(f: CategoryField): string[] {
   return pickableOptions(f).filter((o) => !o.own).map((o) => o.label)
 }
 
-export function fieldAbout(f: CategoryField): FieldAbout {
+/** `partnerOn`: the field that comes with it (fieldPartners.ts) is on. */
+export function fieldAbout(f: CategoryField, { partnerOn = false }: { partnerOn?: boolean } = {}): FieldAbout {
   const about = WRITTEN[idOf(f)] ?? WRITTEN_BY_SETTINGS[idOf(f)]?.(f) ?? `${KIND_LEAD[f.type]} ${kindHow(f)}`
-  if (f.type === 'select') {
-    // A hechsher comes with whether everything there is kosher, and if not,
-    // what isn't: two questions the listing shows as one box of its own.
-    const comesWith = f.caveat ? ['Everything here is kosher?', f.caveat.title?.trim() || 'What isn’t kosher'] : undefined
-    return { about, choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])], ...(comesWith && { comesWith }) }
+  const watched = watchedBy(f)
+  const partner = partnerOn ? partnerRule(f)?.name : undefined
+  // A hechsher comes with whether everything there is kosher, and if not,
+  // what isn't: two questions the listing shows as one box of its own.
+  const caveat = f.type === 'select' && f.caveat ? ['Everything here is kosher?', f.caveat.title?.trim() || 'What isn’t kosher'] : []
+  const parts = f.type === 'minyanim' ? ['Usual weekday times', 'Usual Shabbos times', 'This week’s schedule'] : []
+  const comesWith = [...parts, ...caveat, ...(partner ? [partner] : [])]
+  return {
+    about,
+    ...(f.type === 'select' && { choices: [...fixedChoices(f), ...(f.allowOther ? ['Other, typed in'] : [])] }),
+    ...(comesWith.length && { comesWith }),
+    ...(watched && { watchedBy: watched }),
   }
-  if (f.type === 'minyanim') return { about, comesWith: ['Usual weekday times', 'Usual Shabbos times', 'This week’s schedule'] }
-  return { about }
 }
 
 /** A page's basics (Address, Phone, Hours, Website) aren't fields of their

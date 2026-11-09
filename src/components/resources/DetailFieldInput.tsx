@@ -203,7 +203,7 @@ export function DetailFieldInput({
   if (field.type === 'minyanim') {
     return (
       <>
-        <MinyanimInput label={label} value={value} onChange={onChange} />
+        <MinyanimInput label={label} value={value} onChange={onChange} noSeason={field.minyanOff?.includes('season')} />
         {onChangeSchedules && <SchedulesInput value={schedules} onChange={onChangeSchedules} />}
       </>
     )

@@ -104,6 +104,17 @@ describe('readyMadeFields', () => {
     expect(kosher.companions?.map((f) => f.key)).toEqual(['kosherPartial', 'kosherNote'])
   })
 
+  // The certificate link comes with its field (the user, Nov 9), not as a
+  // row of its own.
+  it('offers a partner with its field, not on its own', () => {
+    const link: CategoryField = { key: 'k', label: 'Kosher Certification URL', type: 'url', linkLabel: 'Certification' }
+    const withLink = { community: 'dc', category: { ...food, detailFields: [...food.detailFields, link] } }
+    const rows = readyMadeFields([withLink], bare)
+    expect(rows.map((r) => r.label)).not.toContain('Kosher Certification URL')
+    expect(rows.find((r) => r.label === 'Kosher Certification')!.partner).toMatchObject({ key: 'k', type: 'url' })
+    expect(readyMadeFields(everywhere, bare).find((r) => r.label === 'Kosher Certification')!.partner).toBeFalsy()
+  })
+
   it('names up to three pages on a field’s line', () => {
     const page = (n: string) => ({ community: 'dc', category: makeCategory({ id: n, pluralLabel: n, detailFields: [{ key: 'd', label: 'Description', type: 'textarea' }] }) })
     expect(readyMadeFields(['A', 'B', 'C', 'D', 'E'].map(page), bare).find((r) => r.label === 'Description')!.line).toBe('A, B, C and 2 more · text')

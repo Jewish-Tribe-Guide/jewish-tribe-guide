@@ -19,6 +19,7 @@ import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview, { type PreviewView } from './CategoryPreview'
 import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
+import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import { useIsSuperAdmin } from './AdminAuthGate'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
@@ -161,6 +162,7 @@ function CategoryEditorScreen({
     toggleHoursField,
     toggleWebsiteField,
     toggleFieldCaveat,
+    togglePartner,
     moveField,
   } = useCategoryFieldEditing(initial, seed)
 
@@ -438,7 +440,7 @@ function CategoryEditorScreen({
           } else if (row.basic === 'phone') set('hasPhone', true)
           else if (row.basic === 'hours') toggleHoursField(true)
           else if (row.basic === 'website') toggleWebsiteField(true)
-          else if (row.field) addReadyField(row.field, row.companions, addingTo)
+          else if (row.field) addReadyField(row.field, row.companions, addingTo, row.partner)
           added(null)
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
@@ -486,6 +488,7 @@ function CategoryEditorScreen({
         canRequire={draft.capabilities.add || draft.capabilities.edit}
         onChange={(patch) => updateField(i, patch)}
         onKosherQuestions={(on) => toggleFieldCaveat(i, on)}
+        partner={partnerRule(field) ? { on: !!partnerOf(draft.fields, field), onChange: (on) => togglePartner(i, on) } : undefined}
         onRemove={removeIt}
         onBack={() => history.back()}
         more={

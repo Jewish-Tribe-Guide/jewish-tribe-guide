@@ -751,28 +751,50 @@ after the deploy, dry run first, and needs its own go-ahead.
     (src/data/categories.js, categoryTemplates.ts). Only dev's Riverton test
     page had it, nothing filled in. Removed there Nov 8 (dev only). Live's
     Cemetery has a different "Type" (Cemetery / Funeral Home), all 5 places
-    use it: it stays. The starter Food page still carries the old Type and
-    Dietary options; not changed.
-  - "Dietary options": also from the starter Food page. A list typed in per
-    place (Vegan, Gluten-free), shown as badges. Only Riverton has it,
-    nothing filled; Philly's Food doesn't. Recommended: remove it too.
-    Waiting on the user.
-  - Recommended, waiting on the user (the user's ideas, Nov 8):
-    - Each field's "What this is" says what keeps it up to date, read from
-      the same rules Add a place uses (src/components/admin/addSources.ts):
-      Name, Phone, Website and Hours from Google; Hours or Davening times
-      from the place's page or emails; Main dishes from its menu; Kosher
-      Certification from Keystone-K and the kosher lists; a hospital's
-      contacts from Refuah; any link by the Sunday link check. The user is
-      also rewriting the paragraphs.
-    - Kosher Certification URL comes with Kosher Certification, with a
-      switch for whether to ask for it (live: 73 of 82 Food places have
-      one). Same shape as the kosher questions switch.
-    - Delivery WhatsApp Group comes with Delivery Details, with a switch
-      (live: 5 places have a group, 6 have delivery details).
-    - Davening times: switches for sign-up minyanim, a join-from-home link
-      and summer/winter only. Days, times and zman times stay. The user is
-      looking for more like these.
+    use it: it stays. The starter Food page still carries the old Type; not
+    changed.
+  - Dietary options: removed Nov 9 (the user). Off the starter Food page
+    (src/data/categories.js, categoryTemplates.ts) and dev's Riverton Food.
+  - Kosher Certification: no "Other Kosher" choice where Other is typed in
+    (the user, Nov 9). `pickableOptions` drops any choice starting "Other"
+    once allowOther is on, so it's never offered twice.
+    `scripts/kosher-cert-no-other.mjs` takes it out of the stored choices:
+    applied on dev. Live dry run: philly Food drops "Other Kosher", no live
+    place picked it. **Live waits on the user's go-ahead.** Note:
+    mekorWatch's `certsIn` still writes "Other Kosher" for a supervisor it
+    doesn't know; it shows as typed-in text, so it's left as is.
+  - Paragraphs written Nov 9 from the user's notes (fieldAbout's WRITTEN):
+    Kosher Store, Services, Size, Store Type, Keilim, Men's and Women's
+    tevillah, Email, Short description (shows under the name on its row),
+    Women's email (the mikvah's women's side).
+  - BUILT Nov 9 (the user: "I like your recommendations in general"):
+    - Each ready-made field's "What this is" lists "Can be kept up to date
+      by": Kosher Certification by Keystone-K, Mekor Habracha and KCL; its
+      URL also by the link check; Main dishes by its menu; Phone and
+      Website by Google (Website also the link check); hours by Google and
+      its website; davening times by its website and emails; a hospital's
+      contacts by Refuah; any link by the link check. Fields nothing
+      watches say nothing.
+    - Partners (src/lib/fieldPartners.ts): Kosher Certification URL comes
+      with Kosher Certification, Delivery WhatsApp Group with Delivery
+      Details. Each has a switch on its field's screen ("Link to the
+      certificate", "WhatsApp group"); on puts it right after its field,
+      off takes it off (Save still asks if places lose an answer). On the
+      Add list a partner isn't its own row; it comes with its field unless
+      switched off. Not done: the page's own field list still shows the
+      partner as a row of its own.
+    - Davening times: three switches, sign-up minyanim, join from home and
+      summer or winter only (`minyanOff` on the field). Switched off, the
+      minyan editors don't ask it, and More is gone when nothing is left
+      under it. Days, times and zman times always stay.
+  - Answered, not built (the user's questions, Nov 9):
+    - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
+      Store (fully kosher, or some kosher items). Recommended: replace it
+      with Kosher Store.
+    - Shabbat friendly (Hotel): recommended a "What makes it Shabbat
+      friendly?" note that comes with it when the answer is Yes, like the
+      kosher questions. Hotel's general Notes is separate. Waiting on the
+      user.
   - The rest of the fields: the user's, later.
 - Noted by the user, Nov 7, not for now (no changes yet): the preview beside
   a field before adding doesn't really show the new field. On Adding it's a

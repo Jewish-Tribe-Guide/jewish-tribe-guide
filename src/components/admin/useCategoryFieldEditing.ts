@@ -9,6 +9,7 @@ import {
 } from '@/lib/categories'
 import { addToBox, renameKey } from '@/lib/fieldBoxes'
 import { fieldRules } from '@/lib/fieldAbout'
+import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT, kosherQuestions } from '@/lib/kosherQuestions'
 import { listingPartsFromKey, listingPartsKey } from '@/lib/listingParts'
 import { slugify } from '@/lib/routes'
@@ -98,8 +99,9 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
 
   // A ready-made field (board 11's Add): copied as it is on its page, under
   // its own key unless this page already uses it, with its caveat's flag and
-  // note. Returns where it landed.
-  function addReadyField(field: CategoryField, companions: CategoryField[] = [], box?: string | null): number {
+  // note, and the field that comes with it when that's on. Returns where it
+  // landed.
+  function addReadyField(field: CategoryField, companions: CategoryField[] = [], box?: string | null, partner?: CategoryField | null): number {
     const used = [...draft.fields, ...draft.hiddenFields]
     const key = nextFieldKey(used, [], field.key || slugifyFieldKey(field.label))
     used.push({ key } as CategoryField)
@@ -119,8 +121,31 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
       ...(field.caveat && { caveat: { ...field.caveat, flagField: renamed.get(field.caveat.flagField) ?? field.caveat.flagField, noteField: renamed.get(field.caveat.noteField) ?? field.caveat.noteField } }),
     }
     const hidden = extra.map((c) => (c.showIf && renamed.has(c.showIf.field) ? { ...c, showIf: { ...c.showIf, field: renamed.get(c.showIf.field)! } } : c))
-    setDraft((d) => ({ ...d, fields: [...d.fields, added], hiddenFields: [...d.hiddenFields, ...hidden], listingParts: inBox(d, box, key) }))
+    const withIt = partner ? [placedPartner(partner, added, used)] : []
+    setDraft((d) => ({ ...d, fields: [...d.fields, added, ...withIt], hiddenFields: [...d.hiddenFields, ...hidden], listingParts: inBox(d, box, key) }))
     return draft.fields.length
+  }
+
+  // The field that comes with `parent`, under a key nothing on the page
+  // uses, pointing at the parent by its key here.
+  function placedPartner(partner: CategoryField, parent: CategoryField, used: Pick<CategoryField, 'key'>[]): CategoryField {
+    const key = nextFieldKey(used as CategoryField[], [], partner.key)
+    return { ...partner, key, ...(partner.leadBox && { leadBox: { ...partner.leadBox, text: parent.key } }) }
+  }
+
+  // The field that comes with field i (fieldPartners.ts), on or off: off
+  // takes it off the page; on puts it right after field i.
+  function togglePartner(i: number, on: boolean) {
+    setDraft((d) => {
+      const field = d.fields[i]
+      const rule = field && partnerRule(field)
+      if (!rule) return d
+      const has = partnerOf(d.fields, field)
+      if (!on) return has ? { ...d, fields: d.fields.filter((f) => f !== has) } : d
+      if (has) return d
+      const placed = placedPartner(rule.make(field), field, [...d.fields, ...d.hiddenFields])
+      return { ...d, fields: [...d.fields.slice(0, i + 1), placed, ...d.fields.slice(i + 1)] }
+    })
   }
 
   // Board 12's Make your own: a field of the picked kind, named as typed. One
@@ -368,6 +393,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     toggleWebsiteField,
     togglePhotoField,
     toggleFieldCaveat,
+    togglePartner,
     moveField,
     managedHoursIndex,
     managedWebsiteIndex,

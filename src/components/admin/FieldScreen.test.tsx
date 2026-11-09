@@ -89,9 +89,48 @@ describe('FieldScreen — a ready-made field', () => {
   })
 
   it('says so when a page has nothing to change', () => {
+    render(<Screen field={{ key: 'liaisons', label: 'Liaisons', type: 'contacts', renderAs: 'row' }} />)
+    expect(box('What you can change')).toHaveTextContent('Nothing. It works the same on every page.')
+  })
+
+  // The user, Nov 9: a community may not need every part of a minyan.
+  it('lets a page turn off sign-up minyanim, join from home and summer or winter only', async () => {
+    const user = userEvent.setup()
     render(<Screen field={{ key: 'minyanim', label: 'Davening Times (Minyanim)', type: 'minyanim', renderAs: 'row' }} />)
     expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent(/Usual weekday times.*Usual Shabbos times.*This week’s schedule/)
-    expect(box('What you can change')).toHaveTextContent('Nothing. It works the same on every page.')
+    const change = box('What you can change')
+    for (const name of ['Sign-up minyanim', 'Join from home', 'Summer or winter only']) expect(within(change).getByRole('switch', { name })).toHaveAttribute('aria-checked', 'true')
+    await user.click(within(change).getByRole('switch', { name: 'Sign-up minyanim' }))
+    await user.click(within(change).getByRole('switch', { name: 'Summer or winter only' }))
+    expect(saved().minyanOff).toEqual(['signUp', 'season'])
+    await user.click(within(change).getByRole('switch', { name: 'Sign-up minyanim' }))
+    await user.click(within(change).getByRole('switch', { name: 'Summer or winter only' }))
+    expect(saved().minyanOff).toBeUndefined()
+  })
+
+  // The user, Nov 9: say which watches can keep a field up to date.
+  it('says what can keep it up to date', () => {
+    render(<Screen field={{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }} />)
+    expect(within(box('What this is')).getByRole('list', { name: 'Can be kept up to date by' })).toHaveTextContent(/Keystone-K.*Mekor Habracha.*KCL/)
+  })
+
+  it('says nothing of watches for a field none can keep', () => {
+    render(<Screen field={{ key: 'size', label: 'Size', type: 'select', options: [] }} />)
+    expect(screen.queryByRole('list', { name: 'Can be kept up to date by' })).toBeNull()
+  })
+
+  // The user, Nov 9: the certificate's link comes with Kosher Certification.
+  it('has a switch for the field that comes with it, and says it comes with it', async () => {
+    const user = userEvent.setup()
+    const onPartner = vi.fn()
+    const cert: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }
+    const { rerender } = render(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} partner={{ on: true, onChange: onPartner }} />)
+    expect(within(box('What this is')).getByRole('list', { name: 'Comes with' })).toHaveTextContent('Link to the certificate')
+    await user.click(within(box('What you can change')).getByRole('switch', { name: 'Link to the certificate' }))
+    expect(onPartner).toHaveBeenCalledWith(false)
+    rerender(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} partner={{ on: false, onChange: onPartner }} />)
+    expect(within(box('What this is')).queryByRole('list', { name: 'Comes with' })).toBeNull()
+    expect(within(box('What you can change')).getByRole('switch', { name: 'Link to the certificate' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('asks a link nothing about its button: that comes with it', () => {

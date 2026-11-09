@@ -7,6 +7,7 @@ import { basicField } from '@/lib/fieldAbout'
 import { MAKE_OWN_KINDS, matchesSearch, pageMenu, readyMadeFields, type PageHas, type ReadyField } from '@/lib/readyMade'
 import { AdminBack, AdminBox, AdminMenu, AdminRow, Chevron, MakeOwnLink, SearchBox } from './AdminUI'
 import { normalizeField } from './categoryEditorLogic'
+import { partnerRule } from '@/lib/fieldPartners'
 import { FieldChanges, FieldTitle, WhatThisIs } from './FieldScreen'
 import { useReadyMade } from './useReadyMade'
 
@@ -135,16 +136,26 @@ function Look({
   const [patch, setPatch] = useState<Partial<CategoryField>>({})
   const field = row.field ? { ...row.field, ...patch } : null
   const shown = field ?? basicField(row.basic!)
+  // What comes with it is on as its page has it; turned on here, it's made.
+  const rule = field ? partnerRule(field) : undefined
+  const [partnerOn, setPartnerOn] = useState(!!row.partner)
+  const partner = rule && field ? (partnerOn ? (row.partner ?? rule.make(field)) : null) : row.partner
   return (
     <div className="flex gap-6 items-start">
       <div className="flex-1 min-w-0 flex flex-col gap-4">
         <AdminBack back={{ label: 'Add a field', onClick: onBack }} title={<FieldTitle field={shown} />} />
-        <WhatThisIs field={shown} />
-        <FieldChanges field={shown} canRequire={canRequire} fixed={!field} onChange={(p) => setPatch((was) => ({ ...was, ...p }))} />
+        <WhatThisIs field={shown} partnerOn={!!partner} />
+        <FieldChanges
+          field={shown}
+          canRequire={canRequire}
+          fixed={!field}
+          onChange={(p) => setPatch((was) => ({ ...was, ...p }))}
+          partner={rule ? { on: partnerOn, onChange: setPartnerOn } : undefined}
+        />
         {field && !besides && <Samples field={field} pageName={pageName} pageLabel={pageLabel} />}
         <button
           type="button"
-          onClick={() => onAdd(field ? { ...row, field } : row)}
+          onClick={() => onAdd(field ? { ...row, field, partner } : row)}
           className="self-start min-h-12 px-[22px] rounded-[10px] bg-primary text-white text-[15px] font-bold hover:bg-primary/90 cursor-pointer"
         >
           Add to {pageName}

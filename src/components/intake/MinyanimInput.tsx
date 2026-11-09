@@ -64,6 +64,8 @@ type Props = {
   days?: readonly MinyanDayKey[]
   /** The day a new row starts on, there. */
   newRowDays?: MinyanDayKey[]
+  /** The page doesn't ask summer or winter only (its field's minyanOff). */
+  noSeason?: boolean
 }
 
 /**
@@ -71,7 +73,7 @@ type Props = {
  * Each row: tefillah select + time text + optional notes + day-chip toggles.
  * Value is a Minyan[].
  */
-export default function MinyanimInput({ label, value, onChange, days: dayChoices = ALL_MINYAN_DAYS, newRowDays = [] }: Props) {
+export default function MinyanimInput({ label, value, onChange, days: dayChoices = ALL_MINYAN_DAYS, newRowDays = [], noSeason = false }: Props) {
   const [rows, setRows] = useState<Minyan[]>(() => initMinyanim(value))
   // The clock / zman rules, shared with SchedulesInput (ZmanTimeFields).
   const modes = useTimeModes()
@@ -217,21 +219,23 @@ export default function MinyanimInput({ label, value, onChange, days: dayChoices
                   when it doesn't currently apply. Which half of the year it is
                   gets derived from the community's timezone — nobody sets a
                   changeover date, here or in the admin (see lib/season.ts). */}
-              <select
-                value={row.season ?? ''}
-                onChange={(e) =>
-                  updateRow(row.id, { season: (e.target.value || undefined) as Season | undefined })
-                }
-                aria-label="Season"
-                className={`${inputClass} shrink-0`}
-              >
-                <option value="">All year</option>
-                {(Object.keys(SEASON_LABELS) as Season[]).map((season) => (
-                  <option key={season} value={season}>
-                    {SEASON_LABELS[season]}
-                  </option>
-                ))}
-              </select>
+              {!noSeason && (
+                <select
+                  value={row.season ?? ''}
+                  onChange={(e) =>
+                    updateRow(row.id, { season: (e.target.value || undefined) as Season | undefined })
+                  }
+                  aria-label="Season"
+                  className={`${inputClass} shrink-0`}
+                >
+                  <option value="">All year</option>
+                  {(Object.keys(SEASON_LABELS) as Season[]).map((season) => (
+                    <option key={season} value={season}>
+                      {SEASON_LABELS[season]}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               <input
                 type="text"

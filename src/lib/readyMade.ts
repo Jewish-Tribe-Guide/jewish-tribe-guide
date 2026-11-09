@@ -1,4 +1,5 @@
 import { PHOTO_FIELD_KEY, type CategoryConfig, type CategoryField, type FieldType } from './categories'
+import { comesWithParent, partnerOf } from './fieldPartners'
 
 // Ready-made pages and fields (Category pages boards 2 and 7-11): what any
 // community's pages already hold, offered first so a new page or field
@@ -34,6 +35,9 @@ export type ReadyField = {
   field?: CategoryField
   /** A caveat's flag and note fields, which come with it. */
   companions?: CategoryField[]
+  /** The field that comes with it on its page (fieldPartners.ts), if that
+   *  page has it; null once turned off before adding. */
+  partner?: CategoryField | null
 }
 
 const BASICS: { kind: BasicKind; label: string; line: string }[] = [
@@ -158,6 +162,8 @@ export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onP
   for (const { category: c } of scoped) {
     for (const f of shownFields(c)) {
       if (isBasicField(f)) continue
+      // Offered with the field it comes with, not on its own.
+      if (comesWithParent(f, c.detailFields)) continue
       const id = fieldId(f)
       if (has.has(id)) continue
       const seen = found.get(id)
@@ -166,7 +172,8 @@ export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onP
         continue
       }
       const companions = f.caveat ? c.detailFields.filter((h) => h.key === f.caveat!.flagField || h.key === f.caveat!.noteField) : undefined
-      found.set(id, { id, label: f.label, line: '', pages: [c.pluralLabel], field: readyCopy(f), ...(companions?.length && { companions }) })
+      const partner = partnerOf(c.detailFields, f)
+      found.set(id, { id, label: f.label, line: '', pages: [c.pluralLabel], field: readyCopy(f), ...(companions?.length && { companions }), ...(partner && { partner: readyCopy(partner) }) })
     }
   }
   const fields = [...found.values()].map((r) => {

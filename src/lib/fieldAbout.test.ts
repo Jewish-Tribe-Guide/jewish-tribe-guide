@@ -13,8 +13,17 @@ describe('fieldAbout', () => {
     expect(fieldAbout({ key: 'x', label: 'Food Type', type: 'text' }).about).not.toContain('meat, dairy')
   })
 
+  // The user, Nov 9, field by field: each says what it's for.
+  it('says what the reviewed fields are for', () => {
+    expect(fieldAbout({ key: 'isKosher', label: 'Kosher Store', type: 'select', options: [] }).about).toMatch(/^Whether a store is fully kosher, or isn’t but carries some kosher items\./)
+    expect(fieldAbout({ key: 'size', label: 'Size', type: 'select', options: [] }).about).toMatch(/^How big a sukkah is/)
+    expect(fieldAbout({ key: 'keilim', label: 'Keilim', type: 'boolean' }).about).toMatch(/keilim mikvah/)
+    expect(fieldAbout({ key: 'w', label: 'Women’s Email', type: 'text' }).about).toMatch(/mikvah’s women’s side/)
+    expect(fieldAbout({ key: 's', label: 'Short Description', type: 'text', showInHeader: true }).about).toMatch(/under its name on its row/)
+  })
+
   it('describes one without a paragraph by what its kind really does', () => {
-    expect(fieldAbout({ key: 's', label: 'Size', type: 'select', multiSelect: true, allowOther: true, options: [] }).about).toBe(
+    expect(fieldAbout({ key: 's', label: 'Seating', type: 'select', multiSelect: true, allowOther: true, options: [] }).about).toBe(
       'One of a set of choices. People adding a place pick any that fit, or type another.',
     )
     expect(fieldAbout({ key: 'm', label: 'Menu', type: 'url', linkLabel: 'See the menu' }).about).toBe(
@@ -44,6 +53,13 @@ describe('fieldAbout', () => {
     const f: CategoryField = { key: 'd', label: 'Denomination', type: 'select', allowOther: true, options: [{ value: 'O', label: 'Orthodox' }, { value: 'Other', label: 'Other' }] }
     expect(fieldAbout(f).choices).toEqual(['Orthodox', 'Other, typed in'])
     expect(fieldAbout({ ...f, allowOther: false }).choices).toEqual(['Orthodox', 'Other'])
+  })
+
+  // The user, Nov 9: Kosher Certification had "Other Kosher" as well as a
+  // typed-in Other.
+  it('drops a catch-all “Other …” choice too when Other is typed in', () => {
+    const f: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', allowOther: true, options: [{ value: 'OU', label: 'OU' }, { value: 'Other Kosher', label: 'Other Kosher' }, { value: 'Others Inc', label: 'Otherside' }] }
+    expect(fieldAbout(f).choices).toEqual(['OU', 'Otherside', 'Other, typed in'])
   })
 
   // The two hidden Food fields belong to the hechsher: shown on its screen.

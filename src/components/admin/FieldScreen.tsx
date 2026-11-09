@@ -1,8 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { slugifyFieldKey, TYPE_IS_FILTERABLE, type CategoryField, type FieldType } from '@/lib/categories'
+import { MINYAN_PARTS, slugifyFieldKey, TYPE_IS_FILTERABLE, type CategoryField, type FieldType } from '@/lib/categories'
 import { fieldAbout, fieldRules } from '@/lib/fieldAbout'
+import { partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT } from '@/lib/kosherQuestions'
 import { AdminBack, AdminBox, AdminField, AdminSwitch, AdminYesNo } from './AdminUI'
 import DragList from './DragList'
@@ -48,6 +49,7 @@ export default function FieldScreen({
   onBack,
   more,
   onKosherQuestions,
+  partner,
 }: {
   field: CategoryField
   pageName: string
@@ -60,12 +62,16 @@ export default function FieldScreen({
   more?: React.ReactNode
   /** Turns a hechsher's questions on or off, with the page's hidden fields. */
   onKosherQuestions?: (on: boolean) => void
+  /** The field that comes with it (fieldPartners.ts): on the page, and its switch. */
+  partner?: PartnerSwitch
 }) {
-  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} onKosherQuestions={onKosherQuestions} />
+  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} onKosherQuestions={onKosherQuestions} partner={partner} />
   return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} />
 }
 
 type ScreenProps = Parameters<typeof FieldScreen>[0]
+
+export type PartnerSwitch = { on: boolean; onChange: (on: boolean) => void }
 
 /** The field's name and kind, as a screen's heading. */
 export function FieldTitle({ field: f }: { field: CategoryField }) {
@@ -98,12 +104,12 @@ function RemoveFrom({ pageName, onRemove }: { pageName: string; onRemove: () => 
   )
 }
 
-function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, onKosherQuestions }: ScreenProps) {
+function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, onKosherQuestions, partner }: ScreenProps) {
   return (
     <>
       <AdminBack back={{ label: pageName, onClick: onBack }} title={<FieldTitle field={f} />} />
-      <WhatThisIs field={f} />
-      <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} />
+      <WhatThisIs field={f} partnerOn={!!partner?.on} />
+      <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} partner={partner} />
       <More more={more} />
       <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
@@ -113,8 +119,8 @@ function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, 
 const chip = 'rounded-full bg-slate-100 px-3 py-1 text-[14px] font-semibold text-slate-700'
 
 /** The first box: what the field is, in a few sentences, and what it holds. */
-export function WhatThisIs({ field }: { field: CategoryField }) {
-  const { about, choices, comesWith } = fieldAbout(field)
+export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField; partnerOn?: boolean }) {
+  const { about, choices, comesWith, watchedBy } = fieldAbout(field, { partnerOn })
   const list = (title: string, names?: string[]) =>
     names?.length ? (
       <div className="flex flex-col gap-1.5">
@@ -134,6 +140,7 @@ export function WhatThisIs({ field }: { field: CategoryField }) {
         <p className="m-0 text-[17px] leading-[1.55] text-slate-800">{about}</p>
         {list('Choices', choices)}
         {list('Comes with', comesWith)}
+        {list('Can be kept up to date by', watchedBy)}
       </div>
     </AdminBox>
   )
@@ -164,6 +171,7 @@ export function FieldChanges({
   onChange,
   fixed = false,
   onKosherQuestions,
+  partner,
 }: {
   field: CategoryField
   canRequire: boolean
@@ -172,6 +180,8 @@ export function FieldChanges({
   /** Added already: the page's hidden fields change with it. Before adding,
    *  the caveat alone, and adding brings its questions. */
   onKosherQuestions?: (on: boolean) => void
+  /** The field that comes with it, when it has one. */
+  partner?: PartnerSwitch
 }) {
   const [adding, setAdding] = useState<string | null>(null)
   const options = f.options ?? []
@@ -189,9 +199,12 @@ export function FieldChanges({
   const rules = fieldRules(f)
   const choices = !fixed && f.type === 'select' && !rules.choicesSet
   const kosher = !fixed && !!rules.asksEverythingKosher
+  const partnerSays = !fixed && partner ? partnerRule(f) : undefined
+  const minyan = !fixed && f.type === 'minyanim'
+  const off = f.minyanOff ?? []
   return (
     <AdminBox title="What you can change">
-      {!required && !filter && !choices && !kosher && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
+      {!required && !filter && !choices && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
       {required && (
         <Change label="Required" hint="A place can’t be added without it">
           <AdminSwitch checked={!!f.required} onChange={(on) => onChange({ required: on })} label="Required" />
@@ -219,6 +232,24 @@ export function FieldChanges({
           />
         </Change>
       )}
+      {partnerSays && partner && (
+        <Change label={partnerSays.name} hint={partnerSays.hint}>
+          <AdminSwitch checked={partner.on} onChange={partner.onChange} label={partnerSays.name} />
+        </Change>
+      )}
+      {minyan &&
+        MINYAN_PARTS.map(({ part, label, hint }) => (
+          <Change key={part} label={label} hint={hint}>
+            <AdminSwitch
+              checked={!off.includes(part)}
+              onChange={(on) => {
+                const next = on ? off.filter((p) => p !== part) : [...off, part]
+                onChange({ minyanOff: next.length ? next : undefined })
+              }}
+              label={label}
+            />
+          </Change>
+        ))}
       {choices && (
         <>
           <Change label="Your own choices" hint="One your community uses that isn’t listed">

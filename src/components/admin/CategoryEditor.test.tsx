@@ -421,7 +421,7 @@ describe('CategoryEditor — editing an existing category', () => {
       })
       renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
       await openBox(user, 'Contact')
-      await user.click(screen.getByRole('button', { name: /^Kosher Certification/ }))
+      await user.click(screen.getByRole('button', { name: /^Kosher Certification(?! URL)/ }))
       await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
 
       expect(await screen.findByRole('heading', { name: 'Remove Kosher Certification from Food?' })).toBeInTheDocument()
@@ -1095,7 +1095,7 @@ describe('CategoryEditor — a hechsher’s kosher questions', () => {
   const saved = () => (JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryField[]).filter((f) => f.type !== 'image')
   const openCert = async (user: ReturnType<typeof userEvent.setup>) => {
     await openBox(user, 'Top')
-    await user.click(screen.getByRole('button', { name: /^Kosher Certification/ }))
+    await user.click(screen.getByRole('button', { name: /^Kosher Certification(?! URL)/ }))
   }
 
   it('turned off, the page stops asking both; turned on, asks them as Food does', async () => {
@@ -1130,11 +1130,71 @@ describe('CategoryEditor — a hechsher’s kosher questions', () => {
     renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
     await openBox(user, 'Top')
     await user.click(screen.getByRole('button', { name: '+ Add a field' }))
-    await user.click(await screen.findByRole('button', { name: /^Kosher Certification/ }))
+    await user.click(await screen.findByRole('button', { name: /^Kosher Certification(?! URL)/ }))
     await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
     await user.click(screen.getByRole('button', { name: /^Add to / }))
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     expect(saved().map((f) => f.label)).toEqual(['Kosher Certification'])
+  })
+
+  // The certificate link comes with its field, with a switch (the user, Nov 9).
+  const link: CategoryField = { key: 'k', label: 'Kosher Certification URL', type: 'url', renderAs: 'row', linkLabel: 'Certification', filterable: false }
+
+  it('the certificate link’s switch takes it off, and puts it back next to its field', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const short: CategoryField = { key: 'short', label: 'Short Description', type: 'text', renderAs: 'row' }
+    const withLink = { ...food, detailFields: [cert, short, flag, note, link] }
+    renderWithProviders(<CategoryEditor token="t" initial={withLink} siblings={[withLink]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    const linkSwitch = () => screen.getByRole('switch', { name: 'Link to the certificate' })
+    expect(linkSwitch()).toHaveAttribute('aria-checked', 'true')
+    await user.click(linkSwitch())
+    expect(linkSwitch()).toHaveAttribute('aria-checked', 'false')
+    await user.click(linkSwitch())
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    // The link goes back right after its field (and its kosher questions).
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert', 'kosherPartial', 'kosherNote', 'k', 'short'])
+  })
+
+  it('switched off, the page stops asking for the link', async () => {
+    // Save checks first whether places lose a link; none have one here.
+    vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: { k: 0 } } })
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const withLink = { ...food, detailFields: [cert, flag, note, link] }
+    renderWithProviders(<CategoryEditor token="t" initial={withLink} siblings={[withLink]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Link to the certificate' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert', 'kosherPartial', 'kosherNote'])
+  })
+
+  it('added from another page, brings its link unless switched off', async () => {
+    for (const keep of [true, false]) {
+      const onSaved = vi.fn()
+      const user = userEvent.setup()
+      const groceries = baseCategory({ detailFields: [] })
+      const withLink = { ...food, detailFields: [cert, flag, note, link] }
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [{ community: 'philly', category: withLink }] }))))
+      renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await openBox(user, 'Top')
+      await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+      expect(screen.queryByRole('button', { name: /^Kosher Certification URL/ })).not.toBeInTheDocument()
+      await user.click(await screen.findByRole('button', { name: /^Kosher Certification(?! URL)/ }))
+      if (!keep) await user.click(screen.getByRole('switch', { name: 'Link to the certificate' }))
+      await user.click(screen.getByRole('button', { name: /^Add to / }))
+      await saveNow(user)
+      await waitFor(() => expect(onSaved).toHaveBeenCalled())
+      expect(saved().map((f) => f.label)).toEqual(keep
+        ? ['Kosher Certification', flag.label, note.label, 'Kosher Certification URL']
+        : ['Kosher Certification', flag.label, note.label])
+      cleanup()
+      forgetReadyMade()
+      vi.mocked(fetchJson).mockClear()
+    }
   })
 })

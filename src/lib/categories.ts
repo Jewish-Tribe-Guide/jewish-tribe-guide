@@ -84,13 +84,22 @@ export function selectValues(value: unknown): string[] {
 }
 
 /** The choices someone adding a place picks from. With a typed-in Other,
- *  a choice that's only called "Other" would be a second one (Denomination
- *  had both; the user, Nov 7: "get rid of 'other' if we have typed in
- *  other"). A place that picked it keeps it, as a typed-in value. */
+ *  a choice called "Other", or "Other Kosher", would be a second one
+ *  (Denomination had the first, Kosher Certification the second; the user,
+ *  Nov 7 and 9). A place that picked it keeps it, as a typed-in value. */
 export function pickableOptions(field: Pick<CategoryField, 'options' | 'allowOther'>): NonNullable<CategoryField['options']> {
   const options = field.options ?? []
-  return field.allowOther ? options.filter((o) => o.label.trim().toLowerCase() !== 'other') : options
+  return field.allowOther ? options.filter((o) => !/^other\b/i.test(o.label.trim())) : options
 }
+
+/** A minyan's parts a page can turn off: sign-up minyanim, a link to join
+ *  from home, and summer or winter only. */
+export type MinyanPart = 'signUp' | 'joinLink' | 'season'
+export const MINYAN_PARTS: { part: MinyanPart; label: string; hint: string }[] = [
+  { part: 'signUp', label: 'Sign-up minyanim', hint: 'One that runs when enough people sign up' },
+  { part: 'joinLink', label: 'Join from home', hint: 'A Zoom or livestream link' },
+  { part: 'season', label: 'Summer or winter only', hint: 'One held only part of the year' },
+]
 
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
@@ -108,6 +117,9 @@ export type CategoryField = {
    *  choices are this page's to set. A field without it came ready-made:
    *  its name and what it does are the same everywhere (the user, Nov 7). */
   madeHere?: boolean
+  /** Davening times: the parts of a minyan this page doesn't ask about
+   *  (the user, Nov 9: a community may not need them). Absent: all. */
+  minyanOff?: MinyanPart[]
   /** For `type: 'tags'`: which tag vocabulary group to draw from / add to. The
    *  field's value is an array of tag labels stored on the listing's `details`. */
   tagGroup?: string
