@@ -58,8 +58,26 @@ import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCa
  *  screen (or a minyan, a person in one) has a title; a row open where it
  *  is has none, the header keeps its own, and Back closes the row. */
 /** `depth`: how many screens in it is (a row 1, a minyan inside it 2), for
- *  a host that gives each its own entry in the history. */
-export type EditorStep = { title?: string; back: () => void; depth?: number }
+ *  a host that gives each its own entry in the history. `path`: which they
+ *  are (the row's id, then the minyan's or the person's), for a host that
+ *  puts them in the address and asks for them again (`reopen`). `id`: a
+ *  minyan's or a person's own, from its field's editor. */
+export type EditorStep = { title?: string; back: () => void; depth?: number; path?: string[]; id?: string }
+
+/** A step asked for by the host, from the address: a row by its id, and a
+ *  minyan or a person in it by theirs. `n` tells one ask from the next. */
+export type StepAsk = { path: readonly string[]; n: number }
+/** The same, for a field's own editor: the minyan or person to open, or
+ *  none (back on its list). */
+export type ChildAsk = { id: string | null; n: number }
+
+/** A step in a box's own Edit, its row and what's open in it as one. */
+const BOX_STEP = '#'
+function splitBoxStep(step: string | undefined): [string | undefined, string | undefined] {
+  if (step === undefined) return [undefined, undefined]
+  const at = step.lastIndexOf(BOX_STEP)
+  return at < 0 ? [step, undefined] : [step.slice(0, at), step.slice(at + 1)]
+}
 
 /** An editor whose host draws its way back (the desktop map's sidebar, in
  *  its search box): one step back, what that step is called, and whether
@@ -93,6 +111,8 @@ type Props = {
   /** A row opened (or a minyan, a person inside one): its title and the way
    *  back, for the host's header and Back; null on the list. */
   onStep?: (step: EditorStep | null) => void
+  /** Opens a step (Back, Forward or a reload onto it, in the admin). */
+  reopen?: StepAsk | null
   /** See useListingSubmit. */
   via?: SendVia
   onSent?: (body: unknown) => void
@@ -124,6 +144,10 @@ type Props = {
   allSections?: boolean
   /** Values to put in as if typed, each new object once: Use Google's. */
   patch?: Record<string, unknown>
+  /** The row with this field (or 'address', 'phone') opens first: the category editor's preview
+   *  beside a field, showing what people adding a place will be asked
+   *  (the user, Nov 7: a "+ Denomination" link didn't show it). */
+  startOpen?: string
   /** With `onlyRows`: each row in a white card of its own under its title,
    *  and no Send, the host's buttons sending (To do's place screen, boards
    *  R3Site, R2Menu); without it, the whole list with no Send (a new place
@@ -193,7 +217,7 @@ const fieldLabel = editorFieldLabel
 /** A choice of a few as big buttons ("Meat", "Dairy", "Parve"), the way
  *  the minyan editor's days are: one replaces the other for a single
  *  choice, several can be on for a multi-choice. */
-function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void; labelHidden?: boolean }) {
+export function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void; labelHidden?: boolean }) {
   const chosen = selectValues(value)
   const known = new Set((field.options ?? []).map((o) => o.value))
   const options = [...(field.options ?? []), ...chosen.filter((v) => !known.has(v)).map((v) => ({ value: v, label: v }))]
@@ -214,8 +238,16 @@ function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field:
               type="button"
               aria-pressed={on}
               onClick={() => pick(o.value)}
-              className={`h-10 cursor-pointer rounded-full border-[1.5px] px-4 text-[14.5px] font-bold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`}
+              // Picked, filled blue with a tick, as a picked filter is
+              // (FilterChip; the user, Nov 9: "align that with blue of
+              // filter select").
+              className={`flex h-10 cursor-pointer items-center gap-1 rounded-full border-[1.5px] text-[14.5px] font-bold ${on ? 'border-primary bg-primary pl-3 pr-4 text-white' : 'border-slate-300 bg-white px-4 text-slate-600'}`}
             >
+              {on && (
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              )}
               {o.label}
             </button>
           )
@@ -227,7 +259,7 @@ function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field:
 
 /** A few choices are buttons; a long list, or one that takes "Other", the
  *  ordinary picker. */
-const asButtons = (f: CategoryField) => f.type === 'select' && !f.allowOther && (f.options?.length ?? 0) > 0 && (f.options?.length ?? 0) <= 6
+export const asButtons = (f: CategoryField) => f.type === 'select' && !f.allowOther && (f.options?.length ?? 0) > 0 && (f.options?.length ?? 0) <= 6
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 
@@ -246,6 +278,7 @@ export default function ListingEditor({
   onRemovalOpenChange,
   removalOpen: removalOpenProp,
   onStep,
+  reopen,
   via,
   onSent,
   adminSubmit,
@@ -258,6 +291,7 @@ export default function ListingEditor({
   splitContact,
   allSections,
   patch,
+  startOpen,
   hosted,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
@@ -312,7 +346,7 @@ export default function ListingEditor({
   const [openId, setOpenId] = useState<string | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
   // which field it belongs to, so the row shows only that one.
-  const [child, setChild] = useState<(EditorStep & { key: string }) | null>(null)
+  const [child, setChild] = useState<(EditorStep & { key: string; row?: string }) | null>(null)
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
   const [removalOpenState, setRemovalOpenState] = useState(false)
   const removalControlled = removalOpenProp !== undefined
@@ -323,6 +357,40 @@ export default function ListingEditor({
   // next week's too. One box's own Edit has them only if it's that box.
   const thisWeek = useEditWeek((!creating || !!rowSource) && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
   const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact, allSections })
+  // Once, on the first render that has its row.
+  const [startTaken, setStartTaken] = useState(false)
+  if (startOpen && !startTaken) {
+    // The address or phone: its own row, or the contact row it's part of.
+    const first =
+      rows.find((r) => r.fields.some((f) => f.key === startOpen)) ??
+      rows.find((r) => r.part === startOpen) ??
+      (startOpen === 'address' || startOpen === 'phone' ? rows.find((r) => r.kind === 'contact' && !r.part) : undefined)
+    if (first) {
+      setStartTaken(true)
+      setOpenId(first.id)
+    }
+  }
+  // A step the host asks for, once its row is there (a week's rows load
+  // after the rest).
+  const [childAsk, setChildAsk] = useState<(ChildAsk & { row: string; key: string | undefined }) | null>(null)
+  const [askTaken, setAskTaken] = useState<number | null>(null)
+  if (reopen && reopen.n !== askTaken) {
+    // A box's own Edit: the row and what's in it are one step (see stepPath).
+    const [first, inBox] = splitBoxStep(reopen.path[0])
+    const want = first ?? null
+    const wanted = want === null ? null : rows.find((r) => r.id === want)
+    if (want === null || wanted) {
+      setAskTaken(reopen.n)
+      // A box's own Edit has its rows open already.
+      if (!onlyRows?.includes(want ?? '')) setOpenId(want)
+      const key = wanted?.fields.find((f) => f.type === 'contacts' || f.type === 'minyanim')?.key
+      if (want) setChildAsk({ row: want, key, id: inBox ?? reopen.path[1] ?? null, n: reopen.n })
+      // A box's own Edit stays open with its rows: what's open in one is
+      // closed by asking it to, as closing a row would have.
+      else setChildAsk(child ? { row: child.row ?? openId ?? '', key: child.key, id: null, n: reopen.n } : null)
+    }
+  }
+  const childAskFor = (rowId: string | null, key: string) => (childAsk && childAsk.key === key && (rowId === null || childAsk.row === rowId) ? childAsk : null)
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
@@ -361,9 +429,16 @@ export default function ListingEditor({
   const stepTitle = step?.title ?? null
   const stepKey = step === null ? null : (stepTitle ?? `in-place:${openId}`)
   const stepDepth = step === null ? 0 : child ? 1 + (child.depth ?? 1) : 1
+  // Which it is: the row, then the minyan or person in it (a box's own
+  // Edit has no row open, but the step is still in one).
+  const childRow = child ? (child.row ?? openId ?? rows.find((r) => r.fields.some((f) => f.key === child.key))?.id ?? null) : null
+  // In a box's own Edit the row is open all along, so it's no step of its
+  // own: an entry for it would show the same screen as the one behind.
+  const stepPath =
+    step === null ? '' : child ? (childRow === null ? '' : onlyRows?.includes(childRow) ? `${childRow}${BOX_STEP}${child.id ?? 'open'}` : [childRow, child.id ?? 'open'].join('\n')) : (openId ?? '')
   useEffect(() => {
-    onStep?.(stepKey === null ? null : { title: stepTitle ?? undefined, back: () => stepBack.current(), depth: stepDepth })
-  }, [stepKey, stepTitle, stepDepth, onStep])
+    onStep?.(stepKey === null ? null : { title: stepTitle ?? undefined, back: () => stepBack.current(), depth: stepDepth, path: stepPath ? stepPath.split('\n') : [] })
+  }, [stepKey, stepTitle, stepDepth, stepPath, onStep])
   // The open card into view, the rows around it where they were.
   const openCard = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -399,6 +474,20 @@ export default function ListingEditor({
     () => Object.fromEntries(category.detailFields.map((f) => [f.key, (s: EditorStep | null) => setChild(s ? { ...s, key: f.key } : null)])),
     [category.detailFields],
   )
+  // The same, for a field in a given row: a shul's minyanim are in a row
+  // per box, two of them open at once in a box's own Edit.
+  // (A Map kept for the component's life, filled as rows ask: the same
+  // function for a row's field every render, so its effect doesn't rerun.)
+  const [stepForRows] = useState(() => new Map<string, (s: EditorStep | null) => void>())
+  const stepForRow = (rowId: string, key: string) => {
+    const at = `${rowId}\n${key}`
+    let report = stepForRows.get(at)
+    if (!report) {
+      report = (s: EditorStep | null) => setChild(s ? { ...s, key, row: rowId } : null)
+      stepForRows.set(at, report)
+    }
+    return report
+  }
 
   // ── A shul's minyanim: ids for the rows stored without one ────────────
   // The box editor opens a minyan by its id. Given once, by position, to
@@ -640,7 +729,7 @@ export default function ListingEditor({
 
   function plainInput(f: CategoryField, label?: string, labelHidden = false) {
     return f.type === 'contacts' ? (
-      <ContactsEditor key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} onStep={stepFor[f.key]} place={item.name || draft.name} />
+      <ContactsEditor key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} onStep={stepFor[f.key]} reopen={childAskFor(null, f.key)} place={item.name || draft.name} />
     ) : asButtons(f) ? (
       <ChoiceButtons key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} labelHidden={labelHidden} />
     ) : (
@@ -747,7 +836,9 @@ export default function ListingEditor({
           place={item.name || draft.name}
           writing={minyanWriting}
           dayChoices={weekPostDays(week)}
-          onStep={stepFor[f.key]}
+          onStep={stepForRow(r.id, f.key)}
+          reopen={childAskFor(r.id, f.key)}
+          off={f.minyanOff}
           onChange={(list) => setDetail(sk, withWeekTimes(readSchedules(details[sk]), readSchedules(item[sk]), week, list, { id: crypto.randomUUID(), now: new Date().toISOString() }))}
           send={() => null}
         />
@@ -765,7 +856,9 @@ export default function ListingEditor({
           place={item.name || draft.name}
           nameShown={!!hosted}
           writing={minyanWriting}
-          onStep={stepFor[f.key]}
+          onStep={stepForRow(r.id, f.key)}
+          reopen={childAskFor(r.id, f.key)}
+          off={f.minyanOff}
           onChange={(list) => setDetail(f.key, mergeMinyanimBox(all, r.box!, list))}
           send={() => null}
         />

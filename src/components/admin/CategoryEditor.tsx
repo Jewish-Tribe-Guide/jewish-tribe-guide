@@ -1,36 +1,53 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CATEGORY_CAPABILITY_KEYS, DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
-import { groupByFromKey, groupByKey, groupByOptions } from '@/lib/listGroups'
-import { questionCardFromKey, questionCardKey, questionCardOptions } from '@/lib/questionCards'
+import { groupByFromKey } from '@/lib/listGroups'
+import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
-import { listingPartsToSave } from '@/lib/listingParts'
-import { PLACE_KINDS, PLACE_KIND_INFO } from '@/lib/placeKinds'
+import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
+import { addBox, fieldBoxes, removeBox, renameBox, renameListingBox, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
-import { ListingPartsEditor, WalkListsEditor } from './ListingPartsEditor'
-import CategoryPreview from './CategoryPreview'
-import { CardBackgroundField, CardBandImageField, IconField, PinColorField } from './CategoryFormFields'
+import FieldBoxes from './FieldBoxes'
+import WalkBox from './WalkBox'
+import CardBox, { ShowOnLine, type CardLine } from './CardBox'
+import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
+import CategoryPreview, { type PreviewView } from './CategoryPreview'
+import { sampleName } from '@/lib/fieldLooks'
+import { CardBandImageField, IconField } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
+import { partnerOf, partnerRule } from '@/lib/fieldPartners'
+import FieldScreen from './FieldScreen'
+import FieldLooks from './FieldLooks'
+import { useIsSuperAdmin } from './AdminAuthGate'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
-import { CAPABILITY_LABELS, fieldShows, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
+import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
-import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminRows, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
+import { addButton } from './DragList'
+import DeletePage from './DeletePage'
+import RemoveField, { type Removing } from './RemoveField'
+import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { routes } from '@/lib/routes'
+import { fieldFromRef, fieldRef, screenFromSearch, type EditorScreen } from '@/lib/editorScreenUrl'
+import { focusOn } from '@/lib/previewFocus'
+import { useScreenHistory } from './useScreenHistory'
 
 // One category page's settings (the admin redesign's boards 6 and 6b): its
 // kind, name and look, what each place shows (a row per field, each opening
 // to its own screen, board "Field"), the map, and the "Not listed here?"
 // line, with the page itself beside them on a computer or a phone and one
 // Save bar. A new category starts by picking its kind (brief, question 8).
+
+/** A field's screen: its place in draft.fields, or the address or phone. */
+type OpenField = number | 'address' | 'phone'
 
 type Props = {
   token: string
@@ -39,15 +56,18 @@ type Props = {
    *  currently resolves to — that fallback is positional, so it can only be
    *  computed against the whole list. Null while they're still loading. */
   siblings: CategoryConfig[] | null
-  /** Whether a Map pseudo-category currently exists — the map switch only
-   *  makes sense (and is only offered) when there's a map for it to send
-   *  this category's places to. */
-  hasMapCategory: boolean
   /** Given the id it was saved under. */
   onSaved: (id: string) => void
   onCancel: () => void
   /** Just saved: the Save bar says so until the next change. */
   justSaved?: boolean
+  /** Deleted from its own "Delete this page". */
+  onDeleted?: () => void
+  /** A new page's ready-made page to start from (board 2). */
+  seed?: CategoryConfig | null
+  /** Where Back goes: "Category pages", or a new page's "What kind of
+   *  places?". */
+  backLabel?: string
 }
 
 export function CategoryEditor(props: Props) {
@@ -57,9 +77,8 @@ export function CategoryEditor(props: Props) {
 }
 
 /** Draft keys that move with another, so one edit counts once: the
- *  singular follows the name, and the "Not listed here?" line is on when
- *  both its boxes are filled. */
-const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'externalLinkEnabled'])
+ *  singular follows the name, and the map follows the address. */
+const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'capabilities'])
 
 function changedKeys(draft: Draft, saved: Draft): number {
   return (Object.keys(draft) as (keyof Draft)[]).filter((k) => !FOLLOWING_KEYS.has(k) && JSON.stringify(draft[k]) !== JSON.stringify(saved[k])).length
@@ -69,19 +88,47 @@ function CategoryEditorScreen({
   token,
   initial,
   siblings,
-  hasMapCategory,
   onSaved,
   onCancel,
   justSaved = false,
+  onDeleted,
+  seed = null,
+  backLabel = 'Category pages',
   onUndo,
 }: Props & { onUndo: () => void }) {
   const isNew = initial === null
   const community = useCommunitySlug()
   const [previewing, setPreviewing] = useState(false)
+  // Page, A listing or Adding, beside the settings and opened full size.
+  const [previewView, setPreviewView] = useState<PreviewView>('page')
+  const superAdmin = useIsSuperAdmin()
   // The field whose own screen is open (board "Field"), by its place in
-  // draft.fields.
-  const [openField, setOpenField] = useState<number | null>(null)
+  // draft.fields, or the page's address or phone.
+  const [openField, setOpenField] = useState<OpenField | null>(null)
+  // "+ Add a field"'s screens (boards 7-12), when one is open, and the box
+  // it was opened from.
+  const [adding, setAdding] = useState<FieldPickerScreen | null>(null)
+  const [addingTo, setAddingTo] = useState<string | null>(null)
+  // Back from a field or the picker, the Fields box is still open on a phone,
+  // with the box it was in (boards 17-19).
+  const [fieldsOpen, setFieldsOpen] = useState(false)
+  const [openBox, setOpenBox] = useState<string | null>(null)
+  // A box just added, its name selected to type over (board 19).
+  const [freshBox, setFreshBox] = useState<string | null>(null)
+  // The fields there were before an add, to find the one added.
+  const [landing, setLanding] = useState<ReadonlySet<string> | null>(null)
+  // Before it's opened: the line open, and board 23's screen for one.
+  const [openLine, setOpenLine] = useState<CardLine | null>(null)
+  const [showLine, setShowLine] = useState<'second' | 'third' | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
+  // "Remove this field" on one places have answered: its own step first
+  // (board 16), and the removals answered there, so Save doesn't ask again.
+  const [removing, setRemoving] = useState<Removing | null>(null)
+  // The banner picker's memory of the photo behind its crop, kept here: the
+  // picker unmounts whenever the Banner photo row closes.
+  const [bannerOriginal, setBannerOriginal] = useState<File | string | null>(null)
+  const [confirmed, setConfirmed] = useState<ReadonlySet<string>>(new Set())
+  const counting = useRef(false)
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
   // count them here.
@@ -111,65 +158,187 @@ function CategoryEditorScreen({
     setGroupForm,
     set,
     setName,
-    setId,
     setCap,
-    pickKind,
     updateField,
-    addField,
+    addReadyField,
+    addOwnField,
     removeField,
     addAudienceGroup,
-    isPlainHoursField,
-    isWebsiteField,
-    isPhotoField,
     toggleHoursField,
     toggleWebsiteField,
-    togglePhotoField,
     toggleFieldCaveat,
+    togglePartner,
     moveField,
-    managedHoursIndex,
-    managedWebsiteIndex,
-    managedPhotoIndex,
-  } = useCategoryFieldEditing(initial)
+  } = useCategoryFieldEditing(initial, seed)
 
-  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
+  // The screen the address names, on opening: a reload, a link, or Back
+  // from another tab lands where the history says (editorScreenUrl.ts).
+  const screens = useScreenHistory()
+  const fieldsNow = useRef(draft.fields)
+  useEffect(() => {
+    fieldsNow.current = draft.fields
+  })
+  const [restored, setRestored] = useState(false)
+  if (!restored) {
+    setRestored(true)
+    if (typeof window !== 'undefined') {
+      const s = screenFromSearch(window.location.search)
+      const open = fieldFromRef(draft.fields, s.field)
+      if (open !== null || s.add) setFieldsOpen(true)
+      setOpenField(open)
+      setAdding(s.add ?? null)
+      setShowLine(s.line ?? null)
+      setPreviewing(!!s.preview)
+    }
+  }
+
+  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
     draft,
     initial,
     isNew,
     token,
     community,
+    confirmed,
     onSaved,
   })
 
   // A new category's bar always shows, to create it; leaving asks only once
   // something's been filled in.
   const changes = isNew ? 1 : changedKeys(draft, toDraft(initial))
-  const dirty = isNew ? changedKeys(draft, toDraft(null)) > 0 : changes > 0
+  const dirty = isNew ? changedKeys(draft, toDraft(seed)) > 0 : changes > 0
   useLeaveGuard(dirty)
 
-  // The preview and a field's screen each get their own history entry, so
-  // browser/trackpad Back (and the preview's own Up button, which calls
-  // history.back) land back on this screen instead of skipping past it to
-  // the category list.
+  // Each screen is an entry in the history with its own address, so
+  // browser/trackpad Back and Forward (and the preview's own Up button,
+  // which calls history.back) land on it instead of skipping past it to the
+  // category list. What shows is read from the address, never kept apart
+  // from it. A removal's step holds a count read just before, kept here for
+  // Back and Forward onto it, and read again after a reload.
+  const lastRemoving = useRef<Removing | null>(null)
+  const removeStep = useRef<(ref: string | undefined) => void>(() => {})
   useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const state = e.state as { editorPreview?: boolean; editorField?: number } | null
-      setPreviewing(!!state?.editorPreview)
-      setOpenField(state?.editorField ?? null)
+    function onPopState() {
+      const s = screenFromSearch(window.location.search)
+      setPreviewing(!!s.preview)
+      setOpenField(fieldFromRef(fieldsNow.current, s.field))
+      setAdding(s.add ?? null)
+      setShowLine(s.line ?? null)
+      if (s.remove) removeStep.current(s.field)
+      else setRemoving(null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  function openPreview() {
-    setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+  const screenNow = (): EditorScreen => ({
+    ...(openField !== null && { field: fieldRef(draft.fields, openField) }),
+    ...(adding && { add: adding }),
+    ...(showLine && { line: showLine }),
+  })
+  // Through Next's router, so the entry is one it made (editorScreenUrl.ts),
+  // one move at a time (useScreenHistory.ts).
+  function go(next: EditorScreen) {
+    void screens.push(next)
   }
 
-  function showField(i: number) {
+  function openPreview() {
+    setPreviewing(true)
+    go({ ...screenNow(), preview: true })
+  }
+
+  function showField(i: OpenField) {
+    setFieldsOpen(true)
     setOpenField(i)
-    history.pushState({ ...(window.history.state ?? {}), editorField: i }, '')
+    go({ field: fieldRef(fieldsNow.current, i) })
     window.scrollTo?.(0, 0)
   }
+
+  function showAdding(next: FieldPickerScreen) {
+    setFieldsOpen(true)
+    setAdding(next)
+    go({ add: next })
+    window.scrollTo?.(0, 0)
+  }
+
+  // Added: back to the page, past the picker's screens (the list, and the
+  // field looked at or the kind picked). Make your own opens the new
+  // field's screen, to name it.
+  function added(i: number | null) {
+    void screens.back(adding?.at === 'list' ? 1 : 2).then(() => {
+      if (i !== null) showField(i)
+    })
+  }
+
+  const confirmKey = (t: Removing['target']) => (typeof t === 'object' ? `field:${t.field}` : t)
+
+  function takeOff(target: Removing['target']) {
+    if (target === 'address') {
+      set('hasAddress', false)
+      setCap('map', false)
+    } else if (target === 'phone') set('hasPhone', false)
+    else {
+      const i = draft.fields.findIndex((f) => f.key === target.field)
+      if (i >= 0) removeField(i)
+    }
+  }
+
+  // A field only this draft has, or one no place has answered, just goes;
+  // otherwise its own step says what goes with it. When the count can't be
+  // had, it goes too, and Save asks as it always has.
+  async function askRemove(target: Removing['target'], label: string, filter: boolean) {
+    const saved =
+      !isNew &&
+      (target === 'address' ? initial!.hasAddress !== false : target === 'phone' ? initial!.hasPhone !== false : initial!.detailFields.some((f) => f.key === target.field))
+    // A second tap while it counts does nothing.
+    if (counting.current) return
+    counting.current = true
+    let count: number | null = 0
+    try {
+      if (saved) count = await countAnswers(target)
+    } finally {
+      counting.current = false
+    }
+    if (!count) {
+      // Nothing to lose is answered too; not knowing leaves it to Save.
+      setConfirmed((c) => (count === 0 ? new Set(c).add(confirmKey(target)) : new Set([...c].filter((k) => k !== confirmKey(target)))))
+      takeOff(target)
+      void screens.back()
+      return
+    }
+    const next: Removing = { target, label, count, filter }
+    lastRemoving.current = next
+    setRemoving(next)
+    go({ ...screenNow(), remove: true })
+    window.scrollTo?.(0, 0)
+  }
+
+  // The Remove step the address names: the one held, or counted again (a
+  // reload, or Forward onto it after one), the field showing meanwhile.
+  // Nothing to lose by then: the address goes back to the field.
+  async function showRemoveStep(ref: string | undefined) {
+    const open = fieldFromRef(fieldsNow.current, ref)
+    if (open === null) return
+    const f = typeof open === 'number' ? fieldsNow.current[open] : null
+    const target: Removing['target'] = f ? { field: f.key } : (open as 'address' | 'phone')
+    const held = lastRemoving.current
+    if (held && confirmKey(held.target) === confirmKey(target)) return setRemoving(held)
+    setRemoving(null)
+    const count = await countAnswers(target)
+    const still = screenFromSearch(window.location.search)
+    if (!still.remove || still.field !== ref) return
+    if (!count) return void screens.replace({ ...still, remove: false })
+    const next: Removing = { target, label: f ? f.label || 'New field' : open === 'address' ? 'Address' : 'Phone', count, filter: !!f && !!normalizeField(f).filterable }
+    lastRemoving.current = next
+    setRemoving(next)
+  }
+  useEffect(() => {
+    removeStep.current = (ref) => void showRemoveStep(ref)
+  })
+  useEffect(() => {
+    const s = screenFromSearch(window.location.search)
+    if (s.remove) void showRemoveStep(s.field)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on opening only
+  }, [])
 
   function leave() {
     if (dirty && !window.confirm(LEAVE_QUESTION)) return
@@ -198,7 +367,7 @@ function CategoryEditorScreen({
     walkList: walkListFromKey(draft.walkList),
     listingParts: listingPartsToSave(draft.listingParts) ?? undefined,
     externalLink:
-      draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
+      draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
         ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
         : null,
     cardImageUrl: draft.cardImageUrl.trim() || null,
@@ -206,81 +375,254 @@ function CategoryEditorScreen({
     pinColor: draft.pinColor || null,
   }
 
-  if (previewing) return <CategoryPreview category={previewCategory} onClose={() => history.back()} />
-
-  const name = draft.pluralLabel.trim() || (isNew ? 'New category' : initial!.pluralLabel)
+  // Page, A listing or Adding (boards 4 and 5): the page on a computer, the
+  // other two as a phone shows them. No Adding where visitors can't add.
+  const views: { view: PreviewView; label: string }[] = [
+    { view: 'page', label: 'Page' },
+    { view: 'listing', label: 'A listing' },
+    ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
+  ]
+  const shownView = views.some((v) => v.view === previewView) ? previewView : 'page'
+  const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
-  const field = openField !== null ? draft.fields[openField] : undefined
+  const field = typeof openField === 'number' ? draft.fields[openField] : undefined
+  // The page as the preview shows it, on the field open (previewFocus.ts).
+  const focused = focusOn(previewCategory, typeof openField === 'number' ? field : (openField ?? undefined))
+  // Full size, the screen showing the field draws it, so a field Add a
+  // field is looking at (worked out there, with what's been set on it) is
+  // in it too. Every other screen: here.
+  const drawnByScreen = wide && !removing && (!adding || adding.at === 'look')
+  if (previewing && !drawnByScreen) return <CategoryPreview category={focused.category} focusField={focused.focus} view={shownView} onClose={() => void screens.back()} />
 
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
-  const preview = wide && (
-    <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start">
-      <PreviewBeside onOpen={openPreview}>{() => <CategoryPreview inline category={previewCategory} onClose={() => {}} onListings={setPlaceCount} />}</PreviewBeside>
+  // `focus`: the field an admin is looking at, which Adding opens on.
+  const previewOf = (category: CategoryConfig, focus?: string) =>
+    previewing ? (
+      <CategoryPreview category={category} focusField={focus} view={shownView} onClose={() => void screens.back()} />
+    ) : (
+    <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
+      {(
+        <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+          {views.map((v) => (
+            <button
+              key={v.view}
+              type="button"
+              aria-pressed={shownView === v.view}
+              onClick={() => setPreviewView(v.view)}
+              className={`flex-1 min-h-10 rounded-md text-sm font-semibold cursor-pointer ${shownView === v.view ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
+        {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaceCount} />}
+      </PreviewBeside>
     </aside>
   )
+  // Beside a field, the field where a visitor meets it, on a made-up place
+  // (boards 33c and 34, FieldLooks.tsx); the whole page one link away.
+  const looksOf = (look: { category: CategoryConfig; focus?: string }, onShowOnRow?: (line: 'second' | 'third') => void) => {
+    const f = look.category.detailFields.find((x) => x.key === look.focus)
+    if (previewing || !f) return previewOf(look.category, look.focus)
+    return (
+      <FieldLooks
+        category={look.category}
+        field={f}
+        placeName={sampleName(draft.label, draft.pluralLabel)}
+        canAdd={draft.capabilities.add}
+        onShowOnRow={onShowOnRow}
+        onWholePage={() => {
+          setPreviewView('page')
+          openPreview()
+        }}
+      />
+    )
+  }
+  const showOnRow = (line: 'second' | 'third') => {
+    setShowLine(line)
+    go({ ...screenNow(), line })
+    window.scrollTo?.(0, 0)
+  }
+  const preview = wide && (typeof openField === 'number' && field ? looksOf(focused, showOnRow) : previewOf(focused.category, focused.focus))
+
+  // Fields, as the listing's boxes (fieldBoxes.ts). A field not named yet
+  // has no key: it goes by its place.
+  const pageFields = draft.fields.map((f, i) => ({ ...normalizeField(f), key: f.key || `#${i}` }))
+  const draftFieldByKey = new Map(pageFields.map((f, i) => [f.key, draft.fields[i]]))
+  const fieldPage: FieldPage = { fields: pageFields, hiddenFields: draft.hiddenFields, hasAddress: draft.hasAddress, hasPhone: draft.hasPhone }
+  const parts = listingPartsFromKey(draft.listingParts)
+  const boxes = fieldBoxes(fieldPage, parts)
+  // Just added: the box it landed in opens, its row there to see.
+  if (landing) {
+    const key = pageFields.find((f) => !landing.has(f.key))?.key
+    const box = key !== undefined && boxes.find((b) => b.fields.includes(key))
+    setLanding(null)
+    if (box) setOpenBox(box.id)
+  }
+  // A hechsher's caveat is set on the hechsher's own screen.
+  const fieldIndex = (key: string) => {
+    const i = pageFields.findIndex((f) => f.key === key)
+    return i >= 0 ? i : draft.fields.findIndex((f) => f.caveat && (f.caveat.flagField === key || f.caveat.noteField === key))
+  }
+
+  const cardPage: CardPage = { fields: pageFields, hasAddress: draft.hasAddress, upvotes: draft.upvotesEnabled }
+  const putOnCard = (key: string, on: boolean) => {
+    const i = pageFields.findIndex((f) => f.key === key)
+    if (i >= 0) updateField(i, cardPatch(pageFields[i], on))
+  }
 
   let screen: React.ReactNode
-  if (field && openField !== null) {
-    // A field's own screen (board "Field").
-    const i = openField
+  if (removing) {
+    screen = (
+      <RemoveField
+        removing={removing}
+        page={name}
+        onKeep={() => void screens.back()}
+        onRemove={() => {
+          takeOff(removing.target)
+          setConfirmed((c) => new Set(c).add(confirmKey(removing.target)))
+          // Past the field's screen too, to the page.
+          void screens.back(2)
+        }}
+      />
+    )
+  } else if (showLine) {
+    screen = (
+      <ShowOnLine
+        line={showLine}
+        fields={pageFields}
+        // From a field's How it looks, Back is to the field.
+        back={{ label: typeof openField === 'number' && field ? field.label || 'New field' : name, onClick: () => void screens.back() }}
+        onPick={(key) => {
+          putOnCard(key, true)
+          void screens.back()
+        }}
+      />
+    )
+  } else if (adding) {
+    screen = (
+      <FieldPicker
+        token={token}
+        pageName={name}
+        pageLabel={draft.label}
+        page={{ hasAddress: draft.hasAddress, hasPhone: draft.hasPhone, fields: draft.fields }}
+        screen={adding}
+        onScreen={showAdding}
+        onBack={() => void screens.back()}
+        onAdd={(row) => {
+          if (row.basic === 'address' || row.basic === 'phone') setOpenBox('contact')
+          else setLanding(new Set(pageFields.map((f) => f.key)))
+          if (row.basic === 'address') {
+            set('hasAddress', true)
+            setCap('map', true)
+          } else if (row.basic === 'phone') set('hasPhone', true)
+          else if (row.basic === 'hours') toggleHoursField(true)
+          else if (row.basic === 'website') toggleWebsiteField(true)
+          else if (row.field) addReadyField(row.field, row.companions, addingTo, row.partner)
+          added(null)
+        }}
+        canRequire={draft.capabilities.add || draft.capabilities.edit}
+        // A field before adding: the page beside with it there.
+        besides={
+          wide
+            ? (f) => {
+                return looksOf(focusOn(previewCategory, normalizeField(f)))
+              }
+            : undefined
+        }
+        onMakeOwn={(type, label) => {
+          setLanding(new Set(pageFields.map((f) => f.key)))
+          added(addOwnField(type, label, addingTo))
+        }}
+      />
+    )
+  } else if (openField === 'address' || openField === 'phone') {
+    // The page's address or phone (board 17's Contact): on, or taken off.
+    const address = openField === 'address'
     screen = (
       <>
-        <AdminBack back={{ label: name, onClick: () => history.back() }} title={field.label || 'New field'} />
-        <p className="m-0 -mt-3 text-[15px] text-slate-600 max-md:mt-0">A field on {name}</p>
-        <FieldEditor
-          field={field}
-          index={i}
-          total={draft.fields.length}
-          // "Required" only matters if people can add or edit listings.
-          canRequire={draft.capabilities.add || draft.capabilities.edit}
-          // Boolean fields make sense as an "audience" a field is scoped to
-          // (e.g. "Women's Tevillah") — a field can't be scoped to itself.
-          audienceOptions={draft.fields
-            .filter((other) => other.type === 'boolean' && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label }))}
-          // Choice fields make sense as a "show only when this equals that
-          // option" trigger — a field can't be scoped to itself.
-          showIfOptions={draft.fields
-            .filter((other) => other.type === 'select' && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
-          // Yes/No and Choice fields are the ones that can render as a badge
-          // — a field can't replace its own badge.
-          badgeFieldOptions={draft.fields
-            .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label }))}
-          // Words a link's own box could say (CategoryField.leadBox).
-          textFieldOptions={draft.fields
-            .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== field.key)
-            .map((other) => ({ key: other.key, label: other.label }))}
-          onChange={(patch) => updateField(i, patch)}
-          onRemove={() => {
-            removeField(i)
-            history.back()
-          }}
-          onMove={(dir) => {
-            moveField(i, dir)
-            setOpenField(i + dir)
-            history.replaceState({ ...(window.history.state ?? {}), editorField: i + dir }, '')
-          }}
-          hasCaveat={!!field.caveat}
-          onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
-        />
+        <AdminBack back={{ label: name, onClick: () => void screens.back() }} title={address ? 'Address' : 'Phone'} />
+        <button
+          type="button"
+          onClick={() => void askRemove(openField, address ? 'Address' : 'Phone', false)}
+          className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer"
+        >
+          Remove this field
+        </button>
       </>
     )
+  } else if (field && typeof openField === 'number') {
+    // A field's own screen (board 13). What the board leaves off (only for
+    // some places, an audience, a link's own box, a badge in place of
+    // another, the order) is a superadmin's, under More.
+    const i = openField
+    const removeIt = () => {
+      if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
+      else {
+        removeField(i)
+        void screens.back()
+      }
+    }
+    screen = (
+      <FieldScreen
+        key={i}
+        field={field}
+        pageName={name}
+        // "Required" only matters if people can add or edit listings.
+        canRequire={draft.capabilities.add || draft.capabilities.edit}
+        onChange={(patch) => updateField(i, patch)}
+        onKosherQuestions={(on) => toggleFieldCaveat(i, on)}
+        partner={partnerRule(field) ? { on: !!partnerOf(draft.fields, field), onChange: (on) => togglePartner(i, on) } : undefined}
+        onRemove={removeIt}
+        onBack={() => void screens.back()}
+        more={
+          superAdmin ? (
+            <FieldEditor
+              field={field}
+              index={i}
+              total={draft.fields.length}
+              // "Required" only matters if people can add or edit listings.
+              canRequire={draft.capabilities.add || draft.capabilities.edit}
+              // Boolean fields make sense as an "audience" a field is scoped to
+              // (e.g. "Women's Tevillah") — a field can't be scoped to itself.
+              audienceOptions={draft.fields
+                .filter((other) => other.type === 'boolean' && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label }))}
+              // Choice fields make sense as a "show only when this equals that
+              // option" trigger — a field can't be scoped to itself.
+              showIfOptions={draft.fields
+                .filter((other) => other.type === 'select' && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
+              // Yes/No and Choice fields are the ones that can render as a badge
+              // — a field can't replace its own badge.
+              badgeFieldOptions={draft.fields
+                .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label }))}
+              // Words a link's own box could say (CategoryField.leadBox).
+              textFieldOptions={draft.fields
+                .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== field.key)
+                .map((other) => ({ key: other.key, label: other.label }))}
+              onChange={(patch) => updateField(i, patch)}
+              onRemove={removeIt}
+              onMove={(dir) => {
+                moveField(i, dir)
+                setOpenField(i + dir)
+                void screens.replace({ field: field.key || `#${i + dir}` })
+              }}
+              hasCaveat={!!field.caveat}
+              onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
+            />
+          ) : undefined
+        }
+      />
+    )
   } else {
-    const rows = draft.fields
-      .map((f, i) => ({ f, i }))
-      // The one Hours/Website/Photo field each "Every place has" box owns
-      // doesn't get a row — like address and phone, the box is the whole
-      // thing. A second field of the same shape is not the box's, and keeps
-      // its row.
-      .filter(({ i }) => i !== managedHoursIndex && i !== managedWebsiteIndex && i !== managedPhotoIndex)
-    const kind = draft.placeKind ? PLACE_KIND_INFO[draft.placeKind] : null
-
     screen = (
       <>
-        <AdminBack back={{ label: 'Category pages', onClick: leave }} title={name} />
+        <AdminBack back={{ label: backLabel, onClick: leave }} title={name} />
         {/* On a phone the page beside has no room: Preview opens it full
             size (board 21b). */}
         {!wide && (
@@ -307,128 +649,40 @@ function CategoryEditorScreen({
           </span>
         </div>
 
-        {isNew ? (
-          <AdminBox title="What kind of places?">
-            <div role="radiogroup" aria-label="What kind of places?">
-              {PLACE_KINDS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.placeKind === k}
-                  onClick={() => pickKind(k)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-b border-slate-100 last:border-b-0 text-left cursor-pointer ${
-                    draft.placeKind === k ? 'bg-blue-50' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <span className={`h-4 w-4 shrink-0 rounded-full border-2 ${draft.placeKind === k ? 'border-primary bg-primary shadow-[inset_0_0_0_3px_white]' : 'border-slate-400'}`} />
-                  <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[15px] font-semibold text-slate-900">{PLACE_KIND_INFO[k].label}</span>
-                    <span className="text-[13px] text-slate-600">{PLACE_KIND_INFO[k].line}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </AdminBox>
-        ) : (
-          kind && (
-            <section aria-label="Kind" className="bg-white border border-slate-200 rounded-[10px] px-4 py-3.5">
-              <p className="m-0 text-[13px] text-slate-600">Kind</p>
-              <p className="m-0 text-[15px] font-semibold text-slate-900">{kind.label}</p>
-              <p className="m-0 text-[13px] text-slate-600">{kind.line}</p>
-            </section>
-          )
-        )}
 
-        <AdminBox title="Name and look">
-          <div className="flex flex-col gap-4 p-4">
-            <AdminField label="Name">
-              <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={adminInputClass} placeholder="e.g. Schools" />
-            </AdminField>
-            <AdminField label="In link previews">
-              <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={adminInputClass} />
-            </AdminField>
-            <div>
-              <AdminField label="Web address">
-                <input value={draft.id} onChange={(e) => setId(e.target.value)} className={adminInputClass} />
-              </AdminField>
-              <span className="block mt-1 text-[13px] text-slate-600">{routes.slug(community, draft.id || '…')}</span>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <ChangeRow
-                label="Icon"
-                look={
-                  <CategoryIcon
-                    icon={draft.icon || DEFAULT_CATEGORY_ICON}
-                    categoryId={initial?.id}
-                    iconImageUrl={draft.iconImageUrl.trim() || undefined}
-                    color={pinColor}
-                    className="h-11 w-11 text-2xl"
-                    sizePx={44}
-                  />
-                }
-              >
-                <IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />
-              </ChangeRow>
-              <ChangeRow label="Banner photo" look={<BannerThumb url={bandImageFor(previewCategory)} />}>
-                <CardBandImageField
-                  cardBandImageUrl={draft.cardBandImageUrl}
-                  onCardBandImageUrl={(v) => set('cardBandImageUrl', v)}
-                  fallbackImageUrl={draft.cardImageUrl}
-                  previewIcon={draft.icon}
-                  previewColor={pinColor}
-                  token={token}
-                />
-                <CardBackgroundField cardImageUrl={draft.cardImageUrl} onCardImageUrl={(v) => set('cardImageUrl', v)} />
-              </ChangeRow>
-            </div>
-          </div>
+        <AdminBox title="Basics" foldOnPhone summary={`${draft.pluralLabel || 'No name'} · ${bandImageFor(previewCategory) ? 'Banner photo' : 'No banner photo'}`}>
+          <Basics
+            name={draft.pluralLabel}
+            onName={setName}
+            icon={
+              <CategoryIcon
+                icon={draft.icon || DEFAULT_CATEGORY_ICON}
+                categoryId={initial?.id}
+                iconImageUrl={draft.iconImageUrl.trim() || undefined}
+                color={pinColor}
+                className="h-11 w-11 text-2xl"
+                sizePx={44}
+              />
+            }
+            iconFields={<IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />}
+            banner={bandImageFor(previewCategory)}
+            bannerFields={
+              <CardBandImageField
+                cardBandImageUrl={draft.cardBandImageUrl}
+                cardImageUrl={draft.cardImageUrl}
+                onChange={(band, card) => {
+                  set('cardBandImageUrl', band)
+                  set('cardImageUrl', card)
+                }}
+                token={token}
+                originalSource={bannerOriginal}
+                onOriginalSourceChange={setBannerOriginal}
+              />
+            }
+          />
         </AdminBox>
 
-        <AdminBox
-          title="What each place shows"
-          action={
-            <span className="flex items-center gap-4">
-              {draft.fields.some((f) => f.type === 'boolean') && (
-                <button
-                  type="button"
-                  onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
-                  className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer"
-                >
-                  + Add audience group
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  addField()
-                  showField(draft.fields.length)
-                }}
-                className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer"
-              >
-                + Add a field
-              </button>
-            </span>
-          }
-        >
-          <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 border-b border-slate-100">
-            <legend className="float-left mr-1 text-[13px] font-semibold text-slate-700">Every place has</legend>
-            <Check label="An address" checked={draft.hasAddress} onChange={(on) => set('hasAddress', on)} />
-            <Check label="A phone number" checked={draft.hasPhone} onChange={(on) => set('hasPhone', on)} />
-            <Check label="Hours" checked={draft.fields.some(isPlainHoursField)} onChange={toggleHoursField} />
-            <Check label="A website" checked={draft.fields.some(isWebsiteField)} onChange={toggleWebsiteField} />
-            {managedWebsiteIndex !== -1 && (
-              // The website field that box owns has no row, so its "show as
-              // a button" setting needs a way in from here.
-              <Check
-                label="Website as a button on the row"
-                checked={!!draft.fields[managedWebsiteIndex].showInHeader}
-                onChange={(on) => updateField(managedWebsiteIndex, { showInHeader: on })}
-              />
-            )}
-            <Check label="A photo" checked={draft.fields.some(isPhotoField)} onChange={togglePhotoField} />
-          </fieldset>
-
+        <AdminBox title="Fields" foldOnPhone defaultOpen={fieldsOpen} summary={fieldsSummary(boxes.map((b) => b.title))}>
           {groupForm && (
             <div className="flex flex-col gap-3 p-4 border-b border-slate-100 bg-blue-50/50">
               <div className="grid sm:grid-cols-2 gap-3">
@@ -465,107 +719,110 @@ function CategoryEditorScreen({
             </div>
           )}
 
-          {rows.length === 0 ? (
-            <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Just a name, address and phone.</p>
-          ) : (
-            <AdminRows items={rows} shown={8}>
-              {({ f, i }) => <AdminRow key={i} onClick={() => showField(i)} name={f.label || 'New field'} line={fieldShows(f)} />}
-            </AdminRows>
+          <FieldBoxes
+            page={fieldPage}
+            boxes={boxes}
+            parts={parts}
+            openId={openBox}
+            freshId={freshBox}
+            onOpen={(id) => {
+              setOpenBox(id)
+              setFreshBox(null)
+            }}
+            onChange={(next, order) => {
+              set('listingParts', listingPartsKey(next))
+              if (order) set('fields', order.map((k) => draftFieldByKey.get(k)!))
+            }}
+            onRename={(id, title) => {
+              const named = renameListingBox(fieldPage, id, title)
+              if (named) set('fields', draft.fields.map((f, i) => (pageFields[i]?.key === named.key ? { ...f, ...named.patch } : f)))
+              else set('listingParts', listingPartsKey(renameBox(parts, id, title)))
+            }}
+            onRemoveBox={(id) => {
+              set('listingParts', listingPartsKey(removeBox(parts, id)))
+              setOpenBox(null)
+            }}
+            onAddField={(id) => {
+              setAddingTo(id)
+              showAdding({ at: 'list' })
+            }}
+            onShowField={(key) => showField(fieldIndex(key))}
+            onShowBasic={showField}
+          />
+
+          <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                const { parts: next, id } = addBox(parts)
+                set('listingParts', listingPartsKey(next))
+                setOpenBox(id)
+                setFreshBox(id)
+              }}
+              className={addButton}
+            >
+              + Add a box
+            </button>
+            {draft.fields.some((f) => f.type === 'boolean') && (
+              <button
+                type="button"
+                onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
+                className={addButton}
+              >
+                + Add audience group
+              </button>
+            )}
+          </div>
+        </AdminBox>
+
+        {!isNew && draft.hasAddress && <WalkBox value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
+
+        <CardBox
+          page={cardPage}
+          sampleName={sampleName(draft.label, draft.pluralLabel)}
+          open={openLine}
+          onOpen={setOpenLine}
+          onField={putOnCard}
+          onOrder={(keys) => set('fields', reorderLine(pageFields, keys).map((f) => draftFieldByKey.get(f.key)!))}
+          onShow={(line) => {
+            setShowLine(line)
+            go({ line })
+            window.scrollTo?.(0, 0)
+          }}
+        />
+
+        <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
+          <AdminYesNo question="Can visitors upvote places?" value={draft.upvotesEnabled} onChange={(yes) => set('upvotesEnabled', yes)} />
+          <AdminYesNo question="A link for places not listed here?" value={draft.externalLinkEnabled} onChange={(yes) => set('externalLinkEnabled', yes)} />
+          {draft.externalLinkEnabled && (
+            <div className="flex flex-col gap-4 p-4 border-t border-slate-100">
+              <AdminField label="What the link says">
+                <input
+                  value={draft.externalLinkLabel}
+                  onChange={(e) => set('externalLinkLabel', e.target.value)}
+                  className={adminInputClass}
+                  placeholder="Find more kosher food"
+                />
+              </AdminField>
+              <AdminField label="Link">
+                <input
+                  value={draft.externalLinkUrl}
+                  onChange={(e) => set('externalLinkUrl', e.target.value)}
+                  className={adminInputClass}
+                  placeholder="https://"
+                />
+              </AdminField>
+            </div>
           )}
         </AdminBox>
 
-        <AdminBox title="Map">
-          <div className="flex flex-col gap-4 p-4">
-            {hasMapCategory && draft.hasAddress && (
-              <label className="flex items-center gap-3 text-[15px] text-slate-900">
-                <AdminSwitch checked={draft.capabilities.map} onChange={(on) => setCap('map', on)} label="Map beside the list, and on the site’s map" />
-                <span aria-hidden="true">Map beside the list, and on the site&rsquo;s map</span>
-              </label>
-            )}
-            <ChangeRow label="Pin colour" look={<span className="block h-6 w-6 rounded-full" style={{ backgroundColor: pinColor }} />} inline>
-              <PinColorField
-                value={draft.pinColor}
-                onChange={(v) => set('pinColor', v)}
-                fallback={fallbackPinColor}
-                icon={draft.icon}
-                categoryId={initial?.id}
-                iconImageUrl={draft.iconImageUrl}
-                siblings={siblings}
-              />
-            </ChangeRow>
-          </div>
-        </AdminBox>
-
-        <AdminBox title="“Not listed here?” line">
-          <div className="flex flex-col gap-4 p-4">
-            <AdminField label="Words">
-              <input
-                value={draft.externalLinkLabel}
-                onChange={(e) => {
-                  set('externalLinkLabel', e.target.value)
-                  set('externalLinkEnabled', !!(e.target.value.trim() && draft.externalLinkUrl.trim()))
-                }}
-                className={adminInputClass}
-                placeholder="Find more kosher food"
-              />
-            </AdminField>
-            <AdminField label="Link">
-              <input
-                value={draft.externalLinkUrl}
-                onChange={(e) => {
-                  set('externalLinkUrl', e.target.value)
-                  set('externalLinkEnabled', !!(draft.externalLinkLabel.trim() && e.target.value.trim()))
-                }}
-                className={adminInputClass}
-                placeholder="https://"
-              />
-            </AdminField>
-          </div>
-        </AdminBox>
-
-        {/* Not on the drawing, kept: how the list is grouped and the one
-            question it asks. Only on an existing category: the choices come
-            from its saved fields. */}
-        {!isNew && (
-          <AdminBox title="The list">
-            <div className="flex flex-col gap-4 p-4">
-              <AdminField label="Group the list">
-                <select value={draft.groupBy} onChange={(e) => set('groupBy', e.target.value)} className={adminInputClass}>
-                  <option value="">One list, no groups</option>
-                  {groupByOptions({ ...initial!, hasAddress: draft.hasAddress, detailFields: draft.fields.map(normalizeField) }).map((o) => (
-                    <option key={groupByKey(o.value)} value={groupByKey(o.value)}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </AdminField>
-              <AdminField label="Question card">
-                <select value={draft.questionCard} onChange={(e) => set('questionCard', e.target.value)} className={adminInputClass}>
-                  <option value="">No question card</option>
-                  {questionCardOptions({ ...initial!, detailFields: draft.fields.map(normalizeField) }).map((o) => (
-                    <option key={questionCardKey(o.value)} value={questionCardKey(o.value)}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </AdminField>
-            </div>
-          </AdminBox>
+        {isNew ? (
+          <button type="button" onClick={leave} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
+            Don&rsquo;t make this page
+          </button>
+        ) : (
+          onDeleted && <DeletePage token={token} category={initial!} onDeleted={onDeleted} />
         )}
-
-        {/* Not on the drawing, kept: other categories' places within a walk,
-            and what each opened place adds. */}
-        {!isNew && draft.hasAddress && <WalkListsEditor value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
-        {!isNew && <ListingPartsEditor value={draft.listingParts} onChange={(v) => set('listingParts', v)} fields={draft.fields.map(normalizeField)} />}
-
-        {/* Not on the drawing, kept: the per-category switches under the
-            site-wide ones. */}
-        <AdminBox title="What visitors can do">
-          {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map').map((k) => (
-            <SwitchRow key={k} label={CAPABILITY_LABELS[k]} checked={draft.capabilities[k]} onChange={(on) => setCap(k, on)} />
-          ))}
-          <SwitchRow label="Upvotes" checked={draft.upvotesEnabled} onChange={(on) => set('upvotesEnabled', on)} />
-        </AdminBox>
       </>
     )
   }
@@ -592,7 +849,8 @@ function CategoryEditorScreen({
             <CleanupConfirm cleanup={pendingCleanup} initial={initial} saving={saving} onCancel={cancelCleanup} onConfirm={() => save()} />
           ) : null}
         </div>
-        {preview}
+        {/* Not beside Add a field or a removal (boards 7-12, 16). */}
+        {!adding && !removing && preview}
       </div>
 
       {!(pendingIdRename || pendingRename || pendingCleanup) && (
@@ -609,33 +867,67 @@ function CategoryEditorScreen({
   )
 }
 
-/** Something with a look and a "Change" that opens its settings in place
- *  (board 6b's Icon, Banner photo and Pin colour). */
-function ChangeRow({ label, look, inline = false, children }: { label: string; look: React.ReactNode; inline?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const change = (
-    <button type="button" aria-expanded={open} aria-label={`${open ? 'Done with' : 'Change'} ${label.toLowerCase()}`} onClick={() => setOpen((o) => !o)} className="self-start min-h-8 text-[15px] font-semibold text-primary hover:underline cursor-pointer">
-      {open ? 'Done' : 'Change'}
-    </button>
-  )
+export { sampleName } from '@/lib/fieldLooks'
+
+/** "Address, Phone, Hours and 3 more" under the folded Fields row. */
+export function fieldsSummary(labels: string[]): string {
+  const named = labels.filter(Boolean)
+  if (named.length === 0) return 'No fields yet'
+  if (named.length <= 3) return named.join(', ')
+  return `${named.slice(0, 3).join(', ')} and ${named.length - 3} more`
+}
+
+/** A page's Basics (board 4): its icon beside its name, each opening its
+ *  settings in place, then the banner photo as a row. */
+function Basics({
+  name,
+  onName,
+  icon,
+  iconFields,
+  banner,
+  bannerFields,
+}: {
+  name: string
+  onName: (name: string) => void
+  icon: React.ReactNode
+  iconFields: React.ReactNode
+  banner: string | null
+  bannerFields: React.ReactNode
+}) {
+  const [open, setOpen] = useState<'icon' | 'banner' | null>(null)
+  const flip = (which: 'icon' | 'banner') => setOpen((o) => (o === which ? null : which))
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      <div className="flex items-center gap-3">
-        {look}
-        {inline ? (
-          <>
-            <span className="text-[15px] text-slate-900">{label}</span>
-            {change}
-          </>
-        ) : (
-          <span className="flex flex-col">
-            <span className="text-[13px] font-semibold text-slate-700">{label}</span>
-            {change}
+    <>
+      <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
+        <div className="flex items-end gap-3">
+          <span className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-semibold text-slate-700">Icon</span>
+            <button type="button" aria-expanded={open === 'icon'} aria-label="Change the icon" onClick={() => flip('icon')} className="rounded-[10px] cursor-pointer">
+              {icon}
+            </button>
           </span>
-        )}
+          <span className="flex-1 min-w-0">
+            <AdminField label="Name">
+              <input value={name} onChange={(e) => onName(e.target.value)} className={adminInputClass} placeholder="Name" />
+            </AdminField>
+          </span>
+        </div>
+        {open === 'icon' && <div className="flex flex-col gap-3">{iconFields}</div>}
       </div>
-      {open && <div className="flex flex-col gap-3">{children}</div>}
-    </div>
+      <button
+        type="button"
+        aria-expanded={open === 'banner'}
+        onClick={() => flip('banner')}
+        className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[60px] text-left cursor-pointer hover:bg-slate-50"
+      >
+        <span className="flex-1 text-[15px] font-semibold text-slate-900">Banner photo</span>
+        <BannerThumb url={banner} />
+        <span className={open === 'banner' ? 'rotate-90' : ''}>
+          <Chevron />
+        </span>
+      </button>
+      {open === 'banner' && <div className="flex flex-col gap-3 px-4 pb-4">{bannerFields}</div>}
+    </>
   )
 }
 
@@ -644,9 +936,9 @@ function BannerThumb({ url }: { url: string | null }) {
   // own note on not optimising it.
   return url ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" className="h-11 w-[72px] rounded-md object-cover" />
+    <img src={url} alt="" className="h-9 w-[72px] rounded-md object-cover" />
   ) : (
-    <span className="block h-11 w-[72px] rounded-md bg-slate-200" />
+    <span className="grid h-9 w-[72px] place-items-center rounded-md bg-slate-200 text-xs font-semibold text-slate-600">None</span>
   )
 }
 
@@ -656,16 +948,5 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
       {label}
     </label>
-  )
-}
-
-function SwitchRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-b border-slate-100 last:border-b-0">
-      <span className="flex-1 text-[15px] text-slate-900" aria-hidden="true">
-        {label}
-      </span>
-      <AdminSwitch checked={checked} onChange={onChange} label={label} />
-    </div>
   )
 }

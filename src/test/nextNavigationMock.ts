@@ -117,3 +117,20 @@ export function pushSyncingSearchParams(url: string): void {
   const qIndex = url.indexOf('?')
   setMockSearchParams(qIndex === -1 ? {} : new URLSearchParams(url.slice(qIndex + 1)))
 }
+
+// A router whose push and replace write the history the way Next's do, for
+// a component whose screens are history entries (CategoryEditor's, which
+// Back and Forward walk). Still recorded on mockRouter for assertions:
+//
+//   vi.mock('next/navigation', () => ({ useRouter: () => historyRouter, ... }))
+export const historyRouter = {
+  ...mockRouter,
+  push(url: string, options?: unknown) {
+    mockRouter.push(url, options)
+    window.history.pushState({}, '', url)
+  },
+  replace(url: string, options?: unknown) {
+    mockRouter.replace(url, options)
+    window.history.replaceState({}, '', url)
+  },
+}

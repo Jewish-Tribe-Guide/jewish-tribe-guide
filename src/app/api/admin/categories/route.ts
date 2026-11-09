@@ -1,7 +1,9 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
+import { parseListingParts, type ListingParts } from '@/lib/listingParts'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
+import { countApprovedByCategory } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import { isValidPinColor } from '@/lib/categoryColor'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
@@ -17,8 +19,13 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const categories = await listCategoriesUncached(community.slug)
-    return Response.json({ ok: true, categories })
+    // ?counts=1: how many places each has, for Category pages' rows.
+    const withCounts = new URL(request.url).searchParams.get('counts') === '1'
+    const [categories, placeCounts] = await Promise.all([
+      listCategoriesUncached(community.slug),
+      withCounts ? countApprovedByCategory(community.slug) : undefined,
+    ])
+    return Response.json({ ok: true, categories, ...(placeCounts && { placeCounts }) })
   } catch (err) {
     console.error('[admin/categories] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load categories.'] }, { status: 502 })
@@ -45,6 +52,8 @@ type CreateBody = {
   pinColor?: string | null
   active?: boolean
   placeKind?: PlaceKind
+  /** A copied page's boxes (listingParts.ts). */
+  listingParts?: ListingParts | null
 }
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
@@ -95,6 +104,7 @@ export async function POST(request: Request) {
       pinColor: body.pinColor,
       active: body.active,
       placeKind: isPlaceKind(body.placeKind) ? body.placeKind : undefined,
+      listingParts: body.listingParts ? parseListingParts(body.listingParts) : undefined,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

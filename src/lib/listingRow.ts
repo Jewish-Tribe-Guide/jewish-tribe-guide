@@ -5,6 +5,7 @@ import type { DirectoryResource, ZmanimData } from '@/types'
 import { parseTimeToMinutes } from './davening'
 import { confirmedAnywhere, timesConfirmedAt } from './boxDates'
 import type { ShulRowStatus } from './upcomingDavening'
+import { secondLineFields, thirdLineFields } from './cardLines'
 
 /** A restaurant's dishes, not a store's items: the noun itemWording reads
  *  from countLabel (not imported from itemMarks, which imports this file
@@ -44,15 +45,11 @@ export type RowFact = {
   ownLine?: boolean
 }
 
-/** The badge fields a collapsed row shows: boolean/select fields rendered as
- *  a badge and tied to a filter. Everything else waits for the opened
+/** The yes/no and choice fields on the row's second line, as the admin
+ *  chose them (cardLines.ts). Everything else waits for the opened
  *  listing. */
 export function rowBadgeFields(category: CategoryConfig): CategoryField[] {
-  return category.detailFields.filter((f) => {
-    if (f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image') return false
-    if ((f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) !== 'badge') return false
-    return !!f.filterable
-  })
+  return secondLineFields(category.detailFields)
 }
 
 /** "7:00 PM" → "7 PM"; "6:30 PM" stays. */
@@ -213,7 +210,8 @@ export function listingRowNote(
   } = {},
 ): RowNote | null {
   const fields = category.detailFields
-  for (const f of rowBadgeFields(category)) {
+  // Whether or not the hechsher itself is on the second line.
+  for (const f of fields) {
     if (!f.caveat || !item[f.caveat.flagField]) continue
     const present = f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0
     if (!present) continue
@@ -237,9 +235,7 @@ export function listingRowNote(
   // confirm". An exception: it changes whether to go.
   if (opts.shulNote) return { text: opts.shulNote, tone: 'quiet', kind: 'exception' }
 
-  const noteField = fields.find(
-    (f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader && String(item[f.key] ?? '').trim(),
-  )
+  const noteField = thirdLineFields(fields).find((f) => String(item[f.key] ?? '').trim())
   if (noteField) {
     const text = String(item[noteField.key]).trim()
     // A longer note is someone's report of the place, and quoted as one; a

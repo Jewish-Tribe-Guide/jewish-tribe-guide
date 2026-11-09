@@ -162,6 +162,17 @@ describe('UpvoteButton', () => {
     expect(screen.getByRole('button').className).toMatch(/\bbg-slate-100\b/)
   })
 
+  // The user, Nov 5: people know "upvote", not "recommend". The listing's
+  // button is a thumb and a count, so its label and hover say the word.
+  it('names the listing\'s button Upvote, with the count in upvotes', () => {
+    render(<UpvoteButton resourceId="r1" count={12} variant="recommend" name="Goldie" />)
+    const button = screen.getByRole('button', { name: 'Upvote Goldie, 12 upvotes' })
+    expect(button).toHaveAttribute('title', 'Upvote this place')
+    cleanup()
+    render(<UpvoteButton resourceId="r1" count={1} variant="recommend" name="Goldie" />)
+    expect(screen.getByRole('button', { name: 'Upvote Goldie, 1 upvote' })).toBeInTheDocument()
+  })
+
   it('tints the inline variant\'s background once voted, distinct from its at-rest color', () => {
     render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
     const before = screen.getByRole('button').className

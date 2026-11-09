@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
@@ -84,9 +84,16 @@ function stubFetch() {
   return calls
 }
 
+// Next's router as it behaves here: the entry written as it lands (at once).
+beforeEach(() => {
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
+})
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  mockRouter.push.mockReset()
+  mockRouter.replace.mockReset()
 })
 
 describe('CategoryPreview', () => {
@@ -107,6 +114,26 @@ describe('CategoryPreview', () => {
     expect(screen.getByTestId('directory')).toHaveTextContent('Sweet Box Bakery · (267) 606-6613')
     // The one read of the category's listings, and nothing sent.
     expect(calls).toEqual([{ url: expect.stringContaining('/api/resources?category=restaurant'), method: 'GET' }])
+  })
+
+  // The user, Nov 9: "I'm not seeing an edit listing option in the preview".
+  it('A listing has Edit listing at its foot; its Send shows the change there without sending it', async () => {
+    const u = userEvent.setup()
+    const calls = stubFetch()
+    renderWithProviders(<CategoryPreview category={FOOD} view="listing" onClose={() => {}} />)
+
+    await u.click(await screen.findByRole('button', { name: 'Edit listing' }))
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
+    await u.click(screen.getByTestId('editor-row-contact'))
+    const phone = screen.getByLabelText('Phone')
+    await u.clear(phone)
+    await u.type(phone, '2676066613')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
+    await u.click(screen.getByRole('button', { name: 'Send 1 change' }))
+
+    expect(await screen.findByText(/\(267\) 606-6613/)).toBeInTheDocument()
+    expect(screen.queryByText(/\(267\) 975-1711/)).toBeNull()
+    expect(calls.filter((c) => c.method !== 'GET')).toEqual([])
   })
 
   it('a box’s own Edit on an opened listing shows the change in the preview, with nothing in the queue', async () => {
@@ -155,5 +182,60 @@ describe('CategoryPreview', () => {
     // Reads of the guide's listings only: no read of the message, nothing sent.
     expect(calls.filter((c) => c.method !== 'GET')).toEqual([])
     expect(calls.every((c) => c.url.includes('/api/resources'))).toBe(true)
+  })
+
+  // The user, Nov 7: beside a field, Adding opens on it. That opened row
+  // isn't a screen in the history: beside the page, the admin's Back first
+  // closed a row they never saw open, and full size it took the field away
+  // again. A row opened by hand, full size, still is one.
+  it('opens Adding on the field it’s given, its row not in the history', async () => {
+    const u = userEvent.setup()
+    stubFetch()
+    // A row in the history has its address (stepAddress.ts).
+    const editorStep = () => new URLSearchParams(window.location.search).get('row') ?? undefined
+    window.history.replaceState({}, '', '/philly/admin/categories/food')
+    const { unmount } = renderWithProviders(<CategoryPreview category={FOOD} inline view="adding" focusField="kosherCert" onClose={() => {}} />)
+    expect(await screen.findByTestId(/^editor-open-/)).toHaveTextContent('Kosher Certification')
+    expect(editorStep()).toBeUndefined()
+    unmount()
+    const full = renderWithProviders(<CategoryPreview category={FOOD} view="adding" focusField="kosherCert" onClose={() => {}} />)
+    expect(await screen.findByTestId(/^editor-open-/)).toHaveTextContent('Kosher Certification')
+    expect(editorStep()).toBeUndefined()
+    full.unmount()
+    renderWithProviders(<CategoryPreview category={FOOD} view="adding" onClose={() => {}} />)
+    await u.click(await screen.findByRole('button', { name: 'About' }))
+    expect(screen.getByTestId('editor-open-about')).toBeInTheDocument()
+    await waitFor(() => expect(editorStep()).toBe('about'))
+  })
+
+  // The user, Nov 9: a new page's preview, before anyone adds a place.
+  it('shows a made-up place on a page with no places, on Page and A listing, and sends nothing', async () => {
+    const calls: { url: string; method: string }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url: String(url), method: init?.method ?? 'GET' })
+        return new Response(JSON.stringify({ ok: true, resources: [] }), { status: 200 })
+      }),
+    )
+    const page = { ...FOOD, label: 'Restaurant', pluralLabel: 'Restaurants' }
+    const { unmount } = renderWithProviders(<CategoryPreview category={page} onClose={() => {}} />)
+    expect(await screen.findByTestId('made-up-note')).toHaveTextContent('A made-up place')
+    expect(screen.getByTestId('directory')).toHaveTextContent('A restaurant · (215) 555-0100')
+    unmount()
+
+    renderWithProviders(<CategoryPreview category={page} view="listing" onClose={() => {}} />)
+    expect(await screen.findByTestId('made-up-note')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'A restaurant' })).toBeInTheDocument()
+    expect(screen.queryByText('No places on this page yet.')).toBeNull()
+    expect(calls.filter((c) => c.method !== 'GET')).toEqual([])
+  })
+
+  it('shows no made-up place once the page has a real one', async () => {
+    stubFetch()
+    renderWithProviders(<CategoryPreview category={FOOD} onClose={() => {}} />)
+    expect(await screen.findByRole('button', { name: 'Edit Sweet Box Bakery' })).toBeInTheDocument()
+    expect(screen.queryByTestId('made-up-note')).toBeNull()
+    expect(screen.getByTestId('directory')).not.toHaveTextContent('A place')
   })
 })

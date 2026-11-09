@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { bandImageFor, type CategoryConfig } from '@/lib/categories'
+import { bandImageFor, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
 import type { Coords } from '@/lib/useStoredLocation'
@@ -21,6 +21,11 @@ import { PreviewCategoryProvider } from '@/lib/contentContext'
 import { PreviewSendProvider } from '@/lib/previewSend'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import ListingEditorScreen from './ListingEditorScreen'
+import ListingView from '@/components/resources/ListingView'
+import ListingEditBar from '@/components/resources/ListingEditBar'
+import { ui } from '@/lib/uiConfig'
+import { fullestListing } from '@/lib/fullestListing'
+import { madeUpPlace, sampleName } from '@/lib/fieldLooks'
 
 // A preview of the real directory page for a category — the exact same
 // GenericDirectory/ListingEditor components a visitor sees, driven
@@ -43,6 +48,10 @@ import ListingEditorScreen from './ListingEditorScreen'
 // colour, icon and chip label are the ones the editor is showing rather than
 // the ones still in the database.
 
+/** Which part of the page (board 5): the list, its most filled-in place
+ *  opened, or the form for adding one. */
+export type PreviewView = 'page' | 'listing' | 'adding'
+
 type Action =
   | { mode: 'edit'; listing: DirectoryResource }
   | { mode: 'map'; query?: string; filters?: MapFilters }
@@ -52,6 +61,8 @@ export default function CategoryPreview({
   onClose,
   inline = false,
   onListings,
+  view = 'page',
+  focusField,
 }: {
   /** The draft, packaged as a full CategoryConfig — never saved. */
   category: CategoryConfig
@@ -62,6 +73,9 @@ export default function CategoryPreview({
   /** How many places the category has, once loaded: the editor's
    *  "N places". */
   onListings?: (count: number) => void
+  view?: PreviewView
+  /** Adding opens on this field's row: the field an admin is looking at. */
+  focusField?: string
 }) {
   const [realListings, setRealListings] = useState<DirectoryResource[] | null>(null)
   // Listings added/edited during this preview session — client-only, never
@@ -138,6 +152,15 @@ export default function CategoryPreview({
     setAction(null)
   }, [])
 
+  // A page with no places yet shows a made-up one, answering every field,
+  // so the page can be seen before anyone adds a place (the user, Nov 9).
+  // Never saved; the first real or previewed place replaces it.
+  const madeUp = category.kind !== 'eruv' && category.kind !== 'zmanim' && realListings?.length === 0 && localListings.length === 0
+  // A 555 phone (never a real one); no address, which would give it
+  // directions to a real street.
+  const orMadeUp = (items: DirectoryResource[]) =>
+    items.length ? items : [{ ...madeUpPlace(category, sampleName(category.label, category.pluralLabel)), ...(category.hasPhone !== false ? { phone: '(215) 555-0100' } : {}) }]
+
   let content: React.ReactNode
   if (category.kind === 'eruv') {
     // No Add/Edit/Report action state applies here — it's a single info
@@ -189,12 +212,33 @@ export default function CategoryPreview({
         />
       </ListingsProvider>
     )
+  } else if (view === 'adding') {
+    content = <ListingEditorScreen key={`adding:${focusField ?? ''}`} heading={`Add to ${category.pluralLabel}`} category={category} onClose={onClose} backLabel={category.pluralLabel} startOpen={focusField} history={!inline && !focusField} />
   } else if (realListings === null) {
     content = <p className="text-sm text-muted p-4">Loading…</p>
+  } else if (view === 'listing') {
+    // An edit made here shadows the place it edited, as on the page.
+    const localIds = new Set(localListings.map((l) => l.id))
+    const fullest = fullestListing(orMadeUp([...localListings, ...realListings.filter((r) => !localIds.has(r.id))]), category)
+    // Edit listing at its foot, as a visitor sees it (the user, Nov 9: "I'm
+    // not seeing an edit listing option in the preview"). It opens the
+    // editor here, which sends nothing (PreviewSendProvider below).
+    const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
+    content = fullest ? (
+      <ListingView
+        item={fullest}
+        category={category}
+        color={getCategoryColor([category], category.id)}
+        path=""
+        foot={<ListingEditBar onEdit={canEdit ? () => setAction({ mode: 'edit', listing: fullest }) : undefined} item={fullest} category={category} />}
+      />
+    ) : (
+      <p className="text-sm text-muted p-4">No places on this page yet.</p>
+    )
   } else {
     // A locally added/edited listing shadows any real listing with the same id.
     const localIds = new Set(localListings.map((l) => l.id))
-    const items = [...realListings.filter((r) => !localIds.has(r.id)), ...localListings]
+    const items = orMadeUp([...realListings.filter((r) => !localIds.has(r.id)), ...localListings])
     content = (
       <GenericDirectory
         category={category}
@@ -230,6 +274,12 @@ export default function CategoryPreview({
           <PinnedProvider>
             <DroppedPinsProvider>
               <HeaderCollapseProvider>
+                {/* Above the site's header: the preview's, not the page's. */}
+                {madeUp && view !== 'adding' && !action && (
+                  <p data-testid="made-up-note" className="m-0 bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900">
+                    A made-up place, until this page has real ones
+                  </p>
+                )}
                 <SiteHeader
                   onGoHome={onClose}
                   location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}

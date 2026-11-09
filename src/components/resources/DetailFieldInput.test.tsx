@@ -156,6 +156,25 @@ describe('a choice field', () => {
     renderField({ ...cuisine, allowOther: true }, 'Fusion')
     expect(screen.getByPlaceholderText('Please specify')).toHaveValue('Fusion')
   })
+
+  // Denomination had a choice called Other and the typed-in Other, so
+  // the list said Other twice (the user, Nov 7: get rid of the first).
+  it('with "Other…", leaves out a choice that is only called Other, one or several', async () => {
+    const withOther = { ...cuisine, allowOther: true, options: [...cuisine.options!, { value: 'Other', label: 'Other' }] }
+    renderField(withOther)
+    expect(within(screen.getByLabelText('Cuisine')).getAllByRole('option').map((o) => o.textContent).filter((t) => /other/i.test(t ?? ''))).toEqual(['Other…'])
+    cleanup()
+    const user = userEvent.setup()
+    renderField({ ...withOther, multiSelect: true })
+    await user.click(screen.getByRole('button', { name: /Cuisine/ }))
+    expect(screen.getByRole('checkbox', { name: 'Italian' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Other' })).toBeNull()
+  })
+
+  it('with "Other…", keeps a place’s Other as its typed-in value', () => {
+    renderField({ ...cuisine, allowOther: true, options: [...cuisine.options!, { value: 'Other', label: 'Other' }] }, 'Other')
+    expect(screen.getByPlaceholderText('Please specify')).toHaveValue('Other')
+  })
 })
 
 // Inside an audience section, "Women's Phone" reads as just "Phone".

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DesktopNavItem } from './siteSettings'
-import { headingLine, tabHolds, tabItems, tabLine, withTabItems } from './navTabs'
+import { headingLine, linksToMap, tabHolds, tabItems, tabLine, withTabItems } from './navTabs'
 
 // A tab holds links or headings; what goes in first decides (the user, Nov 4).
 
@@ -34,5 +34,24 @@ describe('navTabs', () => {
   it('a heading line names its links, or says there are none', () => {
     expect(headingLine(['Food', 'Grocery'])).toBe('Food · Grocery')
     expect(headingLine([])).toBe('Nothing in it yet')
+  })
+})
+
+// The Map is on the site wherever it's linked (board 1, Nov 5).
+describe('linksToMap', () => {
+  const link = (target: string): DesktopNavItem => ({ id: target, label: target, kind: 'link', target })
+  const tab = (target: string) => ({ id: target, label: target, target })
+
+  it('is true for a header link, a link in a dropdown or under a heading, or a phone tab', () => {
+    expect(linksToMap({ desktopNavItems: [link('map')], mobileTabs: [] })).toBe(true)
+    expect(linksToMap({ desktopNavItems: [withTabItems(link('more'), [link('you'), link('map')])], mobileTabs: [] })).toBe(true)
+    const heading: DesktopNavItem = { id: 'h', label: 'Find', kind: 'heading', items: [link('map')] }
+    expect(linksToMap({ desktopNavItems: [withTabItems(link('more'), [heading])], mobileTabs: [] })).toBe(true)
+    expect(linksToMap({ desktopNavItems: [link('you')], mobileTabs: [tab('map')] })).toBe(true)
+  })
+
+  it('is false when nothing links to it, and true for the default header', () => {
+    expect(linksToMap({ desktopNavItems: [link('you')], mobileTabs: [tab('you')] })).toBe(false)
+    expect(linksToMap({ desktopNavItems: [], mobileTabs: [tab('you')] })).toBe(true)
   })
 })

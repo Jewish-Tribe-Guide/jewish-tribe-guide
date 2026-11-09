@@ -236,6 +236,7 @@ export function BoxEditor({
                   writing={edit.writing!}
                   dayChoices={weekPostDays(w)}
                   onStep={weekSteps.get(w.id)!}
+                  off={f.minyanOff}
                   onChange={(rows) => setWeek(w.id, rows)}
                   send={() => null}
                 />
@@ -260,6 +261,7 @@ export function BoxEditor({
             writing={edit.writing!}
             dayChoices={weekPosts.length ? weekPostDays(weekPosts[0]) : undefined}
             onStep={onStep}
+            off={f.minyanOff}
             onChange={(rows) => (weekPosts.length ? setWeek(weekPosts[0].id, rows) : setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows)))}
             send={(n) => (
               <>

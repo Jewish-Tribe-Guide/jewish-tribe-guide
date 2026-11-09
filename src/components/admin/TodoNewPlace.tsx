@@ -5,11 +5,11 @@ import type { DirectoryResource, EnrichedSubmission, ResourceSubmission } from '
 import type { CategoryConfig } from '@/lib/categories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import ListingEditor, { type EditorControl, type EditorStep } from '@/components/resources/ListingEditor'
+import ListingEditor, { type EditorControl } from '@/components/resources/ListingEditor'
 import { useListingDraft } from '@/components/resources/useListingDraft'
 import PlaceFrame, { PlaceButtons, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { SubmissionSourceCard } from './TodoChange'
-import { useHistoryDepth } from '@/lib/useHistoryDepth'
+import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 
 // A new place on To do (board L3NewPlace): the listing as it would go in,
 // in the site's own editor, a row for each thing it has and "Not on the
@@ -89,10 +89,11 @@ export default function TodoNewPlace({
     onEditing(edit.edited)
     return () => onEditing(false)
   }, [edit.edited, onEditing])
-  const [step, setStep] = useState<EditorStep | null>(null)
-  // An open row or a minyan in it is an entry, as in Places' editor: a
-  // swipe back closes it rather than leaving the place (Nov 4).
-  useHistoryDepth('todoStep', step ? (step.depth ?? 1) : 0, () => step?.back())
+  const { step, path, onStep, reopen, ask } = useEditorSteps()
+  // An open row or a minyan in it has an address and an entry, as in
+  // Places' editor: Back closes it rather than leaving the place, Forward
+  // and a reload open it again. Its own, among the other things here.
+  useStepsInAddress('step', path, ask, { owner: s.id.slice(0, 8) })
   const inStep = !!step?.title
 
   const sending = busy || edit.sending
@@ -117,7 +118,8 @@ export default function TodoNewPlace({
         category={category}
         draft={draft}
         onClose={() => {}}
-        onStep={setStep}
+        onStep={onStep}
+        reopen={reopen}
         hosted={{ onControl }}
         splitContact
         adminSave={{

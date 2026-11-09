@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -9,7 +10,7 @@ import { ADMIN_AREA_TAPPED, adminBase } from '@/lib/adminNav'
 import { watchesLine } from '@/lib/todo'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import { screensOpenIn } from '@/lib/useHistoryDepth'
+import { stepCount, withoutSteps } from '@/lib/stepAddress'
 import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import AddPlace from './AddPlace'
@@ -18,6 +19,7 @@ import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
 import { AddButton } from '@/components/AddButton'
 import { coverageOf, useWatchJobsAndReload } from './useWatchJobs'
+import { moveBackTo, moveTo } from './useScreenHistory'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
 // Find one by name, narrow by three menus (what's on the site, its category,
@@ -52,6 +54,25 @@ function categoryFromAddress(): string {
 function checkedFromAddress(): CheckedBy {
   const checked = new URLSearchParams(window.location.search).get('checked')
   return isCheckedBy(checked) ? checked : 'any'
+}
+
+/** The place open (`?place=`) or the category being added to (`?add=`):
+ *  each a screen of its own, with its own address and entry, so Back,
+ *  Forward and a reload land on it. */
+function openFromAddress(): { place: string | null; add: string | null } {
+  const params = new URLSearchParams(window.location.search)
+  return { place: params.get('place'), add: params.get('add') }
+}
+
+/** This address with `place` or `add` (or neither: the list), the list's
+ *  own choices kept and the steps of whatever was open dropped. */
+function listHref(open: { place?: string; add?: string } = {}): string {
+  const url = new URL(withoutSteps(window.location.pathname, window.location.search), window.location.origin)
+  url.searchParams.delete('place')
+  url.searchParams.delete('add')
+  if (open.place) url.searchParams.set('place', open.place)
+  if (open.add) url.searchParams.set('add', open.add)
+  return url.pathname + url.search
 }
 
 /** Writes one of the list's choices into the address, so a reload or Back
@@ -101,6 +122,7 @@ function WatchesRow({ href, line }: { href: string; line: string | undefined }) 
 export default function PlacesList({ token }: { token: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
+  const router = useRouter()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { jobs, reload } = useWatchJobsAndReload(token)
@@ -126,6 +148,9 @@ export default function PlacesList({ token }: { token: string }) {
       setShow(showFromAddress())
       setCategory(categoryFromAddress())
       setChecked(checkedFromAddress())
+      const open = openFromAddress()
+      setOpenId(open.place)
+      setAdding(open.add)
       setData(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the places.')
@@ -139,13 +164,14 @@ export default function PlacesList({ token }: { token: string }) {
     setAddressParam('show', next, 'site')
   }
 
-  // A place or Add is an entry in the history, so swiping back from one
-  // lands on this list, not on the page before it (the user, Oct 31).
+  // A place or Add is an entry in the history, with its own address, so
+  // swiping back from one lands on this list, not on the page before it
+  // (the user, Oct 31), and Forward and a reload land on it again (Nov 9).
   useEffect(() => {
-    const onPop = (e: PopStateEvent) => {
-      const state = e.state as { placeOpen?: string; placeAdding?: string } | null
-      setOpenId(state?.placeOpen ?? null)
-      setAdding(state?.placeAdding ?? null)
+    const onPop = () => {
+      const open = openFromAddress()
+      setOpenId(open.place)
+      setAdding(open.add)
     }
     const onTapped = () => {
       setOpenId(null)
@@ -159,22 +185,29 @@ export default function PlacesList({ token }: { token: string }) {
     }
   }, [])
 
+  // Through Next's router, one move at a time (useScreenHistory.ts).
   function openPlace(id: string) {
     setOpenId(id)
-    history.pushState({ ...(window.history.state ?? {}), placeOpen: id }, '')
+    void moveTo(router, 'push', () => listHref({ place: id }))
     window.scrollTo?.(0, 0)
   }
 
   function startAdding(id: string) {
     setAdding(id)
-    history.pushState({ ...(window.history.state ?? {}), placeAdding: id }, '')
+    void moveTo(router, 'push', () => listHref({ add: id }))
     window.scrollTo?.(0, 0)
   }
 
   function close() {
-    const state = window.history.state as { placeOpen?: string; placeAdding?: string } | null
     // Over any screens the place still has open (a save from an open row).
-    if (state?.placeOpen || state?.placeAdding) history.go(-1 - screensOpenIn(state))
+    void moveBackTo(
+      router,
+      () => {
+        const open = openFromAddress()
+        return open.place || open.add ? 1 + stepCount(window.location.search) : 0
+      },
+      () => listHref(),
+    )
     setOpenId(null)
     setAdding(null)
     window.scrollTo?.(0, 0)

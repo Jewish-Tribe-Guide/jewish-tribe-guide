@@ -83,6 +83,24 @@ export function selectValues(value: unknown): string[] {
   return [String(value)]
 }
 
+/** The choices someone adding a place picks from. With a typed-in Other,
+ *  a choice called "Other", or "Other Kosher", would be a second one
+ *  (Denomination had the first, Kosher Certification the second; the user,
+ *  Nov 7 and 9). A place that picked it keeps it, as a typed-in value. */
+export function pickableOptions(field: Pick<CategoryField, 'options' | 'allowOther'>): NonNullable<CategoryField['options']> {
+  const options = field.options ?? []
+  return field.allowOther ? options.filter((o) => !/^other\b/i.test(o.label.trim())) : options
+}
+
+/** A minyan's parts a page can turn off: sign-up minyanim, a link to join
+ *  from home, and summer or winter only. */
+export type MinyanPart = 'signUp' | 'joinLink' | 'season'
+export const MINYAN_PARTS: { part: MinyanPart; label: string; hint: string }[] = [
+  { part: 'signUp', label: 'Sign-up minyanim', hint: 'One that runs when enough people sign up' },
+  { part: 'joinLink', label: 'Join from home', hint: 'A Zoom or livestream link' },
+  { part: 'season', label: 'Summer or winter only', hint: 'One held only part of the year' },
+]
+
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
   key: string
@@ -91,8 +109,17 @@ export type CategoryField = {
   required?: boolean
   placeholder?: string
   help?: string
-  /** Options for `type: 'select'`. */
-  options?: { value: string; label: string }[]
+  /** Options for `type: 'select'`. `own`: added by this community to a
+   *  ready-made field ("Your own choices"), so it's this page's to remove
+   *  and isn't offered to other communities with the field. */
+  options?: { value: string; label: string; own?: boolean }[]
+  /** Made on this page with Make your own (board 12), so its name, note and
+   *  choices are this page's to set. A field without it came ready-made:
+   *  its name and what it does are the same everywhere (the user, Nov 7). */
+  madeHere?: boolean
+  /** Davening times: the parts of a minyan this page doesn't ask about
+   *  (the user, Nov 9: a community may not need them). Absent: all. */
+  minyanOff?: MinyanPart[]
   /** For `type: 'tags'`: which tag vocabulary group to draw from / add to. The
    *  field's value is an array of tag labels stored on the listing's `details`. */
   tagGroup?: string
@@ -150,6 +177,11 @@ export type CategoryField = {
    *  (e.g. "Sit-down glatt kosher steakhouse, under IKC supervision") — see
    *  headerTextFields in GenericListingCard.tsx. */
   showInHeader?: boolean
+  /** On the card a place is listed on, before it's opened (cardLines.ts):
+   *  a yes/no or choice field on its second line; the photo, `false`, gone
+   *  for the place's initials. Unset follows the rule from before: a badge
+   *  with a filter is on it. */
+  onCard?: boolean
   /** For `type: 'text'` with `showInHeader`: caps the submission form's input
    *  at this many characters (a plain `<input maxLength>`, so a newline can't
    *  sneak in the way it could through a `textarea`) — guaranteeing the value
@@ -201,7 +233,13 @@ export type CategoryField = {
    *  explanation — on hover (desktop) and in the expanded card (mobile). Used
    *  for food establishments that carry a hechsher but aren't entirely kosher
    *  (the note says what isn't). The note is authored per listing, not generic. */
-  caveat?: { flagField: string; noteField: string }
+  caveat?: {
+    flagField: string
+    noteField: string
+    /** The listing's box for it, when the admin renamed it ("What isn’t
+     *  kosher" otherwise). */
+    title?: string
+  }
   /** Ties this field to one of the category's own filterable boolean fields
    *  (its `key`), e.g. a "Women's Hours" field tagged with the "Women's
    *  Tevillah" boolean's key. Groups audience-specific fields (a mikvah's

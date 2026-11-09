@@ -122,7 +122,8 @@ export const synagogues = [
   {
     id: "mkor",
     name: "Congregation Mikveh Israel",
-    denomination: "Orthodox (Sephardic)",
+    denomination: "Orthodox",
+    nusach: "Sephardi (Edot HaMizrach)",
     hospitalId: "chop",
     distance: 2.0,
     address: "Philadelphia, PA 19106",

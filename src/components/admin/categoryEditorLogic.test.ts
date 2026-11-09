@@ -93,8 +93,8 @@ describe('toDraft', () => {
     expect(draft.capabilities).toEqual({ add: true, edit: true, report: true, directorySearch: true, map: true })
     expect(draft.fields).toHaveLength(1)
     expect(draft.fields[0]!.type).toBe('image')
-    // No kind until one is picked.
-    expect(draft.placeKind).toBe('')
+    // Made from nothing: Plain.
+    expect(draft.placeKind).toBe('plain')
   })
 
   it('gives an existing category its saved kind, or the one its slug implies', () => {
@@ -149,6 +149,14 @@ describe('normalizeField', () => {
   it('makes a badge-shown Choice field filterable, and a row-shown one not', () => {
     expect(normalizeField(field({ type: 'select', renderAs: 'badge' })).filterable).toBe(true)
     expect(normalizeField(field({ type: 'select', renderAs: 'row' })).filterable).toBe(false)
+  })
+
+  // The user, Nov 9: Denomination stayed in Filters with "In the filter" off.
+  it('keeps a filter an admin turned off', () => {
+    expect(normalizeField(field({ type: 'select', renderAs: 'badge', filterable: false })).filterable).toBe(false)
+    expect(normalizeField(field({ type: 'boolean', renderAs: 'badge', filterable: false })).filterable).toBe(false)
+    expect(normalizeField(field({ type: 'hours', filterable: false })).filterable).toBe(false)
+    expect(normalizeField(field({ type: 'select', renderAs: 'badge' })).filterable).toBe(true)
   })
 
   it('is never filterable for a plain type like text', () => {
@@ -258,8 +266,9 @@ describe('validateDraft', () => {
     expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', placeKind: 'groceries', fields: [] }))).toEqual([])
   })
 
-  it('asks for a kind on a new category', () => {
-    expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', fields: [] }))).toEqual(['Pick what kind of places it holds.'])
+  // A new page's kind comes from the page it starts from (board 2).
+  it('asks for no kind on a new category', () => {
+    expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', fields: [] }))).toEqual([])
   })
 
   it('rejects a blank or invalid URL slug', () => {

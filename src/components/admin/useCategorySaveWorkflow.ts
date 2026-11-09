@@ -29,6 +29,7 @@ export function useCategorySaveWorkflow({
   isNew,
   token,
   community,
+  confirmed,
   onSaved,
 }: {
   draft: Draft
@@ -36,6 +37,9 @@ export function useCategorySaveWorkflow({
   isNew: boolean
   token: string
   community: string
+  /** Removals already answered in their own step (board 16): `address`,
+   *  `phone` or `field:<key>`. Saved without asking again. */
+  confirmed?: ReadonlySet<string>
   /** Given the id it was saved under (a renamed slug's new one). */
   onSaved: (id: string) => void
 }) {
@@ -67,6 +71,33 @@ export function useCategorySaveWorkflow({
   // renameCategoryId) runs for real. Cleared on cancel or once the confirmed
   // save completes.
   const [pendingIdRename, setPendingIdRename] = useState<{ oldId: string; newId: string; count: number } | null>(null)
+
+  const usageUrl = initial ? withCommunity(`/api/admin/categories/${initial.id}/field-usage`, community) : null
+
+  async function fetchUsage(ask: { address: boolean; phone: boolean; fieldKeys: string[] }) {
+    const body = await fetchJson<{ usage: { address: number; phone: number; fields: Record<string, number> } }>(
+      usageUrl!,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(ask),
+      },
+      'Could not check existing listings.',
+    )
+    return body.usage
+  }
+
+  /** How many saved places have an answer in one field, or null when it
+   *  can't be told (a new page, or the check failed). */
+  async function countAnswers(target: { field: string } | 'address' | 'phone'): Promise<number | null> {
+    if (isNew || !usageUrl) return null
+    try {
+      const usage = await fetchUsage({ address: target === 'address', phone: target === 'phone', fieldKeys: typeof target === 'object' ? [target.field] : [] })
+      return typeof target === 'object' ? (usage.fields[target.field] ?? 0) : usage[target]
+    } catch {
+      return null
+    }
+  }
 
   function cancelCleanup() {
     setPendingCleanup(null)
@@ -154,23 +185,21 @@ export function useCategorySaveWorkflow({
     // field: check whether any existing listings actually have data there
     // before wiping it — skip the check once the admin has already confirmed
     // (pendingCleanup is set) so re-clicking Save doesn't loop.
+    // Removals answered in their own step are cleared without asking again.
+    const told = { address: false, phone: false, keys: [] as string[] }
+    if (!isNew) {
+      told.address = initial!.hasAddress !== false && !draft.hasAddress && !!confirmed?.has('address')
+      told.phone = initial!.hasPhone !== false && !draft.hasPhone && !!confirmed?.has('phone')
+      told.keys = removedFieldKeys(draft, initial).filter((k) => confirmed?.has(`field:${k}`))
+    }
     if (!isNew && !pendingCleanup) {
-      const addressOff = initial!.hasAddress !== false && !draft.hasAddress
-      const phoneOff = initial!.hasPhone !== false && !draft.hasPhone
-      const removedKeys = removedFieldKeys(draft, initial)
+      const addressOff = initial!.hasAddress !== false && !draft.hasAddress && !told.address
+      const phoneOff = initial!.hasPhone !== false && !draft.hasPhone && !told.phone
+      const removedKeys = removedFieldKeys(draft, initial).filter((k) => !told.keys.includes(k))
       if (addressOff || phoneOff || removedKeys.length > 0) {
         setSaving(true)
         try {
-          const body = await fetchJson<{ usage: { address: number; phone: number; fields: Record<string, number> } }>(
-            withCommunity(`/api/admin/categories/${initial!.id}/field-usage`, community),
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ address: addressOff, phone: phoneOff, fieldKeys: removedKeys }),
-            },
-            'Could not check existing listings.',
-          )
-          const usage = body.usage
+          const usage = await fetchUsage({ address: addressOff, phone: phoneOff, fieldKeys: removedKeys })
           const total = usage.address + usage.phone + Object.values(usage.fields).reduce((a, b) => a + b, 0)
           if (total > 0) {
             setPendingCleanup({ ...usage, addressOff, phoneOff, removedKeys })
@@ -221,11 +250,11 @@ export function useCategorySaveWorkflow({
           fieldsWithRenamedShowIf(draft.fields.map(normalizeField), opts?.skipRename ? [] : (pendingRename?.renames ?? [])),
           draft.hiddenFields,
         ),
-        ...(pendingCleanup && {
+        ...((pendingCleanup || told.address || told.phone || told.keys.length > 0) && {
           clearFields: {
-            address: pendingCleanup.addressOff,
-            phone: pendingCleanup.phoneOff,
-            keys: pendingCleanup.removedKeys,
+            address: told.address || !!pendingCleanup?.addressOff,
+            phone: told.phone || !!pendingCleanup?.phoneOff,
+            keys: [...told.keys, ...(pendingCleanup?.removedKeys ?? [])],
           },
         }),
         ...(pendingRename &&
@@ -246,6 +275,8 @@ export function useCategorySaveWorkflow({
         ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList).length ? walkListFromKey(draft.walkList) : null }),
         // And for migration 066.
         ...(!isNew && draft.listingParts !== toDraft(initial).listingParts && { listingParts: listingPartsToSave(draft.listingParts) }),
+        // A new page's boxes, when it has any (a copy of Hospitals).
+        ...(isNew && listingPartsToSave(draft.listingParts) && { listingParts: listingPartsToSave(draft.listingParts) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),
@@ -267,5 +298,5 @@ export function useCategorySaveWorkflow({
     }
   }
 
-  return { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename }
+  return { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename }
 }

@@ -58,6 +58,7 @@ export function PreviewBeside({
   onOpen,
   spot = null,
   wholePage = false,
+  shownWidth,
 }: {
   /** A page of the site to show. */
   src?: string
@@ -76,6 +77,9 @@ export function PreviewBeside({
   /** As tall as the page `src` is, all of it, rather than one screen of it
    *  (the user, Nov 4: the computer's home page runs past one screen). */
   wholePage?: boolean
+  /** How wide it's drawn, where not the device's usual width beside a
+   *  page (the category editor's phone views fill its column). */
+  shownWidth?: number
 }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [loads, setLoads] = useState(0)
@@ -123,7 +127,8 @@ export function PreviewBeside({
   const device = shownDevice ?? picked
   const { width } = DEVICES[device]
   const height = wholePage && fitHeight ? Math.max(fitHeight, DEVICES[device].height) : DEVICES[device].height
-  const scale = SHOWN_WIDTH[device] / width
+  const shown = shownWidth ?? SHOWN_WIDTH[device]
+  const scale = shown / width
   const Frame = onOpen ? 'button' : 'div'
 
   return (
@@ -148,7 +153,7 @@ export function PreviewBeside({
       <Frame
         {...(onOpen && { type: 'button' as const, onClick: onOpen, 'aria-label': 'Open the preview' })}
         className={`relative block p-0 overflow-hidden bg-white border border-slate-200 ${onOpen ? 'cursor-zoom-in' : ''} ${device === 'phone' ? 'rounded-[22px]' : 'rounded-[10px]'}`}
-        style={{ width: SHOWN_WIDTH[device], height: Math.round(height * scale) }}
+        style={{ width: shown, height: Math.round(height * scale) }}
       >
         <div
           className="absolute top-0 left-0 origin-top-left pointer-events-none"
@@ -164,7 +169,7 @@ export function PreviewBeside({
           ) : null}
         </div>
       </Frame>
-      {spot && missing === spot && <p className="m-0 text-[13px] text-slate-600" style={{ width: SHOWN_WIDTH[device] }}>Not on the {DEVICES[device].label.toLowerCase()} version.</p>}
+      {spot && missing === spot && <p className="m-0 text-[13px] text-slate-600" style={{ width: shown }}>Not on the {DEVICES[device].label.toLowerCase()} version.</p>}
     </div>
   )
 }

@@ -9,13 +9,13 @@ import { boxChangeCount, minyanimForBox, type MinyanBox } from '@/lib/minyanimBo
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { readSchedules } from '@/lib/schedules'
 import { useEditWeek } from '@/lib/useEditWeek'
-import { useHistoryDepth } from '@/lib/useHistoryDepth'
+import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 import { reviewParts } from '@/lib/reviewParts'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { normalizeRow } from '@/lib/resourceShape'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
+import ListingEditor from '@/components/resources/ListingEditor'
 import { AdminBack } from './AdminUI'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
@@ -99,11 +99,20 @@ export default function ChangeReview({
   }
   const source = submissionSource(s)
   const [editing, setEditing] = useState(false)
-  const [step, setStep] = useState<EditorStep | null>(null)
+  const { step, path: editorPath, onStep, reopen, ask } = useEditorSteps()
   const [leaving, setLeaving] = useState(false)
   const [reason, setReason] = useState('')
-  // Edit, and each row open in it, is an entry: a swipe back closes it.
-  useHistoryDepth('changeEdit', editing ? 1 + (step ? (step.depth ?? 1) : 0) : 0, step ? step.back : () => setEditing(false))
+  // Edit, and each row open in it, has an address and an entry: Back
+  // closes it, Forward and a reload open it again.
+  useStepsInAddress(
+    'edit',
+    editing ? ['edit', ...editorPath] : [],
+    (to) => {
+      setEditing(to.length > 0)
+      ask(to.slice(1))
+    },
+    { owner: s.id.slice(0, 8) },
+  )
   const onEditing = inPlace?.onEditing
   useEffect(() => {
     onEditing?.(editing)
@@ -139,7 +148,8 @@ export default function ChangeReview({
           item={normalizeRow(s.current)}
           category={category}
           onClose={() => setEditing(false)}
-          onStep={setStep}
+          onStep={onStep}
+          reopen={reopen}
           onlyRows={onlyRows?.map((r) => r.id)}
           preset={preset}
           adminSave={{

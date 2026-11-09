@@ -1159,6 +1159,22 @@ describe('GenericListingCard — the row', () => {
     expect(document.querySelector('img[src*="category.png"]')).toBeNull()
   })
 
+  it('shows the place’s photo on the row, or its initials once the admin takes the photo off the card', () => {
+    const photo = { key: 'photo', label: 'Photo', type: 'image' as const, renderAs: 'row' as const }
+    const item = makeListing({ name: "Shlomo's Fish Market", photo: 'https://example.com/shlomo.jpg' })
+    const { unmount } = renderWithProviders(
+      <GenericListingCard item={item} category={makeCategory({ detailFields: [photo] })} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+    expect(document.querySelector('img[src*="shlomo.jpg"]')).not.toBeNull()
+    unmount()
+
+    renderWithProviders(
+      <GenericListingCard item={item} category={makeCategory({ detailFields: [{ ...photo, onCard: false }] })} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+    expect(screen.getByText('SF')).toBeInTheDocument()
+    expect(document.querySelector('img[src*="shlomo.jpg"]')).toBeNull()
+  })
+
   it('keeps upvotes off the row, and puts them in the opened listing', async () => {
     const user = userEvent.setup()
     renderWithProviders(

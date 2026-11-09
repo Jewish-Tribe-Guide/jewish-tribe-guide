@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, type TextareaHTMLAttributes } from 'react'
-import { selectValues, type CategoryField } from '@/lib/categories'
+import { pickableOptions, selectValues, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import TagsInput from './TagsInput'
 import ContactsInput from './ContactsInput'
@@ -203,7 +203,7 @@ export function DetailFieldInput({
   if (field.type === 'minyanim') {
     return (
       <>
-        <MinyanimInput label={label} value={value} onChange={onChange} />
+        <MinyanimInput label={label} value={value} onChange={onChange} noSeason={field.minyanOff?.includes('season')} />
         {onChangeSchedules && <SchedulesInput value={schedules} onChange={onChangeSchedules} />}
       </>
     )
@@ -321,7 +321,8 @@ function SelectOtherField({
   onChange: (value: unknown) => void
 }) {
   const strValue = (value as string) ?? ''
-  const isKnownOption = (field.options ?? []).some((opt) => opt.value === strValue)
+  const choices = pickableOptions(field)
+  const isKnownOption = choices.some((opt) => opt.value === strValue)
   const [showOther, setShowOther] = useState(strValue !== '' && !isKnownOption)
 
   return (
@@ -342,7 +343,7 @@ function SelectOtherField({
         className={inputClass}
       >
         <option value="">Select…</option>
-        {field.options?.map((opt) => (
+        {choices.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
@@ -399,7 +400,7 @@ function MultiSelectField({
   onChange: (value: unknown) => void
 }) {
   const chosen = selectValues(value)
-  const options = field.options ?? []
+  const options = pickableOptions(field)
   const knownValues = new Set(options.map((opt) => opt.value))
   // Already-chosen values that aren't one of the field's own options — e.g.
   // someone typed "Vegan Certification" into Other on a previous edit. Shown

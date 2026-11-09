@@ -146,6 +146,21 @@ describe('ListingEditor — the listing’s boxes, one row each', () => {
     await waitFor(() => expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument())
   })
 
+  // The user, Nov 7: the preview beside a Denomination field showed only a
+  // "+ Denomination" line at the bottom. Opened on its row, it shows what
+  // people adding a place are asked.
+  it('opens the row with startOpen’s field first, and only the first time', async () => {
+    const u = user()
+    renderEditor({ item: undefined, category: SHUL, startOpen: 'denomination' })
+    const open = screen.getByTestId(/^editor-open-/)
+    expect(within(open).getByText('Orthodox (Sephardic)')).toBeInTheDocument()
+    const id = open.dataset.testid!.replace('editor-open-', '')
+    expect(screen.queryByTestId(`editor-add-${id}`)).toBeNull()
+    // Closed, it stays closed.
+    await u.click(done())
+    expect(screen.queryByTestId(/^editor-open-/)).toBeNull()
+  })
+
   it('opens a week of hours where it is too', async () => {
     const u = user()
     const { step } = renderEditor()

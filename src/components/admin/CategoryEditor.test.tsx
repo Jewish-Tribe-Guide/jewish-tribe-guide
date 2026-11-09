@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CategoryEditor } from './CategoryEditor'
+import { forgetReadyMade } from './useReadyMade'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { mockRouter } from '@/test/nextNavigationMock'
+import { historyRouter } from '@/test/nextNavigationMock'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { fetchJson } from '@/lib/fetchJson'
-import type { CategoryConfig } from '@/lib/categories'
+import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { kosherQuestions } from '@/lib/kosherQuestions'
 
 // This component is ~1000 lines doing template application, field-schema
 // editing, and two separate destructive-change confirmation workflows
@@ -18,16 +20,18 @@ import type { CategoryConfig } from '@/lib/categories'
 // provider stack (ContentProvider/CommunityProvider) that GenericListingCard
 // does, out of scope here — see the memory note on the provider-harness gap.
 
-vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn() }))
+vi.mock('@/lib/fetchJson', async (original) => ({ ...(await original<typeof import('@/lib/fetchJson')>()), fetchJson: vi.fn() }))
 // The page beside the settings: the draft it's given, not the page itself
 // (that needs the whole site's providers).
 vi.mock('./CategoryPreview', () => ({
-  default: ({ category, inline }: { category: CategoryConfig; inline?: boolean }) => (
-    <p data-testid={inline ? 'preview-beside' : 'preview'}>{category.pluralLabel}</p>
+  default: ({ category, inline, view, focusField }: { category: CategoryConfig; inline?: boolean; view?: string; focusField?: string }) => (
+    <p data-testid={inline ? 'preview-beside' : 'preview'} data-view={view} data-focus={focusField} data-fields={category.detailFields.map((f) => f.key).join(' ')}>
+      {category.pluralLabel}
+    </p>
   ),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
+  useRouter: () => historyRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -50,44 +54,51 @@ beforeEach(() => {
 })
 
 /** Saves through the Save bar, which shows once something changed: when
- *  nothing has, a word added to the link-preview line is the change. */
+ *  nothing has, flipping the upvotes question is the change. */
 async function saveNow(user: ReturnType<typeof userEvent.setup>) {
-  if (!screen.queryByRole('button', { name: 'Save' })) await user.type(screen.getByLabelText('In link previews'), ' x')
+  if (!screen.queryByRole('button', { name: 'Save' })) {
+    const upvotes = screen.getByRole('radiogroup', { name: 'Can visitors upvote places?' })
+    await user.click(within(upvotes).getAllByRole('radio').find((r) => r.getAttribute('aria-checked') === 'false')!)
+  }
   await user.click(screen.getByRole('button', { name: 'Save' }))
+}
+
+/** Opens one of Fields' boxes by its row (boards 17-19). */
+async function openBox(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name, expanded: false }))
+}
+
+/** Contact → Address → Remove this field, and back to the page. */
+async function removeAddress(user: ReturnType<typeof userEvent.setup>) {
+  await openBox(user, 'Contact')
+  await user.click(screen.getByRole('button', { name: /^Address/ }))
+  await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove this field' })).not.toBeInTheDocument())
 }
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
+  forgetReadyMade()
+  // A screen's history entry, and its address, left by one test isn't the
+  // next one's page.
+  history.replaceState(null, '', '/')
 })
 
 describe('CategoryEditor — new category', () => {
-  it('shows "New category" and asks what kind of places it holds', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByRole('heading', { name: 'New category' })).toBeInTheDocument()
-    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual([
-      'ShulsDavening times, every weekday and Shabbos',
-      'FoodMenus, kosher lists and main dishes',
-      'GroceriesKosher items and hours',
-      'MikvahsHours, appointments and keilim',
-      'HotelsShabbos-friendly stays and shuttles',
-      'HospitalsChaplains, Shabbos rooms and kosher food',
-      'PlainA list of places, with the fields you choose',
-    ])
-  })
-
-  it('won’t create one until a kind is picked', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    await user.type(screen.getByLabelText('Name'), 'Pharmacies')
-    await user.click(screen.getByRole('button', { name: /create category/i }))
-    expect(screen.getByText('Pick what kind of places it holds.')).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
+  // Board 3: a page made from nothing. Its kind comes from the page it's
+  // copied from, so there's no kind to pick here.
+  it('shows "New category page" and asks no kind', () => {
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} backLabel="What kind of places?" />)
+    expect(screen.getByRole('heading', { name: 'New category page' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /What kind of places\?/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /^Shuls/ })).toBeNull()
   })
 
   it('blocks save without a name', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
@@ -98,9 +109,8 @@ describe('CategoryEditor — new category', () => {
   it('creates the category via POST once a name is given', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="tok" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="tok" initial={null} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByRole('radio', { name: /^Plain/ }))
     await user.type(screen.getByLabelText('Name'), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
@@ -117,27 +127,41 @@ describe('CategoryEditor — new category', () => {
     )
   })
 
-  it('brings a kind’s fields and name, and Plain puts them back', async () => {
+  // Board 2: a ready-made page, copied.
+  it('starts from a ready-made page and makes it with its fields', async () => {
     const user = userEvent.setup()
     const shul = CATEGORY_TEMPLATES.find((t) => t.id === 'synagogue')!
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const seed = baseCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: shul.pluralLabel, detailFields: shul.fields })
+    const onSaved = vi.fn()
+    renderWithProviders(<CategoryEditor token="t" initial={null} seed={seed} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByRole('radio', { name: /^Shuls/ }))
-
-    expect(screen.getByRole('radio', { name: /^Shuls/ })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByLabelText('Name')).toHaveValue(shul.pluralLabel)
-    expect(screen.getByLabelText('Web address')).toHaveValue(shul.pluralLabel.toLowerCase())
-    expect(screen.getByRole('button', { name: /^Davening Times/ })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('radio', { name: /^Plain/ }))
-    expect(screen.getByLabelText('Name')).toHaveValue('')
-    expect(screen.queryByRole('button', { name: /^Davening Times/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: shul.pluralLabel })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Davening times' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /create category/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('synagogue'))
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.fields.map((f: { key: string }) => f.key)).toEqual(expect.arrayContaining(shul.fields.map((f) => f.key)))
   })
 
-  it('sends a kind its web address doesn’t already give', async () => {
+  // A copied page keeps its listing's boxes (before, the create sent none).
+  it('makes a copy with its boxes', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    await user.click(screen.getByRole('radio', { name: /^Food/ }))
+    const seed = baseCategory({
+      id: 'hospital',
+      pluralLabel: 'Hospitals',
+      detailFields: [{ key: 'pantry', label: 'Pantry', type: 'contacts' }],
+      listingParts: { boxes: [{ title: 'Kosher food', fields: ['pantry'] }] },
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={null} seed={seed} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Kosher food' })).toHaveAccessibleDescription('Pantry')
+    await user.click(screen.getByRole('button', { name: /create category/i }))
+    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).listingParts).toEqual({ boxes: [{ title: 'Kosher food', fields: ['pantry'] }] })
+  })
+
+  it('sends a copied kind its web address doesn’t already give', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={null} seed={baseCategory({ id: 'restaurant', pluralLabel: 'Food' })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     await user.clear(screen.getByLabelText('Name'))
     await user.type(screen.getByLabelText('Name'), 'Eat')
     await user.click(screen.getByRole('button', { name: /create category/i }))
@@ -149,28 +173,13 @@ describe('CategoryEditor — new category', () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('Name already in use.'))
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByRole('radio', { name: /^Plain/ }))
     await user.type(screen.getByLabelText('Name'), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
     expect(await screen.findByText('Name already in use.')).toBeInTheDocument()
     expect(onSaved).not.toHaveBeenCalled()
-  })
-})
-
-describe('CategoryEditor — the "every listing also has" checkboxes', () => {
-  it('Hours/Website/Photo toggles add and remove a managed field', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-
-    const hours = screen.getByLabelText('Hours')
-    expect(hours).not.toBeChecked()
-    await user.click(hours)
-    expect(hours).toBeChecked()
-    await user.click(hours)
-    expect(hours).not.toBeChecked()
   })
 })
 
@@ -181,32 +190,47 @@ describe('CategoryEditor — editing an existing category', () => {
         token="t"
         initial={baseCategory()}
         siblings={null}
-        hasMapCategory={false}
         onSaved={vi.fn()}
         onCancel={vi.fn()}
       />,
     )
     expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
-    // Its kind, from its web address.
-    expect(within(screen.getByRole('region', { name: 'Kind' })).getByText('Groceries')).toBeInTheDocument()
   })
 
   it('has nothing to save until something changes, then counts it, and Undo puts it back', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Name'), ' and more')
-    await user.click(screen.getByLabelText('An address'))
+    // A press while typing only puts the keyboard away (listenForPresses).
+    await user.tab()
+    await removeAddress(user)
     expect(within(screen.getByRole('region', { name: 'Save' })).getByText('2 changes')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(screen.getByLabelText('Name')).toHaveValue('Groceries')
     expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
   })
 
+  // The Home page's photo picker (the user, Nov 5), not a banner upload
+  // with a preview beside it and a second pasted address under it.
+  it('has one banner photo, the older pasted one standing in until it is removed', async () => {
+    const user = userEvent.setup()
+    const photo = 'https://example.com/old.jpg'
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ cardImageUrl: photo })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: /^Banner photo/ }))
+    expect(screen.queryByText('Desktop directory banner (optional)')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Paste URL' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await saveNow(user)
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body).toMatchObject({ cardImageUrl: null, cardBandImageUrl: null })
+  })
+
   it('takes it off the site with the switch', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
     const onSite = screen.getByRole('switch', { name: 'On the site' })
     expect(onSite).toHaveAttribute('aria-checked', 'true')
     await user.click(onSite)
@@ -220,34 +244,36 @@ describe('CategoryEditor — editing an existing category', () => {
     renderWithProviders(
       <CategoryEditor
         token="t"
-        initial={baseCategory({ detailFields: [{ key: 'kosher', label: 'Kosher certification', type: 'select', renderAs: 'badge', options: [{ value: 'OU', label: 'OU' }] }] })}
+        initial={baseCategory({ detailFields: [{ key: 'kosher', label: 'Kosher certification', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'OU', label: 'OU' }] }] })}
         siblings={null}
-        hasMapCategory={false}
         onSaved={vi.fn()}
         onCancel={vi.fn()}
       />,
     )
+    // In the box it shows in on the listing (board 17).
+    expect(screen.queryByRole('button', { name: /^Kosher certification/ })).not.toBeInTheDocument()
+    await openBox(user, 'Top')
     const row = screen.getByRole('button', { name: /^Kosher certification/ })
-    expect(row).toHaveTextContent('Filter · on the row')
+    expect(row).toHaveTextContent('Filter')
     await user.click(row)
-    expect(screen.getByRole('heading', { name: 'Kosher certification' })).toBeInTheDocument()
-    expect(screen.getByText('A field on Groceries')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Name and look' })).not.toBeInTheDocument()
+    // Its name, and its kind beside it (board 13).
+    expect(screen.getByRole('heading', { name: /^Kosher certification\s*Choices$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Fields' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '‹ Groceries' }))
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Name and look' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Fields' })).toBeInTheDocument())
   })
 
   it('shows the page beside the settings, as they are being typed', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
     const preview = screen.getByRole('complementary', { name: 'Preview' })
-    expect(within(preview).getByRole('button', { name: 'Computer' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(preview).getByRole('button', { name: 'Page' })).toHaveAttribute('aria-pressed', 'true')
     await user.type(screen.getByLabelText('Name'), ' and more')
     // Drawn into the preview's own frame.
     const frame = preview.querySelector('iframe')!
     await waitFor(() => expect(frame.contentDocument!.body).toHaveTextContent('Groceries and more'))
-    // The page opens full size; Computer and Phone stay buttons of their
-    // own, never inside it (a button in a button doesn't hydrate).
+    // The page opens full size; the Page · A listing · Adding buttons stay
+    // their own, never inside it (a button in a button doesn't hydrate).
     const open = within(preview).getByRole('button', { name: 'Open the preview' })
     expect(within(open).queryAllByRole('button')).toEqual([])
     await user.click(open)
@@ -258,7 +284,7 @@ describe('CategoryEditor — editing an existing category', () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     renderWithProviders(
-      <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+      <CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
     await saveNow(user)
@@ -271,86 +297,208 @@ describe('CategoryEditor — editing an existing category', () => {
     )
   })
 
-  // The field-removal cleanup workflow: turning off "An address" on a
-  // category that already has listings with addresses must check first, and
-  // block the save behind an explicit confirmation — the whole reason this
-  // component needs coverage before it gets split apart.
-  describe('the field-removal cleanup confirmation', () => {
-    it('checks field-usage, then blocks the save behind a confirmation when listings have data', async () => {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
-      const onSaved = vi.fn()
+  // Board 4's Questions: each a No/Yes, not a switch.
+  it('asks about upvotes and the not-listed link with No and Yes, and sends the answers', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    const upvotes = screen.getByRole('radiogroup', { name: 'Can visitors upvote places?' })
+    expect(within(upvotes).getByRole('radio', { name: 'No' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(within(upvotes).getByRole('radio', { name: 'Yes' }))
+    const link = screen.getByRole('radiogroup', { name: 'A link for places not listed here?' })
+    expect(screen.queryByLabelText('What the link says')).not.toBeInTheDocument()
+    await user.click(within(link).getByRole('radio', { name: 'Yes' }))
+    await user.type(screen.getByLabelText('What the link says'), 'Find more')
+    await user.type(screen.getByLabelText('Link'), 'https://example.org')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.upvotesEnabled).toBe(true)
+    expect(body.externalLink).toEqual({ label: 'Find more', url: 'https://example.org' })
+  })
+
+  it('takes the not-listed link off with No, keeping what was typed', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <CategoryEditor token="t" initial={baseCategory({ externalLink: { label: 'Find more', url: 'https://example.org' } })} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
+    )
+    const link = screen.getByRole('radiogroup', { name: 'A link for places not listed here?' })
+    expect(screen.getByLabelText('What the link says')).toHaveValue('Find more')
+    await user.click(within(link).getByRole('radio', { name: 'No' }))
+    expect(screen.queryByLabelText('What the link says')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).externalLink ?? null).toBeNull()
+  })
+
+  // No map switch: a page is on the map when its places have an address,
+  // added like any field (boards 7-11).
+  it('puts the page on the map with its address, as one change', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [] }))))
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ hasAddress: false, capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, map: false } })} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await user.click(await screen.findByRole('button', { name: /^Address/ }))
+    await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+    await screen.findByRole('heading', { name: 'Groceries' })
+    // Back in Contact, open.
+    expect(screen.getByRole('button', { name: /^Address/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Save' })).getByText('1 change')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).capabilities.map).toBe(true)
+  })
+
+  it('deletes the page from its foot, once asked', async () => {
+    const onDeleted = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} onDeleted={onDeleted} />)
+    await user.click(screen.getByRole('button', { name: 'Delete this page' }))
+    expect(screen.getByText('Delete Groceries and every place on it?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep it' }))
+    expect(fetchJson).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Delete this page' }))
+    await user.click(screen.getByRole('button', { name: 'Delete it' }))
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled())
+    expect(fetchJson).toHaveBeenCalledWith('/api/admin/categories/grocery?community=test-community', expect.objectContaining({ method: 'DELETE' }), 'Delete failed.')
+  })
+
+  // "Remove this field" on one places have answered (board 16): its own
+  // step says what goes, and once it's answered there Save doesn't ask
+  // again. Save's own gate is left for when the count couldn't be had.
+  describe('removing a field places have filled in', () => {
+    const usage = (u: { address?: number; phone?: number; fields?: Record<string, number> }) => ({ usage: { address: 0, phone: 0, fields: {}, ...u } })
+    const call = (n: number) => vi.mocked(fetchJson).mock.calls[n]!
+    const body = (n: number) => JSON.parse((call(n)[1] as RequestInit).body as string)
+
+    it('asks first, saying what goes, and Keep it changes nothing', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({ address: 3 }))
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+      await openBox(user, 'Contact')
+      await user.click(screen.getByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
 
-      await user.click(screen.getByLabelText('An address'))
-      await saveNow(user)
+      expect(await screen.findByRole('heading', { name: 'Remove Address from Groceries?' })).toBeInTheDocument()
+      expect(screen.getByText('3 places').parentElement).toHaveTextContent('3 places lose their answer')
+      expect(screen.getByText('Groceries comes off the map')).toBeInTheDocument()
+      expect(call(0)[0]).toBe('/api/admin/categories/grocery/field-usage?community=test-community')
+      expect(body(0)).toEqual({ address: true, phone: false, fieldKeys: [] })
 
-      expect(await screen.findByText('This will permanently clear data from existing listings')).toBeInTheDocument()
-      expect(screen.getByText(/Address — 3 listings/)).toBeInTheDocument()
-      expect(onSaved).not.toHaveBeenCalled()
-      expect(fetchJson).toHaveBeenCalledWith(
-        '/api/admin/categories/grocery/field-usage?community=test-community',
-        expect.objectContaining({ method: 'POST' }),
-        'Could not check existing listings.',
-      )
+      await user.click(screen.getByRole('button', { name: 'Keep it' }))
+      expect(await screen.findByRole('button', { name: 'Remove this field' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
-    it('proceeds straight to save when no listings have data in the removed field', async () => {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: {} } })
+    it('Remove it goes back to the page, and Save clears the answers without asking again', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({ address: 3 }))
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await openBox(user, 'Contact')
+      await user.click(screen.getByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await user.click(await screen.findByRole('button', { name: 'Remove it' }))
 
-      await user.click(screen.getByLabelText('An address'))
+      expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Address/ })).not.toBeInTheDocument()
       await saveNow(user)
-
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
       expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
+      expect(fetchJson).toHaveBeenCalledTimes(2)
+      expect(body(1)).toMatchObject({ hasAddress: false, capabilities: { map: false }, clearFields: { address: true, phone: false, keys: [] } })
     })
 
-    it('"Clear and save" confirms the cleanup and completes the save', async () => {
-      vi.mocked(fetchJson)
-        .mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
-        .mockResolvedValueOnce({ ok: true })
+    it('a field that is a filter says the filter loses it too', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({ fields: { hechsher: 71 } }))
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
+      const initial = baseCategory({
+        pluralLabel: 'Food',
+        detailFields: [{ key: 'hechsher', label: 'Kosher Certification', type: 'select', filterable: true, options: [{ value: 'IKC', label: 'IKC' }] }],
+      })
+      renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await openBox(user, 'Contact')
+      await user.click(screen.getByRole('button', { name: /^Kosher Certification(?! URL)/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
 
-      await user.click(screen.getByLabelText('An address'))
+      expect(await screen.findByRole('heading', { name: 'Remove Kosher Certification from Food?' })).toBeInTheDocument()
+      expect(screen.getByText('71 places').parentElement).toHaveTextContent('71 places lose their answer')
+      expect(screen.getByText('Food’s filter loses Kosher Certification')).toBeInTheDocument()
+      expect(body(0)).toEqual({ address: false, phone: false, fieldKeys: ['hechsher'] })
+      await user.click(screen.getByRole('button', { name: 'Remove it' }))
+      await screen.findByRole('heading', { name: 'Food' })
       await saveNow(user)
-      await screen.findByText('This will permanently clear data from existing listings')
-
-      await user.click(screen.getByRole('button', { name: /clear and save/i }))
-
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-      const secondCall = vi.mocked(fetchJson).mock.calls[1]!
-      const body = JSON.parse((secondCall[1] as RequestInit).body as string)
-      expect(body.clearFields).toEqual({ address: true, phone: false, keys: [] })
+      expect(fetchJson).toHaveBeenCalledTimes(2)
+      expect(body(1).clearFields).toEqual({ address: false, phone: false, keys: ['hechsher'] })
+      expect(body(1).fields.map((f: { key: string }) => f.key)).not.toContain('hechsher')
     })
 
-    it('Cancel backs out of the cleanup confirmation without saving', async () => {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
+    it('with no answers it just goes', async () => {
+      vi.mocked(fetchJson).mockResolvedValueOnce(usage({}))
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      renderWithProviders(
-        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-      )
-
-      await user.click(screen.getByLabelText('An address'))
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await removeAddress(user)
+      expect(screen.queryByRole('button', { name: 'Remove it' })).not.toBeInTheDocument()
       await saveNow(user)
-      await screen.findByText('This will permanently clear data from existing listings')
+      await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+      expect(fetchJson).toHaveBeenCalledTimes(2)
+      expect(body(1)).toMatchObject({ hasAddress: false, capabilities: { map: false } })
+    })
 
-      await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+    it('a field this draft added just goes, without counting', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [] }))))
+      const user = userEvent.setup()
+      renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ hasAddress: false, capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, map: false } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+      await openBox(user, 'Top')
+      await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+      await user.click(await screen.findByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+      await screen.findByRole('heading', { name: 'Groceries' })
+      vi.mocked(fetchJson).mockClear()
+      await user.click(screen.getByRole('button', { name: /^Address/ }))
+      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await screen.findByRole('heading', { name: 'Groceries' })
+      expect(fetchJson).not.toHaveBeenCalled()
+    })
 
-      expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
-      expect(onSaved).not.toHaveBeenCalled()
-      expect(fetchJson).toHaveBeenCalledTimes(1)
+    describe('when the count could not be had, Save asks as it always has', () => {
+      beforeEach(() => {
+        vi.mocked(fetchJson)
+          .mockRejectedValueOnce(new Error('offline'))
+          .mockResolvedValueOnce(usage({ address: 3 }))
+      })
+
+      it('"Clear and save" confirms the cleanup and completes the save', async () => {
+        const onSaved = vi.fn()
+        const user = userEvent.setup()
+        renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+        await removeAddress(user)
+        await saveNow(user)
+        expect(await screen.findByText(/Address — 3 listings/)).toBeInTheDocument()
+        expect(onSaved).not.toHaveBeenCalled()
+        await user.click(screen.getByRole('button', { name: /clear and save/i }))
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+        expect(body(2).clearFields).toEqual({ address: true, phone: false, keys: [] })
+      })
+
+      it('Cancel backs out of the cleanup confirmation without saving', async () => {
+        const onSaved = vi.fn()
+        const user = userEvent.setup()
+        renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+        await removeAddress(user)
+        await saveNow(user)
+        await screen.findByText('This will permanently clear data from existing listings')
+        await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+        expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
+        expect(onSaved).not.toHaveBeenCalled()
+        expect(fetchJson).toHaveBeenCalledTimes(2)
+      })
     })
   })
 
@@ -362,7 +510,8 @@ describe('CategoryEditor — editing an existing category', () => {
     function categoryWithSelectField(): CategoryConfig {
       return baseCategory({
         detailFields: [
-          { key: 'type', label: 'Type', type: 'select', options: [{ value: 'Kosher', label: 'Kosher' }] },
+          // Made here: a ready-made field's choices aren't the page's to rename.
+          { key: 'type', label: 'Type', type: 'select', madeHere: true, options: [{ value: 'Kosher', label: 'Kosher' }] },
         ],
       })
     }
@@ -377,17 +526,16 @@ describe('CategoryEditor — editing an existing category', () => {
           token="t"
           initial={categoryWithSelectField()}
           siblings={null}
-          hasMapCategory={false}
           onSaved={vi.fn()}
           onCancel={vi.fn()}
         />,
       )
 
+      await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Type/ }))
-      const optionsBox = screen.getByLabelText(/choices/i)
-      await user.clear(optionsBox)
-      await user.type(optionsBox, 'Glatt Kosher')
-      await user.tab()
+      await user.click(screen.getByRole('button', { name: 'Remove Kosher' }))
+      await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+      await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Glatt Kosher{Enter}')
       await saveNow(user)
 
       expect(await screen.findByText('Update existing listings to match this rename?')).toBeInTheDocument()
@@ -409,17 +557,16 @@ describe('CategoryEditor — editing an existing category', () => {
           token="t"
           initial={categoryWithSelectField()}
           siblings={null}
-          hasMapCategory={false}
           onSaved={onSaved}
           onCancel={vi.fn()}
         />,
       )
 
+      await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Type/ }))
-      const optionsBox = screen.getByLabelText(/choices/i)
-      await user.clear(optionsBox)
-      await user.type(optionsBox, 'Glatt Kosher')
-      await user.tab()
+      await user.click(screen.getByRole('button', { name: 'Remove Kosher' }))
+      await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+      await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Glatt Kosher{Enter}')
       await saveNow(user)
       await screen.findByText('Update existing listings to match this rename?')
 
@@ -433,212 +580,116 @@ describe('CategoryEditor — editing an existing category', () => {
   })
 })
 
-describe('pin colour', () => {
-  // Regression: the field was wired into the preview object rather than the
-  // save payload, so the picker rendered, previewed correctly, and the PATCH
-  // went out with no pinColor at all — returning 200 and silently keeping the
-  // old colour. Asserting on the request body is the only thing that catches
-  // that; the UI looked entirely correct.
-  it('sends the chosen colour in the save request', async () => {
+// Boards 4 and 5: beside the settings, the page, one of its places
+// opened, or the form for adding one.
+describe('CategoryEditor — Page · A listing · Adding', () => {
+  const computer = () => vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+  const tabs = () => within(screen.getByRole('group', { name: 'Preview of' })).getAllByRole('button').map((b) => b.textContent)
+  // Drawn into the preview's own frame.
+  const shown = () => screen.getByRole('complementary', { name: 'Preview' }).querySelector('iframe')!.contentDocument!.querySelector('[data-testid="preview-beside"]')?.getAttribute('data-view')
+
+  it('switches what the preview shows, and opens that one full size', async () => {
+    computer()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: true } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(tabs()).toEqual(['Page', 'A listing', 'Adding'])
+    await waitFor(() => expect(shown()).toBe('page'))
+    await user.click(screen.getByRole('button', { name: 'A listing' }))
+    expect(screen.getByRole('button', { name: 'A listing' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(shown()).toBe('listing'))
+    await user.click(screen.getByRole('button', { name: 'Adding' }))
+    await waitFor(() => expect(shown()).toBe('adding'))
+    await user.click(screen.getByRole('button', { name: 'Open the preview' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
+  })
+
+  // Boards 33c and 34 (Nov 9): beside a field, the field where a visitor
+  // meets it, in place of the page's switch.
+  it('shows how the field looks beside it, not the page, and only its own screen’s settings', async () => {
+    computer()
+    const user = userEvent.setup()
+    const initial = baseCategory({
+      capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: true },
+      detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'Kosher', label: 'Kosher' }] }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await waitFor(() => expect(shown()).toBe('page'))
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: /^Type/ }))
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    expect(within(looks).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['In the list', 'In Filters', 'On the listing', 'When adding'])
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Preview of' })).toBeNull()
+    // The old form's settings are a superadmin's, under More.
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('combobox').filter((c) => !looks.contains(c))).toEqual([])
+  })
+
+  // The user, Nov 9: Denomination kept its In Filters with the filter off,
+  // and saving put the filter back.
+  it('takes a field out of Filters when In the filter is turned off, and saves it off', async () => {
+    computer()
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
-    await user.click(screen.getByRole('button', { name: '#b63167' }))
-    await saveNow(user)
-
+    const initial = baseCategory({
+      detailFields: [{ key: 'denom', label: 'Denomination', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'Orthodox', label: 'Orthodox' }] }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: /^Denomination/ }))
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    expect(within(looks).getByRole('region', { name: 'In Filters' })).toBeInTheDocument()
+    await user.click(screen.getByRole('switch', { name: 'In the filter' }))
+    expect(within(looks).queryByRole('region', { name: 'In Filters' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls.at(-1)!
-    expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBe('#b63167')
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.fields.find((f: { key: string }) => f.key === 'denom').filterable).toBe(false)
   })
 
-  it('sends null for Automatic, so the positional fallback applies', async () => {
-    const onSaved = vi.fn()
+  // The user, Nov 7: opened full size, the field went away.
+  it('opens the whole page full size from beside a field, the field on it', async () => {
+    computer()
     const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor
-        token="t"
-        initial={{ ...baseCategory(), pinColor: '#b63167' }}
-        siblings={null}
-        hasMapCategory={false}
-        onSaved={onSaved}
-        onCancel={vi.fn()}
-      />,
-    )
+    const initial = baseCategory({
+      capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: true },
+      detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'Kosher', label: 'Kosher' }] }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: /^Type/ }))
+    await user.click(screen.getByRole('button', { name: 'See the whole page' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'page')
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'type')
+  })
 
-    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
-    await user.click(screen.getByRole('button', { name: 'Automatic' }))
-    await saveNow(user)
+  // Board 34: a field not on the row says so, and goes to the card's
+  // picker for its line; Back comes back to the field.
+  it('sends a field not on the row to the card’s line, and back', async () => {
+    computer()
+    const user = userEvent.setup()
+    const initial = baseCategory({ detailFields: [{ key: 'delivery', label: 'Delivery Details', type: 'textarea' }] })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'About')
+    await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
+    const list = within(screen.getByRole('complementary', { name: 'How it looks' })).getByRole('region', { name: 'In the list' })
+    expect(list).toHaveTextContent('Not shown in the list.')
+    await user.click(within(list).getByRole('button', { name: 'Show it on a row' }))
+    expect(await screen.findByRole('heading', { name: 'Show on the third line' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
+    // Back on the field, on the row now.
+    const after = await screen.findByRole('region', { name: 'In the list' })
+    expect(after).not.toHaveTextContent('Not shown in the list.')
+    expect(after.querySelector('mark')).toHaveTextContent('Orders by Wednesday noon')
+  })
 
-    await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls.at(-1)!
-    expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBeNull()
+  it('has no Adding where visitors can’t add', () => {
+    computer()
+    renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: false } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(tabs()).toEqual(['Page', 'A listing'])
   })
 })
 
-// A colour picked blind is how two categories end up with matching pins, which
-// the admin could previously only discover by opening the preview and
-// comparing them by eye. The swatch row names who already holds each colour.
-describe('CategoryEditor — pin colour clashes', () => {
-  const siblings = [
-    baseCategory(),
-    baseCategory({ id: 'shul', label: 'Synagogue', pluralLabel: 'Synagogues', pinColor: '#2c8c47' }),
-  ]
-
-  /** Renders the editor with its pin colours open. */
-  async function withPins(ui: React.ReactElement) {
-    const user = userEvent.setup()
-    renderWithProviders(ui)
-    await user.click(screen.getByRole('button', { name: 'Change pin colour' }))
-    return user
-  }
-
-  it('labels a swatch another category already holds', async () => {
-    await withPins(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.getByRole('button', { name: '#2c8c47 — already used by Synagogues' })).toBeInTheDocument()
-    // A free one keeps the bare hex, so "taken" is what stands out.
-    expect(screen.getByRole('button', { name: '#7a36bf' })).toBeInTheDocument()
-  })
-
-  it('warns after picking a colour that is already taken, and stops once a free one is picked', async () => {
-    const user = await withPins(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: /^#2c8c47 —/ }))
-    expect(screen.getByText(/Same colour as Synagogues/)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '#7a36bf' }))
-    expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
-  })
-
-  it('never reports the category being edited as clashing with itself', async () => {
-    const self = baseCategory({ pinColor: '#2657bf' })
-    await withPins(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '#2657bf' })).toBeInTheDocument()
-  })
-})
-
-// How the category page groups its list (listGroups.ts). Sent only when
-// changed, so every other save keeps working on a database that doesn't
-// have migration 059's column yet.
-describe('CategoryEditor — grouping the list', () => {
-  const shuls = baseCategory({
-    id: 'synagogue',
-    pluralLabel: 'Synagogues',
-    detailFields: [
-      { key: 'hours', label: 'Hours', type: 'hours' },
-      { key: 'denomination', label: 'Denomination', type: 'select', options: [{ value: 'Reform', label: 'Reform' }] },
-    ],
-  })
-  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
-
-  it('offers the groupings the category’s fields allow, and none for a new category', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    const select = screen.getByRole('combobox', { name: 'Group the list' })
-    expect([...(select as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'open', 'distance', 'field:denomination'])
-    cleanup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.queryByRole('combobox', { name: 'Group the list' })).not.toBeInTheDocument()
-  })
-
-  it('sends the grouping when it changed, and leaves it out when it didn’t', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
-
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload())).not.toHaveProperty('groupBy')
-
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Group the list' }), 'field:denomination')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
-    expect(JSON.parse(payload()).groupBy).toEqual({ kind: 'field', key: 'denomination' })
-  })
-
-  it('shows the saved grouping, and clearing it sends null', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor token="t" initial={{ ...shuls, groupBy: { kind: 'open' } }} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-    )
-    const select = screen.getByRole('combobox', { name: 'Group the list' })
-    expect(select).toHaveValue('open')
-    await user.selectOptions(select, '')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload()).groupBy).toBeNull()
-  })
-})
-
-// The one question the category page asks (questionCards.ts). Sent only when
-// changed, like the grouping, for migration 060.
-describe('CategoryEditor — the question card', () => {
-  const food = baseCategory({
-    id: 'restaurant',
-    pluralLabel: 'Food',
-    detailFields: [
-      {
-        key: 't',
-        label: 'Food Type',
-        type: 'select',
-        options: [
-          { value: 'Meat', label: 'Meat' },
-          { value: 'Dairy', label: 'Dairy' },
-          { value: 'Parve', label: 'Parve' },
-        ],
-      },
-      { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean' },
-      { key: 'notes', label: 'Notes', type: 'text' },
-    ],
-  })
-  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
-
-  it('offers "Been there lately?" and each yes/no or short pick-list, worded as the page asks it', () => {
-    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    const select = screen.getByRole('combobox', { name: 'Question card' }) as HTMLSelectElement
-    expect([...select.options].map((o) => o.value)).toEqual(['', 'confirm', 'field:t', 'field:shabbatFriendly'])
-    expect(within(select).getByRole('option', { name: /meat, dairy or parve\?/ })).toBeInTheDocument()
-    cleanup()
-    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(screen.queryByRole('combobox', { name: 'Question card' })).not.toBeInTheDocument()
-  })
-
-  it('sends the question when it changed, and leaves it out when it didn’t', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
-
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload())).not.toHaveProperty('questionCard')
-
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Question card' }), 'field:t')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
-    expect(JSON.parse(payload()).questionCard).toEqual({ kind: 'field', key: 't' })
-  })
-
-  it('shows the saved question, and clearing it sends null', async () => {
-    const onSaved = vi.fn()
-    const user = userEvent.setup()
-    renderWithProviders(
-      <CategoryEditor token="t" initial={{ ...food, questionCard: { kind: 'confirm' } }} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
-    )
-    const select = screen.getByRole('combobox', { name: 'Question card' })
-    expect(select).toHaveValue('confirm')
-    await user.selectOptions(select, '')
-    await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload()).questionCard).toBeNull()
-  })
-})
-
-// Other categories' places within a walk (walkList.ts). Sent only when
-// changed, for migration 061.
 describe('CategoryEditor — places within a walk', () => {
   const hotels = baseCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', detailFields: [] })
   const shuls = baseCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [] })
@@ -655,24 +706,26 @@ describe('CategoryEditor — places within a walk', () => {
   const siblings = [hotels, shuls, food, groups]
   const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
   const editor = (initial: typeof hotels | null, onSaved = vi.fn()) =>
-    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={siblings} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={siblings} onSaved={onSaved} onCancel={vi.fn()} />)
   const save = async (user: ReturnType<typeof userEvent.setup>, onSaved: ReturnType<typeof vi.fn>, times: number) => {
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(times))
     return JSON.parse(payload())
   }
 
+  const walk = () => within(screen.getByRole('region', { name: 'Within a walk' }))
+
   it('adds lists of the other categories whose places have an address, and only on an existing category', async () => {
     const user = userEvent.setup()
     editor(hotels)
-    const section = screen.getByTestId('walk-lists-editor')
-    expect(within(section).queryByRole('combobox')).not.toBeInTheDocument()
-    await user.click(within(section).getByRole('button', { name: '+ Add a list' }))
-    const which = within(section).getByRole('combobox', { name: 'List 1: which places' }) as HTMLSelectElement
+    expect(walk().getByText('None yet')).toBeInTheDocument()
+    await user.click(walk().getByRole('button', { name: '+ Add a page' }))
+    // Opened in place, to which page, how far and how grouped (board 17).
+    const which = walk().getByRole('combobox', { name: 'Which page' }) as HTMLSelectElement
     expect([...which.options].map((o) => o.textContent)).toEqual(['Synagogues', 'Food'])
     cleanup()
     editor(null)
-    expect(screen.queryByTestId('walk-lists-editor')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Within a walk' })).not.toBeInTheDocument()
   })
 
   it('sends the lists when they changed, 30 minutes and by distance unless chosen, and leaves them out when they didn’t', async () => {
@@ -681,140 +734,582 @@ describe('CategoryEditor — places within a walk', () => {
     editor(hotels, onSaved)
     expect(await save(user, onSaved, 1)).not.toHaveProperty('walkList')
 
-    await user.click(screen.getByRole('button', { name: '+ Add a list' }))
+    await user.click(walk().getByRole('button', { name: '+ Add a page' }))
     expect((await save(user, onSaved, 2)).walkList).toEqual([{ categoryId: 'synagogue', maxMinutes: 30 }])
 
     // A second list, of food, grouped by its Store Type; the first can't be
     // chosen again.
-    await user.click(screen.getByRole('button', { name: '+ Add a list' }))
-    const second = screen.getByRole('combobox', { name: 'List 2: which places' }) as HTMLSelectElement
+    await user.click(walk().getByRole('button', { name: '+ Add a page' }))
+    const second = walk().getByRole('combobox', { name: 'Which page' }) as HTMLSelectElement
     expect([...second.options].map((o) => o.value)).toEqual(['restaurant'])
-    expect([...(screen.getByRole('combobox', { name: 'Group Food by' }) as HTMLSelectElement).options].map((o) => o.textContent)).toEqual([
-      'Grouped by distance',
-      'Grouped by Store Type',
-    ])
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Group Food by' }), 'foodType')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'How far a walk for Synagogues' }), '15')
+    const by = walk().getByRole('combobox', { name: 'Grouped by' }) as HTMLSelectElement
+    expect([...by.options].map((o) => o.textContent)).toEqual(['Distance', 'Store Type'])
+    await user.selectOptions(by, 'foodType')
+    await user.click(walk().getByRole('button', { name: /^Synagogues/ }))
+    expect(walk().getByRole('button', { name: /^Food/ })).toHaveTextContent('Up to 30 min · by Store Type')
+    await user.selectOptions(walk().getByRole('combobox', { name: 'How far' }), '15')
     expect((await save(user, onSaved, 3)).walkList).toEqual([
       { categoryId: 'synagogue', maxMinutes: 15 },
       { categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' },
     ])
     // Every category listed: nothing left to add.
-    expect(screen.queryByRole('button', { name: '+ Add a list' })).not.toBeInTheDocument()
+    expect(walk().queryByRole('button', { name: '+ Add a page' })).not.toBeInTheDocument()
   })
 
   it('shows the list saved before there could be several, and removing the last sends null', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     editor({ ...hotels, walkList: { categoryId: 'synagogue', maxMinutes: 45 } }, onSaved)
-    expect(screen.getByRole('combobox', { name: 'List 1: which places' })).toHaveValue('synagogue')
-    expect(screen.getByRole('combobox', { name: 'How far a walk for Synagogues' })).toHaveValue('45')
-    await user.click(within(screen.getByTestId('walk-lists-editor')).getByRole('button', { name: 'Remove' }))
+    await user.click(walk().getByRole('button', { name: /^Synagogues/ }))
+    expect(walk().getByRole('combobox', { name: 'Which page' })).toHaveValue('synagogue')
+    expect(walk().getByRole('combobox', { name: 'How far' })).toHaveValue('45')
+    await user.click(walk().getByRole('button', { name: 'Take Synagogues off' }))
     expect((await save(user, onSaved, 1)).walkList).toBeNull()
   })
 })
 
-// A main card, a Shabbos card, Set as location (listingParts.ts). Sent only
-// when changed, for migration 066.
-describe('CategoryEditor — on each listing', () => {
-  const hospitals = baseCategory({
+// Fields as the listing's boxes (boards 17-19): the admin's own boxes, the
+// main card and the Shabbos card (listingParts.ts). Sent only when changed.
+describe('CategoryEditor — Fields, in boxes', () => {
+  const refuah = baseCategory({
     id: 'hospital',
     label: 'Hospital',
     pluralLabel: 'Hospitals',
     detailFields: [
-      { key: 'who', label: 'Who to call first', type: 'text' },
-      { key: 'who_phone', label: 'Their phone', type: 'tel' },
+      { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
+      { key: 'pantry', label: 'Pantry', type: 'contacts' },
+      { key: 'packages', label: 'Food packages', type: 'contacts' },
       { key: 'eruv', label: 'Eruv', type: 'select', renderAs: 'row', options: [{ value: 'uc', label: 'University City Eruv' }] },
-      { key: 'kosher_inside', label: 'Kosher food inside', type: 'textarea' },
     ],
   })
   const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
-  const editor = (initial = hospitals, onSaved = vi.fn()) =>
-    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={[initial]} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+  const editor = (initial = refuah, onSaved = vi.fn()) =>
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={[initial]} onSaved={onSaved} onCancel={vi.fn()} />)
+  const boxNames = ['Top', 'Who to call', 'This Shabbos', 'Liaisons', 'Pantry', 'Food packages', 'Contact']
 
-  it('sends a titled main card of ticked fields and a Shabbos card, only once changed', async () => {
+  it('lists the listing’s boxes in its order, each with what’s in it', () => {
+    editor({ ...refuah, listingParts: { boxes: [{ title: 'Who to call', fields: ['liaisons'] }], shabbos: { fields: ['eruv'], after: 1 } } })
+    const rows = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent!.trim())
+    expect(boxNames.filter((n) => rows.some((r) => r.startsWith(n))).sort((a, b) => rows.findIndex((r) => r.startsWith(a)) - rows.findIndex((r) => r.startsWith(b)))).toEqual([
+      'Top',
+      'Who to call',
+      'This Shabbos',
+      'Pantry',
+      'Food packages',
+      'Contact',
+    ])
+    expect(screen.getByRole('button', { name: 'This Shabbos' })).toHaveAccessibleDescription('Eruv')
+  })
+
+  it('adds a box, named, and moves a list of contacts into it from the keyboard', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    editor(hospitals, onSaved)
+    editor(refuah, onSaved)
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload())).not.toHaveProperty('listingParts')
 
-    const section = screen.getByTestId('listing-parts-editor')
-    await user.click(within(section).getByRole('checkbox', { name: 'A card of its own first' }))
-    // Not finished: says so, and isn't sent as a card.
-    expect(within(section).getByText(/Give it a title and tick at least one field/)).toBeInTheDocument()
-    await user.type(within(section).getByRole('textbox', { name: 'The card’s title' }), 'Who to call first')
-    const mainFields = within(within(section).getByRole('group', { name: 'Its fields' }))
-    await user.click(mainFields.getByRole('checkbox', { name: 'Who to call first' }))
-    await user.click(mainFields.getByRole('checkbox', { name: 'Their phone' }))
-    await user.click(within(section).getByRole('checkbox', { name: /This Shabbos/ }))
-    const shabbosFields = within(within(section).getByRole('group', { name: 'Fields on the Shabbos card' }))
-    await user.click(shabbosFields.getByRole('checkbox', { name: 'Eruv' }))
-    await user.click(shabbosFields.getByRole('checkbox', { name: 'Kosher food inside' }))
-    // No Set as my location switch: every listing with an address has it (Oct 10).
-    expect(within(section).queryByRole('checkbox', { name: /Set as my location/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '+ Add a box' }))
+    // Open, its name ready to type over, nothing in it yet (board 19).
+    expect(screen.getByText('Nothing in it yet')).toBeInTheDocument()
+    const title = screen.getByDisplayValue('New box')
+    expect(title).toHaveFocus()
+    await user.clear(title)
+    await user.type(title, 'Kosher food')
+    await user.keyboard('{Enter}')
+    // Pantry, up past Liaisons (which can't take it) into Kosher food.
+    await openBox(user, 'Pantry')
+    screen.getByRole('button', { name: 'Move Pantry' }).focus()
+    await user.keyboard('{ArrowUp}')
+    expect(screen.queryByRole('button', { name: 'Pantry' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Kosher food' })).toHaveAccessibleDescription('Pantry')
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
-    expect(JSON.parse(payload()).listingParts).toEqual({
-      main: { title: 'Who to call first', fields: ['who', 'who_phone'] },
-      shabbos: { fields: ['eruv', 'kosher_inside'] },
-    })
+    expect(JSON.parse(payload()).listingParts).toEqual({ boxes: [{ title: 'Kosher food', fields: ['pantry'] }] })
   })
 
-  it('sends boxes of ticked fields in the admin’s order, and where the Shabbos card goes among them', async () => {
+  it('puts a field made from a box in that box', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [] }))))
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    const refuah = baseCategory({
-      ...hospitals,
-      detailFields: [
-        { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
-        { key: 'pantry', label: 'Pantry', type: 'contacts' },
-        { key: 'packages', label: 'Food packages', type: 'contacts' },
-        { key: 'eruv', label: 'Eruv', type: 'select', renderAs: 'row', options: [{ value: 'uc', label: 'University City Eruv' }] },
-      ],
-    })
-    editor(refuah, onSaved)
-    const boxes = screen.getByTestId('boxes-editor')
-    await user.click(within(boxes).getByRole('button', { name: '+ Add a box' }))
-    await user.type(within(boxes).getByRole('textbox', { name: 'Box 1: its title' }), 'Kosher food')
-    // Ticked packages first, then pantry, then the other way round: the box
-    // keeps the order ticked.
-    let first = within(within(boxes).getAllByRole('group', { name: 'In it' })[0])
-    await user.click(first.getByRole('checkbox', { name: 'Pantry' }))
-    await user.click(first.getByRole('checkbox', { name: 'Food packages' }))
-    await user.click(within(boxes).getByRole('button', { name: '+ Add a box' }))
-    await user.type(within(boxes).getByRole('textbox', { name: 'Box 2: its title' }), 'Who to call')
-    await user.click(within(within(boxes).getAllByRole('group', { name: 'In it' })[1]).getByRole('checkbox', { name: 'Liaisons' }))
-    await user.click(within(boxes).getByRole('button', { name: 'Move box 2 up' }))
-    first = within(within(boxes).getAllByRole('group', { name: 'In it' })[0])
-    expect(first.getByRole('checkbox', { name: 'Liaisons' })).toBeChecked()
-
-    const section = screen.getByTestId('listing-parts-editor')
-    await user.click(within(section).getByRole('checkbox', { name: /This Shabbos/ }))
-    await user.click(within(within(section).getByRole('group', { name: 'Fields on the Shabbos card' })).getByRole('checkbox', { name: 'Eruv' }))
-    await user.selectOptions(within(section).getByRole('combobox', { name: 'Where it goes the rest of the week' }), 'After “Who to call”')
+    editor({ ...refuah, listingParts: { boxes: [{ title: 'Who to call', fields: ['liaisons'] }] } }, onSaved)
+    await openBox(user, 'Who to call')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await user.type(await screen.findByRole('searchbox', { name: 'Search fields' }), 'Night line')
+    await user.click(screen.getByRole('button', { name: 'Make your own: Night line' }))
+    await user.click(screen.getByRole('button', { name: /^Text/ }))
+    await screen.findByRole('heading', { name: /^Night line/ })
+    history.back()
+    await screen.findByRole('heading', { name: 'Hospitals' })
+    expect(screen.getByRole('button', { name: /^Night line/ })).toBeInTheDocument()
     await saveNow(user)
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(payload()).listingParts).toEqual({
-      boxes: [
-        { title: 'Who to call', fields: ['liaisons'] },
-        { title: 'Kosher food', fields: ['pantry', 'packages'] },
-      ],
-      shabbos: { fields: ['eruv'], after: 1 },
-    })
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(JSON.parse(payload()).listingParts).toEqual({ boxes: [{ title: 'Who to call', fields: ['liaisons', 'night_line'] }] })
   })
 
-  it('shows what’s saved, and turning everything off sends null', async () => {
+  it('takes a box off, and with nothing left sends null', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    editor({ ...hospitals, listingParts: { shabbos: { fields: ['eruv'] } } }, onSaved)
-    const section = screen.getByTestId('listing-parts-editor')
-    const box = within(section).getByRole('checkbox', { name: /This Shabbos/ })
-    expect(box).toBeChecked()
-    await user.click(box)
+    editor({ ...refuah, listingParts: { shabbos: { fields: ['eruv'] } } }, onSaved)
+    await openBox(user, 'This Shabbos')
+    await user.click(screen.getByRole('button', { name: 'Take This Shabbos off' }))
+    expect(screen.queryByRole('button', { name: 'This Shabbos' })).not.toBeInTheDocument()
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload()).listingParts).toBeNull()
+  })
+})
+
+// Boards 20-23: the card a place is listed on, a row for each of its lines.
+describe('CategoryEditor — Before it’s opened', () => {
+  const opt = (...labels: string[]) => labels.map((l) => ({ value: l.toLowerCase(), label: l }))
+  const food = baseCategory({
+    id: 'restaurant',
+    label: 'Restaurant',
+    pluralLabel: 'Restaurants',
+    upvotesEnabled: true,
+    detailFields: [
+      { key: 'photo', label: 'Photo', type: 'image', renderAs: 'row' },
+      { key: 'short', label: 'Short Description', type: 'text', renderAs: 'row', showInHeader: true, headerMaxLength: 27 },
+      { key: 'food', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true, options: opt('Meat', 'Dairy', 'Parve') },
+      { key: 'store', label: 'Store Type', type: 'select', renderAs: 'badge', filterable: true, options: opt('Restaurant', 'Bakery') },
+      { key: 'delivery', label: 'Delivery Details', type: 'text', renderAs: 'row' },
+      { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true },
+    ],
+  })
+  const fields = () => JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryConfig['detailFields']
+  const editor = (onSaved = vi.fn()) =>
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+  const card = () => within(screen.getByRole('region', { name: 'Before it’s opened' }))
+
+  it('sums up each line, and opens one to what the card works out and what was chosen', async () => {
+    const user = userEvent.setup()
+    editor()
+    expect(card().getByRole('button', { name: 'First line' })).toHaveAccessibleDescription('Photo, Name · where it is, upvotes')
+    expect(card().getByRole('button', { name: 'Second line' })).toHaveAccessibleDescription('Open or opens at, Distance, Food Type, Store Type')
+    expect(card().getByRole('button', { name: 'Third line' })).toHaveAccessibleDescription('Not confirmed by anyone yet, Short Description')
+    await user.click(card().getByRole('button', { name: 'Second line' }))
+    expect(card().getAllByText('Automatic')).toHaveLength(2)
+    expect(card().getByText('Meat, Dairy, Parve')).toBeInTheDocument()
+    expect(card().queryByRole('button', { name: 'Move Distance' })).not.toBeInTheDocument()
+  })
+
+  it('takes a field off the card and leaves it a filter', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'Second line' }))
+    await user.click(card().getByRole('button', { name: 'Take Food Type off' }))
+    expect(card().queryByText('Meat, Dairy, Parve')).not.toBeInTheDocument()
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().find((f) => f.key === 'food')).toMatchObject({ onCard: false, filterable: true })
+  })
+
+  it('moves a field up the line, never above what the card works out', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'Second line' }))
+    card().getByRole('button', { name: 'Move Store Type' }).focus()
+    await user.keyboard('{ArrowUp}{ArrowUp}')
+    const rows = card()
+      .getAllByText(/^(Distance|Store Type|Food Type)$/)
+      .map((el) => el.textContent)
+    expect(rows).toEqual(['Distance', 'Store Type', 'Food Type'])
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().map((f) => f.key).filter((k) => k !== 'photo')).toEqual(['short', 'store', 'food', 'delivery', 'hours'])
+  })
+
+  it('shows another short line on the third line, from the page’s own (board 23)', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'Third line' }))
+    await user.click(card().getByRole('button', { name: '+ Show a field' }))
+    await screen.findByRole('heading', { name: 'Show on the third line' })
+    expect(screen.getByText('On the card')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Short Description/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Delivery Details/ }))
+    await screen.findByRole('heading', { name: 'Restaurants' })
+    expect(card().getByRole('button', { name: 'Take Delivery Details off' })).toBeInTheDocument()
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().find((f) => f.key === 'delivery')).toMatchObject({ showInHeader: true })
+  })
+
+  it('takes the photo off for initials, and puts it back', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(onSaved)
+    await user.click(card().getByRole('button', { name: 'First line' }))
+    await user.click(card().getByRole('button', { name: 'Take Photo off' }))
+    expect(card().getByRole('button', { name: 'First line' })).toBeInTheDocument()
+    expect(card().getByRole('button', { name: '+ Show the photo' })).toBeInTheDocument()
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(fields().find((f) => f.key === 'photo')).toMatchObject({ onCard: false })
+    await user.click(card().getByRole('button', { name: '+ Show the photo' }))
+    expect(card().getByRole('button', { name: 'Take Photo off' })).toBeInTheDocument()
+  })
+})
+
+// Boards 7-12: + Add a field lists every page's fields to look at and add,
+// or a kind to make one of.
+describe('CategoryEditor — + Add a field', () => {
+  const everywhere = [
+    {
+      community: 'other',
+      category: baseCategory({
+        id: 'synagogue',
+        pluralLabel: 'Synagogues',
+        detailFields: [{ key: 'denomination', label: 'Denomination', type: 'select', renderAs: 'badge', options: ['Orthodox', 'Conservative'].map((o) => ({ value: o, label: o })) }],
+      }),
+    },
+    {
+      community: 'other',
+      category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'pantry', label: 'Pantry', type: 'contacts', renderAs: 'row' }] }),
+    },
+  ]
+  const groceries = baseCategory({ detailFields: [{ key: 'pantry', label: 'Pantry', type: 'contacts', renderAs: 'row' }] })
+
+  async function openAdd(user: ReturnType<typeof userEvent.setup>) {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: everywhere }))))
+    renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await screen.findByRole('heading', { name: 'Add a field' })
+  }
+  const listed = () => screen.getAllByRole('button').map((b) => b.textContent).filter((t) => t?.includes('Like '))
+
+  it('lists every page’s fields but the ones this page has, with the basics', async () => {
+    const user = userEvent.setup()
+    await openAdd(user)
+    expect(await screen.findByText('Denomination')).toBeInTheDocument()
+    expect(screen.queryByText('Pantry')).toBeNull()
+    expect(screen.getByText('Synagogues · Orthodox and Conservative')).toBeInTheDocument()
+    expect(screen.queryByText('Address')).toBeNull()
+    expect(screen.getByText('Hours')).toBeInTheDocument()
+  })
+
+  // The list has the screen to itself (board 7); a field before adding has
+  // the page beside it, with the field on it (canvas, Nov 7).
+  it('takes the page from beside the list, and shows how a field looks before adding', async () => {
+    const user = userEvent.setup()
+    // A computer: the page sits beside the settings.
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    await openAdd(user)
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
+    // How it looks (boards 33c and 34), the field on a made-up place.
+    expect(screen.getByRole('complementary', { name: 'How it looks' })).toHaveTextContent('Denomination')
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+    await screen.findByRole('heading', { name: 'Groceries' })
+    expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
+  })
+
+  // Before adding, the field is only in the preview's copy: full size keeps it.
+  it('keeps a field not added yet when its preview opens full size', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    await openAdd(user)
+    await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
+    await user.click(screen.getByRole('button', { name: 'See the whole page' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'denomination')
+    expect(screen.getByTestId('preview').dataset.fields!.split(' ')).toContain('denomination')
+  })
+
+  it('narrows to one page’s fields from the page menu', async () => {
+    const user = userEvent.setup()
+    await openAdd(user)
+    await screen.findByText('Denomination')
+    await user.click(screen.getByRole('button', { name: 'Which page: All pages' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Hospitals' }))
+    expect(screen.queryByText('Denomination')).toBeNull()
+  })
+
+  it('shows a field before adding it, then adds it to the page', async () => {
+    const user = userEvent.setup()
+    await openAdd(user)
+    await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
+    expect(screen.getByRole('heading', { name: /^Denomination\s*Choices$/ })).toBeInTheDocument()
+    // What it is first, then what a page can change (canvas, Nov 7).
+    const what = screen.getByRole('region', { name: 'What this is' })
+    expect(what).toHaveTextContent('Which movement a place belongs to.')
+    expect(within(what).getByRole('list', { name: 'Choices' })).toHaveTextContent('OrthodoxConservative')
+    const change = screen.getByRole('region', { name: 'What you can change' })
+    expect(within(change).getByRole('switch', { name: 'In the filter' })).toHaveAttribute('aria-checked', 'false')
+    // What's changed before adding comes with it.
+    await user.click(within(change).getByRole('switch', { name: 'In the filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+    expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Denomination/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    // On a phone, back to the Fields box still open.
+    expect(screen.getByRole('button', { name: /^Fields/, expanded: true })).toBeInTheDocument()
+    // It came with the filter switched on before adding.
+    await user.click(screen.getByRole('button', { name: /^Denomination/ }))
+    expect(screen.getByRole('switch', { name: 'In the filter' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  // The user, Nov 5: an hours field said only its page, and looked like an
+  // empty text box before adding it. Without room for the page beside (a
+  // phone), board 11's drawn samples stay.
+  it('says what kind an hours field is, and draws the week to fill in', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }))
+    const mikvah = { community: 'other', category: baseCategory({ id: 'mikvah', pluralLabel: 'Mikvah', detailFields: [{ key: 'w_hours', label: 'Women’s Hours', type: 'hours', renderAs: 'row' }] }) }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [mikvah] }))))
+    renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    expect(await screen.findByText('Mikvah · hours')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Women’s Hours/ }))
+    const adding = screen.getByRole('region', { name: 'On Add a place' })
+    expect(within(adding).getByText('Sunday')).toBeInTheDocument()
+    expect(within(adding).getAllByText('Opens – Closes')).toHaveLength(3)
+  })
+
+  it('adds a basic as its own setting', async () => {
+    const user = userEvent.setup()
+    await openAdd(user)
+    await user.click(await screen.findByRole('button', { name: /^Website/ }))
+    await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
+    await screen.findByRole('heading', { name: 'Groceries' })
+    // Its box open, to see it there.
+    expect(screen.getByRole('button', { name: /^Website/ })).toBeInTheDocument()
+  })
+
+  it('offers to make what nothing matches, of a kind picked, and opens it named', async () => {
+    const user = userEvent.setup()
+    await openAdd(user)
+    await screen.findByText('Denomination')
+    await user.type(screen.getByRole('searchbox', { name: 'Search fields' }), 'parking')
+    expect(screen.getByText('No ready-made field called “parking”')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Make your own: Parking' }))
+    expect(screen.getByRole('region', { name: 'Make your own' })).toBeInTheDocument()
+    expect(listed()).toEqual([
+      'ChoicesLike Food Type: Meat, Dairy, Parve',
+      'Yes or noLike Shabbat friendly',
+      'A list of itemsLike Main dishes',
+      'TextLike Delivery Details',
+      'LinkLike Join group',
+    ])
+    await user.click(screen.getByRole('button', { name: /^Yes or no/ }))
+    expect(await screen.findByRole('heading', { name: /^Parking\s*Yes or no$/ })).toBeInTheDocument()
+  })
+})
+
+// The user, Nov 5: the boxes that move are renamed in place too, the new
+// name saved on the field it comes from.
+describe('CategoryEditor — renaming the listing’s own boxes', () => {
+  const food = baseCategory({
+    id: 'restaurant',
+    label: 'Food',
+    pluralLabel: 'Food',
+    detailFields: [
+      { key: 'kosherCert', label: 'Kosher Certification', type: 'select', renderAs: 'badge', filterable: true, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' }, options: [{ value: 'IKC', label: 'IKC' }] },
+      { key: 'kosherPartial', label: 'Everything here is kosher', type: 'boolean', renderAs: 'hidden' },
+      { key: 'kosherNote', label: 'What isn’t kosher?', type: 'textarea', renderAs: 'hidden' },
+      { key: 'delivery_whatsapp_group', label: 'Delivery WhatsApp Group', type: 'url', leadBox: { title: 'Delivery', text: 'delivery_details' } },
+      { key: 'delivery_details', label: 'Delivery Details', type: 'textarea' },
+      { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true },
+    ],
+  })
+  const fields = () => JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryConfig['detailFields']
+  const rename = async (user: ReturnType<typeof userEvent.setup>, from: string, to: string) => {
+    await openBox(user, from)
+    await user.click(screen.getByRole('button', { name: `Rename ${from}` }))
+    const name = within(screen.getByRole('region', { name: 'Fields' })).getByRole('textbox', { name: 'Name' })
+    await user.clear(name)
+    await user.type(name, `${to}{Enter}`)
+    await user.click(screen.getByRole('button', { name: to, expanded: true }))
+  }
+
+  // The user, Nov 7: a ready-made field's box keeps its name.
+  it('keeps a ready-made field’s box name: no Rename on Delivery, What isn’t kosher or Main dishes', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    for (const name of ['Delivery', 'What isn’t kosher', 'Main dishes']) {
+      await openBox(user, name)
+      expect(screen.getByRole('button', { name, expanded: true })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: `Rename ${name}` })).toBeNull()
+    }
+  })
+
+  it('renames the boxes of fields made here, and saves each on its field', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const madeHere = { ...food, detailFields: food.detailFields.map((f) => ({ ...f, madeHere: true })) }
+    renderWithProviders(<CategoryEditor token="t" initial={madeHere} siblings={[madeHere]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await rename(user, 'Delivery', 'Get it delivered')
+    await rename(user, 'What isn’t kosher', 'Not kosher here')
+    await rename(user, 'Main dishes', 'Dishes')
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const by = new Map(fields().map((f) => [f.key, f]))
+    expect(by.get('delivery_whatsapp_group')!.leadBox).toEqual({ title: 'Get it delivered', text: 'delivery_details' })
+    expect(by.get('kosherCert')!.caveat).toEqual({ flagField: 'kosherPartial', noteField: 'kosherNote', title: 'Not kosher here' })
+    expect(by.get('dishes')!.label).toBe('Dishes')
+  })
+})
+
+// The user, Nov 8: some communities never have a place that's only partly
+// kosher, so a hechsher's "Everything here is kosher?" can be turned off.
+describe('CategoryEditor — a hechsher’s kosher questions', () => {
+  const cert: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', renderAs: 'badge', multiSelect: true, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' }, options: [{ value: 'OU', label: 'OU' }] }
+  const [flag, note] = kosherQuestions()
+  const food = baseCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [cert, flag, note] })
+  // Without the photo every page is saved with.
+  const saved = () => (JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).fields as CategoryField[]).filter((f) => f.type !== 'image')
+  const openCert = async (user: ReturnType<typeof userEvent.setup>) => {
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: /^Kosher Certification(?! URL)/ }))
+  }
+
+  it('turned off, the page stops asking both; turned on, asks them as Food does', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert'])
+    expect(saved()[0].caveat).toBeUndefined()
+  })
+
+  it('turned on where it was off, adds both questions', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const without = { ...food, detailFields: [{ ...cert, caveat: undefined }] }
+    renderWithProviders(<CategoryEditor token="t" initial={without} siblings={[without]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved()).toEqual([{ ...cert, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' } }, flag, note].map((f) => expect.objectContaining(f)))
+  })
+
+  it('turned off before adding, comes without them', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const groceries = baseCategory({ detailFields: [] })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [{ community: 'philly', category: food }] }))))
+    renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await user.click(await screen.findByRole('button', { name: /^Kosher Certification(?! URL)/ }))
+    await user.click(screen.getByRole('switch', { name: 'Everything here is kosher?' }))
+    await user.click(screen.getByRole('button', { name: /^Add to / }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved().map((f) => f.label)).toEqual(['Kosher Certification'])
+  })
+
+  // The certificate link comes with its field, with a switch (the user, Nov 9).
+  const link: CategoryField = { key: 'k', label: 'Kosher Certification URL', type: 'url', renderAs: 'row', linkLabel: 'Certification', filterable: false }
+
+  it('the certificate link’s switch takes it off, and puts it back next to its field', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const short: CategoryField = { key: 'short', label: 'Short Description', type: 'text', renderAs: 'row' }
+    const withLink = { ...food, detailFields: [cert, short, flag, note, link] }
+    renderWithProviders(<CategoryEditor token="t" initial={withLink} siblings={[withLink]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    const linkSwitch = () => screen.getByRole('switch', { name: 'Link to the certificate' })
+    expect(linkSwitch()).toHaveAttribute('aria-checked', 'true')
+    await user.click(linkSwitch())
+    expect(linkSwitch()).toHaveAttribute('aria-checked', 'false')
+    await user.click(linkSwitch())
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    // The link goes back right after its field (and its kosher questions).
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert', 'kosherPartial', 'kosherNote', 'k', 'short'])
+  })
+
+  it('switched off, the page stops asking for the link', async () => {
+    // Save checks first whether places lose a link; none have one here.
+    vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: { k: 0 } } })
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const withLink = { ...food, detailFields: [cert, flag, note, link] }
+    renderWithProviders(<CategoryEditor token="t" initial={withLink} siblings={[withLink]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Link to the certificate' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert', 'kosherPartial', 'kosherNote'])
+  })
+
+  it('added from another page, brings its link unless switched off', async () => {
+    for (const keep of [true, false]) {
+      const onSaved = vi.fn()
+      const user = userEvent.setup()
+      const groceries = baseCategory({ detailFields: [] })
+      const withLink = { ...food, detailFields: [cert, flag, note, link] }
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [{ community: 'philly', category: withLink }] }))))
+      renderWithProviders(<CategoryEditor token="t" initial={groceries} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+      await openBox(user, 'Top')
+      await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+      expect(screen.queryByRole('button', { name: /^Kosher Certification URL/ })).not.toBeInTheDocument()
+      await user.click(await screen.findByRole('button', { name: /^Kosher Certification(?! URL)/ }))
+      if (!keep) await user.click(screen.getByRole('switch', { name: 'Link to the certificate' }))
+      await user.click(screen.getByRole('button', { name: /^Add to / }))
+      await saveNow(user)
+      await waitFor(() => expect(onSaved).toHaveBeenCalled())
+      expect(saved().map((f) => f.label)).toEqual(keep
+        ? ['Kosher Certification', flag.label, note.label, 'Kosher Certification URL']
+        : ['Kosher Certification', flag.label, note.label])
+      cleanup()
+      forgetReadyMade()
+      vi.mocked(fetchJson).mockClear()
+    }
+  })
+})
+
+// Each screen has its own address, so a reload or a Back from another tab
+// lands on it (the user, Nov 9: "these add a field pages seem to not
+// register as a new page"). The browser's own ordering is proved in
+// e2e-admin-write/editor-screens.spec.ts; this is what the editor reads.
+describe('CategoryEditor — the screen is in the address', () => {
+  const kosher = baseCategory({ detailFields: [{ key: 'kosher', label: 'Kosher certification', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'OU', label: 'OU' }] }] })
+  const open = (search: string) => {
+    history.replaceState(null, '', `/philly/admin/categories/cat:grocery${search}`)
+    renderWithProviders(<CategoryEditor token="t" initial={kosher} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+  }
+
+  it('opens on the field, Add a field or the preview its address names', async () => {
+    open('?field=kosher')
+    expect(screen.getByRole('heading', { name: /^Kosher certification/ })).toBeInTheDocument()
+    cleanup()
+    open('?add=list')
+    expect(await screen.findByRole('searchbox', { name: 'Search fields' })).toBeInTheDocument()
+    cleanup()
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    open('?field=kosher&preview=1')
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'kosher')
+  })
+
+  it('writes each screen it opens into the address, and Back goes by it', async () => {
+    const user = userEvent.setup()
+    open('')
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: /^Kosher certification/ }))
+    await waitFor(() => expect(location.search).toBe('?field=kosher'))
+    history.back()
+    expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+    expect(location.search).toBe('')
+    history.forward()
+    expect(await screen.findByRole('heading', { name: /^Kosher certification/ })).toBeInTheDocument()
+  })
+
+  it('reloaded on a Remove step, counts again and shows it', async () => {
+    vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: { kosher: 12 } } })
+    open('?field=kosher&remove=1')
+    expect(await screen.findByRole('heading', { name: 'Remove Kosher certification from Groceries?' })).toBeInTheDocument()
+    expect(screen.getByText('12 places').parentElement).toHaveTextContent('12 places lose their answer')
   })
 })

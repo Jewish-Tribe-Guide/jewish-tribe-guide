@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { RELATIVE_ELIGIBLE, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, parseTimeToMinutes, type Minyan, type Season, type Tefillah } from '@/lib/davening'
 import { BOX_DAYS, boxChangeCount, type MinyanBox } from '@/lib/minyanimBox'
 import type { MinyanWriting } from '@/lib/minyanText'
+import type { MinyanPart } from '@/lib/categories'
 import { RelativeTimeFields, ZMAN_ANCHOR_ORDER, useTimeModes } from '@/components/intake/ZmanTimeFields'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
@@ -63,7 +64,9 @@ export default function MinyanBoxEditor({
   nameShown,
   onChange,
   onStep,
+  reopen,
   send,
+  off = [],
 }: {
   /** The box's minyanim as they are (minyanimForBox). */
   original: Minyan[]
@@ -93,21 +96,36 @@ export default function MinyanBoxEditor({
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
-  onStep: (step: { title: string; back: () => void } | null) => void
+  onStep: (step: { title: string; back: () => void; id?: string } | null) => void
+  /** A minyan to open, or none, asked for by the host (Back, Forward or a
+   *  reload onto it, in the admin): by its place in the list, or 'new'. */
+  reopen?: { id: string | null; n: number } | null
   /** The list's button, given how many minyanim changed. */
   send: (changes: number) => ReactNode
+  /** The parts of a minyan the page doesn't ask about (its field's
+   *  minyanOff). What a minyan already has of one still shows on the list. */
+  off?: readonly MinyanPart[]
 }) {
   const [rows, setRows] = useState<Minyan[]>(initial ?? original)
   // The minyan open: an id, 'new' for one being added, or null for the list.
   const [open, setOpen] = useState<string | null>(null)
+  const [asked, setAsked] = useState<number | null>(null)
+  if (reopen && reopen.n !== asked) {
+    setAsked(reopen.n)
+    const id = reopen.id
+    setOpen(id === null ? null : id === 'new' ? 'new' : (rows[Number(id)]?.id ?? null))
+  }
   const was = new Map(original.map((m) => [m.id, m]))
   const isChanged = (m: Minyan) => !was.has(m.id) || boxChangeCount([was.get(m.id)!], [m]) > 0
 
   const editing = open === 'new' ? null : rows.find((m) => m.id === open)
   const title = open === null ? null : open === 'new' ? 'Add a minyan' : TEFILLAH_LABELS[editing!.tefillah]
+  // Which it is, by its place in the list: what the address can say again
+  // after a reload (a stored minyan's id is given anew each time).
+  const stepId = open === null ? undefined : open === 'new' ? 'new' : String(rows.findIndex((m) => m.id === open))
   useEffect(() => {
-    onStep(title ? { title, back: () => setOpen(null) } : null)
-  }, [title, onStep])
+    onStep(title ? { title, back: () => setOpen(null), id: stepId } : null)
+  }, [title, stepId, onStep])
   useEffect(() => () => onStep(null), [onStep])
 
   const save = (next: Minyan[]) => {
@@ -127,6 +145,7 @@ export default function MinyanBoxEditor({
         box={box}
         choices={choices}
         under={`${boxTitle} · ${place}`}
+        off={off}
         onDone={(m) => save(editing ? rows.map((r) => (r.id === m.id ? m : r)) : [...rows, m])}
         onRemove={editing ? () => save(rows.filter((r) => r.id !== editing.id)) : undefined}
       />
@@ -222,12 +241,31 @@ export function MinyanBoxRows({
   )
 }
 
-function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Minyan; box: MinyanBox; choices: Minyan['days']; under: string; onDone: (m: Minyan) => void; onRemove?: () => void }) {
+function OneMinyan({
+  start,
+  box,
+  choices,
+  under,
+  off,
+  onDone,
+  onRemove,
+}: {
+  start: Minyan
+  box: MinyanBox
+  choices: Minyan['days']
+  under: string
+  off: readonly MinyanPart[]
+  onDone: (m: Minyan) => void
+  onRemove?: () => void
+}) {
+  const asks = (part: MinyanPart) => !off.includes(part)
   const [row, setRow] = useState<Minyan>(start)
-  const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter || start.signUp || start.joinLink))
+  const [more, setMore] = useState(!!((asks('season') && start.season) || start.notBefore || start.notAfter || (asks('signUp') && start.signUp) || (asks('joinLink') && start.joinLink)))
   const modes = useTimeModes()
   const set = (p: Partial<Minyan>) => setRow((r) => ({ ...r, ...p }))
   const relative = !!row.anchor
+  // Nothing under More: no part asked, and a clock time has no bounds.
+  const hasMore = relative || asks('season') || asks('signUp') || asks('joinLink')
   const readable = relative || Number.isFinite(parseTimeToMinutes(row.time))
   const view = modes.view(row)
   const canBeRelative = RELATIVE_ELIGIBLE.includes(row.tefillah)
@@ -301,24 +339,26 @@ function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Mi
 
       <input type="text" value={row.notes ?? ''} maxLength={120} onChange={(e) => set({ notes: e.target.value || undefined })} placeholder="Note (optional)" aria-label="Note" className={`${input} w-full`} />
 
-      {more ? (
+      {!hasMore ? null : more ? (
         <div className="space-y-4 border-t border-slate-200/70 pt-4">
-          <div className="space-y-2">
-            <p className="text-[14px] font-bold text-slate-700">Time of year</p>
-            <div className="flex gap-1 rounded-xl bg-slate-100 p-[3px]" role="group" aria-label="Time of year">
-              {([undefined, ...(Object.keys(SEASON_LABELS) as Season[])] as const).map((s) => (
-                <button
-                  key={s ?? 'all'}
-                  type="button"
-                  aria-pressed={row.season === s}
-                  onClick={() => set({ season: s })}
-                  className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] ${row.season === s ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
-                >
-                  {s ? `${s.charAt(0).toUpperCase()}${s.slice(1)}` : 'All year'}
-                </button>
-              ))}
+          {asks('season') && (
+            <div className="space-y-2">
+              <p className="text-[14px] font-bold text-slate-700">Time of year</p>
+              <div className="flex gap-1 rounded-xl bg-slate-100 p-[3px]" role="group" aria-label="Time of year">
+                {([undefined, ...(Object.keys(SEASON_LABELS) as Season[])] as const).map((s) => (
+                  <button
+                    key={s ?? 'all'}
+                    type="button"
+                    aria-pressed={row.season === s}
+                    onClick={() => set({ season: s })}
+                    className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] ${row.season === s ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
+                  >
+                    {s ? `${s.charAt(0).toUpperCase()}${s.slice(1)}` : 'All year'}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           {/* Earliest and latest clamp a zman that moves; a clock time has
               nothing to clamp. */}
           {relative && (
@@ -331,21 +371,23 @@ function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Mi
               </div>
             </div>
           )}
-          <SignUpFields signUp={row.signUp} onChange={(signUp) => set({ signUp })} />
-          <label className="block space-y-1.5">
-            <span className="block text-[14px] font-bold text-slate-700">Zoom or livestream link</span>
-            <input
-              type="url"
-              inputMode="url"
-              value={row.joinLink ?? ''}
-              maxLength={300}
-              onChange={(e) => set({ joinLink: e.target.value.trim() || undefined })}
-              placeholder="https://zoom.us/j/…"
-              aria-label="Zoom or livestream link"
-              className={`${input} w-full`}
-            />
-            {!signUpLinkOk(row.joinLink) && <span className="block text-[13px] text-caution">Paste the whole link, starting https://</span>}
-          </label>
+          {asks('signUp') && <SignUpFields signUp={row.signUp} onChange={(signUp) => set({ signUp })} />}
+          {asks('joinLink') && (
+            <label className="block space-y-1.5">
+              <span className="block text-[14px] font-bold text-slate-700">Zoom or livestream link</span>
+              <input
+                type="url"
+                inputMode="url"
+                value={row.joinLink ?? ''}
+                maxLength={300}
+                onChange={(e) => set({ joinLink: e.target.value.trim() || undefined })}
+                placeholder="https://zoom.us/j/…"
+                aria-label="Zoom or livestream link"
+                className={`${input} w-full`}
+              />
+              {!signUpLinkOk(row.joinLink) && <span className="block text-[13px] text-caution">Paste the whole link, starting https://</span>}
+            </label>
+          )}
           {/* Folds it away again; what's set stays set. */}
           <button type="button" onClick={() => setMore(false)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
             Less

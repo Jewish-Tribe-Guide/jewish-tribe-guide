@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
-import { boxesOf, cardFieldChoices, listingPartsFromKey, listingPartsKey, listingPartsToSave, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from './listingParts'
+import { boxesOf, cardFieldChoices, leadOrderOf, listingPartsFromKey, listingPartsKey, listingPartsToSave, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from './listingParts'
 
 const who: CategoryField = { key: 'who', label: 'Who to call first', type: 'text' }
 const phone: CategoryField = { key: 'who_phone', label: 'Their phone', type: 'tel' }
@@ -91,5 +91,16 @@ describe('boxes', () => {
     const draft = listingPartsKey({ boxes: [{ title: 'Rides', fields: ['rides'] }, { title: '', fields: [] }], shabbos: { fields: [], after: 2 } })
     expect(listingPartsFromKey(draft)).toEqual({ boxes: [{ title: 'Rides', fields: ['rides'] }, { title: '', fields: [] }], shabbos: { fields: [], after: 2 } })
     expect(listingPartsToSave(draft)).toEqual({ boxes: [{ title: 'Rides', fields: ['rides'] }], shabbos: { fields: [], after: 2 } })
+  })
+})
+
+describe('the listing’s own boxes’ order', () => {
+  it('reads each known box once, the rest after, and the usual order as none', () => {
+    expect(parseListingParts({ lead: ['main', 'main', 'x', 'link'] })).toEqual({ lead: ['main', 'link', 'caveat'] })
+    expect(parseListingParts({ lead: ['link', 'caveat', 'main'] })).toEqual({})
+    expect(parseListingParts({ lead: 'main' })).toEqual({})
+    expect(leadOrderOf(makeCategory({ listingParts: { lead: ['caveat'] } }))).toEqual(['caveat', 'link', 'main'])
+    expect(leadOrderOf(makeCategory({}))).toEqual(['link', 'caveat', 'main'])
+    expect(listingPartsToSave(listingPartsKey({ lead: ['main', 'link', 'caveat'] }))).toEqual({ lead: ['main', 'link', 'caveat'] })
   })
 })

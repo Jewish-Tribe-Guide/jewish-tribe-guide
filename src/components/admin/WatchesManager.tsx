@@ -129,6 +129,10 @@ export default function WatchesManager({ token }: { token: string }) {
           {said}
         </div>
       )}
+      {/* What a watch is, for an admin new to them (the user, Nov 9). */}
+      <Link href={`${base}/watches/about`} className="self-start px-1 text-[15px] font-semibold text-primary underline-offset-2 hover:underline">
+        How watches work
+      </Link>
       <JobsNotLoaded jobs={jobs} />
       {fixes.length > 0 && (
         <AdminBox title="Needs fixing">

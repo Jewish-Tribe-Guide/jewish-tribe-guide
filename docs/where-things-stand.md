@@ -321,11 +321,629 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Up next: Site → Category pages, organised and cleaned up
 
+**Built Nov 9: a field, how it looks** (canvas boards 33c and 34, row "A
+field, how it looks"; the user, Nov 9: "build it, but with 33c"). Beside
+an opened field, and beside a field looked at in Add a field, in place of
+the Page / A listing / Adding preview (FieldLooks.tsx, fieldLooks.ts): In
+the list, In Filters (only while it's in the filter), On the listing and
+When adding, on a made-up place that answers every field by its type, the
+field outlined in blue and its neighbours faded. A field off the row says
+so, with Show it on a row (the card's picker for its line; Back returns to
+the field). See the whole page opens the full preview, on Page. The page's
+own screen keeps the Page / A listing / Adding preview. Not as drawn, from
+the site's own rules: the listing's facts are a line ("Meat · IKC"), not
+pills; Delivery Details is in its Delivery box, and Hours in Contact; the
+row before the field when adding follows the add form's order (Type comes
+before Food Type). The add form's picked choice is now the filter's filled
+blue with a tick (ListingEditor's ChoiceButtons, the user's OK, Nov 9), on
+the site's own add form too. Hours, minyanim, contacts and a photo show their answer as
+a line when adding, not their full editor. Phone not built (nothing beside
+a field there).
+
+Fixed Nov 9 (the user: "I don't see that for denomination"): "In the
+filter" turned off on a Choice, a Yes/No or Hours came back on with the
+save, and the panel kept In Filters. Saving now keeps it off. Off, a
+Choice also leaves the row (the row's default is "badge and in the
+filter"); Show it on a row puts it back. No stored
+field had a filter turned off, on dev or live, so nothing saved changes.
+"A link for places not listed here?": its "Words" box is now "What the
+link says" (it's the link under the list, "Not listed here? Find more
+kosher food"). Dev's pretend Riverton Food page (one pretend place) was
+deleted at the user's word, so it's no longer offered as a ready-made
+page; live never had it.
+
+Built Nov 9 (the user: "Yes, build it"): a page with no places yet shows
+a made-up one in its preview, on Page and A listing, with a strip above
+the site's header, "A made-up place, until this page has real ones". It's
+How it looks' made-up place (every field answered by type), plus a 555
+phone; no address, so no directions to a real street. Never saved; the
+first real place, or one added in the preview, replaces it
+(CategoryPreview.tsx). Fixed the same day (the user: "Yes, fix it"): in
+the admin's preview a page with one place drew its card as a tall white
+block running under the footer (Cemetery too; the real site was fine).
+The frame was an about:blank document, which has no doctype, so it laid
+out in quirks mode, where a card's h-full stretched to the page. The
+frame now starts with a doctype (DevicePreviewFrame.tsx), so the preview
+lays out in the same standards mode as the site: every portal preview
+(category pages, forms, site settings).
+
 The user, Nov 4, after Home page became one screen: Category pages is next,
-"organized better and just cleaned up in general". Not started. Start by
-looking at the screen as it stands (and what Home page settled: one screen,
-Computer / Phone, boxes in the order the page reads, the preview beside),
-then draw it before building.
+"organized better and just cleaned up in general". **Seventh draw Nov 5,
+waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
+cleared Nov 5 to the screens going ahead: 1-6 a category page, 7-16
+adding a field, 17-19 a listing's boxes, 20-23 a place before it's opened; earlier drafts and the field map are off the canvas;
+reviewed Nov 5 at the user's ask: the Denomination board shows the one
+list as one choice, Nusach is on Synagogues and in the ready-made list,
+the page's "Kind" tag is gone (a copied page brings its kind, one made
+from scratch is Plain), and the question says "recommend", the word
+visitors see). Board 16, Nov 5: "Remove this field" opens its own step
+when places have filled it in ("Remove Kosher Certification from Food?",
+71 places lose their answer, the filter loses it; Remove it / Keep it).
+Today the same removal waits for Save and an amber warning, then wipes the
+answers. With no answers, the field just goes.
+Boards 17-18, Nov 5 (the user: dragging fields, but a listing has boxes;
+then: make it work like the header editor's tabs and headings). Fields
+is a list of the opened listing's boxes, in the order a visitor sees
+them, drawn on Hospitals: Top (Photo), Who to call, Kosher food, A place
+to stay, This Shabbos, Rides, Also, Contact (Address, Phone, Hours,
+Website, Refuah Link). Each is a row with its fields as its line; a tap
+opens it in place, its fields as inner rows, then "+ Add a field" with
+the boxed trash can right beside it (as the header editor's RowActions
+does); its name is text until tapped, then edits in place, like a
+heading's. Board 19: "+ Add a box" lands an open "New box" before
+Contact, its name selected to type over, "Nothing in it yet", "+ Add a
+field" and the trash. Top and Contact stay first and
+last, with no handle or trash, like Categories' "Other". "+ Add a box"
+at the foot. Dragging is within one list only, as in the header editor:
+a field moves to another box by dragging it onto that box's row (board
+18; the user, Nov 5: a field goes in the box it was added from, so no
+field screen has a Box list). The preview's "A listing" shows the
+same boxes. Within a walk (Food, Synagogues, Hotels, Mikvah, 30 min) is
+its own box below Fields, since those aren't fields. Boards 4 (Food) and
+6 (Synagogues) redrawn the same way, Nov 5, Top open on each. Food: Top
+(Photo, Short Description, Food Type, Store Type, Kosher Certification,
+its URL as the Certification button), Delivery, What isn't kosher, Main
+dishes, then Contact (Address, Phone, Hours, Website) and About
+(Description). Synagogues: Top (Photo, Denomination, Nusach), Davening
+times, Contact (Address, Phone, Website). A fixed box (Top, Contact,
+About) opens to its fields and "+ Add a field", with no handle, rename or
+trash. Neither page has saved listing parts live today, so these are the
+order the listing already shows.
+Board 20, Nov 5 (the user: a section for how the card looks before it's
+opened, built from the fields already added). "The card" sits between
+Fields and Questions, drawn on Food: First line (Photo, Name · where it
+is, recommends), Second line (Open or opens at and Distance, both
+automatic, then Food Type, Kosher Certification, Store Type, each with a
+handle and a trash can, "+ Show a field"), Third line, the first that
+applies (Not everything here is kosher, Not confirmed by anyone yet, both
+automatic, then Short Description). The preview's Page tab shows two
+cards. Boards 4 and 6 have the section with its lines closed, and their
+fields lost "In the list" (Filter stays). Today the card is set on each
+field (listingRow.ts): a choice shows only as a badge that's also a
+filter, Short Description by "in the header", order by field order;
+building this separates "on the card" from "a filter". A restaurant's
+dishes stay off the card (the user, Oct 10); a store's items line would
+be its own line when a page has one. Then (the user: what does First
+line do, and make clear it's the listing before it's opened): the section
+is "Before it's opened", with a sample card at its top (on boards 4, 6
+and 20); First line opens like the others to Photo (trash: initials
+instead), Name, Where it is, Upvotes, all but Photo automatic, and no
+"+ Show a field" (the line is full). The user, Nov 5: people know
+"upvote", not "recommend", so the admin boards say "Can visitors upvote
+places?" and "Upvotes". The visitors' button says Upvote too (the user
+changed their mind, Nov 5): its label and hover were "Recommend Goldie,
+12 recommend it" / "Recommend", now "Upvote Goldie, 12 upvotes" /
+"Upvote this place", like the inline button (UpvoteButton.tsx). On
+screen it was only ever a thumb and a count. Boards 20-23, Nov 5 (the
+user: what happens when you click First line, Second line): each line
+opened on its own board with its part of the sample card lit; Third
+line's "+ Show a field" picks from the page's fields (board 23). Same
+day, four boards brought in line: Make your own page (3) starts with Top
+and Contact, "Nothing in it yet", and Before it's opened (First line
+Name, Third line Not confirmed by anyone yet); Food's listing preview (5)
+follows the boxes' order; the field screens (13-15) lost "Show it before
+a place is opened?" and gained a Box list (Top ticked), and board 18's
+list has Top and Contact too. Then (the user) the Box lists came off
+every field screen, and taking a field off a card line is an x, not a
+trash can. On the phone the page opens folded (board 6b): Basics, Fields,
+Before it's opened and Questions are rows with what's in them; the
+computer keeps them open beside the preview. The user's rule, Nov 5: admins
+shouldn't reinvent the wheel, and visitors shouldn't see different things
+between communities, so ready-made comes first everywhere. The user: design it as it should be, not as the settings are
+today. Read on live Nov 5: Add, Correct, Take off and Search bar are on for
+all 16 pages; Map is off only on the three with no address (WhatsApp,
+Networking, Cemetery); no page sets Groups. On the drawing:
+
+- The list is rows: line glyph, name, places count, "Hidden" when off,
+  chevron; "+ New category page" beside the heading. Candle Lighting &
+  Zmanim is back in the list as a row, like Eruv.
+- "+ New category page" opens **What kind of places?** as its own screen:
+  a search box, then one scrolling list of every listing page live today
+  (Cemetery, Childcare, Food, Grocery, Hospitals, Hotels, Mikvah,
+  Networking, Schools, Synagogues, WhatsApp Groups), each with its real
+  fields as the line; one the community already has says "Already a
+  page". "+ Make your own page" sits under the list. Either opens the
+  page's screen, filled or empty ("Don't make this page" until it's
+  saved). Today only six kinds have templates and live `place_kind` is
+  unset on every page, so building this means copying a page's fields.
+- Three sections on every page, and on every field: **Basics** (a
+  page's icon, name, banner; a field's name), the details (a page's
+  **Fields**, renamed from "Each place" Nov 5; a field's choices), and **Questions**, each a No / Yes. The
+  user's idea, Nov 5.
+- A page's Questions: "Can visitors upvote places?" (the round thumbs-up
+  with a count on each place; it also adds a "Most upvoted" sort and
+  answers "best ..." searches) and "A link for places not listed here?"
+  (Hospitals → Refuah, Mikvah → mikvah.org).
+- Gone from the page: Search bar (always on), Add / Correct / Take off
+  (the "+ Add" box is site-wide; always on), the Map switch (a page is
+  on the map when its places have an address), Groups, web address (set
+  from the name when the page is made), link-preview words.
+- Each place: every field is the same row, the five ready-made ones
+  (Address, Phone, Hours, Website, Photo) included: drag to reorder, tap
+  to open, Remove inside (the user, Nov 5: they shouldn't look
+  different). Each row says where it shows:
+  "Filter · in the list", "In the list", "When a place is opened".
+  Today only Address and Phone are switches (`has_address`,
+  `has_phone`); Hours, Website and Photo are ordinary fields (live: no
+  Hours on Synagogues, Hotels, Cemetery; no Website on WhatsApp).
+- "+ Add a field" is the same shape: a search box plus one page menu
+  ("All pages", or one page: Hospitals shows only the fields Hospitals
+  has), then one scrolling list of every field live on any page, once
+  each, alphabetical, each with the pages it's on and its choices or
+  kind. Each row opens the field first (board 11): the pages it's on, and
+  how it looks in the list, in the filter and on Add a place, then one
+  button, "Add to <page>". No "+ Add" on the rows. Kosher Certification
+  brings "Everything here is kosher" with it. "+ Make your own field"
+  sits under the list, then "What kind of field?" (Choices, Yes or no, A
+  list of items, Text, Link), then the field's screen. When nothing
+  matches, the list says so and offers "Make your own: <what was typed>".
+- Drawn Nov 5 (boards 14, 15), waiting on the user: a ready-made field
+  is one shared definition. Opened after adding, it says "Ready-made"
+  beside its name, and nothing more (the user, Nov 5: no "same
+  everywhere" or "Philly's own" labels; the choices box shows which by
+  having + Add and × or not); name, note and questions show as answers,
+  not inputs; "Remove this field" stays. Its choices are one of
+  two, decided per field by the ready-made definition, never split
+  inside one field (the user, Nov 5: a split by choice felt wrong;
+  hechshers are local, but Kosher Store's choices are what every admin
+  wants kept):
+  - **Each community's own** (board 14, Kosher Certification): the whole
+    list is the community's, drag, ×, "+ Add a choice", and the Other
+    switch. Live, only Kosher Certification and Hospitals' Eruv are like
+    this.
+  - **Same everywhere** (board 15, Kosher Store: Kosher Store, Kosher
+    Items, Other): a plain list, nothing to change. Every other live
+    choice field: Food Type, Store Type, Denomination, Services,
+    Cemetery's Type.
+  - Denomination gets one list (agreed Nov 5). Four differ today: Philly
+    Synagogues (Orthodox (Ashkenazi), Other, one choice), Philly Schools
+    (Orthodox, no Other, several, key `d`), Washington Synagogues and the
+    template (Orthodox, Other, no Non-Denominational, several).
+    One field on every page, since it's the same question everywhere. The
+    user, Nov 5: for shuls, Ashkenazi/Sephardic is really nusach, and
+    schools don't have one. Recommended:
+    - Denomination, every page: Orthodox, Conservative, Reform,
+      Reconstructionist, Non-Denominational, Other; one choice.
+    - Nusach, a ready-made field only Synagogues use: Ashkenaz, Sefard,
+      Ari (Chabad), Sephardi (Edot HaMizrach), Other; may be left empty.
+    Live, Philly's 8 "Orthodox (Ashkenazi)" shuls (7 shown, Vilna
+    archived) and Mikveh Israel's "Orthodox (Sephardic)" become Orthodox.
+    Mikveh Israel's Nusach becomes Sephardi, from its own value. The 8
+    get no Nusach: "Ashkenazi" there isn't a nusach, and both Chabads
+    are among them. The schools' key `d` becomes `denomination`. A saved
+    search filtered on either old value would stop matching.
+    Dry run ready Nov 5 (`scripts/denomination-nusach.mjs`): live is 17
+    rows, 3 pages (Philly Synagogues, Philly Schools, Washington
+    Synagogues), 13 places, and the pending edit #1315 (South Philadelphia
+    Shtiebel, which carries "Orthodox (Ashkenazi)"). Template and seed match
+    already. Waiting on: the user's go-ahead for `--prod --apply`, then a
+    revalidate.
+  The ready ones ask nothing, so "required" goes for them: live, only
+  Networking's Website is required among the five.
+- Each kind of field asks only its own questions (was a map board,
+  now just this list): required (not Photo; Yes or no can be since Nov 8,
+  meaning someone has to pick Yes or No), part of the filter (Choices, Yes or no, Hours as "Open
+  now"), show before opened (Choices, Yes or no, a list's count, Text's
+  line, Link's button; Hours, Address, Photo always show), both X and Y
+  and the "Other" row (Choices only), note under it (all but Photo),
+  button words (Link). A field's screen shows only its kind's questions.
+- Notes under a field, live: Store Type ("Pick Scheduled Deliveries
+  if ..."), Delivery Details (an example), Grocery's Kosher Store and
+  Kosher items available. Grey words inside the box instead: WhatsApp
+  Description, "What isn't kosher?", Hotel Notes. One "Note under it"
+  replaces both.
+- A field's Questions, in the user's words (Nov 5): "Is it a required
+  field?", "Should it be part of the filter?", "Show it before a place is
+  opened?", and for choices "Can a place be both Meat and Dairy?" (built
+  from its first two choices).
+- "Other" is a row at the end of the choices with a switch ("A box to
+  type in"), not a question. The hint is "Note under it, on Add a place"
+  in Basics, shown in the Adding preview.
+- Off the community admin's field screen: "Only for some places" (live:
+  Food's two delivery fields and "What isn't kosher?"; they keep working,
+  superadmin sets it).
+- Not a field question any more: "a place can note exceptions". Used
+  once, on Food's kosher certificate ("Everything here is kosher" plus
+  "What isn't kosher?", the chip turns amber); it's set by the Food kind.
+- Make your own kinds: Choices, Yes or no, A list of items, Text, Link.
+  Short and long text are one; Number (unused) is gone; Phone and Hours
+  are ready-made (a second set, like the Mikvah's Women's Hours, comes
+  with the kind); Davening times and Contacts come with the Shuls and
+  Hospitals kinds.
+- No Map switch for the site either: the Map is on when the header or a
+  tab links to it. Code change only. BUILT Nov 5 (`linksToMap`, navTabs.ts):
+  the header and phone tabs link the Map with or without its row, the
+  home's View Map shows wherever it's linked, and Category pages has no
+  Map row (its old addresses open the list). Its row stays, holding the
+  zoom radius. Live: only Philly, Map on and linked, so nothing changes
+  there; dev's Riverton (no Map row, linked by default) gains one.
+- The question card is chosen by the site; the four listing options are
+  set by the kind (superadmin can adjust).
+- Preview has Page · A listing · Adding. On a phone, Preview is the
+  full-width round button, as on Home page.
+- Not decided: whether "Can visitors upvote places?" stays as asked, or
+  the button is renamed on the site so admin and visitor use one word.
+
+**Building, the user's go-ahead Nov 5** ("Yes, start building"), in five
+steps, each tested and pushed: 1 the list and a page's layout, 2
+ready-made pages and fields first, 3 fields in boxes (Address and Phone
+become rows, drag between boxes, ListingParts goes), 4 Before it's
+opened (built without a DB change, on the fields themselves), 5
+removing a filled-in field. The Denomination/Nusach prod change comes
+after the deploy, dry run first, and needs its own go-ahead.
+
+- **Step 1 BUILT Nov 5** (redesign/oct18-fixes): the list is one box of
+  rows (glyph, name, "N places" or "Eruv page" / "Times page" / "Map
+  page", Hidden), "+ New category page" beside the heading. A page has
+  On the site, Basics (icon beside the name, Banner photo row),
+  Fields, Questions (two No / Yes) and "Delete this page" at its foot
+  (the Eruv's counts its eruvim and watches first). On a phone Basics,
+  Fields and Questions open folded, each with its line. Adding Address
+  puts the page on the map (a tick until step 3). `/categories/restaurant` (no
+  `cat:`) opens the page now.
+- Not on the drawing, in step 1: the Map was a row ("Map page") opening
+  its On the site switch until the header/tab links decided it; gone
+  Nov 5 (above). Pin colour is off
+  the page (not drawn); a saved colour keeps working. Group the list
+  and the question card are off the page too, waiting for Before it's
+  opened (step 4); saved values keep working. Places within a walk and
+  On each listing stay as they were until step 3.
+- **Step 2 BUILT Nov 5** (redesign/oct18-fixes): "+ New category page"
+  opens What kind of places? (search, every community's listing pages
+  with fields of their own, by name, the first three as the line,
+  "Already a page" opening this community's own), then "+ Make your own
+  page". A copy starts with its fields and kind; one made from nothing is
+  Plain. The kind radios are gone. "+ Add a field" opens Add a field
+  (search, "All pages" or one page, every field once by name with its
+  pages and choices; Address, Hours, Phone, Website as "Most pages").
+  A row opens the field: the pages it's on, In the list, In the filter,
+  On Add a place, "Add to <page>". Nothing matching offers "Make your
+  own: <typed>"; Make your own picks a kind, then opens the new field's
+  screen. Read through `/api/admin/ready-made` (an admin of any
+  community).
+- Not on the drawing, in step 2: a ready-made field is copied as it is,
+  choices included, until boards 14-15 (shared or local choices) are
+  decided. A new page's icon is its emoji until it has a line glyph.
+  Test pages in the shared dev/test project show in the list on dev.
+- **Step 3 BUILT Nov 5** (redesign/oct18-fixes): Fields is the opened
+  listing's boxes in a visitor's order (`fieldBoxes.ts`, read the way
+  ListingView lays them out): Top, then the boxes the listing makes itself
+  (Food's Delivery, What isn't kosher, Main dishes, Davening times), the
+  admin's boxes with This Shabbos among them, lists of contacts in no box,
+  Contact, About. A row opens in place to its fields; Address and Phone
+  are rows in Contact, each opening a screen with "Remove this field" (the
+  "Every place has" ticks are gone; Hours, Website and Photo are fields
+  like any other). The admin's boxes drag, rename in place and have the
+  trash; a field moves by dragging it onto another box's row (dashed blue,
+  or red with why when it can't go there), or with the arrow keys on its
+  handle. "+ Add a box" opens a New box, its name selected. A field added
+  from one of the admin's boxes goes in it, and the box a new field lands
+  in opens. Within a walk is its own box ("+ Add a page", rows "Food · Up
+  to 30 min · by Food Type" opening in place). Copying a page now saves
+  its boxes too (the create never sent them). ListingPartsEditor is gone.
+- Not on the drawing, in step 3: A main card and a
+  Shabbos card can be taken off but not added (no drawn way); "+ Add
+  audience group" sits beside "+ Add a box". A New box left empty isn't
+  saved. Within a walk shows on every page with an address, "None" when
+  it has none (boards 4 and 6 leave it out, but it's the only way to add
+  one). A press while a name is being typed only puts
+  the keyboard away, so the first tap on a row after typing doesn't open it.
+- **Step 4 BUILT Nov 5** (redesign/oct18-fixes): Before it's opened sits
+  between Within a walk and Questions: a sample card (the page's first
+  choice of each field, "Neighborhood", "Open until 8 PM", the line being
+  opened outlined), then First, Second and Third line, each opening in
+  place (`cardLines.ts`). What the card works out says "Automatic" and
+  stays first; a chosen field has a handle and an ×; "+ Show a field"
+  opens Show on the second (or third) line, those on the card marked "On
+  the card". No DB change: a choice's `onCard`, the photo's `onCard:
+  false` (initials instead) and a short line's `showInHeader` are on the
+  fields. A field never set keeps the old rule (a badge with a filter),
+  so no live page changes; read on dev (22 pages) and live (16), the old
+  and new second lines match on every one. Taking a field off the card
+  leaves its filter; reordering a line moves only that line's fields.
+  "Not everything here is kosher" now shows for a caveat field even when
+  it's off the second line.
+- Not on the drawing, in step 4: Synagogues' boards list Next minyan and
+  the minyan's note, but a shul's category row shows neither (the user's
+  Oct 15 decision), so they aren't listed. A grocery's items line isn't
+  listed either. The photo row has no handle (it's always first), and
+  "+ Show the photo" brings it back once it's off (not drawn). A field's
+  screen still has "Also show on the collapsed card", which sets the same
+  thing. The preview stays beside Show on the line, as on every sub-screen.
+- **Step 5 BUILT Nov 5** (redesign/oct18-fixes): "Remove this field" on a
+  saved field counts its answers first. With some, it opens Remove <field>
+  from <page>? (board 16): "N places lose their answer", "<page>'s filter
+  loses <field>" when it's a filter, Remove it / Keep it. Remove it goes
+  back to the page with one change; Save then clears the answers without
+  the amber warning. With none, or a field only this draft has, it just
+  goes. Address and Phone ask the same way. The amber warning at Save is
+  left only for when the count couldn't be had.
+- Not on the drawing, in step 5: Address's step also says "<page> comes
+  off the map". The field screen's own button still says "Remove" (the
+  boards say "Remove this field", as Address and Phone do).
+- **The user's notes on the build, Nov 5**, fixed the same day: "+ New
+  category page" sits right of the heading on a computer, level with it
+  (board 1; it had been above the heading). Banner photo opens to the Home
+  page photo's picker (Upload image, Paste image, Paste URL, Remove, a wide
+  crop), in place of the banner upload with its own preview and a second
+  pasted-address box; a page's older pasted photo shows there until a new
+  one is chosen, and choosing or removing one clears it, so a page has one
+  photo. The Map and Eruv pages' Basics use the same picker. Add a field
+  matches boards 7-12: no page beside it (or beside a removal, board 16),
+  the list scrolls in its own box with Make your own field under it, a
+  field's samples stacked one per row with filled chips, the first
+  filter chip solid, and "Make your own" titling the kinds.
+- Not on the drawing, in those fixes: the page menu stays the width Places'
+  menus are (170px, the board's is as wide as its words).
+- **Preview BUILT Nov 5** (the user: "Yes, build both"): beside a page's
+  settings, Page · A listing · Adding (boards 4, 5). A listing opens the
+  page's fullest place (the most fields answered, `fullestListing.ts`);
+  Adding is the real Add form, sending nothing. No Adding on a page
+  visitors can't add to. Tapping it opens that one full size.
+- Not on the drawing, in the preview: Page is a computer's, A listing and
+  Adding a phone's; Computer · Phone is gone.
+- **Handles BUILT Nov 5**: the listing's own boxes before the admin's
+  (Delivery, What isn't kosher, Main dishes, Davening times, a named card,
+  a mikvah's sections) drag among each other, saved as `ListingParts.lead`
+  (link, caveat, main; unset is that order), and the listing and its
+  preview draw them in that order. No migration: it's in `listing_parts`.
+- **Renamed in place too, Nov 5** (the user: "even ones that could be
+  moved like Delivery"): the listing's own boxes take a new name where the
+  name comes from (`renameListingBox`). Delivery: the link's box title.
+  Main dishes and a list of contacts: the field's name. A mikvah's
+  section: its yes/no's filter word, so the filter chip says it too. What
+  isn't kosher: a new `caveat.title` on the hechsher, which the listing's
+  heading reads (`caveatTitle`). Not renamed: Davening times (the listing
+  heads its boxes Usual weekday times, This week's schedule, and so on),
+  This Shabbos, Top, Contact, About.
+- Not on the drawing, in the handles: they stay above the admin's boxes,
+  and a mikvah's sections move as one (the listing draws them together).
+  The main thing is one slot, so Main dishes and Davening times on one
+  page couldn't be split (no live page has both).
+- A field's own screen BUILT Nov 5 (board 13, `FieldScreen.tsx`), after the
+  user's note that it still opened the old form: its name and kind beside
+  it, Basics (Name, the note under it on Add a place, a link's button
+  words), Choices as rows with handles and ×, "+ Add a choice" and the
+  Other switch, then only the questions its kind asks as No / Yes
+  (required, part of the filter, both at once), and "Remove this field".
+  Opening a field turns the preview beside to Adding. A choice is renamed
+  by removing it and adding the new one; Save still offers to update the
+  places that had the old one.
+- Not on the drawing, in the field screen: a superadmin also gets "More",
+  the old form as it was (only for some places, an audience, a link's own
+  box, a badge in place of another, What isn't kosher, the order), so
+  nothing a saved field uses is lost; it repeats Name and the choices. A
+  community admin can't reach those settings now. Kept that way (the
+  user, Nov 5: "Keep under More"). The Adding preview
+  doesn't outline the field being edited. Boards 14-15 (a ready-made
+  field, fixed or local) are still waiting on the user, so no
+  "Ready-made" pill yet.
+- Add a field says every field's kind on its line (hours, phone,
+  davening times and text said only their page) and draws each as it's
+  filled in, not an empty box (the user, Nov 5). BUILT ff32ea7b.
+- The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
+  the listing puts a field in them by its kind, so one added there wouldn't
+  stay. Not drawn.
+- BUILT Nov 7 (canvas row "Each kind of field", the M boards): a
+  ready-made field's screen reads like a shop listing, before adding it and
+  after. "What this is" has a short paragraph (what it is, what people fill
+  in, what visitors see) and its Choices or what it Comes with. Then "What
+  you can change": switches for Required, In the filter and Your own
+  choices, or "Nothing" when none apply. Then Add to / Remove from the page,
+  with the page beside it on a computer (opened on Adding). The name, note
+  and what it does are baked in. The paragraphs are drafts
+  (`src/lib/fieldAbout.ts`). A field made with Make your own is marked
+  `madeHere` and keeps the old editable screen. A choice a page adds is
+  marked `own`, and other pages don't get it with the field.
+- Decided Nov 7: "How many, on the row" is not something a page changes
+  (the user: "lock that in"). In code it is `showCountInHeader`, which makes
+  a list the page's main list. It stays with the field: on for Kosher items
+  available and Main dishes, off for any other list. Only the superadmin's
+  More still shows it.
+- Done Nov 7, from the user's notes on the review page: a choice called
+  just "Other" is left out wherever typed-in Other is on (the Add form and
+  the field screen), so Denomination says Other once. A place that picked it
+  keeps it, as typed-in text. The stored choice is still in the data; taking
+  it out of live data needs the user's go-ahead, and nothing needs it.
+  Kosher Certification's screen now says it comes with "Everything here is
+  kosher?" and "What isn't kosher". Those two Food fields were never hidden
+  from visitors (the listing's What isn't kosher box). They're the
+  hechsher's own questions and come with it when it's added.
+- The user's field-by-field review (started Nov 8) on the review page
+  (artifact TdzYKX4Y3tRFEhFpEjUspn, 47 fields on dev, 34 only described by
+  their kind). Per-field rules live in `fieldRules` (src/lib/fieldAbout.ts).
+  Done so far, BUILT Nov 8:
+  - Food Type and Kosher Store: choices are set, no "Your own choices".
+  - Kosher Store: "Other" isn't a choice. `scripts/kosher-store-no-other.mjs`
+    applied on dev, and live Nov 8 with the user's go-ahead (philly Grocery
+    only; no place or pending submission ever picked Other). Live's cached
+    copy updates on the next deploy or an admin save of Grocery.
+  - Kosher Certification: "Everything here is kosher?" is a switch, since
+    some communities never have a partly kosher place (Riverton's has
+    none). Off drops both questions from the page; on adds them as Food asks
+    them (src/lib/kosherQuestions.ts). Before adding, off adds it without.
+  - Open: Hospitals' Eruv is a plain choice field with the eruv names typed
+    in by hand ("University City Eruv", "Center City Eruv", "Not inside an
+    eruv"), shown in the hospital's This Shabbos box. The user asked whether
+    it should take its choices from the Eruv page. Recommended: yes, the
+    choices are the community's eruvim plus "Not inside an eruv", and the
+    listing links to that eruv. Not built; waiting on the user.
+  - Fine as they are (the user, Nov 8): Childcare Services, Sukkah Size,
+    Store Type.
+  - Yes or no can be Required (BUILT Nov 8, FieldScreen's NEVER_REQUIRED).
+    A yes or no starts unanswered, so required means someone picks one.
+  - "Type" (Restaurant / Bakery & Cafe / Ice Cream) was an old copy of
+    Store Type (same key, `foodType`) from the starter Food page
+    (src/data/categories.js, categoryTemplates.ts). Only dev's Riverton test
+    page had it, nothing filled in. Removed there Nov 8 (dev only). Live's
+    Cemetery has a different "Type" (Cemetery / Funeral Home), all 5 places
+    use it: it stays. The starter Food page still carries the old Type; not
+    changed.
+  - Dietary options: removed Nov 9 (the user). Off the starter Food page
+    (src/data/categories.js, categoryTemplates.ts) and dev's Riverton Food.
+  - Kosher Certification: no "Other Kosher" choice where Other is typed in
+    (the user, Nov 9). `pickableOptions` drops any choice starting "Other"
+    once allowOther is on, so it's never offered twice.
+    `scripts/kosher-cert-no-other.mjs` takes it out of the stored choices:
+    applied on dev. Live dry run: philly Food drops "Other Kosher", no live
+    place picked it. Applied live Nov 9 with the user's go-ahead; live's
+    cached copy updates on the next deploy or an admin save of Food. Note:
+    mekorWatch's `certsIn` still writes "Other Kosher" for a supervisor it
+    doesn't know; it shows as typed-in text, so it's left as is.
+  - Paragraphs written Nov 9 from the user's notes (fieldAbout's WRITTEN):
+    Kosher Store, Services, Size, Store Type, Keilim, Men's and Women's
+    tevillah, Email, Short description (shows under the name on its row),
+    Women's email (the mikvah's women's side).
+  - BUILT Nov 9 (the user: "I like your recommendations in general"):
+    - Each ready-made field's "What this is" lists "Kept up to date by",
+      each source saying what a place needs for it (reworded Nov 9 after
+      the user asked "how do I enable that?"): "Google, for places found on
+      Google", "The place's website, once its page is added in Places",
+      "The shul's emails, once they're signed up for in Places", "Its
+      menu, once its menu link is added in Places", "Refuah, for hospitals
+      on Refuah", the three kosher lists by name, and "A weekly check that
+      the link still works". Fields nothing watches say nothing. The jobs
+      are on for every community unless turned off on Watches.
+      Recommended, not drawn (the user chose a reword for now): a "Kept up
+      to date" box with, per source, whether it's on here, how many places
+      it covers, and a link to fix what's missing.
+    - Partners (src/lib/fieldPartners.ts): Kosher Certification URL comes
+      with Kosher Certification, Delivery WhatsApp Group with Delivery
+      Details. Each has a switch on its field's screen ("Link to the
+      certificate", "WhatsApp group"); on puts it right after its field,
+      off takes it off (Save still asks if places lose an answer). On the
+      Add list a partner isn't its own row; it comes with its field unless
+      switched off. Not done: the page's own field list still shows the
+      partner as a row of its own.
+    - Davening times: three switches, sign-up minyanim, join from home and
+      summer or winter only (`minyanOff` on the field). Switched off, the
+      minyan editors don't ask it, and More is gone when nothing is left
+      under it. Days, times and zman times always stay.
+  - BUILT Nov 9 (the user: "some fields have no edit and some have edit.
+    If you can edit then you can fully edit"): a ready-made field's
+    choices are either the community's or locked. The community's
+    (fieldRules' `choicesEditable`): Kosher Certification, Hospitals' Eruv
+    and Services (decided here: childcare varies by community, nothing
+    reads its values). Those get the full Choices box: rename in place,
+    ×, drag, + Add a choice, and the Other switch. Every other ready-made
+    choice field is locked, not even added to (Sukkah Size per the user;
+    also Food Type, Kosher Store, Store Type, Denomination, Cemetery's
+    Type). This goes back to the Nov 5 boards 14 and 15, which the Nov 7
+    build had turned into fixed choices plus "Your own choices". No page
+    on dev or live had a choice of its own, so locking dropped nothing.
+    A rename changes only a choice's words (`label`), never its stored
+    `value`: everything that shows a choice looks its words up, so
+    answers follow and a watch writing the value still matches, with
+    nothing to move. A field made here renames the same way
+    (src/components/admin/ChoiceList.tsx, shared by both).
+  - "What this is" has less in it (the user, Nov 9: "seems like a lot
+    going on"): only Choices are chips, and only when locked. Comes with
+    is a sentence at the end of the paragraph.
+  - BUILT Nov 9, later (the user: "something that's pretty explicit on
+    what it is", and a way to learn what a watch is): what keeps a field
+    up to date is a line of its own under the paragraph, "Watched:" in
+    bold, each source a sentence with how often it really runs: "Google
+    updates it about once a week, for places found on Google. For places
+    not on Google, a check every Sunday makes sure the link still works."
+    Websites, menus, the kosher lists and Refuah say "every night", shul
+    emails "as they come in". It ends in a link, How watches work: a
+    screen of its own under Watches (`/[community]/admin/watches/about`,
+    WatchesAbout.tsx), also linked from the top of Watches. It says what a
+    watch is in a sentence, what each reads and when (Google straight onto
+    the listing unless a field was typed in by hand; the rest wait on To
+    do; an eruv's up or down goes live), and what's left to the admin
+    (sources in Places, yes or no on To do, a job off on its page). A
+    test ties its "every night" and "every Sunday" to the jobs' schedules.
+  - BUILT Nov 9 (the user: "I'm not seeing an edit listing option in the
+    preview"): the preview's A listing has Edit listing at its foot, as a
+    visitor sees it, when the page lets visitors edit. It opens the
+    visitors' editor; Send shows the change in the preview and sends
+    nothing, like every send there (previewSend.tsx).
+    Recommended rather than a tooltip: a tooltip can't be opened on a
+    phone, and a screen of its own keeps Back working. Not a walkthrough:
+    one short screen, per "less reading".
+- BUILT Nov 9, later (the user: "these add a field pages seem to not
+  register as a new page so back and forward in the browser doesn't work
+  well"): a category page's screens are in the address and the browser's
+  history: a field (`?field=`), Add a field's list, a field looked at and
+  Make your own (`?add=`), a card line's picker (`?line=`), the preview
+  full size (`&preview=1`) and a Remove step (`&remove=1`). Back, Forward
+  and a reload land on each; a reload on a Remove step counts the places
+  again. Written through Next's router (useScreenHistory.ts), one move at
+  a time, never history.pushState, which after a reload left Back from
+  another tab changing the address without drawing the page. The leave
+  guard ("Leave without saving?") moved to src/lib/backGuard.ts, loaded
+  from the root layout so its Back listener comes before the router's:
+  added in an effect it came after, and Back out of a page with unsaved
+  changes left without asking, unless the page had been loaded directly.
+  Proved in a real browser by e2e-admin-write/editor-screens.spec.ts.
+  The other admin screens followed later the same day (below).
+- BUILT Nov 9, later still: every other screen inside a place is in the
+  address too, so Back, Forward, a reload and Back from another tab land
+  on each. Places' open place (`?place=`, `?add=`); a row of a listing's
+  editor and a minyan or person in it (`?row=minyans%3Aweekday/0`); in a
+  place, what a read found (`?found=`), a source's Change over the listing
+  (`?over=`) and a change's Edit (`?edit=`); an eruv's row and its Change;
+  in To do, a new place's or a change's rows and minyanim, and a broken
+  check's Give (`?step=`, under the thing's own name, since a place's
+  things are mounted side by side). Closing a step on the screen steps
+  back over its entry; where the entry behind isn't the place (opened from
+  a link or a reload) it replaces this one instead, so Back never leaves
+  the admin. src/lib/stepAddress.ts is the address side,
+  useStepsInAddress.ts keeps a screen and the address in step;
+  useHistoryDepth is gone. Proved in a real browser by
+  e2e-admin-write/place-screens.spec.ts (a listing and an eruv in Places,
+  a new place and a change in To do: 4 of 4 failed on the old code).
+  Not in the address: To do's Find the place sheet, the Archive question,
+  and an eruv being added (a reload there starts it again). A broken
+  check's Give and a change's Edit are covered by unit tests only: the
+  test project has no job readings to put a broken check in To do.
+  - Answered, not built (the user's questions, Nov 9):
+    - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
+      Store (fully kosher, or some kosher items). Recommended: replace it
+      with Kosher Store.
+    - Shabbat friendly (Hotel): recommended a "What makes it Shabbat
+      friendly?" note that comes with it when the answer is Yes, like the
+      kosher questions. Hotel's general Notes is separate. Waiting on the
+      user.
+  - The rest of the fields: the user's, later.
+- BUILT Nov 9 (noted by the user Nov 7: the preview beside a field showed
+  it only as a "+ Denomination" link, and opened full size it went away):
+  beside a field, before adding or on its own screen, Adding opens on that
+  field's row, so it shows what people adding a place fill in. Full size
+  keeps the same copy, the field included, still open on it. That row is
+  not an entry in the browser's history, so Back goes back to the field
+  screen rather than closing it. A still picture was not needed. Nov 9,
+  later (the user: "when you click on the adding screen the field isn't
+  there"): Adding opened on the first field, and a new field not named
+  yet wasn't found at all. It now opens on the field the screen is on,
+  including one just made (previewFocus.ts), beside and full size.
+- Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
+  field's box on the listing keeps its name. Delivery, What isn't kosher,
+  Main dishes, a list of contacts and a mikvah's section have no Rename
+  unless their field was made here with Make your own. The admin's own
+  boxes (a hospital's "Who to call", "Rides"…) still rename. This takes
+  back part of 906bc5eb (Nov 5), which let every moving box rename.
 
 ## Small open decisions
 
@@ -2333,11 +2951,15 @@ Oct 30" runs to Oct 31 and ends on its own.
 - **Five live shul suggestions to file again** once this is live (Leyv
   Ha-Ir, South Philadelphia Shtiebel, BZBI, Kol Tzedek, Rodeph Shalom). Re-run the dry run first; writing needs the user's yes.
 - **Admin Home on an iPhone jumped back to the top** while scrolling fast,
-  with Phone picked (the user, Nov 5, live and preview). Not reproduced:
-  Chrome at phone size scrolls to the bottom and stays. Fixed the likeliest
-  cause: the preview beside the settings, hidden on a phone, still loaded the
-  whole home page and loaded it again after each edit. It now loads only on a
-  screen wide enough to show it. Try it on the commit's preview on the iPhone.
+  with Phone picked (the user, Nov 5, live and preview). Fixed, and checked
+  by the user on the iPhone. An on-screen log on a debug preview showed the
+  cause: the short page was pulled past its bottom, the browser bar's height
+  flickered a pixel during the bounce, and that resize dropped the scroll to
+  0. No touch, click or script was involved. Admin pages no longer bounce past
+  their ends (`overscroll-behavior-y: none`, admin only). The user finds it "a
+  little stark", but it works. Pull-to-refresh in the admin probably goes with
+  it. The hidden preview no longer loading on a phone (f6b64619) was not the
+  cause, but stays.
 - **Tapping away from a menu on a phone** (Show, Category, Sort): the tap
   only closes it. The click is swallowed until it comes, up to 0.6s after
   the finger lifts (`swallowClick.ts`); on an iPhone it comes later than the

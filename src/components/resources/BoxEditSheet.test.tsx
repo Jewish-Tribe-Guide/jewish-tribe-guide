@@ -257,6 +257,28 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
     expect(screen.getByRole('button', { name: 'Winter' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  // A page can switch off what it doesn't ask (the user, Nov 9): sign-ups,
+  // join from home, summer or winter only.
+  const openWithOff = (minyanOff: CategoryField['minyanOff']) => {
+    const f = { ...minyanim, minyanOff }
+    renderWithProviders(<BoxEditSheet item={shul} category={makeCategory({ id: 'synagogue', detailFields: [f] })} edit={{ ...edit, fields: [f] }} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    return screen.getByRole('dialog', { name: 'Shacharis' })
+  }
+
+  it('asks none of what a page switched off, and has no More when nothing is left under it', () => {
+    const sheet = openWithOff(['signUp', 'joinLink', 'season'])
+    expect(within(sheet).queryByRole('button', { name: /^More/ })).not.toBeInTheDocument()
+  })
+
+  it('leaves out only the parts switched off', () => {
+    const sheet = openWithOff(['season'])
+    fireEvent.click(within(sheet).getByRole('button', { name: /^More/ }))
+    expect(within(sheet).queryByRole('group', { name: 'Time of year' })).not.toBeInTheDocument()
+    expect(within(sheet).getByLabelText('Zoom or livestream link')).toBeInTheDocument()
+    expect(within(sheet).getByRole('group', { name: 'Only on days enough people sign up?' })).toBeInTheDocument()
+  })
+
   it('More folds away again with Less, keeping what was set', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: /^Mincha & Maariv/ }))

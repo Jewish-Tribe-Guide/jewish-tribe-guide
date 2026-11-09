@@ -429,11 +429,15 @@ export function OrderRow({
   open,
   onToggle,
   rename,
+  openLine,
   children,
 }: {
   row: DragRow
   name: string
   line?: React.ReactNode
+  /** Its line while it's open, when it has one then ("The first that
+   *  applies"). */
+  openLine?: string
   icon?: React.ReactNode
   open: boolean
   onToggle: () => void
@@ -482,6 +486,7 @@ export function OrderRow({
                 {line}
               </span>
             )}
+            {open && openLine && <span className="text-[13px] text-slate-600">{openLine}</span>}
           </span>
           <span className={open ? 'rotate-90' : ''}>
             <Chevron />

@@ -1,4 +1,4 @@
-import type { DesktopNavItem } from './siteSettings'
+import { DEFAULT_DESKTOP_NAV_ITEMS, DEFAULT_MOBILE_TABS, type DesktopNavItem, type SiteSettings } from './siteSettings'
 
 // The top of the page, on a computer, as tabs (the user, Nov 4: "Let's call
 // it one thing, a tab, and have the user actions dictate whether it's a link
@@ -43,4 +43,12 @@ export const headings = (n: number) => `${n} heading${n === 1 ? '' : 's'}`
 /** A heading's row line: its links, or that it has none. */
 export function headingLine(names: readonly string[]): string {
   return names.length ? names.join(' · ') : 'Nothing in it yet'
+}
+
+/** Whether the header or a phone tab links to the Map, the one thing that
+ *  puts it on the site (Category pages has no Map row, board 1). */
+export function linksToMap(settings: Pick<SiteSettings, 'desktopNavItems' | 'mobileTabs'>): boolean {
+  const nav = settings.desktopNavItems.length > 0 ? settings.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS
+  const inTab = (tab: DesktopNavItem) => tabItems(tab).some((i) => i.target === 'map' || (i.items ?? []).some((l) => l.target === 'map'))
+  return nav.some(inTab) || (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).some((t) => t.target === 'map')
 }

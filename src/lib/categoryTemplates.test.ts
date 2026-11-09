@@ -25,6 +25,12 @@ describe('starter categories', () => {
       expect(offenders).toEqual([])
     })
 
+    // The user, Nov 9: Dietary options goes. No real page used it.
+    it(`${name}: no Dietary options`, () => {
+      const dietary = list.flatMap((c) => (c.fields ?? c.detailFields ?? []).filter((f) => /^dietary options$/i.test(f.label)).map((f) => `${c.id}.${f.key}`))
+      expect(dietary).toEqual([])
+    })
+
     it(`${name}: the kosher certification lets you name one that isn't listed`, () => {
       const certs = list.flatMap((c) => (c.fields ?? c.detailFields ?? []).filter((f) => f.key === 'kosherCert'))
       expect(certs.length).toBeGreaterThan(0)

@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -12,7 +12,6 @@ import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { shortDay } from '@/lib/todo'
 import { withCommunity } from '@/lib/useCommunityData'
-import { useHistoryDepth } from '@/lib/useHistoryDepth'
 import { TrashIcon } from '@/components/icons'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import type { DirectoryResource } from '@/types'
@@ -25,6 +24,7 @@ import { sourceActions, type Attempt } from './sourceActions'
 import type { Stop } from './openedPlaceBoxes'
 import type { Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
+import { useStepsInAddress } from './useStepsInAddress'
 
 // A listing as an admin sees it, wherever it's opened from: Places, or a job's
 // row with nothing waiting (boards Listing6, States6, Menu5, Change5, Stopped6,
@@ -157,6 +157,9 @@ export type SourceScreenProps = {
   onTried: () => Promise<void> | void
 }
 
+/** A source's screen as a line's control opens it: its title and what it asks. */
+export type SourceSpec = { title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> }
+
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
 export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, failedAtFirst = false, onDone, onTried }: SourceScreenProps) {
@@ -240,7 +243,9 @@ export default function PlaceListing({
   const community = useCommunitySlug()
   const [item, setItem] = useState<DirectoryResource>(place.listing)
   const [patch, setPatch] = useState<Record<string, unknown> | undefined>(undefined)
-  const [screen, setScreen] = useState<{ title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
+  // `key`: which it is, for the address (the row, then which of its line's
+  // controls opened it).
+  const [screen, setScreen] = useState<(SourceSpec & { key: string }) | null>(null)
   const [rowError, setRowError] = useState<{ row: string; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -259,8 +264,6 @@ export default function PlaceListing({
   const [editorRound, setEditorRound] = useState(0)
   // What it found opens from wherever the row was, and starts at its top.
   const foundOpen = !!change || menuChange
-  // A change or a menu opened over the listing is an entry: a swipe back closes it.
-  useHistoryDepth('placeFound', foundOpen ? 1 : 0, () => (change ? setChange(null) : setMenuChange(false)))
   useEffect(() => {
     if (foundOpen) window.scrollTo?.(0, 0)
   }, [foundOpen])
@@ -272,6 +275,79 @@ export default function PlaceListing({
   const loaded = (['google', 'times', 'hours', 'dishes', 'kosher', 'hospitals', 'links', 'runs'] as const).every((k) => jobs[k] !== undefined)
   const sources = useMemo(() => (loaded && category ? listingSources(place.id, jobs, now, category, item as Record<string, unknown> & { id: string }) : null), [loaded, category, place.id, jobs, now, item])
 
+  const give = (add: GiveSource): Attempt => async (url) => {
+    if ('kind' in add.run) await actions.change(add.run, url)
+    else await actions.addSource(add.run, url)
+    return { failed: false }
+  }
+  /** The screens a row's source line opens, by which control opens them. */
+  function screensOf(row: EditorRow): Partial<Record<'change' | 'start' | 'add' | 'also', SourceSpec>> {
+    const source = sources?.(row)
+    if (!source) return {}
+    const { line } = source
+    const changeSpec = (c: NonNullable<SourceLine['change']>): SourceSpec => {
+      const stop: Stop | undefined = c.stop
+      return {
+        title: 'Change',
+        props: {
+          label: c.label,
+          value: c.value,
+          button: 'Save',
+          attempt: async (url) => {
+            await actions.change(c.act, url)
+            return { failed: false }
+          },
+          ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
+        },
+      }
+    }
+    const s = line.start
+    const a = line.add
+    return {
+      ...(line.change && { change: changeSpec(line.change) }),
+      ...(s && { start: { title: 'Change', props: { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) } } }),
+      ...(a && { add: { title: 'Add a source', props: { label: a.label, value: '', button: 'Save', attempt: give(a) } } }),
+      ...(source.also?.change && { also: changeSpec(source.also.change) }),
+    }
+  }
+
+  // What a read found (a change, a menu), and a source's Change or Add a
+  // source over the listing, each have an address and an entry: Back closes
+  // it, Forward and a reload open it again. A change's own Edit is inside
+  // what was found, and goes with it.
+  useStepsInAddress(
+    'found',
+    change ? [change.id] : menuChange ? ['menu'] : [],
+    ([to]) => {
+      setMenuChange(to === 'menu')
+      if (!to || to === 'menu') return setChange(null)
+      if (change?.id !== to) void openChange(to).catch(() => {})
+    },
+    { inner: ['edit'] },
+  )
+  // The rows the editor has shown, for a screen over one to open again.
+  const rowsSeen = useRef(new Map<string, EditorRow>())
+  const [overAsked, setOverAsked] = useState<string | null>(null)
+  useStepsInAddress('over', screen ? [screen.key] : [], ([to]) => {
+    if (!to) {
+      setOverAsked(null)
+      return setScreen(null)
+    }
+    setOverAsked(to)
+  })
+  useEffect(() => {
+    if (!overAsked) return
+    const dot = overAsked.lastIndexOf('.')
+    const row = rowsSeen.current.get(overAsked.slice(0, dot))
+    const spec = row && screensOf(row)[overAsked.slice(dot + 1) as 'change']
+    if (!spec) return
+    setOverAsked(null)
+    setScreen({ ...spec, key: overAsked })
+    // Every row is seen on the editor's first render (its aside); the
+    // sources come with the jobs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- screensOf reads `sources`
+  }, [overAsked, sources])
+
   if (place.status === 'archived' || !category) {
     return (
       <div className="flex flex-col gap-3">
@@ -281,14 +357,9 @@ export default function PlaceListing({
     )
   }
 
-  function open(title: string, props: Omit<SourceScreenProps, 'onDone' | 'onTried'>) {
-    setScreen({ title, props })
-  }
-
-  const give = (add: GiveSource): Attempt => async (url) => {
-    if ('kind' in add.run) await actions.change(add.run, url)
-    else await actions.addSource(add.run, url)
-    return { failed: false }
+  function open(row: EditorRow, which: 'change' | 'start' | 'add' | 'also') {
+    const spec = screensOf(row)[which]
+    if (spec) setScreen({ ...spec, key: `${row.id}.${which}` })
   }
 
   async function google(row: EditorRow, action: 'stop_field' | 'use_field', field: CheckedField) {
@@ -390,23 +461,10 @@ export default function PlaceListing({
     </button>
   )
 
-  const changeControl = (c: NonNullable<SourceLine['change']>) => {
-    const stop: Stop | undefined = c.stop
-    return control('Change', () =>
-      open('Change', {
-        label: c.label,
-        value: c.value,
-        button: 'Save',
-        attempt: async (url) => {
-          await actions.change(c.act, url)
-          return { failed: false }
-        },
-        ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
-      }),
-    )
-  }
+  const changeControl = (row: EditorRow, which: 'change' | 'also') => control('Change', () => open(row, which))
 
   function rowSource(row: EditorRow, changed: boolean): ReactNode {
+    rowsSeen.current.set(row.id, row)
     const source = sources?.(row)
     if (!source) return null
     const { line } = source
@@ -424,15 +482,9 @@ export default function PlaceListing({
     const dated = (l: SourceLine) => (l.read && readJust.includes(JSON.stringify(l.read)) ? { ...l, when: 'just now' } : l)
     const readControl = (l: SourceLine) => (l.read ? [control('Read now', () => void readNow(row, l.read!))] : [])
     const controls: ReactNode[] = [...readControl(line)]
-    if (line.change) controls.push(changeControl(line.change))
-    if (line.start) {
-      const s = line.start
-      controls.push(control('Change', () => open('Change', { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) })))
-    }
-    if (line.add) {
-      const a = line.add
-      controls.push(control('Add a source', () => open('Add a source', { label: a.label, value: '', button: 'Save', attempt: give(a) })))
-    }
+    if (line.change) controls.push(changeControl(row, 'change'))
+    if (line.start) controls.push(control('Change', () => open(row, 'start')))
+    if (line.add) controls.push(control('Add a source', () => open(row, 'add')))
     if (line.googleStop) {
       const f = line.googleStop
       controls.push(control('Stop', () => void google(row, 'stop_field', f)))
@@ -446,7 +498,7 @@ export default function PlaceListing({
         {error}
         {failed}
         <SourceWords line={dated(line)} controls={controls} />
-        {source.also && <SourceWords line={dated(source.also)} controls={[...readControl(source.also), ...(source.also.change ? [changeControl(source.also.change)] : [])]} />}
+        {source.also && <SourceWords line={dated(source.also)} controls={[...readControl(source.also), ...(source.also.change ? [changeControl(row, 'also')] : [])]} />}
       </div>
     )
   }
@@ -513,6 +565,7 @@ export default function PlaceListing({
           }
         }
         rowAside={(row: EditorRow) => {
+          rowsSeen.current.set(row.id, row)
           const source = sources?.(row)
           return source ? <RowJob source={source} /> : null
         }}

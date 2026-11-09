@@ -113,6 +113,21 @@ export async function listCategoriesUncached(community: string): Promise<Categor
   return (data as CategoryRow[]).map(toConfig)
 }
 
+/** Every community's listing pages that are on the site, for Category
+ *  pages' ready-made lists (a new page, + Add a field). Uncached, like the
+ *  admin's own list. */
+export async function listListingPagesEverywhere(): Promise<{ community: string; category: CategoryConfig }[]> {
+  const { data, error } = await getAdminClient()
+    .from('category')
+    .select('*')
+    .eq('kind', 'listing')
+    .eq('active', true)
+    .order('plural_label', { ascending: true })
+
+  if (error) throw new Error(`Failed to load categories: ${error.message}`)
+  return (data as (CategoryRow & { community_id: string })[]).map((row) => ({ community: row.community_id, category: toConfig(row) }))
+}
+
 // Same as listCategoriesUncached, but cached for the public site — and
 // filtered to active categories only. An inactive one is invisible here
 // (and everywhere downstream that resolves a category through this
@@ -216,6 +231,9 @@ export async function createCategory(community: string, input: {
    *  what the slug implies, so creating a category works on a database
    *  without migration 088. */
   placeKind?: PlaceKind
+  /** A page copied from another community's keeps its boxes (readyMade.ts).
+   *  Saved only when there are any, so creating works without migration 066. */
+  listingParts?: ListingParts | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'listing'
@@ -275,6 +293,7 @@ export async function createCategory(community: string, input: {
     icon_image_url: input.iconImageUrl?.trim() || null,
     active: input.active ?? true,
     ...(input.placeKind && { place_kind: input.placeKind }),
+    ...(input.listingParts && hasListingParts(input.listingParts) && { listing_parts: input.listingParts }),
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()

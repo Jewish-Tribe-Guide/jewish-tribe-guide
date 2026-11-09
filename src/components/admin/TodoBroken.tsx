@@ -11,14 +11,14 @@ import { routes } from '@/lib/routes'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { CameraIcon } from '@/components/icons'
-import ListingEditor, { type EditorControl, type EditorStep } from '@/components/resources/ListingEditor'
+import ListingEditor, { type EditorControl } from '@/components/resources/ListingEditor'
 import { FindSheet } from './FindSheet'
 import PlaceFrame, { PlaceButtons, PlaceCard, SourceCard, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { sourceActions } from './sourceActions'
 import { brokenRows, brokenView, googleRows, stoppedGoogleAnswers, type BrokenAct, type BrokenAnswer } from './brokenView'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
-import { useHistoryDepth } from '@/lib/useHistoryDepth'
+import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 
 // A broken check, fixed where it's shown (boards R3Site, R2Menu, R2Google,
 // R6Give, O2Pizza): the listing's field in its own editor, where it's read
@@ -81,10 +81,7 @@ export default function TodoBroken({
     control.current = c
     setEdit((s) => (s.changed === c.changed && s.sending === c.sending ? s : { changed: c.changed, sending: c.sending }))
   }, [])
-  const [step, setStep] = useState<EditorStep | null>(null)
-  // An open row or a minyan in it is an entry, as in Places' editor: a
-  // swipe back closes it rather than leaving the place (Nov 4).
-  useHistoryDepth('todoStep', step ? (step.depth ?? 1) : 0, () => step?.back())
+  const { step, path: editorPath, onStep, reopen, ask } = useEditorSteps()
 
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -92,6 +89,34 @@ export default function TodoBroken({
   const [giving, setGiving] = useState<Give | null>(null)
   const [given, setGiven] = useState('')
   const [finding, setFinding] = useState(false)
+
+  // What it reads now, to correct or replace (R6Give).
+  function startGiving(act: Give) {
+    setGiven(isEmail(act) ? (view!.source.name.includes('@') ? view!.source.name : '') : (view!.source.url ?? ''))
+    setError(null)
+    setGiving(act)
+  }
+  // Give, and an open row or a minyan in it, each have an address and an
+  // entry, as in Places' editor: Back closes it rather than leaving the
+  // place, Forward and a reload open it again. Its own, among the other
+  // things here.
+  // One step, one entry: Give is a screen, not a screen and one in it.
+  const GIVE = 'give:'
+  const givingPath = giving ? [GIVE + giving.label] : null
+  useStepsInAddress(
+    'step',
+    givingPath ?? editorPath,
+    (to) => {
+      if (to[0]?.startsWith(GIVE)) {
+        const act = view?.answers.map((a) => a.act).find((x): x is Give => (x.kind === 'give' || x.kind === 'add') && GIVE + x.label === to[0])
+        if (act) startGiving(act)
+        return ask([])
+      }
+      setGiving(null)
+      ask(to)
+    },
+    { owner: `${placeId.slice(0, 8)}.${label}` },
+  )
 
   if (!view) return null
   const googlePlace = jobs.google?.places.find((g) => g.id === placeId)
@@ -143,12 +168,7 @@ export default function TodoBroken({
     busy: busy === a.label && (BUSY[a.act.kind] ?? 'Saving…'),
     disabled: busy !== null || edit.sending,
     onClick: () => {
-      if (a.act.kind === 'give' || a.act.kind === 'add') {
-        // What it reads now, to correct or replace (R6Give).
-        setGiven(isEmail(a.act) ? (view.source.name.includes('@') ? view.source.name : '') : (view.source.url ?? ''))
-        setError(null)
-        return setGiving(a.act)
-      }
+      if (a.act.kind === 'give' || a.act.kind === 'add') return startGiving(a.act)
       if (a.act.kind === 'find-google') return setFinding(true)
       const after = a.act.kind === 'read' ? 'It still didn’t load.' : a.act.kind === 'check-link' ? 'It still doesn’t open.' : null
       void run(a.label, () => act(a.act), after)
@@ -260,7 +280,8 @@ export default function TodoBroken({
         onlyRows={rows}
         splitContact
         onClose={() => {}}
-        onStep={setStep}
+        onStep={onStep}
+        reopen={reopen}
         hosted={{ onControl }}
         adminSave={{
           label: 'Update the listing',

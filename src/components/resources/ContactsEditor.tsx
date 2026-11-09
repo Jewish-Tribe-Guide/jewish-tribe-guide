@@ -21,21 +21,32 @@ export default function ContactsEditor({
   value,
   onChange,
   onStep,
+  reopen,
   place,
 }: {
   field: CategoryField
   value: unknown
   onChange: (v: ContactEntry[]) => void
   /** A person opened: their name and the way back, for the sheet's header. */
-  onStep: (step: { title: string; back: () => void } | null) => void
+  onStep: (step: { title: string; back: () => void; id?: string } | null) => void
+  /** A person to open, or none, asked for by the host (Back, Forward or a
+   *  reload onto it, in the admin): by their place in the list, or 'new'. */
+  reopen?: { id: string | null; n: number } | null
   place: string
 }) {
   const entries = readContacts(value)
   const [open, setOpen] = useState<number | 'new' | null>(null)
+  const [asked, setAsked] = useState<number | null>(null)
+  if (reopen && reopen.n !== asked) {
+    setAsked(reopen.n)
+    const id = reopen.id
+    setOpen(id === null ? null : id === 'new' ? 'new' : entries[Number(id)] ? Number(id) : null)
+  }
   const title = open === null ? null : open === 'new' ? 'Add a person' : entries[open]?.name || 'A person'
+  const stepId = open === null ? undefined : String(open)
   useEffect(() => {
-    onStep(title ? { title, back: () => setOpen(null) } : null)
-  }, [title, onStep])
+    onStep(title ? { title, back: () => setOpen(null), id: stepId } : null)
+  }, [title, stepId, onStep])
   useEffect(() => () => onStep(null), [onStep])
 
   if (open !== null) {

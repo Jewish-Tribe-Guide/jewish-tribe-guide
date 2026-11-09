@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { LEAVE_QUESTION, guardHere } from '@/lib/backGuard'
 
 // One way to save (the admin redesign's brief, rule 4): a bar along the
 // bottom that appears once something changed, saying how much, with Undo
@@ -70,12 +71,13 @@ export default function SaveBar({
   )
 }
 
-export const LEAVE_QUESTION = 'Leave without saving? Your changes will be lost.'
+export { LEAVE_QUESTION }
 
 /** While `dirty`, leaving asks first: closing or reloading the tab (the
- *  browser's own question), and following a link out of the screen (ours).
- *  `stays(path)` names links that keep the changes, such as another tab
- *  sharing the same draft. */
+ *  browser's own question), following a link out of the screen, and the
+ *  browser's Back or Forward out of it (backGuard.ts). `stays(path)` names
+ *  places that keep the changes, such as another tab sharing the same
+ *  draft. */
 export function useLeaveGuard(dirty: boolean, stays?: (path: string) => boolean) {
   useEffect(() => {
     if (!dirty) return
@@ -95,9 +97,11 @@ export function useLeaveGuard(dirty: boolean, stays?: (path: string) => boolean)
       }
     }
     window.addEventListener('beforeunload', onBeforeUnload)
+    const unguard = guardHere(stays)
     document.addEventListener('click', onClick, true)
     return () => {
       window.removeEventListener('beforeunload', onBeforeUnload)
+      unguard()
       document.removeEventListener('click', onClick, true)
     }
   }, [dirty, stays])

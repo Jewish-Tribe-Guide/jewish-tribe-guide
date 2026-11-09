@@ -30,10 +30,11 @@ const CLOSE_DELAY_MS = 120
 type OpenPanel = string | null
 
 /** Resolves a 'link' item's target to a real href, or null for 'feedback'
- *  (an action, not a page) or a target this community doesn't have (e.g.
- *  'map' with no Map category, or a category that's since been deleted). */
-function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string, hasMap: boolean): string | null {
-  if (target === 'map') return hasMap ? routes.map(communitySlug) : null
+ *  (an action, not a page) or a target this community doesn't have (a
+ *  category that's since been deleted). The Map is there wherever it's
+ *  linked to (navTabs.ts linksToMap). */
+function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string): string | null {
+  if (target === 'map') return routes.map(communitySlug)
   if (target === 'you') return routes.you(communitySlug)
   if (target === 'about') return routes.about(communitySlug)
   if (target === 'privacy') return routes.privacy(communitySlug)
@@ -145,7 +146,6 @@ export default function HeaderNav() {
 
   if (categories === null) return null
 
-  const hasMap = categories.some((c) => c.kind === 'map')
   const resources = resourceCards(navigate, categories, communitySlug)
   const allCards = resources ? [...entryCards, ...resources] : []
   const sections = groupCardsIntoSections(allCards, homeSections ?? [])
@@ -159,7 +159,7 @@ export default function HeaderNav() {
   }
 
   function linkAction(item: DesktopNavItem, onNavigate?: () => void) {
-    const href = resolveHref(item.target!, hrefById, communitySlug, hasMap)
+    const href = resolveHref(item.target!, hrefById, communitySlug)
     if (item.target === 'feedback') {
       if (!settings.feedbackEnabled) return null
       return (
@@ -267,13 +267,13 @@ export default function HeaderNav() {
         // A tab: one link is a link, two a dropdown, headings a dropdown
         // with links under each (lib/navTabs.ts). An empty one isn't shown.
         const shown = (link: DesktopNavItem) =>
-          link.target === 'feedback' ? settings.feedbackEnabled : resolveHref(link.target!, hrefById, communitySlug, hasMap) !== null
+          link.target === 'feedback' ? settings.feedbackEnabled : resolveHref(link.target!, hrefById, communitySlug) !== null
         const holds = tabHolds(item)
         const links = holds === 'links' ? tabItems(item).filter(shown) : []
 
         if (links.length === 1) {
           const target = links[0]!.target!
-          const href = resolveHref(target, hrefById, communitySlug, hasMap)
+          const href = resolveHref(target, hrefById, communitySlug)
           if (target === 'feedback') {
             return (
               <button

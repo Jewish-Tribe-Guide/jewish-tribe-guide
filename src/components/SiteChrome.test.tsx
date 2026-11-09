@@ -55,17 +55,16 @@ describe('SiteChrome', () => {
     expect(within(mobileTabBar).getByText('Feedback')).toBeInTheDocument()
   })
 
-  it('does not show the Map tab when the community has no Map pseudo-category', () => {
+  // The tab is what puts the Map on the site; Category pages has no Map row
+  // to switch (board 1, Nov 5).
+  it('shows the Map tab with no Map pseudo-category too', () => {
     renderWithProviders(
       <SiteChrome year={2026}>
         <p>Page content</p>
       </SiteChrome>,
       { content: { categories: [makeCategory({ id: 'grocery', kind: 'listing' })] } },
     )
-
-    // Neither nav should offer Map without a Map pseudo-category — HeaderNav
-    // has its own identical gate (see its own `hasMap` check).
-    expect(screen.queryByText('Map')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Primary' })).getByText('Map')).toBeInTheDocument()
   })
 
   it('shows the Map tab once the community has a Map pseudo-category', () => {

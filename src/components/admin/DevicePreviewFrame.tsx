@@ -66,9 +66,20 @@ export function IframeViewport({
 
     function setup() {
       if (done) return
-      const doc = iframe!.contentDocument
+      let doc = iframe!.contentDocument
       if (!doc) return
       done = true
+      // about:blank has no doctype, so it lays out in quirks mode, where a
+      // percentage height (h-full) reaches past its auto-height parents to
+      // the page: a one-place list drew its card as a tall white block
+      // under the footer (the user, Nov 9). Rewritten with one, it's the
+      // standards mode every real page is in.
+      if (doc.compatMode !== 'CSS1Compat') {
+        doc.open()
+        doc.write('<!doctype html><html><head></head><body></body></html>')
+        doc.close()
+        doc = iframe!.contentDocument ?? doc
+      }
       document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
         doc.head.appendChild(node.cloneNode(true))
       })

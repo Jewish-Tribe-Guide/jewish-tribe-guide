@@ -28,11 +28,10 @@ type Props = {
   /** Admin-preview only: renders the search box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
-  /** The Map pseudo-category's icon — shows the "View Map" button beside
-   *  Browse Categories (desktop only; mobile reaches the map through its
-   *  own tab instead, see MobileTabBar) when set. Null/undefined (no Map
-   *  category configured) hides it entirely. */
-  mapIcon?: string | null
+  /** Shows the "View Map" button beside Browse Categories (desktop only;
+   *  mobile reaches the map through its own tab instead, see MobileTabBar):
+   *  whenever the header or a tab links to the Map (navTabs.ts linksToMap). */
+  showMap?: boolean
   /** Preview mode has nothing to navigate to, so it's left undefined there —
    *  the button still renders (for visual fidelity) but doesn't do anything. */
   onViewMap?: () => void
@@ -134,7 +133,7 @@ export default function HeroHeading({
   onQueryChange,
   onSearchSubmit,
   interactive = true,
-  mapIcon,
+  showMap = false,
   onViewMap,
   onBrowseCategories,
   searchPanel = null,
@@ -444,7 +443,7 @@ export default function HeroHeading({
             >
               Browse Categories
             </button>
-            {mapIcon != null && (
+            {showMap && (
               <button
                 onClick={onViewMap}
                 className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-[15px] font-medium text-ink shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
