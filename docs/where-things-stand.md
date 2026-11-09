@@ -760,7 +760,8 @@ after the deploy, dry run first, and needs its own go-ahead.
     once allowOther is on, so it's never offered twice.
     `scripts/kosher-cert-no-other.mjs` takes it out of the stored choices:
     applied on dev. Live dry run: philly Food drops "Other Kosher", no live
-    place picked it. **Live waits on the user's go-ahead.** Note:
+    place picked it. Applied live Nov 9 with the user's go-ahead; live's
+    cached copy updates on the next deploy or an admin save of Food. Note:
     mekorWatch's `certsIn` still writes "Other Kosher" for a supervisor it
     doesn't know; it shows as typed-in text, so it's left as is.
   - Paragraphs written Nov 9 from the user's notes (fieldAbout's WRITTEN):
