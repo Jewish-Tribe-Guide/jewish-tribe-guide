@@ -321,6 +321,16 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Up next: Site → Category pages, organised and cleaned up
 
+**Drawn Nov 9, waiting on the user: a field, how it looks** (same canvas,
+boards 33-34, row "A field, how it looks"). The user, Nov 9, on the preview
+beside a field: "a lot of noise for someone who just wants to see what the
+field looks like in three scenarios". Beside an opened field, in place of
+the Page / A listing / Adding preview: In the list, On the listing and When
+adding, each on a made-up place with the field's answer filled in and the
+field outlined, its neighbours faded. A field not on the row says so, with
+Show it on a row (board 34). See the whole page opens the full preview as
+today. Not drawn: the phone (no preview beside there today).
+
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,
