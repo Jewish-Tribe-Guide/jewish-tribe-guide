@@ -358,9 +358,14 @@ the site's header, "A made-up place, until this page has real ones". It's
 How it looks' made-up place (every field answered by type), plus a 555
 phone; no address, so no directions to a real street. Never saved; the
 first real place, or one added in the preview, replaces it
-(CategoryPreview.tsx). Seen in the admin's phone preview, not new: a page
-with one place draws its card as a tall white block running under the
-footer (Cemetery too); the real site on a phone is fine.
+(CategoryPreview.tsx). Fixed the same day (the user: "Yes, fix it"): in
+the admin's preview a page with one place drew its card as a tall white
+block running under the footer (Cemetery too; the real site was fine).
+The frame was an about:blank document, which has no doctype, so it laid
+out in quirks mode, where a card's h-full stretched to the page. The
+frame now starts with a doctype (DevicePreviewFrame.tsx), so the preview
+lays out in the same standards mode as the site: every portal preview
+(category pages, forms, site settings).
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
