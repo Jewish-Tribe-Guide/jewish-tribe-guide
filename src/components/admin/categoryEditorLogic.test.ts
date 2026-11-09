@@ -151,6 +151,14 @@ describe('normalizeField', () => {
     expect(normalizeField(field({ type: 'select', renderAs: 'row' })).filterable).toBe(false)
   })
 
+  // The user, Nov 9: Denomination stayed in Filters with "In the filter" off.
+  it('keeps a filter an admin turned off', () => {
+    expect(normalizeField(field({ type: 'select', renderAs: 'badge', filterable: false })).filterable).toBe(false)
+    expect(normalizeField(field({ type: 'boolean', renderAs: 'badge', filterable: false })).filterable).toBe(false)
+    expect(normalizeField(field({ type: 'hours', filterable: false })).filterable).toBe(false)
+    expect(normalizeField(field({ type: 'select', renderAs: 'badge' })).filterable).toBe(true)
+  })
+
   it('is never filterable for a plain type like text', () => {
     expect(normalizeField(field({ type: 'text', renderAs: 'badge' })).filterable).toBe(false)
   })

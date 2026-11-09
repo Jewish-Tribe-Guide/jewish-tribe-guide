@@ -340,6 +340,18 @@ the site's own add form too. Hours, minyanim, contacts and a photo show their an
 a line when adding, not their full editor. Phone not built (nothing beside
 a field there).
 
+Fixed Nov 9 (the user: "I don't see that for denomination"): "In the
+filter" turned off on a Choice, a Yes/No or Hours came back on with the
+save, and the panel kept In Filters. Saving now keeps it off. Off, a
+Choice also leaves the row (the row's default is "badge and in the
+filter"); Show it on a row puts it back. No stored
+field had a filter turned off, on dev or live, so nothing saved changes.
+"A link for places not listed here?": its "Words" box is now "What the
+link says" (it's the link under the list, "Not listed here? Find more
+kosher food"). Dev's pretend Riverton Food page (one pretend place) was
+deleted at the user's word, so it's no longer offered as a ready-made
+page; live never had it.
+
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
 waiting on the user** (canvas https://claude.ai/artifact/ThgexAyY2q6o6YDxg21RBM,

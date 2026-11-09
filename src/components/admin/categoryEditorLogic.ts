@@ -164,8 +164,9 @@ export function toDraft(c: CategoryConfig | null): Draft {
 // The editor asks Name / Type / Show as / Required, plus (for Choice) whether
 // a listing can hold more than one value; the filter + tag rules are implied
 // and applied here on save:
-//   • Badge (Yes/No, Choice) → a filter. Row → display only, no filter.
-//   • Hours → always the "Open now" filter.
+//   • Badge (Yes/No, Choice) → a filter, unless turned off. Row → display
+//     only, no filter.
+//   • Hours → the "Open now" filter, unless turned off.
 //   • Tags → always chips + click-to-search (never a filter); their tag group is
 //     derived from the name once, then frozen so a rename can't orphan tags.
 // Note: the directory's *filter* for a Choice field always allows picking more
@@ -181,11 +182,14 @@ export function normalizeField(f: CategoryField): CategoryField {
     out.filterable = false
     out.multiSelect = undefined
   } else if (out.type === 'hours') {
-    out.filterable = true
+    // On unless the admin turned "Open now" off (the user, Nov 9: a switch
+    // turned off came back on with the save).
+    out.filterable = out.filterable !== false
     out.multiSelect = undefined
   } else if (TYPE_IS_FILTERABLE(out.type)) {
-    // Yes/No or Choice: the badge is the filter; a row is display-only.
-    out.filterable = isBadge
+    // Yes/No or Choice: a badge is a filter unless the admin turned it off;
+    // a row is display-only.
+    out.filterable = isBadge && out.filterable !== false
     if (out.type !== 'select') out.multiSelect = undefined
   } else {
     out.filterable = false

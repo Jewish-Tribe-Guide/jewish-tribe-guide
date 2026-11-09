@@ -306,9 +306,9 @@ describe('CategoryEditor — editing an existing category', () => {
     expect(within(upvotes).getByRole('radio', { name: 'No' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(upvotes).getByRole('radio', { name: 'Yes' }))
     const link = screen.getByRole('radiogroup', { name: 'A link for places not listed here?' })
-    expect(screen.queryByLabelText('Words')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('What the link says')).not.toBeInTheDocument()
     await user.click(within(link).getByRole('radio', { name: 'Yes' }))
-    await user.type(screen.getByLabelText('Words'), 'Find more')
+    await user.type(screen.getByLabelText('What the link says'), 'Find more')
     await user.type(screen.getByLabelText('Link'), 'https://example.org')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
@@ -324,9 +324,9 @@ describe('CategoryEditor — editing an existing category', () => {
       <CategoryEditor token="t" initial={baseCategory({ externalLink: { label: 'Find more', url: 'https://example.org' } })} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />,
     )
     const link = screen.getByRole('radiogroup', { name: 'A link for places not listed here?' })
-    expect(screen.getByLabelText('Words')).toHaveValue('Find more')
+    expect(screen.getByLabelText('What the link says')).toHaveValue('Find more')
     await user.click(within(link).getByRole('radio', { name: 'No' }))
-    expect(screen.queryByLabelText('Words')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('What the link says')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     expect(JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string).externalLink ?? null).toBeNull()
@@ -623,6 +623,28 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     // The old form's settings are a superadmin's, under More.
     expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
     expect(screen.queryAllByRole('combobox').filter((c) => !looks.contains(c))).toEqual([])
+  })
+
+  // The user, Nov 9: Denomination kept its In Filters with the filter off,
+  // and saving put the filter back.
+  it('takes a field out of Filters when In the filter is turned off, and saves it off', async () => {
+    computer()
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const initial = baseCategory({
+      detailFields: [{ key: 'denom', label: 'Denomination', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'Orthodox', label: 'Orthodox' }] }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openBox(user, 'Top')
+    await user.click(screen.getByRole('button', { name: /^Denomination/ }))
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    expect(within(looks).getByRole('region', { name: 'In Filters' })).toBeInTheDocument()
+    await user.click(screen.getByRole('switch', { name: 'In the filter' }))
+    expect(within(looks).queryByRole('region', { name: 'In Filters' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.fields.find((f: { key: string }) => f.key === 'denom').filterable).toBe(false)
   })
 
   // The user, Nov 7: opened full size, the field went away.

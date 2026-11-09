@@ -795,7 +795,7 @@ function CategoryEditorScreen({
           <AdminYesNo question="A link for places not listed here?" value={draft.externalLinkEnabled} onChange={(yes) => set('externalLinkEnabled', yes)} />
           {draft.externalLinkEnabled && (
             <div className="flex flex-col gap-4 p-4 border-t border-slate-100">
-              <AdminField label="Words">
+              <AdminField label="What the link says">
                 <input
                   value={draft.externalLinkLabel}
                   onChange={(e) => set('externalLinkLabel', e.target.value)}
