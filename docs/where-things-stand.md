@@ -367,27 +367,35 @@ the site's own add form too. Hours, minyanim, contacts and a photo show their an
 a line when adding, not their full editor. Phone not built (nothing beside
 a field there).
 
-**Drawn Nov 9, waiting on the user: How it looks as tabs** (the user:
-"can we have the different views be tabs like we had before, and then what
-we have now will be a little more full"). Canvas boards 33d-34c, beside 33c
-as built, with copies in `docs/mockups/how-it-looks-tabs/` (the canvas
-stays with the old Claude account). The four stacked panels become tabs,
-List · Filters · A listing · Adding, using the same control as the page's
-Page / A listing / Adding. Each tab is a phone-width stretch of the real
-screen, drawn from dev's Food page on a phone:
-- List: the list with the made-up place and two made-up neighbours, the
-  field outlined on each row.
-- Filters: the Filters sheet over the list.
-- A listing: the listing's sheet: header, facts line, actions, the next
+**Built Nov 9: How it looks as tabs** (the user, on boards 33d-34c: "I
+love ths. This is exactly it"). Copies of the boards are in
+`docs/mockups/how-it-looks-tabs/` (the canvas stays with the old Claude
+account). `FieldLooks.tsx`: the four stacked panels are tabs, List · Filters
+· A listing · Adding, in the same control as the page's Page / A listing /
+Adding. Each tab is a phone-width stretch of the screen, the field outlined
+and the rest faded:
+- List: three made-up rows, each answering the field differently (Meat,
+  Dairy, Parve), in the community's own neighbourhoods.
+- Filters: the sheet over the list, Open now first, the field's filter
+  working, the others faded.
+- A listing: header, facts line, buttons (no Directions: no address), the
   boxes.
-- Adding: Add to Food with the field's box open.
+- Adding: Add to Food, the row asked before the field's, then the field's
+  row open with its neighbours.
 
-The field is outlined and the rest faded, as now. Filters shows only while
-the field is in the filter, and Adding only where visitors add. A field off
-the row keeps "Not shown in the list. Show it on a row" above the List tab.
-The made-up place has no address, so no Directions. Not built: waiting on
-the user's OK. Open question: which tab a field opens on. The recommendation
-is the first tab where it shows (A listing for Delivery Details).
+Filters shows only while the field is in the filter, Adding only where
+visitors add. A sheet scrolls itself so the field is in sight. A field
+opens on the first tab it is on (Delivery Details on A listing; the user
+didn't object to that recommendation). A field asked only after an answer
+(Delivery Details, after Store Type is Scheduled Deliveries) gets that
+answer on the made-up place and is asked with Store Type. Anything else
+asked only after an answer is left off, as the site leaves it off. Places
+are named for their type only when the field is a type ("A bakery"), never
+for an answer about them ("An orthodox"). Differences from the boards, all
+from following the site: the row before Kosher in Adding is Store Type,
+not Address; Filters shows all of Food's ten hechshers, so the Show button
+is below the fold; Delivery's box names "Delivery Details" inside it, because
+it holds two fields; the delivery place is "A place", not "A caterer".
 
 Fixed Nov 9 (the user: "I don't see that for denomination"): "In the
 filter" turned off on a Choice, a Yes/No or Hours came back on with the
