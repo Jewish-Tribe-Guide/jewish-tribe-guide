@@ -122,8 +122,9 @@ const andList = (names: readonly string[]) => (names.length < 2 ? names.join('')
 
 /** The first box: what the field is, in a few sentences, and what it holds.
  *  Only its choices are chips, since those are what a place picks; what it
- *  comes with and what keeps it up to date are plain words (the user,
- *  Nov 9: "seems like a lot going on"). */
+ *  comes with and what keeps it up to date are sentences in the paragraph
+ *  (the user, Nov 9: "seems like a lot going on"), the second's start in
+ *  bold to catch the eye. */
 export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField; partnerOn?: boolean }) {
   const { about, choices, comesWith, watchedBy } = fieldAbout(field, { partnerOn })
   return (
@@ -132,6 +133,12 @@ export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField;
         <p className="m-0 text-[17px] leading-[1.55] text-slate-800">
           {about}
           {comesWith?.length ? ` It comes with ${andList(comesWith)}.` : null}
+          {watchedBy ? (
+            <>
+              {' '}
+              <strong className="font-semibold text-slate-900">Kept up to date by</strong> {watchedBy}
+            </>
+          ) : null}
         </p>
         {choices?.length ? (
           <div className="flex flex-col gap-1.5">
@@ -141,16 +148,6 @@ export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField;
                 <li key={n} className={chip}>
                   {n}
                 </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {watchedBy?.length ? (
-          <div className="flex flex-col gap-1">
-            <span className="text-[13px] font-semibold text-slate-500">Kept up to date by</span>
-            <ul aria-label="Kept up to date by" className="m-0 p-0 list-none flex flex-col gap-0.5 text-[15px] leading-[1.45] text-slate-700">
-              {watchedBy.map((n) => (
-                <li key={n}>{n}</li>
               ))}
             </ul>
           </div>

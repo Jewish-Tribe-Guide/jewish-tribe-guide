@@ -19,7 +19,10 @@ export type FieldAbout = {
   /** The parts it comes with (Davening times). */
   comesWith?: string[]
   /** The watches that can keep it up to date, when any can. */
-  watchedBy?: string[]
+  /** What keeps it up to date, as the rest of a sentence that starts
+   *  “Kept up to date by” (the user, Nov 9: part of the paragraph, the
+   *  start in bold). */
+  watchedBy?: string
 }
 
 const norm = (s: string) => s.trim().toLowerCase()
@@ -134,25 +137,38 @@ function kindHow(f: CategoryField): string {
 // Each says what it needs, so an admin can tell what to do (the user,
 // Nov 9: "how do I enable that?"). The jobs are on for every community
 // unless turned off on Watches; what a place needs is set in Places.
-const GOOGLE = 'Google, for places found on Google'
-const LINK_CHECK = 'A weekly check that the link still works'
-const SITE = 'The place’s website, once its page is added in Places'
-const WATCHED: Record<string, string[]> = {
-  'select:kosher certification': ['Keystone-K’s list', 'Mekor Habracha’s list', 'KCL’s list'],
-  'url:kosher certification url': ['Keystone-K’s list', 'Mekor Habracha’s list', LINK_CHECK],
-  'tags:main dishes': ['Its menu, once its menu link is added in Places'],
+type Source = { who: string; when?: string }
+const GOOGLE: Source = { who: 'Google', when: 'for places found on Google' }
+const LINK_CHECK: Source = { who: 'a weekly check that the link still works' }
+const SITE: Source = { who: 'the place’s website', when: 'once its page is added in Places' }
+const LISTS: Source[] = [{ who: 'Keystone-K’s list' }, { who: 'Mekor Habracha’s list' }]
+const WATCHED: Record<string, Source[]> = {
+  'select:kosher certification': [...LISTS, { who: 'KCL’s list' }],
+  'url:kosher certification url': [...LISTS, LINK_CHECK],
+  'tags:main dishes': [{ who: 'its menu', when: 'once its menu link is added in Places' }],
   'tel:phone': [GOOGLE],
   'url:website': [GOOGLE, LINK_CHECK],
 }
 
-function watchedBy(f: CategoryField): string[] | undefined {
+function sources(f: CategoryField): Source[] | undefined {
   const written = WATCHED[idOf(f)]
   if (written) return written
   if (f.type === 'hours') return [GOOGLE, SITE]
-  if (f.type === 'minyanim') return [SITE, 'The shul’s emails, once they’re signed up for in Places']
-  if (f.type === 'contacts') return ['Refuah, for hospitals on Refuah']
+  if (f.type === 'minyanim') return [SITE, { who: 'the shul’s emails', when: 'once they’re signed up for in Places' }]
+  if (f.type === 'contacts') return [{ who: 'Refuah', when: 'for hospitals on Refuah' }]
   if (f.type === 'url') return [LINK_CHECK]
   return undefined
+}
+
+/** “Google, for places found on Google, and by the place’s website, once
+ *  its page is added in Places.” A source with a when gets its own “by”,
+ *  so the whens don't run together. */
+function watchedBy(f: CategoryField): string | undefined {
+  const list = sources(f)
+  if (!list?.length) return undefined
+  const words = list.map((x) => (x.when ? `${x.who}, ${x.when}` : x.who))
+  const joint = list.some((x) => x.when) ? ', and by ' : ' and '
+  return `${words.length < 2 ? words[0] : `${words.slice(0, -1).join(', ')}${joint}${words.at(-1)}`}.`
 }
 
 /** The choices a page starts with: its own (added here) are the page's. */

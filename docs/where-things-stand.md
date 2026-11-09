@@ -812,7 +812,10 @@ after the deploy, dry run first, and needs its own go-ahead.
     (src/components/admin/ChoiceList.tsx, shared by both).
   - "What this is" has less in it (the user, Nov 9: "seems like a lot
     going on"): only Choices are chips, and only when locked. Comes with
-    is a sentence after the paragraph; Kept up to date by is plain lines.
+    and Kept up to date by are sentences at the end of the paragraph, with
+    "Kept up to date by" in bold (the user's idea): "Kept up to date by
+    Google, for places found on Google, and by the place's website, once
+    its page is added in Places."
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
