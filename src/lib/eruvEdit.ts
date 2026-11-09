@@ -2,8 +2,8 @@ import type { EruvEdit } from './eruvStore'
 import { senderEmail } from './eruvEmail'
 
 // What an admin may set on an eruv, checked: text trimmed and kept short,
-// addresses that are web addresses, an order that's a number. Anything
-// else in the body is ignored.
+// addresses that are web addresses. Anything else in the body is ignored
+// (an order or a line colour too, since Nov 9).
 
 const TEXT: Record<string, number> = { name: 120, covers: 600, hotline: 60 }
 const URLS = ['website', 'alertsUrl', 'statusUrl', 'lineUrl'] as const
@@ -20,18 +20,6 @@ function url(v: unknown): string | null | undefined {
   } catch {
     return undefined
   }
-}
-
-/** '#rrggbb', lower case, from '#rgb' or '#rrggbb'; null for none (the
- *  eruv's own colours); undefined when it isn't a colour. */
-function lineColor(v: unknown): string | null | undefined {
-  if (v === null || v === '') return null
-  if (typeof v !== 'string') return undefined
-  const t = v.trim().toLowerCase()
-  if (!t) return null
-  const short = t.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/)
-  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`
-  return /^#[0-9a-f]{6}$/.test(t) ? t : undefined
 }
 
 export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok: false; error: string } {
@@ -62,16 +50,6 @@ export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok:
   if ('statusDated' in r) edit.statusDated = r.statusDated === true
   if ('active' in r) edit.active = r.active !== false
   if ('lineHidePoints' in r) edit.lineHidePoints = r.lineHidePoints === true
-  if ('sortOrder' in r) {
-    const n = Number(r.sortOrder)
-    if (!Number.isFinite(n)) return { ok: false, error: 'The order must be a number.' }
-    edit.sortOrder = Math.round(n)
-  }
-  if ('lineColor' in r) {
-    const v = lineColor(r.lineColor)
-    if (v === undefined) return { ok: false, error: `That isn’t a colour: ${String(r.lineColor)}` }
-    edit.lineColor = v
-  }
   if ('lineLeaveOut' in r) {
     if (!Array.isArray(r.lineLeaveOut)) return { ok: false, error: 'Leave out must be a list.' }
     edit.lineLeaveOut = [...new Set(r.lineLeaveOut.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean))].slice(0, 50)

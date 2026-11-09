@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LINE_COLOR, lineColorOf, lineFetchUrl, missingNames, parseLineFile, partNames, sameLine, shownMap, withLineColor, type EruvLineFile } from './eruvLine'
+import { DEFAULT_LINE_COLOR, lineFetchUrl, missingNames, parseLineFile, partNames, readableLines, sameLine, shownMap, tooPale, type EruvLineFile } from './eruvLine'
 import { labelPoint, metresFrom } from './eruvShape'
 
 // The eruvim's own map files, as published Oct 7 2026: Center City's
@@ -83,35 +83,37 @@ describe('what the guide shows of a map', () => {
     expect(missingNames(CC, ['Washington Border', 'Line 99'])).toEqual(['Line 99'])
     expect(missingNames(EP, [EP_ROUTE])).toEqual([])
   })
-  it('its lines in a colour an admin chose (Oct 15: the Northeast’s pale cyan), no shading, and nothing else of it changed', () => {
+  it('a line too pale to see is drawn in the default colour, no shading, and nothing else of it changed', () => {
+    // Nov 9: the Northeast's own pale cyan, which an admin used to recolour by hand.
     expect(NE.lines[0].color).toBe('#ccffff')
-    const ours = withLineColor(NE, '#1d4ed8')
-    expect(ours.lines.map((l) => l.color)).toEqual(['#1d4ed8'])
+    const ours = readableLines(NE)
+    expect(ours.lines.map((l) => l.color)).toEqual([DEFAULT_LINE_COLOR])
     // Its pale shading went on showing under the new line: gone, but the
     // area stays (unseen), so tapping inside the eruv still picks it.
-    expect(NE.lines[0].fill).toEqual({ color: '#ccffff', opacity: 0.47 })
-    expect(ours.lines[0].fill).toEqual({ color: '#1d4ed8', opacity: 0 })
+    expect(ours.lines[0].fill).toEqual({ color: DEFAULT_LINE_COLOR, opacity: 0 })
     // Where it goes, its width and its markers are still theirs.
     const unstyled = (f: typeof NE) => f.lines.map((l) => ({ ...l, color: undefined, fill: undefined }))
     expect(unstyled(ours)).toEqual(unstyled(NE))
     expect(ours.marks).toEqual(NE.marks)
-    // Every line, Lower Merion's three colours too.
-    expect(new Set(withLineColor(LM, '#000000').lines.map((l) => l.color))).toEqual(new Set(['#000000']))
-    // A line with no shading isn't given any.
-    expect(withLineColor(LM, '#000000').lines.filter((l) => l.fill).length).toBe(LM.lines.filter((l) => l.fill).length)
     // The file itself isn't touched: it's what's kept, and compared.
     expect(NE.lines[0].color).toBe('#ccffff')
     expect(NE.lines[0].fill).toEqual({ color: '#ccffff', opacity: 0.47 })
   })
-  it('no colour chosen, its own', () => {
-    expect(withLineColor(NE, null)).toBe(NE)
-    expect(withLineColor(CC, undefined)).toBe(CC)
+  it('a line that shows is left as the eruv drew it', () => {
+    // Lower Merion's red, blue, green and black; Elkins Park's and University
+    // City's blues; Center City sets none.
+    expect(readableLines(LM)).toBe(LM)
+    expect(readableLines(EP)).toBe(EP)
+    expect(readableLines(UC)).toBe(UC)
+    expect(readableLines(CC)).toBe(CC)
   })
-  it('the colour its lines are drawn in, for the picker', () => {
-    expect(lineColorOf(NE, null)).toBe('#ccffff')
-    expect(lineColorOf(NE, '#1d4ed8')).toBe('#1d4ed8')
-    expect(lineColorOf(CC, null)).toBe(DEFAULT_LINE_COLOR)
-    expect(lineColorOf(null, null)).toBe(DEFAULT_LINE_COLOR)
+  it('too pale: what barely shows against a light map', () => {
+    for (const c of ['#ccffff', '#ffff00', '#ffffff', '#99ccff']) expect(tooPale(c), c).toBe(true)
+    for (const c of ['#ff0000', '#0000ff', '#009900', '#000000', '#4186f0', '#01579b', '#ff9900', DEFAULT_LINE_COLOR]) expect(tooPale(c), c).toBe(false)
+  })
+  it('only the pale lines of a file change', () => {
+    const mixed: EruvLineFile = { lines: [{ name: 'a', points: [[0, 0], [1, 1]], color: '#ffff00' }, { name: 'b', points: [[0, 0], [1, 1]], color: '#0000ff' }, { name: 'c', points: [[0, 0], [1, 1]] }] }
+    expect(readableLines(mixed).lines.map((l) => l.color)).toEqual([DEFAULT_LINE_COLOR, '#0000ff', undefined])
   })
   it('a read compares as a whole', () => {
     expect(sameLine(UC, JSON.parse(JSON.stringify(UC)))).toBe(true)

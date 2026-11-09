@@ -304,9 +304,9 @@ describe('Places', () => {
   // Nov 1, board PlacesEruv4: eruvs live in their own table, and are places.
   describe('eruvs', () => {
     const eruvCategory = makeCategory({ id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', kind: 'eruv' } as never)
-    const eruv = { id: 'cc', name: 'Center City Eruv', covers: 'Center City', website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, statusEmail: null, statusEmailKept: null, updatedAt: day }
+    const eruv = { id: 'cc', name: 'Center City Eruv', covers: 'Center City', website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, lineUrl: null, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], statusEmail: null, statusEmailKept: null, updatedAt: day }
     const posted: unknown[] = []
-    function renderEruvs() {
+    function renderEruvs(shown: typeof eruv = eruv) {
       vi.mocked(fetchJson).mockImplementation(async (url, init) => {
         if (init?.method) {
           const body = JSON.parse(String(init.body))
@@ -315,7 +315,7 @@ describe('Places', () => {
         }
         if (String(url).includes('/api/admin/listings')) return { ok: true, places, categories: [...categories, eruvCategory] }
         if (String(url).includes('/api/admin/categories')) return { ok: true, categories: [...categories, eruvCategory] }
-        if (String(url).includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [eruv], findings: [], watches: [] }
+        if (String(url).includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [shown], findings: [], watches: [] }
         throw new Error('down')
       })
       renderWithProviders(<PlacesList token="tok" />, { community: { slug: 'philly' } })
@@ -334,6 +334,49 @@ describe('Places', () => {
       expect(screen.getByText('1 place')).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Open Center City Eruv' }))
       expect(await screen.findByTestId('editor-row-status')).toBeInTheDocument()
+    })
+
+    // Nov 9: the Eruv page no longer lists eruvim, so what only an eruv has,
+    // which parts of its map show and whether its markers do, is its Map row.
+    // Its line colour and its order aren't an admin's any more.
+    it('its Map row shows the map, its parts and its markers, saved with Update the listing', async () => {
+      const rawLine = {
+        lines: [
+          { name: 'Boundary', points: [[39.95, -75.19], [39.96, -75.18]] as [number, number][], color: '#ccffff' },
+          { name: 'Driving directions', points: [[39.95, -75.19], [39.94, -75.18]] as [number, number][] },
+        ],
+        marks: [{ name: 'A shul', at: [39.955, -75.185] as [number, number] }],
+      }
+      const user = userEvent.setup()
+      renderEruvs({ ...eruv, lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc' as never, rawLine: rawLine as never, lineLeaveOut: ['Driving directions'] as never })
+      await user.click(await screen.findByRole('button', { name: 'Open Center City Eruv' }))
+      await user.click(await screen.findByTestId('editor-row-map'))
+      const open = screen.getByTestId('editor-open-map')
+      expect(within(open).getByTestId('eruv-map-preview')).toBeInTheDocument()
+      expect(within(open).getByRole('checkbox', { name: 'Boundary' })).toBeChecked()
+      expect(within(open).getByRole('checkbox', { name: 'Driving directions' })).not.toBeChecked()
+      expect(within(open).getByRole('checkbox', { name: 'Its markers' })).toBeChecked()
+      // A marker is a part too, until its markers are hidden.
+      expect(within(open).getByRole('checkbox', { name: 'A shul' })).toBeChecked()
+      expect(within(open).queryByText(/colour|Order/i)).toBeNull()
+      // Its pale line drawn darker in the preview, as on the site.
+      expect(within(open).getByTestId('eruv-map-preview').querySelector('polyline')?.getAttribute('stroke')).toBe('#b7372d')
+
+      await user.click(within(open).getByRole('checkbox', { name: 'Driving directions' }))
+      await user.click(within(open).getByRole('checkbox', { name: 'Its markers' }))
+      expect(within(open).queryByRole('checkbox', { name: 'A shul' })).toBeNull()
+      await user.click(screen.getByRole('button', { name: 'Update the listing' }))
+      await waitFor(() => expect(posted).toEqual([{ action: 'save', id: 'cc', edit: { lineLeaveOut: [], lineHidePoints: true } }]))
+    })
+
+    it('an eruv with no map read yet has nothing to choose in its Map row', async () => {
+      const user = userEvent.setup()
+      renderEruvs()
+      await user.click(await screen.findByRole('button', { name: 'Open Center City Eruv' }))
+      await user.click(await screen.findByTestId('editor-row-map'))
+      expect(screen.queryByTestId('eruv-map-preview')).toBeNull()
+      expect(screen.queryByRole('checkbox', { name: 'Its markers' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'No changes yet' })).toBeDisabled()
     })
 
     it('Add a place offers Eruv, on the same Add screen, and goes back to Places', async () => {

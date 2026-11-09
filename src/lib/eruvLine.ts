@@ -210,20 +210,35 @@ export function shownMap(file: EruvLineFile, leftOut: readonly string[], hideMar
  *  red, as Center City draws its own. */
 export const DEFAULT_LINE_COLOR = '#b7372d'
 
-/** Its lines in the colour an admin chose (Oct 15: Northeast draws its own
- *  in a cyan so pale it barely shows on the map), and no shading inside:
- *  the shading was theirs, chosen to go with their line, and stayed as a
- *  pale wash under the new one. The shaded area stays, unseen, so tapping
- *  inside the eruv still picks it. Where the lines go, their widths and the
- *  markers stay theirs. No colour chosen, the file as it is. */
-export function withLineColor(file: EruvLineFile, color: string | null | undefined): EruvLineFile {
-  return color ? { ...file, lines: file.lines.map((l) => ({ ...l, color, ...(l.fill && { fill: { color, opacity: 0 } }) })) } : file
+/** How light a colour is (WCAG's relative luminance), 0 for black to 1
+ *  for white. */
+function luminance(color: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(color.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-/** The colour its lines are drawn in, when it's one: the admin's, or the
- *  first the file sets, or the default. For the admin's colour picker. */
-export const lineColorOf = (file: EruvLineFile | null, chosen: string | null | undefined): string =>
-  chosen ?? file?.lines.find((l) => l.color)?.color ?? DEFAULT_LINE_COLOR
+/** A line whose colour stands out from the map less than this (its contrast
+ *  with white) is too pale to see: the Northeast's cyan is 1.1, a yellow
+ *  1.07; Elkins Park's blue is 3.6 and Lower Merion's green 3.5. */
+const PALEST_CONTRAST = 2
+
+export const tooPale = (color: string): boolean => 1.05 / (luminance(color) + 0.05) < PALEST_CONTRAST
+
+/** Its lines as the eruv draws them, except one too pale to see on the map
+ *  (Nov 9: the Northeast draws its own in a cyan that barely shows), which is
+ *  drawn in the default colour with no shading inside: the shading was
+ *  theirs, chosen to go with their line, and stayed as a pale wash under the
+ *  new one. The shaded area stays, unseen, so tapping inside the eruv still
+ *  picks it. Where the lines go, their widths and the markers stay theirs.
+ *  Until Nov 9 an admin chose the colour by hand; the site does it now. */
+export function readableLines(file: EruvLineFile): EruvLineFile {
+  if (!file.lines.some((l) => l.color && tooPale(l.color))) return file
+  const color = DEFAULT_LINE_COLOR
+  return { ...file, lines: file.lines.map((l) => (l.color && tooPale(l.color) ? { ...l, color, ...(l.fill && { fill: { color, opacity: 0 } }) } : l)) }
+}
 
 /** The names a map file has, its lines' and its markers'. */
 export function partNames(file: EruvLineFile): string[] {

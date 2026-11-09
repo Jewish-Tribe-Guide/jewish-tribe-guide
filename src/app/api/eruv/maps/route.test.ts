@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EruvMapSource } from '@/lib/eruvStore'
-import type { EruvLineFile } from '@/lib/eruvLine'
+import { DEFAULT_LINE_COLOR, type EruvLineFile } from '@/lib/eruvLine'
 
 // GET /api/eruv/maps: each eruv's saved map, without what an admin left out.
 // Nothing is read or saved here (the user, Nov 1): the nightly job reads them.
@@ -20,7 +20,7 @@ const SAVED: EruvLineFile = {
   marks: [{ name: 'Shul', at: [39.95, -75.15] }],
 }
 const source = (over: Partial<EruvMapSource> = {}): EruvMapSource => ({
-  communityId: 'philly', id: 'northeast', name: 'Northeast Eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc', rawLine: SAVED, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, lineError: null, ...over,
+  communityId: 'philly', id: 'northeast', name: 'Northeast Eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc', rawLine: SAVED, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineError: null, ...over,
 })
 const call = async () => {
   const res = await GET(new Request('http://localhost/api/eruv/maps?community=philly'))
@@ -64,10 +64,11 @@ describe('GET /api/eruv/maps', () => {
     expect(body.maps[0].map.marks).toBeUndefined()
   })
 
-  it('in the colour an admin chose for its lines (Oct 15)', async () => {
-    store.sources = [source({ lineColor: '#1d4ed8' })]
-    const { body } = await call()
-    expect(body.maps[0].map.lines[0]).toMatchObject({ name: 'Boundary', color: '#1d4ed8', width: 5 })
+  it('a line too pale to see in the default colour; one that shows as the eruv drew it (Nov 9)', async () => {
+    store.sources = [source({ rawLine: { lines: [{ ...SAVED.lines[0], color: '#ccffff' }] } })]
+    expect((await call()).body.maps[0].map.lines[0]).toMatchObject({ name: 'Boundary', color: DEFAULT_LINE_COLOR, width: 5 })
+    store.sources = [source()]
+    expect((await call()).body.maps[0].map.lines[0]).toMatchObject({ name: 'Boundary', color: '#ff0000', width: 5 })
   })
 
   it('an eruv never read is left off', async () => {

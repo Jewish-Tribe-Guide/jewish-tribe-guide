@@ -9,15 +9,23 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { adminBase } from '@/lib/adminNav'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { MapFoldIcon } from '@/components/icons'
-import { CategoryEditor } from './CategoryEditor'
+import { Basics, CategoryEditor } from './CategoryEditor'
 import NewPagePicker from './NewPagePicker'
 import { useReadyMade } from './useReadyMade'
 import { pageToCopy } from '@/lib/readyMade'
 import CategoryPreview from './CategoryPreview'
-import EruvimManager from './EruvimManager'
 import DeletePage from './DeletePage'
 import { CardBandImageField, IconField } from './CategoryFormFields'
-import { AdminBack, AdminBox, AdminEmpty, AdminRow, AdminSwitch } from './AdminUI'
+import { AdminBack, AdminBox, AdminEmpty, AdminPreviewButton, AdminRow, AdminSwitch } from './AdminUI'
+import CategoryIcon from '@/components/CategoryIcon'
+import { PreviewBeside } from './SitePreview'
+import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
+import { useIsDesktop } from '@/lib/useIsMobile'
+import { getCategoryColor } from '@/lib/categoryColor'
+import { DEFAULT_CATEGORY_ICON, bandImageFor } from '@/lib/categories'
+import Link from 'next/link'
+import { useScreenHistory } from './useScreenHistory'
+import { screenFromSearch } from '@/lib/editorScreenUrl'
 import { LISTED_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
 
 // ── The categories manager: Site's Category pages tab (the Category pages
@@ -175,7 +183,7 @@ export default function CategoryManager({
     const screen = listedScreen
     if (!categories) return <p className="text-sm text-muted">Loading…</p>
     const st = screenState(categories, screen)
-    // The Eruv has its eruvim to keep once it has a row.
+    // The Eruv has its name, icon and photo to keep once it has a row.
     if (screen.kind === 'eruv' && st.row) {
       return <SingletonEditor token={token} category={st.row} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
     }
@@ -296,21 +304,36 @@ function NewPageEditor({
   return <CategoryEditor token={token} initial={null} seed={source && pageToCopy(source)} siblings={categories} onSaved={onSaved} onCancel={onCancel} backLabel="What kind of places?" />
 }
 
-/** A page's "On the site" switch, in its own box. */
-function OnTheSite({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+/** A page's "On the site" switch, laid out as a category page's (board
+ *  21b): on a phone, a box with "On the site" over its count and the switch
+ *  on the right; on a computer, the count, then the switch and its words. */
+function OnTheSite({ on, onChange, places }: { on: boolean; onChange: (on: boolean) => void; places?: { count: number; href: string } }) {
   return (
-    <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px]">
-      <span aria-hidden="true" className="flex-1 text-[15px] font-semibold text-slate-900">On the site</span>
-      <AdminSwitch checked={on} onChange={onChange} label="On the site" />
+    <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
+      <span className="flex-1 min-w-0 flex flex-col gap-px">
+        <span aria-hidden="true" className="md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
+        {places && (
+          <Link href={places.href} className="self-start text-[13px] text-slate-600 md:text-sm md:font-semibold md:text-primary hover:underline">
+            {places.count} {places.count === 1 ? 'place' : 'places'}
+          </Link>
+        )}
+      </span>
+      <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+        <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
+        <AdminSwitch checked={on} onChange={onChange} label="On the site" />
+      </span>
     </div>
   )
 }
 
-// A lightweight editor for Map/Zmanim/Eruv — no fields to change (it's
-// a fixed, code-driven screen), just the card's name, icon, and home-screen
-// photo/text color, reusing the exact same fields as the full category editor.
-// The Eruv's also holds its eruvim (EruvimManager), which live in their own
-// table rather than as listings.
+// The Eruv's page (and an old link to the Map's or Candle Lighting's): no
+// fields to change, since it's a fixed, code-driven screen, just its name,
+// icon and banner photo. Laid out as every category page is (Nov 9, the
+// user: "the same formatting as other category pages"): On the site with its
+// count, Basics, the page beside on a computer and Preview on a phone, the
+// save bar at the bottom, and Delete. The Eruv's eruvim are in Places, like
+// any listing (Nov 9: this page held a second, older editor for them until
+// then); its count opens them there, as a category page's does.
 export function SingletonEditor({
   token,
   category,
@@ -328,26 +351,40 @@ export function SingletonEditor({
   onDeleted?: () => void
 }) {
   const community = useCommunitySlug()
-  const [name, setName] = useState(category.pluralLabel)
-  const [icon, setIcon] = useState(category.icon || '')
-  const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
-  const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
-  const [cardBandImageUrl, setCardBandImageUrl] = useState(category.cardBandImageUrl ?? '')
+  const saved = useMemo(
+    () => ({
+      name: category.pluralLabel,
+      icon: category.icon || '',
+      iconImageUrl: category.iconImageUrl ?? '',
+      cardImageUrl: category.cardImageUrl ?? '',
+      cardBandImageUrl: category.cardBandImageUrl ?? '',
+    }),
+    [category],
+  )
+  const [draft, setDraft] = useState(saved)
+  const set = <K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) => {
+    setDraft((d) => ({ ...d, [k]: v }))
+    setJustSaved(false)
+  }
+  const [bannerOriginal, setBannerOriginal] = useState<File | string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const changes = (Object.keys(draft) as (keyof typeof draft)[]).filter((k) => draft[k].trim() !== saved[k].trim()).length
+  useLeaveGuard(changes > 0)
+  const wide = useIsDesktop('(max-width: 1023px)')
 
-  // Live preview, same pattern as CategoryEditor's own (history entry so
-  // Back/the preview's own Up button land here instead of skipping past to
-  // the category list). Only the Eruv opens this screen from the list now
-  // (Nov 3); the Map and Candle Lighting are switches with nothing to edit,
-  // so an old link to either still lands here but has nothing to preview.
+  // The preview full size is in the address (`?preview=1`, editorScreenUrl.ts),
+  // written through Next's router: until Nov 9 it was a history.pushState
+  // entry, which after a reload drew nothing on Back (AGENTS.md).
   const previewSupported = category.kind === 'eruv'
-  const [previewing, setPreviewing] = useState(false)
+  const screens = useScreenHistory()
+  const [previewing, setPreviewing] = useState(() => previewSupported && typeof window !== 'undefined' && !!screenFromSearch(window.location.search).preview)
 
   useEffect(() => {
     if (!previewSupported) return
-    function onPopState(e: PopStateEvent) {
-      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
+    function onPopState() {
+      setPreviewing(!!screenFromSearch(window.location.search).preview)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -355,29 +392,47 @@ export function SingletonEditor({
 
   function openPreview() {
     setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+    void screens.push({ preview: true })
   }
 
   function closePreview() {
-    history.back()
+    setPreviewing(false)
+    void screens.back()
   }
 
-  if (previewing) {
-    const previewCategory: CategoryConfig = {
-      ...category,
-      label: name.trim() || category.label,
-      pluralLabel: name.trim() || category.pluralLabel,
-      icon: icon.trim() || category.icon,
-      iconImageUrl: iconImageUrl.trim() || null,
-      cardImageUrl: cardImageUrl.trim() || null,
-      cardBandImageUrl: cardBandImageUrl.trim() || null,
+  // How many eruvim it has, for the On the site row's link to them in Places.
+  const [eruvCount, setEruvCount] = useState<number | null>(null)
+  useEffect(() => {
+    if (category.kind !== 'eruv') return
+    let live = true
+    fetchJson<{ eruvim?: { active: boolean }[] }>(withCommunity('/api/admin/eruvim', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the eruvim.')
+      .then((d) => live && setEruvCount(d.eruvim?.filter((e) => e.active).length ?? 0))
+      .catch(() => {})
+    return () => {
+      live = false
     }
-    return <CategoryPreview category={previewCategory} onClose={closePreview} />
+  }, [category.kind, community, token])
+
+  const previewCategory: CategoryConfig = {
+    ...category,
+    label: draft.name.trim() || category.label,
+    pluralLabel: draft.name.trim() || category.pluralLabel,
+    icon: draft.icon.trim() || category.icon,
+    iconImageUrl: draft.iconImageUrl.trim() || null,
+    cardImageUrl: draft.cardImageUrl.trim() || null,
+    cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
+  }
+
+  if (previewing) return <CategoryPreview category={previewCategory} onClose={closePreview} />
+
+  function leave() {
+    if (changes > 0 && !window.confirm(LEAVE_QUESTION)) return
+    onCancel()
   }
 
   async function save() {
     setErrors([])
-    if (!name.trim()) {
+    if (!draft.name.trim()) {
       setErrors(['Name is required.'])
       return
     }
@@ -389,16 +444,17 @@ export function SingletonEditor({
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            label: name.trim(),
-            pluralLabel: name.trim(),
-            icon,
-            iconImageUrl: iconImageUrl.trim() || null,
-            cardImageUrl: cardImageUrl.trim() || null,
-            cardBandImageUrl: cardBandImageUrl.trim() || null,
+            label: draft.name.trim(),
+            pluralLabel: draft.name.trim(),
+            icon: draft.icon,
+            iconImageUrl: draft.iconImageUrl.trim() || null,
+            cardImageUrl: draft.cardImageUrl.trim() || null,
+            cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
           }),
         },
         'Save failed.',
       )
+      setJustSaved(true)
       onSaved()
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Save failed.'])
@@ -407,79 +463,87 @@ export function SingletonEditor({
     }
   }
 
+  const banner = bandImageFor(previewCategory)
+  const name = draft.name.trim() || category.pluralLabel
+
   return (
-    <div className="flex flex-col gap-4">
-      <AdminBack back={{ label: 'Category pages', onClick: onCancel }} title={category.pluralLabel} />
-      {onToggleActive && <OnTheSite on={category.active !== false} onChange={onToggleActive} />}
-
-      <AdminBox title="Basics">
-        <div className="flex flex-col gap-4 p-4">
-          <label className="block">
-            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+    <div>
+      <div className="flex gap-6 items-start">
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
+          <AdminBack back={{ label: 'Category pages', onClick: leave }} title={name} />
+          {/* On a phone the page beside has no room: Preview opens it full
+              size (board 21b). */}
+          {previewSupported && !wide && <AdminPreviewButton onClick={openPreview} />}
+          {onToggleActive && (
+            <OnTheSite
+              on={category.active !== false}
+              onChange={onToggleActive}
+              places={eruvCount !== null ? { count: eruvCount, href: `${adminBase(community)}/places?category=${encodeURIComponent(category.id)}` } : undefined}
             />
-          </label>
-          <IconField icon={icon} onChange={setIcon} iconImageUrl={iconImageUrl} onIconImageUrl={setIconImageUrl} token={token} />
-          <div>
-            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Banner photo</span>
-            <CardBandImageField
-              cardBandImageUrl={cardBandImageUrl}
-              cardImageUrl={cardImageUrl}
-              onChange={(band, card) => {
-                setCardBandImageUrl(band)
-                setCardImageUrl(card)
-              }}
-              token={token}
+          )}
+
+          <AdminBox title="Basics" foldOnPhone summary={`${name} · ${banner ? 'Banner photo' : 'No banner photo'}`}>
+            <Basics
+              name={draft.name}
+              onName={(v) => set('name', v)}
+              icon={
+                <CategoryIcon
+                  icon={draft.icon || DEFAULT_CATEGORY_ICON}
+                  categoryId={category.id}
+                  iconImageUrl={draft.iconImageUrl.trim() || undefined}
+                  color={getCategoryColor([category], category.id)}
+                  className="h-11 w-11 text-2xl"
+                  sizePx={44}
+                />
+              }
+              iconFields={<IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />}
+              banner={banner}
+              bannerFields={
+                <CardBandImageField
+                  cardBandImageUrl={draft.cardBandImageUrl}
+                  cardImageUrl={draft.cardImageUrl}
+                  onChange={(band, card) => {
+                    set('cardBandImageUrl', band)
+                    set('cardImageUrl', card)
+                  }}
+                  token={token}
+                  originalSource={bannerOriginal}
+                  onOriginalSourceChange={setBannerOriginal}
+                />
+              }
             />
-          </div>
-        </div>
-      </AdminBox>
+          </AdminBox>
 
-      {errors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-1">
-          {errors.map((e) => (
-            <p key={e} className="text-sm text-red-700">{e}</p>
-          ))}
-        </div>
-      )}
+          {onDeleted && <DeletePage token={token} category={category} onDeleted={onDeleted} />}
 
-      <div className="flex gap-2">
-        {previewSupported && (
-          <button
-            onClick={openPreview}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Preview
-          </button>
+          {errors.length > 0 && (
+            <ul className="bg-red-50 border border-red-200 rounded-[10px] p-3 text-sm text-red-700 list-disc list-inside space-y-0.5">
+              {errors.map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {/* The page beside, on a computer only, as a category page has it. */}
+        {previewSupported && wide && (
+          <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
+            <PreviewBeside onOpen={openPreview} device="computer" shownWidth={340}>
+              {() => <CategoryPreview inline view="page" category={previewCategory} onClose={() => {}} />}
+            </PreviewBeside>
+          </aside>
         )}
-        <button
-          onClick={save}
-          disabled={saving}
-          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-        >
-          Cancel
-        </button>
       </div>
 
-      {/* The eruvim themselves, each saved on its own: what was the Eruvim
-          tab until Oct 22, so everything about the Eruv page is here. */}
-      {category.kind === 'eruv' && (
-        <div className="mt-4 border-t border-slate-200 pt-6">
-          <EruvimManager token={token} />
-        </div>
-      )}
-
-      {onDeleted && <DeletePage token={token} category={category} onDeleted={onDeleted} />}
+      <SaveBar
+        changes={changes}
+        saving={saving}
+        saved={justSaved && changes === 0}
+        onUndo={() => {
+          setDraft(saved)
+          setErrors([])
+        }}
+        onSave={() => void save()}
+      />
     </div>
   )
 }

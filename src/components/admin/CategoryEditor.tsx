@@ -879,8 +879,9 @@ export function fieldsSummary(labels: string[]): string {
 }
 
 /** A page's Basics (board 4): its icon beside its name, each opening its
- *  settings in place, then the banner photo as a row. */
-function Basics({
+ *  settings in place, then the banner photo as a row. Also the Eruv page's
+ *  (CategoryManager's SingletonEditor). */
+export function Basics({
   name,
   onName,
   icon,

@@ -39,6 +39,39 @@ Small open items from Nov 9:
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
 
+## Done Nov 9: the Eruv page is a category page, eruvs are only in Places
+
+The user, Nov 9: "a lot that doesn't need to be controlled by the admin."
+The Eruv page held a second, older editor for every eruv (the Eruvim tab
+moved there Oct 22), which Places had repeated since Nov 1.
+
+- **Admin → Site → Category pages → Eruv** is laid out as every category
+  page is (the user: "the same formatting as other category pages"): On the
+  site with "5 places" (opening them in Places), Basics as icon + name +
+  banner row (folded on a phone), the page beside it on a computer and
+  Preview on a phone, the save bar (Undo · Save) at the bottom instead of its
+  own Save/Cancel/Preview buttons, and Delete. It has no Fields, so no
+  Page / A listing / Adding tabs. Its Preview has an address (`?preview=1`)
+  through Next's router; it was a `history.pushState` entry before.
+- **Places → an eruv → Map** holds what only an eruv has: its map drawn
+  small, "Parts shown" (ticked is shown; marker names only while its markers
+  show) and "Its markers". Saved with Update the listing.
+- **Line colour is no longer an admin's.** A line too pale to see (contrast
+  with white under 2, as Northeast's own `#ccffff`) is drawn in the default
+  dark red, on the site and in the admin (`readableLines`, eruvLine.ts). Live
+  values checked first: Northeast was the only eruv with a colour set, and it
+  was that same dark red, so nothing visible changes. `line_color` is no
+  longer read; the column is still there.
+- **Order is gone.** Eruvim list by name everywhere, so the public order goes
+  from Center City, University City, Lower Merion, Northeast, Elkins Park to
+  Center City, Elkins Park, Lower Merion, Northeast, University City.
+  `sort_order` is no longer read; the column is still there.
+- The Eruvs job page's "+ Add an eruv" opens Add a place in Places.
+- Kept on purpose (checked against live data): Center City leaves out ten
+  border lines, Elkins Park its driving directions; Elkins Park and
+  Northeast hide their markers (shuls), Lower Merion shows its crossings and
+  reroutes.
+
 The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
 before a deploy keeps the old code until it's closed and reopened.
@@ -2831,7 +2864,8 @@ names only its job ("Stopped" and "Nothing" in amber); its bubble holds one line
 Change. Fields Google keeps say "Google · Oct 19 · Stop", then Use Google's, and
 a cleared field stays blank. Archive is a red bin beside Update the listing.
 Eruvs are places: a category in Places, opened as a listing, and offered by Add
-a place. Their map colour and left-out parts stay on the category page. Eruv maps
+a place. Their map colour and left-out parts stay on the category page (Nov 9: the
+parts and markers moved to the Map row, and the colour is automatic). Eruv maps
 are read only by the nightly job.
 
 Differences from the drawing, decided while building: the button says "No changes
@@ -4307,6 +4341,9 @@ The user, Oct 22: Rodeph Shalom's watch "didn't pick up on … zoom link for
 - No counts on the To do tabs yet (Small open decisions, 8).
 
 ## Done Oct 22: the Eruvim tab is on the Eruv row
+
+(Superseded Nov 9: the Eruv page no longer lists eruvim; see "Done Nov 9:
+the Eruv page is a category page".)
 
 - **Admin → Categories → Eruv → Edit** now holds what was the Eruvim tab,
   under the card's own fields: each eruv's name, order, where it goes,

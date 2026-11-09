@@ -217,7 +217,7 @@ describe('watchKinds', () => {
     const eruv = (over: Partial<AdminEruv>): AdminEruv => ({
       id: 'e', name: 'e', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false,
       status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
-      lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+      lineUrl: null, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [],
       statusEmail: null, statusEmailKept: null,
       ...over,
     })

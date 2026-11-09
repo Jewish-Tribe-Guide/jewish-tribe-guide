@@ -95,8 +95,8 @@ describe('a job, opened', () => {
     show('eruvs')
     expect(await screen.findByRole('link', { name: /Northeast/ })).toHaveAttribute('href', '/philly/admin/watches/place/ne?from=job/eruvs')
     expect(screen.getByRole('link', { name: /Lower Merion/ })).toHaveAttribute('href', '/philly/admin/watches/place/lm?from=job/eruvs')
-    // Eruvs are added in their category's editor; a bare id opens the list.
-    expect(screen.getByRole('link', { name: '+ Add an eruv' })).toHaveAttribute('href', '/philly/admin/categories/cat:eruv-information')
+    // Eruvs are added in Places, like any place (Nov 9: the Eruv page no longer lists them).
+    expect(screen.getByRole('link', { name: '+ Add an eruv' })).toHaveAttribute('href', '/philly/admin/places?add=eruv-information')
   })
 
   it('a job not yet set up says its step, and adds from its header', async () => {

@@ -22,11 +22,16 @@ import { ArchiveBin, ArchivedPlace, RowJob, SourceScreen, SourceWords, type Sour
 import { sourceActions, type Attempt } from './sourceActions'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
+import EruvMapPreview from './EruvMapPreview'
+import { partNames } from '@/lib/eruvLine'
 
 // An eruv as Places opens it (boards PlacesEruv4, EruvListing6, EruvStatus5,
 // Nov 1), the same rows as any listing: each names the job that keeps it, and
-// opened, says where it's read from. What only an eruv has (its map's colour,
-// what's left out of it) stays on the category's own page.
+// opened, says where it's read from. Its Map row also holds what only an
+// eruv has: which parts of its map show, and whether its markers do (moved
+// here from the Eruv page on Nov 9, when that page stopped listing eruvim).
+// Its line colour is no longer an admin's: a too-pale one is darkened by
+// itself (eruvLine.ts).
 
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
 
@@ -63,6 +68,8 @@ export default function EruvListing({
 }) {
   const community = useCommunitySlug()
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
+  const [leaveOut, setLeaveOut] = useState<string[]>(eruv.lineLeaveOut)
+  const [hideMarks, setHideMarks] = useState(eruv.lineHidePoints)
   const [openRow, setOpenRow] = useState<RowId | null>(null)
   // `which`: the control on the open row's source line that opened it.
   const [screen, setScreen] = useState<{ title: string; which: Which; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
@@ -108,14 +115,20 @@ export default function EruvListing({
   }
 
   const was = draftOf(eruv)
-  const changes = (Object.keys(draft) as (keyof Draft)[]).filter((k) => draft[k].trim() !== was[k].trim())
-  const changedRow = (id: RowId) => (id === 'name' ? changes.includes('name') || changes.includes('covers') : (changes as string[]).includes(id))
+  const textChanges = (Object.keys(draft) as (keyof Draft)[]).filter((k) => draft[k].trim() !== was[k].trim())
+  const sameNames = (a: string[], b: string[]) => a.length === b.length && a.every((n) => b.includes(n))
+  const mapChanges = {
+    ...(!sameNames(leaveOut, eruv.lineLeaveOut) && { lineLeaveOut: leaveOut }),
+    ...(hideMarks !== eruv.lineHidePoints && { lineHidePoints: hideMarks }),
+  }
+  const changes = [...textChanges, ...Object.keys(mapChanges)]
+  const changedRow = (id: RowId) => (id === 'name' ? changes.includes('name') || changes.includes('covers') : id === 'map' ? Object.keys(mapChanges).length > 0 : (changes as string[]).includes(id))
 
   async function update() {
     setBusy(true)
     setError(null)
     try {
-      await save(Object.fromEntries(changes.map((k) => [k, draft[k].trim()])))
+      await save({ ...Object.fromEntries(textChanges.map((k) => [k, draft[k].trim()])), ...mapChanges })
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save that.')
@@ -201,6 +214,42 @@ export default function EruvListing({
     </div>
   )
 
+  // Which parts of its map show (by name: Center City's borders, Elkins
+  // Park's driving directions) and whether its markers do (Lower Merion's
+  // crossings, yes; the shuls Northeast pins, no). Ticked is shown.
+  // A marker is a part too (Lower Merion's old reroute alerts), but not while
+  // its markers are hidden.
+  const names = eruv.rawLine ? (hideMarks ? partNames({ lines: eruv.rawLine.lines }) : partNames(eruv.rawLine)) : []
+  const mapBody: ReactNode = eruv.rawLine ? (
+    <>
+      <EruvMapPreview file={eruv.rawLine} leaveOut={leaveOut} hideMarks={hideMarks} />
+      {eruv.lineMissing.length > 0 && (
+        <p className="m-0 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="eruv-line-missing">
+          No longer in its map: {eruv.lineMissing.map((n) => `“${n}”`).join(', ')}
+        </p>
+      )}
+      {names.length > 1 && (
+        <fieldset className="m-0 border-0 p-0">
+          <legend className={editorFieldLabel}>Parts shown</legend>
+          <div className="mt-1 flex flex-col gap-1.5">
+            {names.map((n) => (
+              <label key={n} className="flex items-center gap-2 text-[15px] text-slate-800">
+                <input type="checkbox" checked={!leaveOut.includes(n)} onChange={(e) => setLeaveOut(e.target.checked ? leaveOut.filter((x) => x !== n) : [...leaveOut, n])} />
+                {n}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      {eruv.rawLine.marks?.length ? (
+        <label className="flex items-center gap-2 text-[15px] text-slate-800">
+          <input type="checkbox" checked={!hideMarks} onChange={(e) => setHideMarks(!e.target.checked)} />
+          Its markers
+        </label>
+      ) : null}
+    </>
+  ) : null
+
   const rows: { id: RowId; title: string; summary: string; source: RowSource | null; body: ReactNode }[] = [
     { id: 'name', title: draft.name.trim() || 'Name', summary: draft.covers.trim(), source: null, body: <>{input('name', 'Name')}{input('covers', 'What it covers', true)}</> },
     {
@@ -232,7 +281,7 @@ export default function EruvListing({
         </>
       ),
     },
-    { id: 'map', title: 'Map', summary: eruv.lineUrl ? (eruv.lineError ? 'As last read' : 'On the map') : 'None', source: sources.map, body: null },
+    { id: 'map', title: 'Map', summary: eruv.lineUrl ? (eruv.lineError ? 'As last read' : 'On the map') : 'None', source: sources.map, body: mapBody },
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim() || 'None', source: sources.details, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() ? shortUrl(draft.alertsUrl.trim()) : 'None', source: sources.details, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() ? shortUrl(draft.website.trim()) : 'None', source: sources.website, body: input('website', 'Website') },

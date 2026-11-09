@@ -1,4 +1,4 @@
-import { lineFetchUrl, missingNames, parseLineFile, sameLine, shownMap, withLineColor, type EruvLineFile } from './eruvLine'
+import { lineFetchUrl, missingNames, parseLineFile, sameLine, shownMap, readableLines, type EruvLineFile } from './eruvLine'
 import type { EruvMapSource } from './eruvStore'
 
 // ── Reading the eruvim's maps (Oct 12) ──────────────────────────────────────
@@ -37,16 +37,16 @@ export type MapRead = {
   missing: string[] | null
 }
 
-/** What the guide shows of a saved map. The colour an admin chose is only
- *  shown: what's kept is their file. */
-export function savedMap(source: Pick<EruvMapSource, 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>, file: EruvLineFile | null): EruvLineFile | null {
-  return file ? shownMap(withLineColor(file, source.lineColor), source.lineLeaveOut, source.lineHidePoints) : null
+/** What the guide shows of a saved map. A line too pale to see is only
+ *  shown darker: what's kept is their file. */
+export function savedMap(source: Pick<EruvMapSource, 'lineLeaveOut' | 'lineHidePoints'>, file: EruvLineFile | null): EruvLineFile | null {
+  return file ? shownMap(readableLines(file), source.lineLeaveOut, source.lineHidePoints) : null
 }
 
 /** One eruv's map, read now: shown from the read, or from the last good
  *  one when the read fails. */
 export async function readEruvMap(
-  source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>,
+  source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints'>,
   now: Date,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MapRead> {

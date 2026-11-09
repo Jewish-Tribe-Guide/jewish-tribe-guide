@@ -616,7 +616,7 @@ describe('an eruv', () => {
   const BASE = {
     id: 'x', name: 'x', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false,
     status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
-    lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+    lineUrl: null, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [],
     statusEmail: null, statusEmailKept: null,
   }
   const LM = { ...BASE, id: 'lm', name: 'Lower Merion Eruv', covers: 'Bala Cynwyd', website: 'https://lowermerioneruv.org/', hotline: '(610) 664-5626', statusUrl: 'https://lowermerioneruv.org/status', status: 'up', statusWords: 'The Eruv is UP!', statusCheckedAt: at, lineUrl: 'https://maps.example/lm.kml', lineReadAt: at }

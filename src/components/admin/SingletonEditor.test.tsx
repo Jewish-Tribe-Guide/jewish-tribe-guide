@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SingletonEditor } from './CategoryManager'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -55,7 +55,12 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
+
+/** No room for the page beside: a phone, or a narrow window. */
+const phone = () => vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }))
+const computer = () => vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
 
 // The Map's zoom radius is set once and stays as stored (Nov 3): the Map is
 // a switch on the list with nothing to open, and an old link to its editor
@@ -70,7 +75,8 @@ describe('SingletonEditor — the Map keeps its zoom radius', () => {
     const user = userEvent.setup()
     renderWithProviders(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.type(screen.getByLabelText('Name'), 's')
+    await user.click(within(screen.getByRole('region', { name: 'Save' })).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(fetchJson).toHaveBeenCalled())
     const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
@@ -78,29 +84,69 @@ describe('SingletonEditor — the Map keeps its zoom radius', () => {
   })
 })
 
-// The eruvim were the admin's Eruvim tab until Oct 22; now they're edited
-// here, on the Eruv row, so no category has a tab of its own.
-describe('SingletonEditor — the Eruv row holds the eruvim', () => {
-  const eruv: AdminEruv = { id: 'center-city', name: 'Center City Eruv', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, statusEmail: null, statusEmailKept: null, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, lineUrl: null, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, sortOrder: 1, active: true }
+// The eruvim were the admin's Eruvim tab until Oct 22, then a second
+// editor on this page; since Nov 9 they're only in Places, like any listing.
+// The page counts them there, as a category page counts its places.
+describe('SingletonEditor — the Eruv page', () => {
+  const eruv = (id: string, active: boolean): AdminEruv => ({ id, name: id, covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, statusEmail: null, statusEmailKept: null, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, statusEmailed: false, lineUrl: null, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], active })
   const eruvCategory: CategoryConfig = { id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv' }
   const eruvimCalls = () => vi.mocked(fetchJson).mock.calls.filter(([url]) => String(url).includes('/api/admin/eruvim'))
 
   beforeEach(() => {
     vi.mocked(fetchJson).mockImplementation(async (url) =>
-      String(url).includes('/api/admin/eruvim') ? { ok: true, available: true, timezone: 'America/New_York', eruvim: [eruv] } : { ok: true },
+      String(url).includes('/api/admin/eruvim') ? { ok: true, available: true, timezone: 'America/New_York', eruvim: [eruv('center-city', true), eruv('old', false)] } : { ok: true },
     )
   })
 
-  it('lists each eruv, with Add an eruv, under the card’s own fields', async () => {
-    renderWithProviders(<SingletonEditor token="t" category={eruvCategory} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    expect(await screen.findByTestId('admin-eruv')).toHaveTextContent('Center City Eruv')
-    expect(screen.getByRole('heading', { name: 'Eruvim' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Add an eruv')).toBeInTheDocument()
+  it('lists no eruvim, and counts the ones on the site, opening them in Places', async () => {
+    renderWithProviders(<SingletonEditor token="t" category={eruvCategory} onToggleActive={vi.fn()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const link = await screen.findByRole('link', { name: '1 place' })
+    expect(link.getAttribute('href')).toMatch(/\/admin\/places\?category=eruv-information$/)
+    expect(screen.queryByTestId('admin-eruv')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Add an eruv')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Line colour|Order/)).not.toBeInTheDocument()
   })
 
-  it('is on the Eruv row only', () => {
+  it('its preview is an address written through the router, never history.pushState', async () => {
+    phone()
+    const pushState = vi.spyOn(window.history, 'pushState')
+    const user = userEvent.setup()
+    renderWithProviders(<SingletonEditor token="t" category={eruvCategory} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(/[?&]preview=1/), expect.anything()))
+    expect(pushState).not.toHaveBeenCalled()
+    pushState.mockRestore()
+  })
+
+  // Nov 9, the user: "make sure that eruv category page is using the same
+  // formatting as other category pages". Until then it had its own boxed
+  // Name/Icon/Banner fields and Preview/Save/Cancel buttons.
+  it('is laid out as a category page: Basics, the page beside, and the save bar', async () => {
+    computer()
+    const user = userEvent.setup()
+    renderWithProviders(<SingletonEditor token="t" category={eruvCategory} onToggleActive={vi.fn()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: 'Basics' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change the icon' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
+    // No buttons of its own: the save bar appears once something changed.
+    expect(screen.queryByRole('button', { name: /^(Save|Cancel|Preview)$/ })).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Name'), ' guide')
+    const bar = screen.getByRole('region', { name: 'Save' })
+    expect(bar).toHaveTextContent('1 change')
+    await user.click(within(bar).getByRole('button', { name: 'Undo' }))
+    expect(screen.getByLabelText('Name')).toHaveValue('Eruv')
+    expect(screen.queryByRole('region', { name: 'Save' })).not.toBeInTheDocument()
+  })
+
+  it('on a phone, opens the page with Preview instead of showing it beside', () => {
+    phone()
+    renderWithProviders(<SingletonEditor token="t" category={eruvCategory} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.queryByRole('complementary', { name: 'Preview' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument()
+  })
+
+  it('is on the Eruv page only', () => {
     renderWithProviders(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(eruvimCalls()).toHaveLength(0)
-    expect(screen.queryByRole('heading', { name: 'Eruvim' })).not.toBeInTheDocument()
   })
 })

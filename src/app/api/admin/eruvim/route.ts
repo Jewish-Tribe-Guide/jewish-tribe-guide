@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
       const newId = eruvIdFor(name)
       if (!name || !newId) return bad('Give the eruv a name.')
-      if (!(await addEruv(community.slug, newId, { name, sortOrder: 99 }))) return bad('There’s already an eruv by that name.')
+      if (!(await addEruv(community.slug, newId, { name }))) return bad('There’s already an eruv by that name.')
       return Response.json({ ok: true, eruv: await one(community.slug, newId) })
     }
 
