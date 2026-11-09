@@ -828,6 +828,11 @@ after the deploy, dry run first, and needs its own go-ahead.
     do; an eruv's up or down goes live), and what's left to the admin
     (sources in Places, yes or no on To do, a job off on its page). A
     test ties its "every night" and "every Sunday" to the jobs' schedules.
+  - BUILT Nov 9 (the user: "I'm not seeing an edit listing option in the
+    preview"): the preview's A listing has Edit listing at its foot, as a
+    visitor sees it, when the page lets visitors edit. It opens the
+    visitors' editor; Send shows the change in the preview and sends
+    nothing, like every send there (previewSend.tsx).
     Recommended rather than a tooltip: a tooltip can't be opened on a
     phone, and a screen of its own keeps Back working. Not a walkthrough:
     one short screen, per "less reading".

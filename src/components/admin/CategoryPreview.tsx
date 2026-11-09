@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { bandImageFor, type CategoryConfig } from '@/lib/categories'
+import { bandImageFor, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
 import type { Coords } from '@/lib/useStoredLocation'
@@ -22,6 +22,8 @@ import { PreviewSendProvider } from '@/lib/previewSend'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import ListingEditorScreen from './ListingEditorScreen'
 import ListingView from '@/components/resources/ListingView'
+import ListingEditBar from '@/components/resources/ListingEditBar'
+import { ui } from '@/lib/uiConfig'
 import { fullestListing } from '@/lib/fullestListing'
 
 // A preview of the real directory page for a category — the exact same
@@ -205,9 +207,21 @@ export default function CategoryPreview({
   } else if (realListings === null) {
     content = <p className="text-sm text-muted p-4">Loading…</p>
   } else if (view === 'listing') {
-    const fullest = fullestListing([...localListings, ...realListings], category)
+    // An edit made here shadows the place it edited, as on the page.
+    const localIds = new Set(localListings.map((l) => l.id))
+    const fullest = fullestListing([...localListings, ...realListings.filter((r) => !localIds.has(r.id))], category)
+    // Edit listing at its foot, as a visitor sees it (the user, Nov 9: "I'm
+    // not seeing an edit listing option in the preview"). It opens the
+    // editor here, which sends nothing (PreviewSendProvider below).
+    const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
     content = fullest ? (
-      <ListingView item={fullest} category={category} color={getCategoryColor([category], category.id)} path="" foot={null} />
+      <ListingView
+        item={fullest}
+        category={category}
+        color={getCategoryColor([category], category.id)}
+        path=""
+        foot={<ListingEditBar onEdit={canEdit ? () => setAction({ mode: 'edit', listing: fullest }) : undefined} item={fullest} category={category} />}
+      />
     ) : (
       <p className="text-sm text-muted p-4">No places on this page yet.</p>
     )
