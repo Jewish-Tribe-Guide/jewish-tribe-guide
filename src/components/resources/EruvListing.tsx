@@ -174,7 +174,11 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
           const rows = inBox(box.fields).flatMap((f) => contactRow(f, values[f.key]) ?? [])
           return rows.length > 0 ? <Card key={box.id}>{rows}</Card> : null
         }
-        return <FieldsBox key={box.id} item={values as unknown as DirectoryResource} title={box.title} fields={inBox(box.fields)} />
+        // About is a listing's description; an eruv has none, so a lone
+        // long-text field there is headed by its own name ("Certified by").
+        // Several are each named under About (FieldsBox).
+        const title = box.id === 'about' && box.fields.length === 1 ? (byKey.get(box.fields[0])?.label ?? box.title) : box.title
+        return <FieldsBox key={box.id} item={values as unknown as DirectoryResource} title={title} fields={inBox(box.fields)} />
       })}
     </div>
   )

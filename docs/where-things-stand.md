@@ -106,10 +106,17 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   Suggest an edit. The Eruv page no longer gets one.
 - Known edge: an Eruv page with every field and box taken off shows the
   four rows again (there's no way to tell it from a page never saved).
-- **Migration 094 (`eruv.details`) isn't run anywhere yet.** Until it is,
-  everything works except saving a value for an admin's own field (the save
-  says the column is missing). Run it on dev in Supabase's SQL editor; live
-  needs a yes (see "Waiting for a yes").
+- A Text field lands in About, as long text does on every page. A
+  listing's About is its description, with no heading; an eruv has none,
+  so on an eruv a lone field there is headed by its own name ("Certified
+  by"), and several are each named under About. Found on dev after 094.
+- Opening "What kind of field?" from a pasted address, straight after
+  another admin screen, and picking a kind goes Back to that screen and
+  drops the draft. A reload there works. Every category page does this.
+- **Migration 094 (`eruv.details`) is on dev (Nov 9), not live.** Checked
+  on dev: a "Certified by" field made on the Eruv page, filled in from
+  Places, saved to `details`, shown on the opened eruv and in Edit
+  listing; then put back. Live needs a yes (see "Waiting for a yes").
 
 The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
@@ -199,8 +206,8 @@ for that exact change, in the same conversation. Show the dry run first.
 1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
    after PR 373 deployed: live's table has every column, no rows yet).
 
-1l. **Migration 094 (`eruv.details`, Nov 9):** not run on live (nor dev
-    yet). One `add column if not exists`; nothing is read from it until an
+1l. **Migration 094 (`eruv.details`, Nov 9):** on dev (the user ran it
+    Nov 9), not on live. One `add column if not exists`; nothing is read from it until an
     admin makes a field on the Eruv page, so it can go any time after the
     branch deploys. Needs a yes.
 

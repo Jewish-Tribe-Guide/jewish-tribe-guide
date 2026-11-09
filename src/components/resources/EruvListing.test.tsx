@@ -56,4 +56,28 @@ describe('EruvListing — the Eruv page’s fields', () => {
     expect(screen.queryByRole('heading', { name: 'Where it goes' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /centercityeruv\.com/ })).not.toBeInTheDocument()
   })
+
+  // Found on dev, Nov 9: a Text field made on the Eruv page lands in About,
+  // as long text does on any page, and showed as "About" over "Rabbi A",
+  // never saying who Rabbi A is. A listing's About is its description; an
+  // eruv has none, so the box says what it holds.
+  it('heads a long-text field in no box with its own name, not "About"', () => {
+    open([page({ detailFields: [{ key: 'certifiedBy', label: 'Certified by', type: 'textarea' }] })])
+    expect(screen.getByRole('heading', { name: 'Certified by' })).toBeInTheDocument()
+    expect(screen.getByText('Rabbi A')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
+  })
+
+  it('names each long-text field when there are several', () => {
+    open([
+      page({
+        detailFields: [
+          { key: 'certifiedBy', label: 'Certified by', type: 'textarea' },
+          { key: 'area', label: 'Area', type: 'textarea' },
+        ],
+      }),
+    ])
+    expect(screen.getByText('Certified by')).toBeInTheDocument()
+    expect(screen.getByText('Area')).toBeInTheDocument()
+  })
 })
