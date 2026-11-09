@@ -156,4 +156,27 @@ describe('CategoryPreview', () => {
     expect(calls.filter((c) => c.method !== 'GET')).toEqual([])
     expect(calls.every((c) => c.url.includes('/api/resources'))).toBe(true)
   })
+
+  // The user, Nov 7: beside a field, Adding opens on it. That opened row
+  // isn't a screen in the history: beside the page, the admin's Back first
+  // closed a row they never saw open, and full size it took the field away
+  // again. A row opened by hand, full size, still is one.
+  it('opens Adding on the field it’s given, its row not in the history', async () => {
+    const u = userEvent.setup()
+    stubFetch()
+    const editorStep = () => (window.history.state as Record<string, unknown> | null)?.editorStep
+    window.history.replaceState({}, '')
+    const { unmount } = renderWithProviders(<CategoryPreview category={FOOD} inline view="adding" focusField="kosherCert" onClose={() => {}} />)
+    expect(await screen.findByTestId(/^editor-open-/)).toHaveTextContent('Kosher Certification')
+    expect(editorStep()).toBeUndefined()
+    unmount()
+    const full = renderWithProviders(<CategoryPreview category={FOOD} view="adding" focusField="kosherCert" onClose={() => {}} />)
+    expect(await screen.findByTestId(/^editor-open-/)).toHaveTextContent('Kosher Certification')
+    expect(editorStep()).toBeUndefined()
+    full.unmount()
+    renderWithProviders(<CategoryPreview category={FOOD} view="adding" onClose={() => {}} />)
+    await u.click(await screen.findByRole('button', { name: 'About' }))
+    expect(screen.getByTestId('editor-open-about')).toBeInTheDocument()
+    expect(editorStep()).toBe(1)
+  })
 })

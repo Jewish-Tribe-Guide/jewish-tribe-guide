@@ -24,8 +24,8 @@ vi.mock('@/lib/fetchJson', async (original) => ({ ...(await original<typeof impo
 // The page beside the settings: the draft it's given, not the page itself
 // (that needs the whole site's providers).
 vi.mock('./CategoryPreview', () => ({
-  default: ({ category, inline, view }: { category: CategoryConfig; inline?: boolean; view?: string }) => (
-    <p data-testid={inline ? 'preview-beside' : 'preview'} data-view={view}>
+  default: ({ category, inline, view, focusField }: { category: CategoryConfig; inline?: boolean; view?: string; focusField?: string }) => (
+    <p data-testid={inline ? 'preview-beside' : 'preview'} data-view={view} data-focus={focusField} data-fields={category.detailFields.map((f) => f.key).join(' ')}>
       {category.pluralLabel}
     </p>
   ),
@@ -621,6 +621,24 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
+  // The user, Nov 7: opened full size, the field went away.
+  it('opens on the field, beside it and full size', async () => {
+    computer()
+    const user = userEvent.setup()
+    const initial = baseCategory({
+      capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: true },
+      detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'Kosher', label: 'Kosher' }] }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: /^Type/ }))
+    const beside = () => screen.getByRole('complementary', { name: 'Preview' }).querySelector('iframe')!.contentDocument!.querySelector('[data-testid="preview-beside"]')
+    await waitFor(() => expect(beside()).toHaveAttribute('data-focus', 'type'))
+    await user.click(screen.getByRole('button', { name: 'Open the preview' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-view', 'adding')
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'type')
+  })
+
   it('has no Adding where visitors can’t add', () => {
     computer()
     renderWithProviders(<CategoryEditor token="t" initial={baseCategory({ capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, add: false } })} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
@@ -948,6 +966,17 @@ describe('CategoryEditor — + Add a field', () => {
     await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
     await screen.findByRole('heading', { name: 'Groceries' })
     expect(screen.getByRole('complementary', { name: 'Preview' })).toBeInTheDocument()
+  })
+
+  // Before adding, the field is only in the preview's copy: full size keeps it.
+  it('keeps a field not added yet when its preview opens full size', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    await openAdd(user)
+    await user.click(await screen.findByRole('button', { name: /^Denomination/ }))
+    await user.click(screen.getByRole('button', { name: 'Open the preview' }))
+    expect(screen.getByTestId('preview')).toHaveAttribute('data-focus', 'denomination')
+    expect(screen.getByTestId('preview').dataset.fields!.split(' ')).toContain('denomination')
   })
 
   it('narrows to one page’s fields from the page menu', async () => {

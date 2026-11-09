@@ -825,10 +825,13 @@ after the deploy, dry run first, and needs its own go-ahead.
       kosher questions. Hotel's general Notes is separate. Waiting on the
       user.
   - The rest of the fields: the user's, later.
-- Noted by the user, Nov 7, not for now (no changes yet): the preview beside
-  a field before adding doesn't really show the new field. On Adding it's a
-  "+ Denomination" link, and clicking into it makes it disappear. Maybe a
-  still picture of the pages rather than the live page. Undecided.
+- BUILT Nov 9 (noted by the user Nov 7: the preview beside a field showed
+  it only as a "+ Denomination" link, and opened full size it went away):
+  beside a field, before adding or on its own screen, Adding opens on that
+  field's row, so it shows what people adding a place fill in. Full size
+  keeps the same copy, the field included, still open on it. That row is
+  not an entry in the browser's history, so Back goes back to the field
+  screen rather than closing it. A still picture was not needed.
 - Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
   field's box on the listing keeps its name. Delivery, What isn't kosher,
   Main dishes, a list of contacts and a mikvah's section have no Rename

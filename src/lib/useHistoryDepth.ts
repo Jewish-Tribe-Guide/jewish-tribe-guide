@@ -15,9 +15,11 @@ import { useEffect, useRef } from 'react'
  * the browser's, calls `back` once per level left; the page's own Back
  * calls `back` as before, and this takes the entry off with it. Hosts that
  * nest (a change opened over a place's editor) each use their own key.
+ * No key: none of this, for a copy drawn beside the page (the category
+ * editor's preview), whose open row is no screen the page's Back is for.
  */
-export function useHistoryDepth(key: string, depth: number, back: () => void) {
-  KEYS.add(key)
+export function useHistoryDepth(key: string | null, depth: number, back: () => void) {
+  if (key) KEYS.add(key)
   const now = useRef({ depth, back })
   useEffect(() => {
     now.current = { depth, back }
@@ -25,6 +27,7 @@ export function useHistoryDepth(key: string, depth: number, back: () => void) {
 
   const first = useRef(true)
   useEffect(() => {
+    if (!key) return
     const marked = depthIn(window.history.state, key)
     if (depth > marked) {
       for (let d = marked + 1; d <= depth; d++) window.history.pushState({ ...(window.history.state ?? {}), [key]: d }, '')
@@ -38,6 +41,7 @@ export function useHistoryDepth(key: string, depth: number, back: () => void) {
   }, [key, depth])
 
   useEffect(() => {
+    if (!key) return
     const onPop = (e: PopStateEvent) => {
       const to = depthIn(e.state, key)
       if (now.current.depth > to) now.current.back()

@@ -21,13 +21,22 @@ export default function ListingEditorScreen({
   onClose,
   overlay,
   backLabel = 'Back',
+  history = true,
   ...editor
-}: { heading: string; overlay?: { title: string; back: () => void; node: ReactNode } | null; backLabel?: string } & Omit<ComponentProps<typeof ListingEditor>, 'onStep'>) {
+}: {
+  heading: string
+  overlay?: { title: string; back: () => void; node: ReactNode } | null
+  backLabel?: string
+  /** Off for a preview beside the page, or one opened on a field: an open
+   *  row isn't in the history, or Back first closed a row nobody opened
+   *  (and, full size, the field the admin came to see). */
+  history?: boolean
+} & Omit<ComponentProps<typeof ListingEditor>, 'onStep'>) {
   const [step, setStep] = useState<EditorStep | null>(null)
   const title = overlay?.title ?? step?.title ?? heading
   const back = overlay?.back ?? (step ? step.back : onClose)
   // Each open row, and a screen over it, is an entry: a swipe back closes it.
-  useHistoryDepth('editorStep', (step ? (step.depth ?? 1) : 0) + (overlay ? 1 : 0), back)
+  useHistoryDepth(history ? 'editorStep' : null, (step ? (step.depth ?? 1) : 0) + (overlay ? 1 : 0), back)
   // The preview's own SiteHeader shows "‹ title" on mobile, as it does over
   // the real editor.
   useSetScreenHeader(true, title, back)

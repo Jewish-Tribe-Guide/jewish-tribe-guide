@@ -59,6 +59,7 @@ export default function CategoryPreview({
   inline = false,
   onListings,
   view = 'page',
+  focusField,
 }: {
   /** The draft, packaged as a full CategoryConfig — never saved. */
   category: CategoryConfig
@@ -70,6 +71,8 @@ export default function CategoryPreview({
    *  "N places". */
   onListings?: (count: number) => void
   view?: PreviewView
+  /** Adding opens on this field's row: the field an admin is looking at. */
+  focusField?: string
 }) {
   const [realListings, setRealListings] = useState<DirectoryResource[] | null>(null)
   // Listings added/edited during this preview session — client-only, never
@@ -198,7 +201,7 @@ export default function CategoryPreview({
       </ListingsProvider>
     )
   } else if (view === 'adding') {
-    content = <ListingEditorScreen key="adding" heading={`Add to ${category.pluralLabel}`} category={category} onClose={onClose} backLabel={category.pluralLabel} />
+    content = <ListingEditorScreen key={`adding:${focusField ?? ''}`} heading={`Add to ${category.pluralLabel}`} category={category} onClose={onClose} backLabel={category.pluralLabel} startOpen={focusField} history={!inline && !focusField} />
   } else if (realListings === null) {
     content = <p className="text-sm text-muted p-4">Loading…</p>
   } else if (view === 'listing') {

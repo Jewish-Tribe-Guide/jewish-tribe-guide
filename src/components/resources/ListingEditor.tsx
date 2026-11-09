@@ -124,6 +124,10 @@ type Props = {
   allSections?: boolean
   /** Values to put in as if typed, each new object once: Use Google's. */
   patch?: Record<string, unknown>
+  /** The row with this field opens first: the category editor's preview
+   *  beside a field, showing what people adding a place will be asked
+   *  (the user, Nov 7: a "+ Denomination" link didn't show it). */
+  startOpen?: string
   /** With `onlyRows`: each row in a white card of its own under its title,
    *  and no Send, the host's buttons sending (To do's place screen, boards
    *  R3Site, R2Menu); without it, the whole list with no Send (a new place
@@ -258,6 +262,7 @@ export default function ListingEditor({
   splitContact,
   allSections,
   patch,
+  startOpen,
   hosted,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
@@ -323,6 +328,15 @@ export default function ListingEditor({
   // next week's too. One box's own Edit has them only if it's that box.
   const thisWeek = useEditWeek((!creating || !!rowSource) && category.detailFields.some((f) => f.type === 'minyanim') && (!onlyRows || onlyRows.some((id) => id === 'minyans:this_week' || id === 'minyans:next_week')))
   const rows = editorRows(category, details, { week: thisWeek?.week, nextWeek: adminSave ? thisWeek?.next : null, splitContact, allSections })
+  // Once, on the first render that has its row.
+  const [startTaken, setStartTaken] = useState(false)
+  if (startOpen && !startTaken) {
+    const first = rows.find((r) => r.fields.some((f) => f.key === startOpen))
+    if (first) {
+      setStartTaken(true)
+      setOpenId(first.id)
+    }
+  }
   const row = rows.find((r) => r.id === openId) ?? null
   // A box's own Edit: its rows, in the listing's order.
   const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null

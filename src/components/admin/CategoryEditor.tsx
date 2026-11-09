@@ -219,7 +219,11 @@ function CategoryEditorScreen({
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  function openPreview() {
+  // Opened from the page beside a field: what that page showed, the field
+  // in it and open (the user, Nov 7: opened full size, it disappeared).
+  const [previewFull, setPreviewFull] = useState<{ category: CategoryConfig; focus?: string } | null>(null)
+  function openPreview(from?: { category: CategoryConfig; focus?: string }) {
+    setPreviewFull(from ?? null)
     setPreviewing(true)
     history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
@@ -336,7 +340,7 @@ function CategoryEditorScreen({
     ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
   ]
   const shownView = views.some((v) => v.view === previewView) ? previewView : 'page'
-  if (previewing) return <CategoryPreview category={previewCategory} view={shownView} onClose={() => history.back()} />
+  if (previewing) return <CategoryPreview category={previewFull?.category ?? previewCategory} focusField={previewFull?.focus} view={shownView} onClose={() => history.back()} />
 
   const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
@@ -344,7 +348,8 @@ function CategoryEditorScreen({
 
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
-  const previewOf = (category: CategoryConfig) => (
+  // `focus`: the field an admin is looking at, which Adding opens on.
+  const previewOf = (category: CategoryConfig, focus?: string) => (
     <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
       {(
         <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
@@ -361,12 +366,12 @@ function CategoryEditorScreen({
           ))}
         </div>
       )}
-      <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
-        {() => <CategoryPreview inline view={shownView} category={category} onClose={() => {}} onListings={setPlaceCount} />}
+      <PreviewBeside onOpen={() => openPreview({ category, focus })} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
+        {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaceCount} />}
       </PreviewBeside>
     </aside>
   )
-  const preview = wide && previewOf(previewCategory)
+  const preview = wide && previewOf(previewCategory, field?.key || undefined)
 
   // Fields, as the listing's boxes (fieldBoxes.ts). A field not named yet
   // has no key: it goes by its place.
@@ -445,7 +450,7 @@ function CategoryEditorScreen({
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
         // A field before adding: the page beside with it there.
-        besides={wide ? (f) => previewOf({ ...previewCategory, detailFields: [...previewCategory.detailFields, normalizeField({ ...f, key: f.key || 'new' })] }) : undefined}
+        besides={wide ? (f) => previewOf({ ...previewCategory, detailFields: [...previewCategory.detailFields, normalizeField({ ...f, key: f.key || 'new' })] }, f.key || 'new') : undefined}
         onMakeOwn={(type, label) => {
           setLanding(new Set(pageFields.map((f) => f.key)))
           added(addOwnField(type, label, addingTo))
@@ -539,7 +544,7 @@ function CategoryEditorScreen({
         {/* On a phone the page beside has no room: Preview opens it full
             size (board 21b). */}
         {!wide && (
-          <AdminPreviewButton onClick={openPreview} />
+          <AdminPreviewButton onClick={() => openPreview()} />
         )}
         <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
           {/* A phone: "On the site" over the count, the switch on the right
