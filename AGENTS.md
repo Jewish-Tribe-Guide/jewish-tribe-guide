@@ -347,7 +347,9 @@ summary block, not the tail.** Two separate traps, both hit in one session
 `offline.spec.ts` fails about one run in two (the service worker not taking
 control in time; see [[project-e2e-flakiness-baseline]]), and
 `server-rendering.spec.ts:127` desktop about one in four (two copies of the
-count text mid-transition). Anything else red is worth taking seriously.
+count text mid-transition). In CI, `saved.spec.ts` has twice missed its
+Saved chip within 5s (Nov 5 :130 mobile, Nov 9 :104 desktop; both passed
+on a rerun, cause not found yet). Anything else red is worth taking seriously.
 Before concluding you broke something, get a baseline:
 `git worktree add --detach <tmp> <pre-change-sha>`, `npm ci` inside it (a
 symlinked `node_modules` makes Turbopack panic with "points out of the

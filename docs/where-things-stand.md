@@ -2,15 +2,42 @@
 
 The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
-account). Update it in the same commit as the work that changes it.
+account). Update it in the same commit as the work that changes it. How
+the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 5, 2026.
+Last updated: Nov 9, 2026.
 
 ## The branch
 
 The redesign was merged into `main` on Oct 17 at 7:24 PM (#322, at
-7d5fead6) and is live. Later work is on `redesign/map-google-sizes` until
-the next merge.
+7d5fead6) and is live. Work since is on `redesign/oct18-fixes`, which goes to
+`main` a PR at a time. The last, #379 (the Category pages redesign, Nov 5–9),
+merged Nov 9 at 2:38 PM (ffb6ca63), so as of Nov 9 the branch holds nothing
+`main` doesn't. Keep building on it, and merge `origin/main` into it before
+the next PR.
+
+**Moved to a new Claude account on Nov 9.** What didn't come along:
+
+- **The drawings.** Every canvas and artifact linked in this file
+  (claude.ai/artifact/…) belongs to the old account. The new one can open
+  them only if the old account shares them. The decisions they settled are
+  written here, so the text is what to go by. The latest is the Category
+  pages canvas, ThgexAyY2q6o6YDxg21RBM.
+- **Auto-fix on PRs.** The app's PR watcher was switched on per session.
+  Turn it on again for the next PR from the new account.
+
+Small open items from Nov 9:
+
+- `e2e/saved.spec.ts` failed in CI twice on a Saved chip that didn't show
+  within 5s: Nov 5 (:130, mobile) and Nov 9 (:104 desktop, PR #379, which
+  passed on a rerun). Both times the branch hadn't touched saving. Treat it as
+  a flake to look into, not a regression.
+- Dev's pretend Riverton community has no pages left and can be deleted
+  (dev only; no yes needed).
+- "How it looks" isn't built for the phone (nothing sits beside a field
+  there).
+- The Denomination/Nusach script is still a dry run (see "Waiting for a yes
+  to change the live site").
 
 The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
