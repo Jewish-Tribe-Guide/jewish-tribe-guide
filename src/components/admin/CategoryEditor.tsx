@@ -396,8 +396,14 @@ function CategoryEditorScreen({
 
   // Page, A listing or Adding (boards 4 and 5): the page on a computer, the
   // other two as a phone shows them. No Adding where visitors can't add.
+  // The Eruv page's Editing is an eruv's Edit listing: visitors don't add
+  // eruvim, they suggest edits to them.
   const views: { view: PreviewView; label: string }[] = eruvPage
-    ? [{ view: 'page', label: 'Page' }]
+    ? [
+        { view: 'page', label: 'Page' },
+        { view: 'listing', label: 'A listing' },
+        { view: 'adding', label: 'Editing' },
+      ]
     : [
         { view: 'page', label: 'Page' },
         { view: 'listing', label: 'A listing' },
@@ -418,14 +424,18 @@ function CategoryEditorScreen({
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
   // `focus`: the field an admin is looking at, which Adding opens on.
-  const previewOf = (category: CategoryConfig, focus?: string) =>
-    previewing ? (
+  // `onField`: beside one of the Eruv page's fields, which isn't on its
+  // list of eruvim, so only where it is: A listing and Editing.
+  const previewOf = (category: CategoryConfig, focus?: string, onField = false) => {
+    const tabs = onField ? views.filter((v) => v.view !== 'page') : views
+    const shownView = tabs.some((v) => v.view === previewView) ? previewView : tabs[0].view
+    return previewing ? (
       <CategoryPreview category={category} focusField={focus} view={shownView} onClose={() => void screens.back()} />
     ) : (
     <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
-      {views.length > 1 && (
+      {tabs.length > 1 && (
         <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
-          {views.map((v) => (
+          {tabs.map((v) => (
             <button
               key={v.view}
               type="button"
@@ -443,12 +453,15 @@ function CategoryEditorScreen({
       </PreviewBeside>
     </aside>
   )
+  }
   // Beside a field, the field where a visitor meets it, on a made-up place
   // (boards 33c and 34, FieldLooks.tsx); the whole page one link away.
   const looksOf = (look: { category: CategoryConfig; focus?: string }, onShowOnRow?: (line: 'second' | 'third') => void) => {
     const f = look.category.detailFields.find((x) => x.key === look.focus)
-    // An eruv isn't a made-up place to draw a field on: the page instead.
-    if (previewing || !f || eruvPage) return previewOf(look.category, look.focus)
+    // An eruv isn't a made-up place to draw a field on: a real one, opened
+    // and in its Edit listing, instead.
+    if (eruvPage) return previewOf(look.category, look.focus, !!f)
+    if (previewing || !f) return previewOf(look.category, look.focus)
     return (
       <FieldLooks
         category={look.category}

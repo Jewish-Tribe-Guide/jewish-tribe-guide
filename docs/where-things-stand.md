@@ -86,10 +86,25 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   name and status always come first and can't be moved or removed. The four
   are ready-made (name locked), so they can be taken off, moved, or put
   back from + Add a field. Nothing visible changes until an admin does.
-- **+ Add a field** offers those four, and fields other communities made on
-  their Eruv pages; Make your own takes Choices, Yes or no, Text and Link.
-  No basics (address, hours…). A field made there is kept on each eruv in a
-  new `details` column (migration 094).
+- **+ Add a field** offers those four, fields other communities made on
+  their Eruv pages, and (the user, Nov 9: existing fields should show as
+  options) every listing page's field an eruv can hold: text, a link, a
+  phone, yes or no, choices. Not one tied to a listing's own boxes (a
+  hechsher's caveat, a link's own box and its words, an audience's, a
+  field that comes with another), and no photo, hours or website. The
+  Which page menu has Eruv first. Make your own takes Choices, Yes or no,
+  Text and Link. A field made or added there is kept on each eruv in a new
+  `details` column (migration 094).
+- **The preview** has Page · A listing · Editing, as other pages have Page
+  · A listing · Adding: A listing opens the eruv holding the most of the
+  page's fields, Editing its Edit listing (visitors suggest edits to an
+  eruv, they don't add one). Beside a field, A listing and Editing only:
+  a field isn't on the list of eruvim. These are the real eruv screens, not
+  the drawn How it looks tabs a listing page's field has, so the field
+  isn't outlined in them.
+- **Not yet:** Places' Add a place for an eruv (AddEruv) has its fixed
+  rows only, so a field made on the Eruv page is filled in after the eruv
+  is added, not while adding it.
 - **An admin's field is filled in** in Places (a row of its own after
   Website, saved with Update the listing) and by anyone through Suggest an
   edit, which goes to the queue; the queue and the admin email show it

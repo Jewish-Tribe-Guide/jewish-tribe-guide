@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import type { CategoryField, FieldType } from '@/lib/categories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { basicField } from '@/lib/fieldAbout'
-import { MAKE_OWN_KINDS, matchesSearch, pageMenu, readyEruvFields, readyMadeFields, type PageHas, type ReadyField } from '@/lib/readyMade'
+import { MAKE_OWN_KINDS, eruvPageMenu, matchesSearch, pageMenu, readyEruvFields, readyMadeFields, type PageHas, type ReadyField } from '@/lib/readyMade'
 import { ERUV_FIELD_TYPES } from '@/lib/eruvFields'
 import { AdminBack, AdminBox, AdminMenu, AdminRow, Chevron, MakeOwnLink, SearchBox } from './AdminUI'
 import { normalizeField } from './categoryEditorLogic'
@@ -40,8 +40,8 @@ export default function FieldPicker({
   /** One place on it: "Restaurant". */
   pageLabel: string
   page: PageHas
-  /** The Eruv's page: its own ready-made fields and the kinds an eruv
-   *  shows, no other page's (eruvFields.ts). */
+  /** The Eruv's page: its own ready-made fields, then other pages' of
+   *  the kinds an eruv shows (readyEruvFields). */
   kind?: 'listing' | 'eruv'
   screen: FieldPickerScreen
   onScreen: (next: FieldPickerScreen) => void
@@ -59,8 +59,8 @@ export default function FieldPicker({
   const [onPage, setOnPage] = useState('')
   const eruv = kind === 'eruv'
   const all = useMemo(() => (pages ? (eruv ? readyEruvFields(pages, page) : readyMadeFields(pages, page)) : null), [pages, page, eruv])
-  const rows = useMemo(() => (pages ? (eruv ? readyEruvFields(pages, page) : readyMadeFields(pages, page, onPage || undefined)) : null), [pages, page, onPage, eruv])
-  const menu = useMemo(() => (pages && !eruv ? pageMenu(pages) : []), [pages, eruv])
+  const rows = useMemo(() => (pages ? (eruv ? readyEruvFields(pages, page, onPage || undefined) : readyMadeFields(pages, page, onPage || undefined)) : null), [pages, page, onPage, eruv])
+  const menu = useMemo(() => (pages ? (eruv ? eruvPageMenu(pages) : pageMenu(pages)) : []), [pages, eruv])
   const kinds = eruv ? MAKE_OWN_KINDS.filter((k) => ERUV_FIELD_TYPES.includes(k.type)) : MAKE_OWN_KINDS
 
   if (screen.at === 'look') {

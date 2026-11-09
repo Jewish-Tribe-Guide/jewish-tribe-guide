@@ -73,15 +73,22 @@ export function EruvListing(props: {
   candles: number | null
   onEditingChange?: (editing: boolean) => void
   onEditor?: (editor: HostedEditor | null) => void
+  /** Opens on its Edit listing: the admin preview's Editing tab. */
+  startEditing?: boolean
 }) {
-  const { onEditingChange, onEditor, ...listing } = props
-  const [editing, setEditing] = useState(false)
+  const { onEditingChange, onEditor, startEditing = false, ...listing } = props
+  const [editing, setEditing] = useState(startEditing)
+  // Opened by Edit listing, the editor is a step in the history and Back
+  // closes it; opened on it (startEditing), there's no step to go back
+  // over, and Back would leave the page it's in.
+  const [stepped, setStepped] = useState(false)
   const [changed, setChanged] = useState(false)
   // Another eruv opened in its place starts as its listing.
   const [shownId, setShownId] = useState(props.eruv.id)
   if (shownId !== props.eruv.id) {
     setShownId(props.eruv.id)
-    setEditing(false)
+    setEditing(startEditing)
+    setStepped(false)
   }
   useEffect(() => {
     const onPop = (e: PopStateEvent) => setEditing((e.state as { mapSheetForm?: string } | null)?.mapSheetForm === 'edit')
@@ -95,13 +102,18 @@ export function EruvListing(props: {
   const openEditor = () => {
     window.history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
     setChanged(false)
+    setStepped(true)
     setEditing(true)
   }
-  const closeEditor = () => window.history.back()
+  const closeEditor = () => {
+    if (!stepped) return setEditing(false)
+    setStepped(false)
+    window.history.back()
+  }
   useEffect(() => {
     if (!onEditor) return
-    onEditor(editing ? { back: () => window.history.back(), label: 'Back to listing', changed } : null)
-  }, [onEditor, editing, changed])
+    onEditor(editing ? { back: stepped ? () => window.history.back() : () => setEditing(false), label: 'Back to listing', changed } : null)
+  }, [onEditor, editing, changed, stepped])
   useEffect(() => () => onEditor?.(null), [onEditor])
   if (editing) {
     return (

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { Eruv } from '@/lib/eruv'
@@ -79,5 +79,28 @@ describe('EruvListing — the Eruv page’s fields', () => {
     ])
     expect(screen.getByText('Certified by')).toBeInTheDocument()
     expect(screen.getByText('Area')).toBeInTheDocument()
+  })
+
+  // The admin preview's Editing tab opens an eruv on its Edit listing. Its
+  // Back there has no step of its own to go back over: going back in the
+  // history would leave the admin's page.
+  it('opened on its Edit listing, Back shows the listing and leaves the history alone', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    renderWithProviders(<EruvListing startEditing eruv={eruv} color="#000" now={new Date('2026-11-09T15:00:00Z')} timezone="America/New_York" candles={null} />, { content: { categories: [page()] } })
+    expect(screen.getByTestId('eruv-editing')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Edit listing/ })).toBeInTheDocument()
+    expect(back).not.toHaveBeenCalled()
+    back.mockRestore()
+  })
+
+  it('opened by Edit listing, Back goes back over its step', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    open([page()])
+    fireEvent.click(screen.getByRole('button', { name: /Edit listing/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(back).toHaveBeenCalledTimes(1)
+    back.mockRestore()
   })
 })

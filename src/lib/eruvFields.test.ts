@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryConfig } from './categories'
-import { ERUV_FIELDS, eruvPageOwnFields, eruvValues, ownEruvFields, readEruvDetails, withEruvFields } from './eruvFields'
+import { ERUV_FIELDS, eruvPageOwnFields, eruvValues, fullestEruv, ownEruvFields, readEruvDetails, withEruvFields } from './eruvFields'
 
 // Nov 9: the Eruv page has Fields like every page. Never saved, it has the
 // four rows an eruv always had; a field an admin makes is kept in the
@@ -69,5 +69,27 @@ describe('readEruvDetails', () => {
     expect(readEruvDetails({ note: 'x'.repeat(900) })!.note).toHaveLength(600)
     expect(readEruvDetails('text')).toBeNull()
     expect(readEruvDetails(['a'])).toBeNull()
+  })
+})
+
+// The preview's A listing and Editing tabs open one eruv, as a listing
+// page's open its most filled-in place.
+describe('fullestEruv', () => {
+  const e = (id: string, over: Record<string, unknown> = {}) => ({ id, covers: null, website: null, hotline: null, alertsUrl: null, details: {}, ...over })
+  const eruvPage: CategoryConfig = { id: 'eruv', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv' }
+
+  it('picks the eruv holding the most of the page’s fields, the first on ties', () => {
+    const eruvim = [e('a', { covers: 'x' }), e('b', { covers: 'x', website: 'https://b.org' }), e('c', { covers: 'x', hotline: '1' })]
+    expect(fullestEruv(eruvim, eruvPage)!.id).toBe('b')
+  })
+
+  it('counts the page’s own fields from details, and not a field the page doesn’t have', () => {
+    const page = { ...eruvPage, detailFields: [{ key: 'certifiedBy', label: 'Certified by', type: 'text' as const }] }
+    const eruvim = [e('a', { covers: 'x', website: 'https://a.org' }), e('b', { details: { certifiedBy: 'Rabbi A' } })]
+    expect(fullestEruv(eruvim, page)!.id).toBe('b')
+  })
+
+  it('is null with no eruvim', () => {
+    expect(fullestEruv([], eruvPage)).toBeNull()
   })
 })

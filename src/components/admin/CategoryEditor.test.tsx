@@ -1402,4 +1402,51 @@ describe('CategoryEditor — the Eruv page', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     expect(payload().fields.map((f: CategoryField) => f.key)).toEqual(['covers', 'website', 'hotline', 'alertsUrl', 'certified_by'])
   })
+
+  // The user, Nov 9: "I'm not seeing the different views. Page, listing,
+  // adding." An eruv is opened and edited, not added: Editing is its Edit
+  // listing.
+  const computer = () => vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+  const tabs = () => within(screen.getByRole('group', { name: 'Preview of' })).getAllByRole('button').map((b) => b.textContent)
+  const shown = () => screen.getByRole('complementary', { name: 'Preview' }).querySelector('iframe')!.contentDocument!.querySelector('[data-testid="preview-beside"]')?.getAttribute('data-view')
+
+  it('previews the page, an opened eruv and its Edit listing', async () => {
+    computer()
+    const user = userEvent.setup()
+    editor()
+    expect(tabs()).toEqual(['Page', 'A listing', 'Editing'])
+    await user.click(screen.getByRole('button', { name: 'A listing' }))
+    await waitFor(() => expect(shown()).toBe('listing'))
+    await user.click(screen.getByRole('button', { name: 'Editing' }))
+    await waitFor(() => expect(shown()).toBe('adding'))
+  })
+
+  it('beside a field, shows where it is: an opened eruv and its Edit listing, not the list', async () => {
+    computer()
+    const user = userEvent.setup()
+    editor()
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: /^Hotline/ }))
+    expect(tabs()).toEqual(['A listing', 'Editing'])
+    await waitFor(() => expect(shown()).toBe('listing'))
+  })
+
+  // The user, Nov 9: "when I add more fields I don't see the fields
+  // existing showing up as options."
+  it('offers the fields other pages have that an eruv can hold', async () => {
+    const shuls: CategoryConfig = {
+      id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', icon: '', description: '', kind: 'listing',
+      detailFields: [
+        { key: 'denomination', label: 'Denomination', type: 'select', options: [{ value: 'Orthodox', label: 'Orthodox' }] },
+        { key: 'minyanim', label: 'Davening Times', type: 'minyanim' },
+      ],
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [{ community: 'philly', category: shuls }], eruvim: [] }))))
+    const user = userEvent.setup()
+    editor()
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    expect(await screen.findByRole('button', { name: /^Denomination/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Davening Times/ })).not.toBeInTheDocument()
+  })
 })

@@ -92,3 +92,24 @@ export function eruvPageOwnFields(pages: readonly CategoryConfig[]): CategoryFie
   const page = pages.find((c) => c.kind === 'eruv')
   return page ? ownEruvFields(withEruvFields(page).detailFields) : []
 }
+
+/** The eruv to show the page on, as a listing page shows its most filled-in
+ *  place (fullestListing): the one holding the most of the page's fields,
+ *  the first on ties. Null with none. */
+export function fullestEruv<E extends Pick<Eruv, 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'details'>>(eruvim: readonly E[], page: CategoryConfig): E | null {
+  const fields = withEruvFields(page).detailFields
+  const filled = (e: E) => {
+    const values = eruvValues(e)
+    return fields.filter((f) => {
+      const v = values[f.key]
+      return Array.isArray(v) ? v.length > 0 : typeof v === 'string' ? v.trim() !== '' : v === true || typeof v === 'number'
+    }).length
+  }
+  let best: E | null = null
+  let most = -1
+  for (const e of eruvim) {
+    const n = filled(e)
+    if (n > most) [best, most] = [e, n]
+  }
+  return best
+}

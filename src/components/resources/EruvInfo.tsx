@@ -14,6 +14,8 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { eruvView, localParts, type Eruv } from '@/lib/eruv'
+import { fullestEruv } from '@/lib/eruvFields'
+import { useCategories } from '@/lib/useCategories'
 import MobileSheet from './MobileSheet'
 import ListHeading from './ListHeading'
 import { useWide } from './CategoryMap'
@@ -59,6 +61,11 @@ type Props = {
   bandImageUrl?: string | null
   /** `?item=`: the eruv open. */
   itemId?: string | null
+  /** The admin preview's A listing and Editing tabs: the eruv holding the
+   *  most of the page's fields open, as a listing page's preview opens its
+   *  fullest place, and with Editing, on its Edit listing. */
+  openFullest?: boolean
+  startEditing?: boolean
   onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
@@ -67,7 +74,7 @@ const ERUV_STEP = 'eruv'
 /** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
 type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
-export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
+export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange, openFullest = false, startEditing = false }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -123,7 +130,8 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
 
   const now = clock === null ? null : new Date(clock)
   const ready = loaded?.available && now ? loaded : null
-  const open = ready?.eruvim.find((e) => e.id === openId) ?? null
+  const eruvPage = useCategories()?.find((c) => c.kind === 'eruv')
+  const open = ready?.eruvim.find((e) => e.id === openId) ?? (ready && openFullest && eruvPage ? fullestEruv(ready.eruvim, eruvPage) : null)
   const shabbosSide = ready && now ? [5, 6].includes(localParts(now, ready.timezone).weekday) : false
   const openIndex = ready && open ? ready.eruvim.indexOf(open) : -1
 
@@ -148,7 +156,10 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   }
   // Escape goes back, and ← → step, as on any opened listing; never from
   // inside a text field.
-  const column = !isMobile && !!open
+  // On a computer, an open eruv takes the list's place beside the map; on a
+  // phone it's a sheet, except in the admin preview's tabs, where it is the
+  // screen (as a listing page's preview shows its opened place).
+  const column = (!isMobile || openFullest) && !!open
   useEffect(() => {
     if (!column) return
     const onKey = (e: KeyboardEvent) => {
@@ -223,7 +234,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
         // people come here for.
         <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
           <div className="min-w-0 space-y-3.5">
-            {!mapBeside && !(wide && mapHidden) && mapped.length > 0 && eruvMap('h-[300px]')}
+            {!mapBeside && !(wide && mapHidden) && !(isMobile && column) && mapped.length > 0 && eruvMap('h-[300px]')}
             {column && open && (
               <section aria-label={open.name} data-testid="eruv-column">
                 {!editing && (
@@ -235,7 +246,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
                     onShowMap={wide && mapHidden ? () => setMapHidden(false) : undefined}
                   />
                 )}
-                <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} onEditingChange={setEditing} />
+                <EruvListing startEditing={startEditing} eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} onEditingChange={setEditing} />
               </section>
             )}
             {ready.eruvim.length > 0 && (
@@ -301,9 +312,9 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
         </div>
       )}
 
-      {ready && now && open && isMobile && (
+      {ready && now && open && isMobile && !column && (
         <MobileSheet isOpen onClose={closeEruv} title={open.name} titleHidden draggable>
-          <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
+          <EruvListing startEditing={startEditing} eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
         </MobileSheet>
       )}
     </CategoryBandFrame>
