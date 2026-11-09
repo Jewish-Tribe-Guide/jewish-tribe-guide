@@ -274,7 +274,9 @@ export function useCategorySaveWorkflow({
         // And for migration 061.
         ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList).length ? walkListFromKey(draft.walkList) : null }),
         // And for migration 066.
-        ...(!isNew && draft.listingParts !== toDraft(initial).listingParts && { listingParts: listingPartsToSave(draft.listingParts) }),
+        // The Eruv's, every time: a page never saved shows its four fields
+        // in their boxes (eruvFields.ts), which have to be saved together.
+        ...(!isNew && (initial!.kind === 'eruv' || draft.listingParts !== toDraft(initial).listingParts) && { listingParts: listingPartsToSave(draft.listingParts) }),
         // A new page's boxes, when it has any (a copy of Hospitals).
         ...(isNew && listingPartsToSave(draft.listingParts) && { listingParts: listingPartsToSave(draft.listingParts) }),
       }

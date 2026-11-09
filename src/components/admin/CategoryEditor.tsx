@@ -36,6 +36,7 @@ import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import { fieldFromRef, fieldRef, screenFromSearch, type EditorScreen } from '@/lib/editorScreenUrl'
 import { focusOn } from '@/lib/previewFocus'
 import { useScreenHistory } from './useScreenHistory'
@@ -97,6 +98,10 @@ function CategoryEditorScreen({
   onUndo,
 }: Props & { onUndo: () => void }) {
   const isNew = initial === null
+  // The Eruv's page (Nov 9): its fields and boxes, as every page's, and
+  // none of what a page of places has besides (Within a walk, Before it's
+  // opened, Questions). Its preview is the page alone.
+  const eruvPage = initial?.kind === 'eruv'
   const community = useCommunitySlug()
   const [previewing, setPreviewing] = useState(false)
   // Page, A listing or Adding, beside the settings and opened full size.
@@ -132,7 +137,21 @@ function CategoryEditorScreen({
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
   // count them here.
-  const countId = !wide && !isNew ? initial.id : null
+  const countId = !wide && !isNew && !eruvPage ? initial.id : null
+  // The Eruv's are eruvim, not listings: counted as Places counts them.
+  useEffect(() => {
+    if (!eruvPage) return
+    let cancelled = false
+    fetch(withCommunity('/api/admin/eruvim', community), { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        const body = await res.json()
+        if (!cancelled && res.ok && body.ok) setPlaceCount((body.eruvim as { active: boolean }[]).filter((e) => e.active).length)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [eruvPage, community, token])
   useEffect(() => {
     if (!countId) return
     let cancelled = false
@@ -357,7 +376,7 @@ function CategoryEditorScreen({
     iconImageUrl: draft.iconImageUrl.trim() || null,
     description: draft.description,
     detailFields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
-    kind: 'listing',
+    kind: initial?.kind ?? 'listing',
     hasAddress: draft.hasAddress,
     hasPhone: draft.hasPhone,
     upvotesEnabled: draft.upvotesEnabled,
@@ -377,11 +396,13 @@ function CategoryEditorScreen({
 
   // Page, A listing or Adding (boards 4 and 5): the page on a computer, the
   // other two as a phone shows them. No Adding where visitors can't add.
-  const views: { view: PreviewView; label: string }[] = [
-    { view: 'page', label: 'Page' },
-    { view: 'listing', label: 'A listing' },
-    ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
-  ]
+  const views: { view: PreviewView; label: string }[] = eruvPage
+    ? [{ view: 'page', label: 'Page' }]
+    : [
+        { view: 'page', label: 'Page' },
+        { view: 'listing', label: 'A listing' },
+        ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
+      ]
   const shownView = views.some((v) => v.view === previewView) ? previewView : 'page'
   const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
@@ -402,7 +423,7 @@ function CategoryEditorScreen({
       <CategoryPreview category={category} focusField={focus} view={shownView} onClose={() => void screens.back()} />
     ) : (
     <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
-      {(
+      {views.length > 1 && (
         <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
           {views.map((v) => (
             <button
@@ -426,7 +447,8 @@ function CategoryEditorScreen({
   // (boards 33c and 34, FieldLooks.tsx); the whole page one link away.
   const looksOf = (look: { category: CategoryConfig; focus?: string }, onShowOnRow?: (line: 'second' | 'third') => void) => {
     const f = look.category.detailFields.find((x) => x.key === look.focus)
-    if (previewing || !f) return previewOf(look.category, look.focus)
+    // An eruv isn't a made-up place to draw a field on: the page instead.
+    if (previewing || !f || eruvPage) return previewOf(look.category, look.focus)
     return (
       <FieldLooks
         category={look.category}
@@ -510,6 +532,7 @@ function CategoryEditorScreen({
         pageName={name}
         pageLabel={draft.label}
         page={{ hasAddress: draft.hasAddress, hasPhone: draft.hasPhone, fields: draft.fields }}
+        kind={eruvPage ? 'eruv' : 'listing'}
         screen={adding}
         onScreen={showAdding}
         onBack={() => void screens.back()}
@@ -749,6 +772,7 @@ function CategoryEditorScreen({
             }}
             onShowField={(key) => showField(fieldIndex(key))}
             onShowBasic={showField}
+            topLine={eruvPage ? 'The name and whether it’s up' : undefined}
           />
 
           <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
@@ -764,7 +788,7 @@ function CategoryEditorScreen({
             >
               + Add a box
             </button>
-            {draft.fields.some((f) => f.type === 'boolean') && (
+            {!eruvPage && draft.fields.some((f) => f.type === 'boolean') && (
               <button
                 type="button"
                 onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
@@ -778,7 +802,7 @@ function CategoryEditorScreen({
 
         {!isNew && draft.hasAddress && <WalkBox value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
 
-        <CardBox
+        {!eruvPage && <CardBox
           page={cardPage}
           sampleName={sampleName(draft.label, draft.pluralLabel)}
           open={openLine}
@@ -790,9 +814,9 @@ function CategoryEditorScreen({
             go({ line })
             window.scrollTo?.(0, 0)
           }}
-        />
+        />}
 
-        <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
+        {!eruvPage && <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
           <AdminYesNo question="Can visitors upvote places?" value={draft.upvotesEnabled} onChange={(yes) => set('upvotesEnabled', yes)} />
           <AdminYesNo question="A link for places not listed here?" value={draft.externalLinkEnabled} onChange={(yes) => set('externalLinkEnabled', yes)} />
           {draft.externalLinkEnabled && (
@@ -815,7 +839,7 @@ function CategoryEditorScreen({
               </AdminField>
             </div>
           )}
-        </AdminBox>
+        </AdminBox>}
 
         {isNew ? (
           <button type="button" onClick={leave} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
@@ -879,9 +903,8 @@ export function fieldsSummary(labels: string[]): string {
 }
 
 /** A page's Basics (board 4): its icon beside its name, each opening its
- *  settings in place, then the banner photo as a row. Also the Eruv page's
- *  (CategoryManager's SingletonEditor). */
-export function Basics({
+ *  settings in place, then the banner photo as a row. */
+function Basics({
   name,
   onName,
   icon,

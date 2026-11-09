@@ -7,7 +7,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // emails render the identical before/after — see that file's own note.
 import { diffLines, diffListing, flatListing, isMultiline } from '@/lib/submissionDiff'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
-import { ERUV_SUGGESTION_FIELDS, eruvChanges, type EruvSuggestion } from '@/lib/eruvSuggestion'
+import { ERUV_SUGGESTION_FIELDS, eruvChanges, ownWords, type EruvSuggestion } from '@/lib/eruvSuggestion'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
 // buttons) and the read-only history view (approved/rejected, past tense)
@@ -290,11 +290,19 @@ function ProposedDetails({ src, fields }: { src: ResourceSubmission; fields?: Ca
  *  replaced, and the rest as they are. */
 function EruvDiff({ current, proposed }: { current: EnrichedSubmission['currentEruv']; proposed: Partial<EruvSuggestion> }) {
   const changed = new Set(eruvChanges(current ?? null, proposed).map((c) => c.key))
+  // The four rows, then the page's own fields it names (eruvFields.ts).
+  const rows = [
+    ...ERUV_SUGGESTION_FIELDS.map(({ key, label }) => ({ key, label, before: current?.[key] || '—', after: proposed[key] || '—' })),
+    ...(proposed.detailFields ?? []).map((f) => ({
+      key: f.key,
+      label: f.label,
+      before: ownWords(f, current?.details?.[f.key]) || '—',
+      after: ownWords(f, proposed.details?.[f.key]) || '—',
+    })),
+  ]
   return (
     <dl className="text-xs space-y-0.5" data-testid="eruv-diff">
-      {ERUV_SUGGESTION_FIELDS.map(({ key, label }) => {
-        const before = current?.[key] || '—'
-        const after = proposed[key] || '—'
+      {rows.map(({ key, label, before, after }) => {
         return (
           <div key={key} className="flex gap-2">
             <dt className="text-muted w-28 shrink-0">{label}</dt>

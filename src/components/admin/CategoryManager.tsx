@@ -9,23 +9,12 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { adminBase } from '@/lib/adminNav'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { MapFoldIcon } from '@/components/icons'
-import { Basics, CategoryEditor } from './CategoryEditor'
+import { CategoryEditor } from './CategoryEditor'
 import NewPagePicker from './NewPagePicker'
 import { useReadyMade } from './useReadyMade'
 import { pageToCopy } from '@/lib/readyMade'
-import CategoryPreview from './CategoryPreview'
-import DeletePage from './DeletePage'
-import { CardBandImageField, IconField } from './CategoryFormFields'
-import { AdminBack, AdminBox, AdminEmpty, AdminPreviewButton, AdminRow, AdminSwitch } from './AdminUI'
-import CategoryIcon from '@/components/CategoryIcon'
-import { PreviewBeside } from './SitePreview'
-import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
-import { useIsDesktop } from '@/lib/useIsMobile'
-import { getCategoryColor } from '@/lib/categoryColor'
-import { DEFAULT_CATEGORY_ICON, bandImageFor } from '@/lib/categories'
-import Link from 'next/link'
-import { useScreenHistory } from './useScreenHistory'
-import { screenFromSearch } from '@/lib/editorScreenUrl'
+import { AdminBack, AdminBox, AdminEmpty, AdminRow, AdminSwitch } from './AdminUI'
+import { withEruvFields } from '@/lib/eruvFields'
 import { LISTED_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
 
 // ── The categories manager: Site's Category pages tab (the Category pages
@@ -175,6 +164,30 @@ export default function CategoryManager({
     }} onCancel={() => onOpenEditor(`${CAT_PREFIX}new`)} />
   }
 
+  // A page with fields: a page of places, or the Eruv's (Nov 9: its fields
+  // and boxes, as every page's; eruvFields.ts).
+  const editorFor = (initial: CategoryConfig) => (
+    <CategoryEditor
+      // Saved: start again from what's now saved, staying on the screen.
+      key={`${initial.id}:${savedRound}`}
+      token={token}
+      initial={withEruvFields(initial)}
+      siblings={categories}
+      justSaved={justSaved === initial.id}
+      onSaved={async (savedId) => {
+        await load()
+        setJustSaved(savedId)
+        setSavedRound((r) => r + 1)
+        if (savedId !== initial.id) {
+          savedHandOff = savedId
+          onOpenEditor(`${CAT_PREFIX}${savedId}`)
+        }
+      }}
+      onCancel={onCloseEditor}
+      onDeleted={deleted}
+    />
+  )
+
   // Candle Lighting, and an Eruv with no row yet: the page's own switch and
   // nothing else (neither has anything to change, Nov 3). The Map's old
   // address is the list: it has no page (board 1).
@@ -183,10 +196,8 @@ export default function CategoryManager({
     const screen = listedScreen
     if (!categories) return <p className="text-sm text-muted">Loading…</p>
     const st = screenState(categories, screen)
-    // The Eruv has its name, icon and photo to keep once it has a row.
-    if (screen.kind === 'eruv' && st.row) {
-      return <SingletonEditor token={token} category={st.row} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
-    }
+    // The Eruv, once it has a row, is a page with fields.
+    if (screen.kind === 'eruv' && st.row) return editorFor(st.row)
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: 'Category pages', onClick: onCloseEditor }} title={st.row?.pluralLabel ?? screen.label} />
@@ -204,9 +215,7 @@ export default function CategoryManager({
     // An old address of the Eruv or Candle Lighting (the Map's is the list).
     if (initial.kind !== 'listing') {
       const screen = LISTED_SCREENS.find((sc) => sc.kind === initial.kind)
-      if (screen?.kind === 'eruv') {
-        return <SingletonEditor token={token} category={initial} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
-      }
+      if (screen?.kind === 'eruv') return editorFor(initial)
       return (
         <div className="flex flex-col gap-4">
           <AdminBack back={{ label: 'Category pages', onClick: onCloseEditor }} title={initial.pluralLabel} />
@@ -214,27 +223,7 @@ export default function CategoryManager({
         </div>
       )
     }
-    return (
-      <CategoryEditor
-        // Saved: start again from what's now saved, staying on the screen.
-        key={`${initial.id}:${savedRound}`}
-        token={token}
-        initial={initial}
-        siblings={categories}
-        justSaved={justSaved === initial.id}
-        onSaved={async (savedId) => {
-          await load()
-          setJustSaved(savedId)
-          setSavedRound((r) => r + 1)
-          if (savedId !== initial.id) {
-            savedHandOff = savedId
-            onOpenEditor(`${CAT_PREFIX}${savedId}`)
-          }
-        }}
-        onCancel={onCloseEditor}
-        onDeleted={deleted}
-      />
-    )
+    return editorFor(initial)
   }
 
   return (
@@ -296,7 +285,7 @@ function NewPageEditor({
   const community = useCommunitySlug()
   const { pages, error } = useReadyMade(token, community)
   const own = from === OWN_PAGE
-  const source = own ? null : (pages?.filter((p) => p.category.id === from).sort((a, b) => Number(b.community === community) - Number(a.community === community))[0]?.category ?? null)
+  const source = own ? null : (pages?.filter((p) => p.category.kind === 'listing' && p.category.id === from).sort((a, b) => Number(b.community === community) - Number(a.community === community))[0]?.category ?? null)
   if (!own && !source) {
     if (error) return <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
     return <p className="text-sm text-muted">{pages ? 'No ready-made page here.' : 'Loading…'}</p>
@@ -304,20 +293,13 @@ function NewPageEditor({
   return <CategoryEditor token={token} initial={null} seed={source && pageToCopy(source)} siblings={categories} onSaved={onSaved} onCancel={onCancel} backLabel="What kind of places?" />
 }
 
-/** A page's "On the site" switch, laid out as a category page's (board
- *  21b): on a phone, a box with "On the site" over its count and the switch
- *  on the right; on a computer, the count, then the switch and its words. */
-function OnTheSite({ on, onChange, places }: { on: boolean; onChange: (on: boolean) => void; places?: { count: number; href: string } }) {
+/** A page's "On the site" switch (Candle Lighting, an Eruv with no row
+ *  yet), laid out as a category page's (board 21b): on a phone, a box with
+ *  the switch on the right; on a computer, the switch and its words. */
+function OnTheSite({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
     <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
-      <span className="flex-1 min-w-0 flex flex-col gap-px">
-        <span aria-hidden="true" className="md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
-        {places && (
-          <Link href={places.href} className="self-start text-[13px] text-slate-600 md:text-sm md:font-semibold md:text-primary hover:underline">
-            {places.count} {places.count === 1 ? 'place' : 'places'}
-          </Link>
-        )}
-      </span>
+      <span aria-hidden="true" className="flex-1 min-w-0 md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
       <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
         <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
         <AdminSwitch checked={on} onChange={onChange} label="On the site" />
@@ -326,226 +308,5 @@ function OnTheSite({ on, onChange, places }: { on: boolean; onChange: (on: boole
   )
 }
 
-// The Eruv's page (and an old link to the Map's or Candle Lighting's): no
-// fields to change, since it's a fixed, code-driven screen, just its name,
-// icon and banner photo. Laid out as every category page is (Nov 9, the
-// user: "the same formatting as other category pages"): On the site with its
-// count, Basics, the page beside on a computer and Preview on a phone, the
-// save bar at the bottom, and Delete. The Eruv's eruvim are in Places, like
-// any listing (Nov 9: this page held a second, older editor for them until
-// then); its count opens them there, as a category page's does.
-export function SingletonEditor({
-  token,
-  category,
-  onSaved,
-  onCancel,
-  onToggleActive,
-  onDeleted,
-}: {
-  token: string
-  category: CategoryConfig
-  onSaved: () => void
-  onCancel: () => void
-  /** The page's "On the site" switch, saved at once. */
-  onToggleActive?: (on: boolean) => void
-  onDeleted?: () => void
-}) {
-  const community = useCommunitySlug()
-  const saved = useMemo(
-    () => ({
-      name: category.pluralLabel,
-      icon: category.icon || '',
-      iconImageUrl: category.iconImageUrl ?? '',
-      cardImageUrl: category.cardImageUrl ?? '',
-      cardBandImageUrl: category.cardBandImageUrl ?? '',
-    }),
-    [category],
-  )
-  const [draft, setDraft] = useState(saved)
-  const set = <K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) => {
-    setDraft((d) => ({ ...d, [k]: v }))
-    setJustSaved(false)
-  }
-  const [bannerOriginal, setBannerOriginal] = useState<File | string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [justSaved, setJustSaved] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
-  const changes = (Object.keys(draft) as (keyof typeof draft)[]).filter((k) => draft[k].trim() !== saved[k].trim()).length
-  useLeaveGuard(changes > 0)
-  const wide = useIsDesktop('(max-width: 1023px)')
-
-  // The preview full size is in the address (`?preview=1`, editorScreenUrl.ts),
-  // written through Next's router: until Nov 9 it was a history.pushState
-  // entry, which after a reload drew nothing on Back (AGENTS.md).
-  const previewSupported = category.kind === 'eruv'
-  const screens = useScreenHistory()
-  const [previewing, setPreviewing] = useState(() => previewSupported && typeof window !== 'undefined' && !!screenFromSearch(window.location.search).preview)
-
-  useEffect(() => {
-    if (!previewSupported) return
-    function onPopState() {
-      setPreviewing(!!screenFromSearch(window.location.search).preview)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [previewSupported])
-
-  function openPreview() {
-    setPreviewing(true)
-    void screens.push({ preview: true })
-  }
-
-  function closePreview() {
-    setPreviewing(false)
-    void screens.back()
-  }
-
-  // How many eruvim it has, for the On the site row's link to them in Places.
-  const [eruvCount, setEruvCount] = useState<number | null>(null)
-  useEffect(() => {
-    if (category.kind !== 'eruv') return
-    let live = true
-    fetchJson<{ eruvim?: { active: boolean }[] }>(withCommunity('/api/admin/eruvim', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the eruvim.')
-      .then((d) => live && setEruvCount(d.eruvim?.filter((e) => e.active).length ?? 0))
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-  }, [category.kind, community, token])
-
-  const previewCategory: CategoryConfig = {
-    ...category,
-    label: draft.name.trim() || category.label,
-    pluralLabel: draft.name.trim() || category.pluralLabel,
-    icon: draft.icon.trim() || category.icon,
-    iconImageUrl: draft.iconImageUrl.trim() || null,
-    cardImageUrl: draft.cardImageUrl.trim() || null,
-    cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
-  }
-
-  if (previewing) return <CategoryPreview category={previewCategory} onClose={closePreview} />
-
-  function leave() {
-    if (changes > 0 && !window.confirm(LEAVE_QUESTION)) return
-    onCancel()
-  }
-
-  async function save() {
-    setErrors([])
-    if (!draft.name.trim()) {
-      setErrors(['Name is required.'])
-      return
-    }
-    setSaving(true)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/categories/${category.id}`, community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            label: draft.name.trim(),
-            pluralLabel: draft.name.trim(),
-            icon: draft.icon,
-            iconImageUrl: draft.iconImageUrl.trim() || null,
-            cardImageUrl: draft.cardImageUrl.trim() || null,
-            cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
-          }),
-        },
-        'Save failed.',
-      )
-      setJustSaved(true)
-      onSaved()
-    } catch (err) {
-      setErrors([err instanceof Error ? err.message : 'Save failed.'])
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const banner = bandImageFor(previewCategory)
-  const name = draft.name.trim() || category.pluralLabel
-
-  return (
-    <div>
-      <div className="flex gap-6 items-start">
-        <div className="flex-1 min-w-0 flex flex-col gap-4">
-          <AdminBack back={{ label: 'Category pages', onClick: leave }} title={name} />
-          {/* On a phone the page beside has no room: Preview opens it full
-              size (board 21b). */}
-          {previewSupported && !wide && <AdminPreviewButton onClick={openPreview} />}
-          {onToggleActive && (
-            <OnTheSite
-              on={category.active !== false}
-              onChange={onToggleActive}
-              places={eruvCount !== null ? { count: eruvCount, href: `${adminBase(community)}/places?category=${encodeURIComponent(category.id)}` } : undefined}
-            />
-          )}
-
-          <AdminBox title="Basics" foldOnPhone summary={`${name} · ${banner ? 'Banner photo' : 'No banner photo'}`}>
-            <Basics
-              name={draft.name}
-              onName={(v) => set('name', v)}
-              icon={
-                <CategoryIcon
-                  icon={draft.icon || DEFAULT_CATEGORY_ICON}
-                  categoryId={category.id}
-                  iconImageUrl={draft.iconImageUrl.trim() || undefined}
-                  color={getCategoryColor([category], category.id)}
-                  className="h-11 w-11 text-2xl"
-                  sizePx={44}
-                />
-              }
-              iconFields={<IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />}
-              banner={banner}
-              bannerFields={
-                <CardBandImageField
-                  cardBandImageUrl={draft.cardBandImageUrl}
-                  cardImageUrl={draft.cardImageUrl}
-                  onChange={(band, card) => {
-                    set('cardBandImageUrl', band)
-                    set('cardImageUrl', card)
-                  }}
-                  token={token}
-                  originalSource={bannerOriginal}
-                  onOriginalSourceChange={setBannerOriginal}
-                />
-              }
-            />
-          </AdminBox>
-
-          {onDeleted && <DeletePage token={token} category={category} onDeleted={onDeleted} />}
-
-          {errors.length > 0 && (
-            <ul className="bg-red-50 border border-red-200 rounded-[10px] p-3 text-sm text-red-700 list-disc list-inside space-y-0.5">
-              {errors.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-        {/* The page beside, on a computer only, as a category page has it. */}
-        {previewSupported && wide && (
-          <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
-            <PreviewBeside onOpen={openPreview} device="computer" shownWidth={340}>
-              {() => <CategoryPreview inline view="page" category={previewCategory} onClose={() => {}} />}
-            </PreviewBeside>
-          </aside>
-        )}
-      </div>
-
-      <SaveBar
-        changes={changes}
-        saving={saving}
-        saved={justSaved && changes === 0}
-        onUndo={() => {
-          setDraft(saved)
-          setErrors([])
-        }}
-        onSave={() => void save()}
-      />
-    </div>
-  )
-}
 
 

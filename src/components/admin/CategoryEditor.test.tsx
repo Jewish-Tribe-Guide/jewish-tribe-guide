@@ -5,11 +5,12 @@ import userEvent from '@testing-library/user-event'
 import { CategoryEditor } from './CategoryEditor'
 import { forgetReadyMade } from './useReadyMade'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { historyRouter } from '@/test/nextNavigationMock'
+import { historyRouter, mockRouter } from '@/test/nextNavigationMock'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { fetchJson } from '@/lib/fetchJson'
 import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { kosherQuestions } from '@/lib/kosherQuestions'
+import { withEruvFields } from '@/lib/eruvFields'
 
 // This component is ~1000 lines doing template application, field-schema
 // editing, and two separate destructive-change confirmation workflows
@@ -1318,5 +1319,87 @@ describe('CategoryEditor — the screen is in the address', () => {
     open('?field=kosher&remove=1')
     expect(await screen.findByRole('heading', { name: 'Remove Kosher certification from Groceries?' })).toBeInTheDocument()
     expect(screen.getByText('12 places').parentElement).toHaveTextContent('12 places lose their answer')
+  })
+})
+
+// Nov 9, the user: "keep what we have but just have it on that category
+// page that way someone can change it if they want." The Eruv page has
+// Fields like every page (eruvFields.ts), and nothing it doesn't have:
+// no Questions, no card, no audiences. Its places are eruvim, counted as
+// Places counts them. (Until Nov 9 these were SingletonEditor's tests.)
+describe('CategoryEditor — the Eruv page', () => {
+  const page = withEruvFields({ id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv' })
+  const payload = () =>
+    vi.mocked(fetchJson)
+      .mock.calls.map(([, init]) => JSON.parse(String((init as { body?: string } | undefined)?.body ?? '{}')))
+      .filter((b) => 'fields' in b && Array.isArray(b.fields))
+      .at(-1)
+  const editor = (initial: CategoryConfig = page, onSaved = vi.fn()) =>
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={[initial]} onSaved={onSaved} onCancel={vi.fn()} />)
+
+  beforeEach(() => {
+    forgetReadyMade()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        new Response(JSON.stringify(String(url).includes('/api/admin/eruvim') ? { ok: true, eruvim: [{ id: 'a', active: true }, { id: 'b', active: false }] } : { ok: true, pages: [] })),
+      ),
+    )
+  })
+
+  it('has the four rows an eruv always had, in their boxes, and nothing a page of places has', () => {
+    editor()
+    expect(screen.getByRole('button', { name: 'Top' })).toHaveAccessibleDescription('The name and whether it’s up')
+    expect(screen.getByRole('button', { name: 'Where it goes' })).toHaveAccessibleDescription('Where it goes')
+    expect(screen.getByRole('button', { name: 'Contact' })).toHaveAccessibleDescription('Website, Hotline, Email alerts')
+    expect(screen.queryByText(/Photo/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Questions|Before it’s opened|Within a walk/ })).not.toBeInTheDocument()
+  })
+
+  it('counts the eruvim on the site, opening them in Places', async () => {
+    editor()
+    const link = await screen.findByRole('link', { name: '1 place' })
+    expect(link.getAttribute('href')).toMatch(/\/admin\/places\?category=eruv-information$/)
+  })
+
+  it('on a phone, its preview is an address written through the router', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }))
+    const user = userEvent.setup()
+    editor()
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(/[?&]preview=1/), expect.anything()))
+  })
+
+  // A page never saved shows the defaults: its first save, of anything,
+  // keeps them, Where it goes in its own box included.
+  it('its first save keeps the four rows and their boxes', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(page, onSaved)
+    await user.type(screen.getByLabelText('Name'), ' guide')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const sent = payload()
+    expect(sent.fields.map((f: CategoryField) => f.key)).toEqual(['covers', 'website', 'hotline', 'alertsUrl'])
+    expect(sent.listingParts).toEqual({ boxes: [{ title: 'Where it goes', fields: ['covers'] }] })
+  })
+
+  it('makes a field of its own, of a kind an eruv takes', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(page, onSaved)
+    await openBox(user, 'Contact')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await user.type(await screen.findByRole('searchbox', { name: 'Search fields' }), 'Certified by')
+    await user.click(screen.getByRole('button', { name: 'Make your own: Certified by' }))
+    expect(screen.getByRole('button', { name: /^Choices/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^A list of items/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Text/ }))
+    await screen.findByRole('heading', { name: /^Certified by/ })
+    history.back()
+    await screen.findByRole('heading', { name: 'Eruv' })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(payload().fields.map((f: CategoryField) => f.key)).toEqual(['covers', 'website', 'hotline', 'alertsUrl', 'certified_by'])
   })
 })

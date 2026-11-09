@@ -127,12 +127,17 @@ export function toDraft(c: CategoryConfig | null): Draft {
   // real field its position is never a deliberate admin choice to respect,
   // only ever this checkbox's own placement rule (photoInsertIndex). This
   // also self-heals categories saved before that rule existed.
+  //
+  // Not the Eruv page's (Nov 9): an eruv has no photo, and its fields are
+  // what an eruv holds (eruvFields.ts).
   const existingPhotoIndex = fields.findIndex((f) => f.type === 'image')
-  const photoField =
-    existingPhotoIndex === -1
-      ? { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image' as FieldType, renderAs: 'row' as const }
-      : fields.splice(existingPhotoIndex, 1)[0]!
-  fields.splice(photoInsertIndex(fields), 0, photoField)
+  if (c?.kind !== 'eruv') {
+    const photoField =
+      existingPhotoIndex === -1
+        ? { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image' as FieldType, renderAs: 'row' as const }
+        : fields.splice(existingPhotoIndex, 1)[0]!
+    fields.splice(photoInsertIndex(fields), 0, photoField)
+  }
   return {
     id: c?.id ?? '',
     label: c?.label ?? '',

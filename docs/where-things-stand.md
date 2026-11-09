@@ -50,9 +50,10 @@ moved there Oct 22), which Places had repeated since Nov 1.
   site with "5 places" (opening them in Places), Basics as icon + name +
   banner row (folded on a phone), the page beside it on a computer and
   Preview on a phone, the save bar (Undo · Save) at the bottom instead of its
-  own Save/Cancel/Preview buttons, and Delete. It has no Fields, so no
-  Page / A listing / Adding tabs. Its Preview has an address (`?preview=1`)
-  through Next's router; it was a `history.pushState` entry before.
+  own Save/Cancel/Preview buttons, and Delete. Its Fields came later the
+  same day (next section); its preview is the Page tab only. Its Preview
+  has an address (`?preview=1`) through Next's router; it was a
+  `history.pushState` entry before.
 - **Places → an eruv → Map** holds what only an eruv has: its map drawn
   small, "Parts shown" (ticked is shown; marker names only while its markers
   show) and "Its markers". Saved with Update the listing.
@@ -71,6 +72,44 @@ moved there Oct 22), which Places had repeated since Nov 1.
   border lines, Elkins Park its driving directions; Elkins Park and
   Northeast hide their markers (shuls), Lower Merion shows its crossings and
   reroutes.
+
+## Done Nov 9: the Eruv page has Fields and boxes
+
+The user, Nov 9: "keep what we have but just have it on that category page
+that way someone can change it if they want. And an admin starting a new
+community can add or change things as they apply. I don't think we need to
+invent any questions or other things." (`src/lib/eruvFields.ts`)
+
+- **Admin → Category pages → Eruv → Fields** starts with the four rows an
+  eruv always had: Where it goes in its own box, then Website, Hotline and
+  Email alerts in Contact. Top reads "The name and whether it's up": the
+  name and status always come first and can't be moved or removed. The four
+  are ready-made (name locked), so they can be taken off, moved, or put
+  back from + Add a field. Nothing visible changes until an admin does.
+- **+ Add a field** offers those four, and fields other communities made on
+  their Eruv pages; Make your own takes Choices, Yes or no, Text and Link.
+  No basics (address, hours…). A field made there is kept on each eruv in a
+  new `details` column (migration 094).
+- **An admin's field is filled in** in Places (a row of its own after
+  Website, saved with Update the listing) and by anyone through Suggest an
+  edit, which goes to the queue; the queue and the admin email show it
+  before and after, named as the page named it when it was sent. Use this
+  takes it only when it's ticked.
+- **The opened eruv** follows the page: its boxes, a field taken off the
+  page isn't shown or offered in Suggest an edit, and a field set to show
+  in the header goes after "Eruv" under the name. The Eruv page's list of
+  eruvs is unchanged.
+- **Not added, on purpose:** Questions, Within a walk, Before it's opened
+  and audiences; an eruv has none today.
+- Found on the way: the editor added a Photo field to every page it opened,
+  the Eruv page included, which would have put a photo picker into eruv
+  Suggest an edit. The Eruv page no longer gets one.
+- Known edge: an Eruv page with every field and box taken off shows the
+  four rows again (there's no way to tell it from a page never saved).
+- **Migration 094 (`eruv.details`) isn't run anywhere yet.** Until it is,
+  everything works except saving a value for an admin's own field (the save
+  says the column is missing). Run it on dev in Supabase's SQL editor; live
+  needs a yes (see "Waiting for a yes").
 
 The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
@@ -159,6 +198,11 @@ for that exact change, in the same conversation. Show the dry run first.
    looking the id up and showing it.
 1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
    after PR 373 deployed: live's table has every column, no rows yet).
+
+1l. **Migration 094 (`eruv.details`, Nov 9):** not run on live (nor dev
+    yet). One `add column if not exists`; nothing is read from it until an
+    admin makes a field on the Eruv page, so it can go any time after the
+    branch deploys. Needs a yes.
 
 ## For the user or the community
 

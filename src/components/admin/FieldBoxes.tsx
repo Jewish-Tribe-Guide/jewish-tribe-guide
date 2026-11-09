@@ -33,6 +33,7 @@ export default function FieldBoxes({
   onAddField,
   onShowField,
   onShowBasic,
+  topLine = 'Just the name',
 }: {
   page: FieldPage
   boxes: FieldBox[]
@@ -49,6 +50,8 @@ export default function FieldBoxes({
   onAddField: (boxId: string) => void
   onShowField: (key: string) => void
   onShowBasic: (basic: 'address' | 'phone') => void
+  /** What Top says with no fields in it: an eruv's has its status too. */
+  topLine?: string
 }) {
   const items = fieldItems(boxes, openId)
   const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
@@ -100,7 +103,7 @@ export default function FieldBoxes({
             <OrderRow
               row={box.moves ? row : still(row)}
               name={box.title || 'New box'}
-              line={boxLine(box, page) || (box.id === 'top' ? 'Just the name' : undefined)}
+              line={boxLine(box, page) || (box.id === 'top' ? topLine : undefined)}
               open={open}
               onToggle={() => onOpen(open ? null : box.id)}
               rename={renames ? { ...boxName(page, box), onChange: (t) => onRename(box.id, t), fresh: box.id === freshId } : undefined}

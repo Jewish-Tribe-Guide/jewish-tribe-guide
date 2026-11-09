@@ -1,5 +1,6 @@
 import type { EruvEdit } from './eruvStore'
 import { senderEmail } from './eruvEmail'
+import { readEruvDetails } from './eruvFields'
 
 // What an admin may set on an eruv, checked: text trimmed and kept short,
 // addresses that are web addresses. Anything else in the body is ignored
@@ -53,6 +54,11 @@ export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok:
   if ('lineLeaveOut' in r) {
     if (!Array.isArray(r.lineLeaveOut)) return { ok: false, error: 'Leave out must be a list.' }
     edit.lineLeaveOut = [...new Set(r.lineLeaveOut.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean))].slice(0, 50)
+  }
+  if ('details' in r) {
+    const details = readEruvDetails(r.details)
+    if (!details) return { ok: false, error: 'Its own fields must be a list of values.' }
+    edit.details = details
   }
   return { ok: true, edit }
 }

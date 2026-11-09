@@ -10,6 +10,11 @@ describe('readEruvEdit', () => {
       edit: { name: 'Lower Merion Eruv', covers: null, website: 'https://lowermerioneruv.org/', statusDated: true, lineLeaveOut: ['Fall 2025 Reroute Alert'] },
     })
   })
+  // Nov 9: what it keeps for the Eruv page's own fields (eruvFields.ts).
+  it('the page’s own fields, as an eruv keeps them; never an object’s worth of anything', () => {
+    expect(readEruvEdit({ details: { certifiedBy: ' Rabbi A ', covers: 'not here', empty: '' } })).toEqual({ ok: true, edit: { details: { certifiedBy: 'Rabbi A' } } })
+    expect(readEruvEdit({ details: 'Rabbi A' })).toMatchObject({ ok: false })
+  })
   it('refuses what isn’t one', () => {
     expect(readEruvEdit({ name: '' })).toEqual({ ok: false, error: 'The eruv needs a name.' })
     expect(readEruvEdit({ statusUrl: 'not a site' })).toMatchObject({ ok: false })

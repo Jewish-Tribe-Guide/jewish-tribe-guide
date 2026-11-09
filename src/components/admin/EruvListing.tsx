@@ -24,6 +24,9 @@ import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
 import EruvMapPreview from './EruvMapPreview'
 import { partNames } from '@/lib/eruvLine'
+import { ownEruvFields, readEruvDetails, withEruvFields } from '@/lib/eruvFields'
+import { ownWords } from '@/lib/eruvSuggestion'
+import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 
 // An eruv as Places opens it (boards PlacesEruv4, EruvListing6, EruvStatus5,
 // Nov 1), the same rows as any listing: each names the job that keeps it, and
@@ -32,14 +35,17 @@ import { partNames } from '@/lib/eruvLine'
 // here from the Eruv page on Nov 9, when that page stopped listing eruvim).
 // Its line colour is no longer an admin's: a too-pale one is darkened by
 // itself (eruvLine.ts).
+//
+// After them, a row for each field an admin made on the Eruv page (Nov 9,
+// eruvFields.ts), kept in the eruv's `details`.
 
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
 
 type Draft = { name: string; covers: string; hotline: string; alertsUrl: string; website: string }
-type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website'
+type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website' | `own-${string}`
 /** Which of a source line's controls opened a screen over its row. */
 type Which = 'change' | 'start' | 'add'
-type AddEruvRow = RowId
+type AddEruvRow = Exclude<RowId, `own-${string}`>
 const WHERE_ITS_MAP = 'Where its map is'
 const draftOf = (e: AdminEruv): Draft => ({ name: e.name, covers: e.covers ?? '', hotline: e.hotline ?? '', alertsUrl: e.alertsUrl ?? '', website: e.website ?? '' })
 
@@ -68,6 +74,7 @@ export default function EruvListing({
 }) {
   const community = useCommunitySlug()
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
+  const [details, setDetails] = useState<Record<string, unknown>>(() => ({ ...eruv.details }))
   const [leaveOut, setLeaveOut] = useState<string[]>(eruv.lineLeaveOut)
   const [hideMarks, setHideMarks] = useState(eruv.lineHidePoints)
   const [openRow, setOpenRow] = useState<RowId | null>(null)
@@ -121,14 +128,24 @@ export default function EruvListing({
     ...(!sameNames(leaveOut, eruv.lineLeaveOut) && { lineLeaveOut: leaveOut }),
     ...(hideMarks !== eruv.lineHidePoints && { lineHidePoints: hideMarks }),
   }
-  const changes = [...textChanges, ...Object.keys(mapChanges)]
+  // The Eruv page's own fields, each as it would be saved.
+  const own = category ? ownEruvFields(withEruvFields(category).detailFields) : []
+  const kept = (key: string) => readEruvDetails({ [key]: details[key] })?.[key] ?? null
+  const ownChanges = own.filter((f) => ownWords(f, eruv.details?.[f.key]) !== ownWords(f, kept(f.key))).map((f) => `own-${f.key}` as const)
+  const changes = [...textChanges, ...Object.keys(mapChanges), ...ownChanges]
   const changedRow = (id: RowId) => (id === 'name' ? changes.includes('name') || changes.includes('covers') : id === 'map' ? Object.keys(mapChanges).length > 0 : (changes as string[]).includes(id))
 
   async function update() {
     setBusy(true)
     setError(null)
     try {
-      await save({ ...Object.fromEntries(textChanges.map((k) => [k, draft[k].trim()])), ...mapChanges })
+      const nextDetails = { ...eruv.details }
+      for (const f of own) {
+        const v = kept(f.key)
+        if (v === null) delete nextDetails[f.key]
+        else nextDetails[f.key] = v
+      }
+      await save({ ...Object.fromEntries(textChanges.map((k) => [k, draft[k].trim()])), ...mapChanges, ...(ownChanges.length > 0 && { details: nextDetails }) })
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save that.')
@@ -285,6 +302,13 @@ export default function EruvListing({
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim() || 'None', source: sources.details, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() ? shortUrl(draft.alertsUrl.trim()) : 'None', source: sources.details, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() ? shortUrl(draft.website.trim()) : 'None', source: sources.website, body: input('website', 'Website') },
+    ...own.map((f) => ({
+      id: `own-${f.key}` as const,
+      title: f.label,
+      summary: ownWords(f, kept(f.key)) || 'None',
+      source: null,
+      body: <DetailFieldInput field={f} labelHidden value={details[f.key]} onChange={(v) => setDetails({ ...details, [f.key]: v })} />,
+    })),
   ]
 
   if (screenAsked) {

@@ -20,6 +20,7 @@ import { rebaseSection } from './hoursSections'
 import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import { eruvAsDecided, type EruvSuggestion } from './eruvSuggestion'
+import { eruvPageOwnFields } from './eruvFields'
 import { keepOnly } from './watchFindings'
 import { editedFields, onListingNow } from './editedFields'
 import { approvingPart, leavingPart, reviewParts } from './reviewParts'
@@ -95,7 +96,7 @@ export async function listSubmissionsByStatus(
   return submissions.map((s) => {
     if (s.target_type === 'eruv') {
       const e = eruvById.get((s.payload as Partial<EruvSuggestion>).eruvId ?? '')
-      return { ...s, current: null, categoryLabel: categoryLabel(s, null), currentEruv: e ? { name: e.name, covers: e.covers, website: e.website, hotline: e.hotline, alertsUrl: e.alertsUrl } : null }
+      return { ...s, current: null, categoryLabel: categoryLabel(s, null), currentEruv: e ? { name: e.name, covers: e.covers, website: e.website, hotline: e.hotline, alertsUrl: e.alertsUrl, ...(e.details && { details: e.details }) } : null }
     }
     const current = s.target_id ? byId.get(s.target_id) ?? null : null
     // A pending edit as approving it would go on the listing now: only its
@@ -399,7 +400,8 @@ export async function approveSubmission(
     const sent = submission.payload as unknown as EruvSuggestion
     const eruv = (await listEruvimForAdmin(submission.community_id)).eruvim.find((e) => e.id === sent.eruvId)
     if (!eruv) throw new ReviewEditError('The eruv this changes couldn’t be found.')
-    const next = eruvAsDecided(sent, eruv, { edited, only })
+    const own = edited !== undefined ? eruvPageOwnFields(await listCategories(submission.community_id)) : []
+    const next = eruvAsDecided(sent, eruv, { edited, only, own })
     if (!next.ok) throw new ReviewEditError(next.errors.join(' '))
     savedPayload = next.suggestion as unknown as Record<string, unknown>
     submission.payload = savedPayload
@@ -581,14 +583,25 @@ export async function decidePart(
   return { whole: false, submission: data as SubmissionRow }
 }
 
-/** An approved eruv suggestion: its four rows, as suggested, on the eruv.
- *  Its name, status page and map are untouched. */
+/** An approved eruv suggestion: its four rows, as suggested, on the eruv,
+ *  and the page's own fields it names. Its name, status page and map, and
+ *  any own field it doesn't name, are untouched. */
 async function applyEruv(submission: SubmissionRow): Promise<void> {
   const s = submission.payload as Partial<EruvSuggestion>
   const id = s.eruvId ?? ''
   const eruv = (await listEruvimForAdmin(submission.community_id)).eruvim.find((e) => e.id === id)
   if (!eruv) throw new Error(`Eruv not found: ${id}`)
-  await updateEruv(submission.community_id, id, { covers: s.covers ?? null, website: s.website ?? null, hotline: s.hotline ?? null, alertsUrl: s.alertsUrl ?? null }, { statusUrl: eruv.statusUrl, lineUrl: eruv.lineUrl })
+  const details = s.details ? { ...(eruv.details ?? {}) } : null
+  for (const [k, v] of Object.entries(s.details ?? {})) {
+    if (v === null) delete details![k]
+    else details![k] = v
+  }
+  await updateEruv(
+    submission.community_id,
+    id,
+    { covers: s.covers ?? null, website: s.website ?? null, hotline: s.hotline ?? null, alertsUrl: s.alertsUrl ?? null, ...(details && { details }) },
+    { statusUrl: eruv.statusUrl, lineUrl: eruv.lineUrl },
+  )
 }
 
 const APPROVAL_KIND = { create: 'listing_added', update: 'listing_edited', delete: 'listing_removed' } as const

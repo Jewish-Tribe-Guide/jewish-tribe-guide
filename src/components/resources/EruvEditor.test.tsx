@@ -37,3 +37,31 @@ describe('EruvEditor — onHasChanges', () => {
     expect(onHasChanges).toHaveBeenLastCalledWith(false)
   })
 })
+
+// Nov 9: it follows the Eruv page's Fields (eruvFields.ts): a row taken off
+// the page isn't here, and a field made on it is, sent in `details`.
+describe('EruvEditor — the Eruv page’s fields', () => {
+  const page = {
+    id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', kind: 'eruv' as const,
+    detailFields: [{ key: 'hotline', label: 'Hotline', type: 'tel' as const }, { key: 'certifiedBy', label: 'Certified by', type: 'text' as const }],
+  }
+
+  it('has the page’s rows only, in its order, and sends a made field’s value in details', async () => {
+    const sent: unknown[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify({ ok: true, id: 's1' }))
+    }))
+    const user = userEvent.setup()
+    renderWithProviders(<EruvEditor eruv={{ ...eruv, details: { certifiedBy: 'Rabbi A' } }} page={page} onClose={() => {}} />)
+    const labels = screen.getAllByText(/^(Where it goes|Website|Hotline|Email alerts|Certified by)$/).map((l) => l.textContent)
+    expect(labels).toEqual(['Hotline', 'Certified by'])
+    expect(screen.getByLabelText('Certified by')).toHaveValue('Rabbi A')
+    await user.clear(screen.getByLabelText('Certified by'))
+    await user.type(screen.getByLabelText('Certified by'), 'Rabbi B')
+    await user.click(screen.getByRole('button', { name: /Send/ }))
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]).toMatchObject({ targetType: 'eruv', payload: { covers: 'Center City.', hotline: '', details: { certifiedBy: 'Rabbi B' } } })
+    vi.unstubAllGlobals()
+  })
+})

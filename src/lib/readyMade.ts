@@ -1,5 +1,6 @@
 import { PHOTO_FIELD_KEY, type CategoryConfig, type CategoryField, type FieldType } from './categories'
 import { comesWithParent, partnerOf } from './fieldPartners'
+import { ERUV_FIELDS, ERUV_FIELD_TYPES } from './eruvFields'
 
 // Ready-made pages and fields (Category pages boards 2 and 7-11): what any
 // community's pages already hold, offered first so a new page or field
@@ -156,12 +157,28 @@ export function readyCopy(f: CategoryField): CategoryField {
  *  this page already has. With `onPage`, only that page's fields. */
 export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onPage?: string): ReadyField[] {
   const pages = everywhere.filter((p) => p.category.kind === 'listing')
+  return readyMadeFrom(pages, page, onPage)
+}
+
+/** An Eruv page's ready-made fields (Nov 9): the four an eruv has, then
+ *  what any community's Eruv page made, of the kinds an eruv shows. No
+ *  address, phone, hours or website of a page of places: an eruv's
+ *  website and hotline are among its four. */
+export function readyEruvFields(everywhere: PageEverywhere[], page: PageHas): ReadyField[] {
+  const own: PageEverywhere = { community: '', category: { id: 'eruv', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', kind: 'eruv', detailFields: ERUV_FIELDS.map((f) => ({ ...f })) } }
+  const eruvPages = everywhere
+    .filter((p) => p.category.kind === 'eruv')
+    .map((p) => ({ ...p, category: { ...p.category, pluralLabel: 'Eruv', detailFields: p.category.detailFields.filter((f) => ERUV_FIELD_TYPES.includes(f.type)) } }))
+  return readyMadeFrom([own, ...eruvPages], page, undefined, false)
+}
+
+function readyMadeFrom(pages: PageEverywhere[], page: PageHas, onPage?: string, withBasics = true): ReadyField[] {
   const scoped = onPage ? pages.filter((p) => p.category.pluralLabel === onPage) : pages
   const has = new Set(page.fields.map(fieldId))
   const found = new Map<string, ReadyField>()
   for (const { category: c } of scoped) {
     for (const f of shownFields(c)) {
-      if (isBasicField(f)) continue
+      if (withBasics && isBasicField(f)) continue
       // Offered with the field it comes with, not on its own.
       if (comesWithParent(f, c.detailFields)) continue
       const id = fieldId(f)
@@ -181,6 +198,7 @@ export function readyMadeFields(everywhere: PageEverywhere[], page: PageHas, onP
     const where = sorted.length > 3 ? `${sorted.slice(0, 3).join(', ')} and ${sorted.length - 3} more` : sorted.join(', ')
     return { ...r, line: `${where} · ${fieldKindWord(r.field!)}` }
   })
+  if (!withBasics) return fields.sort((a, b) => a.label.localeCompare(b.label))
   const basics = BASICS.filter((b) => !pageHasBasic(page, b.kind))
     // On one page's menu, only the basics that page has.
     .filter((b) => !onPage || scoped.some((p) => pageHasBasic({ hasAddress: p.category.hasAddress !== false, hasPhone: p.category.hasPhone !== false, fields: p.category.detailFields }, b.kind)))

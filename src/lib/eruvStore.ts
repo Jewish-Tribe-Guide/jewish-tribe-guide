@@ -25,7 +25,11 @@ const SOURCE_COLUMNS = 'community_id, id, name, line_url, line, line_leave_out, 
 // status by email) and everything else works.
 const EMAIL_COLUMNS = ['status_email', 'status_email_kept']
 const LATER_COLUMNS = ['line_hide_points', 'line_missing', ...EMAIL_COLUMNS]
-const laterNamed = (message: string | undefined) => LATER_COLUMNS.filter((c) => !!message && message.includes(c))
+// 094: what an eruv holds for the fields its page's admin made (eruvFields.ts).
+// Read only where an eruv is shown or edited, so a map's fingerprint
+// (eruvMapsVersion) doesn't change with them.
+const DETAILS_COLUMN = 'details'
+const laterNamed = (message: string | undefined) => [...LATER_COLUMNS, DETAILS_COLUMN].filter((c) => !!message && message.includes(c))
 
 /** A select of `columns` plus the later ones, less any not there yet. */
 async function selectWithLater<T>(
@@ -61,6 +65,7 @@ type Row = {
   status_error_at: string | null
   status_error: string | null
   status_email?: string | null
+  details?: Record<string, unknown> | null
 }
 type AdminRow = Row & {
   updated_at?: string | null
@@ -149,6 +154,7 @@ function fromRow(r: Row): Eruv {
     statusError: r.status_error,
     // Whether, never the address: that's an admin's.
     statusEmailed: !!r.status_email,
+    ...(r.details && Object.keys(r.details).length > 0 && { details: r.details }),
   }
 }
 
@@ -179,7 +185,7 @@ export async function listEruvim(community: string): Promise<{ eruvim: Eruv[]; a
   const { data, error } = await selectWithLater<Row>(
     (cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).eq('active', true).order('name'),
     PUBLIC_COLUMNS,
-    ['status_email'],
+    ['status_email', DETAILS_COLUMN],
   )
   if (error) {
     if (eruvTableMissing(error.message)) return { eruvim: [], available: false }
@@ -190,7 +196,10 @@ export async function listEruvim(community: string): Promise<{ eruvim: Eruv[]; a
 
 /** Every eruv of a community, hidden ones too, for its admin tab. */
 export async function listEruvimForAdmin(community: string): Promise<{ eruvim: AdminEruv[]; available: boolean }> {
-  const { data, error } = await selectWithLater<AdminRow>((cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).order('name'), ADMIN_COLUMNS)
+  const { data, error } = await selectWithLater<AdminRow>((cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).order('name'), ADMIN_COLUMNS, [
+    ...LATER_COLUMNS,
+    DETAILS_COLUMN,
+  ])
   if (error) {
     if (eruvTableMissing(error.message)) return { eruvim: [], available: false }
     throw new Error(`Failed to load eruvim: ${error.message}`)
@@ -296,7 +305,10 @@ export type EruvEdit = Partial<
     AdminEruv,
     'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'statusEmail' | 'lineUrl' | 'active' | 'lineLeaveOut' | 'lineHidePoints'
   >
->
+> & {
+  /** The page's own fields' values, all of them (eruvFields.ts). */
+  details?: Record<string, unknown>
+}
 const EDIT_COLUMN: Record<keyof EruvEdit, string> = {
   name: 'name',
   covers: 'covers',
@@ -310,9 +322,11 @@ const EDIT_COLUMN: Record<keyof EruvEdit, string> = {
   active: 'active',
   lineLeaveOut: 'line_leave_out',
   lineHidePoints: 'line_hide_points',
+  details: DETAILS_COLUMN,
 }
 
-const unset = (v: unknown) => v == null || v === false || (Array.isArray(v) && v.length === 0)
+const unset = (v: unknown) =>
+  v == null || v === false || (Array.isArray(v) && v.length === 0) || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0)
 
 function editColumns(edit: EruvEdit): Record<string, unknown> {
   const out: Record<string, unknown> = {}

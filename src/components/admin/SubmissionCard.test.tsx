@@ -651,4 +651,34 @@ describe('an eruv suggestion', () => {
     expect(diff).toHaveTextContent('Where it goesCenter City.')
     expect(screen.getByText('Center City.')).not.toHaveClass('line-through')
   })
+
+  // Nov 9: a field made on the Eruv page (eruvFields.ts), named as the page
+  // named it when it was sent, a choice by its label.
+  it('shows each of the page’s own fields it changes, before and after', () => {
+    const submission = {
+      id: 's10',
+      operation: 'update',
+      target_type: 'eruv',
+      target_id: null,
+      payload: {
+        eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: null, hotline: null, alertsUrl: null,
+        details: { certifiedBy: 'Rabbi B', kind: 'city' },
+        detailFields: [{ key: 'certifiedBy', label: 'Certified by', type: 'text' }, { key: 'kind', label: 'Kind', type: 'select', options: [{ value: 'city', label: 'City eruv' }] }],
+      },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      current: null,
+      categoryLabel: 'Eruv',
+      currentEruv: { name: 'Center City Eruv', covers: 'Center City.', website: null, hotline: null, alertsUrl: null, details: { certifiedBy: 'Rabbi A' } },
+    } as unknown as EnrichedSubmission
+    render(<SubmissionCard submission={submission} categoriesById={new Map()} onModerate={() => {}} onOpen={() => {}} />)
+    const diff = screen.getByTestId('eruv-diff')
+    expect(diff).toHaveTextContent('Certified byRabbi A → Rabbi B')
+    expect(diff).toHaveTextContent('Kind— → City eruv')
+    expect(screen.getByText('Rabbi A')).toHaveClass('line-through')
+  })
 })

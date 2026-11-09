@@ -15,6 +15,12 @@ import { useCategories } from '@/lib/useCategories'
 import { ui } from '@/lib/uiConfig'
 import BackIconButton from '@/components/BackIconButton'
 import { Card } from './listingParts'
+import { FieldsBox, fieldText } from './FieldsBox'
+import { eruvValues, withEruvFields } from '@/lib/eruvFields'
+import { fieldBoxes } from '@/lib/fieldBoxes'
+import { parseListingParts } from '@/lib/listingParts'
+import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import type { DirectoryResource } from '@/types'
 
 // ── One eruv's listing (Oct 7; its own file Oct 13) ─────────────────────────
 // Shown by the Eruv page (EruvInfo) and the Map tab's Eruvim layer
@@ -85,6 +91,7 @@ export function EruvListing(props: {
   useEffect(() => {
     onEditingChange?.(editing)
   }, [editing, onEditingChange])
+  const eruvPage = useCategories()?.find((c) => c.kind === 'eruv') ?? null
   const openEditor = () => {
     window.history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
     setChanged(false)
@@ -105,7 +112,7 @@ export function EruvListing(props: {
           <span>{!onEditor && <BackIconButton onClick={closeEditor} />}</span>
           <h2 className="truncate text-base font-semibold text-slate-900">Edit listing</h2>
         </div>
-        <EruvEditor eruv={props.eruv} onClose={closeEditor} onHasChanges={setChanged} />
+        <EruvEditor eruv={props.eruv} page={eruvPage ?? FALLBACK_PAGE} onClose={closeEditor} onHasChanges={setChanged} />
       </div>
     )
   }
@@ -125,34 +132,22 @@ export function EruvListing(props: {
 }
 
 function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null }) {
-  const contact = [
-    eruv.website && (
-      <ListingRow key="web" icon={<GlobeIcon className="h-[17px] w-[17px]" />}>
-        <a href={eruv.website} target="_blank" rel="noopener noreferrer" className={linkClass}>
-          {siteLabel(eruv.website)}
-        </a>
-      </ListingRow>
-    ),
-    eruv.hotline && (
-      <ListingRow key="call" icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
-        <a href={`tel:${dialable(eruv.hotline)}`} className={linkClass}>
-          {eruv.hotline}
-        </a>
-      </ListingRow>
-    ),
-    eruv.alertsUrl && (
-      <ListingRow key="alerts" icon={<MailIcon className="h-[17px] w-[17px]" />}>
-        <a href={eruv.alertsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-          Email alerts from the eruv
-        </a>
-      </ListingRow>
-    ),
-  ].filter(Boolean)
   // Saved as a place of the Eruv page's: it's found again among the
   // eruvim (usePinnedPlaces).
   const { isPinned, toggle } = usePinned()
   const page = useCategories()?.find((c) => c.kind === 'eruv') ?? null
   const saved = !!page && isPinned(eruv.id)
+  // Its boxes are the Eruv page's Fields (Nov 9, eruvFields.ts): never
+  // saved, the ones an eruv always had. Its name and status come first.
+  const shown = withEruvFields(page ?? FALLBACK_PAGE)
+  const fields = shown.detailFields
+  const boxes = fieldBoxes({ fields, hasAddress: false, hasPhone: false }, parseListingParts(shown.listingParts))
+  const values = eruvValues(eruv)
+  const byKey = new Map(fields.map((f) => [f.key, f]))
+  const inBox = (keys: string[]) => keys.map((k) => byKey.get(k)).filter((f): f is CategoryField => !!f)
+  const topWords = inBox(boxes.find((b) => b.id === 'top')?.fields ?? [])
+    .map((f) => fieldText(f, values[f.key]))
+    .filter(Boolean)
   return (
     <div className="space-y-3.5" data-testid="eruv-listing">
       <div className="flex items-start gap-3.5">
@@ -165,7 +160,7 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
             <h2 className="min-w-0 flex-1 text-[22px] font-extrabold leading-tight tracking-tight text-slate-900">{eruv.name}</h2>
             {ui.map.pins && page && <SaveButton saved={saved} onToggle={() => toggle({ id: eruv.id, categoryId: page.id })} name={eruv.name} />}
           </div>
-          <p className="mt-1 text-[14.5px] leading-snug text-muted">Eruv</p>
+          <p className="mt-1 text-[14.5px] leading-snug text-muted">{['Eruv', ...topWords].join(' · ')}</p>
         </div>
       </div>
       <Card>
@@ -173,12 +168,66 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
           <EruvStatusLine eruv={eruv} now={now} timezone={timezone} candles={candles} />
         </div>
       </Card>
-      {eruv.covers && (
-        <Card title="Where it goes">
-          <p className="pb-1 text-[15px] leading-relaxed text-slate-800">{eruv.covers}</p>
-        </Card>
-      )}
-      {contact.length > 0 && <Card>{contact}</Card>}
+      {boxes.map((box) => {
+        if (box.id === 'top' || box.id === 'hidden') return null
+        if (box.id === 'contact') {
+          const rows = inBox(box.fields).flatMap((f) => contactRow(f, values[f.key]) ?? [])
+          return rows.length > 0 ? <Card key={box.id}>{rows}</Card> : null
+        }
+        return <FieldsBox key={box.id} item={values as unknown as DirectoryResource} title={box.title} fields={inBox(box.fields)} />
+      })}
     </div>
+  )
+}
+
+/** Before the categories load (or with no Eruv page at all), the fields an
+ *  eruv always had. */
+const FALLBACK_PAGE: CategoryConfig = { id: 'eruv', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv' }
+
+/** A field in the contact box: its icon and what it holds, to tap. The
+ *  eruv's own website, hotline and alerts as they always were. */
+function contactRow(f: CategoryField, v: unknown): React.ReactNode | null {
+  const text = fieldText(f, v)
+  if (!text) return null
+  if (f.key === 'alertsUrl') {
+    return (
+      <ListingRow key={f.key} icon={<MailIcon className="h-[17px] w-[17px]" />}>
+        <a href={text} target="_blank" rel="noopener noreferrer" className={linkClass}>
+          Email alerts from the eruv
+        </a>
+      </ListingRow>
+    )
+  }
+  if (f.type === 'url') {
+    return (
+      <ListingRow key={f.key} icon={<GlobeIcon className="h-[17px] w-[17px]" />}>
+        <a href={text} target="_blank" rel="noopener noreferrer" className={linkClass}>
+          {f.key === 'website' ? siteLabel(text) : (f.linkLabel ?? f.label)}
+        </a>
+      </ListingRow>
+    )
+  }
+  if (f.type === 'tel') {
+    // The hotline as the eruv writes it ("215-EIRUV-11"), dialled as digits.
+    const raw = String(v).trim()
+    return (
+      <ListingRow key={f.key} icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
+        <a href={`tel:${dialable(raw)}`} className={linkClass}>
+          {f.key === 'hotline' ? raw : text}
+        </a>
+      </ListingRow>
+    )
+  }
+  return (
+    <ListingRow key={f.key} icon={<span aria-hidden="true" className="block h-[17px] w-[17px]" />}>
+      {f.type === 'boolean' ? (
+        text
+      ) : (
+        <>
+          <span className="text-muted">{f.label}: </span>
+          {text}
+        </>
+      )}
+    </ListingRow>
   )
 }

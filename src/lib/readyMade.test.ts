@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryField, FieldType } from './categories'
-import { listLine, matchesSearch, pageMenu, pageToCopy, readyMadeFields, readyMadePages } from './readyMade'
+import { listLine, matchesSearch, pageMenu, pageToCopy, readyEruvFields, readyMadeFields, readyMadePages } from './readyMade'
 
 const denomination = (options: string[]): CategoryField => ({
   key: 'denomination',
@@ -148,5 +148,26 @@ describe('readyMadeFields', () => {
   it('searches by every word typed, in the name or the line', () => {
     expect(matchesSearch({ label: 'Kosher Store', line: 'Grocery · a list' }, 'kosher groc')).toBe(true)
     expect(matchesSearch({ label: 'Kosher Store', line: 'Grocery' }, 'parking')).toBe(false)
+  })
+})
+
+// Nov 9: the Eruv page's Add a field offers what an eruv has: its own four
+// rows, and what other communities' Eruv pages made, never a listing's.
+describe('readyEruvFields', () => {
+  const otherEruv = makeCategory({
+    id: 'eruv',
+    kind: 'eruv',
+    pluralLabel: 'Eruv info',
+    detailFields: [
+      { key: 'certifiedBy', label: 'Certified by', type: 'text' },
+      { key: 'photo', label: 'Photo', type: 'image' },
+    ],
+  })
+  const pages = [...everywhere, { community: 'dc', category: otherEruv }]
+
+  it('lists the four rows the page doesn’t have and other Eruv pages’ fields, no basics, nothing from a listing page', () => {
+    const offered = readyEruvFields(pages, { ...bare, fields: [{ key: 'covers', label: 'Where it goes', type: 'textarea' }] })
+    expect(offered.map((f) => f.label)).toEqual(['Certified by', 'Email alerts', 'Hotline', 'Website'])
+    expect(offered.every((f) => !f.basic)).toBe(true)
   })
 })

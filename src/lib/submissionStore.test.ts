@@ -1907,11 +1907,12 @@ describe('an eruv suggestion', () => {
 
   // Oct 22, Eruv status: Use this takes only the rows its website changed,
   // so one edited since it was read isn't put back; Edit saves the admin's.
-  const approveWith = async (edited: unknown, only?: string[], now = eruv) => {
+  const approveWith = async (edited: unknown, only?: string[], now: typeof eruv & { details?: Record<string, unknown> } = eruv, sent = sub, pages: unknown[] = []) => {
     let calls = 0
-    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
-    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sub), error: null }) : approveBuilder))
+    const approveBuilder = chainable({ data: { ...sent, status: 'approved' }, error: null })
+    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sent), error: null }) : approveBuilder))
     mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [now] })
+    mockListCategories.mockResolvedValue(pages)
     mockUpdateEruv.mockResolvedValue(undefined)
     await approveSubmission('sub-1', 'philly', 'admin@example.org', edited, only)
     return { builder: approveBuilder }
@@ -1927,6 +1928,36 @@ describe('an eruv suggestion', () => {
     await approveWith({ covers: 'Center City.', website: 'https://old.example', hotline: '(215) 555-0100', alertsUrl: '' })
     expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', { covers: 'Center City.', website: 'https://old.example', hotline: '(215) 555-0100', alertsUrl: null }, expect.anything())
     await expect(approveWith({ covers: 'Center City.', website: 'not a site at all' })).rejects.toThrow('isn’t a web address')
+  })
+
+  // Nov 9: the Eruv page's own fields (eruvFields.ts), kept in `details`.
+  const certified = { key: 'certifiedBy', label: 'Certified by', type: 'text' as const }
+  const withOwn = baseSubmission({
+    operation: 'update',
+    target_type: 'eruv',
+    payload: { ...payload, website: 'https://old.example', hotline: null, details: { certifiedBy: 'Rabbi B', hours: null }, detailFields: [certified, { key: 'hours', label: 'Hours', type: 'text' }] },
+  })
+  const hasOwn = { ...eruv, details: { certifiedBy: 'Rabbi A', hours: 'All day', kept: 'Untouched' } }
+
+  it('approving puts the own fields it names on the eruv, and leaves the rest', async () => {
+    await approveWith(undefined, undefined, hasOwn, withOwn)
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', expect.objectContaining({ details: { certifiedBy: 'Rabbi B', kept: 'Untouched' } }), expect.anything())
+  })
+
+  it('a suggestion without own fields leaves the eruv’s as they are', async () => {
+    await approveWith(undefined, undefined, hasOwn)
+    expect(mockUpdateEruv.mock.calls[0][2]).not.toHaveProperty('details')
+  })
+
+  it('Use this takes an own field only when it’s given', async () => {
+    await approveWith(undefined, ['hours'], hasOwn, withOwn)
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', expect.objectContaining({ details: { certifiedBy: 'Rabbi A', kept: 'Untouched' } }), expect.anything())
+  })
+
+  it('an Edit that leaves the own fields out keeps what was sent for them', async () => {
+    const page = { id: 'eruv', label: 'Eruv', kind: 'eruv', detailFields: [certified] }
+    await approveWith({ covers: 'Center City.', website: 'https://old.example', hotline: '', alertsUrl: '' }, undefined, hasOwn, withOwn, [page])
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', expect.objectContaining({ details: { certifiedBy: 'Rabbi B', hours: 'All day', kept: 'Untouched' } }), expect.anything())
   })
 
   it('an eruv that’s gone can’t be approved', async () => {

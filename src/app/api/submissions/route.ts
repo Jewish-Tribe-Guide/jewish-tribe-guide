@@ -1,5 +1,5 @@
 import { validateSubmission, getResourceById } from '@/lib/resourceStore'
-import { getCategoryById } from '@/lib/categoryStore'
+import { getCategoryById, listCategories } from '@/lib/categoryStore'
 import { resolveCapabilities, isCategorySyncEligible } from '@/lib/categories'
 import { submitterDetails } from '@/lib/syncFields'
 import { keepsMenuLink } from '@/lib/menuLink'
@@ -11,6 +11,7 @@ import {
 } from '@/lib/submissionStore'
 import { listEruvim } from '@/lib/eruvStore'
 import { readEruvSuggestion } from '@/lib/eruvSuggestion'
+import { eruvPageOwnFields } from '@/lib/eruvFields'
 import { after } from 'next/server'
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
     if (operation !== 'update' || !targetId) return Response.json({ ok: false, errors: ['Unknown operation.'] }, { status: 400 })
     const eruv = (await listEruvim(community.slug)).eruvim.find((e) => e.id === targetId)
     if (!eruv) return Response.json({ ok: false, errors: ['Eruv not found.'] }, { status: 404 })
-    const read = readEruvSuggestion(body.payload, eruv)
+    const read = readEruvSuggestion(body.payload, eruv, eruvPageOwnFields(await listCategories(community.slug)))
     if (!read.ok) return Response.json({ ok: false, errors: read.errors }, { status: 400 })
     let submission: SubmissionRow
     try {

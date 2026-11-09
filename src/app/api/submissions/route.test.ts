@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   resolveCommunity: vi.fn(),
   getResourceById: vi.fn(),
   getCategoryById: vi.fn(),
+  listCategories: vi.fn(async () => [] as unknown[]),
   validateSubmission: vi.fn(),
   hasListingChanged: vi.fn(),
   submitListingCreate: vi.fn(),
@@ -29,7 +30,7 @@ vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
 }))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById, validateSubmission: m.validateSubmission }))
-vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
+vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById, listCategories: m.listCategories }))
 vi.mock('@/lib/listingDiff', () => ({ hasListingChanged: m.hasListingChanged }))
 vi.mock('@/lib/submissionStore', () => ({
   submitListingCreate: m.submitListingCreate,
