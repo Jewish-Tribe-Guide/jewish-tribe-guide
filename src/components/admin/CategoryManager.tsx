@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { prefetchCategoryListings } from '@/lib/categoryListings'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -41,6 +42,19 @@ const SCREEN_LINES: Record<SiteScreen['kind'], string> = { eruv: 'Eruv page', zm
 /** The category a save just moved to: see `justSaved` below. */
 let savedHandOff: string | null = null
 
+// The list of pages as last loaded, kept between screens. Each screen of
+// Category pages is its own address, and a new address is a new
+// CategoryManager, so every open waited for the list again before showing
+// anything (the user, Nov 9: "Most noticable is clicking on a category page
+// in admin"). The kept list shows at once; the screen still asks again, and
+// what comes back replaces it.
+let kept: { community: string; categories: CategoryConfig[]; placeCounts: Record<string, number> } | null = null
+
+/** Tests: no list kept from the one before. */
+export function forgetCategoryList(): void {
+  kept = null
+}
+
 export default function CategoryManager({
   token,
   editingId: rawEditingId,
@@ -56,10 +70,12 @@ export default function CategoryManager({
   // it too; it used to fall through to the list.
   const editingId = rawEditingId && !rawEditingId.includes(':') ? `${CAT_PREFIX}${rawEditingId}` : rawEditingId
   const community = useCommunitySlug()
-  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
-  const [placeCounts, setPlaceCounts] = useState<Record<string, number>>({})
+  const keptHere = kept?.community === community ? kept : null
+  const [categories, setCategories] = useState<CategoryConfig[] | null>(keptHere?.categories ?? null)
+  const [placeCounts, setPlaceCounts] = useState<Record<string, number>>(keptHere?.placeCounts ?? {})
   const [error, setError] = useState<string | null>(null)
   const [switching, setSwitching] = useState<string | null>(null)
+  const [listRound, setListRound] = useState(0)
   // The category just saved, and how many saves there have been: its screen
   // starts again from the saved settings, and its Save bar says "Saved."
   // A save that moves to another address (made, or a new web address) lands
@@ -81,14 +97,31 @@ export default function CategoryManager({
     try {
       const catRes = await fetch(withCommunity('/api/admin/categories?counts=1', community), { headers: { Authorization: `Bearer ${token}` } })
       const catBody = await parseOkJson<{ categories: CategoryConfig[]; placeCounts?: Record<string, number> }>(catRes, 'Failed to load categories.')
+      // A kept list that turns out stale (changed in another tab) starts
+      // the open page again from what's saved, before anything's typed.
+      if (keptHere && JSON.stringify(keptHere.categories) !== JSON.stringify(catBody.categories)) setListRound((r) => r + 1)
       setCategories(catBody.categories)
       setPlaceCounts(catBody.placeCounts ?? {})
+      kept = { community, categories: catBody.categories, placeCounts: catBody.placeCounts ?? {} }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
+    // keptHere: the list this screen opened with, read once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, community])
 
   useLoadOnMount(load)
+
+  // Opened from its address, with no list kept: the page's places are asked
+  // for beside the list, not after it (categoryListings.ts). With a list
+  // kept, the editor shows at once and asks itself.
+  const openedId = editingId?.startsWith(CAT_PREFIX) && !editingId.startsWith(NEW_PREFIX) && editingId !== `${CAT_PREFIX}new` ? editingId.slice(CAT_PREFIX.length) : null
+  const listKept = categories !== null
+  useEffect(() => {
+    if (openedId && !listKept) prefetchCategoryListings(openedId)
+    // Only as the page opens: once the list is here, the editor has asked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openedId])
 
   // Every page in one list by name (board 1): the categories that hold
   // places, and the Eruv and Candle Lighting, with or without a row yet
@@ -169,7 +202,7 @@ export default function CategoryManager({
   const editorFor = (initial: CategoryConfig) => (
     <CategoryEditor
       // Saved: start again from what's now saved, staying on the screen.
-      key={`${initial.id}:${savedRound}`}
+      key={`${initial.id}:${savedRound}:${listRound}`}
       token={token}
       initial={withEruvFields(initial)}
       siblings={categories}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { bandImageFor, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
+import { takeCategoryListings } from '@/lib/categoryListings'
 import type { Coords } from '@/lib/useStoredLocation'
 import { withMilesFromAddress } from '@/lib/listingTravel'
 import { community } from '@/community.config'
@@ -124,10 +125,9 @@ export default function CategoryPreview({
     let cancelled = false
     // A brand-new, unsaved category's id has no matching rows — this just
     // resolves to an empty list, same as any other empty category.
-    fetch(`/api/resources?category=${encodeURIComponent(category.id)}`)
-      .then(async (res) => {
-        const body = await res.json()
-        const listings = res.ok && body.ok ? (body.resources as DirectoryResource[]) : []
+    // Already on its way when the manager asked as the page opened.
+    takeCategoryListings(category.id)
+      .then(({ resources: listings }) => {
         if (!cancelled) {
           setRealListings(listings)
           // The Eruv page's places are eruvim, counted by the editor

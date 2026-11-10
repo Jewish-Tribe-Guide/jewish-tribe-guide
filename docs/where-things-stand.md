@@ -133,6 +133,17 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   address (`in=`), so a reload keeps it. Changing a ready-made field's
   settings before adding it (turning In the filter on, say) can still
   move it, as it would after adding.
+- **A category page in admin opens without waiting on the list again**
+  (the user, Nov 9: "Most noticable is lcikcing on a category page in
+  admin"). Each Category pages screen is its own address, so every open
+  fetched the list of pages before showing anything, and opened from its
+  address the page then fetched its places after that. The list is kept
+  between screens and refreshed behind it (a page changed in another tab
+  starts again from the fresh copy), and a page opened from its address
+  asks for its places beside the list. Locally a click from the list shows
+  the page in 175ms, before the list's refresh comes back. Measured on
+  the live site Nov 9: Supabase answers in about 0.1s; a preview
+  deployment's API calls took 0.8–1.2s each, uncached.
 - **An admin's field is filled in** in Places (a row of its own after
   Website, saved with Update the listing) and by anyone through Suggest an
   edit, which goes to the queue; the queue and the admin email show it

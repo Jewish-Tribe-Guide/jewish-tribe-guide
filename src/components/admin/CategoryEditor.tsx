@@ -37,6 +37,7 @@ import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { takeCategoryListings } from '@/lib/categoryListings'
 import { fieldFromRef, fieldRef, screenFromSearch, type EditorScreen } from '@/lib/editorScreenUrl'
 import { focusOn } from '@/lib/previewFocus'
 import { useScreenHistory } from './useScreenHistory'
@@ -155,10 +156,9 @@ function CategoryEditorScreen({
   useEffect(() => {
     if (!countId) return
     let cancelled = false
-    fetch(`/api/resources?category=${encodeURIComponent(countId)}`)
-      .then(async (res) => {
-        const body = await res.json()
-        if (!cancelled && res.ok && body.ok) setPlaceCount((body.resources as unknown[]).length)
+    takeCategoryListings(countId)
+      .then(({ ok, resources }) => {
+        if (!cancelled && ok) setPlaceCount(resources.length)
       })
       .catch(() => {})
     return () => {

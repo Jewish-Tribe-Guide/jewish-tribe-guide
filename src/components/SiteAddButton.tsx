@@ -17,7 +17,7 @@ import { ui } from '@/lib/uiConfig'
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
 
 /** Screens without this "+": the Map, a category page or a listing (their
- *  own), the Eruv page (its own, Nov 9: Add an eruv), and the site's own
+ *  own), the Eruv page (its own +, opening this same box beside its list), and the site's own
  *  pages (Feedback, About, Privacy). */
 export function showsSiteAdd(pathname: string, community: string, categoryIds: readonly string[]): boolean {
   const parts = pathname.split('/').filter(Boolean)
