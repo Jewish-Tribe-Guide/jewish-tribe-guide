@@ -11,7 +11,7 @@ import { useCategoriesIfAny } from '@/lib/contentContext'
 import { kindKeyById } from '@/lib/placeKinds'
 import { builtInTabIcon } from '../MobileTabBar'
 import { useCardOptions } from './useCardOptions'
-import DragList, { AddMenu, InnerRow, OrderRow, RowActions } from './DragList'
+import DragList, { AddMenu, InnerRow, ListCard, OrderRow } from './DragList'
 
 // ── The mobile bottom tab bar editor ─────────────────────────────────────────
 // Phone-only. The bar is the mobile counterpart of the desktop featured-card
@@ -121,7 +121,7 @@ export default function MobileTabsEditor({
             <OrderRow
               row={row}
               name={tab.label || targetLabel(tab.target)}
-              line={empty ? 'Nothing in it yet' : `Opens ${OPENS[tab.target] ?? targetLabel(tab.target)}`}
+              line={empty ? undefined : `Opens ${OPENS[tab.target] ?? targetLabel(tab.target)}`}
               icon={
                 Icon ? (
                   <Icon className="h-[22px] w-[22px]" />
@@ -132,20 +132,24 @@ export default function MobileTabsEditor({
               open={open}
               onToggle={() => setOpenId(open ? null : tab.id)}
               rename={{ value: tab.label, placeholder: 'Shown under the icon', onChange: (label) => update(tab.id, { label }) }}
+              // Comes off by its X only while it's empty, as a field box
+              // does (the user, Nov 10).
+              onRemove={empty ? () => remove(tab.id) : undefined}
             >
               {/* Opens to what's in it, as a tab at the top of the page on a
                   computer does (the user, Nov 4): its one link, with an × to
                   take it out and put another in. */}
-              {!empty && (
-                <DragList items={[tab]} keyOf={(t) => t.id} nameOf={(t) => t.label} onReorder={() => {}} className="rounded-lg border border-slate-200">
-                  {(t, inner) => (
-                    <InnerRow row={inner} name={PLACE_NAMES[t.target] ?? targetLabel(t.target)} onRemove={() => update(tab.id, { target: '' })} />
-                  )}
-                </DragList>
-              )}
-              <RowActions name={tab.label || targetLabel(tab.target)} onRemove={() => remove(tab.id)}>
-                {empty && <AddMenu label="+ Add a link" options={available} onPick={(target) => update(tab.id, { target })} />}
-              </RowActions>
+              <ListCard>
+                {empty ? (
+                  <AddMenu row label="Add a link" options={available} onPick={(target) => update(tab.id, { target })} />
+                ) : (
+                  <DragList items={[tab]} keyOf={(t) => t.id} nameOf={(t) => t.label} onReorder={() => {}}>
+                    {(t, inner) => (
+                      <InnerRow row={inner} name={PLACE_NAMES[t.target] ?? targetLabel(t.target)} onRemove={() => update(tab.id, { target: '' })} />
+                    )}
+                  </DragList>
+                )}
+              </ListCard>
             </OrderRow>
           )
         }}

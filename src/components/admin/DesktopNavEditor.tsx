@@ -6,13 +6,20 @@ import { newDraftSectionId, type DraftHomeSection } from '@/lib/homeSections'
 import { headingLine, headings, tabHolds, tabItems, tabLine, withTabItems } from '@/lib/navTabs'
 import { LEFTOVER_SECTION } from '@/components/home/sections'
 import { useCardOptions } from './useCardOptions'
-import DragList, { AddListButton, AddMenu, InnerRow, OrderRow, RowActions, addButton, type RowRename } from './DragList'
+import DragList, { AddListButton, AddMenu, AddRowButton, InnerRow, ListCard, OrderRow, RowActions, type RowRename } from './DragList'
 
 // ── The top of the page, on a computer, as tabs (the user, Nov 4; drawing
 // KdHT8Tci1ufXSXobnnSfEm, boards "New · What goes in first decides" and
 // "Tabs, links and headings"). A tab holds links or headings, and what goes
 // in first decides which (lib/navTabs.ts): an empty tab offers both, a tab
 // with a link offers only links, a tab with a heading only headings.
+//
+// A tab, and a heading in one, comes off by the X on its name bar, shown
+// only while it's empty, as a field box's is (the user, Nov 10); one with
+// something in it is emptied first. Its adds are rows across the foot of
+// its list, as a box's "Add a field" is. The Categories menu and its
+// headings keep their trash can: its headings are the home sections, and
+// the menu always holds Other.
 //
 // Categories is the tab whose headings are the home sections — the groups,
 // which only ever showed as this menu's columns, so they're edited here now
@@ -116,13 +123,13 @@ export default function DesktopNavEditor({
             open={openId === item.id}
             onToggle={() => toggle(item.id)}
             rename={rename(item)}
+            onRemove={item.kind !== 'categories-menu' && tabHolds(item) === 'nothing' ? () => remove(item.id) : undefined}
           >
             {item.kind === 'categories-menu' ? (
               <CategoriesHeadings sections={sections} onChange={onSectionsChange} cardOptions={cardOptions} name={item.label || 'Untitled'} onRemove={() => remove(item.id)} />
             ) : (
               <TabContents
                 tab={item}
-                onRemove={() => remove(item.id)}
                 onChange={(next) => update(item.id, next)}
                 allTargets={allTargets}
                 linkName={linkName}
@@ -141,17 +148,16 @@ export default function DesktopNavEditor({
   )
 }
 
-/** An open tab: its links or headings, and what can go in next. */
+/** An open tab: its links or headings, and what can go in next, across
+ *  the foot of the list. */
 function TabContents({
   tab,
-  onRemove,
   onChange,
   allTargets,
   linkName,
   opens,
 }: {
   tab: DesktopNavItem
-  onRemove: () => void
   onChange: (tab: DesktopNavItem) => void
   allTargets: Option[]
   linkName: (target: string) => string
@@ -173,18 +179,11 @@ function TabContents({
     setFresh(id)
   }
 
-  const linkAdd = <AddMenu label="+ Add a link" options={allTargets.filter((o) => !inside.some((i) => i.target === o.id))} onPick={addLink} />
-  const headingAdd = (
-    <button type="button" onClick={addHeading} className={addButton}>
-      + Add a heading
-    </button>
-  )
-
   return (
-    <>
+    <ListCard>
       {holds === 'links' && <Links links={inside} onChange={set} linkName={linkName} opens={opens} />}
       {holds === 'headings' && (
-        <DragList items={inside} keyOf={(h) => h.id} nameOf={(h) => h.label} onReorder={set} className="rounded-lg border border-slate-200">
+        <DragList items={inside} keyOf={(h) => h.id} nameOf={(h) => h.label} onReorder={set}>
           {(h, row) => {
             const links = h.items ?? []
             const put = (next: DesktopNavItem) => set(inside.map((i) => (i.id === h.id ? next : i)))
@@ -196,27 +195,25 @@ function TabContents({
                 open={openId === h.id}
                 onToggle={() => setOpenId(openId === h.id ? null : h.id)}
                 rename={{ value: h.label, fresh: fresh === h.id, onChange: (label) => put({ ...h, label }) }}
+                onRemove={links.length ? undefined : () => set(inside.filter((i) => i.id !== h.id))}
               >
-                {links.length > 0 && (
-                  <Links links={links} onChange={(next) => put({ ...h, items: next })} linkName={linkName} opens={opens} />
-                )}
-                <RowActions name={h.label || 'Untitled'} onRemove={() => set(inside.filter((i) => i.id !== h.id))}>
+                <ListCard>
+                  {links.length > 0 && <Links links={links} onChange={(next) => put({ ...h, items: next })} linkName={linkName} opens={opens} />}
                   <AddMenu
-                    label="+ Add a link"
+                    row
+                    label="Add a link"
                     options={allTargets.filter((o) => !links.some((l) => l.target === o.id))}
                     onPick={(target) => put({ ...h, items: [...links, { id: newItemId(), label: linkName(target), kind: 'link', target }] })}
                   />
-                </RowActions>
+                </ListCard>
               </OrderRow>
             )
           }}
         </DragList>
       )}
-      <RowActions name={tab.label || 'Untitled'} onRemove={onRemove}>
-        {holds !== 'headings' && linkAdd}
-        {holds !== 'links' && headingAdd}
-      </RowActions>
-    </>
+      {holds !== 'headings' && <AddMenu row label="Add a link" options={allTargets.filter((o) => !inside.some((i) => i.target === o.id))} onPick={addLink} />}
+      {holds !== 'links' && <AddRowButton onClick={addHeading}>Add a heading</AddRowButton>}
+    </ListCard>
   )
 }
 
@@ -235,7 +232,7 @@ function Links({
   opens: (target: string) => string
 }) {
   return (
-    <DragList items={links} keyOf={(l) => l.id} nameOf={(l) => l.label} onReorder={onChange} className="rounded-lg border border-slate-200">
+    <DragList items={links} keyOf={(l) => l.id} nameOf={(l) => l.label} onReorder={onChange}>
       {(link, row) => (
         <InnerRow
           row={row}
@@ -324,19 +321,16 @@ function CategoriesHeadings({
                 onToggle={() => setOpenId(open ? null : s.id)}
                 rename={{ value: s.title, fresh: fresh === s.id, onChange: (title) => put(s.id, { title }) }}
               >
-                {s.cardIds.length > 0 && (
-                  <DragList
-                    items={s.cardIds}
-                    keyOf={(id) => id}
-                    nameOf={cardName}
-                    onReorder={(cardIds) => put(s.id, { cardIds })}
-                    className="rounded-lg border border-slate-200"
-                  >
-                    {(cardId, inner) => (
-                      <InnerRow row={inner} name={cardName(cardId)} onRemove={() => put(s.id, { cardIds: s.cardIds.filter((id) => id !== cardId) })} />
-                    )}
-                  </DragList>
-                )}
+                <ListCard>
+                  {s.cardIds.length > 0 && (
+                    <DragList items={s.cardIds} keyOf={(id) => id} nameOf={cardName} onReorder={(cardIds) => put(s.id, { cardIds })}>
+                      {(cardId, inner) => (
+                        <InnerRow row={inner} name={cardName(cardId)} onRemove={() => put(s.id, { cardIds: s.cardIds.filter((id) => id !== cardId) })} />
+                      )}
+                    </DragList>
+                  )}
+                  <AddMenu row label="Add a link" options={availableHere} onPick={(id) => addCard(s.id, id)} />
+                </ListCard>
                 {removing === s.id ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="m-0 flex-1 text-sm font-semibold text-slate-900">
@@ -350,21 +344,18 @@ function CategoriesHeadings({
                     </button>
                   </div>
                 ) : (
-                  <RowActions name={s.title || 'Untitled'} onRemove={() => setRemoving(s.id)}>
-                    <AddMenu label="+ Add a link" options={availableHere} onPick={(id) => addCard(s.id, id)} />
-                  </RowActions>
+                  <RowActions name={s.title || 'Untitled'} onRemove={() => setRemoving(s.id)} />
                 )}
               </OrderRow>
             )
           }}
         </DragList>
         <OtherRow names={other.map((c) => c.label)} />
+        <div className="border-t border-slate-100">
+          <AddRowButton onClick={addHeading}>Add a heading</AddRowButton>
+        </div>
       </div>
-      <RowActions name={name} onRemove={onRemove}>
-        <button type="button" onClick={addHeading} className={addButton}>
-          + Add a heading
-        </button>
-      </RowActions>
+      <RowActions name={name} onRemove={onRemove} />
     </>
   )
 }

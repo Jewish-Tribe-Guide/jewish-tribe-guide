@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
 import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
-import DragList, { addListButton, PLUS, RowName, type DragRow } from './DragList'
+import DragList, { addListButton, PLUS, RowName, X, type DragRow } from './DragList'
 
 // Site → Category pages → a page → Fields, as board E1b draws it (the user,
 // Nov 10: "I like the creativity. I just want you to implement it"): every
@@ -16,20 +16,18 @@ import DragList, { addListButton, PLUS, RowName, type DragRow } from './DragList
 // too, which turns blue while it's over it, or red with why when it can't
 // take it. The admin's boxes, and the listing's own from a field made here,
 // are renamed by tapping the name; a ready-made field's keeps its name.
+//
+// Every box starts open, as E1b draws it. A box with something in it folds
+// and opens by the chevron at the end of its name bar; an empty one has its
+// X there instead (the user, Nov 10: "once we add a field then a box turns
+// into an accordion and we remove the x"). A field dragged onto a folded
+// box goes in at its end.
 
 /** Where the handle would be: rows that don't move keep their names lined
  *  up with the ones that do. */
 const NO_HANDLE = <span aria-hidden="true" className="h-11 w-8 shrink-0" />
 const still = (row: DragRow): DragRow => ({ ...row, handle: NO_HANDLE, rowProps: { onPointerDown: () => {}, onContextMenu: () => {} } })
 
-
-/** A box's X, at the end of its name bar (the user, Nov 10: "I think that's
- *  better than trashcan on add a field line"). */
-const X = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-    <path d="M6 6l12 12M18 6L6 18" />
-  </svg>
-)
 
 /** E1b's "+ Add a box": a dashed button as wide as the list. */
 export { addListButton as addBoxButton, PLUS as PlusIcon }
@@ -66,10 +64,28 @@ export default function FieldBoxes({
   onShowField: (key: string) => void
   onShowBasic: (basic: 'address' | 'phone') => void
 }) {
-  const items = fieldItems(boxes)
+  // Folded boxes, by id: just their name bar in the list.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const items = boxes.flatMap((box) => (folded.has(box.id) ? [{ box }] : fieldItems([box])))
+  const all = fieldItems(boxes)
+  const fold = (id: string, on: boolean) =>
+    setFolded((f) => {
+      const next = new Set(f)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
   const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
   const hidden = new Set((page.hiddenFields ?? []).map((f) => f.key))
   const list = useRef<HTMLDivElement>(null)
+  // A field landing in a folded box opens it, so it can be seen landing
+  // (set while rendering, as React's "adjusting state on a prop change").
+  const [seenLanded, setSeenLanded] = useState(landed)
+  if (landed !== seenLanded) {
+    setSeenLanded(landed)
+    const landedIn = landed ? boxOf(all, landed) : null
+    if (landedIn && folded.has(landedIn)) fold(landedIn, false)
+  }
   useEffect(() => {
     if (landed) list.current?.querySelector(`[data-drag-row="${CSS.escape(landed)}"]`)?.scrollIntoView?.({ block: 'center' })
   }, [landed])
@@ -84,7 +100,7 @@ export default function FieldBoxes({
     const edge = turnedDown ? 'border-red-400 bg-red-50' : over ? 'border-primary bg-blue-50' : 'border-slate-200'
     if ('box' in item)
       return {
-        className: `${i === 0 ? '' : 'mt-3'} overflow-hidden rounded-t-xl border border-b-slate-100 ${turnedDown || over ? edge : 'border-slate-200 bg-slate-50'}`,
+        className: `${i === 0 ? '' : 'mt-3'} overflow-hidden border ${folded.has(item.box.id) ? 'rounded-xl' : 'rounded-t-xl border-b-slate-100'} ${turnedDown || over ? edge : 'border-slate-200 bg-slate-50'}`,
         note: turnedDown ? <p className="m-0 px-4 pb-2.5 text-[13px] font-semibold text-red-700">{no!.why}</p> : undefined,
       }
     const afterHead = i > 0 && 'box' in shown[i - 1]
@@ -136,9 +152,23 @@ export default function FieldBoxes({
                   </h3>
                 )}
                 {/* An empty box comes off by its X; one with fields in it
-                    has none, and its X is back once its last field is
-                    taken off or dragged out (the user, Nov 10: "once we add
-                    a field ... we remove the x"). Not "Not on the listing". */}
+                    has none, and folds by its chevron instead. Its X is
+                    back once its last field is taken off or dragged out
+                    (the user, Nov 10: "once we add a field ... we remove
+                    the x"). Not "Not on the listing". */}
+                {(box.fields.length > 0 || (box.basics?.length ?? 0) > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => fold(box.id, !folded.has(box.id))}
+                    aria-expanded={!folded.has(box.id)}
+                    aria-label={name}
+                    className="grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-slate-100"
+                  >
+                    <span className={`transition-transform ${folded.has(box.id) ? '' : 'rotate-90'}`}>
+                      <Chevron />
+                    </span>
+                  </button>
+                )}
                 {box.moves && !box.fields.length && !box.basics?.length && (
                   <button
                     type="button"
@@ -161,14 +191,8 @@ export default function FieldBoxes({
                 Add a field
               </button>
             )
-            const empty = box.fields.length === 0 && !box.basics?.length && <span className="block px-10 pt-3 text-[13px] text-slate-500">Nothing in it yet</span>
             if (!box.moves) return <div className="h-1" />
-            return (
-              <div>
-                {empty}
-                <div className="flex items-center">{add}</div>
-              </div>
-            )
+            return <div className="flex items-center">{add}</div>
           }
           if ('basic' in item) {
             const name = item.basic === 'address' ? 'Address' : 'Phone'

@@ -24,7 +24,7 @@ describe('navTabs', () => {
   })
 
   it('a row line: nothing, where one link goes, a dropdown of links, or of headings', () => {
-    expect(tabLine(tab([]), opens)).toBe('Nothing in it yet')
+    expect(tabLine(tab([]), opens)).toBe('')
     expect(tabLine(tab([link('map')]), opens)).toBe('Opens map')
     expect(tabLine(tab([link('About', 'about'), link('Privacy', 'privacy')]), opens)).toBe('Dropdown · About, Privacy')
     expect(tabLine(tab([heading('h')]), opens)).toBe('Dropdown · 1 heading')
@@ -33,7 +33,7 @@ describe('navTabs', () => {
 
   it('a heading line names its links, or says there are none', () => {
     expect(headingLine(['Food', 'Grocery'])).toBe('Food · Grocery')
-    expect(headingLine([])).toBe('Nothing in it yet')
+    expect(headingLine([])).toBe('')
   })
 })
 

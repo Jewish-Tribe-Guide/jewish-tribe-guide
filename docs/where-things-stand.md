@@ -155,6 +155,27 @@ The user's answers on Nov 10, evening, and what was done with them:
       questions, from the header), and Campaigns' Add a campaign (under
       the list, from the header; still greyed out until there's a
       category, `AddListButton disabled`).
+    - **Boxes fold; tabs come off like boxes; adds inside one thing look
+      like "Add a field"** (the user, Nov 10). The rule as built, whole:
+      - Fields: every box starts open. A box with something in it folds
+        and opens by a chevron at the end of its name bar; an empty box has
+        its X there instead. A field dragged onto a folded box goes in at
+        its end. Folding isn't saved or in the address; it's how the list
+        is showing, and a field added to a folded box opens it.
+      - "Nothing in it yet" is gone everywhere it was: an empty field box
+        shows only its Add a field, and an empty Home page tab or heading
+        has no line under its name.
+      - Home page, computer Header and phone Tabs: a tab comes off by an X
+        on its name bar, last, shown only while it's empty; one with links
+        or headings is emptied first (each link's × as before). A heading
+        inside an ordinary tab works the same. Exceptions: the Categories
+        menu and its headings keep their trash can (its headings are the
+        home sections, taking one off still asks and moves its links to
+        Other, and the menu always holds Other).
+      - Add a link and Add a heading, in a tab, a heading and Categories'
+        headings, on computer and phone, are rows across the foot of a
+        white card holding the links, as a box's Add a field is
+        (`ListCard`, `AddRowButton`, `AddMenu row`).
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

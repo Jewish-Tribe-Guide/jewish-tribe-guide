@@ -848,8 +848,10 @@ describe('CategoryEditor — Fields, in boxes', () => {
     // In place, at the end, no screen to name it on (board B).
     await user.click(screen.getByRole('button', { name: 'Add a box' }))
     expect(screen.queryByRole('heading', { name: 'Add a box' })).toBeNull()
-    // Open, its name ready to type, nothing in it yet.
-    expect(await screen.findByText('Nothing in it yet')).toBeInTheDocument()
+    // Open, its name ready to type, and only its Add a field under it: no
+    // "Nothing in it yet" (the user, Nov 10).
+    expect(await screen.findByRole('button', { name: 'Add a field to New box' })).toBeInTheDocument()
+    expect(screen.queryByText('Nothing in it yet')).toBeNull()
     const title = screen.getByPlaceholderText('New box')
     expect(title).toHaveFocus()
     expect(title).toHaveValue('')
@@ -873,6 +875,35 @@ describe('CategoryEditor — Fields, in boxes', () => {
   // The user, Nov 10: "once we add a field then ... we remove the x and to
   // delete the box we just remove it when we remove the last field", with
   // the X back on the emptied box rather than the box going on its own.
+  // The user, Nov 10: "Category pages fields seemingly can't expand and
+  // de-expand". A box with fields folds by its chevron, where an empty
+  // box's X is.
+  it('folds and opens a box with fields by its chevron; a field moved onto a folded box goes in at its end', async () => {
+    const user = userEvent.setup()
+    const page = baseCategory({
+      detailFields: [
+        { key: 'night', label: 'Night line', type: 'tel' },
+        { key: 'day', label: 'Day line', type: 'tel' },
+      ],
+      listingParts: { boxes: [{ title: 'Call us', fields: ['night'] }, { title: 'Hours', fields: ['day'] }] },
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const chevron = () => screen.getByRole('button', { name: 'Call us', expanded: true })
+    // Open to start with, as E1b draws it.
+    expect(shownIn('Call us')).toEqual(['Night line'])
+    await user.click(chevron())
+    const folded = screen.getByRole('button', { name: 'Call us', expanded: false })
+    expect(shownIn('Call us')).toEqual([])
+    expect(screen.queryByRole('button', { name: 'Add a field to Call us' })).toBeNull()
+    // Day line, moved up past Hours' name bar, lands under folded Call us.
+    screen.getAllByRole('button', { name: 'Move Day line' }).at(-1)!.focus()
+    for (let i = 0; i < 6 && shownIn('Hours')?.includes('Day line'); i++) await user.keyboard('{ArrowUp}')
+    expect(shownIn('Hours')).toEqual([])
+    await user.click(folded)
+    expect(shownIn('Call us')).toEqual(['Night line', 'Day line'])
+    expect(screen.getByRole('button', { name: 'Add a field to Call us' })).toBeInTheDocument()
+  })
+
   it('has no X on a box with fields; taking off its last field brings it back', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()

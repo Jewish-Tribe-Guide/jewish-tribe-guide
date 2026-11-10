@@ -515,6 +515,7 @@ export function OrderRow({
   onToggle,
   rename,
   openLine,
+  onRemove,
   children,
 }: {
   row: DragRow
@@ -527,6 +528,9 @@ export function OrderRow({
   open: boolean
   onToggle: () => void
   rename?: RowRename
+  /** An X at the end of its name bar: given only while it's empty, as a
+   *  field box's X is (the user, Nov 10). */
+  onRemove?: () => void
   /** What it opens to. */
   children?: React.ReactNode
 }) {
@@ -535,6 +539,11 @@ export function OrderRow({
   useEffect(listenForPresses, [])
   const toggle = () => !typingAtPress && onToggle()
   const iconBox = icon && <span className="grid h-7 w-7 shrink-0 place-items-center text-slate-600">{icon}</span>
+  const x = onRemove && (
+    <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={iconButton}>
+      {X}
+    </button>
+  )
   return (
     <div className={`border-b border-slate-100 last:border-b-0 ${row.lifted ? 'border-transparent' : ''}`}>
       <div className="flex items-center pl-1.5 pr-2">
@@ -578,6 +587,8 @@ export function OrderRow({
           </span>
         </button>
         )}
+        {/* Last, open or closed. */}
+        {x}
       </div>
       {open && Children.toArray(children).length > 0 && <div className="flex flex-col gap-3 px-4 pb-4 pt-1 sm:pl-10">{children}</div>}
     </div>
@@ -611,11 +622,11 @@ export function InnerRow({ row, name, line, onRemove, className }: { row: DragRo
  *  can be added (a phone's own picker), with no ▾ (the user, Nov 4). `wide`:
  *  under a whole list, as "+ Add a box" is (`addListButton`), its label
  *  without the "+", which the icon is. */
-export function AddMenu({ label, options, onPick, wide }: { label: string; options: { id: string; label: string }[]; onPick: (id: string) => void; wide?: boolean }) {
+export function AddMenu({ label, options, onPick, wide, row }: { label: string; options: { id: string; label: string }[]; onPick: (id: string) => void; wide?: boolean; row?: boolean }) {
   if (options.length === 0) return null
   return (
-    <label className={`relative ${wide ? addListButton : addButton}`}>
-      {wide && PLUS}
+    <label className={`relative ${wide ? addListButton : row ? addRowButton : addButton}`}>
+      {(wide || row) && PLUS}
       {label}
       <select
         aria-label={label}
@@ -648,6 +659,13 @@ export const addButton = `${plainButton} text-primary`
 export const addListButton =
   'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50'
 
+/** A box's or a tab's X (FieldBoxes, OrderRow). */
+export const X = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+)
+
 export const PLUS = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
     <path d="M12 5v14M5 12h14" />
@@ -662,4 +680,27 @@ export function AddListButton({ onClick, disabled, children }: { onClick: () => 
       {children}
     </button>
   )
+}
+
+/** Adding inside one thing, as a field box's "Add a field" is: a row across
+ *  the foot of its list, a plus before its words, lined up with the names
+ *  above it (the user, Nov 10: "can add a link be the same as add a field
+ *  in design?"). */
+export const addRowButton =
+  'flex min-h-[46px] w-full cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[15px] font-semibold text-primary hover:bg-blue-50/60'
+
+/** `addRowButton` as a button. */
+export function AddRowButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={addRowButton}>
+      {PLUS}
+      {children}
+    </button>
+  )
+}
+
+/** A list in a white card with its adds across its foot, as a field box is
+ *  its fields and then "Add a field". */
+export function ListCard({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">{children}</div>
 }

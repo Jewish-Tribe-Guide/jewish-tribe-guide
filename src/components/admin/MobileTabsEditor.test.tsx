@@ -45,29 +45,35 @@ describe('MobileTabsEditor', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  // The name is edited in the row, beside a trash can (the user, Nov 4).
+  // The name is edited in the row (the user, Nov 4).
   // Opens like a tab on a computer (the user, Nov 4: "Why would this work
   // differently than the You tab"): its link inside, with an ×.
-  it('a row opens to its link, which its × takes out, leaving + Add a link', async () => {
+  it('a row opens to its link, which its × takes out, leaving Add a link', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     show(TABS, onChange)
     await user.click(screen.getByRole('button', { name: 'Map' }))
-    // The link's × first, then the tab's own trash can.
-    expect(screen.getAllByRole('button', { name: 'Take Map off' })).toHaveLength(2)
-    expect(screen.queryByLabelText('+ Add a link')).toBeNull()
-    await user.click(screen.getAllByRole('button', { name: 'Take Map off' })[0]!)
+    // Only the link's ×: a tab with its link in has no X (the user, Nov 10).
+    expect(screen.getAllByRole('button', { name: 'Take Map off' })).toHaveLength(1)
+    expect(screen.queryByLabelText('Add a link')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Take Map off' }))
     expect(onChange).toHaveBeenLastCalledWith([TABS[0], { ...TABS[1], target: '' }, TABS[2]])
-    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'browse')
+    // As a box's "Add a field" is: a row across the foot.
+    expect(screen.getByLabelText('Add a link').closest('label')).toHaveClass('pl-10', 'w-full')
+    await user.selectOptions(screen.getByLabelText('Add a link'), 'browse')
     expect(onChange).toHaveBeenLastCalledWith([TABS[0], { ...TABS[1], target: 'browse' }, TABS[2]])
   })
 
-  it('an empty tab says Nothing in it yet in its row', () => {
-    show([TABS[0], { ...TABS[1], target: '' }])
-    expect(screen.getByRole('button', { name: 'Map' })).toHaveAccessibleDescription('Nothing in it yet')
+  it('an empty tab says nothing under its name, and comes off by its X', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    show([TABS[0], { ...TABS[1], target: '' }], onChange)
+    expect(screen.getByRole('button', { name: 'Map' })).toHaveAccessibleDescription('')
+    await user.click(screen.getByRole('button', { name: 'Take Map off' }))
+    expect(onChange).toHaveBeenLastCalledWith([TABS[0]])
   })
 
-  it('a row opens to its name in the row, a trash can, and what it opens', async () => {
+  it('a row opens to its name in the row and what it opens; emptied, its X takes it off', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     show(TABS, onChange)
@@ -81,6 +87,8 @@ describe('MobileTabsEditor', () => {
     await user.type(name, 'Find')
     expect(screen.getByRole('button', { name: 'Find' })).toHaveAttribute('aria-expanded', 'true')
     expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Take Find off' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Take Map off' }))
     await user.click(screen.getByRole('button', { name: 'Take Find off' }))
     expect(onChange).toHaveBeenLastCalledWith([TABS[0], TABS[2]])
   })
