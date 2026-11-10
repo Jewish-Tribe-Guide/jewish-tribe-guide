@@ -10,7 +10,7 @@ import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
 import { MENU_LINK_KEY, MENU_LINK_LABEL } from './menuLink'
 import { readSchedules, schedulesKey, weekPostRows } from './schedules'
-import { isNoMinyan, weekDates, weekDiffers, weekPostFor, type EditWeek } from './thisWeekEdit'
+import { isNoMinyan, weekDates, weekDiffers, weekPostFor, weekRowsFor, type EditWeek } from './thisWeekEdit'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
 // "Suggest an edit" is the listing's own boxes, in the listing's order, one
@@ -295,7 +295,7 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
   if (row.kind === 'minyans' && row.week) {
     if (weekRowEmpty(row, d)) return ''
     const post = weekPostOf(row, d)!
-    return [weekDates(row.week), ...(isNoMinyan(post) ? ['No minyan'] : weekPostRows(post, row.week).map((m) => minyanText(m, timeText)))].join(' · ')
+    return [weekDates(row.week), ...(isNoMinyan(post) ? ['No minyan'] : weekRowsFor(readSchedules(d[schedulesKey(row.fields[0].key)]), row.week).map((m) => minyanText(m, timeText)))].join(' · ')
   }
   if (row.kind === 'minyans') {
     const rows = minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!)
@@ -401,7 +401,7 @@ function weekPostOf(row: EditorRow, details: Record<string, unknown>) {
  *  dated in it that isn't a no-minyan week. */
 function weekRowEmpty(row: EditorRow, details: Record<string, unknown>) {
   const post = weekPostOf(row, details)
-  return !post || (!isNoMinyan(post) && weekPostRows(post, row.week).length === 0)
+  return !post || (!isNoMinyan(post) && weekRowsFor(readSchedules(details[schedulesKey(row.fields[0].key)]), row.week!).length === 0)
 }
 
 /** A box's minyanim as one string, ids left out and keys in order. */

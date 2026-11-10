@@ -827,8 +827,8 @@ export default function ListingEditor({
       const post = weekPostFor(readSchedules(details[sk]), week)
       return (
         <MinyanBoxEditor
-          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), week)}
-          initial={weekRowsFor(post, week)}
+          original={weekRowsFor(readSchedules(item[sk]), week)}
+          initial={weekRowsFor(readSchedules(details[sk]), week)}
           box="this_week"
           boxTitle={r.title}
           heading={weekDates(week)}

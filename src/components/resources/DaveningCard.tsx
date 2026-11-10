@@ -54,7 +54,7 @@ export default function DaveningCard({
   category?: CategoryConfig
   /** Edit under a usual box (Oct 10): that box's times alone, in a plain
    *  editor (BoxEditSheet). Without it, "Update their times" as before. */
-  onEditBox?: (box: MinyanBox, title: string, week?: string) => void
+  onEditBox?: (box: MinyanBox, title: string, weeks?: readonly string[]) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [sent, setSent] = useState(false)
@@ -347,9 +347,11 @@ export default function DaveningCard({
   // A week of only dated services (a newsletter's "Shabbat Oct 24"), no
   // week posted: the first of them, or the box had no line at all (BZBI,
   // the user, Oct 22).
-  /** A box of this week's own line: `fp` is the post its times are from,
-   *  which its Edit opens. */
-  const postFootFor = (fp: SpecialSchedule | undefined, key: string) => {
+  /** A box of this week's own line: `fp` is the post its times are from;
+   *  its Edit opens that and every other post the box shows a time from
+   *  (Mekor's Shabbos 9:15 PM, from a second post, couldn't be found to
+   *  change; the user, Nov 10). */
+  const postFootFor = (fp: SpecialSchedule | undefined, key: string, days: readonly { minyanim: readonly { from: SpecialSchedule }[] }[] = []) => {
     if (!fp) return undefined
     // When it was posted, or the date the shul's website last gave the
     // week's times (THIS_WEEK_SECTION) or a person the whole place, if
@@ -362,7 +364,7 @@ export default function DaveningCard({
     const postedFrom = fp.postedBy === 'website' && fp.postedAt ? { source: { from: item.name, at: fp.postedAt } } : {}
     const postDate = { confirmedAt: postedLater ? fp.postedAt : weekDate.confirmedAt, ...(postedLater ? postedFrom : { source: weekDate.source, by: weekDate.by }) }
     return onEditBox ? (
-      <FreshnessFooter resourceId={item.id} {...postDate} onEdit={() => onEditBox('this_week', 'This week’s schedule', fp.id)} />
+      <FreshnessFooter resourceId={item.id} {...postDate} onEdit={() => onEditBox('this_week', 'This week’s schedule', [...new Set([fp.id, ...days.flatMap((d) => d.minyanim.map((m) => m.from.id))])])} />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
         <FreshnessFooter resourceId={item.id} {...postDate} subject="Times" ask={false} />
@@ -396,7 +398,7 @@ export default function DaveningCard({
   const weekDated = (
     <div key="week-dated" className="space-y-5 empty:hidden">
       {!waiting && weekdayDays.length > 0 && (
-        <Card title="This week’s schedule" testId="davening-this-week" footer={postFootFor(weekFootPost, 'this-week')}>
+        <Card title="This week’s schedule" testId="davening-this-week" footer={postFootFor(weekFootPost, 'this-week', weekdayDays)}>
           <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-week-dates">
             {weekdayDates}
           </p>
@@ -440,7 +442,7 @@ export default function DaveningCard({
   // This Shabbos's own times, once they're out (drawn Oct 26): until then
   // only the usual Shabbos box, with no dates of its own.
   const shabbosDated = !waiting && shabbosDays.length > 0 && (
-    <Card key="shabbos-dated" title="This Shabbos" testId="davening-this-shabbos" footer={postFootFor(shabbosPost, 'this-shabbos')}>
+    <Card key="shabbos-dated" title="This Shabbos" testId="davening-this-shabbos" footer={postFootFor(shabbosPost, 'this-shabbos', shabbosDays)}>
       <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-shabbos-dates">
         {shabbosPost && !weekByDates(shabbosPost) && shabbosDays.every((d) => d.minyanim.every((m) => m.from === shabbosPost))
           ? postTitle(shabbosPost)
