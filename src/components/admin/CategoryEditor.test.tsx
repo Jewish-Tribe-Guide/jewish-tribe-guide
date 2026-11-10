@@ -751,8 +751,11 @@ describe('CategoryEditor — places within a walk', () => {
   it('adds lists of the other categories whose places have an address, and only on an existing category', async () => {
     const user = userEvent.setup()
     editor(hotels)
-    expect(walk().getByText('None yet')).toBeInTheDocument()
-    await user.click(walk().getByRole('button', { name: '+ Add a page' }))
+    // Nothing yet: only its dashed Add a page, under where the list goes,
+    // as Add a box is under Fields (the user, Nov 10).
+    expect(walk().queryByText('None yet')).toBeNull()
+    expect(walk().getByRole('button', { name: 'Add a page' })).toHaveClass('border-dashed', 'w-full')
+    await user.click(walk().getByRole('button', { name: 'Add a page' }))
     // Opened in place, to which page, how far and how grouped (board 17).
     const which = walk().getByRole('combobox', { name: 'Which page' }) as HTMLSelectElement
     expect([...which.options].map((o) => o.textContent)).toEqual(['Synagogues', 'Food'])
@@ -767,12 +770,12 @@ describe('CategoryEditor — places within a walk', () => {
     editor(hotels, onSaved)
     expect(await save(user, onSaved, 1)).not.toHaveProperty('walkList')
 
-    await user.click(walk().getByRole('button', { name: '+ Add a page' }))
+    await user.click(walk().getByRole('button', { name: 'Add a page' }))
     expect((await save(user, onSaved, 2)).walkList).toEqual([{ categoryId: 'synagogue', maxMinutes: 30 }])
 
     // A second list, of food, grouped by its Store Type; the first can't be
     // chosen again.
-    await user.click(walk().getByRole('button', { name: '+ Add a page' }))
+    await user.click(walk().getByRole('button', { name: 'Add a page' }))
     const second = walk().getByRole('combobox', { name: 'Which page' }) as HTMLSelectElement
     expect([...second.options].map((o) => o.value)).toEqual(['restaurant'])
     const by = walk().getByRole('combobox', { name: 'Grouped by' }) as HTMLSelectElement
@@ -786,7 +789,7 @@ describe('CategoryEditor — places within a walk', () => {
       { categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' },
     ])
     // Every category listed: nothing left to add.
-    expect(walk().queryByRole('button', { name: '+ Add a page' })).not.toBeInTheDocument()
+    expect(walk().queryByRole('button', { name: 'Add a page' })).not.toBeInTheDocument()
   })
 
   it('shows the list saved before there could be several, and removing the last sends null', async () => {

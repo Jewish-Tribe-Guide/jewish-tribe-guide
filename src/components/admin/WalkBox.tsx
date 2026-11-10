@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { MAX_WALK_LISTS, WALK_LIST_MINUTES, walkGroupFields, walkListFromKey, walkListKey, walkListTargets, type WalkList } from '@/lib/walkList'
 import { AdminBox, AdminField, Chevron, adminInputClass } from './AdminUI'
-import { addButton, RowActions } from './DragList'
+import { AddListButton, RowActions } from './DragList'
 
 // "Within a walk" (board 17): other pages' places near each of this page's,
 // a row each ("Food · Up to 30 min · by Food Type"), opening in place to
@@ -34,23 +34,7 @@ export default function WalkBox({
       title="Within a walk"
       foldOnPhone
       summary={lists.length ? lists.map((l) => categories.find((c) => c.id === l.categoryId)?.pluralLabel ?? l.categoryId).join(', ') : 'None'}
-      action={
-        unused.length > 0 &&
-        lists.length < MAX_WALK_LISTS && (
-          <button
-            type="button"
-            onClick={() => {
-              put([...lists, { categoryId: unused[0].id, maxMinutes: 30 }])
-              setOpen(unused[0].id)
-            }}
-            className={addButton}
-          >
-            + Add a page
-          </button>
-        )
-      }
     >
-      {lists.length === 0 && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">None yet</p>}
       {lists.map((walk, i) => {
         const target = categories.find((c) => c.id === walk.categoryId)
         const groupFields = target ? walkGroupFields(target) : []
@@ -126,6 +110,20 @@ export default function WalkBox({
           </div>
         )
       })}
+      {/* Under the list, as "+ Add a box" is under Fields (the user, Nov
+          10: "Should 'Within a walk' add a page also look like add a box?"). */}
+      {unused.length > 0 && lists.length < MAX_WALK_LISTS && (
+        <div className="px-4 pb-4 pt-2">
+          <AddListButton
+            onClick={() => {
+              put([...lists, { categoryId: unused[0].id, maxMinutes: 30 }])
+              setOpen(unused[0].id)
+            }}
+          >
+            Add a page
+          </AddListButton>
+        </div>
+      )}
     </AdminBox>
   )
 }

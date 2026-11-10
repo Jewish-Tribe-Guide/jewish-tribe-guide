@@ -608,11 +608,14 @@ export function InnerRow({ row, name, line, onRemove, className }: { row: DragRo
 }
 
 /** "+ Add a card" and the like: a button that opens the native list of what
- *  can be added (a phone's own picker), with no ▾ (the user, Nov 4). */
-export function AddMenu({ label, options, onPick }: { label: string; options: { id: string; label: string }[]; onPick: (id: string) => void }) {
+ *  can be added (a phone's own picker), with no ▾ (the user, Nov 4). `wide`:
+ *  under a whole list, as "+ Add a box" is (`addListButton`), its label
+ *  without the "+", which the icon is. */
+export function AddMenu({ label, options, onPick, wide }: { label: string; options: { id: string; label: string }[]; onPick: (id: string) => void; wide?: boolean }) {
   if (options.length === 0) return null
   return (
-    <label className={`relative ${addButton}`}>
+    <label className={`relative ${wide ? addListButton : addButton}`}>
+      {wide && PLUS}
       {label}
       <select
         aria-label={label}
@@ -636,3 +639,27 @@ const plainButton = 'inline-flex min-h-10 items-center rounded-lg border border-
 export const rowButton = `${plainButton} text-slate-900`
 /** The same in blue, for adding ("+ Add a group"). */
 export const addButton = `${plainButton} text-primary`
+
+/** Adding one more to a whole list ("+ Add a box", "+ Add a tab", "+ Add a
+ *  page"): a dashed button as wide as the list, a plus before its words, the
+ *  same on every admin screen (the user, Nov 10: "Should we apply that to
+ *  the site homepage part of admin?"). Adding inside one row stays that
+ *  row's own button. */
+export const addListButton =
+  'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50'
+
+export const PLUS = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+
+/** `addListButton` as a button. */
+export function AddListButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={addListButton}>
+      {PLUS}
+      {children}
+    </button>
+  )
+}

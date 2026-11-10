@@ -151,13 +151,13 @@ export default function MobileTabsEditor({
         }}
       </DragList>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
+      <div className="flex flex-col gap-2.5 px-4 pb-4 pt-2">
         {tabs.length >= MAX_MOBILE_TABS ? (
           <p className="m-0 text-[13px] text-slate-600">Five tabs at most. Take one off to add another.</p>
         ) : available.length === 0 ? (
           <p className="m-0 text-[13px] text-slate-600">Every place a tab can open is on the bar.</p>
         ) : (
-          <AddMenu label="+ Add a tab" options={available} onPick={add} />
+          <AddMenu wide label="Add a tab" options={available} onPick={add} />
         )}
       </div>
     </div>

@@ -121,7 +121,9 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('+ Add a tab adds an empty New tab, open with its name ready to type over, offering a link or a heading', async () => {
     const { user } = show()
-    await user.click(row('+ Add a tab'))
+    // Dashed and as wide as the list, as "+ Add a box" is (the user, Nov 10).
+    expect(row('Add a tab')).toHaveClass('border-dashed', 'w-full')
+    await user.click(row('Add a tab'))
     const name = screen.getByRole('textbox', { name: 'Name' })
     expect(name).toHaveValue('New tab')
     expect(name).toHaveFocus()
@@ -131,7 +133,7 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('what goes in first decides: a link leaves only links, emptying it brings both back', async () => {
     const { user, onChange } = show()
-    await user.click(row('+ Add a tab'))
+    await user.click(row('Add a tab'))
     await user.selectOptions(screen.getByLabelText('+ Add a link'), 'map')
     expect(screen.queryByRole('button', { name: '+ Add a heading' })).toBeNull()
     expect(onChange.mock.lastCall![0].at(-1)).toMatchObject({ label: 'New tab', kind: 'more-menu', items: [{ kind: 'link', target: 'map' }] })
@@ -141,7 +143,7 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('what goes in first decides: a heading leaves only headings, and opens with its name ready', async () => {
     const { user, onChange } = show()
-    await user.click(row('+ Add a tab'))
+    await user.click(row('Add a tab'))
     await user.click(row('+ Add a heading'))
     const name = screen.getAllByRole('textbox', { name: 'Name' }).at(-1)!
     expect(name).toHaveValue('New heading')
@@ -190,7 +192,7 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('a link added is named as the site calls it', async () => {
     const { user, onChange } = show()
-    await user.click(row('+ Add a tab'))
+    await user.click(row('Add a tab'))
     await user.selectOptions(screen.getByLabelText('+ Add a link'), 'you')
     expect(onChange.mock.lastCall![0].at(-1).items).toEqual([expect.objectContaining({ label: 'You', target: 'you' })])
   })
@@ -210,10 +212,10 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('offers the Categories menu back only once it has been taken off', async () => {
     const { user } = show()
-    expect(screen.queryByRole('button', { name: '+ Add the Categories menu' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add the Categories menu' })).toBeNull()
     await user.click(row('Categories'))
     await user.click(screen.getByRole('button', { name: 'Take Categories off' }))
-    expect(row('+ Add the Categories menu')).toBeInTheDocument()
+    expect(row('Add the Categories menu')).toBeInTheDocument()
   })
 
   it('shows an empty-nav warning when there are no tabs', () => {

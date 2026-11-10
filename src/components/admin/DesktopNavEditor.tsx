@@ -6,7 +6,7 @@ import { newDraftSectionId, type DraftHomeSection } from '@/lib/homeSections'
 import { headingLine, headings, tabHolds, tabItems, tabLine, withTabItems } from '@/lib/navTabs'
 import { LEFTOVER_SECTION } from '@/components/home/sections'
 import { useCardOptions } from './useCardOptions'
-import DragList, { AddMenu, InnerRow, OrderRow, RowActions, addButton, type RowRename } from './DragList'
+import DragList, { AddListButton, AddMenu, InnerRow, OrderRow, RowActions, addButton, type RowRename } from './DragList'
 
 // ── The top of the page, on a computer, as tabs (the user, Nov 4; drawing
 // KdHT8Tci1ufXSXobnnSfEm, boards "New · What goes in first decides" and
@@ -133,15 +133,9 @@ export default function DesktopNavEditor({
         )}
       </DragList>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
-        <button type="button" onClick={() => add({ label: 'New tab', kind: 'more-menu', items: [] })} className={addButton}>
-          + Add a tab
-        </button>
-        {!hasCategoriesMenu && (
-          <button type="button" onClick={() => add({ label: 'Categories', kind: 'categories-menu' })} className={addButton}>
-            + Add the Categories menu
-          </button>
-        )}
+      <div className="flex flex-col gap-2.5 px-4 pb-4 pt-2">
+        <AddListButton onClick={() => add({ label: 'New tab', kind: 'more-menu', items: [] })}>Add a tab</AddListButton>
+        {!hasCategoriesMenu && <AddListButton onClick={() => add({ label: 'Categories', kind: 'categories-menu' })}>Add the Categories menu</AddListButton>}
       </div>
     </div>
   )

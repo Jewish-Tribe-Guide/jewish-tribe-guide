@@ -137,9 +137,20 @@ The user's answers on Nov 10, evening, and what was done with them:
       ("Remove from <page>"); rows have no X. A box of the site's own
       (Davening times, Main dishes, Delivery) still goes when emptied, as
       it always has: it has no box to keep once nothing is in it.
-    - **Waiting on the user**: whether Home page's "+ Add a tab" and
-      Within a walk's "+ Add a page" should look like "+ Add a box". Asked,
-      not decided.
+    - **Adding one more to a whole list looks like "+ Add a box"** (the
+      user's yes, Nov 10): a dashed button as wide as the list, a plus
+      icon before its words, under the list (`AddListButton` /
+      `AddMenu wide`, DragList.tsx). Done for: Within a walk's Add a page
+      (moved from the box's header to under its list; "None yet" dropped,
+      the button says it), Site → Home page's computer Header (Add a tab,
+      Add the Categories menu), phone Tabs (Add a tab) and Cards under the
+      search (Add <card>), on computer and phone. Adding inside one opened
+      row keeps that row's own small button, as a box's "+ Add a field" is
+      its own line: a tab's "+ Add a link" / "+ Add a heading", the
+      Categories dropdown's "+ Add a heading". Not changed yet, other
+      lists' adds with the old small button: Fields' "+ Add audience
+      group", a field's "+ Add a choice", Forms' "+ Add a form" and "+ Add
+      a question", Campaigns' "+ Add a campaign".
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

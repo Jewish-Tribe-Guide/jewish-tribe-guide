@@ -85,7 +85,7 @@ describe('DesktopTopicsManager', () => {
     const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], sharesRow: false }
     const { onChange } = renderManager([legacyZmanim, card('map')])
 
-    await user.click(screen.getByRole('button', { name: '+ Add Davening Times' }))
+    await user.click(screen.getByRole('button', { name: 'Add Davening Times' }))
 
     expect(onChange).toHaveBeenCalledWith([legacyZmanim, card('map'), card('davening')])
   })
@@ -129,15 +129,16 @@ describe('DesktopTopicsManager', () => {
   // 'map' is retired, so there's no "+ Add" for it under any circumstance.
   it('offers "+ Add" for each card not in the list, Suggest a Listing included, never the map', () => {
     renderManager([card('davening')])
-    const adds = screen.getAllByRole('button', { name: /^\+ Add / }).map((b) => b.textContent)
-    expect(adds).toEqual(['+ Add Categories', `+ Add ${LISTINGS}`, '+ Add Suggest a Listing', `+ Add ${SUBSCRIBE}`, `+ Add ${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`])
+    const adds = screen.getAllByRole('button', { name: /^Add / }).map((b) => b.textContent)
+    for (const b of screen.getAllByRole('button', { name: /^Add / })) expect(b).toHaveClass('border-dashed', 'w-full')
+    expect(adds).toEqual(['Add Categories', `Add ${LISTINGS}`, 'Add Suggest a Listing', `Add ${SUBSCRIBE}`, `Add ${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`])
   })
 
   it('"+ Add" puts the card back at the bottom, in a row of its own', async () => {
     const user = userEvent.setup()
     const { onChange } = renderManager([card('davening'), card('listings', true)])
 
-    await user.click(screen.getByRole('button', { name: '+ Add Suggest a Listing' }))
+    await user.click(screen.getByRole('button', { name: 'Add Suggest a Listing' }))
 
     expect(onChange).toHaveBeenCalledWith([card('davening'), card('listings', true), card('suggest')])
   })

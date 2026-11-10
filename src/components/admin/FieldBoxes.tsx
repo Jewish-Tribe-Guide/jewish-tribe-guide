@@ -5,7 +5,7 @@ import type { CategoryField } from '@/lib/categories'
 import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
-import DragList, { RowName, type DragRow } from './DragList'
+import DragList, { addListButton, PLUS, RowName, type DragRow } from './DragList'
 
 // Site → Category pages → a page → Fields, as board E1b draws it (the user,
 // Nov 10: "I like the creativity. I just want you to implement it"): every
@@ -22,11 +22,6 @@ import DragList, { RowName, type DragRow } from './DragList'
 const NO_HANDLE = <span aria-hidden="true" className="h-11 w-8 shrink-0" />
 const still = (row: DragRow): DragRow => ({ ...row, handle: NO_HANDLE, rowProps: { onPointerDown: () => {}, onContextMenu: () => {} } })
 
-const PLUS = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-)
 
 /** A box's X, at the end of its name bar (the user, Nov 10: "I think that's
  *  better than trashcan on add a field line"). */
@@ -37,9 +32,7 @@ const X = (
 )
 
 /** E1b's "+ Add a box": a dashed button as wide as the list. */
-export const addBoxButton =
-  'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50'
-export { PLUS as PlusIcon }
+export { addListButton as addBoxButton, PLUS as PlusIcon }
 
 export default function FieldBoxes({
   page,

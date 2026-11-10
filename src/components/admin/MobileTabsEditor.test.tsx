@@ -97,10 +97,12 @@ describe('MobileTabsEditor', () => {
   it('+ Add a tab adds one named after where it goes, and opens it; five at most', async () => {
     const user = userEvent.setup()
     show()
-    await user.selectOptions(screen.getByLabelText('+ Add a tab'), 'grocery')
+    // Dashed and as wide as the list, as "+ Add a box" is (the user, Nov 10).
+    expect(screen.getByLabelText('Add a tab').closest('label')).toHaveClass('border-dashed', 'w-full')
+    await user.selectOptions(screen.getByLabelText('Add a tab'), 'grocery')
     expect(screen.getByRole('button', { name: 'Grocery Stores' })).toHaveAttribute('aria-expanded', 'true')
-    await user.selectOptions(screen.getByLabelText('+ Add a tab'), 'feedback')
-    expect(screen.queryByLabelText('+ Add a tab')).toBeNull()
+    await user.selectOptions(screen.getByLabelText('Add a tab'), 'feedback')
+    expect(screen.queryByLabelText('Add a tab')).toBeNull()
     expect(screen.getByText(/Five tabs at most/)).toBeInTheDocument()
   })
 })
