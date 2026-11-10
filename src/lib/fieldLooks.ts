@@ -6,10 +6,10 @@ import { isCertificateLink, kindField, listingActions, listingFacts, listingKind
 import { fieldBoxes } from './fieldBoxes'
 import { ownerOfPart } from './fieldParts'
 import { parseListingParts } from './listingParts'
-import { editorRows } from './editorRows'
+import { editorRows, rowHas } from './editorRows'
+import { formatPhone } from './validation'
 import { formatHoursSummary, type StructuredHours } from './hours'
 import { formatMinyanimSummary, type Minyan } from './davening'
-import { formatPhone } from './validation'
 import { itemFields } from './itemFilter'
 
 // ── A field, how it looks (boards 33c and 34, Nov 9) ─────────────────────────
@@ -419,7 +419,7 @@ export function addingScreen(
   field: CategoryField,
   item: DirectoryResource,
   askedWhen?: CategoryField['showIf'],
-): { before: AddingRow[]; title: string; fields: CategoryField[]; big: boolean } {
+): { before: AddingRow[]; title: string; fields: CategoryField[]; big: boolean; after: AddingRow[] } {
   // Asked where the site asks it: a field asked after an answer sits with
   // the question it follows (Delivery Details with Store Type).
   const category = askedWhen ? { ...page, detailFields: page.detailFields.map((f) => (f.key === field.key ? { ...f, showIf: askedWhen } : f)) } : page
@@ -427,12 +427,26 @@ export function addingScreen(
   const at = rows.findIndex((r) => r.fields.some((f) => f.key === field.key))
   const summary = (r: (typeof rows)[number]): AddingRow => ({
     title: r.kind === 'name' ? 'Name' : r.title,
-    text: r.kind === 'name' ? item.name : r.fields.map((f) => (f.type === 'image' || f.type === 'boolean' ? '' : answerText(f, item[f.key]))).filter(Boolean).join(' · '),
+    // The address and phone, where the row edits them, as the add form's
+    // own row says them: the street, then the phone.
+    text:
+      r.kind === 'name'
+        ? item.name
+        : [
+            rowHas(r, 'address') && item.address ? item.address.split(',')[0].trim() : '',
+            rowHas(r, 'phone') && item.phone ? formatPhone(item.phone) : '',
+            ...r.fields.map((f) => (f.type === 'image' || f.type === 'boolean' ? '' : answerText(f, item[f.key]))),
+          ]
+            .filter(Boolean)
+            .join(' · '),
   })
   const big = field.type === 'hours' || field.type === 'minyanim' || field.type === 'contacts' || field.type === 'image' || field.type === 'tags'
-  if (at < 0) return { before: rows.slice(0, 1).map(summary), title: field.label, fields: [field], big }
+  if (at < 0) return { before: rows.slice(0, 1).map(summary), title: field.label, fields: [field], big, after: [] }
   const before = [rows[0], at > 1 ? rows[at - 1] : null].filter((r): r is (typeof rows)[number] => !!r && r !== rows[at]).map(summary)
   const row = rows[at]
   const asked = row.fields.filter((f) => f.key === field.key || (f.type !== 'image' && fieldIsVisible(f, item as Record<string, unknown>)))
-  return { before, title: row.title, fields: asked, big }
+  // The field's other sections, right under it (davening's usual Shabbos
+  // times): the form asks it in more than one.
+  const after = rows.slice(at + 1).filter((r) => r.fields.some((f) => f.key === field.key) && !r.week).map((r) => ({ title: r.title, text: '' }))
+  return { before, title: row.title, fields: asked, big, after }
 }

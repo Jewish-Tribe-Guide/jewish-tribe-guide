@@ -139,6 +139,27 @@ describe('fieldLooks: a field on a made-up place', () => {
     expect(adding.fields.map((f) => f.key)).toContain('food_type')
     expect(addingScreen(page, hours, item).big).toBe(true)
   })
+
+  // The user, Nov 10: the Adding tab should show a field as the add form
+  // really does. Hours are a section of their own after the contact, and
+  // that row says the address and phone, as the form's own row does.
+  it('shows hours as their own section after the contact, which says the address and phone', () => {
+    const at = { ...item, address: '133 S 18th St, Philadelphia, PA', phone: '(267) 606-6612' }
+    const adding = addingScreen(page, hours, at)
+    expect(adding.title).toBe('Hours')
+    const contact = adding.before.at(-1)!
+    expect(contact.title).toMatch(/^Address(,| and) phone/)
+    expect(contact.text).toBe('133 S 18th St · (267) 606-6612')
+    expect(adding.after).toEqual([])
+  })
+
+  it('shows davening as the form asks it: usual weekday times open, usual Shabbos times under it', () => {
+    const minyanim: CategoryField = { key: 'minyanim', label: 'Davening Times', type: 'minyanim' }
+    const shul = { ...page, detailFields: [...page.detailFields, minyanim] }
+    const adding = addingScreen(shul, minyanim, item)
+    expect(adding.title).toBe('Usual weekday times')
+    expect(adding.after.map((r) => r.title)).toEqual(['Usual Shabbos times'])
+  })
 })
 
 // The user, Nov 10: "it's not previewing with the fields we actually have".
