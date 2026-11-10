@@ -8,7 +8,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, basicsLandIn, fieldBoxes, madeField, ownBox, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, basicLandsIn, basicsLandIn, fieldBoxes, madeField, ownBox, placeBasic, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -561,10 +561,18 @@ function CategoryEditorScreen({
         onAdd={(row) => {
           if (row.basic === 'address' || row.basic === 'phone') setLanded(`basic:${row.basic}`)
           else setLanding(new Set(pageFields.map((f) => f.key)))
-          if (row.basic === 'address') {
-            set('hasAddress', true)
-            setCap('map', true)
-          } else if (row.basic === 'phone') set('hasPhone', true)
+          if (row.basic === 'address' || row.basic === 'phone') {
+            // In the box it was added from (the user, Nov 10: "move all
+            // fields. Including address and phone").
+            if (addingTo && addingTo !== 'contact') {
+              const own = ownBox(parts, boxes, addingTo, fieldPage)
+              set('listingParts', listingPartsKey(placeBasic(own.parts, row.basic, own.id)))
+            }
+            if (row.basic === 'address') {
+              set('hasAddress', true)
+              setCap('map', true)
+            } else set('hasPhone', true)
+          }
           else if (row.basic === 'hours') toggleHoursField(true)
           else if (row.basic === 'website') toggleWebsiteField(true)
           else if (row.field) addReadyField(row.field, row.companions, ownAddingBox(), row.partner)
@@ -578,6 +586,7 @@ function CategoryEditorScreen({
         into={addingBox ? {
           heading: `Add a field to ${addingBox.title || 'New box'}`,
           offers: (row) => {
+            if (row.basic === 'address' || row.basic === 'phone') return basicLandsIn(addingBox, fieldPage)
             if (!row.field) return basicsLandIn(addingBox)
             return whereAdded(addingBox, normalizeField(row.field), fieldPage) === 'here'
           },

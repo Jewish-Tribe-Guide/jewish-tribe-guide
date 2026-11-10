@@ -54,6 +54,50 @@ export type ListingParts = {
   about?: string[]
 }
 
+// ── The page's address and phone, as a box holds them ──────────────────────
+// The user, Nov 10: "we should also be able to move all fields. Including
+// address and phone." They're the place's own (item.address, item.phone),
+// not fields, so a box names them by token. In Contact unless put elsewhere.
+
+export const BASICS = ['address', 'phone'] as const
+export type Basic = (typeof BASICS)[number]
+export const basicToken = (b: Basic) => `@${b}`
+
+/** Where the address or phone is: Contact, About, or the admin's nth box. */
+export function basicPlace(parts: ListingParts, b: Basic): 'contact' | 'about' | `box:${number}` {
+  const t = basicToken(b)
+  if (parts.about?.includes(t)) return 'about'
+  const n = (parts.boxes ?? []).findIndex((x) => x.fields.includes(t))
+  return n >= 0 ? `box:${n}` : 'contact'
+}
+
+/** The address or phone as a field a box draws: the place's own value. */
+const BASIC_FIELDS: Record<string, CategoryField> = {
+  '@address': { key: 'address', label: 'Address', type: 'text' },
+  '@phone': { key: 'phone', label: 'Phone', type: 'tel' },
+}
+
+/** Whether a box's field is the place's address or phone (BASIC_FIELDS):
+ *  edited with the place's contact, not as a field. */
+export const isBasicField = (f: CategoryField) => Object.values(BASIC_FIELDS).includes(f)
+
+/** The address and phone, as fields, put in Contact or About. */
+export function basicsIn(category: CategoryConfig, place: 'contact' | 'about'): CategoryField[] {
+  const parts = parseListingParts(category.listingParts)
+  const has = { address: category.hasAddress !== false, phone: category.hasPhone !== false }
+  return BASICS.filter((b) => has[b] && basicPlace(parts, b) === place).map((b) => BASIC_FIELDS[basicToken(b)])
+}
+
+/** A box's fields by key, the address and phone among them where the page
+ *  has them. */
+function boxFieldsByKey(category: CategoryConfig): Map<string, CategoryField> {
+  return new Map([
+    ...category.detailFields.filter((f) => f.renderAs !== 'hidden').map((f): [string, CategoryField] => [f.key, f]),
+    ...(category.hasAddress !== false ? [['@address', BASIC_FIELDS['@address']] as [string, CategoryField]] : []),
+    ...(category.hasPhone !== false ? [['@phone', BASIC_FIELDS['@phone']] as [string, CategoryField]] : []),
+  ])
+}
+
 export function parseListingParts(raw: unknown): ListingParts {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
   const r = raw as Record<string, unknown>
@@ -173,7 +217,7 @@ export function shabbosFieldsOf(category: CategoryConfig): CategoryField[] | nul
  *  box's order is the admin's, not the category's: "Pantry" before "Food
  *  packages"), the ones that still exist. A box left with none isn't one. */
 export function boxesOf(category: CategoryConfig): { title: string; fields: CategoryField[] }[] {
-  const byKey = new Map(category.detailFields.filter((f) => f.renderAs !== 'hidden').map((f) => [f.key, f]))
+  const byKey = boxFieldsByKey(category)
   return (parseListingParts(category.listingParts).boxes ?? []).flatMap((b) => {
     const fields = b.fields.map((k) => byKey.get(k)).filter((f): f is CategoryField => !!f)
     return fields.length > 0 ? [{ title: b.title, fields }] : []
@@ -183,7 +227,7 @@ export function boxesOf(category: CategoryConfig): { title: string; fields: Cate
 /** The same, each with its id in the admin's list ('box:<n>', its place
  *  among all of them, empty ones included), for the saved order. */
 export function boxesWithIds(category: CategoryConfig): { id: string; title: string; fields: CategoryField[] }[] {
-  const byKey = new Map(category.detailFields.filter((f) => f.renderAs !== 'hidden').map((f) => [f.key, f]))
+  const byKey = boxFieldsByKey(category)
   return (parseListingParts(category.listingParts).boxes ?? []).flatMap((b, n) => {
     const fields = b.fields.map((k) => byKey.get(k)).filter((f): f is CategoryField => !!f)
     return fields.length > 0 ? [{ id: `box:${n}`, title: b.title, fields }] : []

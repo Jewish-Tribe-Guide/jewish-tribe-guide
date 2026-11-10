@@ -1030,6 +1030,18 @@ describe('ListingView — a field where the admin put it', () => {
     expect(screen.getAllByText('Reuven Levi')).toHaveLength(1)
   })
 
+  // The user, Nov 10: "move all fields. Including address and phone."
+  it('the address in About and the phone in a box of the admin’s, drawn there and not in Contact', () => {
+    const fields: CategoryField[] = [{ key: 'notes', label: 'Notes', type: 'textarea' }, { key: 'gabbaim', label: 'Gabbaim', type: 'contacts', renderAs: 'row' }]
+    const page = makeCategory({ id: 'synagogue', detailFields: fields, listingParts: { about: ['@address'], boxes: [{ title: 'Who to call', fields: ['gabbaim', '@phone'] }] } })
+    view({ item: makeListing({ address: '1 Pine St', phone: '2155550199', notes: 'Kiddush after', gabbaim: [{ name: 'Reuven Levi', phone: '2155550111' }] }), category: page })
+    expect(screen.getByTestId('listing-about')).toHaveTextContent('1 Pine St')
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Who to call'))!
+    expect(within(box).getByRole('link', { name: /555-0199/ })).toHaveAttribute('href', 'tel:2155550199')
+    expect(screen.queryByTestId('listing-details')?.textContent ?? '').not.toMatch(/1 Pine St|555-0199/)
+    expect(screen.getAllByText('1 Pine St')).toHaveLength(1)
+  })
+
   it('hours in a box of the admin’s, said there and not again in Contact', () => {
     const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
     view({ item: { ...judah, hours: everyDay }, category: makeCategory({ ...food, listingParts: { boxes: [{ title: 'When to come', fields: ['hours'] }] } }) })

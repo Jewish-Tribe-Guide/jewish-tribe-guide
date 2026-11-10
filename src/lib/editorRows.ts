@@ -4,7 +4,7 @@ import { readContacts, sameContacts } from './contacts'
 import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
 import { sameFieldValue } from './listingDiff'
-import { boxesOf, fixedPlaceOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
+import { boxesOf, fixedPlaceOf, isBasicField, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
 import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
@@ -113,7 +113,7 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   const namedKeys = new Set(named?.fields.map((f) => f.key) ?? [])
   const shabbos = shabbosFieldsOf(category) ?? []
   const shabbosKeys = new Set(shabbos.map((f) => f.key))
-  const boxKeys = new Set(boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)))
+  const boxKeys = new Set(boxesOf(category).flatMap((b) => b.fields.filter((f) => !isBasicField(f)).map((f) => f.key)))
   const kind = kindField(category)
   if (kind && !placed.has(kind.key)) {
     // What the choice brings up goes with it (the user, Oct 20): picking
@@ -183,7 +183,8 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   // 4 · The admin's boxes, then any list of contacts in none of them, with
   // the Shabbos card among them where the admin put it.
   const boxes: EditorRow[] = [
-    ...boxesOf(category).map((b) => ({ id: `box:${b.title}`, title: b.title, kind: 'fields' as const, fields: take([...b.fields]) })),
+    // The address and phone are edited with the place's contact.
+    ...boxesOf(category).map((b) => ({ id: `box:${b.title}`, title: b.title, kind: 'fields' as const, fields: take(b.fields.filter((f) => !isBasicField(f))) })),
     ...fields
       .filter((f) => f.type === 'contacts' && !placed.has(f.key) && !shabbosKeys.has(f.key))
       .map((f) => ({ id: `box:${f.key}`, title: f.label, kind: 'fields' as const, fields: take([f]) })),

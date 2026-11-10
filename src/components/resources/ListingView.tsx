@@ -42,7 +42,7 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { arrange, boxesOf, boxOrderOf, fixedPlaceOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { arrange, basicsIn, boxesOf, boxOrderOf, fixedPlaceOf, isBasicField, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
 import { isMinyanim } from '@/lib/davening'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
@@ -558,8 +558,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   })
 
   // ── 4 · Details ────────────────────────────────────────────────────────
-  const showAddress = category.hasAddress !== false && !!item.address
-  const showPhone = category.hasPhone !== false && !!item.phone
+  // In Contact unless the admin put them elsewhere (the user, Nov 10:
+  // "move all fields. Including address and phone").
+  const inContact = new Set(basicsIn(category, 'contact').map((f) => f.key))
+  const showAddress = inContact.has('address') && !!item.address
+  const showPhone = inContact.has('phone') && !!item.phone
   // The place's hours, in the contact box: today, opening to the week. A
   // mikvah's are in its own boxes, one per audience.
   // Contact or About, where the admin put a field in one by name (the
@@ -590,7 +593,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // Contact; its button under the name stays.
   const aboutLink = (a: ActionSpec) => (a.kind === 'link' || a.kind === 'email') && inAbout(a.field) && !placed.has(a.field.key)
   for (const a of [...buttons, ...extra]) if (aboutLink(a)) shownElsewhere.delete((a as { field: CategoryField }).field.key)
-  const aboutFields = category.detailFields.filter(
+  const aboutFields = [...basicsIn(category, 'about').filter((f) => fieldText(f, item[f.key])), ...category.detailFields.filter(
     (f) =>
       ((f.type === 'textarea' && fixedPlace(f.key) !== 'contact') || inAbout(f)) &&
       f.renderAs !== 'hidden' &&
@@ -598,7 +601,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       !shownElsewhere.has(f.key) &&
       !(isBig(f) && fixedPlace(f.key)) &&
       fieldText(f, item[f.key]),
-  )
+  )]
   const contactExtra = extra.filter((a) => !aboutLink(a))
   const detailFields = category.detailFields.filter(
     (f) =>
@@ -747,7 +750,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // asked about once that's old, under its first description's key
   // (migration 078). Edit beside either.
   const editAbout = editRows('About', ['about'])
-  const aboutKey = aboutFields[0]?.key
+  const aboutKey = aboutFields.find((f) => !isBasicField(f))?.key
   const aboutFoot = fromGoogle ? (
     <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
   ) : aboutKey ? (

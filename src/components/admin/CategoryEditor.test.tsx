@@ -1244,6 +1244,27 @@ describe('CategoryEditor — + Add a field', () => {
     await waitFor(() => expect(vi.mocked(fetchJson)).toHaveBeenCalled())
     expect(JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).listingParts.boxes).toEqual([{ title: 'Visiting', fields: ['liaisons'] }])
   })
+
+  // The user, Nov 10: "we should also be able to move all fields. Including
+  // address and phone."
+  it('adds the phone from one of the admin’s boxes into that box', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: everywhere }))))
+    const page = baseCategory({ hasPhone: false, detailFields: [{ key: 'about', label: 'About us', type: 'textarea' }] })
+    renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await addBoxNamed(user, 'Call us')
+    await user.click(addField())
+    await user.click(await screen.findByRole('button', { name: /^Phone/ }))
+    await user.click(await screen.findByRole('button', { name: /^Add to / }))
+    // The new box, its name still in the box it's typed in.
+    await waitFor(() => expect(boxesShown().at(-1)?.[1]).toEqual(['Phone']))
+    expect(shownIn('Contact')).toEqual(['Address'])
+    await saveNow(user)
+    await waitFor(() => expect(vi.mocked(fetchJson)).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body)
+    expect(body.hasPhone).toBe(true)
+    expect(body.listingParts.boxes).toEqual([{ title: 'Call us', fields: ['@phone'] }])
+  })
 })
 
 // The user, Nov 5: the boxes that move are renamed in place too, the new

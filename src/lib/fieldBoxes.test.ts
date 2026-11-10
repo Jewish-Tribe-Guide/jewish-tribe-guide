@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, placeBasic, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -226,11 +226,41 @@ describe('dragging', () => {
     expect(orderProblem(before, drop(before, 'field:r', 0), page)).toEqual({})
   })
 
-  it('keeps the address, phone and the end of the opened box under it', () => {
+  it('keeps the end of a box under it', () => {
     const items = fieldItems(boxes, 'contact')
-    expect(orderProblem(items, drop(items, 'basic:phone', 1), hospital)).toEqual({})
     const at = items.findIndex((i) => 'end' in i)
     expect(orderProblem(items, drop(items, 'field:w', at), hospital)).toEqual({})
+  })
+
+  // The user, Nov 10: "we should also be able to move all fields. Including
+  // address and phone."
+  it('moves the address and phone into any box, and back to Contact', () => {
+    const items = fieldItems(boxes)
+    // The phone, into Who to call.
+    const toBox = drop(items, 'basic:phone', 1)
+    expect(orderProblem(items, toBox, hospital)).toBeNull()
+    const inBox = readOrder(items, toBox, hospitalParts, hospital).parts
+    expect(inBox.boxes![0].fields).toEqual(['liaisons', '@phone'])
+    const shown = fieldBoxes(hospital, inBox)
+    expect(shown.find((b) => b.id === 'box:0')!.basics).toEqual(['phone'])
+    expect(shown.find((b) => b.id === 'contact')!.basics).toEqual(['address'])
+    // The address, into About: a box of its own then, there being nothing
+    // else in it (the Sukkah is the Shabbos card's).
+    const both = placeBasic(inBox, 'address', 'about')
+    expect(both.about).toEqual(['@address'])
+    expect(lines(hospital, both).find(([t]) => t === 'About')).toEqual(['About', 'Address'])
+    expect(fieldBoxes(hospital, both).find((b) => b.id === 'contact')).toMatchObject({ basics: [] })
+    // The phone, back into Contact.
+    const three = fieldItems(fieldBoxes(hospital, both))
+    const back = drop(three, 'basic:phone', three.findIndex((i) => itemKey(i) === 'end:contact') - 1)
+    expect(orderProblem(three, back, hospital)).toBeNull()
+    const home = readOrder(three, back, both, hospital).parts
+    expect(home.boxes![0].fields).toEqual(['liaisons'])
+    expect(fieldBoxes(hospital, home).find((b) => b.id === 'contact')!.basics).toEqual(['phone'])
+    // Never above the first box, nor into the Shabbos card.
+    expect(orderProblem(items, drop(items, 'basic:phone', 0), hospital)).toEqual({})
+    const shabbos = items.findIndex((i) => itemKey(i) === 'end:shabbos') - 1
+    expect(orderProblem(items, drop(items, 'basic:phone', shabbos), hospital)).toEqual({ at: 'shabbos', why: 'Phone can’t go in This Shabbos' })
   })
 
   // The user, Nov 10: "an admin can arrange how they want".

@@ -1,5 +1,5 @@
 import type { CategoryField, FieldType } from './categories'
-import { arrange, cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
+import { arrange, basicPlace, basicToken, BASICS, cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type Basic, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
 import { underName } from './cardLines'
 import { partKeys } from './fieldParts'
 import { caveatTitle } from './listingView'
@@ -168,8 +168,13 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const before = (parts.lead ?? LEAD_SLOTS).flatMap((s) => slots[s])
   // The admin's boxes, then lists of contacts in none, with the Shabbos card
   // after `after` of them, or after them all.
+  // The address and phone: Contact's unless put elsewhere (the user, Nov
+  // 10: "move all fields. Including address and phone").
+  const pageHas = { address: page.hasAddress, phone: page.hasPhone }
+  const basicsAt = (id: string) => BASICS.filter((b) => pageHas[b] && basicPlace(parts, b) === id)
+  const withBasics = (id: string) => (basicsAt(id).length ? { basics: basicsAt(id) } : {})
   const zone: FieldBox[] = [
-    ...boxes.map((b, n) => ({ id: `box:${n}`, title: b.title, kind: 'admin' as const, moves: true, fields: b.fields })),
+    ...boxes.map((b, n) => ({ id: `box:${n}`, title: b.title, kind: 'admin' as const, moves: true, fields: b.fields, ...withBasics(`box:${n}`) })),
     ...prefixed('contacts:', label),
   ]
   // A box with nothing in it isn't on the listing, so isn't counted.
@@ -183,10 +188,11 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
     }
     zone.splice(at, 0, { id: 'shabbos', title: 'This Shabbos', kind: 'admin', moves: true, fields: shabbos })
   }
-  const basics = [...(page.hasAddress ? ['address' as const] : []), ...(page.hasPhone ? ['phone' as const] : [])]
+  const basics = basicsAt('contact')
   const contact: FieldBox[] =
     basics.length || homes.get('contact')?.length ? [{ id: 'contact', title: 'Contact', kind: 'fixed', moves: false, fields: homes.get('contact') ?? [], basics }] : []
-  const about: FieldBox[] = homes.get('about')?.length ? [{ id: 'about', title: 'About', kind: 'fixed', moves: false, fields: homes.get('about')! }] : []
+  const about: FieldBox[] =
+    homes.get('about')?.length || basicsAt('about').length ? [{ id: 'about', title: 'About', kind: 'fixed', moves: false, fields: homes.get('about') ?? [], ...withBasics('about') }] : []
   const middle = [...before, ...zone, ...contact, ...about].map((b) => ({ ...b, moves: true }))
   return [...(parts.order ? arrange(middle, parts.order) : middle), ...listing('hidden', 'Not on the listing')]
 }
@@ -400,10 +406,18 @@ export function orderProblem(prev: readonly FieldItem[], next: readonly FieldIte
     for (const [k, box] of now) if (was.get(k) !== box) return {}
     return null
   }
-  // A box's address, phone and end stay under it, the end last.
-  for (const [k, box] of now) if ((k.startsWith('basic:') || k.startsWith('end:')) && box !== was.get(k)) return {}
+  // A box's end stays under it, last.
+  for (const [k, box] of now) if (k.startsWith('end:') && box !== was.get(k)) return {}
   for (let n = 0; n < next.length - 1; n++) if ('end' in next[n] && !('box' in next[n + 1])) return {}
   const byKey = new Map([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
+  // The address and phone go in any box but the Shabbos card, a card it
+  // opens with, a mikvah's section and "Not on the listing".
+  for (const [k, box] of now) {
+    if (!k.startsWith('basic:') || box === was.get(k)) continue
+    const target = boxes.find((b) => b.id === box)
+    if (!target) return {}
+    if (!takesBasic(target, page)) return { at: target.id, why: `${k === 'basic:address' ? 'Address' : 'Phone'} can’t go in ${target.title}` }
+  }
   for (const [k, box] of now) {
     if (!k.startsWith('field:') || box === was.get(k)) continue
     const f = byKey.get(k.slice(6))
@@ -426,7 +440,7 @@ export function readOrder(
 ): { parts: ListingParts; order: string[] | null } {
   // A field dropped into a box of the listing's own makes it the admin's
   // first, in its place.
-  const to = [...owners(next)].find(([k, box]) => k.startsWith('field:') && box !== owners(prev).get(k) && box && !box.startsWith('box:'))?.[1]
+  const to = [...owners(next)].find(([k, box]) => (k.startsWith('field:') || k.startsWith('basic:')) && box !== owners(prev).get(k) && box && !box.startsWith('box:'))?.[1]
   const target = to ? prev.find((i): i is { box: FieldBox } => 'box' in i && i.box.id === to)?.box : undefined
   if (target && ownable(target, page)) {
     const shown = prev.flatMap((i) => ('box' in i ? [i.box] : []))
@@ -453,16 +467,22 @@ export function readOrder(
   if (parts.main) out.main = { ...parts.main, fields: fieldsOf('main', parts.main.fields) }
   if (parts.shabbos) out.shabbos = { ...parts.shabbos, fields: fieldsOf('shabbos', parts.shabbos.fields) }
   const boxIds = next.flatMap((i) => ('box' in i ? [i.box.id] : []))
-  if (parts.boxes) {
-    const order = boxIds.filter((id) => id.startsWith('box:')).map((id) => Number(id.slice(4)))
-    out.boxes = order.map((n) => ({ ...parts.boxes![n], fields: fieldsOf(`box:${n}`, parts.boxes![n].fields) }))
-  }
+  const adminOrder = boxIds.filter((id) => id.startsWith('box:')).map((id) => Number(id.slice(4)))
+  if (parts.boxes) out.boxes = adminOrder.map((n) => ({ ...parts.boxes![n], fields: fieldsOf(`box:${n}`, parts.boxes![n].fields) }))
   // A field moved into Contact or About is put there by name; one moved
   // anywhere else is in neither.
   let placedOut: ListingParts = out
   for (const m of moved) placedOut = putInPlace(placedOut, m.key, m.to === 'contact' || m.to === 'about' ? m.to : null)
   Object.assign(out, placedOut)
   for (const p of FIXED_PLACES) if (!placedOut[p]) delete out[p]
+  // The address and phone, in the box they're under now.
+  for (const i of next) {
+    if (!('basic' in i)) continue
+    const at = now.get(itemKey(i)) ?? 'contact'
+    const placed = placeBasic(out, i.basic, at.startsWith('box:') ? `box:${adminOrder.indexOf(Number(at.slice(4)))}` : at)
+    for (const k of Object.keys(out) as (keyof ListingParts)[]) if (!(k in placed)) delete out[k]
+    Object.assign(out, placed)
+  }
 
   // The boxes, when they moved: the order, which then decides it all.
   const prevIds = prev.flatMap((i) => ('box' in i ? [i.box.id] : []))
@@ -555,6 +575,27 @@ export function addToBox(parts: ListingParts, id: string, key: string): ListingP
   if (!id.startsWith('box:')) return parts
   const n = Number(id.slice(4))
   return { ...parts, boxes: (parts.boxes ?? []).map((b, i) => (i === n ? { ...b, fields: put(b.fields) } : b)) }
+}
+
+/** Whether a box takes the address and phone: Contact, About, the admin's
+ *  own and a box of the listing's own that becomes the admin's (ownBox). */
+function takesBasic(box: FieldBox, page: FieldPage): boolean {
+  return box.id === 'contact' || box.id === 'about' || box.id.startsWith('box:') || ownable(box, page)
+}
+
+/** From a box's + Add a field: whether it offers the address or phone. */
+export const basicLandsIn = (box: FieldBox, page: FieldPage) => takesBasic(box, page)
+
+/** The address or phone put in a box (Contact, About or the admin's nth),
+ *  and out of any other. Contact is where it is when nowhere else. */
+export function placeBasic(parts: ListingParts, b: Basic, id: string): ListingParts {
+  const t = basicToken(b)
+  const out: ListingParts = { ...parts }
+  if (parts.boxes) out.boxes = parts.boxes.map((x, n) => ({ ...x, fields: [...x.fields.filter((k) => k !== t), ...(id === `box:${n}` ? [t] : [])] }))
+  const about = [...(parts.about ?? []).filter((k) => k !== t), ...(id === 'about' ? [t] : [])]
+  if (about.length) out.about = about
+  else delete out.about
+  return out
 }
 
 /** A field put in Contact or About by name (null: in neither), and out of

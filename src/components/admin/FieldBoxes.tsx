@@ -159,7 +159,7 @@ export default function FieldBoxes({
           }
           if ('basic' in item) {
             const name = item.basic === 'address' ? 'Address' : 'Phone'
-            return <Inner row={still(row)} name={name} onOpen={() => onShowBasic(item.basic)} />
+            return <Inner row={row} name={name} onOpen={() => onShowBasic(item.basic)} />
           }
           const f = byKey.get(item.field)
           return <Inner row={hidden.has(item.field) ? still(row) : row} name={f?.label || 'New field'} tags={f ? tagsOf(f) : []} onOpen={() => onShowField(item.field)} />
