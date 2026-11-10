@@ -8,8 +8,10 @@ import {
   submitListingUpdate,
   submitListingDelete,
   submitEruvUpdate,
+  submitEruvCreate,
 } from '@/lib/submissionStore'
-import { listEruvim } from '@/lib/eruvStore'
+import { readNewEruv } from '@/lib/newEruv'
+import { listEruvim, listEruvimForAdmin } from '@/lib/eruvStore'
 import { readEruvSuggestion } from '@/lib/eruvSuggestion'
 import { eruvPageOwnFields } from '@/lib/eruvFields'
 import { after } from 'next/server'
@@ -38,8 +40,8 @@ type Body = {
 }
 
 // POST /api/submissions — public endpoint for proposing a change: add/edit/report
-// a listing, or a fix to an eruv's listing (`targetType: 'eruv'`, an update
-// only; eruvSuggestion.ts). Everything lands in the moderation queue as `pending`; nothing goes
+// a listing, a fix to an eruv's listing (`targetType: 'eruv'`, an update;
+// eruvSuggestion.ts), or a new eruv (an eruv's create; newEruv.ts). Everything lands in the moderation queue as `pending`; nothing goes
 // live until an admin approves. (`targetType: 'category'` is rejected outright —
 // suggesting a new category is no longer a public path; feedback comes through
 // the general feedback form instead. Older `category` rows may still exist in the
@@ -83,6 +85,26 @@ export async function POST(request: Request) {
 
   if (targetType === 'category') {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+  }
+
+  if (targetType === 'eruv' && operation === 'create') {
+    const categories = await listCategories(community.slug)
+    const page = categories.find((c) => c.kind === 'eruv')
+    if (!ui.contributions.add || !page || !resolveCapabilities(page.capabilities).add) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    // Hidden ones too: adding one by the same name would fail at approval.
+    const listed = await listEruvimForAdmin(community.slug)
+    if (!listed.available) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    const read = readNewEruv(body.payload, listed.eruvim, eruvPageOwnFields(categories))
+    if (!read.ok) return Response.json({ ok: false, errors: read.errors }, { status: 400 })
+    let submission: SubmissionRow
+    try {
+      submission = await submitEruvCreate(community.slug, read.suggestion, note?.trim() || null, submittedBy)
+    } catch (err) {
+      console.error('[submissions] new eruv insert failed:', err)
+      return Response.json({ ok: false, errors: ['Could not save your submission. Please try again.'] }, { status: 502 })
+    }
+    after(() => notify(submission))
+    return Response.json({ ok: true, id: submission.id })
   }
 
   if (targetType === 'eruv') {

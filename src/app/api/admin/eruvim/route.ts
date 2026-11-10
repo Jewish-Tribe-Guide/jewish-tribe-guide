@@ -1,9 +1,8 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
-import { addEruv, listEruvimForAdmin, removeEruv, saveLineMissing, saveLineRead, saveStatusRead, saveEmailRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
-import { keptEmailSays, rereadKeptEmail } from '@/lib/eruvEmail'
-import { readEruvPage } from '@/lib/eruvReader'
-import { readEruvMap } from '@/lib/eruvLines'
+import { addEruv, listEruvimForAdmin, removeEruv, saveEmailRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
+import { keptEmailSays } from '@/lib/eruvEmail'
+import { readAndSaveMap, readEruvNow } from '@/lib/eruvReadNow'
 import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
 import { findEruvStatusPages } from '@/lib/eruvFind'
 import { enforceRateLimit } from '@/lib/rateLimit'
@@ -44,15 +43,6 @@ export async function GET(request: Request) {
 
 async function one(community: string, id: string): Promise<AdminEruv | null> {
   return (await listEruvimForAdmin(community)).eruvim.find((e) => e.id === id) ?? null
-}
-
-/** Its map read now, dated even when it's the same; seen here, so no email
- *  about a missing part later. */
-async function readAndSaveMap(community: string, eruv: AdminEruv | null, now = new Date()): Promise<void> {
-  if (!eruv?.lineUrl) return
-  const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
-  await saveLineRead(community, eruv.id, read.save)
-  if (read.missing) await saveLineMissing(community, eruv.id, read.missing)
 }
 
 export async function POST(request: Request) {
@@ -106,12 +96,7 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, found: found.found, error: null })
     }
     if (action === 'check') {
-      const now = new Date()
-      if (eruv.statusUrl) await saveStatusRead(community.slug, id, await readEruvPage(eruv.statusUrl, now))
-      // Read now, it goes live and is put away; still unreadable, it waits.
-      const reread = eruv.statusEmailKept && rereadKeptEmail(eruv.statusEmailKept, community.timezone)
-      if (reread) await saveEmailRead(community.slug, id, reread, null)
-      await readAndSaveMap(community.slug, eruv, now)
+      await readEruvNow(community.slug, community.timezone, eruv)
       return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
     return bad('Unknown action.')

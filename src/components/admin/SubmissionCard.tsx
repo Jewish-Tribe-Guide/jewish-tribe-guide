@@ -7,7 +7,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // emails render the identical before/after — see that file's own note.
 import { diffLines, diffListing, flatListing, isMultiline } from '@/lib/submissionDiff'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
-import { ERUV_SUGGESTION_FIELDS, eruvChanges, ownWords, type EruvSuggestion } from '@/lib/eruvSuggestion'
+import { ERUV_SUGGESTION_FIELDS, eruvChanges, newEruvRows, ownWords, type EruvSuggestion } from '@/lib/eruvSuggestion'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
 // buttons) and the read-only history view (approved/rejected, past tense)
@@ -134,7 +134,8 @@ export function SubmissionCard({
           </div>
 
           {isCategory && <CategoryDetails payload={s.payload as CategorySubmissionPayload} />}
-          {isEruv && <EruvDiff current={s.currentEruv ?? null} proposed={s.payload as Partial<EruvSuggestion>} />}
+          {isEruv && s.operation === 'create' && <NewEruvRows proposed={s.payload as Partial<EruvSuggestion>} />}
+          {isEruv && s.operation !== 'create' && <EruvDiff current={s.currentEruv ?? null} proposed={s.payload as Partial<EruvSuggestion>} />}
           {isEruv && s.note && <SourceNote text={s.note} />}
           {!isCategory && !isEruv && s.operation === 'create' && (
             <ProposedDetails src={s.payload as ResourceSubmission} fields={detailFields} />
@@ -280,6 +281,21 @@ function ProposedDetails({ src, fields }: { src: ResourceSubmission; fields?: Ca
         <div key={r.key} className="flex gap-2">
           <dt className="text-muted w-28 shrink-0">{r.label}</dt>
           <dd className="min-w-0 break-words whitespace-pre-line text-slate-800">{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** A new eruv (newEruv.ts): each row it gives, as it would go on. Its
+ *  status is read from where it says it's posted, once it's approved. */
+function NewEruvRows({ proposed }: { proposed: Partial<EruvSuggestion> }) {
+  return (
+    <dl className="text-xs space-y-0.5" data-testid="new-eruv">
+      {newEruvRows(proposed).map(({ key, label, value }) => (
+        <div key={key} className="flex gap-2">
+          <dt className="text-muted w-28 shrink-0">{label}</dt>
+          <dd className="min-w-0 break-words text-slate-800">{value}</dd>
         </div>
       ))}
     </dl>

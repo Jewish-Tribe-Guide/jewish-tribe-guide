@@ -29,6 +29,10 @@ export type EruvSuggestion = { eruvId: string; name: string } & Record<EruvSugge
    *  queue and the email however the page changes after. */
   details?: Record<string, OwnValue | null>
   detailFields?: OwnField[]
+  /** A new eruv only (newEruv.ts): where its status is posted, a page or
+   *  the address its emails come from, and where its map is, as given. */
+  statusAt?: string | null
+  map?: string | null
 }
 
 type OwnValue = string | boolean | string[]
@@ -54,7 +58,13 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ?
 /** A suggestion as sent, read against the eruv as it is: tidied (a website
  *  typed without https:// gets it), checked, and refused when it changes
  *  nothing. */
-export function readEruvSuggestion(raw: unknown, current: Eruv, own: readonly CategoryField[] = []): { ok: true; suggestion: EruvSuggestion } | { ok: false; errors: string[] } {
+export function readEruvSuggestion(
+  raw: unknown,
+  current: Eruv,
+  own: readonly CategoryField[] = [],
+  /** A new eruv's: read against nothing, and its name is enough. */
+  { adding = false }: { adding?: boolean } = {},
+): { ok: true; suggestion: EruvSuggestion } | { ok: false; errors: string[] } {
   const body = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const errors: string[] = []
   const suggestion: EruvSuggestion = { eruvId: current.id, name: current.name, covers: null, website: null, hotline: null, alertsUrl: null }
@@ -87,7 +97,7 @@ export function readEruvSuggestion(raw: unknown, current: Eruv, own: readonly Ca
     if (fields.length > 0) Object.assign(suggestion, { details, detailFields: fields })
   }
   if (errors.length > 0) return { ok: false, errors }
-  if (eruvChanges(current, suggestion).length === 0) return { ok: false, errors: ['Nothing was changed.'] }
+  if (!adding && eruvChanges(current, suggestion).length === 0) return { ok: false, errors: ['Nothing was changed.'] }
   return { ok: true, suggestion }
 }
 
@@ -110,6 +120,18 @@ export function eruvChanges(
     return text(before) === text(after) ? [] : [{ key: f.key, label: f.label, before, after }]
   })
   return [...columns, ...own]
+}
+
+/** A new eruv's rows as the queue and the admin's email list them: each
+ *  one it gives, then where its status is posted and its map. */
+export function newEruvRows(s: Partial<EruvSuggestion>): { key: string; label: string; value: string }[] {
+  const rows = [
+    ...ERUV_SUGGESTION_FIELDS.map((f) => ({ key: f.key, label: f.label, value: s[f.key] ?? '' })),
+    ...(s.detailFields ?? []).map((f) => ({ key: f.key, label: f.label, value: ownWords(f, s.details?.[f.key]) })),
+    { key: 'statusAt', label: 'Status', value: s.statusAt ?? '' },
+    { key: 'map', label: 'Map', value: s.map ?? '' },
+  ]
+  return rows.filter((r) => r.value.trim())
 }
 
 /** A suggestion as an admin approves it from Eruv status: with `only`, the

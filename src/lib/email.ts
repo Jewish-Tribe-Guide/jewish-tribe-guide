@@ -20,7 +20,7 @@ import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 import type { CategoryField } from './categories'
 import { listEruvimForAdmin } from './eruvStore'
-import { eruvChanges, type EruvSuggestion } from './eruvSuggestion'
+import { eruvChanges, newEruvRows, type EruvSuggestion } from './eruvSuggestion'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -399,6 +399,16 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
       ${row('First listing', f?.name ?? '')}
       ${row('Address', f?.address ?? '')}
       ${row('Phone', f?.phone ?? '')}`
+  } else if (submission.target_type === 'eruv' && submission.operation === 'create') {
+    // A new eruv: each row it gives (newEruv.ts).
+    const payload = submission.payload as Partial<EruvSuggestion>
+    verb = 'New eruv'
+    title = payload.name ?? 'an eruv'
+    subject = subjectLine(submissionRef(submission.case_number), `New Eruv Suggestion — ${title}`)
+    proposedRows = `${row('Eruv', title)}
+      ${newEruvRows(payload)
+        .map((r) => row(r.label, r.value))
+        .join('')}`
   } else if (submission.target_type === 'eruv') {
     // A fix to an eruv's listing: each row it changes, before and after,
     // as the queue shows it (eruvSuggestion.ts).

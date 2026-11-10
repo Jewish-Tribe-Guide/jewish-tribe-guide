@@ -362,3 +362,62 @@ describe('EruvInfo', () => {
     })
   })
 })
+
+// Nov 9, the user: "why can't a user add an eruv? like on main site?" The
+// page's "+ Add" opens Add an eruv where the list was, named in the address
+// (?form=create) so Back closes it; what's sent goes to the queue.
+describe('EruvInfo — Add an eruv', () => {
+  const eruvPage = (over = {}) => ({ content: { categories: [makeCategory({ id: 'eruv', kind: 'eruv', pluralLabel: 'Eruvim', ...over })] } })
+  const showAdding = ({ adding = false, isMobile = false, onParamsChange = vi.fn() as (c: Record<string, string | null>, o?: { replace?: boolean; step?: string }) => void, over = {} } = {}) =>
+    renderWithProviders(
+      <ForcedViewport isMobile={isMobile}>
+        <EruvInfo onUp={() => {}} title="Eruvim" adding={adding} onParamsChange={onParamsChange} />
+      </ForcedViewport>,
+      eruvPage(over),
+    )
+
+  it('+ Add opens it in the list’s place, as a step in the address, and sends a new eruv', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    showAdding({ onParamsChange })
+    await screen.findAllByTestId('eruv-row')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onParamsChange).toHaveBeenLastCalledWith({ item: null, form: 'create' }, { step: 'eruv' })
+    const adding = await screen.findByTestId('eruv-adding')
+    expect(within(adding).getByRole('heading', { name: 'Add an eruv' })).toBeInTheDocument()
+    expect(screen.getByTestId('eruv-list')).not.toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    await user.type(await within(adding).findByLabelText('Name'), 'Overbrook Eruv')
+    await user.click(within(adding).getByRole('button', { name: 'Send' }))
+    await vi.waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ operation: 'create', targetType: 'eruv', payload: { name: 'Overbrook Eruv' } })
+  })
+
+  it('opens from its address, and its Back takes ?form= off', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    showAdding({ adding: true, onParamsChange })
+    const adding = await screen.findByTestId('eruv-adding')
+    await user.click(within(adding).getByRole('button', { name: 'Back' }))
+    expect(onParamsChange).toHaveBeenLastCalledWith({ form: null }, { replace: true })
+    expect(screen.queryByTestId('eruv-adding')).not.toBeInTheDocument()
+    expect(screen.getByTestId('eruv-list')).toBeVisible()
+  })
+
+  it('on a phone, opens in a sheet', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    showAdding({ isMobile: true, onParamsChange })
+    await screen.findAllByTestId('eruv-row')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onParamsChange).toHaveBeenLastCalledWith({ item: null, form: 'create' }, { replace: true })
+    expect(await screen.findByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
+  })
+
+  it('has no + where the Eruv page takes no additions', async () => {
+    showAdding({ adding: true, over: { capabilities: { add: false } } })
+    await screen.findAllByTestId('eruv-row')
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('eruv-adding')).not.toBeInTheDocument()
+  })
+})

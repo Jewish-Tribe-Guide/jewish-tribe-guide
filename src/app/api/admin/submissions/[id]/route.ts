@@ -1,4 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { readEruvNowById } from '@/lib/eruvReadNow'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
@@ -106,6 +107,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       ),
     ])
   })
+
+  // A new eruv, approved: its status page and map read now, not at their
+  // next turn (Fridays, for its status). Best-effort, as the emails are.
+  if (decision === 'approved' && submission.target_type === 'eruv' && submission.operation === 'create') {
+    const id = (submission.payload as { eruvId?: string }).eruvId
+    if (id) after(() => readEruvNowById(community.slug, community.timezone, id).catch((err) => console.error('[admin/submissions/:id] Reading the new eruv failed:', err)))
+  }
 
   // Notify category subscribers (see SubscribeSection.tsx / subscriberStore.ts)
   // — a new listing they picked, or one closing. Best-effort, scheduled with

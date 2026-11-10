@@ -97,8 +97,7 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   `details` column (migration 094).
 - **The preview** has Page · A listing · Editing, as other pages have Page
   · A listing · Adding: A listing opens the eruv holding the most of the
-  page's fields, Editing its Edit listing (visitors suggest edits to an
-  eruv, they don't add one). Beside a field, A listing and Editing only:
+  page's fields, Editing its Edit listing. Beside a field, A listing and Editing only:
   a field isn't on the list of eruvim. These are the real eruv screens, not
   the drawn How it looks tabs a listing page's field has, so the field
   isn't outlined in them.
@@ -107,9 +106,19 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   user, Nov 9). Found on the way: typing the first letter in an empty row
   there (Hotline, say) moved it up to the filled rows and dropped the rest
   of what was typed; an open row now stays where it was opened.
-- **Asked, not decided (Nov 9):** visitors can't add an eruv, only Suggest
-  an edit to one (c15bfe3d). The queue has no new-eruv suggestion, and
-  the site's + Add doesn't offer the Eruv page.
+- **Visitors can suggest a new eruv** (the user, Nov 9: "why can't a user
+  add an eruv?"). The Eruv page has its own + Add, as a category page
+  does, and the site-wide + is off it. It opens Add an eruv where the list
+  was (`?form=create`; a sheet on a phone): a name, the page's rows, and
+  where its status is posted (a page or an email address) and its map, if
+  they know. It goes to the queue as a New place in To do, the card and
+  the admin email listing what it gives. Approving adds it and reads its
+  status page (or kept email) and map at once, not on Friday. It is
+  refused when the name is already listed (hidden eruvim too), and where
+  the community or the Eruv page takes no additions. On the live site it
+  needs migration 077, the same as Suggest an edit (item 4 below). The
+  Eruv page's admin preview still has Page · A listing · Editing, no
+  Adding.
 - **An admin's field is filled in** in Places (a row of its own after
   Website, saved with Update the listing) and by anyone through Suggest an
   edit, which goes to the queue; the queue and the admin email show it
@@ -313,7 +322,7 @@ for that exact change, in the same conversation. Show the dry run first.
    Tables and columns through 081 are there. 077 (eruv suggestions, a
    database rule) and 082 (confirming a contact box, a database function)
    can't be seen through the API: without them a public eruv suggestion
-   fails to send and Yes under a contact box says "Didn't save". 067's
+   (a fix or, since Nov 9, a new eruv) fails to send and Yes under a contact box says "Didn't save". 067's
    columns (Today) are missing too, harmless while Today is held back.
 5. **Menu watches start on the live site Oct 18** (merged with #324, no
    migration). The first daily run, 07:00 UTC Oct 18, gives every live food

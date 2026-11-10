@@ -324,6 +324,7 @@ export default function FindResources({
         color={eruv ? getCategoryColor(categories, eruv.id) : undefined}
         bandImageUrl={eruv ? bandImageFor(eruv) : undefined}
         itemId={searchItem}
+        adding={searchForm === 'create'}
         onParamsChange={setParams}
       />
     )

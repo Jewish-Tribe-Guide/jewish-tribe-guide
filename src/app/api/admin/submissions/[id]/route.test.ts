@@ -18,6 +18,7 @@ const m = vi.hoisted(() => ({
   sendNewListingNotification: vi.fn(),
   sendClosureNotification: vi.fn(),
   runWalkRoutesAfterChange: vi.fn(),
+  readEruvNowById: vi.fn(),
   afterCallbacks: [] as Array<() => unknown>,
   ReviewEditError: class ReviewEditError extends Error {},
 }))
@@ -49,6 +50,7 @@ vi.mock('@/lib/subscriberEmail', () => ({
 }))
 vi.mock('@/lib/siteUrl', () => ({ siteUrl: () => 'https://site.test' }))
 vi.mock('@/lib/walkRouteJob', () => ({ runWalkRoutesAfterChange: m.runWalkRoutesAfterChange }))
+vi.mock('@/lib/eruvReadNow', () => ({ readEruvNowById: m.readEruvNowById }))
 
 const { PATCH } = await import('./route')
 const ctx = { params: Promise.resolve({ id: 'sub1' }) } as never
@@ -374,5 +376,42 @@ describe('PATCH /api/admin/submissions/:id — an eruv suggestion', () => {
     expect(m.loadSyncableListing).not.toHaveBeenCalled()
     expect(m.sendDecisionEmail).toHaveBeenCalled()
     expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+})
+
+// A new eruv, approved (Nov 9): its status page and map are read straight
+// away, not at their next turn (its status, Friday), so the Eruv page has
+// something to say about it from the start.
+describe('PATCH /api/admin/submissions/:id — a new eruv', () => {
+  const newEruv = { id: 'sub1', operation: 'create', target_type: 'eruv', target_id: null, payload: { eruvId: 'overbrook', name: 'Overbrook Eruv' } }
+  beforeEach(() => {
+    m.resolveCommunity.mockResolvedValue({ slug: 'ues', timezone: 'America/New_York' })
+    m.readEruvNowById.mockResolvedValue(undefined)
+  })
+
+  it('approving it reads it now, after answering; nobody’s subscribed to a listing it isn’t', async () => {
+    m.approveSubmission.mockResolvedValue(newEruv)
+    expect((await patch({ status: 'approved' })).status).toBe(200)
+    expect(m.readEruvNowById).not.toHaveBeenCalled()
+    await runAfter()
+    expect(m.readEruvNowById).toHaveBeenCalledWith('ues', 'America/New_York', 'overbrook')
+    expect(m.getResourceRowById).not.toHaveBeenCalled()
+    expect(m.loadSyncableListing).not.toHaveBeenCalled()
+  })
+
+  it('a reading that fails doesn’t fail the approval', async () => {
+    m.approveSubmission.mockResolvedValue(newEruv)
+    m.readEruvNowById.mockRejectedValue(new Error('page down'))
+    expect((await patch({ status: 'approved' })).status).toBe(200)
+    await expect(runAfter()).resolves.toBeUndefined()
+  })
+
+  it('rejecting it, or approving a fix to one, reads nothing', async () => {
+    m.rejectSubmission.mockResolvedValue(newEruv)
+    await patch({ status: 'rejected' })
+    m.approveSubmission.mockResolvedValue({ ...newEruv, operation: 'update', payload: { eruvId: 'center-city' } })
+    await patch({ status: 'approved' })
+    await runAfter()
+    expect(m.readEruvNowById).not.toHaveBeenCalled()
   })
 })

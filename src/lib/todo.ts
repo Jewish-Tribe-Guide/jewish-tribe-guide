@@ -21,10 +21,10 @@ export type TodoSearch = ClassifiedMiss & { words: TodoWord[]; readingKey?: stri
  *  words, and when; all it says, and who to reply to. */
 export type TodoResponse = { id: string; title: string; line: string; createdAt: string; text?: string[]; email?: string; name?: string }
 
-/** A new listing, as opposed to a change to one, a removal, an eruv fix
- *  or a new category. */
+/** A new listing or a new eruv, as opposed to a change to one, a
+ *  removal, an eruv fix or a new category. */
 export function isNewPlace(s: Pick<EnrichedSubmission, 'operation' | 'target_type'>): boolean {
-  return s.operation === 'create' && s.target_type === 'listing'
+  return s.operation === 'create' && (s.target_type === 'listing' || s.target_type === 'eruv')
 }
 
 export function splitSubmissions(submissions: EnrichedSubmission[]): { newPlaces: EnrichedSubmission[]; changes: EnrichedSubmission[] } {

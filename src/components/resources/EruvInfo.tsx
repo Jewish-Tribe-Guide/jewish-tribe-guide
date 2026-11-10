@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ParamsOpts } from './GenericDirectory'
 import { ListingBar } from './ListingColumn'
 import { mapQueryString, routes } from '@/lib/routes'
@@ -30,6 +30,14 @@ import SavedBadge from '@/components/SavedBadge'
 import { initialsOf } from '@/lib/listingRow'
 import { usePinned } from '@/lib/pinnedContext'
 import { pointerHover } from '@/lib/pointerHover'
+import { AddButton } from '@/components/AddButton'
+import BackIconButton from '@/components/BackIconButton'
+import { resolveCapabilities } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
+import dynamic from 'next/dynamic'
+
+// Loaded on the first tap of "+ Add", as Edit listing loads it.
+const EruvEditor = dynamic(() => import('./EruvEditor'), { loading: () => null })
 
 // ── The Eruv page (Oct 7, canvas page "eruv") ───────────────────────────────
 // The eruvim's own maps, as each eruv draws them, with the visitor's dot;
@@ -47,6 +55,11 @@ import { pointerHover } from '@/lib/pointerHover'
 // maps from /api/eruv/maps. Until migration 074 is run there are none, and
 // it says so: the old list with its links (Oct 15) was Philadelphia's,
 // written into the code, and showed in every community.
+//
+// Its "+ Add" (Nov 9, the user: "why can't a user add an eruv?") opens Add
+// an eruv, where the list was, as an opened eruv does (?form=create): what
+// they send goes to the moderation queue, and the eruv is listed when an
+// admin approves it.
 
 type Props = {
   onUp: () => void
@@ -61,6 +74,8 @@ type Props = {
   bandImageUrl?: string | null
   /** `?item=`: the eruv open. */
   itemId?: string | null
+  /** `?form=create`: Add an eruv open. */
+  adding?: boolean
   /** The admin preview's A listing and Editing tabs: the eruv holding the
    *  most of the page's fields open, as a listing page's preview opens its
    *  fullest place, and with Editing, on its Edit listing. */
@@ -74,7 +89,7 @@ const ERUV_STEP = 'eruv'
 /** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
 type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
-export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange, openFullest = false, startEditing = false }: Props) {
+export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, adding: addingParam = false, onParamsChange, openFullest = false, startEditing = false }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -95,6 +110,12 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
     setSeenItemId(itemId)
     setOpenId(itemId)
   }
+  const [adding, setAdding] = useState(addingParam)
+  const [seenAdding, setSeenAdding] = useState(addingParam)
+  if (addingParam !== seenAdding) {
+    setSeenAdding(addingParam)
+    setAdding(addingParam)
+  }
   // Back and Forward over a step this page pushed: Next doesn't always hand
   // the address back as a new ?item=, so it's read here (as GenericDirectory
   // does).
@@ -103,7 +124,11 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   const addressed = !!onParamsChange
   useEffect(() => {
     if (!addressed) return
-    const onPop = () => setOpenId(new URLSearchParams(window.location.search).get('item'))
+    const onPop = () => {
+      const params = new URLSearchParams(window.location.search)
+      setOpenId(params.get('item'))
+      setAdding(params.get('form') === 'create')
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [addressed])
@@ -132,6 +157,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   const ready = loaded?.available && now ? loaded : null
   const eruvPage = useCategories()?.find((c) => c.kind === 'eruv')
   const open = ready?.eruvim.find((e) => e.id === openId) ?? (ready && openFullest && eruvPage ? fullestEruv(ready.eruvim, eruvPage) : null)
+  const canAdd = !!ready && addressed && ui.contributions.add && !!eruvPage && resolveCapabilities(eruvPage.capabilities).add
   const shabbosSide = ready && now ? [5, 6].includes(localParts(now, ready.timezone).weekday) : false
   const openIndex = ready && open ? ready.eruvim.indexOf(open) : -1
 
@@ -150,6 +176,21 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
     setOpenId(null)
     onParamsChange?.({ item: null }, { replace: true })
   }
+  // Add an eruv: a step Back undoes on a computer, as an opened eruv is.
+  const openAdd = () => {
+    setOpenId(null)
+    setAdding(true)
+    onParamsChange?.({ item: null, form: 'create' }, isMobile ? { replace: true } : { step: ERUV_STEP })
+  }
+  const closeAdd = () => {
+    if ((window.history.state as { step?: string } | null)?.step === ERUV_STEP) {
+      window.history.back()
+      return
+    }
+    setAdding(false)
+    onParamsChange?.({ form: null }, { replace: true })
+  }
+  const addingNow = canAdd && adding && !open
   const stepEruv = (direction: 1 | -1) => {
     const next = ready?.eruvim[openIndex + direction]
     if (next) openEruv(next.id)
@@ -160,6 +201,20 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   // phone it's a sheet, except in the admin preview's tabs, where it is the
   // screen (as a listing page's preview shows its opened place).
   const column = (!isMobile || openFullest) && !!open
+  const addColumn = !isMobile && addingNow
+  // What's opened in the list's column is at its top: brought back into
+  // view if the page was scrolled past it, as a category's opened listing
+  // is (GenericDirectory's scrollItemIntoView). An eruv tapped low in the
+  // list, or "+ Add" from the bottom, otherwise opened out of sight.
+  const columnRef = useRef<HTMLElement | null>(null)
+  const columnShows = addColumn ? 'add' : column ? `eruv:${open?.id}` : null
+  useEffect(() => {
+    const el = columnRef.current
+    if (!columnShows || !el) return
+    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+    const top = el.getBoundingClientRect().top
+    if (top < headerH) window.scrollTo({ top: Math.max(0, window.scrollY + top - headerH) })
+  }, [columnShows])
   useEffect(() => {
     if (!column) return
     const onKey = (e: KeyboardEvent) => {
@@ -216,9 +271,9 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
       {/* An open eruv has the top of the page, as a category's opened
           listing has (GenericDirectory's deskListing): its ‹ is the way
           back, so the title over it would say the same thing twice. */}
-      <DirectoryHeader title={title} titleInHeader banner={banner} titleOnly={column} />
+      <DirectoryHeader title={title} titleInHeader banner={banner} titleOnly={column || addColumn} />
 
-      {loaded && (!loaded.available || loaded.eruvim.length === 0) && (
+      {loaded && !addColumn && (!loaded.available || loaded.eruvim.length === 0) && (
         <p className="text-sm text-muted" data-testid="eruv-none">
           {!loaded.available && loaded.failed ? 'Couldn’t check the eruvim just now. Try again in a moment.' : 'No eruvim are listed here yet.'}
         </p>
@@ -234,9 +289,20 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
         // people come here for.
         <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
           <div className="min-w-0 space-y-3.5">
-            {!mapBeside && !(wide && mapHidden) && !(isMobile && column) && mapped.length > 0 && eruvMap('h-[300px]')}
+            {!mapBeside && !(wide && mapHidden) && !(isMobile && column) && !addColumn && mapped.length > 0 && eruvMap('h-[300px]')}
+            {addColumn && (
+              <section ref={columnRef} aria-label="Add an eruv" data-testid="eruv-adding">
+                <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <span>
+                    <BackIconButton onClick={closeAdd} />
+                  </span>
+                  <h2 className="truncate text-base font-semibold text-slate-900">Add an eruv</h2>
+                </div>
+                <EruvEditor eruv={null} page={eruvPage} onClose={closeAdd} />
+              </section>
+            )}
             {column && open && (
-              <section aria-label={open.name} data-testid="eruv-column">
+              <section ref={columnRef} aria-label={open.name} data-testid="eruv-column">
                 {!editing && (
                   <ListingBar
                     backLabel={title}
@@ -251,7 +317,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
             )}
             {ready.eruvim.length > 0 && (
               // Kept while one is open, hidden, as a category's list is.
-              <div hidden={column} data-testid="eruv-list">
+              <div hidden={column || addColumn} data-testid="eruv-list">
                 <ListHeading
                   label={shabbosSide ? 'This Shabbos' : undefined}
                   noun
@@ -310,6 +376,16 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
             </div>
           )}
         </div>
+      )}
+
+      {canAdd && !open && !adding && <AddButton onClick={openAdd} />}
+
+      {addingNow && isMobile && (
+        <MobileSheet isOpen onClose={closeAdd} title="Add an eruv" draggable>
+          <div data-testid="eruv-adding">
+            <EruvEditor eruv={null} page={eruvPage} onClose={closeAdd} />
+          </div>
+        </MobileSheet>
       )}
 
       {ready && now && open && isMobile && !column && (

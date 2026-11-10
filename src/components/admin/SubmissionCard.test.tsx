@@ -682,3 +682,42 @@ describe('an eruv suggestion', () => {
     expect(screen.getByText('Rabbi A')).toHaveClass('line-through')
   })
 })
+
+// Nov 9: a new eruv a visitor suggests. Nothing to compare it with: the card
+// lists what it gives, where its status is read from and its map included,
+// so an admin sees what will be read before approving.
+describe('a new eruv suggestion', () => {
+  it('lists each row it gives, its own fields by the page’s names, its status and map; no diff', () => {
+    const submission = {
+      id: 's11',
+      operation: 'create',
+      target_type: 'eruv',
+      target_id: null,
+      payload: {
+        eruvId: 'overbrook', name: 'Overbrook Eruv', covers: 'Overbrook and Wynnefield.', website: null, hotline: '(215) 555-0100', alertsUrl: null,
+        details: { certifiedBy: 'Rabbi A' }, detailFields: [{ key: 'certifiedBy', label: 'Certified by', type: 'text' }],
+        statusAt: 'status@overbrookeruv.org', map: 'https://overbrookeruv.org/map.kml',
+      },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      current: null,
+      categoryLabel: 'Eruv',
+      currentEruv: null,
+    } as unknown as EnrichedSubmission
+    render(<SubmissionCard submission={submission} categoriesById={new Map()} onModerate={() => {}} onOpen={() => {}} />)
+    expect(screen.getByText('Overbrook Eruv')).toBeInTheDocument()
+    const rows = [...screen.getByTestId('new-eruv').querySelectorAll('div')].map((d) => d.textContent)
+    expect(rows).toEqual([
+      'Where it goesOverbrook and Wynnefield.',
+      'Hotline(215) 555-0100',
+      'Certified byRabbi A',
+      'Statusstatus@overbrookeruv.org',
+      'Maphttps://overbrookeruv.org/map.kml',
+    ])
+    expect(screen.queryByTestId('eruv-diff')).not.toBeInTheDocument()
+  })
+})

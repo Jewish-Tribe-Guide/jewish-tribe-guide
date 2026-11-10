@@ -28,13 +28,18 @@ import { EditorSent, editorFieldLabel, editorInputClass, sendChangesLabel } from
 // Since Nov 9 it follows the Eruv page's Fields (eruvFields.ts): a row
 // taken off the page isn't here, and a field an admin made on it is, in
 // the page's order. Without the page (Eruv status's Edit), the four rows.
+//
+// With no eruv (Nov 9), it adds one: the Eruv page's "+". A name first,
+// the same rows, and where its status is posted and its map, if they know;
+// sent as a new eruv (newEruv.ts), added once an admin approves it.
 
 export type EruvValues = Record<EruvSuggestionField, string>
 type Values = EruvValues
 type Row = { column: (typeof ERUV_SUGGESTION_FIELDS)[number] } | { own: CategoryField }
 
 export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSave }: {
-  eruv: Eruv
+  /** Null to add a new one. */
+  eruv: Eruv | null
   /** The Eruv page, whose Fields say which rows there are. */
   page?: CategoryConfig | null
   onClose: () => void
@@ -49,7 +54,10 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
 }) {
   const uid = useId()
   const community = useCommunitySlug()
-  const [values, setValues] = useState<Values>(() => ({ covers: eruv.covers ?? '', website: eruv.website ?? '', hotline: eruv.hotline ?? '', alertsUrl: eruv.alertsUrl ?? '', ...adminSave?.values }))
+  const adding = !eruv
+  const [values, setValues] = useState<Values>(() => ({ covers: eruv?.covers ?? '', website: eruv?.website ?? '', hotline: eruv?.hotline ?? '', alertsUrl: eruv?.alertsUrl ?? '', ...adminSave?.values }))
+  // A new one's own: its name, where its status is posted, its map.
+  const [added, setAdded] = useState({ name: '', statusAt: '', map: '' })
   const [honeypot, setHoneypot] = useState('')
   const [token, setToken] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
@@ -57,7 +65,7 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
   const [sent, setSent] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  const [details, setDetails] = useState<Record<string, unknown>>(() => ({ ...eruv.details }))
+  const [details, setDetails] = useState<Record<string, unknown>>(() => ({ ...eruv?.details }))
   const fields = page ? withEruvFields(page).detailFields : null
   const own = fields ? ownEruvFields(fields) : []
   const rows: Row[] = fields
@@ -68,11 +76,14 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
     : ERUV_SUGGESTION_FIELDS.map((column) => ({ column }))
   /** The own fields as they'd be sent: each one's value, or null for none. */
   const sentDetails = Object.fromEntries(own.map((f) => [f.key, readEruvDetails({ [f.key]: details[f.key] })?.[f.key] ?? null]))
-  const changes = eruvChanges(eruv, {
-    ...Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim() || null])),
-    ...(own.length > 0 && { details: sentDetails, detailFields: own }),
-  }).length
-  const hasChanges = !sent && changes > 0
+  const filled =
+    eruvChanges(eruv, {
+      ...Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim() || null])),
+      ...(own.length > 0 && { details: sentDetails, detailFields: own }),
+    }).length + (adding ? Object.values(added).filter((v) => v.trim()).length : 0)
+  // A new one is sent once it has a name; a fix, once it changes something.
+  const changes = adding && !added.name.trim() ? 0 : filled
+  const hasChanges = !sent && filled > 0
   useEffect(() => {
     onHasChanges?.(hasChanges)
   }, [hasChanges, onHasChanges])
@@ -97,7 +108,13 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
       const res = await fetchOrPreview(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'update', targetType: 'eruv', targetId: eruv.id, payload: { ...values, ...(own.length > 0 && { details: sentDetails }) }, company: honeypot, turnstileToken: token }),
+        body: JSON.stringify({
+          ...(eruv ? { operation: 'update', targetId: eruv.id } : { operation: 'create' }),
+          targetType: 'eruv',
+          payload: { ...values, ...(own.length > 0 && { details: sentDetails }), ...(adding && added) },
+          company: honeypot,
+          turnstileToken: token,
+        }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body.ok) {
@@ -118,6 +135,23 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
     }
   }
 
+  const addedInput = (key: keyof typeof added, label: string, inputMode?: 'url') => (
+    <div>
+      <label htmlFor={`${uid}-${key}`} className={editorFieldLabel}>
+        {label}
+      </label>
+      <input
+        id={`${uid}-${key}`}
+        type="text"
+        inputMode={inputMode}
+        autoCapitalize={inputMode ? 'none' : undefined}
+        value={added[key]}
+        onChange={(e) => setAdded({ ...added, [key]: e.target.value })}
+        className={editorInputClass}
+      />
+    </div>
+  )
+
   if (sent) return <EditorSent message="An admin checks it, usually within a day." onDone={onClose} />
 
   return (
@@ -130,9 +164,10 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
       }}
     >
       {!adminSave && <Honeypot value={honeypot} onChange={setHoneypot} />}
-      <p className="px-1 text-[16px] font-extrabold text-slate-900">{eruv.name}</p>
+      {eruv && <p className="px-1 text-[16px] font-extrabold text-slate-900">{eruv.name}</p>}
       <Card>
         <div className="space-y-3 py-2">
+          {adding && addedInput('name', 'Name')}
           {rows.map((row) => {
             if ('own' in row) {
               const f = row.own
@@ -163,6 +198,8 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
               </div>
             )
           })}
+          {adding && addedInput('statusAt', 'Status page or email', 'url')}
+          {adding && addedInput('map', 'Map link', 'url')}
         </div>
       </Card>
       {errors.length > 0 && (
@@ -173,7 +210,7 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
         </ul>
       )}
       <button type="submit" disabled={changes === 0 || sending || verifying} className={SUBMIT_PILL}>
-        {adminSave ? (sending ? 'Saving…' : adminSave.label) : sendChangesLabel(changes, sending, verifying)}
+        {adminSave ? (sending ? 'Saving…' : adminSave.label) : adding ? (sending ? 'Sending…' : !added.name.trim() ? 'Still needed: Name' : verifying ? 'Verifying…' : 'Send') : sendChangesLabel(changes, sending, verifying)}
       </button>
       {changes > 0 && turnstileActive && <TurnstileWidget ref={turnstileRef} onVerify={setToken} />}
     </form>

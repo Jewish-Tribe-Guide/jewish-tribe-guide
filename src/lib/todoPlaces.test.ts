@@ -130,6 +130,16 @@ describe('todoPlaces', () => {
     ])
   })
 
+  // Nov 9: an eruv a visitor suggests, under the Eruv page, as a new place.
+  it('a new eruv is a New place on the Eruv page', () => {
+    const eruvPage = { id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv' as const }
+    const [p] = todoPlaces(
+      { submissions: [sub({ id: 'e', operation: 'create', target_type: 'eruv', target_id: null, payload: { eruvId: 'overbrook', name: 'Overbrook Eruv' } })], responses: [], unmatched: [] },
+      new Map([['eruv-information', eruvPage]]),
+    )
+    expect([p.name, placeLine(p), p.category, p.things.map((t) => t.filter)]).toEqual(['Overbrook Eruv', 'New place', 'eruv-information', ['new']])
+  })
+
   it('search, filter and sort: the filter keeps a place with anything of its kind, and picks where it opens', () => {
     const places = todoPlaces(
       {

@@ -643,8 +643,9 @@ describe('showsSiteAdd', () => {
   it('shows on every screen but the Map, a category or listing, and the site’s own pages', () => {
     const cats = ['grocery', 'synagogue']
     expect(['/philly', '/philly/browse', '/philly/pinned', '/philly/changes', '/philly/ask'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual([true, true, true, true, true])
-    expect(['/philly/map', '/philly/grocery', '/philly/grocery/abc', '/philly/feedback', '/philly/about', '/philly/privacy', '/ues', '/admin'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual(
-      Array(8).fill(false),
+    // The Eruv page has its own "+" (Nov 9), as a category page does.
+    expect(['/philly/map', '/philly/grocery', '/philly/grocery/abc', '/philly/eruv', '/philly/feedback', '/philly/about', '/philly/privacy', '/ues', '/admin'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual(
+      Array(9).fill(false),
     )
   })
 })

@@ -302,6 +302,37 @@ describe('sendEmail', () => {
         expect(sent.html).not.toContain('Where it goes')
       })
 
+      // Nov 9: a new eruv a visitor suggests: each row it gives, its
+      // status and map, never compared with an eruv.
+      it('sendSubmissionNotification lists a new eruv’s rows, its status and map', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+        const submission: SubmissionRow = {
+          id: 's3',
+          community_id: 'philly',
+          operation: 'create',
+          target_type: 'eruv',
+          target_id: null,
+          payload: { eruvId: 'overbrook', name: 'Overbrook <Eruv>', covers: 'Overbrook.', website: null, hotline: null, alertsUrl: null, statusAt: 'https://overbrookeruv.org/status', map: null },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: 13,
+        }
+        await sendSubmissionNotification(submission)
+        const sent = sendSpy.mock.calls[0]![0] as { subject: string; html: string }
+        expect(sent.subject).toBe('#13 New Eruv Suggestion — Overbrook <Eruv>')
+        expect(sent.html).toContain('Overbrook &lt;Eruv&gt;')
+        expect(sent.html).not.toContain('Overbrook <Eruv>')
+        expect(sent.html).toContain('Where it goes')
+        expect(sent.html).toContain('https://overbrookeruv.org/status')
+        expect(sent.html).not.toContain('Hotline')
+        expect(sent.html).not.toContain('>Map<')
+        expect(mockListEruvimForAdmin).not.toHaveBeenCalled()
+      })
+
       // Real bug, in every notification email this app has ever sent: the
       // case_number migration was never applied to any project, so `*` came
       // back without the column, `submission.case_number` was undefined, and

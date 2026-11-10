@@ -65,3 +65,33 @@ describe('EruvEditor — the Eruv page’s fields', () => {
     vi.unstubAllGlobals()
   })
 })
+
+// Nov 9, the user: "why can't a user add an eruv?" With no eruv, the form
+// adds one: a name first, the same rows, and where its status and map are.
+describe('EruvEditor — adding an eruv', () => {
+  it('waits for a name, then sends a new eruv with its status and map', async () => {
+    const sent: unknown[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify({ ok: true, id: 's1' }))
+    }))
+    const user = userEvent.setup()
+    renderWithProviders(<EruvEditor eruv={null} onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Still needed: Name' })).toBeDisabled()
+    await user.type(screen.getByLabelText(/hotline/i), '215')
+    expect(screen.getByRole('button', { name: 'Still needed: Name' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Name'), 'Overbrook Eruv')
+    await user.type(screen.getByLabelText('Status page or email'), 'overbrookeruv.org/status')
+    await user.type(screen.getByLabelText('Map link'), 'https://overbrookeruv.org/map')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]).toMatchObject({
+      operation: 'create',
+      targetType: 'eruv',
+      payload: { name: 'Overbrook Eruv', hotline: '215', statusAt: 'overbrookeruv.org/status', map: 'https://overbrookeruv.org/map' },
+    })
+    expect(sent[0]).not.toHaveProperty('targetId')
+    expect(await screen.findByTestId('editor-sent')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+})
