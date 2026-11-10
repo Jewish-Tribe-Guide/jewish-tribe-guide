@@ -333,13 +333,15 @@ function CategoryEditorScreen({
       // Nothing to lose is answered too; not knowing leaves it to Save.
       setConfirmed((c) => (count === 0 ? new Set(c).add(confirmKey(target)) : new Set([...c].filter((k) => k !== confirmKey(target)))))
       takeOff(target)
-      void screens.back()
       return
     }
     const next: Removing = { target, label, count, filter }
     lastRemoving.current = next
     setRemoving(next)
-    go({ ...screenNow(), remove: true })
+    // From the list, by the row's X (the user, Nov 10): the step is the
+    // field's address with remove, and Back is to the list.
+    const at = typeof target === 'object' ? fieldsNow.current.findIndex((f) => f.key === target.field) : target
+    go({ field: fieldRef(fieldsNow.current, at), remove: true })
     window.scrollTo?.(0, 0)
   }
 
@@ -541,8 +543,7 @@ function CategoryEditorScreen({
         onRemove={() => {
           takeOff(removing.target)
           setConfirmed((c) => new Set(c).add(confirmKey(removing.target)))
-          // Past the field's screen too, to the page.
-          void screens.back(2)
+          void screens.back()
         }}
       />
     )
@@ -623,33 +624,11 @@ function CategoryEditorScreen({
         }}
       />
     )
-  } else if (openField === 'address' || openField === 'phone') {
-    // The page's address or phone (board 17's Contact): on, or taken off.
-    const address = openField === 'address'
-    screen = (
-      <>
-        <AdminBack back={{ label: name, onClick: () => void screens.back() }} title={address ? 'Address' : 'Phone'} />
-        <button
-          type="button"
-          onClick={() => void askRemove(openField, address ? 'Address' : 'Phone', false)}
-          className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer"
-        >
-          Remove this field
-        </button>
-      </>
-    )
   } else if (field && typeof openField === 'number') {
     // A field's own screen (board 13). What the board leaves off (only for
     // some places, an audience, a link's own box, a badge in place of
     // another, the order) is a superadmin's, under More.
     const i = openField
-    const removeIt = () => {
-      if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
-      else {
-        removeField(i)
-        void screens.back()
-      }
-    }
     screen = (
       <FieldScreen
         key={i}
@@ -662,7 +641,6 @@ function CategoryEditorScreen({
         partner={partnerRule(field) ? { on: !!partnerOf(draft.fields, field), onChange: (on) => togglePartner(i, on) } : undefined}
         // An eruv isn't listed on rows (no "Before it's opened").
         rows={!eruvPage}
-        onRemove={removeIt}
         onBack={() => void screens.back()}
       />
     )
@@ -807,7 +785,15 @@ function CategoryEditorScreen({
               showAdding({ at: 'list' }, id)
             }}
             onShowField={(key) => showField(fieldIndex(key))}
-            onShowBasic={showField}
+            onRemoveRow={(r) => {
+              if (r === 'address' || r === 'phone') return void askRemove(r, r === 'address' ? 'Address' : 'Phone', false)
+              const i = fieldIndex(r.field)
+              const f = draft.fields[i]
+              if (!f) return
+              // A field not named yet has nothing anyone has answered.
+              if (!f.key) return removeField(i)
+              void askRemove({ field: f.key }, f.label || 'New field', !!normalizeField(f).filterable)
+            }}
           />
 
           <div className="flex flex-col gap-2.5 px-4 pb-4 pt-2">

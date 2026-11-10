@@ -130,8 +130,8 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   // else; a plain name-only listing is enough to prove the direct-add path.
   // A press while typing only puts the keyboard away, so leave the name first.
   await visible(page.getByLabel('Name', { exact: true })).blur()
-  await visible(page.getByRole('button', { name: /^Address/ })).click()
-  await visible(page.getByRole('button', { name: 'Remove this field' })).click()
+  // Off by its X in the list (the user, Nov 10).
+  await visible(page.getByRole('button', { name: 'Take Address off' })).click()
   // The create-time visibility toggle this test exists to cover — see
   // AGENTS.md's testing conventions: this failed against the pre-fix
   // CategoryEditor (no such control existed; every category was created

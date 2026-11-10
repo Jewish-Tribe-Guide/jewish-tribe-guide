@@ -2,7 +2,7 @@
 
 import { AdminBack, AdminBox } from './AdminUI'
 
-// Board 16: "Remove this field" on a field places have filled in opens this
+// Board 16: a field's X, in the list, on one places have filled in opens this
 // step first, saying what goes with it. With no answers, the field just goes.
 
 export type Removing = {

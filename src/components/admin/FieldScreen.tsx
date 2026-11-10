@@ -48,7 +48,6 @@ export default function FieldScreen({
   pageName,
   canRequire,
   onChange,
-  onRemove,
   onBack,
   onKosherQuestions,
   partner,
@@ -59,7 +58,6 @@ export default function FieldScreen({
   /** Visitors can add or edit places, so "required" means something. */
   canRequire: boolean
   onChange: (patch: Partial<CategoryField>) => void
-  onRemove: () => void
   onBack: () => void
   /** Turns a hechsher's questions on or off, with the page's hidden fields. */
   onKosherQuestions?: (on: boolean) => void
@@ -68,8 +66,8 @@ export default function FieldScreen({
   /** The page lists its places on rows, so "Under the name" means something. */
   rows?: boolean
 }) {
-  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
-  return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} rows={rows} />
+  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onBack={onBack} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
+  return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onBack={onBack} rows={rows} />
 }
 
 type ScreenProps = Parameters<typeof FieldScreen>[0]
@@ -86,21 +84,12 @@ export function FieldTitle({ field: f }: { field: CategoryField }) {
   )
 }
 
-function RemoveFrom({ pageName, onRemove }: { pageName: string; onRemove: () => void }) {
-  return (
-    <button type="button" onClick={onRemove} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
-      Remove from {pageName}
-    </button>
-  )
-}
-
-function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, onKosherQuestions, partner, rows }: ScreenProps) {
+function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onBack, onKosherQuestions, partner, rows }: ScreenProps) {
   return (
     <>
       <AdminBack back={{ label: pageName, onClick: onBack }} title={<FieldTitle field={f} />} />
       <WhatThisIs field={f} partnerOn={!!partner?.on} />
       <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
-      <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
   )
 }
@@ -269,7 +258,7 @@ export function FieldChanges({
   )
 }
 
-function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, rows }: ScreenProps) {
+function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onBack, rows }: ScreenProps) {
   // A new field's key follows its name until the name is left, then never
   // changes, so a rename never strands its answers (CategoryFieldEditor's
   // keyFrozenRef has the history).
@@ -323,7 +312,6 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, on
           {f.type === 'select' && <AdminYesNo question={both} value={!!f.multiSelect} onChange={(yes) => onChange({ multiSelect: yes })} />}
         </AdminBox>
       ) : null}
-      <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
   )
 }

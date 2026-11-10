@@ -176,6 +176,15 @@ The user's answers on Nov 10, evening, and what was done with them:
         headings, on computer and phone, are rows across the foot of a
         white card holding the links, as a box's Add a field is
         (`ListCard`, `AddRowButton`, `AddMenu row`).
+    - **A field comes off by the X on its row** (the user's yes, Nov 10).
+      Every field row in a category's Fields ends in an X ("Take … off").
+      A field no place has answered goes at once; one with answers opens
+      "Remove … from …?" (`?field=…&remove=1`), and Remove it or the
+      browser's Back return to the list. The field's own screen no longer
+      has "Remove from …". Address and Phone rows are only the X (they
+      have no screen). Exceptions: the hidden hechsher-part rows have no
+      X, and a category's "Delete this page" stays a small red link.
+      Adds stay full width; removes stay small, on the thing they remove.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

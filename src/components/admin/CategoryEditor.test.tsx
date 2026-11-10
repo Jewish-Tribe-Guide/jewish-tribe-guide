@@ -81,7 +81,7 @@ function boxesShown(): [string, string[]][] {
   for (const el of within(screen.getByRole('region', { name: 'Fields' })).queryAllByText((_, e) => !!e?.matches('[data-drag-row]'))) {
     const key = el.getAttribute('data-drag-row')!
     if (key.startsWith('box:')) out.push([el.textContent!.trim(), []])
-    else if (!key.startsWith('end:')) out.at(-1)?.[1].push(el.querySelector('button > span > span')?.textContent?.trim() ?? '')
+    else if (!key.startsWith('end:')) out.at(-1)?.[1].push(el.querySelector('[data-row-name]')?.textContent?.trim() ?? '')
   }
   return out
 }
@@ -97,12 +97,11 @@ async function addBoxNamed(user: ReturnType<typeof userEvent.setup>, name: strin
   await openBox(user, name)
 }
 
-/** Contact → Address → Remove this field, and back to the page. */
+/** Contact's Address, off by its X (the user, Nov 10). */
 async function removeAddress(user: ReturnType<typeof userEvent.setup>) {
   await openBox(user, 'Contact')
-  await user.click(screen.getByRole('button', { name: /^Address/ }))
-  await user.click(screen.getByRole('button', { name: 'Remove this field' }))
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove this field' })).not.toBeInTheDocument())
+  await user.click(screen.getByRole('button', { name: 'Take Address off' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Take Address off' })).not.toBeInTheDocument())
 }
 
 afterEach(() => {
@@ -373,8 +372,9 @@ describe('CategoryEditor — editing an existing category', () => {
     await user.click(await screen.findByRole('button', { name: /^Address/ }))
     await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
     await screen.findByRole('heading', { name: 'Groceries' })
-    // Back in Contact, open.
-    expect(screen.getByRole('button', { name: /^Address/ })).toBeInTheDocument()
+    // Back in Contact: a row with only its X, nothing to set on it.
+    expect(screen.getByRole('button', { name: 'Take Address off' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Address/ })).toBeNull()
     expect(within(screen.getByRole('region', { name: 'Save' })).getByText('1 change')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
@@ -395,7 +395,7 @@ describe('CategoryEditor — editing an existing category', () => {
     expect(fetchJson).toHaveBeenCalledWith('/api/admin/categories/grocery?community=test-community', expect.objectContaining({ method: 'DELETE' }), 'Delete failed.')
   })
 
-  // "Remove this field" on one places have answered (board 16): its own
+  // A field's X on one places have answered (board 16): its own
   // step says what goes, and once it's answered there Save doesn't ask
   // again. Save's own gate is left for when the count couldn't be had.
   describe('removing a field places have filled in', () => {
@@ -408,8 +408,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const user = userEvent.setup()
       renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
       await openBox(user, 'Contact')
-      await user.click(screen.getByRole('button', { name: /^Address/ }))
-      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await user.click(screen.getByRole('button', { name: 'Take Address off' }))
 
       expect(await screen.findByRole('heading', { name: 'Remove Address from Groceries?' })).toBeInTheDocument()
       expect(screen.getByText('3 places').parentElement).toHaveTextContent('3 places lose their answer')
@@ -418,7 +417,8 @@ describe('CategoryEditor — editing an existing category', () => {
       expect(body(0)).toEqual({ address: true, phone: false, fieldKeys: [] })
 
       await user.click(screen.getByRole('button', { name: 'Keep it' }))
-      expect(await screen.findByRole('button', { name: 'Remove this field' })).toBeInTheDocument()
+      // Back in the list, the address still in Contact.
+      expect(await screen.findByRole('button', { name: 'Take Address off' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
@@ -428,12 +428,11 @@ describe('CategoryEditor — editing an existing category', () => {
       const user = userEvent.setup()
       renderWithProviders(<CategoryEditor token="t" initial={baseCategory()} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
       await openBox(user, 'Contact')
-      await user.click(screen.getByRole('button', { name: /^Address/ }))
-      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await user.click(screen.getByRole('button', { name: 'Take Address off' }))
       await user.click(await screen.findByRole('button', { name: 'Remove it' }))
 
       expect(await screen.findByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /^Address/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Take Address off' })).not.toBeInTheDocument()
       await saveNow(user)
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
       expect(screen.queryByText('This will permanently clear data from existing listings')).not.toBeInTheDocument()
@@ -451,8 +450,7 @@ describe('CategoryEditor — editing an existing category', () => {
       })
       renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
       await openBox(user, 'Contact')
-      await user.click(screen.getByRole('button', { name: /^Kosher Certification(?! URL)/ }))
-      await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
+      await user.click(screen.getByRole('button', { name: 'Take Kosher Certification off' }))
 
       expect(await screen.findByRole('heading', { name: 'Remove Kosher Certification from Food?' })).toBeInTheDocument()
       expect(screen.getByText('71 places').parentElement).toHaveTextContent('71 places lose their answer')
@@ -490,8 +488,7 @@ describe('CategoryEditor — editing an existing category', () => {
       await user.click(screen.getByRole('button', { name: 'Add to Groceries' }))
       await screen.findByRole('heading', { name: 'Groceries' })
       vi.mocked(fetchJson).mockClear()
-      await user.click(screen.getByRole('button', { name: /^Address/ }))
-      await user.click(screen.getByRole('button', { name: 'Remove this field' }))
+      await user.click(screen.getByRole('button', { name: 'Take Address off' }))
       await screen.findByRole('heading', { name: 'Groceries' })
       expect(fetchJson).not.toHaveBeenCalled()
     })
@@ -913,9 +910,7 @@ describe('CategoryEditor — Fields, in boxes', () => {
     await openBox(user, 'Call us')
     expect(screen.queryByRole('button', { name: 'Take Call us off' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Take Contact off' })).toBeNull()
-    await user.click(screen.getByRole('button', { name: /^Night line/ }))
-    await user.click(await screen.findByRole('button', { name: 'Remove from Groceries' }))
-    await screen.findByRole('heading', { name: 'Groceries' })
+    await user.click(screen.getByRole('button', { name: 'Take Night line off' }))
     // Still there, empty, and its X at the end of its name bar.
     expect(shownIn('Call us')).toEqual([])
     const x = await screen.findByRole('button', { name: 'Take Call us off' })
@@ -1414,9 +1409,7 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     const added = () => boxesShown().slice(4).map(([, rows]) => rows)
     await addDavening('Box A')
     expect(added()).toEqual([['Davening times']])
-    await user.click(screen.getByRole('button', { name: /^Davening times/ }))
-    await user.click(await screen.findByRole('button', { name: 'Remove from Food' }))
-    await screen.findByRole('heading', { name: 'Food' })
+    await user.click(screen.getByRole('button', { name: 'Take Davening times off' }))
     expect(added()).toEqual([[]])
     await addDavening('Box B')
     expect(added()).toEqual([[], ['Davening times']])

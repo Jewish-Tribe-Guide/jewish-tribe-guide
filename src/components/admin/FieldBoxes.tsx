@@ -44,7 +44,7 @@ export default function FieldBoxes({
   onRemoveBox,
   onAddField,
   onShowField,
-  onShowBasic,
+  onRemoveRow,
 }: {
   page: FieldPage
   boxes: FieldBox[]
@@ -62,7 +62,8 @@ export default function FieldBoxes({
   onRemoveBox: (id: string) => void
   onAddField: (boxId: string) => void
   onShowField: (key: string) => void
-  onShowBasic: (basic: 'address' | 'phone') => void
+  /** A row's X: a field (by key), or the page's address or phone. */
+  onRemoveRow: (row: { field: string } | 'address' | 'phone') => void
 }) {
   // Folded boxes, by id: just their name bar in the list.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
@@ -196,10 +197,21 @@ export default function FieldBoxes({
           }
           if ('basic' in item) {
             const name = item.basic === 'address' ? 'Address' : 'Phone'
-            return <Inner row={row} name={name} onOpen={() => onShowBasic(item.basic)} />
+            // Nothing to set on them: no screen, only the X.
+            return <Inner row={row} name={name} onRemove={() => onRemoveRow(item.basic)} />
           }
           const f = byKey.get(item.field)
-          return <Inner row={hidden.has(item.field) ? still(row) : row} name={f?.label || 'New field'} tags={f ? tagsOf(f) : []} onOpen={() => onShowField(item.field)} />
+          // A hechsher's part is switched on the hechsher's own screen: no X.
+          const part = hidden.has(item.field)
+          return (
+            <Inner
+              row={part ? still(row) : row}
+              name={f?.label || 'New field'}
+              tags={f ? tagsOf(f) : []}
+              onOpen={() => onShowField(item.field)}
+              onRemove={part ? undefined : () => onRemoveRow({ field: item.field })}
+            />
+          )
         }}
       </DragList>
     </div>
@@ -213,23 +225,40 @@ function tagsOf(f: CategoryField): string[] {
   return (fieldLine(f) ?? '').split(' · ').filter((t) => t === 'Filter' || t === 'Under the name')
 }
 
-/** A field in its box: its handle, name and tags, and a chevron to its own
- *  screen. */
-function Inner({ row, name, tags = [], onOpen }: { row: DragRow; name: string; tags?: string[]; onOpen: () => void }) {
-  return (
-    <div className="flex min-h-[46px] items-center gap-1 pl-1 pr-3">
-      {row.handle}
-      <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-1.5 text-left">
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <span className="text-[15px] text-slate-900">{name}</span>
-          {tags.map((t) => (
-            <span key={t} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
-              {t}
-            </span>
-          ))}
+/** A field in its box: its handle, name and tags, a chevron to its own
+ *  screen, and last its X (the user, Nov 10: removing is where the field
+ *  is, as a link's × is), the way a tab's X sits after its chevron. */
+function Inner({ row, name, tags = [], onOpen, onRemove }: { row: DragRow; name: string; tags?: string[]; onOpen?: () => void; onRemove?: () => void }) {
+  const label = (
+    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <span data-row-name className="text-[15px] text-slate-900">{name}</span>
+      {tags.map((t) => (
+        <span key={t} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+          {t}
         </span>
-        <Chevron />
-      </button>
+      ))}
+    </span>
+  )
+  return (
+    <div className="flex min-h-[46px] items-center gap-1 pl-1 pr-1">
+      {row.handle}
+      {onOpen ? (
+        <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-1.5 pr-2 text-left">
+          {label}
+          <Chevron />
+        </button>
+      ) : (
+        <span {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 select-none items-center py-1.5 pr-2">
+          {label}
+        </span>
+      )}
+      {onRemove ? (
+        <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className="grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+          {X}
+        </button>
+      ) : (
+        <span aria-hidden="true" className="w-10 shrink-0" />
+      )}
     </div>
   )
 }
