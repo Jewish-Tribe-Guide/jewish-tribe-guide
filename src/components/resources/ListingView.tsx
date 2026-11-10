@@ -80,7 +80,7 @@ import { SectionCard, ShabbosCard } from './listingCards'
 import { BoxField, FieldsBox, fieldText, hasValue } from './FieldsBox'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
-import { Card, shortDate } from './listingParts'
+import { Card, InBoxProvider, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -515,7 +515,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       : f.key === itemsF?.key
         ? itemsBox
         : f.key === lead?.text?.key || (lead && !lead.text && f.key === lead.field.key)
-          ? leadBody
+          ? <Card title={lead.title}>{leadBody}</Card>
           : null
   const isBig = (f: CategoryField) => f.type === 'minyanim' || f.type === 'contacts' || !!f.caveat || f.key === itemsF?.key || f.key === lead?.text?.key || f.key === lead?.field.key
   // Those put in Contact or About: drawn there, under their names.
@@ -523,13 +523,15 @@ export default function ListingView({ item, category, color, place = null, upvot
     category.detailFields
       .filter((f) => fixedPlace(f.key) === where && isBig(f) && f.renderAs !== 'hidden')
       .flatMap((f) => {
-        const node = bigOf(f) ?? (hasValue(f, item[f.key]) ? <BoxField field={f} item={item} /> : null)
-        return node ? [{ f, node }] : []
+        const big = bigOf(f)
+        // A box drawn in this one names itself (Card, inside one).
+        if (big) return [{ f, node: <InBoxProvider value={{ title: '' }}>{big}</InBoxProvider>, named: true }]
+        return hasValue(f, item[f.key]) ? [{ f, node: <BoxField field={f} item={item} />, named: false }] : []
       })
   const bigShown = (where: 'contact' | 'about') =>
-    bigIn(where).map(({ f, node }) => (
+    bigIn(where).map(({ f, node, named }) => (
       <div key={f.key} data-testid="placed-big" className="py-2.5">
-        <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{f.label}</p>
+        {!named && <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{f.label}</p>}
         {node}
       </div>
     ))

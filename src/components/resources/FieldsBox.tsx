@@ -5,7 +5,7 @@ import { formatPhone } from '@/lib/validation'
 import { formatHoursSummary, hasAnyHours } from '@/lib/hours'
 import { readContacts, webLink, type ContactEntry } from '@/lib/contacts'
 import { PhoneIcon } from '@/components/icons'
-import { Card } from './listingParts'
+import { Card, InBoxProvider } from './listingParts'
 
 // Kept light (no data hooks), so the "+ Add" box can show a list as the
 // listing will, without the listing's own cards coming with it.
@@ -131,13 +131,14 @@ export function FieldsBox({
     <Card title={heading} testId="listing-box" footer={footer} onEdit={onEdit}>
       {filled.map((f, i) => (
         <div key={f.key} className={headed && i > 0 ? 'mt-1 border-t border-slate-200' : ''}>
-          {headed && (
+          {/* A box drawn in this one names itself (Card, inside one). */}
+          {headed && !drawn.has(f.key) && (
             <p className="pt-2.5 text-[12px] font-extrabold uppercase tracking-wide text-muted">
               {f.label}
               {count(f) > 1 && ` · ${count(f)}`}
             </p>
           )}
-          {drawn.get(f.key) ?? <BoxField field={f} item={item} />}
+          {drawn.has(f.key) ? <InBoxProvider value={{ title }}>{drawn.get(f.key)}</InBoxProvider> : <BoxField field={f} item={item} />}
         </div>
       ))}
     </Card>

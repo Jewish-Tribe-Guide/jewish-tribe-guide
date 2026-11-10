@@ -1042,6 +1042,29 @@ describe('ListingView — a field where the admin put it', () => {
     expect(screen.getAllByText('1 Pine St')).toHaveLength(1)
   })
 
+  // The user, Nov 10: Main dishes, made one of the admin's boxes, said
+  // "Main dishes" three times: the box, the field's small heading, and the
+  // items' own box inside it.
+  it('the items in a box of the same name, named once, with no box inside the box', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const page = makeCategory({ ...food, detailFields: [...food.detailFields, dishes], listingParts: { boxes: [{ title: 'Main dishes', fields: ['@phone', 'dishes'] }] } })
+    view({ item: { ...judah, dishes: ['Shawarma', 'Falafel'] }, category: page })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Shawarma'))!
+    expect(within(box).getAllByText(/Main dishes/i)).toHaveLength(1)
+    expect(within(box).getByText('Phone')).toBeInTheDocument()
+    // Drawn inside it, not as a framed box of its own.
+    expect(within(box).getByTestId('listing-items').tagName).not.toBe('SECTION')
+  })
+
+  it('the items in a box with another name, named small under it', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const page = makeCategory({ ...food, detailFields: [...food.detailFields, dishes], listingParts: { boxes: [{ title: 'Today’s food', fields: ['dishes'] }] } })
+    view({ item: { ...judah, dishes: ['Shawarma', 'Falafel'] }, category: page })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Shawarma'))!
+    expect(within(box).getByRole('heading', { name: 'Today’s food' })).toBeInTheDocument()
+    expect(within(box).getAllByText(/Main dishes/)).toHaveLength(1)
+  })
+
   it('hours in a box of the admin’s, said there and not again in Contact', () => {
     const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
     view({ item: { ...judah, hours: everyDay }, category: makeCategory({ ...food, listingParts: { boxes: [{ title: 'When to come', fields: ['hours'] }] } }) })
