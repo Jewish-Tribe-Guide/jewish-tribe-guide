@@ -107,9 +107,12 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   there (Hotline, say) moved it up to the filled rows and dropped the rest
   of what was typed; an open row now stays where it was opened.
 - **Visitors can suggest a new eruv** (the user, Nov 9: "why can't a user
-  add an eruv?"). The Eruv page has its own + Add, as a category page
-  does, and the site-wide + is off it. It opens Add an eruv where the list
-  was (`?form=create`; a sheet on a phone): a name, the page's rows, and
+  add an eruv?"). It is in the regular + Add box, as every category is
+  (then: "why didn't you just make an add an eruv as an option within the
+  regular add button"): the Eruv page's + opens the box, whose "Fill it in
+  yourself" goes straight to Add an eruv, and the site-wide box's "What kind
+  of place?" lists the Eruv page when it takes additions. Add an eruv is a
+  name, the page's rows, and
   where its status is posted (a page or an email address) and its map, if
   they know. It goes to the queue as a New place in To do, the card and
   the admin email listing what it gives. Approving adds it and reads its

@@ -37,9 +37,11 @@ export type EruvValues = Record<EruvSuggestionField, string>
 type Values = EruvValues
 type Row = { column: (typeof ERUV_SUGGESTION_FIELDS)[number] } | { own: CategoryField }
 
-export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSave }: {
+export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSave, name = '' }: {
   /** Null to add a new one. */
   eruv: Eruv | null
+  /** Adding: the name it starts with, what was searched for in + Add. */
+  name?: string
   /** The Eruv page, whose Fields say which rows there are. */
   page?: CategoryConfig | null
   onClose: () => void
@@ -57,7 +59,7 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
   const adding = !eruv
   const [values, setValues] = useState<Values>(() => ({ covers: eruv?.covers ?? '', website: eruv?.website ?? '', hotline: eruv?.hotline ?? '', alertsUrl: eruv?.alertsUrl ?? '', ...adminSave?.values }))
   // A new one's own: its name, where its status is posted, its map.
-  const [added, setAdded] = useState({ name: '', statusAt: '', map: '' })
+  const [added, setAdded] = useState({ name, statusAt: '', map: '' })
   const [honeypot, setHoneypot] = useState('')
   const [token, setToken] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)

@@ -22,6 +22,7 @@ import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
 import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 import { FieldsBox } from '@/components/resources/FieldsBox'
 import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
+import EruvEditor from '@/components/resources/EruvEditor'
 import { useListingDraft } from '@/components/resources/useListingDraft'
 import type { SendVia } from '@/components/resources/useListingSubmit'
 import FindPlace from '@/components/FindPlace'
@@ -191,7 +192,15 @@ export default function TellUsSheet({
 // The form's title, by the category's plural name (Oct 5): "Add a Food"
 // read badly, and "Add to Food", "Add to Synagogues", "Add to WhatsApp
 // Groups" read well for every category, a place or not.
-const addTitle = (c: CategoryConfig) => `Add to ${c.pluralLabel || c.label}`
+const addTitle = (c: CategoryConfig) => (c.kind === 'eruv' ? 'Add an eruv' : `Add to ${c.pluralLabel || c.label}`)
+
+/** What + Add can add: every category of places that takes additions, and
+ *  the Eruv page when it does (Nov 9, the user: "why didn't you just make
+ *  an add an eruv as an option within the regular add button just like the
+ *  other categories"). An eruv is added with its own form, not a listing's. */
+export function addableCategories(categories: readonly CategoryConfig[] | null | undefined): CategoryConfig[] {
+  return (categories ?? []).filter((c) => (c.kind === 'listing' || c.kind === 'eruv') && c.active !== false && resolveCapabilities(c.capabilities).add)
+}
 
 type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
 export type TellKind = 'times' | 'menu'
@@ -290,7 +299,7 @@ export function TellUsBody({
     setStepOnly(next)
     onTitle(title)
   }
-  const addable = (categories ?? []).filter((c) => c.kind === 'listing' && c.active !== false && resolveCapabilities(c.capabilities).add)
+  const addable = addableCategories(categories)
   // `back`: returning to the search from what was found, keeping where the
   // search itself goes back to.
   // What a place found is added as: the page's category, or the one the
@@ -595,7 +604,7 @@ export function TellUsBody({
       result: () => setStep('write'),
       find: () => setStep(findFrom),
       kind: () => openFind(true),
-      add: editorStep ? editorStep.back : () => openFind(true),
+      add: editorStep ? editorStep.back : adding?.category.kind === 'eruv' && pageCategory?.kind === 'eruv' ? () => setStep('write') : () => openFind(true),
       edit: editorStep ? editorStep.back : () => (editFrom === 'result' ? setStep('result') : openFind(true)),
     }
     onBack(go[step])
@@ -632,7 +641,10 @@ export function TellUsBody({
           label: 'Fill it in yourself',
           run: () => {
             setAiPlace(null)
-            openFind()
+            // An eruv isn't on Google: the Eruv page's own goes straight to
+            // its form.
+            if (pageCategory?.kind === 'eruv') startAdding({}, pageCategory)
+            else openFind()
           },
         }
       : null
@@ -937,7 +949,12 @@ export function TellUsBody({
           </div>
         </div>
       )}
-      {step === 'add' && adding && (
+      {step === 'add' && adding?.category.kind === 'eruv' && (
+        <div data-testid="eruv-adding">
+          <EruvEditor eruv={null} page={adding.category} name={adding.place?.name ?? aiPlace?.query ?? ''} onClose={onClose} />
+        </div>
+      )}
+      {step === 'add' && adding && adding.category.kind !== 'eruv' && (
         <AddByHand
           key={`${adding.category.id}:${adding.place?.placeId ?? ''}`}
           category={adding.category}

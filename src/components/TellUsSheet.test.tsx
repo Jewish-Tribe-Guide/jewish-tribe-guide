@@ -5,7 +5,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import SiteAddButton, { showsSiteAdd } from './SiteAddButton'
-import TellUsSheet from './TellUsSheet'
+import TellUsSheet, { addableCategories } from './TellUsSheet'
 import { track } from '@vercel/analytics'
 
 vi.mock('@/components/resources/useListingSubmit', async (original) => ({ ...(await original<object>()), TURNSTILE_ACTIVE: false }))
@@ -545,6 +545,30 @@ describe('Saw something? Tell us', () => {
       find({ category: grocery })
       fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
       expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
+    })
+
+    // Nov 9, the user: "why didn't you just make an add an eruv as an
+    // option within the regular add button just like the other categories".
+    it('offers an eruv as a kind of place where the Eruv page takes additions, with its own form', () => {
+      const eruv = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim' })
+      respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
+      renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, { community: { slug: 'philly' }, content: { categories: [grocery, eruv] } })
+      fireEvent.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      fireEvent.click(within(screen.getByTestId('pick-kind')).getByRole('button', { name: 'Eruv' }))
+      expect(screen.getByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('eruv-adding')).getByLabelText('Status page or email')).toBeInTheDocument()
+      // Back goes to the place search, as from any kind.
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.getByTestId('find-place')).toBeInTheDocument()
+    })
+
+    it('leaves the eruv out where the Eruv page takes none, or is hidden', () => {
+      const eruv = (over = {}) => makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv', ...over })
+      expect(addableCategories([grocery, eruv()]).map((c) => c.id)).toEqual(['grocery', 'eruv'])
+      expect(addableCategories([grocery, eruv({ capabilities: { add: false } })]).map((c) => c.id)).toEqual(['grocery'])
+      expect(addableCategories([grocery, eruv({ active: false })]).map((c) => c.id)).toEqual(['grocery'])
+      expect(addableCategories([grocery, makeCategory({ id: 'zmanim', kind: 'zmanim' })]).map((c) => c.id)).toEqual(['grocery'])
     })
 
     it('isn’t offered over a listing, where it’s that listing’s edit', () => {
