@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, placeBasic, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, placeBasic, readOrder, removeBox, renameKey, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -452,11 +452,11 @@ describe('the admin’s boxes', () => {
   })
 })
 
-// The user, Nov 5: "even ones that could be moved like Delivery". A box the
-// listing makes itself is renamed where its name comes from.
+// The user, Nov 5: "even ones that could be moved like Delivery". Renamed,
+// a box of the listing's own becomes the admin's; its field keeps its name.
 describe('renaming the listing’s own boxes', () => {
-  // The user, Nov 10, changing Nov 7's "lock the name": every box is
-  // renamed but those every listing has (the Shabbos card, Contact, About).
+  // The user, Nov 10: every box is renamed but those every listing has
+  // (the Shabbos card, Contact, About). Nov 7's lock was on fields only.
   it('renames every box but the ones every listing has', () => {
     const named = (page: FieldPage, parts: ListingParts = {}) => fieldBoxes(page, parts).filter((b) => boxRenames(b, page)).map((b) => b.title)
     const madeHere = (page: FieldPage): FieldPage => ({ ...page, fields: page.fields.map((f) => ({ ...f, madeHere: true })) })
@@ -467,28 +467,6 @@ describe('renaming the listing’s own boxes', () => {
     expect(named(hospital, hospitalParts)).toEqual(['Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also'])
   })
 
-  it('says each one’s new name on the field it comes from', () => {
-    expect(renameListingBox(food, 'items', 'Dishes')).toEqual({ key: 'dishes', patch: { label: 'Dishes' } })
-    expect(renameListingBox(food, 'box:0', 'x')).toBeNull()
-    const mikvah: FieldPage = {
-      fields: [
-        { key: 'women', label: 'Women’s Tevillah', type: 'boolean', filterLabel: 'Women’s' },
-        { key: 'womenHours', label: 'Women’s Hours', type: 'hours', audienceKey: 'women' },
-        contacts('liaisons', 'Liaisons'),
-      ],
-      hasAddress: true,
-      hasPhone: false,
-    }
-    expect(renameListingBox(mikvah, 'audience:women', 'Women')).toEqual({ key: 'women', patch: { filterLabel: 'Women' } })
-    expect(renameListingBox(mikvah, 'contacts:liaisons', 'Who to call')).toEqual({ key: 'liaisons', patch: { label: 'Who to call' } })
-  })
-
-  it('is typed over as saved, empty while it’s retyped', () => {
-    const box = (page: FieldPage, id: string) => fieldBoxes(page, {}).find((b) => b.id === id)!
-    expect(boxName(food, box(food, 'items'))).toEqual({ value: 'Main dishes', placeholder: 'New box' })
-    const cleared: FieldPage = { ...food, fields: food.fields.map((f) => (f.key === 'dishes' ? { ...f, label: '' } : f)) }
-    expect(boxName(cleared, box(cleared, 'items')).value).toBe('')
-  })
 })
 
 // The user, Nov 9: "I'll click add a field under a specific box and it gets

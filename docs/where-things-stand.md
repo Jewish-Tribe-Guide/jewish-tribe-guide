@@ -70,8 +70,14 @@ The user's answers on Nov 10, evening, and what was done with them:
       of contacts' own box take any field from their + Add a field and by
       drag, and are renamed. Doing any of those makes the box one of the
       admin's, in the same place with its name and fields (`ownBox`,
-      6a91cc56). **This changes Nov 7's "lock the name".** Still taking
-      only their own: a mikvah's section and "Not on the listing".
+      6a91cc56). Nov 7's "lock the name" was on fields only, so this
+      doesn't change it. Still taking only their own: a mikvah's section
+      and "Not on the listing".
+    - **Renaming a box never renames a field** (the user: "Boxes and
+      fields are separate. you can edit the name of a field you created,
+      yes. But not through renaming the box."). A field's name changes
+      only on its own screen. Before, a box named by a field made here
+      (Main dishes) renamed the field.
     - **Address and phone move to any box** ("we should also be able to
       move all fields. Including address and phone"; deab70a7). Saved as
       `@address` / `@phone` in the box's list, Contact when nowhere. The

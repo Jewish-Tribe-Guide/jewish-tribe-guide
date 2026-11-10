@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { CategoryField } from '@/lib/categories'
-import { boxName, boxOf, boxRenames, fieldItems, renamesField, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
+import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
 import DragList, { RowName, type DragRow } from './DragList'
@@ -127,10 +127,11 @@ export default function FieldBoxes({
                     <RowName
                       name={name}
                       rename={{
-                        ...boxName(page, box),
+                        value: box.title,
+                        placeholder: 'New box',
                         onChange: (t) => onRename(box.id, t),
                         fresh: box.id === freshId,
-                        ...(box.kind === 'listing' && !renamesField(box, page) && onOwnBox && { onStart: () => onOwnBox(box.id) }),
+                        ...(box.kind === 'listing' && onOwnBox && { onStart: () => onOwnBox(box.id) }),
                       }}
                     />
                   </span>

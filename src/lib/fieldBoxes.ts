@@ -240,55 +240,14 @@ function afterOwning(id: string, owned: string, n: number): string {
   return k >= n ? `box:${k + 1}` : id
 }
 
-/** Whether a box's name is changed in place: the admin's, the boxes the
- *  listing makes itself from a field made here (renameListingBox), and
- *  every other of the listing's own, which then becomes the admin's
- *  (ownBox; the user, Nov 10, changing Nov 7's "lock the name"). Not the
- *  Shabbos card, Contact or About, which every listing has. */
+/** Whether a box's name is changed in place: the admin's, and every other
+ *  of the listing's own, which then becomes the admin's (ownBox). A box's
+ *  name is never a field's: a field is renamed on its own screen (the
+ *  user, Nov 10). Not the Shabbos card, Contact or About, which every
+ *  listing has. */
 export function boxRenames(box: FieldBox, page: FieldPage): boolean {
   if (box.kind === 'admin') return box.id !== 'shabbos'
-  return renamesField(box, page) || ownable(box, page)
-}
-
-/** A box the listing names from a field made here: renamed, it renames the
- *  field (renameListingBox). Any other of the listing's own becomes the
- *  admin's (ownBox). */
-export function renamesField(box: FieldBox, page: FieldPage): boolean {
-  if (box.kind !== 'listing' || box.id === 'minyanim' || box.id === 'hidden') return false
-  const named = renameListingBox(page, box.id, '')
-  return !!named && !!page.fields.find((f) => f.key === named.key)?.madeHere
-}
-
-/** A renamed box's name as it's typed: what's saved, which can be empty
- *  while it's retyped, and what the listing says when it is. */
-export function boxName(page: FieldPage, box: FieldBox): { value: string; placeholder: string } {
-  const field = page.fields.find((f) => f.key === renameListingBox(page, box.id, '')?.key)
-  if (!field || box.kind === 'admin') return { value: box.title, placeholder: 'New box' }
-  if (box.id.startsWith('lead:')) return { value: field.leadBox?.title ?? '', placeholder: field.label }
-  if (box.id === 'caveat') return { value: field.caveat?.title ?? 'What isn’t kosher', placeholder: 'What isn’t kosher' }
-  if (box.id.startsWith('audience:')) return { value: field.filterLabel ?? field.label, placeholder: field.label }
-  return { value: field.label, placeholder: 'New box' }
-}
-
-/** Renaming a box the listing makes itself renames the field it's named by:
- *  the items ("Main dishes"), a list of contacts, an audience's section. */
-export function renameListingBox(page: FieldPage, id: string, title: string): { key: string; patch: Partial<CategoryField> } | null {
-  const field = (key: string) => page.fields.find((f) => f.key === key)
-  if (id.startsWith('lead:')) {
-    const f = field(id.slice(5))
-    return f?.leadBox ? { key: f.key, patch: { leadBox: { ...f.leadBox, title } } } : null
-  }
-  if (id === 'caveat') {
-    const f = page.fields.find((o) => o.caveat)
-    return f ? { key: f.key, patch: { caveat: { ...f.caveat!, title } } } : null
-  }
-  if (id.startsWith('contacts:')) return field(id.slice(9)) ? { key: id.slice(9), patch: { label: title } } : null
-  if (id.startsWith('audience:')) return field(id.slice(9)) ? { key: id.slice(9), patch: { filterLabel: title } } : null
-  if (id === 'items') {
-    const f = page.fields.find((o) => homeOf(o, page) === 'items')
-    return f ? { key: f.key, patch: { label: title } } : null
-  }
-  return null
+  return ownable(box, page)
 }
 
 /** A box's line: its fields' names, the address and phone first. */

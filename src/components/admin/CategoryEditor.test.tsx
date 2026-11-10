@@ -1334,7 +1334,9 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     expect(body.listingParts.boxes).toEqual([{ title: 'Main dishes', fields: ['dishes', 'parking'] }])
   })
 
-  it('renames the boxes of fields made here, and saves each on its field', async () => {
+  // The user, Nov 10: "Boxes and fields are separate. you can edit the name
+  // of a field you created, yes. But not through renaming the box."
+  it('renames the box of a field made here, never the field', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     const madeHere = { ...food, detailFields: food.detailFields.map((f) => ({ ...f, madeHere: true })) }
@@ -1342,8 +1344,9 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     await rename(user, 'Main dishes', 'Dishes')
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    const by = new Map(fields().map((f) => [f.key, f]))
-    expect(by.get('dishes')!.label).toBe('Dishes')
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body)
+    expect(body.listingParts.boxes).toEqual([{ title: 'Dishes', fields: ['dishes'] }])
+    expect(fields().find((f) => f.key === 'dishes')!.label).toBe('Main dishes')
   })
 })
 
