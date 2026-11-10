@@ -1,5 +1,5 @@
 import type { CategoryField, FieldType } from './categories'
-import { cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
+import { arrange, cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
 import { caveatTitle, isCertificateLink } from './listingView'
 
 // ── A page's fields, as its opened listing's boxes (Category pages step 3,
@@ -28,6 +28,11 @@ import { caveatTitle, isCertificateLink } from './listingView'
 // a field that draws a whole box (the davening times, a list of items or
 // contacts, a link's own box) is a box, added from "+ Add a box".
 //
+// Every box moves, anywhere between Top and "Not on the listing", and any
+// box can be taken off, its fields with it (the user, Nov 10: "Can't we
+// just have boxes and fields and an admin can arrange how they want?").
+// The order is saved as ListingParts.order (arrange).
+//
 // A field is moved by dragging it onto another box's row: one list, the
 // opened box's fields among the boxes (fieldItems), read back by readOrder.
 
@@ -40,8 +45,7 @@ export type FieldBox = {
   /** 'fixed': Top, Contact, About. 'listing': where the listing puts its
    *  own fields. 'admin': the admin's own, named and changed here. */
   kind: 'fixed' | 'listing' | 'admin'
-  /** The admin's boxes and the Shabbos card: dragged among each other.
-   *  So are the listing's own boxes before them, by their `lead`. */
+  /** Every box but Top and "Not on the listing". */
   moves: boolean
   /** Which of the listing's own boxes before the admin's it is: a mikvah's
    *  sections are one, its main thing, and move together. */
@@ -158,8 +162,16 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const contact: FieldBox[] =
     basics.length || homes.get('contact')?.length ? [{ id: 'contact', title: 'Contact', kind: 'fixed', moves: false, fields: homes.get('contact') ?? [], basics }] : []
   const about: FieldBox[] = homes.get('about')?.length ? [{ id: 'about', title: 'About', kind: 'fixed', moves: false, fields: homes.get('about')! }] : []
-  return [top, ...before, ...zone, ...contact, ...about, ...listing('hidden', 'Not on the listing')]
+  const middle = [...before, ...zone, ...contact, ...about].map((b) => ({ ...b, moves: true }))
+  return [top, ...(parts.order ? arrange(middle, parts.order) : middle), ...listing('hidden', 'Not on the listing')]
 }
+
+/** A box's token in the saved order: its id, but 'box' for each of the
+ *  admin's, in turn (their ids are their places among them). */
+export const boxToken = (id: string) => (id.startsWith('box:') ? 'box' : id)
+
+/** The tokens of an order of boxes, Top and "Not on the listing" left out. */
+const tokensOf = (ids: readonly string[]) => ids.filter((id) => id !== 'top' && id !== 'hidden').map(boxToken)
 
 /** Whether a box's name is changed in place: the admin's, and the boxes the
  *  listing makes itself from a field made here (renameListingBox). A
@@ -288,14 +300,6 @@ function owners(items: readonly FieldItem[]): Map<string, string | null> {
   return at
 }
 
-/** 0 before the admin's boxes, 1 among them, 2 after. */
-function zoneOf(box: FieldBox): number {
-  if (box.lead) return 0
-  if (box.moves || box.id.startsWith('contacts:')) return 1
-  if (box.id === 'contact' || box.id === 'about' || box.id === 'hidden') return 2
-  return 0
-}
-
 /** Why an order isn't one the listing can take: null when it is. With the
  *  box that turned a field down, for drawing it so (`at`). */
 export function orderProblem(prev: readonly FieldItem[], next: readonly FieldItem[], page: FieldPage): { at?: string; why?: string } | null {
@@ -306,16 +310,12 @@ export function orderProblem(prev: readonly FieldItem[], next: readonly FieldIte
   const boxIds = boxes.map((b) => b.id)
   const prevIds = prev.flatMap((i) => ('box' in i ? [i.box.id] : []))
   if (boxIds.join('\n') !== prevIds.join('\n')) {
-    // A box moved: only the admin's, among each other, and nothing changes box.
+    // A box moved: anywhere after Top and before "Not on the listing", and
+    // nothing changes box.
     const still = (ids: string[]) => ids.filter((id) => !boxes.find((b) => b.id === id)?.moves).join('\n')
     if (still(boxIds) !== still(prevIds)) return {}
-    const zones = boxes.map(zoneOf)
-    if (zones.some((z, n) => n > 0 && z < zones[n - 1])) return {}
-    const firstList = boxIds.findIndex((id) => id.startsWith('contacts:'))
-    if (firstList >= 0 && boxIds.slice(firstList).some((id) => id.startsWith('box:'))) return {}
-    // The listing's own boxes move as theirs do: a mikvah's sections together.
-    const leads = boxes.flatMap((b) => (b.lead ? [b.lead] : []))
-    if (leads.some((l, n) => n > 0 && l !== leads[n - 1] && leads.indexOf(l) < n)) return {}
+    const hiddenAt = boxIds.indexOf('hidden')
+    if (hiddenAt >= 0 && hiddenAt !== boxIds.length - 1) return {}
     for (const [k, box] of now) if (was.get(k) !== box) return {}
     return null
   }
@@ -374,23 +374,12 @@ export function readOrder(
   Object.assign(out, placedOut)
   for (const p of FIXED_PLACES) if (!placedOut[p]) delete out[p]
 
-  // The listing's own boxes, when they moved: their order, unless it's the
-  // usual one.
-  const leads = [...new Set(next.flatMap((i) => ('box' in i && i.box.lead ? [i.box.lead] : [])))]
-  const prevLeads = [...new Set(prev.flatMap((i) => ('box' in i && i.box.lead ? [i.box.lead] : [])))]
-  if (leads.join() !== prevLeads.join()) {
-    const order = [...leads, ...(parts.lead ?? LEAD_SLOTS).filter((l) => !leads.includes(l))]
-    if (order.join() === LEAD_SLOTS.join()) delete out.lead
-    else out.lead = order
-  }
-  // The Shabbos card, when it moved: after however many of the boxes and
-  // lists of contacts come before it. After them all stays "after them all".
+  // The boxes, when they moved: the order, which then decides it all.
   const prevIds = prev.flatMap((i) => ('box' in i ? [i.box.id] : []))
-  if (parts.shabbos && boxIds.join('\n') !== prevIds.join('\n')) {
-    const counted = next.flatMap((i) => ('box' in i && (i.box.id.startsWith('box:') || i.box.id.startsWith('contacts:')) && i.box.fields.length > 0 ? [i.box.id] : []))
-    const at = boxIds.indexOf('shabbos')
-    const after = counted.filter((id) => boxIds.indexOf(id) < at).length
-    out.shabbos = { fields: out.shabbos!.fields, ...(after < counted.length || parts.shabbos.after !== undefined ? { after } : {}) }
+  if (boxIds.join('\n') !== prevIds.join('\n')) {
+    out.order = tokensOf(boxIds)
+    delete out.lead
+    if (out.shabbos) out.shabbos = { fields: out.shabbos.fields }
   }
 
   // A box of the listing's own, reordered: its fields take each other's
@@ -409,17 +398,39 @@ export function readOrder(
   return { parts: out, order }
 }
 
-/** "+ Add a box": a new, empty box, after the admin's others (and before
- *  any list of contacts in none), and its id. */
-export function addBox(parts: ListingParts, title = 'New box'): { parts: ListingParts; id: string } {
+/** "+ Add a box": a new, empty box at the end, after About (board B), and
+ *  its id. `shown` is the boxes as they are, for the order to start from. */
+export function addBox(parts: ListingParts, shown: readonly FieldBox[], title = ''): { parts: ListingParts; id: string } {
   const boxes = [...(parts.boxes ?? []), { title, fields: [] }]
-  return { parts: { ...parts, boxes }, id: `box:${boxes.length - 1}` }
+  const order = [...tokensOf(shown.map((b) => b.id)), 'box']
+  const out: ListingParts = { ...parts, boxes, order, ...(parts.shabbos && { shabbos: { fields: parts.shabbos.fields } }) }
+  delete out.lead
+  return {
+    parts: out,
+    id: `box:${boxes.length - 1}`,
+  }
 }
 
-/** Takes one of the admin's boxes off; its fields go back where they go. */
+/** Takes a box off the listing. Its fields come off the page with it,
+ *  which the editor does (the user, Nov 10); here, the box itself. */
 export function removeBox(parts: ListingParts, id: string): ListingParts {
-  if (id === 'main') return { ...parts, main: undefined }
-  if (id === 'shabbos') return { ...parts, shabbos: undefined }
+  const order = parts.order && dropToken(parts.order, id)
+  const out = order ? { ...parts, order } : parts
+  if (id === 'main') return { ...out, main: undefined }
+  if (id === 'shabbos') return { ...out, shabbos: undefined }
+  if (!id.startsWith('box:')) return out
+  return removeAdminBox(out, id)
+}
+
+/** The order without one box's token: the nth 'box' for the admin's nth. */
+function dropToken(order: readonly string[], id: string): string[] {
+  if (!id.startsWith('box:')) return order.filter((t) => t !== id)
+  const n = Number(id.slice(4))
+  let seen = -1
+  return order.filter((t) => t !== 'box' || ++seen !== n)
+}
+
+function removeAdminBox(parts: ListingParts, id: string): ListingParts {
   const n = Number(id.slice(4))
   const all = parts.boxes ?? []
   const boxes = all.filter((_, i) => i !== n)

@@ -153,9 +153,25 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   the list"); a field you made gets "Show it under the name?" Yes / No.
   It sets the field's second line (`onCard`) or third line
   (`showInHeader`), whichever it is. How it looks switches to List when
-  it changes. Not on the Eruv page, which has no rows. Still to build from
-  boards A and B: no Top, every box moves, + Add a box in place, and how
-  a box is removed.
+  it changes. Not on the Eruv page, which has no rows.
+- **Every box moves, any box comes off, + Add a box adds in place** (the
+  user, Nov 10, boards A and B: "Can't we just have boxes and fields and
+  an admin can arrange how they want?"; "Yes, build it" to removing a box
+  taking its fields). Every box but Top and "Not on the listing" has a
+  handle and goes anywhere between them, Contact and About included; the
+  order is saved as `listingParts.order` and the listing draws its boxes
+  in it (a box it doesn't name follows the one it usually follows; the
+  Shabbos card still leads on a Friday). Every box has a trash can: its
+  fields come off the page with it, Contact's address and phone too, and
+  Save asks before clearing answers, as for any field. "+ Add a box" adds
+  an empty box at the end, open, its name ready to type, with no screen
+  in between; a field that is a box itself (davening times, a list of
+  contacts) is offered by any box's "+ Add a field" and lands as a box of
+  its own. Not built yet: no Top (where the header's fields sit in the
+  list), and big fields as rows inside any box (board A's Menu holding
+  Main dishes). A listing's own sections that it draws as one (a mikvah's
+  audience sections, the main thing) still render together, where the
+  first of them is.
 - **A category page in admin opens without waiting on the list again**
   (the user, Nov 9: "Most noticable is lcikcing on a category page in
   admin"). Each Category pages screen is its own address, so every open

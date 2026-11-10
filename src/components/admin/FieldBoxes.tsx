@@ -10,8 +10,8 @@ import DragList, { addButton, OrderRow, RowActions, type DragRow } from './DragL
 // of its opened listings, in the order a visitor sees them (fieldBoxes.ts).
 // A box opens in place to its fields, each opening that field's screen; the
 // admin's own, and the listing's own from a field made here, are renamed in
-// place (a ready-made field's keeps its name); the admin's have a trash
-// can. A field moves by
+// place (a ready-made field's keeps its name). Every box but Top and "Not
+// on the listing" is dragged anywhere and has a trash can. A field moves by
 // dragging it onto another box's row, which is drawn dashed while it's
 // over it, or red with why when that box can't take it.
 
@@ -118,7 +118,9 @@ export default function FieldBoxes({
             </button>
           )
           const empty = box.fields.length === 0 && !box.basics?.length && <span className="block pb-2.5 text-[13px] text-slate-500">Nothing in it yet</span>
-          if (box.kind === 'admin')
+          // Every box but Top and "Not on the listing" comes off, its fields
+          // with it (the user, Nov 10).
+          if (box.moves)
             return (
               <div>
                 {empty}
@@ -127,7 +129,7 @@ export default function FieldBoxes({
                 </RowActions>
               </div>
             )
-          return box.kind === 'fixed' ? <div>{add}</div> : <div className="h-1" />
+          return box.id === 'top' ? <div>{add}</div> : <div className="h-1" />
         }
         if ('basic' in item) {
           const name = item.basic === 'address' ? 'Address' : 'Phone'

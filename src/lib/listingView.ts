@@ -7,7 +7,7 @@ import { haversineMiles, milesText, roundMiles } from './geo'
 import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
 import { parseWalkLists } from './walkList'
-import { boxesOf, mainCardOf, shabbosFieldsOf } from './listingParts'
+import { boxesOf, boxesWithIds, mainCardOf, shabbosFieldsOf } from './listingParts'
 import { readContacts } from './contacts'
 import type { DirectoryResource } from '@/types'
 
@@ -437,13 +437,13 @@ export { sectionConfirmedAt, confirmedByFor, sectionSource, boxDate } from './bo
  *  admin's, then any list of contacts in none of them, or in the main card
  *  or the Shabbos card, as a box of its own. Each with its editor row's id
  *  (editorRows), and the key it's dated under (boxConfirmKey). */
-export function listingBoxes(item: DirectoryResource, category: CategoryConfig): { title: string; fields: CategoryField[]; row: string; key: string | null }[] {
-  const configured = boxesOf(category)
+export function listingBoxes(item: DirectoryResource, category: CategoryConfig): { id: string; title: string; fields: CategoryField[]; row: string; key: string | null }[] {
+  const configured = boxesWithIds(category)
   const named = mainThing(item, category) === 'section' ? mainCardOf(category) : null
   const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
   return [
     ...configured.map((b) => ({ ...b, row: `box:${b.title}` })),
-    ...category.detailFields.filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key)).map((f) => ({ title: f.label, fields: [f], row: `box:${f.key}` })),
+    ...category.detailFields.filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key)).map((f) => ({ id: `contacts:${f.key}`, title: f.label, fields: [f], row: `box:${f.key}` })),
   ].map((b) => ({ ...b, key: boxConfirmKey(item, b.fields) }))
 }
 

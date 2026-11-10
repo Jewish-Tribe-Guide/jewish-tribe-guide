@@ -42,7 +42,7 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { boxesOf, fixedPlaceOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { arrange, boxesOf, boxOrderOf, fixedPlaceOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -760,6 +760,33 @@ export default function ListingView({ item, category, color, place = null, upvot
   const after = shabbosAfter(category)
   const amongBoxes = !!shabbos && !shabbosFirst && after !== null && boxes.length > 0
   const boxesAndShabbos = amongBoxes ? [...boxes.slice(0, after), <div key="shabbos">{shabbos}</div>, ...boxes.slice(after!)] : boxes
+  // A place whose list has nothing on it yet: the box, with its Add, after
+  // whatever it leads with.
+  const emptyItems = main !== 'items' && itemsF && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
+
+  // Every box where the admin dragged it (ListingParts.order; the user,
+  // Nov 10: "an admin can arrange how they want"), once they have. A box
+  // the order doesn't name follows the one it follows anyway. The Shabbos
+  // card still comes right after the main thing on a Friday, until candles.
+  let arranged: ReactNode = null
+  const order = boxOrderOf(category)
+  if (order) {
+    const usual: { id: string; node: ReactNode }[] = [
+      ...leadOrderOf(category).map((slot) => ({ id: slot === 'link' ? 'lead' : slot, node: slot === 'link' ? leadBoxView : slot === 'caveat' ? caveatBox : mainSection })),
+      ...boxDefs.map((b, n) => ({ id: b.id, node: boxes[n] })),
+      { id: 'walks', node: walks },
+      { id: 'shabbos', node: shabbosFirst ? null : shabbos },
+      { id: 'items-empty', node: emptyItems },
+      { id: 'contact', node: details },
+      { id: 'about', node: about },
+    ]
+    // The admin's list has a box for each of the listing's own sections that
+    // the listing draws as one: a link's box, its main thing.
+    const tokens = order.map((t) => (t.startsWith('lead:') ? 'lead' : t === 'minyanim' || t === 'items' || t.startsWith('audience:') ? 'main' : t))
+    const placed = arrange(usual, tokens)
+    if (shabbosFirst && shabbos) placed.splice(placed.findIndex((p) => p.id === 'main') + 1, 0, { id: 'shabbos-first', node: shabbos })
+    arranged = placed.map((p) => <Fragment key={p.id}>{p.node}</Fragment>)
+  }
 
   return (
     <div className="space-y-5" data-testid="listing-view">
@@ -767,6 +794,8 @@ export default function ListingView({ item, category, color, place = null, upvot
       {foundBox}
       <TappedMinyanBox item={item} category={category} />
       {actions}
+      {arranged ?? (
+        <>
       {/* A link's own box, what isn't kosher and the main thing, in the
           order the admin put them (ListingParts.lead). */}
       {leadOrderOf(category).map((slot) => (
@@ -780,9 +809,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       {!shabbosFirst && !amongBoxes && shabbos}
       {/* A place whose list has nothing on it yet: the box, with its Add,
           after whatever it leads with. */}
-      {main !== 'items' && itemsF && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />}
+      {emptyItems}
       {details}
       {about}
+        </>
+      )}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
           answer (pickListingQuestion); nothing when there's nothing. */}
       <QuestionCard category={category} listing={item} items={main === 'items' && itemsF ? { field: itemsF, api: itemApi } : undefined} />

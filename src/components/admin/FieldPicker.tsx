@@ -53,11 +53,10 @@ export default function FieldPicker({
   canRequire: boolean
   /** The page beside, with the field on it (a computer only). */
   besides?: (field: CategoryField) => React.ReactNode
-  /** Opened from a box's "+ Add a field", or from "+ Add a box": the
-   *  screen's title, and whether each field lands there. Only what lands
-   *  there is offered (the user, Nov 9 and 10). From "+ Add a box", making
-   *  your own is an empty box. */
-  into?: { heading: string; offers: (row: ReadyField) => boolean; kindFits: (type: FieldType) => boolean; emptyBox?: () => void }
+  /** Opened from a box's "+ Add a field": the screen's title, and
+   *  whether each field lands there. Only what lands there is offered (the
+   *  user, Nov 9 and 10). */
+  into?: { heading: string; offers: (row: ReadyField) => boolean; kindFits: (type: FieldType) => boolean }
 }) {
   const community = useCommunitySlug()
   const { pages, error } = useReadyMade(token, community)
@@ -92,8 +91,7 @@ export default function FieldPicker({
   const shown = into ? found?.filter(into.offers) : found
   const typed = query.trim()
   const ownName = typed.charAt(0).toUpperCase() + typed.slice(1)
-  const emptyBox = into?.emptyBox
-  const canMake = !emptyBox && kinds.length > 0
+  const canMake = kinds.length > 0
   return (
     <div className="flex flex-col gap-4 [&>section]:max-w-[760px]">
       <AdminBack back={{ label: pageName, onClick: onBack }} title={into?.heading ?? 'Add a field'} />
@@ -108,7 +106,7 @@ export default function FieldPicker({
         !error && <p className="text-sm text-muted">Loading…</p>
       ) : shown.length === 0 && typed ? (
         <AdminBox>
-          <p className="m-0 px-4 py-3 text-[15px] text-slate-600">No ready-made {emptyBox ? 'box' : 'field'} called “{typed}”</p>
+          <p className="m-0 px-4 py-3 text-[15px] text-slate-600">No ready-made field called “{typed}”</p>
           {canMake && <AdminRow onClick={() => onScreen({ at: 'make', name: ownName })} name={`Make your own: ${ownName}`} />}
         </AdminBox>
       ) : (
@@ -124,7 +122,6 @@ export default function FieldPicker({
         )
       )}
       {canMake && !(shown?.length === 0 && typed) && <MakeOwnLink onClick={() => onScreen({ at: 'make' })}>Make your own field</MakeOwnLink>}
-      {emptyBox && <MakeOwnLink onClick={emptyBox}>Make an empty box</MakeOwnLink>}
     </div>
   )
 }

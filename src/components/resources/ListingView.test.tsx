@@ -131,6 +131,19 @@ describe('ListingView — who and whether', () => {
     expect(after(screen.getByTestId('listing-actions'), screen.getByTestId('listing-items'))).toBe(true)
   })
 
+  // The user, Nov 10: any box anywhere. Contact and About above the rest.
+  it('puts every box where the admin dragged it, Contact and About included', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const about: CategoryField = { key: 'about', label: 'About', type: 'textarea' }
+    const item = { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'], about: 'Family run since 1990.' }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes, about], listingParts: { order: ['about', 'contact', 'items', 'caveat'] } }) })
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const aboutBox = screen.getByText('Family run since 1990.')
+    expect(after(aboutBox, screen.getByTestId('listing-details'))).toBe(true)
+    expect(after(screen.getByTestId('listing-details'), screen.getByTestId('listing-items'))).toBe(true)
+    expect(after(screen.getByTestId('listing-items'), screen.getByTestId('listing-caveat-box'))).toBe(true)
+  })
+
   it('a grocery’s caveat stays under the name and in the details', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     view({ item: { ...judah, kosherPartial: true, kosherNote: 'The deli is not supervised', m: ['Challah'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, m] }) })
