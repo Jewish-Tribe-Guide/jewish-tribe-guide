@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { CategoryField } from '@/lib/categories'
-import { boxName, boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
+import { boxName, boxOf, boxRenames, fieldItems, renamesField, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
 import DragList, { RowActions, RowName, type DragRow } from './DragList'
@@ -41,6 +41,7 @@ export default function FieldBoxes({
   landed,
   onChange,
   onRename,
+  onOwnBox,
   onRemoveBox,
   onAddField,
   onShowField,
@@ -57,6 +58,8 @@ export default function FieldBoxes({
    *  of the listing's own was reordered. */
   onChange: (parts: ListingParts, order: string[] | null) => void
   onRename: (id: string, title: string) => void
+  /** A box of the listing's own, tapped to rename: it becomes the admin's. */
+  onOwnBox?: (id: string) => void
   onRemoveBox: (id: string) => void
   onAddField: (boxId: string) => void
   onShowField: (key: string) => void
@@ -112,7 +115,15 @@ export default function FieldBoxes({
               <div className="flex min-h-[52px] items-center gap-1 py-1.5 pl-1 pr-3">
                 {box.moves ? row.handle : NO_HANDLE}
                 {renames ? (
-                  <RowName name={name} rename={{ ...boxName(page, box), onChange: (t) => onRename(box.id, t), fresh: box.id === freshId }} />
+                  <RowName
+                    name={name}
+                    rename={{
+                      ...boxName(page, box),
+                      onChange: (t) => onRename(box.id, t),
+                      fresh: box.id === freshId,
+                      ...(box.kind === 'listing' && !renamesField(box, page) && onOwnBox && { onStart: () => onOwnBox(box.id) }),
+                    }}
+                  />
                 ) : (
                   <h3 {...(box.moves ? row.rowProps : {})} className="m-0 min-w-0 flex-1 select-none text-base font-semibold text-slate-900">
                     {name}

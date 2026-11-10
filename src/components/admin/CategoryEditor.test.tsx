@@ -852,20 +852,18 @@ describe('CategoryEditor — Fields, in boxes', () => {
     expect(title).toHaveValue('')
     await user.type(title, 'Kosher food')
     await user.keyboard('{Enter}')
-    // Pantry, down through Contact and About (which take it too, the
+    // Pantry, down through every box after it (each takes it too, the
     // user, Nov 10) into Kosher food.
     await openBox(user, 'Pantry')
     // The field's handle, under the box's own.
     screen.getAllByRole('button', { name: 'Move Pantry' }).at(-1)!.focus()
-    await user.keyboard('{ArrowDown}')
-    expect(shownIn('Contact')).toContain('Pantry')
-    for (let i = 0; i < 20 && !shownIn('Kosher food')?.includes('Pantry'); i++) await user.keyboard('{ArrowDown}')
+    for (let i = 0; i < 40 && !shownIn('Kosher food')?.includes('Pantry'); i++) await user.keyboard('{ArrowDown}')
     expect(boxesShown().map(([name]) => name)).not.toContain('Pantry')
     expect(shownIn('Kosher food')).toEqual(['Pantry'])
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
     const saved = JSON.parse(payload()).listingParts
-    expect(saved.boxes).toEqual([{ title: 'Kosher food', fields: ['pantry'] }])
+    expect(saved.boxes.at(-1)).toEqual({ title: 'Kosher food', fields: ['pantry'] })
     expect(saved.order.at(-1)).toBe('box')
   })
 
@@ -1273,18 +1271,43 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     await user.type(name, `${to}{Enter}`)
   }
 
-  // The user, Nov 7: a ready-made field's box keeps its name.
-  // Nov 10: Delivery and the hechsher are in the boxes the listing draws
-  // them in, each one field.
-  it('keeps a ready-made field’s box name: no Rename on Delivery, What isn’t kosher or Main dishes', async () => {
+  // The user, Nov 10, changing Nov 7's "lock the name": "existing boxes not
+  // being editable". A ready-made field's box is renamed too, and becomes
+  // one of the admin's, in its place; the field keeps its own name.
+  it('renames a ready-made field’s box, which becomes one of the admin’s in its place', async () => {
+    const onSaved = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
     expect(boxesShown().slice(0, 3)).toEqual([['Delivery', ['Delivery Details']], ['What isn’t kosher', ['Kosher Certification']], ['Main dishes', ['Main dishes']]])
-    for (const name of ['Delivery', 'What isn’t kosher', 'Main dishes']) {
-      await openBox(user, name)
-      expect(boxesShown().map(([n]) => n)).toContain(name)
-      expect(screen.queryByRole('button', { name: `Rename ${name}` })).toBeNull()
-    }
+    for (const name of ['Delivery', 'What isn’t kosher', 'Main dishes']) expect(screen.getByRole('button', { name: `Rename ${name}` })).toBeInTheDocument()
+    await rename(user, 'Main dishes', 'Today’s food')
+    expect(boxesShown().slice(0, 3)).toEqual([['Delivery', ['Delivery Details']], ['What isn’t kosher', ['Kosher Certification']], ['Today’s food', ['Main dishes']]])
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body)
+    expect(body.listingParts.boxes).toEqual([{ title: 'Today’s food', fields: ['dishes'] }])
+    expect(body.listingParts.order.slice(0, 3)).toEqual(['lead:delivery_whatsapp_group', 'caveat', 'box'])
+    expect(fields().find((f) => f.key === 'dishes')!.label).toBe('Main dishes')
+  })
+
+  it('offers every field from a ready-made field’s box’s + Add a field, and puts it there', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    const hospital = { community: 'other', category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'liaisons', label: 'Liaisons', type: 'contacts', renderAs: 'row' }, { key: 'night', label: 'Night line', type: 'tel' }] }) }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [hospital] }))))
+    await user.click(screen.getByRole('button', { name: 'Add a field to Main dishes' }))
+    await screen.findByRole('heading', { name: 'Add a field to Main dishes' })
+    expect(await screen.findByText('Liaisons')).toBeInTheDocument()
+    expect(screen.getByText('Night line')).toBeInTheDocument()
+    await user.type(screen.getByRole('searchbox', { name: 'Search fields' }), 'Parking')
+    await user.click(screen.getByRole('button', { name: 'Make your own: Parking' }))
+    await user.click(screen.getByRole('button', { name: /^Link/ }))
+    await screen.findByRole('heading', { name: /^Parking/ })
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body)
+    expect(body.listingParts.boxes).toEqual([{ title: 'Main dishes', fields: ['dishes', 'parking'] }])
   })
 
   it('renames the boxes of fields made here, and saves each on its field', async () => {

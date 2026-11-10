@@ -410,6 +410,10 @@ export type RowRename = {
   placeholder?: string
   /** Just added: the name is selected, ready to type over. */
   fresh?: boolean
+  /** Tapped to rename, in place of editing here: the row is about to be
+   *  another's (a box of the listing's own becoming the admin's), which
+   *  then starts `fresh`. */
+  onStart?: () => void
 }
 
 /** Open, the name reads as the name; a tap on it edits it, and leaving
@@ -424,7 +428,7 @@ export function RowName({ rename, name }: { rename: RowRename; name: string }) {
       <button
         type="button"
         aria-label={`Rename ${name}`}
-        onClick={() => setEditing(true)}
+        onClick={() => (rename.onStart ? rename.onStart() : setEditing(true))}
         className={`${pad} min-w-0 cursor-text truncate border-transparent text-left text-slate-900 hover:border-slate-200 hover:bg-slate-50`}
       >
         {rename.value || <span className="text-slate-400">{rename.placeholder}</span>}

@@ -198,14 +198,56 @@ export const boxToken = (id: string) => (id.startsWith('box:') ? 'box' : id)
 /** The tokens of an order of boxes, "Not on the listing" left out. */
 const tokensOf = (ids: readonly string[]) => ids.filter((id) => id !== 'hidden').map(boxToken)
 
-/** Whether a box's name is changed in place: the admin's, and the boxes the
- *  listing makes itself from a field made here (renameListingBox). A
- *  ready-made field's box keeps its name, which comes with the field (the
- *  user, Nov 7: "lock the name"). Not the Shabbos card, Contact or
- *  About, which every listing has, nor the davening times, whose boxes are
- *  named by what's in them. */
+/** Whether a box of the listing's own can become one of the admin's: every
+ *  field in it is one a card can show. Not "Not on the listing", nor a
+ *  mikvah's section, whose fields belong to its switch. */
+export function ownable(box: FieldBox, page: FieldPage): boolean {
+  if (box.kind !== 'listing' || box.id === 'hidden' || box.id.startsWith('audience:') || !box.fields.length) return false
+  const fields = box.fields.map((k) => page.fields.find((f) => f.key === k))
+  return fields.every((f) => !!f && cardFieldChoices([f]).length > 0)
+}
+
+/** A box of the listing's own made one of the admin's, in its place, with
+ *  its name (or `title`) and fields: what adding to it, dragging into it or
+ *  renaming it does (the user, Nov 10: "existing boxes not being editable").
+ *  Its new id; the admin's boxes after it move up one. Any other box, as it
+ *  is. `shown` is the boxes as they are. */
+export function ownBox(parts: ListingParts, shown: readonly FieldBox[], id: string, page: FieldPage, title?: string): { parts: ListingParts; id: string } {
+  const at = shown.findIndex((b) => b.id === id)
+  const box = shown[at]
+  if (!box || !ownable(box, page)) return { parts, id }
+  const n = shown.slice(0, at).filter((b) => b.id.startsWith('box:')).length
+  const boxes = [...(parts.boxes ?? [])]
+  boxes.splice(n, 0, { title: title ?? box.title, fields: [...box.fields] })
+  const order = tokensOf(shown.map((b) => (b.id === id ? 'box:' : b.id)))
+  const out: ListingParts = { ...parts, boxes, order, ...(parts.shabbos && { shabbos: { fields: parts.shabbos.fields } }) }
+  delete out.lead
+  return { parts: out, id: `box:${n}` }
+}
+
+/** The id a box has once `owned` became the admin's nth: itself `box:n`, and
+ *  the admin's from n on one further along. */
+function afterOwning(id: string, owned: string, n: number): string {
+  if (id === owned) return `box:${n}`
+  if (!id.startsWith('box:')) return id
+  const k = Number(id.slice(4))
+  return k >= n ? `box:${k + 1}` : id
+}
+
+/** Whether a box's name is changed in place: the admin's, the boxes the
+ *  listing makes itself from a field made here (renameListingBox), and
+ *  every other of the listing's own, which then becomes the admin's
+ *  (ownBox; the user, Nov 10, changing Nov 7's "lock the name"). Not the
+ *  Shabbos card, Contact or About, which every listing has. */
 export function boxRenames(box: FieldBox, page: FieldPage): boolean {
   if (box.kind === 'admin') return box.id !== 'shabbos'
+  return renamesField(box, page) || ownable(box, page)
+}
+
+/** A box the listing names from a field made here: renamed, it renames the
+ *  field (renameListingBox). Any other of the listing's own becomes the
+ *  admin's (ownBox). */
+export function renamesField(box: FieldBox, page: FieldPage): boolean {
   if (box.kind !== 'listing' || box.id === 'minyanim' || box.id === 'hidden') return false
   const named = renameListingBox(page, box.id, '')
   return !!named && !!page.fields.find((f) => f.key === named.key)?.madeHere
@@ -259,12 +301,14 @@ export function fieldLine(f: CategoryField): string | undefined {
   return undefined
 }
 
-/** Whether a box can take this field: the admin's, Contact and About take
- *  any field (the user, Nov 10: "anything takes anything"), the davening
- *  times, a list, Delivery and a hechsher among them; any other only what
- *  goes there anyway. */
+/** Whether a box can take this field: every box takes any field (the user,
+ *  Nov 10: "anything takes anything"; "existing boxes not being editable"),
+ *  the davening times, a list, Delivery and a hechsher among them. A box of
+ *  the listing's own becomes one of the admin's when it takes one (ownBox).
+ *  Not "Not on the listing", nor a mikvah's section, whose fields are its
+ *  switch's. */
 function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
-  if (box.kind === 'admin') return cardFieldChoices([f]).length > 0
+  if (box.kind === 'admin' || ownable(box, page)) return cardFieldChoices([f]).length > 0
   if (box.id === 'contact' || box.id === 'about') return takesAnywhere(f, page)
   return homeOf(f, page) === box.id
 }
@@ -380,6 +424,20 @@ export function readOrder(
   parts: ListingParts,
   page: FieldPage,
 ): { parts: ListingParts; order: string[] | null } {
+  // A field dropped into a box of the listing's own makes it the admin's
+  // first, in its place.
+  const to = [...owners(next)].find(([k, box]) => k.startsWith('field:') && box !== owners(prev).get(k) && box && !box.startsWith('box:'))?.[1]
+  const target = to ? prev.find((i): i is { box: FieldBox } => 'box' in i && i.box.id === to)?.box : undefined
+  if (target && ownable(target, page)) {
+    const shown = prev.flatMap((i) => ('box' in i ? [i.box] : []))
+    const own = ownBox(parts, shown, to!, page)
+    const n = Number(own.id.slice(4))
+    const remap = (items: readonly FieldItem[]): FieldItem[] =>
+      items.map((i) =>
+        'box' in i ? { box: { ...i.box, id: afterOwning(i.box.id, to!, n), ...(i.box.id === to && { kind: 'admin' as const }) } } : 'end' in i ? { end: afterOwning(i.end, to!, n) } : i,
+      )
+    return readOrder(remap(prev), remap(next), own.parts, page)
+  }
   const was = owners(prev)
   const now = owners(next)
   const open = new Set(prev.flatMap((i) => ('end' in i ? [i.end] : [])))

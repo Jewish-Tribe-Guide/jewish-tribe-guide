@@ -8,7 +8,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, basicsLandIn, fieldBoxes, madeField, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, basicsLandIn, fieldBoxes, madeField, ownBox, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -493,6 +493,14 @@ function CategoryEditorScreen({
   const parts = listingPartsFromKey(draft.listingParts)
   const boxes = fieldBoxes(fieldPage, parts)
   const addingBox = addingTo ? boxes.find((b) => b.id === addingTo) : undefined
+  // A field added to a box of the listing's own makes it the admin's, in
+  // its place (ownBox): the box it lands in.
+  const ownAddingBox = () => {
+    if (!addingTo) return addingTo
+    const own = ownBox(parts, boxes, addingTo, fieldPage)
+    if (own.id !== addingTo) set('listingParts', listingPartsKey(own.parts))
+    return own.id
+  }
   // Just added: its row is scrolled to and lit.
   if (landing) {
     const key = pageFields.find((f) => !landing.has(f.key))?.key
@@ -559,7 +567,7 @@ function CategoryEditorScreen({
           } else if (row.basic === 'phone') set('hasPhone', true)
           else if (row.basic === 'hours') toggleHoursField(true)
           else if (row.basic === 'website') toggleWebsiteField(true)
-          else if (row.field) addReadyField(row.field, row.companions, addingTo, row.partner)
+          else if (row.field) addReadyField(row.field, row.companions, ownAddingBox(), row.partner)
           added(null)
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
@@ -585,7 +593,7 @@ function CategoryEditorScreen({
         }
         onMakeOwn={(type, label) => {
           setLanding(new Set(pageFields.map((f) => f.key)))
-          added(addOwnField(type, label, addingTo))
+          added(addOwnField(type, label, ownAddingBox()))
         }}
       />
     )
@@ -746,6 +754,13 @@ function CategoryEditorScreen({
               const named = renameListingBox(fieldPage, id, title)
               if (named) set('fields', draft.fields.map((f, i) => (pageFields[i]?.key === named.key ? { ...f, ...named.patch } : f)))
               else set('listingParts', listingPartsKey(renameBox(parts, id, title)))
+            }}
+            onOwnBox={(id) => {
+              // Renamed: a box of the listing's own becomes the admin's, its
+              // name ready to type.
+              const own = ownBox(parts, boxes, id, fieldPage)
+              set('listingParts', listingPartsKey(own.parts))
+              setFreshBox(own.id)
             }}
             onRemoveBox={(id) => {
               // Its fields come off the page with it (the user, Nov 10), the

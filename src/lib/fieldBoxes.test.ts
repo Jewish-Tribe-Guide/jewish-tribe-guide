@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -375,9 +375,19 @@ describe('the listing’s own boxes', () => {
     const after = fieldBoxes(food, parts)
     expect(after.find((b) => b.id === 'contact')!.fields).toContain('kosherCert')
     expect(after.find((b) => b.id === 'caveat')).toBeUndefined()
-    const all = fieldItems(fieldBoxes(food, {}))
-    const wrong = drop(all, 'field:s', all.findIndex((i) => itemKey(i) === 'box:items') + 1)
-    expect(orderProblem(all, wrong, food)).toEqual({ at: 'items', why: 'Short Description can’t go in Main dishes' })
+    // A mikvah's section is its switch's: nothing else goes in it.
+    const mikvah: FieldPage = {
+      hasAddress: true,
+      hasPhone: false,
+      fields: [
+        { key: 'women', label: 'Women’s Tevillah', type: 'boolean', filterLabel: 'Women’s' },
+        { key: 'womenHours', label: 'Women’s Hours', type: 'hours', audienceKey: 'women' },
+        { key: 's', label: 'Short Description', type: 'text' },
+      ],
+    }
+    const all = fieldItems(fieldBoxes(mikvah, {}))
+    const wrong = drop(all, 'field:s', all.findIndex((i) => itemKey(i) === 'box:audience:women') + 1)
+    expect(orderProblem(all, wrong, mikvah)).toEqual({ at: 'audience:women', why: 'Short Description can’t go in Women’s' })
   })
 })
 
@@ -415,14 +425,14 @@ describe('the admin’s boxes', () => {
 // The user, Nov 5: "even ones that could be moved like Delivery". A box the
 // listing makes itself is renamed where its name comes from.
 describe('renaming the listing’s own boxes', () => {
-  // The user, Nov 7: a ready-made field's box keeps its name ("lock the
-  // name"); only a field made here, or the admin's own box, is renamed.
-  it('renames a box made here, never a ready-made field’s, nor one every listing has', () => {
+  // The user, Nov 10, changing Nov 7's "lock the name": every box is
+  // renamed but those every listing has (the Shabbos card, Contact, About).
+  it('renames every box but the ones every listing has', () => {
     const named = (page: FieldPage, parts: ListingParts = {}) => fieldBoxes(page, parts).filter((b) => boxRenames(b, page)).map((b) => b.title)
     const madeHere = (page: FieldPage): FieldPage => ({ ...page, fields: page.fields.map((f) => ({ ...f, madeHere: true })) })
-    expect(named(food)).toEqual([])
+    expect(named(food)).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
     expect(named(madeHere(food))).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
-    expect(named(shuls, { shabbos: { fields: ['denomination'] } })).toEqual([])
+    expect(named(shuls, { shabbos: { fields: ['denomination'] } })).toEqual(['Davening times'])
     // A hospital's are the admin's own boxes, holding ready-made fields.
     expect(named(hospital, hospitalParts)).toEqual(['Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also'])
   })
@@ -493,9 +503,62 @@ describe('what a box’s + Add a field offers', () => {
     expect(whereAdded(box('contact'), food.fields[6], food)).toBe('here')
   })
 
+  it('takes any field into a box of the listing’s own (the user, Nov 10: "existing boxes not being editable")', () => {
+    const own = fieldBoxes(food, {})
+    const at = (id: string) => own.find((b) => b.id === id)!
+    for (const id of ['lead:delivery_whatsapp_group', 'caveat', 'items']) {
+      expect(whereAdded(at(id), kind('text'), food)).toBe('here')
+      expect(whereAdded(at(id), kind('minyanim'), food)).toBe('here')
+      expect(whereAdded(at(id), kind('image'), food)).toBe('elsewhere')
+    }
+    const shul = fieldBoxes(shuls, {}).find((b) => b.id === 'minyanim')!
+    expect(whereAdded(shul, kind('contacts'), shuls)).toBe('here')
+  })
+
   it('puts the page’s address, phone, hours and website in Contact only', () => {
     expect(basicsLandIn(box('contact'))).toBe(true)
     expect(basicsLandIn(box('about'))).toBe(false)
     expect(basicsLandIn(box('box:0'))).toBe(false)
+  })
+})
+
+// The user, Nov 10: "I can not for the life of me understand why we're still
+// having existing boxes not being editable." A box of the listing's own
+// becomes one of the admin's, in its place, when it takes a field or a name.
+describe('a box of the listing’s own, made the admin’s', () => {
+  it('keeps its place, name and fields, the admin’s after it one further along', () => {
+    const parts: ListingParts = { boxes: [{ title: 'Mine', fields: ['s'] }] }
+    const shown = fieldBoxes(food, parts)
+    expect(shown.map((b) => b.id)).toEqual(['lead:delivery_whatsapp_group', 'caveat', 'items', 'box:0', 'contact', 'about'])
+    const { parts: owned, id } = ownBox(parts, shown, 'items', food)
+    expect(id).toBe('box:0')
+    expect(owned.boxes).toEqual([{ title: 'Main dishes', fields: ['dishes'] }, { title: 'Mine', fields: ['s'] }])
+    const after = fieldBoxes(food, owned)
+    expect(after.map((b) => [b.id, b.title, b.kind])).toEqual([
+      ['lead:delivery_whatsapp_group', 'Delivery', 'listing'],
+      ['caveat', 'What isn’t kosher', 'listing'],
+      ['box:0', 'Main dishes', 'admin'],
+      ['box:1', 'Mine', 'admin'],
+      ['contact', 'Contact', 'fixed'],
+      ['about', 'About', 'fixed'],
+    ])
+    // Renamed as it's made.
+    expect(ownBox({}, fieldBoxes(food, {}), 'lead:delivery_whatsapp_group', food, 'Getting it delivered').parts.boxes).toEqual([{ title: 'Getting it delivered', fields: ['delivery_details'] }])
+    // Contact, About and the admin's own stay as they are.
+    for (const b of ['contact', 'about', 'box:0']) expect(ownBox(parts, shown, b, food)).toEqual({ parts, id: b })
+  })
+
+  it('takes a field dragged into it', () => {
+    const shown = fieldBoxes(shuls, {})
+    const items = fieldItems(shown)
+    // The website, from Contact, under the davening times.
+    const next = drop(items, 'field:website', items.findIndex((i) => itemKey(i) === 'end:minyanim'))
+    expect(orderProblem(items, next, shuls)).toBeNull()
+    const { parts } = readOrder(items, next, {}, shuls)
+    expect(parts.boxes).toEqual([{ title: 'Davening times', fields: ['minyanim', 'website'] }])
+    expect(fieldBoxes(shuls, parts).map((b) => [b.title, boxLine(b, shuls)])).toEqual([
+      ['Davening times', 'Davening Times (Minyanim), Website'],
+      ['Contact', 'Address, Phone, Denomination'],
+    ])
   })
 })
