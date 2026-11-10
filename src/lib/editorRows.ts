@@ -4,12 +4,14 @@ import { readContacts, sameContacts } from './contacts'
 import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
 import { sameFieldValue } from './listingDiff'
-import { boxesOf, fixedPlaceOf, isBasicField, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
+import { boxesOf, fixedPlaceOf, isBasicField, mainCardOf, parseListingParts, shabbosFieldsOf } from './listingParts'
+import { fieldBoxes, type FieldPage } from './fieldBoxes'
+import { partsOf } from './fieldParts'
 import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
 import { MENU_LINK_KEY, MENU_LINK_LABEL } from './menuLink'
-import { readSchedules, schedulesKey, weekPostRows } from './schedules'
+import { readSchedules, schedulesKey } from './schedules'
 import { isNoMinyan, weekDates, weekDiffers, weekPostFor, weekRowsFor, type EditWeek } from './thisWeekEdit'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
@@ -39,7 +41,14 @@ export type EditorRow = {
   flag?: string
   /** An admin's listing: the contact box a row each (`splitContact`). */
   part?: 'address' | 'phone'
+  /** A contact row: which of the address and phone it edits, by where the
+   *  admin put them (fieldBoxes.ts). Both when unset. */
+  basics?: ('address' | 'phone')[]
 }
+
+/** Whether the row edits the place's address or phone. */
+export const rowHas = (row: EditorRow, b: 'address' | 'phone'): boolean =>
+  row.part ? row.part === b : row.kind === 'contact' && (!row.basics || row.basics.includes(b))
 
 /** What a draft holds: the three core values and the details. */
 export type EditorValues = { name: string; address: string; phone: string; details: Record<string, unknown> }
@@ -102,6 +111,13 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   for (const f of fields) if (f.renderAs === 'hidden' && !caveatParts.has(f.key)) placed.add(f.key)
 
   const rows: EditorRow[] = []
+  const hasAddress = category.hasAddress !== false
+  const hasPhone = category.hasPhone !== false
+  // The listing's boxes, as the admin's Fields list lays them out.
+  const page: FieldPage = { fields: fields.filter((f) => f.renderAs !== 'hidden'), hiddenFields: fields.filter((f) => f.renderAs === 'hidden'), hasAddress, hasPhone }
+  const shownBoxes = fieldBoxes(page, parseListingParts(category.listingParts))
+  // A field with no box of its own: in Contact or About.
+  const boxless = new Set(shownBoxes.filter((b) => b.id === 'contact' || b.id === 'about').flatMap((b) => b.fields))
 
   // 1 · The name, its photo, and a short line under it.
   const photo = fields.filter((f) => f.key === PHOTO_FIELD_KEY && f.type === 'image')
@@ -127,9 +143,7 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
         !placed.has(f.key) &&
         !f.audienceKey &&
         BROUGHT_UP[f.type] &&
-        !namedKeys.has(f.key) &&
-        !shabbosKeys.has(f.key) &&
-        !boxKeys.has(f.key),
+        boxless.has(f.key),
     )
     const section = brought.length > 0 ? category.formSections?.find((s) => s.key === kind.formSection)?.label?.trim() : undefined
     rows.push({ id: 'kind', title: section || kind.label, kind: 'fields', fields: take([kind, ...brought]) })
@@ -156,73 +170,84 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   if (allSections) take(fields.filter((f) => audienceFlags.has(f.key)))
   if (facts.length > 0) rows.push({ id: 'facts', title: factsTitle(facts), kind: 'fields', fields: take(facts) })
 
-  // 3 · The main thing.
-  if (named) rows.push({ id: 'main', title: named.label, kind: 'fields', fields: take([...named.fields]) })
-  const minyanim = fields.find((f) => f.type === 'minyanim' && !placed.has(f.key))
-  if (minyanim) {
-    take([minyanim])
-    rows.push({ id: 'minyans:weekday', title: 'Usual weekday times', kind: 'minyans', fields: [minyanim], box: 'weekday' })
-    rows.push({ id: 'minyans:shabbos', title: 'Usual Shabbos times', kind: 'minyans', fields: [minyanim], box: 'shabbos' })
+  // 3 · The listing's boxes, in its order, each as the admin arranged it
+  // in Fields (fieldBoxes.ts): its name, its fields, the address and phone
+  // where they were put (the user, Nov 10: editing follows the listing;
+  // admins arrange it). The davening times keep their own rows, wherever
+  // they are; a week of hours from Contact has its own, after it (Oct 11).
+  const all = new Map(fields.map((f) => [f.key, f]))
+  const audienceRow = (flagKey: string): EditorRow[] => {
+    const flag = all.get(flagKey)
+    const own = take(fields.filter((f) => f.audienceKey === flagKey && f.renderAs !== 'hidden'))
+    return flag && (details[flagKey] || allSections) ? [{ id: `audience:${flagKey}`, title: flag.filterLabel ?? flag.label, kind: 'audience', fields: own, flag: flagKey }] : []
+  }
+  const minyanRows = (minyanim: CategoryField): EditorRow[] => [
+    { id: 'minyans:weekday', title: 'Usual weekday times', kind: 'minyans', fields: [minyanim], box: 'weekday' },
+    { id: 'minyans:shabbos', title: 'Usual Shabbos times', kind: 'minyans', fields: [minyanim], box: 'shabbos' },
     // This week's, or that there's no minyan this week (the user, Oct 23).
     // No Yom Tov schedules row (the user, Oct 11): a shul doesn't have
     // those ahead of time; they're added when posted, from the listing's
     // own schedule box.
-    if (week) rows.push({ id: 'minyans:this_week', title: 'This week’s schedule', kind: 'minyans', fields: [minyanim], box: 'this_week', week })
+    ...(week ? [{ id: 'minyans:this_week', title: 'This week’s schedule', kind: 'minyans' as const, fields: [minyanim], box: 'this_week' as const, week }] : []),
     // An admin's too (the user, Oct 31): a newsletter before Shabbos is about next week.
-    if (nextWeek) rows.push({ id: 'minyans:next_week', title: 'Next week’s schedule', kind: 'minyans', fields: [minyanim], box: 'this_week', week: nextWeek })
-  }
-  if (items && !placed.has(items.key)) rows.push({ id: 'items', title: items.label, kind: 'items', fields: take([items]) })
-  // A section per audience (a mikvah's Women’s, Men’s, Keilim), while it's on.
-  for (const flagKey of audienceFlags) {
-    const flag = fields.find((f) => f.key === flagKey)
-    const own = fields.filter((f) => f.audienceKey === flagKey && f.renderAs !== 'hidden')
-    take(own)
-    if (flag && (details[flagKey] || allSections)) rows.push({ id: `audience:${flagKey}`, title: flag.filterLabel ?? flag.label, kind: 'audience', fields: own, flag: flagKey })
-  }
-
-  // 4 · The admin's boxes, then any list of contacts in none of them, with
-  // the Shabbos card among them where the admin put it.
-  const boxes: EditorRow[] = [
-    // The address and phone are edited with the place's contact.
-    ...boxesOf(category).map((b) => ({ id: `box:${b.title}`, title: b.title, kind: 'fields' as const, fields: take(b.fields.filter((f) => !isBasicField(f))) })),
-    ...fields
-      .filter((f) => f.type === 'contacts' && !placed.has(f.key) && !shabbosKeys.has(f.key))
-      .map((f) => ({ id: `box:${f.key}`, title: f.label, kind: 'fields' as const, fields: take([f]) })),
+    ...(nextWeek ? [{ id: 'minyans:next_week', title: 'Next week’s schedule', kind: 'minyans' as const, fields: [minyanim], box: 'this_week' as const, week: nextWeek }] : []),
   ]
-  const shabbosRow: EditorRow[] = shabbos.length > 0 ? [{ id: 'shabbos', title: 'Shabbos', kind: 'fields', fields: take(shabbos) }] : []
-  const after = shabbosAfter(category)
-  rows.push(...(after === null ? [...boxes, ...shabbosRow] : [...boxes.slice(0, after), ...shabbosRow, ...boxes.slice(after)]))
-
-  // 5 · The contact box: address, phone, website and other links, and
-  // short lines (an email).
-  // With what the admin put in Contact by name (a long text), and without
-  // what they put in About.
-  const contact = fields.filter(
-    (f) =>
-      !placed.has(f.key) &&
-      !f.audienceKey &&
-      fixedPlace(f.key) !== 'about' &&
-      (f.type === 'url' || f.type === 'text' || f.type === 'tel' || f.type === 'number' || (f.type === 'textarea' && fixedPlace(f.key) === 'contact')),
-  )
-  const hasAddress = category.hasAddress !== false
-  const hasPhone = category.hasPhone !== false
-  if (splitContact) {
-    if (hasAddress) rows.push({ id: 'contact:address', title: 'Address', kind: 'contact', fields: [], part: 'address' })
-    if (hasPhone) rows.push({ id: 'contact:phone', title: 'Phone', kind: 'contact', fields: [], part: 'phone' })
-    for (const f of take(contact)) if (fieldIsVisible(f, details)) rows.push({ id: `field:${f.key}`, title: f.label, kind: 'fields', fields: [f] })
-  } else if (hasAddress || hasPhone || contact.length > 0) {
-    rows.push({ id: 'contact', title: contactTitle(hasAddress, hasPhone, contact), kind: 'contact', fields: take(contact) })
+  for (const box of shownBoxes) {
+    if (box.id === 'hidden') continue
+    if (box.id.startsWith('audience:')) {
+      rows.push(...audienceRow(box.id.slice(9)))
+      continue
+    }
+    // Its fields, each with its parts (Delivery's link), not yet in a row.
+    const seen = new Set<string>()
+    const inBox = box.fields
+      .flatMap((k) => {
+        const f = all.get(k)
+        return f ? [f, ...partsOf(f, fields)] : []
+      })
+      .filter((f) => !placed.has(f.key) && !seen.has(f.key) && seen.add(f.key))
+    // A list, the davening times or the people to call: rows of their own.
+    // People to call in an admin's box are edited in that box, together.
+    const isBig = (f: CategoryField) => f.type === 'minyanim' || f.key === items?.key || (f.type === 'contacts' && box.kind !== 'admin')
+    const big = inBox.filter(isBig)
+    const contactBox = box.id === 'contact'
+    const hoursOut = contactBox ? inBox.filter((f) => f.type === 'hours' && !f.audienceKey) : []
+    // What Contact edits with the address and phone: links and short
+    // lines, and a long text put there; anything else is a row of its own.
+    const small = inBox.filter(
+      (f) =>
+        !isBig(f) &&
+        !hoursOut.includes(f) &&
+        !f.audienceKey &&
+        (!contactBox || f.type === 'url' || f.type === 'text' || f.type === 'tel' || f.type === 'number' || (f.type === 'textarea' && fixedPlace(f.key) === 'contact')),
+    )
+    const basics = box.basics ?? []
+    const id = contactBox ? 'contact' : box.id === 'about' || box.id === 'main' || box.id === 'shabbos' || box.id === 'items' || box.id === 'caveat' ? box.id : box.id.startsWith('contacts:') ? `box:${box.id.slice(9)}` : box.id.startsWith('box:') ? `box:${box.title}` : box.id
+    const title = contactBox ? contactTitle(basics.includes('address'), basics.includes('phone'), small) : box.title
+    // A box of just one list is that list's row, by the box's name.
+    const alone = small.length === 0 && basics.length === 0 && big.length === 1
+    if (splitContact && (basics.length > 0 || contactBox)) {
+      // A job keeps each one (the Places listing, Nov 1).
+      for (const b of basics) rows.push({ id: `contact:${b}`, title: b === 'address' ? 'Address' : 'Phone', kind: 'contact', fields: [], part: b })
+      if (contactBox) {
+        for (const f of take(small)) if (fieldIsVisible(f, details)) rows.push({ id: `field:${f.key}`, title: f.label, kind: 'fields', fields: [f] })
+      } else if (small.length > 0) rows.push({ id, title, kind: 'fields', fields: take(small) })
+    } else if (small.length > 0 || basics.length > 0) {
+      rows.push({ id, title, kind: basics.length > 0 ? 'contact' : 'fields', fields: take(small), ...(basics.length > 0 && { basics }) })
+    }
+    for (const f of big) {
+      take([f])
+      if (f.type === 'minyanim') rows.push(...minyanRows(f))
+      else if (f.key === items?.key) rows.push({ id: 'items', title: alone ? box.title : f.label, kind: 'items', fields: [f] })
+      else rows.push({ id: `box:${f.key}`, title: alone ? box.title : f.label, kind: 'fields', fields: [f] })
+    }
+    // A place with a section per audience shows its hours in those.
+    if (audienceFlags.size === 0) for (const f of hoursOut) rows.push({ id: hoursOut.length > 1 ? `hours:${f.key}` : 'hours', title: hoursOut.length > 1 ? f.label : 'Hours', kind: 'fields', fields: take([f]) })
   }
-
-  // 6 · Hours, on their own (the user, Oct 11): a week of them is its own
-  // screen, and the thing most often wrong. A place with a section per
-  // audience shows its hours in those, not here.
-  const hours = audienceFlags.size > 0 ? [] : fields.filter((f) => f.type === 'hours' && !placed.has(f.key) && !f.audienceKey && fixedPlace(f.key) !== 'about')
-  for (const f of hours) rows.push({ id: hours.length > 1 ? `hours:${f.key}` : 'hours', title: hours.length > 1 ? f.label : 'Hours', kind: 'fields', fields: take([f]) })
-
-  // 7 · About: the descriptions.
-  const about = fields.filter((f) => !placed.has(f.key) && !f.audienceKey && ((f.type === 'textarea' && fixedPlace(f.key) !== 'contact') || fixedPlace(f.key) === 'about'))
-  if (about.length > 0) rows.push({ id: 'about', title: 'About', kind: 'fields', fields: take(about) })
+  // A section with no box of its own: its fields have no row of their own.
+  for (const flagKey of audienceFlags) if (!rows.some((r) => r.flag === flagKey)) rows.push(...audienceRow(flagKey))
+  // Hours left out of Contact for a mikvah's sections aren't offered.
+  if (audienceFlags.size > 0) take(fields.filter((f) => f.type === 'hours' && !f.audienceKey))
 
   // Anything else the listing lists: another tags field, a yes/no or a
   // choice it shows as a line.
@@ -312,8 +337,8 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
   if (row.part === 'address') parts.push(values.address.trim())
   else if (row.part === 'phone') parts.push(values.phone.trim())
   else if (row.kind === 'contact') {
-    if (values.address.trim()) parts.push(values.address.split(',')[0].trim())
-    if (values.phone.trim()) parts.push(values.phone.trim())
+    if (rowHas(row, 'address') && values.address.trim()) parts.push(values.address.split(',')[0].trim())
+    if (rowHas(row, 'phone') && values.phone.trim()) parts.push(values.phone.trim())
   }
   const anyFilled = shown.some((f) => !blank(f, d[f.key]))
   for (const f of shown) {
@@ -355,7 +380,7 @@ export function rowIsEmpty(row: EditorRow, values: EditorValues): boolean {
   if (row.kind === 'minyans') return minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!).length === 0
   if (row.kind === 'items') return blank(row.fields[0], d[row.fields[0].key]) && selectValues(d[`${row.fields[0].key}_sometimes`]).length === 0 && !hasMenuLink(row, d)
   if (row.part) return !(row.part === 'address' ? values.address : values.phone).trim()
-  if (row.kind === 'contact' && (values.address.trim() || values.phone.trim())) return false
+  if ((rowHas(row, 'address') && values.address.trim()) || (rowHas(row, 'phone') && values.phone.trim())) return false
   return row.fields.every((f) => (f.invertDisplay ? true : blank(f, d[f.key])))
 }
 
@@ -368,7 +393,8 @@ export function rowChanged(row: EditorRow, item: DirectoryResource, values: Edit
   if (row.kind === 'name' && !sameFieldValue('name', item.name, values.name)) return true
   if (row.part === 'address') return !sameFieldValue('address', item.address, values.address)
   if (row.part === 'phone') return !sameFieldValue('phone', item.phone, values.phone)
-  if (row.kind === 'contact' && (!sameFieldValue('address', item.address, values.address) || !sameFieldValue('phone', item.phone, values.phone))) return true
+  if (rowHas(row, 'address') && !sameFieldValue('address', item.address, values.address)) return true
+  if (rowHas(row, 'phone') && !sameFieldValue('phone', item.phone, values.phone)) return true
   if (row.kind === 'minyans' && row.week) {
     const sk = schedulesKey(row.fields[0].key)
     return weekDiffers(readSchedules(item[sk]), readSchedules(d[sk]), row.week)
