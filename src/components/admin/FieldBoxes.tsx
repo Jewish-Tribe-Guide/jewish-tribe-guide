@@ -5,7 +5,7 @@ import type { CategoryField } from '@/lib/categories'
 import { boxName, boxOf, boxRenames, fieldItems, renamesField, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
-import DragList, { RowActions, RowName, type DragRow } from './DragList'
+import DragList, { RowName, type DragRow } from './DragList'
 
 // Site → Category pages → a page → Fields, as board E1b draws it (the user,
 // Nov 10: "I like the creativity. I just want you to implement it"): every
@@ -25,6 +25,14 @@ const still = (row: DragRow): DragRow => ({ ...row, handle: NO_HANDLE, rowProps:
 const PLUS = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
     <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+
+/** A box's X, at the end of its name bar (the user, Nov 10: "I think that's
+ *  better than trashcan on add a field line"). */
+const X = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 )
 
@@ -115,19 +123,33 @@ export default function FieldBoxes({
               <div className="flex min-h-[52px] items-center gap-1 py-1.5 pl-1 pr-3">
                 {box.moves ? row.handle : NO_HANDLE}
                 {renames ? (
-                  <RowName
-                    name={name}
-                    rename={{
-                      ...boxName(page, box),
-                      onChange: (t) => onRename(box.id, t),
-                      fresh: box.id === freshId,
-                      ...(box.kind === 'listing' && !renamesField(box, page) && onOwnBox && { onStart: () => onOwnBox(box.id) }),
-                    }}
-                  />
+                  <span className="flex min-w-0 flex-1">
+                    <RowName
+                      name={name}
+                      rename={{
+                        ...boxName(page, box),
+                        onChange: (t) => onRename(box.id, t),
+                        fresh: box.id === freshId,
+                        ...(box.kind === 'listing' && !renamesField(box, page) && onOwnBox && { onStart: () => onOwnBox(box.id) }),
+                      }}
+                    />
+                  </span>
                 ) : (
                   <h3 {...(box.moves ? row.rowProps : {})} className="m-0 min-w-0 flex-1 select-none text-base font-semibold text-slate-900">
                     {name}
                   </h3>
+                )}
+                {/* Every box but "Not on the listing" comes off, its fields
+                    with it (the user, Nov 10). */}
+                {box.moves && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveBox(box.id)}
+                    aria-label={`Take ${name} off`}
+                    className="grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  >
+                    {X}
+                  </button>
                 )}
               </div>
             )
@@ -142,18 +164,11 @@ export default function FieldBoxes({
               </button>
             )
             const empty = box.fields.length === 0 && !box.basics?.length && <span className="block px-10 pt-3 text-[13px] text-slate-500">Nothing in it yet</span>
-            // Every box but "Not on the listing" comes off, its fields with
-            // it (the user, Nov 10). Its trash can stays on this line, at
-            // the far end of it.
             if (!box.moves) return <div className="h-1" />
             return (
               <div>
                 {empty}
-                <div className="flex items-center pr-2">
-                  <RowActions name={name} onRemove={() => onRemoveBox(box.id)} wide>
-                    {add}
-                  </RowActions>
-                </div>
+                <div className="flex items-center">{add}</div>
               </div>
             )
           }

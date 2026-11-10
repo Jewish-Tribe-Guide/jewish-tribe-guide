@@ -875,6 +875,9 @@ describe('CategoryEditor — Fields, in boxes', () => {
     const page = baseCategory({ detailFields: [{ key: 'night', label: 'Night line', type: 'tel' }, { key: 'about', label: 'About us', type: 'textarea' }] })
     renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
     await openBox(user, 'Contact')
+    // An X at the end of the box's name bar, not on its + Add a field line
+    // (the user, Nov 10).
+    expect(screen.getByRole('button', { name: 'Take Contact off' }).closest('[data-drag-row]')).toHaveAttribute('data-drag-row', 'box:contact')
     await user.click(screen.getByRole('button', { name: 'Take Contact off' }))
     expect(screen.queryByRole('button', { name: 'Contact' })).toBeNull()
     // Save says what answers go with it, as for any field taken off.
