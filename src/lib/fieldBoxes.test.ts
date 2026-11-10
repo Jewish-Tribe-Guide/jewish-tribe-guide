@@ -240,7 +240,8 @@ describe('dragging', () => {
     const toBox = drop(items, 'basic:phone', 1)
     expect(orderProblem(items, toBox, hospital)).toBeNull()
     const inBox = readOrder(items, toBox, hospitalParts, hospital).parts
-    expect(inBox.boxes![0].fields).toEqual(['liaisons', '@phone'])
+    // First in the box, as the listing draws it.
+    expect(inBox.boxes![0].fields).toEqual(['@phone', 'liaisons'])
     const shown = fieldBoxes(hospital, inBox)
     expect(shown.find((b) => b.id === 'box:0')!.basics).toEqual(['phone'])
     expect(shown.find((b) => b.id === 'contact')!.basics).toEqual(['address'])

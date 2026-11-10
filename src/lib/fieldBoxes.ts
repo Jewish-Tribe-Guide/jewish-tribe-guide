@@ -546,11 +546,18 @@ function takesBasic(box: FieldBox, page: FieldPage): boolean {
 export const basicLandsIn = (box: FieldBox, page: FieldPage) => takesBasic(box, page)
 
 /** The address or phone put in a box (Contact, About or the admin's nth),
- *  and out of any other. Contact is where it is when nowhere else. */
+ *  and out of any other. Contact is where it is when nowhere else. In a box
+ *  they come first, the address before the phone, as the admin's list and
+ *  the listing both draw them. */
 export function placeBasic(parts: ListingParts, b: Basic, id: string): ListingParts {
   const t = basicToken(b)
   const out: ListingParts = { ...parts }
-  if (parts.boxes) out.boxes = parts.boxes.map((x, n) => ({ ...x, fields: [...x.fields.filter((k) => k !== t), ...(id === `box:${n}` ? [t] : [])] }))
+  const first = (fields: string[], here: boolean) => {
+    const rest = fields.filter((k) => k !== t)
+    const tokens = BASICS.map(basicToken).filter((k) => (k === t ? here : rest.includes(k)))
+    return [...tokens, ...rest.filter((k) => !tokens.includes(k))]
+  }
+  if (parts.boxes) out.boxes = parts.boxes.map((x, n) => ({ ...x, fields: first(x.fields, id === `box:${n}`) }))
   const about = [...(parts.about ?? []).filter((k) => k !== t), ...(id === 'about' ? [t] : [])]
   if (about.length) out.about = about
   else delete out.about

@@ -1314,6 +1314,23 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     expect(fields().find((f) => f.key === 'dishes')!.label).toBe('Main dishes')
   })
 
+  // The user, Nov 10: "address and phone don't actually move". From the
+  // keyboard, the phone's first step up was above the address, which
+  // changes nothing, so it never got out of Contact.
+  it('moves the phone up out of Contact from the keyboard, first in the box above', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    screen.getByRole('button', { name: 'Move Phone' }).focus()
+    await user.keyboard('{ArrowUp}')
+    await waitFor(() => expect(boxesShown().find(([t]) => t === 'Main dishes')?.[1]).toEqual(['Phone', 'Main dishes']))
+    expect(boxesShown().find(([t]) => t === 'Contact')?.[1]).not.toContain('Phone')
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body)
+    expect(body.listingParts.boxes).toEqual([{ title: 'Main dishes', fields: ['@phone', 'dishes'] }])
+  })
+
   it('offers every field from a ready-made field’s box’s + Add a field, and puts it there', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()

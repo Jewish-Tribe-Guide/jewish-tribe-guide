@@ -106,7 +106,9 @@ export default function FieldBoxes({
         items={items}
         keyOf={itemKey}
         nameOf={(i) => ('box' in i ? i.box.title || 'New box' : 'field' in i ? byKey.get(i.field)?.label || 'New field' : 'basic' in i ? (i.basic === 'address' ? 'Address' : 'Phone') : '')}
-        canMove={(next) => orderProblem(items, next, page) === null}
+        // From the keyboard, a step that changes nothing (the phone above
+        // the address, which always come first) is passed over.
+        canMove={(next, via) => orderProblem(items, next, page) === null && (via === 'pointer' || changes(readOrder(items, next, parts, page), parts))}
         carries={(i, all) => ('box' in i ? rowsOfBox(all, i.box.id) : [])}
         onReorder={(next) => {
           const read = readOrder(items, next, parts, page)
@@ -211,4 +213,9 @@ function Inner({ row, name, tags = [], onOpen }: { row: DragRow; name: string; t
       </button>
     </div>
   )
+}
+
+/** Whether a reorder changes what's saved. */
+function changes(read: { parts: ListingParts; order: string[] | null }, parts: ListingParts): boolean {
+  return read.order !== null || JSON.stringify(read.parts) !== JSON.stringify(parts)
 }
