@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 9, 2026.
+Last updated: Nov 10, 2026.
 
 ## The branch
 
@@ -38,6 +38,25 @@ Small open items from Nov 9:
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
+
+## Open from the boxes and fields work (Nov 10)
+
+Each is written up in its entry below; this is the one list of them.
+
+- **Food on the live site** needs converting to the Kosher and Delivery
+  boxes once round 3 (02ad751b) deploys. Dry run shown; waits on the
+  user's yes, then revalidate.
+- **Boxes fold in Fields, the boards draw them open.** Held by the user
+  (Nov 10: "let's actually hold off on that for now").
+- **A box's trash can isn't on any board** (built: on the opened box's
+  + Add a field line). Held with the folding.
+- **Big fields as rows inside any box** (board A's Menu holding Main
+  dishes). Not built; Main dishes is still a box of its own.
+- **"Within a walk" and "Before it's opened"** are still on the page but
+  on no board.
+- **Mikvah sections** aren't drawn in the boxes boards yet.
+- **"How it looks" on a phone** isn't built (nothing sits beside a field
+  there).
 
 ## Done Nov 9: the Eruv page is a category page, eruvs are only in Places
 
