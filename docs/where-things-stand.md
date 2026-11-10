@@ -129,11 +129,17 @@ The user's answers on Nov 10, evening, and what was done with them:
         dropped it without a word, and left its place in the saved order
         behind, which could shift the boxes after it. Save now stops and
         says "“Box A” has nothing in it. Add a field or take the box off."
-      - **Waiting on the user**: whether a box's X should go once it has
-        fields (taking the last field off then removes the box, or brings
-        the X back), and whether Home page's "+ Add a tab" and Within a
-        walk's "+ Add a page" should look like "+ Add a box". Questions so
-        far, not decisions.
+    - **A box's X is only on an empty box** (the user's yes, Nov 10). A box
+      with fields in it, or the address or phone, has no X. Taking off or
+      dragging out its last field leaves it empty, with its X back; it
+      doesn't go on its own, so moving the only field elsewhere never
+      makes a box vanish mid-move. A field comes off on its own screen
+      ("Remove from <page>"); rows have no X. A box of the site's own
+      (Davening times, Main dishes, Delivery) still goes when emptied, as
+      it always has: it has no box to keep once nothing is in it.
+    - **Waiting on the user**: whether Home page's "+ Add a tab" and
+      Within a walk's "+ Add a page" should look like "+ Add a box". Asked,
+      not decided.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

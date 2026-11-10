@@ -142,9 +142,11 @@ export default function FieldBoxes({
                     {name}
                   </h3>
                 )}
-                {/* Every box but "Not on the listing" comes off, its fields
-                    with it (the user, Nov 10). */}
-                {box.moves && (
+                {/* An empty box comes off by its X; one with fields in it
+                    has none, and its X is back once its last field is
+                    taken off or dragged out (the user, Nov 10: "once we add
+                    a field ... we remove the x"). Not "Not on the listing". */}
+                {box.moves && !box.fields.length && !box.basics?.length && (
                   <button
                     type="button"
                     onClick={() => onRemoveBox(box.id)}
