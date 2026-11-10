@@ -77,7 +77,7 @@ import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
-import { FieldsBox, fieldText } from './FieldsBox'
+import { BoxField, FieldsBox, fieldText, hasValue } from './FieldsBox'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
@@ -169,6 +169,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { isPinned, toggle: toggleSaved } = usePinned()
 
   const main = mainThing(item, category)
+  // Contact or About, where the admin put a field there by name.
+  const fixedPlace = fixedPlaceOf(category)
   // A listing's items and this visitor's answers about them, shared by the
   // items card and the one question below it.
   const itemsF = itemsField(category)
@@ -409,7 +411,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const leadKey = lead && (lead.text ?? lead.field).key
   // Delivery is one field, its link a part of it: put in one of the
   // admin's boxes, it's drawn there, the same, and not up here too.
-  const leadInBox = !!leadKey && boxesOf(category).some((b) => b.fields.some((f) => f.key === leadKey))
+  const leadInBox = !!leadKey && (boxesOf(category).some((b) => b.fields.some((f) => f.key === leadKey)) || !!fixedPlace(leadKey))
   const leadBody = lead && (
     <>
       {lead.text && <p className="whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
@@ -505,6 +507,35 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromItem={item} /> : null
   }
 
+  // A field that's a box of its own elsewhere, drawn in another box as it
+  // is there (the user, Nov 10: "Let's say same for now").
+  const bigOf = (f: CategoryField): ReactNode | null =>
+    f.type === 'minyanim'
+      ? isMinyanim(item[f.key]) && (item[f.key] as unknown[]).length > 0 ? daveningOf(f) : null
+      : f.key === itemsF?.key
+        ? itemsBox
+        : f.key === lead?.text?.key || (lead && !lead.text && f.key === lead.field.key)
+          ? leadBody
+          : null
+  const isBig = (f: CategoryField) => f.type === 'minyanim' || f.type === 'contacts' || !!f.caveat || f.key === itemsF?.key || f.key === lead?.text?.key || f.key === lead?.field.key
+  // Those put in Contact or About: drawn there, under their names.
+  const bigIn = (where: 'contact' | 'about') =>
+    category.detailFields
+      .filter((f) => fixedPlace(f.key) === where && isBig(f) && f.renderAs !== 'hidden')
+      .flatMap((f) => {
+        const node = bigOf(f) ?? (hasValue(f, item[f.key]) ? <BoxField field={f} item={item} /> : null)
+        return node ? [{ f, node }] : []
+      })
+  const bigShown = (where: 'contact' | 'about') =>
+    bigIn(where).map(({ f, node }) => (
+      <div key={f.key} data-testid="placed-big" className="py-2.5">
+        <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{f.label}</p>
+        {node}
+      </div>
+    ))
+  const contactBig = bigShown('contact')
+  const aboutBig = bigShown('about')
+
   // The admin's boxes, and lists of contacts in none (listingBoxes). Each
   // dated on its own.
   const placed = new Set([...boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
@@ -521,15 +552,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         fields={b.fields}
         footer={dated ? <FreshnessFooter resourceId={item.id} {...boxDate(item, key)} section={key} onEdit={edit} /> : undefined}
         onEdit={dated ? undefined : edit}
-        big={(f) =>
-          f.type === 'minyanim'
-            ? isMinyanim(item[f.key]) && (item[f.key] as unknown[]).length > 0 ? daveningOf(f) : null
-            : f.key === itemsF?.key
-              ? itemsBox
-              : f.key === lead?.text?.key || (lead && !lead.text && f.key === lead.field.key)
-                ? leadBody
-                : null
-        }
+        big={bigOf}
       />
     )
   })
@@ -541,7 +564,6 @@ export default function ListingView({ item, category, color, place = null, upvot
   // mikvah's are in its own boxes, one per audience.
   // Contact or About, where the admin put a field in one by name (the
   // user, Nov 10: any field in any box but Top).
-  const fixedPlace = fixedPlaceOf(category)
   const inAbout = (f: CategoryField) => fixedPlace(f.key) === 'about'
   const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && !placed.has(f.key) && !inAbout(f) && hasAny(item[f.key]))
   // When Google last updated the box, at its foot (Oct 6): one date for
@@ -574,6 +596,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       f.renderAs !== 'hidden' &&
       !f.audienceKey &&
       !shownElsewhere.has(f.key) &&
+      !(isBig(f) && fixedPlace(f.key)) &&
       fieldText(f, item[f.key]),
   )
   const contactExtra = extra.filter((a) => !aboutLink(a))
@@ -583,6 +606,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       !f.audienceKey &&
       !inAbout(f) &&
       !shownElsewhere.has(f.key) &&
+      !(isBig(f) && fixedPlace(f.key)) &&
       (f.renderAs ?? 'row') === 'row' &&
       String(item[f.key] ?? '').trim(),
   )
@@ -594,6 +618,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       !f.filterable &&
       !inAbout(f) &&
       !placed.has(f.key) &&
+      !(isBig(f) && fixedPlace(f.key)) &&
       (f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0),
   )
   // Tags fields other than the items the main thing lists.
@@ -625,7 +650,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   ) : contactDated ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
   ) : undefined
-  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0 || contactBig.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
@@ -703,6 +728,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {[...selectValues(item[f.key]), ...selectValues(item[`${f.key}_sometimes`]).map((t) => `${t} (sometimes)`)].join(', ')}
         </Row>
       ))}
+      {contactBig}
     </div>
     </Card>
   )
@@ -727,7 +753,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   ) : aboutKey ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined
-  const about = aboutFields.length > 0 && (
+  const about = (aboutFields.length > 0 || aboutBig.length > 0) && (
     <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) =>
@@ -749,6 +775,7 @@ export default function ListingView({ item, category, color, place = null, upvot
             </div>
           ),
         )}
+        {aboutBig}
       </div>
     </Card>
   )

@@ -112,9 +112,15 @@ export const movable = (f: CategoryField, page: FieldPage) => ['contact', 'about
  *  its own home. */
 function placedHome(f: CategoryField, page: FieldPage, parts: ListingParts): string {
   const home = homeOf(f, page)
-  if (home !== 'contact' && home !== 'about') return home
+  // Anything goes in Contact or About (the user, Nov 10: "anything takes
+  // anything"): a field that's a box of its own too, once it's put there.
+  if (home !== 'contact' && home !== 'about' && !takesAnywhere(f, page)) return home
   return FIXED_PLACES.find((p) => parts[p]?.includes(f.key)) ?? home
 }
+
+/** A field that can go in any box: one Contact or About has, or one a
+ *  card can show (the davening times, a list, Delivery, a hechsher). */
+const takesAnywhere = (f: CategoryField, page: FieldPage) => movable(f, page) || cardFieldChoices([f]).length > 0
 
 /** The boxes, in the listing's order. */
 export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
@@ -253,13 +259,13 @@ export function fieldLine(f: CategoryField): string | undefined {
   return undefined
 }
 
-/** Whether a box can take this field: any of the admin's takes any field
- *  (the user, Nov 10), the davening times and a list of items among them;
- *  Contact and About any that isn't a box of its own; any other only what
+/** Whether a box can take this field: the admin's, Contact and About take
+ *  any field (the user, Nov 10: "anything takes anything"), the davening
+ *  times, a list, Delivery and a hechsher among them; any other only what
  *  goes there anyway. */
 function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
   if (box.kind === 'admin') return cardFieldChoices([f]).length > 0
-  if (box.id === 'contact' || box.id === 'about') return movable(f, page)
+  if (box.id === 'contact' || box.id === 'about') return takesAnywhere(f, page)
   return homeOf(f, page) === box.id
 }
 

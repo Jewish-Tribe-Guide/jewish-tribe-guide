@@ -1016,6 +1016,20 @@ describe('ListingView — a field where the admin put it', () => {
     expect(screen.getAllByTestId('davening-shabbos')).toHaveLength(1)
   })
 
+  // The user, Nov 10: "anything takes anything", Contact and About too.
+  it('the davening times in About and a list of contacts in Contact, drawn there and nowhere else', () => {
+    const fields: CategoryField[] = [
+      { key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' },
+      { key: 'gabbaim', label: 'Gabbaim', type: 'contacts', renderAs: 'row' },
+    ]
+    const shuls = makeCategory({ id: 'synagogue', detailFields: fields, listingParts: { about: ['minyanim'], contact: ['gabbaim'] } })
+    view({ item: makeListing({ address: '1 Pine St', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }], gabbaim: [{ name: 'Reuven Levi', phone: '2155550111' }] }), category: shuls })
+    expect(within(screen.getByTestId('listing-about')).getByTestId('davening-shabbos')).toHaveTextContent(/9 AM/)
+    expect(screen.getAllByTestId('davening-shabbos')).toHaveLength(1)
+    expect(within(screen.getByTestId('listing-details')).getByText('Reuven Levi')).toBeInTheDocument()
+    expect(screen.getAllByText('Reuven Levi')).toHaveLength(1)
+  })
+
   it('hours in a box of the admin’s, said there and not again in Contact', () => {
     const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
     view({ item: { ...judah, hours: everyDay }, category: makeCategory({ ...food, listingParts: { boxes: [{ title: 'When to come', fields: ['hours'] }] } }) })

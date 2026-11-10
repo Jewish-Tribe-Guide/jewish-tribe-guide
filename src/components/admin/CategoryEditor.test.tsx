@@ -852,12 +852,14 @@ describe('CategoryEditor — Fields, in boxes', () => {
     expect(title).toHaveValue('')
     await user.type(title, 'Kosher food')
     await user.keyboard('{Enter}')
-    // Pantry, down past Food packages and Contact (which can't take it)
-    // into Kosher food.
+    // Pantry, down through Contact and About (which take it too, the
+    // user, Nov 10) into Kosher food.
     await openBox(user, 'Pantry')
     // The field's handle, under the box's own.
     screen.getAllByRole('button', { name: 'Move Pantry' }).at(-1)!.focus()
     await user.keyboard('{ArrowDown}')
+    expect(shownIn('Contact')).toContain('Pantry')
+    for (let i = 0; i < 20 && !shownIn('Kosher food')?.includes('Pantry'); i++) await user.keyboard('{ArrowDown}')
     expect(boxesShown().map(([name]) => name)).not.toContain('Pantry')
     expect(shownIn('Kosher food')).toEqual(['Pantry'])
     await saveNow(user)
@@ -1176,7 +1178,7 @@ describe('CategoryEditor — + Add a field', () => {
 
   // The user, Nov 9: "I'll click add a field under a specific box and it gets
   // added under a different box." Each box offers only what lands in it.
-  it('offers from About any field and a filter, not one that is a box of its own', async () => {
+  it('offers from About any field, a filter, and one that is a box of its own', async () => {
     const user = userEvent.setup()
     const hospital = { community: 'other', category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'notes', label: 'Visiting notes', type: 'textarea' }, { key: 'liaisons', label: 'Liaisons', type: 'contacts', renderAs: 'row' }, { key: 'night', label: 'Night line', type: 'tel' }] }) }
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [...everywhere, hospital] }))))
@@ -1188,10 +1190,10 @@ describe('CategoryEditor — + Add a field', () => {
     expect(await screen.findByText('Visiting notes')).toBeInTheDocument()
     // Any field (the user, Nov 10), one that would be Contact's too.
     expect(screen.getByText('Night line')).toBeInTheDocument()
-    // A filter too, now there's no Top (Nov 10). Not one that is a box
-    // itself: it would land somewhere else.
+    // A filter too, now there's no Top (Nov 10), and one that is a box
+    // itself (the user, Nov 10: "anything takes anything").
     expect(screen.getByText('Denomination')).toBeInTheDocument()
-    expect(screen.queryByText('Liaisons')).toBeNull()
+    expect(screen.getByText('Liaisons')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'In a box of their own' })).toBeNull()
     // A reload comes back to the same box's list.
     expect(new URLSearchParams(window.location.search).get('in')).toBe('about')

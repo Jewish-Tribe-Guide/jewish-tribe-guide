@@ -24,7 +24,7 @@ export function fieldText(f: CategoryField, v: unknown): string {
 
 // ── An admin's box: "Who to call", "Kosher food" (Oct 6) ────────────────────
 
-function hasValue(f: CategoryField, v: unknown): boolean {
+export function hasValue(f: CategoryField, v: unknown): boolean {
   return f.type === 'contacts' ? readContacts(v).length > 0 : fieldText(f, v) !== ''
 }
 
@@ -67,7 +67,7 @@ function ContactLines({ entry }: { entry: ContactEntry }) {
 
 /** A field in a box: a list's entries, one under another; anything else
  *  as the named card says it. */
-function BoxField({ field: f, item }: { field: CategoryField; item: DirectoryResource }) {
+export function BoxField({ field: f, item }: { field: CategoryField; item: DirectoryResource }) {
   if (f.type === 'contacts') {
     return (
       <div className="divide-y divide-slate-100">

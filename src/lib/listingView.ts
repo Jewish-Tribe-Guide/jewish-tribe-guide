@@ -7,7 +7,7 @@ import { haversineMiles, milesText, roundMiles } from './geo'
 import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
 import { parseWalkLists } from './walkList'
-import { boxesOf, boxesWithIds, mainCardOf, shabbosFieldsOf } from './listingParts'
+import { boxesOf, boxesWithIds, fixedPlaceOf, mainCardOf, shabbosFieldsOf } from './listingParts'
 import { readContacts } from './contacts'
 import type { DirectoryResource } from '@/types'
 
@@ -121,9 +121,13 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
   const fields = category.detailFields
   if (mainCardOf(category)) return 'section'
   if (boxesOf(category).length > 0) return 'boxes'
-  const minyanim = fields.find((f) => f.type === 'minyanim')
+  // Put in Contact or About (the user, Nov 10: "anything takes anything"),
+  // it's drawn there, not as the main thing.
+  const there = fixedPlaceOf(category)
+  const minyanim = fields.find((f) => f.type === 'minyanim' && !there(f.key))
   if (minyanim && isMinyanim(item[minyanim.key]) && (item[minyanim.key] as unknown[]).length > 0) return 'davening'
-  const items = itemsField(category)
+  const listed = itemsField(category)
+  const items = listed && !there(listed.key) ? listed : undefined
   if (items && selectValues(item[items.key]).length + selectValues(item[`${items.key}_sometimes`]).length > 0) return 'items'
   if (items && ui.contributions.edit && resolveCapabilities(category.capabilities).edit) return 'items'
   if (audienceGroups(item, category).length > 0) return 'groups'
@@ -440,7 +444,8 @@ export { sectionConfirmedAt, confirmedByFor, sectionSource, boxDate } from './bo
 export function listingBoxes(item: DirectoryResource, category: CategoryConfig): { id: string; title: string; fields: CategoryField[]; row: string; key: string | null }[] {
   const configured = boxesWithIds(category)
   const named = mainThing(item, category) === 'section' ? mainCardOf(category) : null
-  const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
+  const there = fixedPlaceOf(category)
+  const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key), ...category.detailFields.filter((f) => there(f.key)).map((f) => f.key)])
   return [
     ...configured.map((b) => ({ ...b, row: `box:${b.title}` })),
     ...category.detailFields.filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key)).map((f) => ({ id: `contacts:${f.key}`, title: f.label, fields: [f], row: `box:${f.key}` })),

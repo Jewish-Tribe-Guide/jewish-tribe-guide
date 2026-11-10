@@ -141,11 +141,12 @@ describe('fieldBoxes', () => {
     const boxes = fieldBoxes(hospital, { contact: ['sukkah'], about: ['w'] })
     expect(boxes.find((b) => b.id === 'contact')!.fields).toEqual(['hours', 'r', 'eruv', 'sukkah'])
     expect(boxes.find((b) => b.id === 'about')!.fields).toEqual(['w'])
-    // Not the header's, nor a field that is a box itself.
+    // Not the header's photo. A field that is a box itself too (the user,
+    // Nov 10: "anything takes anything"), its own box gone.
     const kept = fieldBoxes(hospital, { about: ['photo', 'liaisons'] })
     expect(kept.some((b) => b.fields.includes('photo'))).toBe(false)
-    expect(kept.find((b) => b.id === 'contacts:liaisons')).toBeTruthy()
-    expect(kept.find((b) => b.id === 'about')!.fields).toEqual(['sukkah'])
+    expect(kept.find((b) => b.id === 'contacts:liaisons')).toBeUndefined()
+    expect(kept.find((b) => b.id === 'about')!.fields).toEqual(['liaisons', 'sukkah'])
   })
 
   it('says what a field is, where its name doesn’t', () => {
@@ -196,11 +197,11 @@ describe('dragging', () => {
     expect(readOrder(items, next, hospitalParts, hospital).parts.boxes![1].fields).toEqual(['food_packages', 'pantry'])
   })
 
-  it('turns a field down where it can’t go, saying so', () => {
+  it('takes a list of contacts into Contact (the user, Nov 10: "anything takes anything")', () => {
     const items = fieldItems(boxes, 'box:1')
-    // Pantry, a list of contacts, under Contact's row.
     const next = drop(items, 'field:pantry', items.findIndex((i) => itemKey(i) === 'box:contact'))
-    expect(orderProblem(items, next, hospital)).toEqual({ at: 'contact', why: 'Pantry can’t go in Contact' })
+    expect(orderProblem(items, next, hospital)).toBeNull()
+    expect(readOrder(items, next, hospitalParts, hospital).parts.contact).toEqual(['pantry'])
   })
 
   it('takes any field into any box, and says where it went (the user, Nov 10)', () => {
@@ -361,14 +362,22 @@ describe('the listing’s own boxes', () => {
   })
 
   // A hechsher in the admin's Kosher box, its question and link as no rows
-  // of their own. Contact and About don't take a field that's a box of its
-  // own, and say so.
-  it('keeps a hechsher in the admin’s box with its parts, and won’t drop it in Contact', () => {
+  // of their own; dragged into Contact, it's Contact's, What isn't kosher
+  // gone. A box of the listing's own still takes only its own field.
+  it('keeps a hechsher in the admin’s box with its parts, and drops it in Contact', () => {
     const boxed: ListingParts = { boxes: [{ title: 'Kosher', fields: ['kosherCert', 't'] }] }
     const items = fieldItems(fieldBoxes(food, boxed), 'box:0')
     expect(keys(items).slice(0, 6)).toEqual(['box:lead:delivery_whatsapp_group', 'box:items', 'box:box:0', 'field:kosherCert', 'field:t', 'end:box:0'])
     const next = drop(items, 'field:kosherCert', items.findIndex((i) => itemKey(i) === 'box:contact'))
-    expect(orderProblem(items, next, food)).toEqual({ at: 'contact', why: 'Kosher Certification can’t go in Contact' })
+    expect(orderProblem(items, next, food)).toBeNull()
+    const parts = readOrder(items, next, boxed, food).parts
+    expect(parts.contact).toEqual(['kosherCert'])
+    const after = fieldBoxes(food, parts)
+    expect(after.find((b) => b.id === 'contact')!.fields).toContain('kosherCert')
+    expect(after.find((b) => b.id === 'caveat')).toBeUndefined()
+    const all = fieldItems(fieldBoxes(food, {}))
+    const wrong = drop(all, 'field:s', all.findIndex((i) => itemKey(i) === 'box:items') + 1)
+    expect(orderProblem(all, wrong, food)).toEqual({ at: 'items', why: 'Short Description can’t go in Main dishes' })
   })
 })
 
@@ -470,21 +479,18 @@ describe('what a box’s + Add a field offers', () => {
     expect(whereAdded(box('box:0'), kind('image'), page)).toBe('elsewhere')
   })
 
-  it('takes a field that is a box of its own only into one of the admin’s boxes', () => {
-    // Not from Contact or About; from one of the admin's boxes, into it
-    // (the user, Nov 10: "Let's say same for now").
-    expect(whereAdded(box('contact'), kind('contacts'), page)).toBe('elsewhere')
-    expect(whereAdded(box('about'), kind('minyanim'), page)).toBe('elsewhere')
+  it('takes a field that is a box of its own into any box (the user, Nov 10: "anything takes anything")', () => {
+    expect(whereAdded(box('contact'), kind('contacts'), page)).toBe('here')
+    expect(whereAdded(box('about'), kind('minyanim'), page)).toBe('here')
     expect(whereAdded(box('box:0'), kind('minyanim'), page)).toBe('here')
     expect(whereAdded(box('box:0'), kind('contacts'), page)).toBe('here')
     expect(makesBox(kind('minyanim'), page)).toBe(true)
     expect(makesBox(kind('contacts'), page)).toBe(true)
     expect(makesBox(kind('textarea'), page)).toBe(false)
-    // A hechsher is What isn't kosher's until it's put in one of the
-    // admin's boxes.
+    // A hechsher is What isn't kosher's until it's put in another box.
     expect(makesBox(food.fields[6], food)).toBe(true)
     expect(whereAdded(box('box:0'), food.fields[6], food)).toBe('here')
-    expect(whereAdded(box('contact'), food.fields[6], food)).toBe('elsewhere')
+    expect(whereAdded(box('contact'), food.fields[6], food)).toBe('here')
   })
 
   it('puts the page’s address, phone, hours and website in Contact only', () => {
