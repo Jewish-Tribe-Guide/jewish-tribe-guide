@@ -72,7 +72,6 @@ const lines = (page: FieldPage, parts: ListingParts) => fieldBoxes(page, parts).
 describe('fieldBoxes', () => {
   it('gives a hospital its boxes in the listing’s order, the Shabbos card after three (board 17)', () => {
     expect(lines(hospital, hospitalParts)).toEqual([
-      ['Top', 'Photo'],
       ['Who to call', 'Liaisons'],
       ['Kosher food', 'Pantry, Food packages'],
       ['A place to stay', 'Accommodations'],
@@ -85,26 +84,24 @@ describe('fieldBoxes', () => {
 
   it('gives Food its link’s own box, what isn’t kosher and its dishes (board 4)', () => {
     expect(lines(food, {})).toEqual([
-      ['Top', 'Photo, Short Description, Food Type, Kosher Certification, Store Type, Kosher Certification URL'],
       ['Delivery', 'Delivery WhatsApp Group, Delivery Details'],
-      ['What isn’t kosher', 'Everything here is kosher, What isn’t kosher?'],
+      ['What isn’t kosher', 'Kosher Certification, Kosher Certification URL, Everything here is kosher, What isn’t kosher?'],
       ['Main dishes', 'Main dishes'],
-      ['Contact', 'Address, Phone, Hours, Website'],
+      ['Contact', 'Address, Phone, Hours, Website, Short Description, Food Type, Store Type'],
       ['About', 'Description'],
     ])
   })
 
   it('gives a shul its davening times (board 6)', () => {
     expect(lines(shuls, {})).toEqual([
-      ['Top', 'Photo, Denomination'],
       ['Davening times', 'Davening Times (Minyanim)'],
-      ['Contact', 'Address, Phone, Website'],
+      ['Contact', 'Address, Phone, Website, Denomination'],
     ])
   })
 
   it('makes a list of contacts in no box a box of its own, after the admin’s', () => {
     const boxes = fieldBoxes(hospital, { boxes: [{ title: 'Who to call', fields: ['liaisons'] }] })
-    expect(boxes.slice(1, 4).map((b) => [b.id, b.title, b.kind])).toEqual([
+    expect(boxes.slice(0, 3).map((b) => [b.id, b.title, b.kind])).toEqual([
       ['box:0', 'Who to call', 'admin'],
       ['contacts:pantry', 'Pantry', 'listing'],
       ['contacts:food_packages', 'Food packages', 'listing'],
@@ -113,9 +110,10 @@ describe('fieldBoxes', () => {
 
   it('leaves a field the admin can’t put in a card where it goes, and counts no empty box before the Shabbos card', () => {
     const boxes = fieldBoxes(hospital, { boxes: [{ title: 'New box', fields: [] }, { title: 'Odd', fields: ['photo', 'liaisons'] }], shabbos: { after: 1, fields: ['eruv'] } })
-    expect(boxes.map((b) => b.id).slice(0, 4)).toEqual(['top', 'box:0', 'box:1', 'shabbos'])
+    expect(boxes.map((b) => b.id).slice(0, 3)).toEqual(['box:0', 'box:1', 'shabbos'])
     expect(boxes.find((b) => b.id === 'box:1')!.fields).toEqual(['liaisons'])
-    expect(boxes.find((b) => b.id === 'top')!.fields).toContain('photo')
+    // The photo goes with the name, in no box (Nov 10).
+    expect(boxes.some((b) => b.fields.includes('photo'))).toBe(false)
   })
 
   it('puts a field in Contact or About by name, whatever kind it is (the user, Nov 10)', () => {
@@ -124,13 +122,13 @@ describe('fieldBoxes', () => {
     expect(boxes.find((b) => b.id === 'about')!.fields).toEqual(['w'])
     // Not the header's, nor a field that is a box itself.
     const kept = fieldBoxes(hospital, { about: ['photo', 'liaisons'] })
-    expect(kept.find((b) => b.id === 'top')!.fields).toContain('photo')
+    expect(kept.some((b) => b.fields.includes('photo'))).toBe(false)
     expect(kept.find((b) => b.id === 'contacts:liaisons')).toBeTruthy()
     expect(kept.find((b) => b.id === 'about')!.fields).toEqual(['sukkah'])
   })
 
   it('says what a field is, where its name doesn’t', () => {
-    expect(fieldLine(food.fields[5])).toBe('Filter')
+    expect(fieldLine(food.fields[5])).toBe('Filter · Under the name')
     expect(fieldLine(food.fields[8])).toBe('Button: Certification')
     expect(fieldLine(hospital.fields[4])).toBe('A list of contacts')
     expect(fieldLine(food.fields[2])).toBeUndefined()
@@ -154,9 +152,9 @@ describe('dragging', () => {
 
   it('moves a field onto another box’s row (board 18)', () => {
     const items = fieldItems(boxes, 'box:1')
-    expect(keys(items).slice(0, 7)).toEqual(['box:top', 'box:box:0', 'box:box:1', 'field:pantry', 'field:food_packages', 'end', 'box:box:2'])
+    expect(keys(items).slice(0, 6)).toEqual(['box:box:0', 'box:box:1', 'field:pantry', 'field:food_packages', 'end', 'box:box:2'])
     // Food packages, just under A place to stay's row.
-    const next = drop(items, 'field:food_packages', 6)
+    const next = drop(items, 'field:food_packages', 5)
     expect(orderProblem(items, next, hospital)).toBeNull()
     const { parts } = readOrder(items, next, hospitalParts, hospital)
     expect(parts.boxes!.map((b) => b.fields)).toEqual([['liaisons'], ['pantry'], ['accommodations', 'food_packages'], ['transportation'], ['miscellaneous']])
@@ -164,7 +162,7 @@ describe('dragging', () => {
 
   it('reorders the fields in an opened box', () => {
     const items = fieldItems(boxes, 'box:1')
-    const next = drop(items, 'field:food_packages', 3)
+    const next = drop(items, 'field:food_packages', 2)
     expect(orderProblem(items, next, hospital)).toBeNull()
     expect(readOrder(items, next, hospitalParts, hospital).parts.boxes![1].fields).toEqual(['food_packages', 'pantry'])
   })
@@ -176,10 +174,10 @@ describe('dragging', () => {
     expect(orderProblem(items, next, hospital)).toEqual({ at: 'contact', why: 'Pantry can’t go in Contact' })
   })
 
-  it('takes any field into any box but Top, and says where it went (the user, Nov 10)', () => {
+  it('takes any field into any box, and says where it went (the user, Nov 10)', () => {
     // Hours, from Contact, into Who to call.
     const open = fieldItems(boxes, 'contact')
-    const hours = drop(open, 'field:hours', 2)
+    const hours = drop(open, 'field:hours', 1)
     expect(orderProblem(open, hours, hospital)).toBeNull()
     expect(readOrder(open, hours, hospitalParts, hospital).parts.boxes![0].fields).toEqual(['liaisons', 'hours'])
     // The Refuah link, from Contact, to About; then back.
@@ -194,9 +192,8 @@ describe('dragging', () => {
     const back = drop(after, 'field:w', after.findIndex((i) => itemKey(i) === 'box:contact') + 1)
     expect(orderProblem(after, back, page)).toBeNull()
     expect(readOrder(after, back, read, page).parts).toEqual({ about: ['r'], contact: ['w'] })
-    // Never into Top.
-    const top = drop(before, 'field:r', 1)
-    expect(orderProblem(before, top, page)).toEqual({ at: 'top', why: 'Refuah Link can’t go in Top' })
+    // Never above the first box: there's no box there to be in.
+    expect(orderProblem(before, drop(before, 'field:r', 0), page)).toEqual({})
   })
 
   it('keeps the address, phone and the end of the opened box under it', () => {
@@ -207,24 +204,21 @@ describe('dragging', () => {
   })
 
   // The user, Nov 10: "an admin can arrange how they want".
-  it('moves any box anywhere below Top, and saves the order', () => {
+  it('moves any box anywhere, and saves the order', () => {
     const items = fieldItems(boxes, null)
-    expect(keys(items)).toEqual(['box:top', 'box:box:0', 'box:box:1', 'box:box:2', 'box:shabbos', 'box:box:3', 'box:box:4', 'box:contact'])
+    expect(keys(items)).toEqual(['box:box:0', 'box:box:1', 'box:box:2', 'box:shabbos', 'box:box:3', 'box:box:4', 'box:contact'])
     // Rides above Who to call.
-    const rides = drop(items, 'box:box:3', 1)
+    const rides = drop(items, 'box:box:3', 0)
     expect(orderProblem(items, rides, hospital)).toBeNull()
     const read = readOrder(items, rides, hospitalParts, hospital).parts
     expect(read.boxes!.map((b) => b.title)).toEqual(['Rides', 'Who to call', 'Kosher food', 'A place to stay', 'Also'])
     expect(read.order).toEqual(['box', 'box', 'box', 'box', 'shabbos', 'box', 'contact'])
     expect(read.shabbos).toEqual({ fields: ['eruv', 'sukkah'] })
-    expect(fieldBoxes(hospital, read).map((b) => b.title)).toEqual(['Top', 'Rides', 'Who to call', 'Kosher food', 'A place to stay', 'This Shabbos', 'Also', 'Contact'])
+    expect(fieldBoxes(hospital, read).map((b) => b.title)).toEqual(['Rides', 'Who to call', 'Kosher food', 'A place to stay', 'This Shabbos', 'Also', 'Contact'])
     // Contact first.
-    const contact = drop(items, 'box:contact', 1)
+    const contact = drop(items, 'box:contact', 0)
     expect(orderProblem(items, contact, hospital)).toBeNull()
-    expect(fieldBoxes(hospital, readOrder(items, contact, hospitalParts, hospital).parts).map((b) => b.title).slice(0, 3)).toEqual(['Top', 'Contact', 'Who to call'])
-    // Not above Top, and Top never moves.
-    expect(orderProblem(items, drop(items, 'box:box:0', 0), hospital)).toEqual({})
-    expect(orderProblem(items, drop(items, 'box:top', 3), hospital)).toEqual({})
+    expect(fieldBoxes(hospital, readOrder(items, contact, hospitalParts, hospital).parts).map((b) => b.title).slice(0, 2)).toEqual(['Contact', 'Who to call'])
   })
 
   it('keeps "Not on the listing" last', () => {
@@ -238,7 +232,7 @@ describe('dragging', () => {
   it('puts a box the saved order doesn’t name after the one it follows anyway', () => {
     const parts: ListingParts = { ...hospitalParts, order: ['contact', 'box', 'box', 'box', 'box', 'box'], shabbos: { fields: ['eruv', 'sukkah'] } }
     // The Shabbos card isn't named: it follows Also, as it would.
-    expect(fieldBoxes(hospital, parts).map((b) => b.title)).toEqual(['Top', 'Contact', 'Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also', 'This Shabbos'])
+    expect(fieldBoxes(hospital, parts).map((b) => b.title)).toEqual(['Contact', 'Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also', 'This Shabbos'])
   })
 
   it('doesn’t let a box move between an opened box and its fields', () => {
@@ -247,23 +241,25 @@ describe('dragging', () => {
   })
 
   it('reorders a box of the listing’s own among the page’s fields', () => {
-    const items = fieldItems(fieldBoxes(food, {}), 'top')
-    const at = items.findIndex((i) => itemKey(i) === 'field:photo')
+    const items = fieldItems(fieldBoxes(food, {}), 'contact')
+    const at = items.findIndex((i) => itemKey(i) === 'field:hours')
     const next = drop(items, 'field:foodType', at)
     expect(orderProblem(items, next, food)).toBeNull()
     const { order } = readOrder(items, next, {}, food)
-    // Store Type takes Photo's place; the rest of Top moves along a slot.
-    expect(order).toEqual(['hours', 'website', 'foodType', 'googleDescription', 'photo', 's', 't', 'kosherCert', 'k', 'delivery_whatsapp_group', 'delivery_details', 'dishes'])
+    // Store Type takes Hours' place; the rest of Contact moves along a slot.
+    expect(order).toEqual(['foodType', 'hours', 'photo', 'googleDescription', 'website', 's', 'kosherCert', 't', 'k', 'delivery_whatsapp_group', 'delivery_details', 'dishes'])
   })
 
   it('puts a field back where it goes when it’s dropped there', () => {
     const parts = { boxes: [{ title: 'Note', fields: ['s'] }] }
     const items = fieldItems(fieldBoxes(food, parts), 'box:0')
-    expect(keys(items).slice(0, 4)).toEqual(['box:top', 'box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items'])
-    // Short Description, back under Top's row.
-    const next = drop(items, 'field:s', 1)
+    expect(keys(items).slice(0, 3)).toEqual(['box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items'])
+    // Short Description, back under Contact's row.
+    const next = drop(items, 'field:s', items.findIndex((i) => itemKey(i) === 'box:contact'))
     expect(orderProblem(items, next, food)).toBeNull()
-    expect(readOrder(items, next, parts, food).parts.boxes![0].fields).toEqual([])
+    const read = readOrder(items, next, parts, food).parts
+    expect(read.boxes![0].fields).toEqual([])
+    expect(fieldBoxes(food, read).find((b) => b.id === 'contact')!.fields).toContain('s')
   })
 })
 
@@ -274,19 +270,19 @@ describe('the listing’s own boxes', () => {
 
   it('move anywhere, About above them all, and the order is kept', () => {
     const items = fieldItems(foodBoxes, null)
-    expect(keys(items)).toEqual(['box:top', 'box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items', 'box:contact', 'box:about'])
+    expect(keys(items)).toEqual(['box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items', 'box:contact', 'box:about'])
     expect(foodBoxes.filter((b) => b.moves).map((b) => b.title)).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes', 'Contact', 'About'])
     // Main dishes first.
-    const next = drop(items, 'box:items', 1)
+    const next = drop(items, 'box:items', 0)
     expect(orderProblem(items, next, food)).toBeNull()
     const { parts } = readOrder(items, next, {}, food)
     expect(parts.order).toEqual(['items', 'lead:delivery_whatsapp_group', 'caveat', 'contact', 'about'])
     expect(parts.lead).toBeUndefined()
-    expect(fieldBoxes(food, parts).map((b) => b.title).slice(0, 4)).toEqual(['Top', 'Main dishes', 'Delivery', 'What isn’t kosher'])
+    expect(fieldBoxes(food, parts).map((b) => b.title).slice(0, 3)).toEqual(['Main dishes', 'Delivery', 'What isn’t kosher'])
     // About above Delivery.
-    const about = drop(items, 'box:about', 1)
+    const about = drop(items, 'box:about', 0)
     expect(orderProblem(items, about, food)).toBeNull()
-    expect(fieldBoxes(food, readOrder(items, about, {}, food).parts).map((b) => b.title)).toEqual(['Top', 'About', 'Delivery', 'What isn’t kosher', 'Main dishes', 'Contact'])
+    expect(fieldBoxes(food, readOrder(items, about, {}, food).parts).map((b) => b.title)).toEqual(['About', 'Delivery', 'What isn’t kosher', 'Main dishes', 'Contact'])
   })
 })
 
@@ -295,7 +291,7 @@ describe('the admin’s boxes', () => {
   it('adds an empty box at the end, after Contact, keeping the others where they were', () => {
     const { parts, id } = addBox(hospitalParts, fieldBoxes(hospital, hospitalParts))
     expect(id).toBe('box:5')
-    expect(fieldBoxes(hospital, parts).map((b) => b.title)).toEqual(['Top', 'Who to call', 'Kosher food', 'A place to stay', 'This Shabbos', 'Rides', 'Also', 'Contact', ''])
+    expect(fieldBoxes(hospital, parts).map((b) => b.title)).toEqual(['Who to call', 'Kosher food', 'A place to stay', 'This Shabbos', 'Rides', 'Also', 'Contact', ''])
     expect(parts.boxes![5]).toEqual({ title: '', fields: [] })
   })
 
@@ -304,14 +300,14 @@ describe('the admin’s boxes', () => {
     const less = removeBox(parts, 'box:1')
     expect(less.order).toEqual(['contact', 'box', 'shabbos', 'box', 'box', 'box'])
     // Kosher food's lists, in no box now, follow the admin's boxes.
-    expect(fieldBoxes(hospital, less).map((b) => b.title)).toEqual(['Top', 'Contact', 'Who to call', 'This Shabbos', 'A place to stay', 'Rides', 'Also', 'Pantry', 'Food packages'])
+    expect(fieldBoxes(hospital, less).map((b) => b.title)).toEqual(['Contact', 'Who to call', 'This Shabbos', 'A place to stay', 'Rides', 'Also', 'Pantry', 'Food packages'])
     expect(removeBox(parts, 'contact').order).toEqual(['box', 'box', 'shabbos', 'box', 'box', 'box'])
   })
 
   it('takes a box off, its fields going back where they go, the Shabbos card after the same boxes', () => {
     const parts = removeBox(hospitalParts, 'box:0')
     expect(parts.shabbos!.after).toBe(2)
-    expect(fieldBoxes(hospital, parts).map((b) => b.title)).toEqual(['Top', 'Kosher food', 'A place to stay', 'This Shabbos', 'Rides', 'Also', 'Liaisons', 'Contact'])
+    expect(fieldBoxes(hospital, parts).map((b) => b.title)).toEqual(['Kosher food', 'A place to stay', 'This Shabbos', 'Rides', 'Also', 'Liaisons', 'Contact'])
     expect(removeBox(hospitalParts, 'box:4').shabbos!.after).toBe(3)
   })
 
@@ -389,7 +385,6 @@ describe('what a box’s + Add a field offers', () => {
       expect(whereAdded(box('about'), kind(type), page)).toBe('here')
       expect(whereAdded(box('box:0'), kind(type), page)).toBe('here')
     }
-    expect(whereAdded(box('top'), kind('text'), page)).toBe('elsewhere')
   })
 
   it('puts one added from Contact or About there by name, out of the other', () => {

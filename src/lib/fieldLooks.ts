@@ -1,7 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import { fieldIsVisible, pickableOptions, selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { listingRowFacts, type RowFact, type RowFactTone } from './listingRow'
-import { lineChoices, onThirdLine } from './cardLines'
+import { lineChoices, onThirdLine, underName } from './cardLines'
 import { isCertificateLink, kindField, listingActions, listingFacts, listingKind } from './listingView'
 import { fieldBoxes } from './fieldBoxes'
 import { parseListingParts } from './listingParts'
@@ -260,9 +260,9 @@ export function listingLook(category: CategoryConfig, field: CategoryField, item
   // admin's boxes, Contact, About.
   const boxes = listingBoxes(category)
   const box = boxes.find((b) => b.fields.includes(field.key))
-  // Up in the header: the photo, a short line, a certificate's link.
-  if (!box || box.id === 'top') return { at: 'tagline', text: text || field.label }
-  const others = boxes.filter((b) => b !== box && b.id !== 'top' && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
+  // Up in the header: the photo, a certificate's button.
+  if (!box || field.type === 'image' || isCertificateLink(field)) return { at: 'tagline', text: text || field.label }
+  const others = boxes.filter((b) => b !== box && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
   const inBox = box.fields.length + (box.basics?.length ?? 0) > 1
   return { at: 'box', title: box.title, label: inBox ? field.label : null, text: field.type === 'url' && field.linkLabel ? field.linkLabel : text, others }
 }
@@ -321,7 +321,6 @@ export function listingScreen(category: CategoryConfig, field: CategoryField, it
   actions.push({ label: 'Share', icon: 'share' })
   const byKey = new Map(category.detailFields.map((f) => [f.key, f]))
   const boxes = listingBoxes(category)
-    .filter((b) => b.id !== 'top')
     .flatMap((b): ListingScreen['boxes'] => {
       const mine = look.at === 'box' && b.fields.includes(field.key)
       // What isn't kosher shows on a place where not everything is; the
@@ -332,8 +331,9 @@ export function listingScreen(category: CategoryConfig, field: CategoryField, it
         ...(b.basics ?? []).flatMap((basic) => (basic === 'phone' && item.phone ? [formatPhone(item.phone)] : [])),
         ...b.fields.flatMap((key) => {
           const f = byKey.get(key)
-          // A "Yes" alone says nothing out of its row.
-          const text = f && f.type !== 'image' && f.type !== 'boolean' ? answerText(f, item[key]) : ''
+          // A "Yes" alone says nothing out of its row; one under the name
+          // is said there.
+          const text = f && f.type !== 'image' && f.type !== 'boolean' && !underName(f) ? answerText(f, item[key]) : ''
           return text ? [text] : []
         }),
       ].slice(0, 2)

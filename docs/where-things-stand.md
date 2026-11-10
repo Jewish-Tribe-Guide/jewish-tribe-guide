@@ -82,8 +82,8 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
 
 - **Admin → Category pages → Eruv → Fields** starts with the four rows an
   eruv always had: Where it goes in its own box, then Website, Hotline and
-  Email alerts in Contact. Top reads "The name and whether it's up": the
-  name and status always come first and can't be moved or removed. The four
+  Email alerts in Contact. The name and status always come first and
+  can't be moved or removed; since Nov 10 (no Top) they have no row. The four
   are ready-made (name locked), so they can be taken off, moved, or put
   back from + Add a field. Nothing visible changes until an admin does.
 - **+ Add a field** offers those four, fields other communities made on
@@ -167,11 +167,21 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   an empty box at the end, open, its name ready to type, with no screen
   in between; a field that is a box itself (davening times, a list of
   contacts) is offered by any box's "+ Add a field" and lands as a box of
-  its own. Not built yet: no Top (where the header's fields sit in the
-  list), and big fields as rows inside any box (board A's Menu holding
-  Main dishes). A listing's own sections that it draws as one (a mikvah's
+  its own. Not built yet: big fields as rows inside any box (board A's
+  Menu holding Main dishes). A listing's own sections that it draws as one (a mikvah's
   audience sections, the main thing) still render together, where the
   first of them is.
+- **No Top** (the user, Nov 10, board A; "Yes, build it"). Fields lists
+  only boxes and fields. A field's own Under the name switch puts it under
+  the name, and a listing (an eruv's too) shows it only there, not again
+  in its box (its row in admin says "Under the name").
+  The photo goes with the name and isn't listed (its switch is in "Before
+  it's opened"). A hechsher and its certificate link are in the kosher
+  box ("What isn't kosher"), or in Contact once its questions are off; a
+  hechsher added from any box's + Add a field makes that box. A filter or
+  short line that used to be Top's lands in Contact, and any box offers
+  it. Not drawn on board 1b and still on the page: "Within a walk" and
+  "Before it's opened".
 - **A category page in admin opens without waiting on the list again**
   (the user, Nov 9: "Most noticable is lcikcing on a category page in
   admin"). Each Category pages screen is its own address, so every open

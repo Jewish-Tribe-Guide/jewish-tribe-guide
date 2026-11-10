@@ -152,7 +152,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
   // with no name yet takes its key from the name typed on its screen.
   function addOwnField(type: FieldType, label = '', box?: string | null): number {
     const key = label.trim() ? nextFieldKey(draft.fields, draft.hiddenFields, slugifyFieldKey(label)) : ''
-    setDraft((d) => ({ ...d, fields: [...d.fields, madeField(type, label, key, box)], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
+    setDraft((d) => ({ ...d, fields: [...d.fields, madeField(type, label, key)], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
     return draft.fields.length
   }
 

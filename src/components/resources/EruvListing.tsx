@@ -18,6 +18,7 @@ import { Card } from './listingParts'
 import { FieldsBox, fieldText } from './FieldsBox'
 import { eruvValues, withEruvFields } from '@/lib/eruvFields'
 import { fieldBoxes } from '@/lib/fieldBoxes'
+import { underName } from '@/lib/cardLines'
 import { parseListingParts } from '@/lib/listingParts'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
@@ -157,7 +158,10 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
   const values = eruvValues(eruv)
   const byKey = new Map(fields.map((f) => [f.key, f]))
   const inBox = (keys: string[]) => keys.map((k) => byKey.get(k)).filter((f): f is CategoryField => !!f)
-  const topWords = inBox(boxes.find((b) => b.id === 'top')?.fields ?? [])
+  // A field under the name is said there, not again in its box (Nov 10:
+  // no Top, just each field's own Under the name).
+  const topWords = fields
+    .filter((f) => underName(f) && f.renderAs !== 'hidden')
     .map((f) => fieldText(f, values[f.key]))
     .filter(Boolean)
   return (
@@ -181,16 +185,18 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
         </div>
       </Card>
       {boxes.map((box) => {
-        if (box.id === 'top' || box.id === 'hidden') return null
+        if (box.id === 'hidden') return null
+        const keys = box.fields.filter((k) => !byKey.get(k) || !underName(byKey.get(k)!))
         if (box.id === 'contact') {
-          const rows = inBox(box.fields).flatMap((f) => contactRow(f, values[f.key]) ?? [])
+          const rows = inBox(keys).flatMap((f) => contactRow(f, values[f.key]) ?? [])
           return rows.length > 0 ? <Card key={box.id}>{rows}</Card> : null
         }
         // About is a listing's description; an eruv has none, so a lone
         // long-text field there is headed by its own name ("Certified by").
         // Several are each named under About (FieldsBox).
-        const title = box.id === 'about' && box.fields.length === 1 ? (byKey.get(box.fields[0])?.label ?? box.title) : box.title
-        return <FieldsBox key={box.id} item={values as unknown as DirectoryResource} title={title} fields={inBox(box.fields)} />
+        if (keys.length === 0) return null
+        const title = box.id === 'about' && keys.length === 1 ? (byKey.get(keys[0])?.label ?? box.title) : box.title
+        return <FieldsBox key={box.id} item={values as unknown as DirectoryResource} title={title} fields={inBox(keys)} />
       })}
     </div>
   )

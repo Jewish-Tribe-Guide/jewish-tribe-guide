@@ -1,5 +1,6 @@
 import type { CategoryField, FieldType } from './categories'
 import { arrange, cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
+import { underName } from './cardLines'
 import { caveatTitle, isCertificateLink } from './listingView'
 
 // ── A page's fields, as its opened listing's boxes (Category pages step 3,
@@ -9,8 +10,12 @@ import { caveatTitle, isCertificateLink } from './listingView'
 // Where a field lands is worked out the way the listing works it out
 // (listingView.ts, ListingView.tsx), never from the page's name:
 //
-//   Top           the photo, the line under the name, the filters' facts, a
-//                 certificate's button. Always there; never moved.
+//   (no Top)      the photo is the listing's, with the name, and isn't in
+//                 the list (Nov 10, board A: "just boxes and fields"); what
+//                 shows under the name is each field's own Under the name.
+//                 A hechsher and its certificate's link are in the Kosher
+//                 box (What isn't kosher); any other field where its kind
+//                 puts it.
 //   the listing's own sections, where its fields put them: a link's own box
 //                 ("Delivery"), what isn't kosher, the davening times, the
 //                 items ("Main dishes"), a mikvah's sections. Dragged among
@@ -23,9 +28,8 @@ import { caveatTitle, isCertificateLink } from './listingView'
 //   Contact       address, phone, hours, links, short lines. Always there.
 //   About         the descriptions. Always there once there is one.
 //
-// Any field goes in any box but Top (the user, Nov 10): a long text in
-// Contact, a phone in About, hours in "Who to call". Top is the header, and
-// a field that draws a whole box (the davening times, a list of items or
+// Any field goes in any box (the user, Nov 10): a long text in Contact, a
+// phone in About, hours in "Who to call". A field that draws a whole box (the davening times, a list of items or
 // contacts, a link's own box) is a box, added from "+ Add a box".
 //
 // Every box moves, anywhere between Top and "Not on the listing", and any
@@ -37,15 +41,15 @@ import { caveatTitle, isCertificateLink } from './listingView'
 // opened box's fields among the boxes (fieldItems), read back by readOrder.
 
 export type FieldBox = {
-  /** 'top', 'lead:<key>', 'caveat', 'main', 'minyanim', 'items',
+  /** 'lead:<key>', 'caveat', 'main', 'minyanim', 'items',
    *  'audience:<flag>', 'box:<n>' (the admin's nth), 'shabbos',
    *  'contacts:<key>', 'contact', 'about', 'hidden'. */
   id: string
   title: string
-  /** 'fixed': Top, Contact, About. 'listing': where the listing puts its
+  /** 'fixed': Contact, About. 'listing': where the listing puts its
    *  own fields. 'admin': the admin's own, named and changed here. */
   kind: 'fixed' | 'listing' | 'admin'
-  /** Every box but Top and "Not on the listing". */
+  /** Every box but "Not on the listing". */
   moves: boolean
   /** Which of the listing's own boxes before the admin's it is: a mikvah's
    *  sections are one, its main thing, and move together. */
@@ -77,7 +81,10 @@ export function homeOf(f: CategoryField, page: FieldPage): string {
   if (f.type === 'url' && f.leadBox) return `lead:${f.key}`
   const lead = page.fields.find((o) => o.type === 'url' && o.leadBox?.text === f.key)
   if (lead) return `lead:${lead.key}`
-  if (f.type === 'image' || f.showInHeader || (isBadge(f) && f.filterable) || f.caveat || isCertificateLink(f)) return 'top'
+  // The place's photo is with its name.
+  if (f.type === 'image') return 'name'
+  if (f.caveat) return 'caveat'
+  if (isCertificateLink(f)) return all.some((o) => o.caveat) ? 'caveat' : 'contact'
   if (f.type === 'minyanim') return 'minyanim'
   if (f.type === 'tags' && f.showCountInHeader) return 'items'
   if (f.type === 'contacts') return `contacts:${f.key}`
@@ -86,7 +93,7 @@ export function homeOf(f: CategoryField, page: FieldPage): string {
 }
 
 /** Whether a field goes in whichever box it's put in: one whose own home
- *  is Contact or About, not the header's or one that is a box itself. */
+ *  is Contact or About, not one that is a box itself. */
 export const movable = (f: CategoryField, page: FieldPage) => ['contact', 'about'].includes(homeOf(f, page))
 
 /** Where a field is: Contact or About when the admin put it there, else
@@ -128,7 +135,6 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
     [...homes.keys()].filter((id) => id.startsWith(prefix)).flatMap((id) => listing(id, title(id.slice(prefix.length))))
   const label = (key: string) => byKey.get(key)?.label ?? key
 
-  const top: FieldBox = { id: 'top', title: 'Top', kind: 'fixed', moves: false, fields: homes.get('top') ?? [] }
   const slot = (lead: LeadSlot) => (b: FieldBox): FieldBox => ({ ...b, moves: true, lead })
   const slots: Record<LeadSlot, FieldBox[]> = {
     link: prefixed('lead:', (k) => byKey.get(k)?.leadBox?.title.trim() || label(k)).map(slot('link')),
@@ -163,20 +169,20 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
     basics.length || homes.get('contact')?.length ? [{ id: 'contact', title: 'Contact', kind: 'fixed', moves: false, fields: homes.get('contact') ?? [], basics }] : []
   const about: FieldBox[] = homes.get('about')?.length ? [{ id: 'about', title: 'About', kind: 'fixed', moves: false, fields: homes.get('about')! }] : []
   const middle = [...before, ...zone, ...contact, ...about].map((b) => ({ ...b, moves: true }))
-  return [top, ...(parts.order ? arrange(middle, parts.order) : middle), ...listing('hidden', 'Not on the listing')]
+  return [...(parts.order ? arrange(middle, parts.order) : middle), ...listing('hidden', 'Not on the listing')]
 }
 
 /** A box's token in the saved order: its id, but 'box' for each of the
  *  admin's, in turn (their ids are their places among them). */
 export const boxToken = (id: string) => (id.startsWith('box:') ? 'box' : id)
 
-/** The tokens of an order of boxes, Top and "Not on the listing" left out. */
-const tokensOf = (ids: readonly string[]) => ids.filter((id) => id !== 'top' && id !== 'hidden').map(boxToken)
+/** The tokens of an order of boxes, "Not on the listing" left out. */
+const tokensOf = (ids: readonly string[]) => ids.filter((id) => id !== 'hidden').map(boxToken)
 
 /** Whether a box's name is changed in place: the admin's, and the boxes the
  *  listing makes itself from a field made here (renameListingBox). A
  *  ready-made field's box keeps its name, which comes with the field (the
- *  user, Nov 7: "lock the name"). Not the Shabbos card, Top, Contact or
+ *  user, Nov 7: "lock the name"). Not the Shabbos card, Contact or
  *  About, which every listing has, nor the davening times, whose boxes are
  *  named by what's in them. */
 export function boxRenames(box: FieldBox, page: FieldPage): boolean {
@@ -229,14 +235,15 @@ export function boxLine(box: FieldBox, page: FieldPage): string {
  *  isn't plain from its name. */
 export function fieldLine(f: CategoryField): string | undefined {
   if (f.type === 'contacts') return 'A list of contacts'
-  if (isBadge(f) && f.filterable) return 'Filter'
+  const says = [...(isBadge(f) && f.filterable ? ['Filter'] : []), ...(underName(f) ? ['Under the name'] : [])]
+  if (says.length) return says.join(' · ')
   if (f.type === 'url' && f.linkLabel?.trim()) return `Button: ${f.linkLabel.trim()}`
   return undefined
 }
 
 /** Whether a box can take this field: any of the admin's, Contact and
- *  About take any field that isn't the header's or a box of its own; any
- *  other only what goes there anyway. */
+ *  About take any field that isn't a box of its own; any other only what
+ *  goes there anyway. */
 function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
   if (box.kind === 'admin') return cardFieldChoices([f]).length > 0
   if (box.id === 'contact' || box.id === 'about') return movable(f, page)
@@ -255,16 +262,14 @@ export function whereAdded(box: FieldBox, f: CategoryField, page: FieldPage): 'h
 }
 
 /** Whether a field is a box of its own: the davening times, a list of items
- *  or contacts, a link's own box, an audience's section. What "+ Add a box"
- *  offers. */
-export const makesBox = (f: CategoryField, page: FieldPage) => !['top', 'contact', 'about', 'hidden', 'caveat'].includes(homeOf(f, page))
+ *  or contacts, a link's own box, an audience's section, a hechsher's
+ *  kosher box (its questions and link come with it). */
+export const makesBox = (f: CategoryField, page: FieldPage) => !!f.caveat || !['name', 'contact', 'about', 'hidden', 'caveat'].includes(homeOf(f, page))
 
-/** A field made here, from a box's + Add a field. A choice or a yes-or-no
- *  made from Top is a filter badge, as everything in Top is; anywhere else
- *  a row. */
-export function madeField(type: FieldType, label: string, key: string, boxId?: string | null): CategoryField {
-  const badge = boxId === 'top' && (type === 'select' || type === 'boolean')
-  return { key, label, type, renderAs: badge ? 'badge' : 'row', ...(badge && { filterable: true }), madeHere: true }
+/** A field made here, from a box's + Add a field: a row. In the filter and
+ *  Under the name are its own switches. */
+export function madeField(type: FieldType, label: string, key: string): CategoryField {
+  return { key, label, type, renderAs: 'row', madeHere: true }
 }
 
 /** The page's own address, phone, hours and website: always Contact's. */
@@ -303,7 +308,7 @@ function owners(items: readonly FieldItem[]): Map<string, string | null> {
 /** Why an order isn't one the listing can take: null when it is. With the
  *  box that turned a field down, for drawing it so (`at`). */
 export function orderProblem(prev: readonly FieldItem[], next: readonly FieldItem[], page: FieldPage): { at?: string; why?: string } | null {
-  if (!next.length || !('box' in next[0]) || next[0].box.id !== 'top') return {}
+  if (!next.length || !('box' in next[0])) return {}
   const was = owners(prev)
   const now = owners(next)
   const boxes = next.flatMap((i) => ('box' in i ? [i.box] : []))

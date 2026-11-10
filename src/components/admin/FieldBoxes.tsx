@@ -11,7 +11,8 @@ import DragList, { addButton, OrderRow, RowActions, type DragRow } from './DragL
 // A box opens in place to its fields, each opening that field's screen; the
 // admin's own, and the listing's own from a field made here, are renamed in
 // place (a ready-made field's keeps its name). Every box but Top and "Not
-// on the listing" is dragged anywhere and has a trash can. A field moves by
+// on the listing" is dragged anywhere and has a trash can. No Top (Nov 10):
+// the photo is with the name, and Under the name is each field's own. A field moves by
 // dragging it onto another box's row, which is drawn dashed while it's
 // over it, or red with why when that box can't take it.
 
@@ -33,7 +34,6 @@ export default function FieldBoxes({
   onAddField,
   onShowField,
   onShowBasic,
-  topLine = 'Just the name',
 }: {
   page: FieldPage
   boxes: FieldBox[]
@@ -50,8 +50,6 @@ export default function FieldBoxes({
   onAddField: (boxId: string) => void
   onShowField: (key: string) => void
   onShowBasic: (basic: 'address' | 'phone') => void
-  /** What Top says with no fields in it: an eruv's has its status too. */
-  topLine?: string
 }) {
   const items = fieldItems(boxes, openId)
   const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
@@ -103,7 +101,7 @@ export default function FieldBoxes({
             <OrderRow
               row={box.moves ? row : still(row)}
               name={box.title || 'New box'}
-              line={boxLine(box, page) || (box.id === 'top' ? topLine : undefined)}
+              line={boxLine(box, page) || undefined}
               open={open}
               onToggle={() => onOpen(open ? null : box.id)}
               rename={renames ? { ...boxName(page, box), onChange: (t) => onRename(box.id, t), fresh: box.id === freshId } : undefined}
@@ -118,8 +116,8 @@ export default function FieldBoxes({
             </button>
           )
           const empty = box.fields.length === 0 && !box.basics?.length && <span className="block pb-2.5 text-[13px] text-slate-500">Nothing in it yet</span>
-          // Every box but Top and "Not on the listing" comes off, its fields
-          // with it (the user, Nov 10).
+          // Every box but "Not on the listing" comes off, its fields with it
+          // (the user, Nov 10).
           if (box.moves)
             return (
               <div>
@@ -129,7 +127,7 @@ export default function FieldBoxes({
                 </RowActions>
               </div>
             )
-          return box.id === 'top' ? <div>{add}</div> : <div className="h-1" />
+          return <div className="h-1" />
         }
         if ('basic' in item) {
           const name = item.basic === 'address' ? 'Address' : 'Phone'

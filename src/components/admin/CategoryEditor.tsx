@@ -580,7 +580,7 @@ function CategoryEditorScreen({
             const where = whereAdded(addingBox, normalizeField(row.field), fieldPage)
             return where === 'here' || (where === 'own' && !row.field.audienceKey)
           },
-          kindFits: (type) => whereAdded(addingBox, madeField(type, '', '#new', addingBox.id), fieldPage) === 'here',
+          kindFits: (type) => whereAdded(addingBox, madeField(type, '', '#new'), fieldPage) === 'here',
         } : undefined}
         // A field before adding: the page beside with it there.
         besides={
@@ -822,7 +822,6 @@ function CategoryEditorScreen({
             }}
             onShowField={(key) => showField(fieldIndex(key))}
             onShowBasic={showField}
-            topLine={eruvPage ? 'The name and whether it’s up' : undefined}
           />
 
           <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
