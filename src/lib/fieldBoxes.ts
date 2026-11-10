@@ -1,4 +1,4 @@
-import type { CategoryField } from './categories'
+import type { CategoryField, FieldType } from './categories'
 import { cardFieldChoices, LEAD_SLOTS, type LeadSlot, type ListingParts } from './listingParts'
 import { caveatTitle, isCertificateLink } from './listingView'
 
@@ -211,6 +211,28 @@ function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
   if (box.kind === 'admin') return cardFieldChoices([f]).length > 0
   return homeOf(f, page) === box.id
 }
+
+/** Where a field added from a box's "+ Add a field" lands: in that box
+ *  ('here'), in a box it makes of its own ('own': a link's Delivery box, a
+ *  list of items, the davening times), or in another of the boxes every
+ *  listing has ('elsewhere'), which the picker doesn't offer there. The
+ *  user, Nov 9: "sometimes I'll click add a field under a specific box and
+ *  it gets added under a different box." */
+export function whereAdded(box: FieldBox, f: CategoryField, page: FieldPage): 'here' | 'own' | 'elsewhere' {
+  if (boxTakes(box, f, page)) return 'here'
+  return ['top', 'contact', 'about', 'hidden'].includes(homeOf(f, page)) ? 'elsewhere' : 'own'
+}
+
+/** A field made here, from a box's + Add a field. A choice or a yes-or-no
+ *  made from Top is a filter badge, as everything in Top is; anywhere else
+ *  a row. */
+export function madeField(type: FieldType, label: string, key: string, boxId?: string | null): CategoryField {
+  const badge = boxId === 'top' && (type === 'select' || type === 'boolean')
+  return { key, label, type, renderAs: badge ? 'badge' : 'row', ...(badge && { filterable: true }), madeHere: true }
+}
+
+/** The page's own address, phone, hours and website: always Contact's. */
+export const basicsLandIn = (box: FieldBox) => box.id === 'contact'
 
 // ── Dragging ─────────────────────────────────────────────────────────────────
 

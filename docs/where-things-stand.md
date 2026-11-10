@@ -122,6 +122,17 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   needs migration 077, the same as Suggest an edit (item 4 below). The
   Eruv page's admin preview still has Page · A listing · Editing, no
   Adding.
+- **+ Add a field adds to the box it was clicked under** (the user, Nov 9:
+  "I'll click add a field under a specific box and it gets added under a
+  different box"). A field's box follows from its kind, so Contact's +
+  used to offer a Text that landed in About. Now each box's picker is
+  "Add a field to <box>" and lists only what lands there, then "In a box
+  of their own" (contact lists, davening times, a lead link's box). Make
+  your own offers only the kinds that land there; a Choices or Yes-or-no
+  made from Top is a filter badge, so it stays in Top. The box is in the
+  address (`in=`), so a reload keeps it. Changing a ready-made field's
+  settings before adding it (turning In the filter on, say) can still
+  move it, as it would after adding.
 - **An admin's field is filled in** in Places (a row of its own after
   Website, saved with Update the listing) and by anyone through Suggest an
   edit, which goes to the queue; the queue and the admin email show it

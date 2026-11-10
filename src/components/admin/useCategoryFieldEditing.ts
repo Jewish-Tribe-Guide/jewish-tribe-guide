@@ -7,7 +7,7 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
-import { addToBox, renameKey } from '@/lib/fieldBoxes'
+import { addToBox, madeField, renameKey } from '@/lib/fieldBoxes'
 import { fieldRules } from '@/lib/fieldAbout'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT, kosherQuestions } from '@/lib/kosherQuestions'
@@ -152,7 +152,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
   // with no name yet takes its key from the name typed on its screen.
   function addOwnField(type: FieldType, label = '', box?: string | null): number {
     const key = label.trim() ? nextFieldKey(draft.fields, draft.hiddenFields, slugifyFieldKey(label)) : ''
-    setDraft((d) => ({ ...d, fields: [...d.fields, { key, label, type, renderAs: 'row', madeHere: true }], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
+    setDraft((d) => ({ ...d, fields: [...d.fields, madeField(type, label, key, box)], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
     return draft.fields.length
   }
 

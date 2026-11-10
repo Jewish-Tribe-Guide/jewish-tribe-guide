@@ -22,6 +22,9 @@ export type EditorScreen = {
    *  page's 'address' or 'phone'. */
   field?: string
   add?: PickerScreen
+  /** The box whose "+ Add a field" opened the picker, so a reload or Back
+   *  offers what lands in it, as the click did. */
+  into?: string
   line?: 'second' | 'third'
   preview?: boolean
   /** The field's Remove step. Its count is kept in memory only: a reload
@@ -29,7 +32,7 @@ export type EditorScreen = {
   remove?: boolean
 }
 
-const OURS = ['field', 'add', 'line', 'preview', 'remove'] as const
+const OURS = ['field', 'add', 'in', 'line', 'preview', 'remove'] as const
 
 /** The address for a screen: this page's, its other parameters kept. */
 export function screenHref(pathname: string, search: string, screen: EditorScreen): string {
@@ -37,6 +40,7 @@ export function screenHref(pathname: string, search: string, screen: EditorScree
   for (const key of OURS) params.delete(key)
   if (screen.field) params.set('field', screen.field)
   if (screen.add) params.set('add', screen.add.at === 'look' ? screen.add.id : screen.add.at)
+  if (screen.add && screen.into) params.set('in', screen.into)
   if (screen.line) params.set('line', screen.line)
   if (screen.preview) params.set('preview', '1')
   if (screen.remove) params.set('remove', '1')
@@ -51,6 +55,8 @@ export function screenFromSearch(search: string): EditorScreen {
   if (field) screen.field = field
   const add = params.get('add')
   if (add) screen.add = add === 'list' || add === 'make' ? { at: add } : { at: 'look', id: add }
+  const into = params.get('in')
+  if (add && into) screen.into = into
   const line = params.get('line')
   if (line === 'second' || line === 'third') screen.line = line
   if (params.get('preview') === '1') screen.preview = true

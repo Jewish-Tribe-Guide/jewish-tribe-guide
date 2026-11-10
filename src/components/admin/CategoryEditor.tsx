@@ -8,7 +8,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, fieldBoxes, removeBox, renameBox, renameListingBox, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, basicsLandIn, fieldBoxes, madeField, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -206,6 +206,7 @@ function CategoryEditorScreen({
       if (open !== null || s.add) setFieldsOpen(true)
       setOpenField(open)
       setAdding(s.add ?? null)
+      setAddingTo(s.into ?? null)
       setShowLine(s.line ?? null)
       setPreviewing(!!s.preview)
     }
@@ -241,6 +242,7 @@ function CategoryEditorScreen({
       setPreviewing(!!s.preview)
       setOpenField(fieldFromRef(fieldsNow.current, s.field))
       setAdding(s.add ?? null)
+      setAddingTo(s.into ?? null)
       setShowLine(s.line ?? null)
       if (s.remove) removeStep.current(s.field)
       else setRemoving(null)
@@ -252,6 +254,7 @@ function CategoryEditorScreen({
   const screenNow = (): EditorScreen => ({
     ...(openField !== null && { field: fieldRef(draft.fields, openField) }),
     ...(adding && { add: adding }),
+    ...(adding && addingTo && { into: addingTo }),
     ...(showLine && { line: showLine }),
   })
   // Through Next's router, so the entry is one it made (editorScreenUrl.ts),
@@ -272,10 +275,11 @@ function CategoryEditorScreen({
     window.scrollTo?.(0, 0)
   }
 
-  function showAdding(next: FieldPickerScreen) {
+  function showAdding(next: FieldPickerScreen, into: string | null = addingTo) {
     setFieldsOpen(true)
     setAdding(next)
-    go({ add: next })
+    setAddingTo(into)
+    go({ add: next, ...(into && { into }) })
     window.scrollTo?.(0, 0)
   }
 
@@ -491,6 +495,7 @@ function CategoryEditorScreen({
   const fieldPage: FieldPage = { fields: pageFields, hiddenFields: draft.hiddenFields, hasAddress: draft.hasAddress, hasPhone: draft.hasPhone }
   const parts = listingPartsFromKey(draft.listingParts)
   const boxes = fieldBoxes(fieldPage, parts)
+  const addingBox = addingTo ? boxes.find((b) => b.id === addingTo) : undefined
   // Just added: the box it landed in opens, its row there to see.
   if (landing) {
     const key = pageFields.find((f) => !landing.has(f.key))?.key
@@ -547,7 +552,7 @@ function CategoryEditorScreen({
         page={{ hasAddress: draft.hasAddress, hasPhone: draft.hasPhone, fields: draft.fields }}
         kind={eruvPage ? 'eruv' : 'listing'}
         screen={adding}
-        onScreen={showAdding}
+        onScreen={(next) => showAdding(next)}
         onBack={() => void screens.back()}
         onAdd={(row) => {
           if (row.basic === 'address' || row.basic === 'phone') setOpenBox('contact')
@@ -562,6 +567,13 @@ function CategoryEditorScreen({
           added(null)
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
+        // From a box's "+ Add a field": only what lands in it, then what
+        // makes a box of its own (the user, Nov 9).
+        into={addingBox ? {
+          title: addingBox.title || 'New box',
+          where: (row) => (row.field ? whereAdded(addingBox, normalizeField(row.field), fieldPage) : basicsLandIn(addingBox) ? 'here' : 'elsewhere'),
+          kindFits: (type) => whereAdded(addingBox, madeField(type, '', '#new', addingBox.id), fieldPage) === 'here',
+        } : undefined}
         // A field before adding: the page beside with it there.
         besides={
           wide
@@ -780,8 +792,7 @@ function CategoryEditorScreen({
               setOpenBox(null)
             }}
             onAddField={(id) => {
-              setAddingTo(id)
-              showAdding({ at: 'list' })
+              showAdding({ at: 'list' }, id)
             }}
             onShowField={(key) => showField(fieldIndex(key))}
             onShowBasic={showField}

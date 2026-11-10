@@ -33,6 +33,7 @@ export default function FieldPicker({
   onMakeOwn,
   canRequire,
   besides,
+  into,
 }: {
   token: string
   /** The page being added to: "Food". */
@@ -52,6 +53,11 @@ export default function FieldPicker({
   canRequire: boolean
   /** The page beside, with the field on it (a computer only). */
   besides?: (field: CategoryField) => React.ReactNode
+  /** Opened from a box's "+ Add a field": the box, and where each field
+   *  would land (fieldBoxes.ts's whereAdded). Only what goes in it is
+   *  offered, then what makes a box of its own; never one that would land
+   *  in another box (the user, Nov 9). */
+  into?: { title: string; where: (row: ReadyField) => 'here' | 'own' | 'elsewhere'; kindFits: (type: FieldType) => boolean }
 }) {
   const community = useCommunitySlug()
   const { pages, error } = useReadyMade(token, community)
@@ -61,7 +67,7 @@ export default function FieldPicker({
   const all = useMemo(() => (pages ? (eruv ? readyEruvFields(pages, page) : readyMadeFields(pages, page)) : null), [pages, page, eruv])
   const rows = useMemo(() => (pages ? (eruv ? readyEruvFields(pages, page, onPage || undefined) : readyMadeFields(pages, page, onPage || undefined)) : null), [pages, page, onPage, eruv])
   const menu = useMemo(() => (pages ? (eruv ? eruvPageMenu(pages) : pageMenu(pages)) : []), [pages, eruv])
-  const kinds = eruv ? MAKE_OWN_KINDS.filter((k) => ERUV_FIELD_TYPES.includes(k.type)) : MAKE_OWN_KINDS
+  const kinds = (eruv ? MAKE_OWN_KINDS.filter((k) => ERUV_FIELD_TYPES.includes(k.type)) : MAKE_OWN_KINDS).filter((k) => !into || into.kindFits(k.type))
 
   if (screen.at === 'look') {
     const row = all?.find((r) => r.id === screen.id)
@@ -82,12 +88,15 @@ export default function FieldPicker({
     )
   }
 
-  const shown = rows?.filter((r) => matchesSearch(r, query))
+  const found = rows?.filter((r) => matchesSearch(r, query))
+  const shown = into ? found?.filter((r) => into.where(r) === 'here') : found
+  const ownBox = into ? (found?.filter((r) => into.where(r) === 'own') ?? []) : []
   const typed = query.trim()
   const ownName = typed.charAt(0).toUpperCase() + typed.slice(1)
+  const canMake = kinds.length > 0
   return (
     <div className="flex flex-col gap-4 [&>section]:max-w-[760px]">
-      <AdminBack back={{ label: pageName, onClick: onBack }} title="Add a field" />
+      <AdminBack back={{ label: pageName, onClick: onBack }} title={into ? `Add a field to ${into.title}` : 'Add a field'} />
       <div className="flex gap-2.5 max-w-[760px]">
         <div className="flex-1 min-w-0">
           <SearchBox value={query} onChange={setQuery} label="Search fields" />
@@ -97,10 +106,10 @@ export default function FieldPicker({
       {error && <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}
       {!shown ? (
         !error && <p className="text-sm text-muted">Loading…</p>
-      ) : shown.length === 0 && typed ? (
+      ) : shown.length === 0 && ownBox.length === 0 && typed ? (
         <AdminBox>
           <p className="m-0 px-4 py-3 text-[15px] text-slate-600">No ready-made field called “{typed}”</p>
-          <AdminRow onClick={() => onScreen({ at: 'make', name: ownName })} name={`Make your own: ${ownName}`} />
+          {canMake && <AdminRow onClick={() => onScreen({ at: 'make', name: ownName })} name={`Make your own: ${ownName}`} />}
         </AdminBox>
       ) : (
         shown.length > 0 && (
@@ -114,7 +123,14 @@ export default function FieldPicker({
           </AdminBox>
         )
       )}
-      {!(shown?.length === 0 && typed) && <MakeOwnLink onClick={() => onScreen({ at: 'make' })}>Make your own field</MakeOwnLink>}
+      {ownBox.length > 0 && (
+        <AdminBox title="In a box of their own">
+          {ownBox.map((r) => (
+            <AdminRow key={r.id} onClick={() => onScreen({ at: 'look', id: r.id })} name={r.label} line={r.line} />
+          ))}
+        </AdminBox>
+      )}
+      {canMake && !(shown?.length === 0 && ownBox.length === 0 && typed) && <MakeOwnLink onClick={() => onScreen({ at: 'make' })}>Make your own field</MakeOwnLink>}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -331,5 +331,38 @@ describe('renaming the listing’s own boxes', () => {
   it('heads what isn’t kosher with its new name', () => {
     const renamed = { ...food, fields: food.fields.map((f) => (f.caveat ? { ...f, caveat: { ...f.caveat, title: 'Not kosher here' } } : f)) }
     expect(fieldBoxes(renamed, {}).map((b) => b.title)).toContain('Not kosher here')
+  })
+})
+
+// The user, Nov 9: "I'll click add a field under a specific box and it gets
+// added under a different box." The picker opened from a box offers what
+// lands in it, then what makes a box of its own, never what goes elsewhere.
+describe('what a box’s + Add a field offers', () => {
+  const page: FieldPage = { hasAddress: true, hasPhone: true, fields: [{ key: 's', label: 'Short', type: 'text', showInHeader: true }, { key: 'd', label: 'About it', type: 'textarea' }] }
+  const boxes = fieldBoxes(page, { boxes: [{ title: 'Mine', fields: [] }] })
+  const box = (id: string) => boxes.find((b) => b.id === id)!
+  const kind = (type: CategoryField['type']): CategoryField => ({ key: 'x', label: 'X', type })
+
+  it('never lands a long text in Contact, or a short one in About', () => {
+    expect(whereAdded(box('contact'), kind('textarea'), page)).toBe('elsewhere')
+    expect(whereAdded(box('contact'), kind('text'), page)).toBe('here')
+    expect(whereAdded(box('about'), kind('textarea'), page)).toBe('here')
+    expect(whereAdded(box('about'), kind('text'), page)).toBe('elsewhere')
+  })
+
+  it('takes into an admin’s box what a box can show', () => {
+    expect(whereAdded(box('box:0'), kind('text'), page)).toBe('here')
+    expect(whereAdded(box('box:0'), kind('image'), page)).toBe('elsewhere')
+  })
+
+  it('keeps the fields that make a box of their own addable from any box', () => {
+    expect(whereAdded(box('contact'), kind('contacts'), page)).toBe('own')
+    expect(whereAdded(box('about'), kind('minyanim'), page)).toBe('own')
+  })
+
+  it('puts the page’s address, phone, hours and website in Contact only', () => {
+    expect(basicsLandIn(box('contact'))).toBe(true)
+    expect(basicsLandIn(box('about'))).toBe(false)
+    expect(basicsLandIn(box('box:0'))).toBe(false)
   })
 })
