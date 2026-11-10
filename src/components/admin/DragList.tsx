@@ -655,9 +655,9 @@ export const PLUS = (
 )
 
 /** `addListButton` as a button. */
-export function AddListButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+export function AddListButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className={addListButton}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`${addListButton} disabled:cursor-default disabled:opacity-50 disabled:hover:border-slate-300 disabled:hover:bg-transparent`}>
       {PLUS}
       {children}
     </button>

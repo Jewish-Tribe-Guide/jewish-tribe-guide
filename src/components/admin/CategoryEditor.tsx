@@ -28,7 +28,7 @@ import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './ca
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
-import { addButton } from './DragList'
+import { AddListButton } from './DragList'
 import DeletePage from './DeletePage'
 import RemoveField, { type Removing } from './RemoveField'
 import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
@@ -825,13 +825,9 @@ function CategoryEditorScreen({
               Add a box
             </button>
             {!eruvPage && draft.fields.some((f) => f.type === 'boolean') && (
-              <button
-                type="button"
-                onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
-                className={`${addButton} self-start`}
-              >
-                + Add audience group
-              </button>
+              <AddListButton onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}>
+                Add audience group
+              </AddListButton>
             )}
           </div>
         </AdminBox>

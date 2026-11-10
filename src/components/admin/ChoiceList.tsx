@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
 import { AdminBox, AdminSwitch } from './AdminUI'
-import DragList from './DragList'
+import DragList, { AddListButton } from './DragList'
 
 // A field's choices, when they're the page's to change (the user, Nov 9:
 // "if you can edit then you can fully edit"): rename one where it is,
@@ -66,18 +66,7 @@ export default function ChoiceList({
   const rename = (value: string, label: string) => onChange({ options: options.map((o) => (o.value === value ? { ...o, label } : o)) })
 
   return (
-    <AdminBox
-      title="Choices"
-      action={
-        <button
-          type="button"
-          onClick={() => setAdding('')}
-          className="min-h-10 shrink-0 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-primary hover:bg-slate-50 cursor-pointer"
-        >
-          + Add a choice
-        </button>
-      }
-    >
+    <AdminBox title="Choices">
       <DragList items={options} keyOf={(o) => o.value} nameOf={(o) => o.label} onReorder={(next) => onChange({ options: next })}>
         {(o, r) => (
           <div className={row}>
@@ -110,6 +99,9 @@ export default function ChoiceList({
           />
         </div>
       )}
+      <div className="px-4 pb-4 pt-2">
+        <AddListButton onClick={() => setAdding('')}>Add a choice</AddListButton>
+      </div>
       {f.type === 'select' && (
         <div className={`${row} border-t border-slate-200`}>
           <span className="flex flex-1 min-w-0 flex-col">

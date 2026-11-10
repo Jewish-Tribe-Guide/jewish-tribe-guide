@@ -13,6 +13,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminSwitch, MoreToggle, adminInputClass } from './AdminUI'
 import { PreviewBeside } from './SitePreview'
+import { AddListButton } from './DragList'
 import SaveBar, { LEAVE_QUESTION, changesLabel, useLeaveGuard } from './SaveBar'
 
 // One form (the admin redesign's board "Forms"): its questions as rows, each
@@ -355,14 +356,7 @@ export default function FormEditor({
           </div>
         )}
 
-        <AdminBox
-          title="Questions"
-          action={
-            <button type="button" onClick={addStep} className="text-sm font-semibold text-primary cursor-pointer">
-              + Add a question
-            </button>
-          }
-        >
+        <AdminBox title="Questions">
           {shown.map((s, i) => {
             const section = sectionName(s.section)
             const heading = section && section !== sectionName(draft.steps[i - 1]?.section) ? section : null
@@ -374,6 +368,9 @@ export default function FormEditor({
             )
           })}
           {more > 0 && <MoreToggle open={allQuestions} more={more} onToggle={() => setAllQuestions((a) => !a)} />}
+          <div className="px-4 pb-4 pt-2">
+            <AddListButton onClick={addStep}>Add a question</AddListButton>
+          </div>
         </AdminBox>
 
         <AdminBox title="After sending">

@@ -30,7 +30,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
   // matters for isNew: an existing category's id already exists and never
   // auto-follows the name, touched or not.
   const [idTouched, setIdTouched] = useState(false)
-  // The "+ Add audience group" mini-form's own draft state — separate from
+  // The "Add audience group" mini-form's own draft state — separate from
   // `draft` since it's discarded on cancel and only ever produces a batch of
   // new fields, never edits an existing one.
   const [groupForm, setGroupForm] = useState<{

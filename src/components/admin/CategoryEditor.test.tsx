@@ -563,7 +563,7 @@ describe('CategoryEditor — editing an existing category', () => {
       await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Type/ }))
       await user.click(screen.getByRole('button', { name: 'Remove Kosher' }))
-      await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+      await user.click(screen.getByRole('button', { name: 'Add a choice' }))
       await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Glatt Kosher{Enter}')
       await saveNow(user)
 
@@ -594,7 +594,7 @@ describe('CategoryEditor — editing an existing category', () => {
       await openBox(user, 'Contact')
       await user.click(screen.getByRole('button', { name: /^Type/ }))
       await user.click(screen.getByRole('button', { name: 'Remove Kosher' }))
-      await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+      await user.click(screen.getByRole('button', { name: 'Add a choice' }))
       await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Glatt Kosher{Enter}')
       await saveNow(user)
       await screen.findByText('Update existing listings to match this rename?')
@@ -1297,6 +1297,14 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     await user.clear(name)
     await user.type(name, `${to}{Enter}`)
   }
+
+  // The user, Nov 10: every add to a whole list is the dashed button.
+  it('adds an audience group with the dashed button under Add a box', () => {
+    const page = { ...food, detailFields: [...food.detailFields, { key: 'forWomen', label: 'For women', type: 'boolean' as const }] }
+    renderWithProviders(<CategoryEditor token="t" initial={page} siblings={[page]} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const fields = within(screen.getByRole('region', { name: 'Fields' }))
+    for (const name of ['Add a box', 'Add audience group']) expect(fields.getByRole('button', { name })).toHaveClass('border-dashed', 'w-full')
+  })
 
   // The user, Nov 10, changing Nov 7's "lock the name": "existing boxes not
   // being editable". A ready-made field's box is renamed too, and becomes

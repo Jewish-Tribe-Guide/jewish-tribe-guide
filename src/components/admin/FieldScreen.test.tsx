@@ -80,7 +80,8 @@ describe('FieldScreen — a ready-made field', () => {
     expect(ou).toHaveValue('OU')
     expect(saved().options![2]).toEqual({ value: 'OU', label: 'OU' })
     await user.click(within(choices).getByRole('button', { name: 'Remove Tartikov' }))
-    await user.click(within(choices).getByRole('button', { name: '+ Add a choice' }))
+    expect(within(choices).getByRole('button', { name: 'Add a choice' })).toHaveClass('border-dashed', 'w-full')
+    await user.click(within(choices).getByRole('button', { name: 'Add a choice' }))
     await user.type(within(choices).getByRole('textbox', { name: 'New choice' }), 'Star-K{Enter}')
     expect(saved().options).toEqual([{ value: 'IKC', label: 'IKC (Philadelphia)' }, { value: 'OU', label: 'OU' }, { value: 'Star-K', label: 'Star-K', own: true }])
     await user.click(within(choices).getByRole('switch', { name: 'Other, a box to type in' }))
@@ -168,7 +169,7 @@ describe('FieldScreen — a ready-made field', () => {
     for (const field of [foodType, { ...foodType, key: 'size', label: 'Size' }, { ...foodType, key: 'storeType', label: 'Store Type' }]) {
       render(<Screen field={field} />)
       expect(screen.queryByRole('region', { name: 'Choices' })).toBeNull()
-      expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Add a choice' })).toBeNull()
       expect(screen.queryByRole('textbox', { name: /^Rename/ })).toBeNull()
       expect(screen.getByRole('switch', { name: 'In the filter' })).toBeInTheDocument()
       cleanup()
@@ -217,7 +218,7 @@ describe('FieldScreen — a field made here', () => {
     expect(screen.getByRole('radiogroup', { name: 'Should it be part of the filter?' })).toBeInTheDocument()
     // A choice off, one added, Other on, one choice only.
     await user.click(screen.getByRole('button', { name: 'Remove Dairy' }))
-    await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+    await user.click(screen.getByRole('button', { name: 'Add a choice' }))
     await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Fish{Enter}')
     await user.click(screen.getByRole('switch', { name: 'Other, a box to type in' }))
     await user.click(within(screen.getByRole('radiogroup', { name: 'Can a place be both Meat and Parve?' })).getByRole('radio', { name: 'No' }))

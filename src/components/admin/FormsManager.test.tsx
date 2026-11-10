@@ -86,7 +86,9 @@ describe('Forms list', () => {
     expect(onOpen).toHaveBeenCalledWith('feedback')
     await user.click(rows[1])
     expect(onOpen).toHaveBeenCalledWith('form:sukkah-signup')
-    await user.click(screen.getByRole('button', { name: '+ Add a form' }))
+    // Adding is the dashed full-width button at the foot of the list.
+    expect(screen.getByRole('button', { name: 'Add a form' })).toHaveClass('border-dashed', 'w-full')
+    await user.click(screen.getByRole('button', { name: 'Add a form' }))
     expect(onOpen).toHaveBeenCalledWith('form:new')
   })
 })
@@ -121,6 +123,7 @@ describe('A form', () => {
     expect(questions.getByRole('button', { name: /What do you need\?/ })).toHaveTextContent('Pick any · Meals, A ride')
     expect(questions.getByRole('button', { name: /Which hospital and room\?/ })).toHaveTextContent('Short answer · only if they picked Meals')
     expect(questions.getByText('Your details')).toBeInTheDocument()
+    expect(questions.getByRole('button', { name: 'Add a question' })).toHaveClass('border-dashed', 'w-full')
     expect(questions.getAllByText('Meals', { selector: 'p' })).toHaveLength(1)
     expect(questions.queryByRole('button', { name: /Question 2/ })).toBeNull()
     await user.click(questions.getByRole('button', { name: '3 more' }))

@@ -10,6 +10,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { activeCampaignBanner, type CampaignBanner } from '@/lib/campaignBanner'
 import { AdminBack, AdminBox, AdminField, AdminRow, adminInputClass } from './AdminUI'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
+import { AddListButton } from './DragList'
 
 // ── The 'campaigns' tab: seasonal promotions (a "Sukkah Map" every Sukkot,
 // or whatever the next one-off is) — a title/subtitle, a link to an existing
@@ -128,19 +129,7 @@ export default function CampaignBannerManager({
 
   const live = now === null ? null : activeCampaignBanner(banners, now, timezone)
   return (
-    <AdminBox
-      title="Campaigns"
-      action={
-        <button
-          type="button"
-          onClick={() => onOpen('new')}
-          disabled={listingCategories.length === 0}
-          className="min-h-11 text-sm font-semibold text-primary hover:underline cursor-pointer disabled:opacity-50 disabled:no-underline"
-        >
-          + Add a campaign
-        </button>
-      }
-    >
+    <AdminBox title="Campaigns">
       <p className="m-0 px-4 pt-3 text-[13px] text-slate-600">A banner on the home page between two dates, leading to one category, like a Sukkah map.</p>
       {banners.length === 0 ? (
         <p className="m-0 px-4 py-4 text-[15px] text-slate-600">{listingCategories.length === 0 ? 'Make a category first.' : 'No campaigns yet.'}</p>
@@ -157,6 +146,11 @@ export default function CampaignBannerManager({
             />
           ))
       )}
+      <div className="px-4 pb-4 pt-2">
+        <AddListButton onClick={() => onOpen('new')} disabled={listingCategories.length === 0}>
+          Add a campaign
+        </AddListButton>
+      </div>
     </AdminBox>
   )
 }
