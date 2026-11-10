@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
 import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
-import { Chevron } from './AdminUI'
+import { Chevron, GoChevron } from './AdminUI'
 import DragList, { addListButton, PLUS, RowName, useBarToggle, X, type DragRow } from './DragList'
 
 // Site → Category pages → a page → Fields, as board E1b draws it (the user,
@@ -250,12 +250,12 @@ function Inner({ row, name, tags = [], onOpen, onRemove }: { row: DragRow; name:
     <div className="flex min-h-[46px] items-center gap-1 pl-1 pr-1">
       {row.handle}
       {onOpen ? (
-        <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-1.5 pr-2 text-left">
+        <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-2 text-left hover:bg-slate-100">
           {label}
-          <Chevron />
+          <GoChevron />
         </button>
       ) : (
-        <span {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 select-none items-center py-1.5 pr-2">
+        <span {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 select-none items-center py-1.5 pl-2 pr-2">
           {label}
         </span>
       )}

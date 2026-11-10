@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { setupSteps, type SetupState } from '@/lib/setup'
-import { Chevron } from './AdminUI'
+import { GoChevron } from './AdminUI'
 
 // To do's "Set up your guide" (board "Setup"): four rows, each opening the
 // screen that does it, ticked when it's saved. Gone once all four are done.
@@ -31,7 +31,7 @@ export default function SetupChecklist({ setup }: { setup: SetupState }) {
       <ul className="m-0 p-0 list-none">
         {steps.map((s) => (
           <li key={s.key} className="border-b border-slate-100 last:border-b-0">
-            <Link href={s.href} className="flex items-center gap-3 px-4 py-2.5 min-h-[56px] text-left hover:bg-slate-50" data-done={s.done}>
+            <Link href={s.href} className="flex items-center gap-3 px-4 py-2.5 min-h-[56px] text-left hover:bg-slate-100" data-done={s.done}>
               {s.done ? (
                 <span className="shrink-0 grid place-items-center w-6 h-6 rounded-full bg-green-700" aria-hidden="true">
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.4">
@@ -45,7 +45,7 @@ export default function SetupChecklist({ setup }: { setup: SetupState }) {
                 <span className={`text-[15px] font-semibold ${s.done ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</span>
                 <span className="text-[13px] text-slate-600">{s.done ? 'Done' : s.line}</span>
               </span>
-              <Chevron />
+              <GoChevron />
             </Link>
           </li>
         ))}

@@ -192,6 +192,19 @@ The user's answers on Nov 10, evening, and what was done with them:
       read What this is, Choices, then the switches. Ready-made fields'
       fixed choices were already chips in What this is. A field made here
       keeps Basics, Choices, Questions.
+    - **Hover on a computer, chevron on a phone, admin-wide** (the user,
+      Nov 10). A row that opens a screen of its own shows its chevron only
+      where there's no mouse to hover with (`GoChevron`,
+      `pointer-fine:hidden`); with a mouse, its row shades under the
+      pointer (`slate-100`). That is every `AdminRow` (To do, Places,
+      Watches, Reports, Category pages, Forms, Campaigns and the rest),
+      the setup checklist and a category's field rows. Exceptions: a
+      chevron that folds something open in place stays everywhere, since
+      it turns to say whether it's open (field boxes, Home page tabs,
+      phone boxes, Repeated searches, Banner photo, Within a walk, Look
+      again's rows); and the picture of a visitor's row in Add a field
+      keeps its chevron, since visitors' rows have one. A touch-screen
+      computer counts as a phone.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the
