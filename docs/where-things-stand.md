@@ -107,21 +107,19 @@ The user's answers on Nov 10, evening, and what was done with them:
       its box is.
     - **A box's X is at the end of its name bar**, not a trash can on its
       + Add a field line (405aacd9).
-- **The Add flow: a recommendation, waiting on the user** (looked at
-  Nov 10, nothing changed). Today: + Add → "Add or update a place" (paste
-  or photo, or "Fill it in yourself") → "Find the place" (Google search,
-  or "Not on Google? Fill it in yourself") → "Add to Food" (Name and
-  Address needed, the rest under "Not on the listing yet", now in the
-  listing's order). Two findings: "Fill it in yourself" is on two screens
-  and means a different thing on each, and the three steps are React
-  state only, so the browser's Back from "Add to Food" closes the whole
-  box and loses what was typed (against "every screen of its own has an
-  address"). Recommended: put the steps in the address
-  (`useStepsInAddress`), and call the first screen's link "Find the place"
-  (what it opens), leaving "Fill it in yourself" to mean the empty form.
-  Keep "Find the place" itself: it is the one search that finds a place
-  already in the guide and opens its edit (agreed Oct 5), which the add
-  form's address box doesn't.
+- **The Add box's steps are in the address, and its first link is "Find
+  the place"** (the user's yes, Nov 10). Each step of the + Add box is an
+  entry in the browser's history (`?box=find`, `?box=find/add`, then the
+  editor's row, `?box=find/add/hours`), so the browser's Back and Forward
+  walk the steps as the header's Back does; before, Back from "Add to …"
+  closed the whole box and lost what was typed. Closing the box takes its
+  steps back off the address. Going back to the search and forward again
+  starts the form fresh, as the header's Back always has. A reload closes
+  the box (the box itself has no address). The first screen's link is
+  "Find the place", what it opens, so "Fill it in yourself" only means the
+  empty form; the Eruv page's keeps "Fill it in yourself", since it goes
+  straight to the form. "Find the place" stays: it is the one search that
+  finds a place already in the guide and opens its edit (Oct 5).
 - **"More" is gone from a field's screen**, for a superadmin too (the
   user: "yes remove it"). The old field form (CategoryFieldEditor) is
   deleted, so its settings can't be reached by anyone now.

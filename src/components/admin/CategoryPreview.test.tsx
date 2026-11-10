@@ -167,7 +167,7 @@ describe('CategoryPreview', () => {
     expect(screen.getByLabelText('Your message')).toHaveValue('Sweet Box has a new phone number')
 
     // The other path: the by-hand editor, a new place.
-    await u.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+    await u.click(screen.getByRole('button', { name: 'Find the place' }))
     await u.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
     await u.click(screen.getByTestId('editor-row-name'))
     await u.type(screen.getByRole('textbox', { name: 'Name' }), 'Kosher Corner')

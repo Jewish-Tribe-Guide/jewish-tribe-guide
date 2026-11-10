@@ -503,7 +503,7 @@ describe('Saw something? Tell us', () => {
     const find = (props: Partial<Parameters<typeof TellUsSheet>[0]> = {}) => {
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
       renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...props} />, { community: { slug: 'philly' }, content: { categories: [grocery, shuls] } })
-      fireEvent.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
     }
 
     it('finds a place the guide has and opens its edit, with Back to the search and back to the box', async () => {
@@ -553,7 +553,7 @@ describe('Saw something? Tell us', () => {
       const eruv = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim' })
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
       renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, { community: { slug: 'philly' }, content: { categories: [grocery, eruv] } })
-      fireEvent.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
       fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
       fireEvent.click(within(screen.getByTestId('pick-kind')).getByRole('button', { name: 'Eruv' }))
       expect(screen.getByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
@@ -573,7 +573,7 @@ describe('Saw something? Tell us', () => {
 
     it('isn’t offered over a listing, where it’s that listing’s edit', () => {
       open({ about: { id: 'tj', name: 'Trader Joe’s' }, onEditYourself: () => {} })
-      expect(screen.queryByRole('button', { name: 'Fill it in yourself' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Edit it yourself' })).toBeInTheDocument()
     })
   })
@@ -597,10 +597,10 @@ describe('Saw something? Tell us', () => {
       expect(edit).toHaveBeenCalled()
     })
 
-    it('from a page or the site’s “+”, adds or updates a place, filling it in yourself being the other path', () => {
+    it('from a page or the site’s “+”, adds or updates a place, finding the place being the other path', () => {
       open()
       expect(screen.getByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Fill it in yourself' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Find the place' })).toBeInTheDocument()
     })
 
     it('says the reader isn’t answering, keeps what was written, and tries again', async () => {
