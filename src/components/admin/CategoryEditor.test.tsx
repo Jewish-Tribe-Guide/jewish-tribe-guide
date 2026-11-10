@@ -1351,6 +1351,24 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     expect(body.listingParts.boxes).toEqual([{ title: 'Main dishes', fields: ['dishes', 'parking'] }])
   })
 
+  // The user, Nov 10: "I clicked add a field under the delivery details box
+  // and then chose davening times and the preview in that field didn't
+  // show the davening times under the delivery details box."
+  it('previews a field picked from a box’s + Add a field in that box', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const hospital = { community: 'other', category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'night', label: 'Night line', type: 'tel' }] }) }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [hospital] }))))
+    await user.click(screen.getByRole('button', { name: 'Add a field to Delivery' }))
+    await user.click(await screen.findByText('Night line'))
+    const looks = await screen.findByRole('complementary', { name: 'How it looks' })
+    await user.click(within(looks).getByRole('tab', { name: 'A listing' }))
+    const mine = within(looks).getByRole('tabpanel').querySelector('[data-mine]')!
+    expect(mine).toHaveTextContent(/^Delivery/)
+    expect(mine).toHaveTextContent('Night line')
+  })
+
   // The user, Nov 10: "Boxes and fields are separate. you can edit the name
   // of a field you created, yes. But not through renaming the box."
   it('renames the box of a field made here, never the field', async () => {

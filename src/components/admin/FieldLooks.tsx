@@ -3,6 +3,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
+import { isMinyanim } from '@/lib/davening'
+import { UsualTimes } from '@/components/resources/DaveningCard'
 import { initialsOf } from '@/lib/listingRow'
 import { neighborhoodsFor } from '@/lib/places'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
@@ -12,6 +14,7 @@ import {
   filtersScreen,
   listingScreen,
   madeUpPlaces,
+  withRealPlaces,
   rowLook,
   type FilterLook,
   type ListingScreen,
@@ -49,6 +52,7 @@ export default function FieldLooks({
   canAdd,
   onShowOnRow,
   onWholePage,
+  realPlaces = [],
 }: {
   /** The page with the field on it (previewFocus.ts). */
   category: CategoryConfig
@@ -63,15 +67,22 @@ export default function FieldLooks({
   /** The card's picker for the line it could go on (boards 20-23). */
   onShowOnRow?: (line: 'second' | 'third') => void
   onWholePage: () => void
+  /** The page's own places, drawn on in place of made-up ones. */
+  realPlaces?: readonly DirectoryResource[]
 }) {
   const community = useOptionalCommunitySlug()
-  const places = madeUpPlaces(
+  const { places, answered } = withRealPlaces(
     category,
-    placeName,
-    neighborhoodsFor(community)
-      .slice(0, 3)
-      .map((p) => p.name),
-    askedWhen,
+    field,
+    realPlaces,
+    madeUpPlaces(
+      category,
+      placeName,
+      neighborhoodsFor(community)
+        .slice(0, 3)
+        .map((p) => p.name),
+      askedWhen,
+    ),
   )
   const rows = places.map((p) => ({ ...p, row: rowLook(category, field, p.item) }))
   const row = rows[0].row
@@ -99,7 +110,9 @@ export default function FieldLooks({
     <aside aria-label="How it looks" className="shrink-0 sticky top-8 self-start flex w-[376px] flex-col gap-3">
       <div>
         <h2 className="m-0 text-base font-bold text-slate-900">How it looks</h2>
-        <p className="m-0 text-[13px] text-slate-500">On a made-up place</p>
+        <p className="m-0 text-[13px] text-slate-500">
+          {answered === null ? 'On a made-up place' : answered ? `On ${places[0].item.name}` : `On ${places[0].item.name}, its answer made up`}
+        </p>
       </div>
 
       <div role="tablist" aria-label="Where" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
@@ -136,7 +149,7 @@ export default function FieldLooks({
           <PageTop category={category} />
           {tab === 'list' && <ListView rows={rows} />}
           {tab === 'filters' && <FiltersView filters={filters} />}
-          {tab === 'listing' && <ListingSheet listing={listing} item={places[0].item} where={places[0].where} />}
+          {tab === 'listing' && <ListingSheet listing={listing} field={field} item={places[0].item} where={places[0].where} />}
           {tab === 'adding' && <AddingSheet category={category} field={field} askedWhen={askedWhen} item={places[0].item} where={places[0].where} />}
         </Phone>
       </section>
@@ -352,7 +365,7 @@ const ACTION_ICONS: Record<ListingScreen['actions'][number]['icon'], ReactNode> 
 
 /** The opened listing (boards 33f, 34c): the header, the buttons, the
  *  boxes, the field marked where it is. */
-function ListingSheet({ listing, item, where }: { listing: ListingScreen; item: DirectoryResource; where: string | null }) {
+function ListingSheet({ listing, field, item, where }: { listing: ListingScreen; field: CategoryField; item: DirectoryResource; where: string | null }) {
   return (
     <Sheet top={120}>
       <Grabber />
@@ -396,11 +409,16 @@ function ListingSheet({ listing, item, where }: { listing: ListingScreen; item: 
           <div key={b.title} data-mine={b.mine ? '' : undefined} className={b.mine ? `${OUTLINE} rounded-xl px-4 py-3` : 'rounded-xl border border-slate-200 px-4 py-3'}>
             <p className={`m-0 text-[15px] font-bold text-ink ${b.mine ? '' : FADED}`}>{b.title}</p>
             {b.label && <p className="m-0 mt-1 text-[13px] font-semibold text-slate-500">{b.label}</p>}
-            {b.lines.map((line, i) => (
-              <p key={i} className={`m-0 mt-1 truncate text-sm ${b.mine ? 'whitespace-normal text-slate-800' : `${FADED} text-slate-600`}`}>
-                {line}
-              </p>
-            ))}
+            {/* Davening times as the listing draws them, not a line. */}
+            {b.mine && field.type === 'minyanim' && isMinyanim(item[field.key]) ? (
+              <UsualTimes minyanim={item[field.key]} />
+            ) : (
+              b.lines.map((line, i) => (
+                <p key={i} className={`m-0 mt-1 truncate text-sm ${b.mine ? 'whitespace-normal text-slate-800' : `${FADED} text-slate-600`}`}>
+                  {line}
+                </p>
+              ))
+            )}
           </div>
         ))}
       </div>

@@ -160,3 +160,23 @@ describe('FieldLooks: a field, how it looks, as tabs (boards 33d–34c)', () => 
     expect(onWholePage).toHaveBeenCalled()
   })
 })
+
+// The user, Nov 10: "davening times isn't in the format we actually have",
+// and "it's not previewing with the fields we actually have".
+describe('FieldLooks: the real thing', () => {
+  const minyanim: CategoryField = { key: 'minyanim', label: 'Davening times', type: 'minyanim', renderAs: 'row' }
+
+  it('draws davening times on the listing as the listing does: the weekday table and the Shabbos lines', async () => {
+    show(minyanim, [minyanim, delivery])
+    await open('A listing')
+    const times = within(shown()).getByTestId('usual-times')
+    expect(within(times).getByTestId('davening-week-table')).toHaveTextContent(/Shacharis/i)
+    expect(within(times).getByText('Usual weekday times')).toBeInTheDocument()
+  })
+
+  it('draws on one of the page’s own places, by name', () => {
+    show(foodType, [foodType, hechsher], { realPlaces: [{ id: 'r', category: 'food', name: 'Bar Bombón', anchorId: 'all', distance: 1, address: '', food_type: 'Parve' }] })
+    expect(looks()).toHaveTextContent('On Bar Bombón')
+    expect(marks()[0]).toBe('Parve')
+  })
+})

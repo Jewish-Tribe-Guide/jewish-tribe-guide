@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { DirectoryResource } from '@/types'
 import Link from 'next/link'
 import { DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -8,7 +9,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, basicLandsIn, basicsLandIn, fieldBoxes, madeField, ownBox, placeBasic, removeBox, renameBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, addToBox, basicLandsIn, basicsLandIn, fieldBoxes, madeField, ownBox, placeBasic, removeBox, renameBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -125,6 +126,13 @@ function CategoryEditorScreen({
   const [openLine, setOpenLine] = useState<CardLine | null>(null)
   const [showLine, setShowLine] = useState<'second' | 'third' | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
+  // This page's places, for How it looks to draw a field on a real one (the
+  // user, Nov 10: "it's not previewing with the fields we actually have").
+  const [realPlaces, setRealPlaces] = useState<DirectoryResource[]>([])
+  const setPlaces = (places: DirectoryResource[]) => {
+    setPlaceCount(places.length)
+    setRealPlaces(places)
+  }
   // "Remove this field" on one places have answered: its own step first
   // (board 16), and the removals answered there, so Save doesn't ask again.
   const [removing, setRemoving] = useState<Removing | null>(null)
@@ -156,7 +164,10 @@ function CategoryEditorScreen({
     let cancelled = false
     takeCategoryListings(countId)
       .then(({ ok, resources }) => {
-        if (!cancelled && ok) setPlaceCount(resources.length)
+        if (!cancelled && ok) {
+          setPlaceCount(resources.length)
+          setRealPlaces(resources)
+        }
       })
       .catch(() => {})
     return () => {
@@ -450,7 +461,7 @@ function CategoryEditorScreen({
         </div>
       )}
       <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
-        {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaceCount} />}
+        {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaces} />}
       </PreviewBeside>
     </aside>
   )
@@ -470,6 +481,7 @@ function CategoryEditorScreen({
         placeName={sampleName(draft.label, draft.pluralLabel)}
         askedWhen={field?.showIf}
         canAdd={draft.capabilities.add}
+        realPlaces={realPlaces}
         onShowOnRow={onShowOnRow}
         onWholePage={() => {
           setPreviewView('page')
@@ -596,7 +608,12 @@ function CategoryEditorScreen({
         besides={
           wide
             ? (f) => {
-                return looksOf(focusOn(previewCategory, normalizeField(f)))
+                // In the box it's being added to, as Add would put it.
+                const look = focusOn(previewCategory, normalizeField(f))
+                if (!addingTo || !look.focus) return looksOf(look)
+                const own = ownBox(parts, boxes, addingTo, fieldPage)
+                const placed = listingPartsToSave(listingPartsKey(addToBox(own.parts, own.id, look.focus))) ?? undefined
+                return looksOf({ ...look, category: { ...look.category, listingParts: placed } })
               }
             : undefined
         }

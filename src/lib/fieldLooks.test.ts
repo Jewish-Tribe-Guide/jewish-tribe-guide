@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryConfig, CategoryField } from './categories'
-import { addingScreen, answerText, filterLook, filtersScreen, listingLook, listingScreen, madeUpPlace, madeUpPlaces, rowLook } from './fieldLooks'
+import { addingScreen, answerText, filterLook, filtersScreen, listingLook, listingScreen, madeUpPlace, madeUpPlaces, rowLook, withRealPlaces } from './fieldLooks'
 
 const choices = (...values: string[]) => values.map((v) => ({ value: v, label: v }))
 const foodType: CategoryField = { key: 'food_type', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true, onCard: true, options: choices('Meat', 'Dairy', 'Parve') }
@@ -138,5 +138,33 @@ describe('fieldLooks: a field on a made-up place', () => {
     expect(adding.before.map((r) => r.title)).toEqual(['Name', 'Type'])
     expect(adding.fields.map((f) => f.key)).toContain('food_type')
     expect(addingScreen(page, hours, item).big).toBe(true)
+  })
+})
+
+// The user, Nov 10: "it's not previewing with the fields we actually have".
+describe('fieldLooks: the page’s own places', () => {
+  const page = food([foodType, hechsher, delivery])
+  const made = madeUpPlaces(page, 'A restaurant')
+  const real = (id: string, more: Record<string, unknown>) => ({ id, category: 'food', name: id, anchorId: 'all', distance: 1, address: '', ...more })
+
+  it('draws on those that answer the field first, then the fullest', () => {
+    const { places, answered } = withRealPlaces(page, delivery, [real('Bare', {}), real('Full', { food_type: 'Meat', hechsher: 'OU' }), real('Delivers', { delivery: 'Sundays' })], made)
+    expect(places.map((p) => p.item.name)).toEqual(['Delivers', 'Full', 'Bare'])
+    expect(places[0].item.delivery).toBe('Sundays')
+    expect(answered).toBe(true)
+  })
+
+  it('gives a place the made-up answer where none answers it, and says so', () => {
+    const { places, answered } = withRealPlaces(page, delivery, [real('Full', { food_type: 'Meat' })], made)
+    expect(places[0].item.name).toBe('Full')
+    expect(places[0].item.delivery).toBe(made[0].item.delivery)
+    expect(places[0].item.food_type).toBe('Meat')
+    expect(answered).toBe(false)
+    // Made-up places fill in the list's other rows.
+    expect(places.slice(1).map((p) => p.item.id)).toEqual(['made-up-1', 'made-up-2'])
+  })
+
+  it('is the made-up places with none of the page’s own', () => {
+    expect(withRealPlaces(page, delivery, [], made)).toEqual({ places: made, answered: null })
   })
 })

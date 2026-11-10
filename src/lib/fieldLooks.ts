@@ -175,6 +175,34 @@ export function madeUpPlaces(
   })
 }
 
+/** The page's own places in place of made-up ones (the user, Nov 10: "it's
+ *  not previewing with the fields we actually have"): those that answer
+ *  the field first, then the fullest. A place without an answer to it is
+ *  given the made-up one, which `answered` says. Made-up places fill in
+ *  when the page has fewer than three. */
+export function withRealPlaces(
+  category: CategoryConfig,
+  field: CategoryField,
+  real: readonly DirectoryResource[],
+  madeUp: readonly MadeUp[],
+): { places: MadeUp[]; answered: boolean | null } {
+  if (real.length === 0) return { places: [...madeUp], answered: null }
+  const answers = (r: DirectoryResource) => answerText(field, r[field.key]) !== ''
+  const fullness = (r: DirectoryResource) => category.detailFields.filter((f) => answerText(f, r[f.key]) !== '').length
+  const ranked = [...real].sort((a, b) => Number(answers(b)) - Number(answers(a)) || fullness(b) - fullness(a)).slice(0, madeUp.length)
+  const places = madeUp.map((m, i): MadeUp => {
+    const r = ranked[i]
+    if (!r) return m
+    const item: DirectoryResource = { ...r, distance: r.distance ?? SAMPLE_MILES[i] }
+    if (!answers(r)) {
+      const v = sampleAnswer(field, i)
+      if (v !== undefined) item[field.key] = v
+    }
+    return { item, where: null }
+  })
+  return { places, answered: answers(ranked[0]) }
+}
+
 /** The page and place with one field gone: what's left when it's taken
  *  off. */
 function without(category: CategoryConfig, item: DirectoryResource, key: string): [CategoryConfig, DirectoryResource] {

@@ -73,7 +73,7 @@ export default function CategoryPreview({
   inline?: boolean
   /** How many places the category has, once loaded: the editor's
    *  "N places". */
-  onListings?: (count: number) => void
+  onListings?: (listings: DirectoryResource[]) => void
   view?: PreviewView
   /** Adding opens on this field's row: the field an admin is looking at. */
   focusField?: string
@@ -132,7 +132,7 @@ export default function CategoryPreview({
           setRealListings(listings)
           // The Eruv page's places are eruvim, counted by the editor
           // itself; it has no listings to count over them.
-          if (category.kind !== 'eruv') onListingsRef.current?.(listings.length)
+          if (category.kind !== 'eruv') onListingsRef.current?.(listings)
         }
       })
       .catch(() => {

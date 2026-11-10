@@ -766,3 +766,28 @@ function WeekDays({
     </div>
   )
 }
+
+/** A shul's usual times as its listing draws them (the weekday table and
+ *  the Shabbos lines), with nothing to tap: the admin's How it looks (the
+ *  user, Nov 10: "davening times isn't in the format we actually have"). */
+export function UsualTimes({ minyanim }: { minyanim: unknown }) {
+  const rows = regularMinyanim(minyanim)
+  const week = weekdayTable(rows, null, undefined)
+  const shab = shabbosList(rows, null, undefined)
+  return (
+    <div data-testid="usual-times">
+      {week && (
+        <>
+          <p className="mt-1 text-[12px] font-extrabold uppercase tracking-wide text-muted">Usual weekday times</p>
+          <WeekTable table={week} today={null} marks={false} />
+        </>
+      )}
+      {shab && (
+        <>
+          <p className="mt-2 text-[12px] font-extrabold uppercase tracking-wide text-muted">Usual Shabbos times</p>
+          <ShabbosLines lines={shab.lines} anchors={undefined} today={null} marks={false} />
+        </>
+      )}
+    </div>
+  )
+}
