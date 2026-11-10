@@ -60,11 +60,26 @@ The user's answers on Nov 10, evening, and what was done with them:
     the admin's boxes, where the listing then draws it (Delivery's text
     and Join button there, not up top too; the hechsher's amber box and
     Certification button stay where they always are).
-  - **Limit, the user's call:** Contact and About don't take a field
-    that is a box of its own (Delivery, a hechsher, davening times, a
-    list of items or contacts). Their + Add a field doesn't offer one,
-    and a drag there says it can't go. To add one to a page, + Add a box
-    and add it there.
+  - **Every box takes every field** (the user: "Yes, anything takes
+    anything"; then "I can not for the life of me understand why we're
+    still having existing boxes not being editable and those add a fields
+    not showing every field"). BUILT Nov 10:
+    - Contact and About take Delivery, a hechsher, davening times and
+      lists too, and the listing draws them there (f735af0e).
+    - Delivery, What isn't kosher, Main dishes, Davening times and a list
+      of contacts' own box take any field from their + Add a field and by
+      drag, and are renamed. Doing any of those makes the box one of the
+      admin's, in the same place with its name and fields (`ownBox`,
+      6a91cc56). **This changes Nov 7's "lock the name".** Still taking
+      only their own: a mikvah's section and "Not on the listing".
+    - **Address and phone move to any box** ("we should also be able to
+      move all fields. Including address and phone"; deab70a7). Saved as
+      `@address` / `@phone` in the box's list, Contact when nowhere. The
+      listing draws them in that box; the place editor still edits them
+      with the contact. Hours and website are still added from Contact
+      (they drag after, as before).
+    - **A box's X is at the end of its name bar**, not a trash can on its
+      + Add a field line (405aacd9).
 - **"More" is gone from a field's screen**, for a superadmin too (the
   user: "yes remove it"). The old field form (CategoryFieldEditor) is
   deleted, so its settings can't be reached by anyone now.
@@ -1266,7 +1281,8 @@ after the deploy, dry run first, and needs its own go-ahead.
   there"): Adding opened on the first field, and a new field not named
   yet wasn't found at all. It now opens on the field the screen is on,
   including one just made (previewFocus.ts), beside and full size.
-- Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
+- (Changed Nov 10: every box renames now; see "Every box takes every
+  field" above.) Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
   field's box on the listing keeps its name. Delivery, What isn't kosher,
   Main dishes, a list of contacts and a mikvah's section have no Rename
   unless their field was made here with Make your own. The admin's own
