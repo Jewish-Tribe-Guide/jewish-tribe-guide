@@ -200,6 +200,9 @@ export function FieldChanges({
   const off = f.minyanOff ?? []
   return (
     <>
+      {/* Its choices before its switches: they're what the field is (the
+          user, Nov 10). */}
+      {choices && <ChoiceList field={f} onChange={onChange} markOwn />}
       <AdminBox title="What you can change">
         {!required && !filter && !under && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
         {required && (
@@ -253,7 +256,6 @@ export function FieldChanges({
             </Change>
           ))}
       </AdminBox>
-      {choices && <ChoiceList field={f} onChange={onChange} markOwn />}
     </>
   )
 }

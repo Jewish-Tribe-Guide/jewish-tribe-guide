@@ -67,6 +67,8 @@ describe('FieldScreen — a ready-made field', () => {
     // The list is the choices box, not chips in What this is.
     expect(within(box('What this is')).queryByRole('list', { name: 'Choices' })).toBeNull()
     const choices = box('Choices')
+    // Before the switches, since they're what the field is (the user, Nov 10).
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label') ?? r.querySelector('h2')?.textContent)).toEqual(['What this is', 'Choices', 'What you can change'])
     // A rename changes only the words; places keep the stored value.
     const name = within(choices).getByRole('textbox', { name: 'Rename IKC' })
     await user.clear(name)

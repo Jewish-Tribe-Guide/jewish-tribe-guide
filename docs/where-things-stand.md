@@ -187,6 +187,11 @@ The user's answers on Nov 10, evening, and what was done with them:
       have no screen). Exceptions: the hidden hechsher-part rows have no
       X, and a category's "Delete this page" stays a small red link.
       Adds stay full width; removes stay small, on the thing they remove.
+    - **A field's editable Choices come before "What you can change"**
+      (the user's yes, Nov 10): Kosher Certification, Eruv and Services
+      read What this is, Choices, then the switches. Ready-made fields'
+      fixed choices were already chips in What this is. A field made here
+      keeps Basics, Choices, Questions.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the
