@@ -9,6 +9,7 @@ import { isMinyanim } from './davening'
 import { parseWalkLists } from './walkList'
 import { boxesOf, boxesWithIds, mainCardOf, shabbosFieldsOf } from './listingParts'
 import { readContacts } from './contacts'
+import { partKeys } from './fieldParts'
 import type { DirectoryResource } from '@/types'
 
 // ── An opened listing ────────────────────────────────────────────────────────
@@ -120,12 +121,14 @@ export type MainThing = 'section' | 'boxes' | 'davening' | 'items' | 'groups' | 
 export function mainThing(item: DirectoryResource, category: CategoryConfig): MainThing | null {
   const fields = category.detailFields
   if (mainCardOf(category)) return 'section'
-  if (boxesOf(category).length > 0) return 'boxes'
+  // The times and the items before the admin's boxes (Nov 10): Food's
+  // Kosher box doesn't take its dishes' place.
   const minyanim = fields.find((f) => f.type === 'minyanim')
   if (minyanim && isMinyanim(item[minyanim.key]) && (item[minyanim.key] as unknown[]).length > 0) return 'davening'
   const items = itemsField(category)
   if (items && selectValues(item[items.key]).length + selectValues(item[`${items.key}_sometimes`]).length > 0) return 'items'
   if (items && ui.contributions.edit && resolveCapabilities(category.capabilities).edit) return 'items'
+  if (boxesOf(category).length > 0) return 'boxes'
   if (audienceGroups(item, category).length > 0) return 'groups'
   if (parseWalkLists(category.walkList).length > 0 && item.geo) return 'walk'
   if (primaryLink(item, category)) return 'join'
@@ -330,11 +333,13 @@ export function listingActions(item: DirectoryResource, category: CategoryConfig
   if (category.hasAddress !== false && item.address && !lead) all.push({ kind: 'directions' })
   if (category.hasPhone !== false && item.phone) all.push({ kind: 'call' })
   const primary = primaryLink(item, category)?.field.key ?? lead?.field.key
-  // A link on the admin's main card is said there, not twice.
+  // A link on the admin's main card is said there, not twice; a field's
+  // part (a hechsher's certificate, Delivery's group) with its field.
   const onCard = new Set(mainCardOf(category)?.fields.map((f) => f.key) ?? [])
+  const parts = partKeys(category.detailFields)
   const inDetails: ActionSpec[] = []
   for (const f of category.detailFields) {
-    if (f.audienceKey || f.key === primary || onCard.has(f.key)) continue
+    if (f.audienceKey || f.key === primary || onCard.has(f.key) || parts.has(f.key)) continue
     const v = String(item[f.key] ?? '').trim()
     if (!v) continue
     if (f.type === 'url') (f.linkInDetails ? inDetails : all).push({ kind: 'link', field: f, href: v })
@@ -410,13 +415,7 @@ export function isWebsite(field: CategoryField): boolean {
   return field.key === 'website' || /website/i.test(field.linkLabel ?? field.label)
 }
 
-/** A link to a place's kosher certificate (Food's "Kosher Certification
- *  URL"), by what it's called, as its button's rosette is chosen: the
- *  editor asks for it with the hechsher, not with the website. */
-export function isCertificateLink(field: CategoryField): boolean {
-  const words = `${field.key} ${field.linkLabel ?? field.label}`.toLowerCase()
-  return field.type === 'url' && !/website/.test(words) && /certif|hechsher|kosher/.test(words)
-}
+export { isCertificateLink } from './fieldParts'
 
 /** A note's first sentence, and what's left after it: a mikvah section's
  *  box shows the first and folds the rest (Oct 6). The first line, when it

@@ -1241,10 +1241,15 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
   }
 
   // The user, Nov 7: a ready-made field's box keeps its name.
-  it('keeps a ready-made field’s box name: no Rename on Delivery, What isn’t kosher or Main dishes', async () => {
+  // Round 3 (Nov 10): Delivery and the hechsher are fields, in Contact and
+  // About until put in a box; neither is a box of its own any more.
+  it('keeps a ready-made field’s box name: no Rename on Main dishes; no Delivery or What isn’t kosher box', async () => {
     const user = userEvent.setup()
     renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={vi.fn()} onCancel={vi.fn()} />)
-    for (const name of ['Delivery', 'What isn’t kosher', 'Main dishes']) {
+    const list = within(screen.getByRole('region', { name: 'Fields' }))
+    expect(list.queryByRole('button', { name: 'Delivery', expanded: false })).toBeNull()
+    expect(list.queryByRole('button', { name: 'What isn’t kosher', expanded: false })).toBeNull()
+    for (const name of ['Main dishes']) {
       await openBox(user, name)
       expect(screen.getByRole('button', { name, expanded: true })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: `Rename ${name}` })).toBeNull()
@@ -1256,14 +1261,10 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     const user = userEvent.setup()
     const madeHere = { ...food, detailFields: food.detailFields.map((f) => ({ ...f, madeHere: true })) }
     renderWithProviders(<CategoryEditor token="t" initial={madeHere} siblings={[madeHere]} onSaved={onSaved} onCancel={vi.fn()} />)
-    await rename(user, 'Delivery', 'Get it delivered')
-    await rename(user, 'What isn’t kosher', 'Not kosher here')
     await rename(user, 'Main dishes', 'Dishes')
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     const by = new Map(fields().map((f) => [f.key, f]))
-    expect(by.get('delivery_whatsapp_group')!.leadBox).toEqual({ title: 'Get it delivered', text: 'delivery_details' })
-    expect(by.get('kosherCert')!.caveat).toEqual({ flagField: 'kosherPartial', noteField: 'kosherNote', title: 'Not kosher here' })
     expect(by.get('dishes')!.label).toBe('Dishes')
   })
 })

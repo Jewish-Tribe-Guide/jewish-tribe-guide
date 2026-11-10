@@ -82,14 +82,31 @@ describe('fieldBoxes', () => {
     ])
   })
 
-  it('gives Food its link’s own box, what isn’t kosher and its dishes (board 4)', () => {
+  // Round 3 (the user, Nov 10): no box of its own for a hechsher or a
+  // delivery link. Each is one field, in the box it's put in; its parts
+  // (the questions, the certificate, the group) are no row anywhere.
+  it('makes a hechsher and Delivery details one field each, in the box they’re in (E1b)', () => {
     expect(lines(food, {})).toEqual([
-      ['Delivery', 'Delivery WhatsApp Group, Delivery Details'],
-      ['What isn’t kosher', 'Kosher Certification, Kosher Certification URL, Everything here is kosher, What isn’t kosher?'],
       ['Main dishes', 'Main dishes'],
-      ['Contact', 'Address, Phone, Hours, Website, Short Description, Food Type, Store Type'],
+      ['Contact', 'Address, Phone, Hours, Website, Short Description, Food Type, Kosher Certification, Store Type'],
+      ['About', 'Description, Delivery Details'],
+    ])
+    const boxed: ListingParts = {
+      boxes: [
+        { title: 'Kosher', fields: ['kosherCert', 't'] },
+        { title: 'Delivery', fields: ['delivery_details'] },
+      ],
+      order: ['box', 'box', 'items', 'contact', 'about'],
+    }
+    expect(lines(food, boxed)).toEqual([
+      ['Kosher', 'Kosher Certification, Food Type'],
+      ['Delivery', 'Delivery Details'],
+      ['Main dishes', 'Main dishes'],
+      ['Contact', 'Address, Phone, Hours, Website, Short Description, Store Type'],
       ['About', 'Description'],
     ])
+    const shown = fieldBoxes(food, boxed).flatMap((b) => b.fields)
+    for (const part of ['kosherPartial', 'kosherNote', 'k', 'delivery_whatsapp_group']) expect(shown).not.toContain(part)
   })
 
   it('gives a shul its davening times (board 6)', () => {
@@ -135,8 +152,16 @@ describe('fieldBoxes', () => {
   })
 
   it('finds each field’s home', () => {
-    expect(homeOf(food.hiddenFields![0], food)).toBe('caveat')
-    expect(homeOf(food.fields[10], food)).toBe('lead:delivery_whatsapp_group')
+    // A part is where its field is.
+    expect(homeOf(food.hiddenFields![0], food)).toBe('part')
+    expect(homeOf(food.fields[8], food)).toBe('part')
+    expect(homeOf(food.fields[9], food)).toBe('part')
+    // The fields themselves, where any field of their kind goes.
+    expect(homeOf(food.fields[6], food)).toBe('contact')
+    expect(homeOf(food.fields[10], food)).toBe('about')
+    // A certificate's link on a page with no hechsher is a link like any other.
+    const noHechsher: FieldPage = { ...food, fields: food.fields.filter((f) => !f.caveat), hiddenFields: [] }
+    expect(homeOf(food.fields[8], noHechsher)).toBe('contact')
     expect(homeOf({ key: 'h', label: 'Women’s Hours', type: 'hours', audienceKey: 'w' }, food)).toBe('audience:w')
   })
 })
@@ -247,13 +272,13 @@ describe('dragging', () => {
     expect(orderProblem(items, next, food)).toBeNull()
     const { order } = readOrder(items, next, {}, food)
     // Store Type takes Hours' place; the rest of Contact moves along a slot.
-    expect(order).toEqual(['foodType', 'hours', 'photo', 'googleDescription', 'website', 's', 'kosherCert', 't', 'k', 'delivery_whatsapp_group', 'delivery_details', 'dishes'])
+    expect(order).toEqual(['foodType', 'hours', 'photo', 'googleDescription', 'website', 's', 't', 'kosherCert', 'k', 'delivery_whatsapp_group', 'delivery_details', 'dishes'])
   })
 
   it('puts a field back where it goes when it’s dropped there', () => {
     const parts = { boxes: [{ title: 'Note', fields: ['s'] }] }
     const items = fieldItems(fieldBoxes(food, parts), 'box:0')
-    expect(keys(items).slice(0, 3)).toEqual(['box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items'])
+    expect(keys(items).slice(0, 2)).toEqual(['box:items', 'box:box:0'])
     // Short Description, back under Contact's row.
     const next = drop(items, 'field:s', items.findIndex((i) => itemKey(i) === 'box:contact'))
     expect(orderProblem(items, next, food)).toBeNull()
@@ -263,26 +288,40 @@ describe('dragging', () => {
   })
 })
 
-// Board 4: Delivery, What isn't kosher and Main dishes have handles, and
-// the listing follows their order.
+// Board 4: Main dishes has a handle, and the listing follows the order.
 describe('the listing’s own boxes', () => {
   const foodBoxes = fieldBoxes(food, {})
 
   it('move anywhere, About above them all, and the order is kept', () => {
     const items = fieldItems(foodBoxes, null)
-    expect(keys(items)).toEqual(['box:lead:delivery_whatsapp_group', 'box:caveat', 'box:items', 'box:contact', 'box:about'])
-    expect(foodBoxes.filter((b) => b.moves).map((b) => b.title)).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes', 'Contact', 'About'])
-    // Main dishes first.
-    const next = drop(items, 'box:items', 0)
+    expect(keys(items)).toEqual(['box:items', 'box:contact', 'box:about'])
+    expect(foodBoxes.filter((b) => b.moves).map((b) => b.title)).toEqual(['Main dishes', 'Contact', 'About'])
+    // Contact first.
+    const next = drop(items, 'box:contact', 0)
     expect(orderProblem(items, next, food)).toBeNull()
     const { parts } = readOrder(items, next, {}, food)
-    expect(parts.order).toEqual(['items', 'lead:delivery_whatsapp_group', 'caveat', 'contact', 'about'])
+    expect(parts.order).toEqual(['contact', 'items', 'about'])
     expect(parts.lead).toBeUndefined()
-    expect(fieldBoxes(food, parts).map((b) => b.title).slice(0, 3)).toEqual(['Main dishes', 'Delivery', 'What isn’t kosher'])
-    // About above Delivery.
+    expect(fieldBoxes(food, parts).map((b) => b.title)).toEqual(['Contact', 'Main dishes', 'About'])
+    // About above them all.
     const about = drop(items, 'box:about', 0)
     expect(orderProblem(items, about, food)).toBeNull()
-    expect(fieldBoxes(food, readOrder(items, about, {}, food).parts).map((b) => b.title)).toEqual(['About', 'Delivery', 'What isn’t kosher', 'Main dishes', 'Contact'])
+    expect(fieldBoxes(food, readOrder(items, about, {}, food).parts).map((b) => b.title)).toEqual(['About', 'Main dishes', 'Contact'])
+  })
+
+  // E3b: Hechsher dragged into Contact; its question and link come along,
+  // as no rows of their own.
+  it('drags a hechsher from its box into Contact, its parts with it', () => {
+    const boxed: ListingParts = { boxes: [{ title: 'Kosher', fields: ['kosherCert', 't'] }] }
+    const items = fieldItems(fieldBoxes(food, boxed), 'box:0')
+    expect(keys(items).slice(0, 5)).toEqual(['box:items', 'box:box:0', 'field:kosherCert', 'field:t', 'end'])
+    const next = drop(items, 'field:kosherCert', items.findIndex((i) => itemKey(i) === 'box:contact'))
+    expect(orderProblem(items, next, food)).toBeNull()
+    const read = readOrder(items, next, boxed, food).parts
+    expect(read.boxes![0].fields).toEqual(['t'])
+    const contact = fieldBoxes(food, read).find((b) => b.id === 'contact')!.fields
+    expect(contact).toContain('kosherCert')
+    expect(contact).not.toContain('k')
   })
 })
 
@@ -326,22 +365,14 @@ describe('renaming the listing’s own boxes', () => {
     const named = (page: FieldPage, parts: ListingParts = {}) => fieldBoxes(page, parts).filter((b) => boxRenames(b, page)).map((b) => b.title)
     const madeHere = (page: FieldPage): FieldPage => ({ ...page, fields: page.fields.map((f) => ({ ...f, madeHere: true })) })
     expect(named(food)).toEqual([])
-    expect(named(madeHere(food))).toEqual(['Delivery', 'What isn’t kosher', 'Main dishes'])
+    expect(named(madeHere(food))).toEqual(['Main dishes'])
     expect(named(shuls, { shabbos: { fields: ['denomination'] } })).toEqual([])
     // A hospital's are the admin's own boxes, holding ready-made fields.
     expect(named(hospital, hospitalParts)).toEqual(['Who to call', 'Kosher food', 'A place to stay', 'Rides', 'Also'])
   })
 
   it('says each one’s new name on the field it comes from', () => {
-    expect(renameListingBox(food, 'lead:delivery_whatsapp_group', 'Get it delivered')).toEqual({
-      key: 'delivery_whatsapp_group',
-      patch: { leadBox: { title: 'Get it delivered', text: 'delivery_details' } },
-    })
     expect(renameListingBox(food, 'items', 'Dishes')).toEqual({ key: 'dishes', patch: { label: 'Dishes' } })
-    expect(renameListingBox(food, 'caveat', 'Not kosher here')).toEqual({
-      key: 'kosherCert',
-      patch: { caveat: { flagField: 'kosherPartial', noteField: 'kosherNote', title: 'Not kosher here' } },
-    })
     expect(renameListingBox(food, 'box:0', 'x')).toBeNull()
     const mikvah: FieldPage = {
       fields: [
@@ -358,15 +389,9 @@ describe('renaming the listing’s own boxes', () => {
 
   it('is typed over as saved, empty while it’s retyped', () => {
     const box = (page: FieldPage, id: string) => fieldBoxes(page, {}).find((b) => b.id === id)!
-    expect(boxName(food, box(food, 'caveat'))).toEqual({ value: 'What isn’t kosher', placeholder: 'What isn’t kosher' })
-    const cleared: FieldPage = { ...food, fields: food.fields.map((f) => (f.leadBox ? { ...f, leadBox: { ...f.leadBox, title: '' } } : f)) }
-    expect(boxName(cleared, box(cleared, 'lead:delivery_whatsapp_group'))).toEqual({ value: '', placeholder: 'Delivery WhatsApp Group' })
     expect(boxName(food, box(food, 'items'))).toEqual({ value: 'Main dishes', placeholder: 'New box' })
-  })
-
-  it('heads what isn’t kosher with its new name', () => {
-    const renamed = { ...food, fields: food.fields.map((f) => (f.caveat ? { ...f, caveat: { ...f.caveat, title: 'Not kosher here' } } : f)) }
-    expect(fieldBoxes(renamed, {}).map((b) => b.title)).toContain('Not kosher here')
+    const cleared: FieldPage = { ...food, fields: food.fields.map((f) => (f.key === 'dishes' ? { ...f, label: '' } : f)) }
+    expect(boxName(cleared, box(cleared, 'items')).value).toBe('')
   })
 })
 
@@ -404,6 +429,9 @@ describe('what a box’s + Add a field offers', () => {
     expect(makesBox(kind('minyanim'), page)).toBe(true)
     expect(makesBox(kind('contacts'), page)).toBe(true)
     expect(makesBox(kind('textarea'), page)).toBe(false)
+    // A hechsher goes in any box (Nov 10, round 3).
+    expect(makesBox(food.fields[6], food)).toBe(false)
+    expect(whereAdded(box('box:0'), food.fields[6], food)).toBe('here')
   })
 
   it('puts the page’s address, phone, hours and website in Contact only', () => {

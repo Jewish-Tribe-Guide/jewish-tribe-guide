@@ -273,10 +273,12 @@ describe('nearbyListings', () => {
 })
 
 describe('listingActions', () => {
-  it('Directions, Call, then each link: Judah’s website and certificate', () => {
+  // The certificate is the hechsher's part, said with it in its box (the
+  // user, Nov 10, E2), not a button under the name.
+  it('Directions, Call, then each link: Judah’s website; the certificate with its hechsher', () => {
     const judah = makeListing({ phone: '(215) 613-6110', website: 'http://judahgrill.com', k: 'https://keystone-k.org/judah' })
     const { buttons, extra } = listingActions(judah, food)
-    expect(buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['directions', 'call', 'Website', 'Certificate'])
+    expect(buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['directions', 'call', 'Website'])
     expect(extra).toEqual([])
   })
   it('an email in a text field becomes a button; four at most, the rest kept for the details', () => {

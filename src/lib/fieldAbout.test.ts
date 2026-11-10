@@ -67,6 +67,9 @@ describe('fieldAbout', () => {
     const f: CategoryField = { key: 'k', label: 'Kosher Certification', type: 'select', caveat: { flagField: 'p', noteField: 'n' }, options: [{ value: 'OU', label: 'OU' }] }
     expect(fieldAbout(f).comesWith).toEqual(['Everything here is kosher?', 'What isn’t kosher'])
     expect(fieldAbout(f).about).toContain('Which hechsher')
+    // Round 3 (Nov 10): what isn't kosher goes with the hechsher, not a box.
+    expect(fieldAbout(f).about).toContain('under the hechsher, wherever it is')
+    expect(fieldAbout(f).about).not.toContain('box of its own')
     expect(fieldAbout({ ...f, caveat: { ...f.caveat!, title: 'Not under the hechsher' } }).comesWith).toEqual(['Everything here is kosher?', 'Not under the hechsher'])
   })
 

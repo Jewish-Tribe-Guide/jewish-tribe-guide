@@ -1,7 +1,7 @@
 import type { CategoryField, FieldType } from './categories'
-import { arrange, cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
+import { arrange, cardFieldChoices, FIXED_PLACES, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
 import { underName } from './cardLines'
-import { caveatTitle, isCertificateLink } from './listingView'
+import { partKeys } from './fieldParts'
 
 // ── A page's fields, as its opened listing's boxes (Category pages step 3,
 // boards 17-19) ─────────────────────────────────────────────────────────────
@@ -13,13 +13,8 @@ import { caveatTitle, isCertificateLink } from './listingView'
 //   (no Top)      the photo is the listing's, with the name, and isn't in
 //                 the list (Nov 10, board A: "just boxes and fields"); what
 //                 shows under the name is each field's own Under the name.
-//                 A hechsher and its certificate's link are in the Kosher
-//                 box (What isn't kosher); any other field where its kind
-//                 puts it.
-//   the listing's own sections, where its fields put them: a link's own box
-//                 ("Delivery"), what isn't kosher, the davening times, the
-//                 items ("Main dishes"), a mikvah's sections. Dragged among
-//                 each other (board 4), saved as ListingParts.lead.
+//   the listing's own sections, where its fields put them: the davening
+//                 times, the items ("Main dishes"), a mikvah's sections.
 //   the admin's   the card it opens with, the boxes ("Who to call"), the
 //                 Shabbos card among them: named, moved, taken off, and
 //                 any field a card can show dropped into them
@@ -29,8 +24,14 @@ import { caveatTitle, isCertificateLink } from './listingView'
 //   About         the descriptions. Always there once there is one.
 //
 // Any field goes in any box (the user, Nov 10): a long text in Contact, a
-// phone in About, hours in "Who to call". A field that draws a whole box (the davening times, a list of items or
-// contacts, a link's own box) is a box, added from "+ Add a box".
+// phone in About, hours in "Who to call". A field that draws a whole box (the
+// davening times, a list of items or contacts) is a box, added from
+// "+ Add a box".
+//
+// A field stays in the box it's in (the user, Nov 10, round 3: "these
+// hidden rules do not work for me"). It lands in the box whose + Add a field
+// was clicked and moves only when dragged. A field with parts (a hechsher,
+// Delivery details: fieldParts.ts) is one row, and its parts go with it.
 //
 // Every box moves, anywhere between Top and "Not on the listing", and any
 // box can be taken off, its fields with it (the user, Nov 10: "Can't we
@@ -41,7 +42,7 @@ import { caveatTitle, isCertificateLink } from './listingView'
 // opened box's fields among the boxes (fieldItems), read back by readOrder.
 
 export type FieldBox = {
-  /** 'lead:<key>', 'caveat', 'main', 'minyanim', 'items',
+  /** 'main', 'minyanim', 'items',
    *  'audience:<flag>', 'box:<n>' (the admin's nth), 'shabbos',
    *  'contacts:<key>', 'contact', 'about', 'hidden'. */
   id: string
@@ -51,8 +52,8 @@ export type FieldBox = {
   kind: 'fixed' | 'listing' | 'admin'
   /** Every box but "Not on the listing". */
   moves: boolean
-  /** Which of the listing's own boxes before the admin's it is: a mikvah's
-   *  sections are one, its main thing, and move together. */
+  /** The listing's main thing, before the admin's boxes until moved: a
+   *  mikvah's sections are one, and move together. */
   lead?: LeadSlot
   /** Field keys, in the order the box shows them. */
   fields: string[]
@@ -63,7 +64,7 @@ export type FieldBox = {
 export type FieldPage = {
   fields: readonly CategoryField[]
   /** Kept with a field, not shown on their own (a hechsher's caveat flag
-   *  and note). */
+   *  and note: its parts). */
   hiddenFields?: readonly CategoryField[]
   hasAddress: boolean
   hasPhone: boolean
@@ -73,18 +74,12 @@ const isBadge = (f: CategoryField) => (f.renderAs ?? (f.type === 'boolean' ? 'ba
 
 /** Where a field goes when it's in none of the admin's boxes. */
 export function homeOf(f: CategoryField, page: FieldPage): string {
-  const all = [...page.fields, ...(page.hiddenFields ?? [])]
-  if (all.some((o) => o.caveat && (o.caveat.flagField === f.key || o.caveat.noteField === f.key))) return 'caveat'
+  // Another field's part goes where that field is, and isn't a row.
+  if (partKeys([...page.fields, ...(page.hiddenFields ?? [])]).has(f.key)) return 'part'
   if (f.renderAs === 'hidden') return 'hidden'
   if (f.audienceKey) return `audience:${f.audienceKey}`
-  // A link with its own box, and that box's words.
-  if (f.type === 'url' && f.leadBox) return `lead:${f.key}`
-  const lead = page.fields.find((o) => o.type === 'url' && o.leadBox?.text === f.key)
-  if (lead) return `lead:${lead.key}`
   // The place's photo is with its name.
   if (f.type === 'image') return 'name'
-  if (f.caveat) return 'caveat'
-  if (isCertificateLink(f)) return all.some((o) => o.caveat) ? 'caveat' : 'contact'
   if (f.type === 'minyanim') return 'minyanim'
   if (f.type === 'tags' && f.showCountInHeader) return 'items'
   if (f.type === 'contacts') return `contacts:${f.key}`
@@ -122,9 +117,10 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const shabbos = parts.shabbos ? own(parts.shabbos.fields) : null
 
   const homes = new Map<string, string[]>()
-  for (const f of [...fields, ...(page.hiddenFields ?? []).filter((h) => homeOf(h, page) === 'caveat')]) {
+  for (const f of fields) {
     if (placed.has(f.key)) continue
     const home = placedHome(f, page, parts)
+    if (home === 'part') continue
     homes.set(home, [...(homes.get(home) ?? []), f.key])
   }
   const listing = (id: string, title: string): FieldBox[] => {
@@ -135,18 +131,12 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
     [...homes.keys()].filter((id) => id.startsWith(prefix)).flatMap((id) => listing(id, title(id.slice(prefix.length))))
   const label = (key: string) => byKey.get(key)?.label ?? key
 
-  const slot = (lead: LeadSlot) => (b: FieldBox): FieldBox => ({ ...b, moves: true, lead })
-  const slots: Record<LeadSlot, FieldBox[]> = {
-    link: prefixed('lead:', (k) => byKey.get(k)?.leadBox?.title.trim() || label(k)).map(slot('link')),
-    caveat: listing('caveat', caveatTitle(fields)).map(slot('caveat')),
-    main: [
-      ...(main ? [{ id: 'main', title: parts.main!.title, kind: 'admin' as const, moves: false, fields: main }] : []),
-      ...listing('minyanim', 'Davening times'),
-      ...listing('items', label(homes.get('items')?.[0] ?? '')),
-      ...prefixed('audience:', (k) => byKey.get(k)?.filterLabel ?? label(k)),
-    ].map(slot('main')),
-  }
-  const before = (parts.lead ?? LEAD_SLOTS).flatMap((s) => slots[s])
+  const before: FieldBox[] = [
+    ...(main ? [{ id: 'main', title: parts.main!.title, kind: 'admin' as const, moves: false, fields: main }] : []),
+    ...listing('minyanim', 'Davening times'),
+    ...listing('items', label(homes.get('items')?.[0] ?? '')),
+    ...prefixed('audience:', (k) => byKey.get(k)?.filterLabel ?? label(k)),
+  ].map((b) => ({ ...b, moves: true, lead: 'main' }))
   // The admin's boxes, then lists of contacts in none, with the Shabbos card
   // after `after` of them, or after them all.
   const zone: FieldBox[] = [
@@ -197,30 +187,19 @@ export function boxRenames(box: FieldBox, page: FieldPage): boolean {
 export function boxName(page: FieldPage, box: FieldBox): { value: string; placeholder: string } {
   const field = page.fields.find((f) => f.key === renameListingBox(page, box.id, '')?.key)
   if (!field || box.kind === 'admin') return { value: box.title, placeholder: 'New box' }
-  if (box.id.startsWith('lead:')) return { value: field.leadBox?.title ?? '', placeholder: field.label }
-  if (box.id === 'caveat') return { value: field.caveat?.title ?? 'What isn’t kosher', placeholder: 'What isn’t kosher' }
   if (box.id.startsWith('audience:')) return { value: field.filterLabel ?? field.label, placeholder: field.label }
   return { value: field.label, placeholder: 'New box' }
 }
 
 /** Renaming a box the listing makes itself renames the field it's named by:
- *  a link's own box ("Delivery"), the items ("Main dishes"), a list of
- *  contacts, an audience's section, what isn't kosher. */
+ *  the items ("Main dishes"), a list of contacts, an audience's section. */
 export function renameListingBox(page: FieldPage, id: string, title: string): { key: string; patch: Partial<CategoryField> } | null {
   const field = (key: string) => page.fields.find((f) => f.key === key)
-  if (id.startsWith('lead:')) {
-    const f = field(id.slice(5))
-    return f?.leadBox ? { key: f.key, patch: { leadBox: { ...f.leadBox, title } } } : null
-  }
   if (id.startsWith('contacts:')) return field(id.slice(9)) ? { key: id.slice(9), patch: { label: title } } : null
   if (id.startsWith('audience:')) return field(id.slice(9)) ? { key: id.slice(9), patch: { filterLabel: title } } : null
   if (id === 'items') {
     const f = page.fields.find((o) => homeOf(o, page) === 'items')
     return f ? { key: f.key, patch: { label: title } } : null
-  }
-  if (id === 'caveat') {
-    const f = page.fields.find((o) => o.caveat)
-    return f ? { key: f.key, patch: { caveat: { ...f.caveat!, title } } } : null
   }
   return null
 }
@@ -251,8 +230,8 @@ function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
 }
 
 /** Where a field added from a box's "+ Add a field" lands: in that box
- *  ('here'), in a box it makes of its own ('own': a link's Delivery box, a
- *  list of items, the davening times), or in another of the boxes every
+ *  ('here'), in a box it makes of its own ('own': a list of items, the
+ *  davening times), or in another of the boxes every
  *  listing has ('elsewhere'), which the picker doesn't offer there. The
  *  user, Nov 9: "sometimes I'll click add a field under a specific box and
  *  it gets added under a different box." */
@@ -262,9 +241,9 @@ export function whereAdded(box: FieldBox, f: CategoryField, page: FieldPage): 'h
 }
 
 /** Whether a field is a box of its own: the davening times, a list of items
- *  or contacts, a link's own box, an audience's section, a hechsher's
- *  kosher box (its questions and link come with it). */
-export const makesBox = (f: CategoryField, page: FieldPage) => !!f.caveat || !['name', 'contact', 'about', 'hidden', 'caveat'].includes(homeOf(f, page))
+ *  or contacts, an audience's section. A hechsher isn't (Nov 10): it goes
+ *  in whichever box it's put in, its parts with it. */
+export const makesBox = (f: CategoryField, page: FieldPage) => !['name', 'contact', 'about', 'hidden', 'part'].includes(homeOf(f, page))
 
 /** A field made here, from a box's + Add a field: a row. In the filter and
  *  Under the name are its own switches. */

@@ -171,24 +171,31 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   Menu holding Main dishes). A listing's own sections that it draws as one (a mikvah's
   audience sections, the main thing) still render together, where the
   first of them is.
-- **Waiting on the user (Nov 10): round 3 boards E1b, E2, E3b** (canvas
-  Y4Cn6WNqe54xHQpYGY6dPH). A field stays in the box it's in, landing where
-  its + Add a field was clicked; Hechsher and Delivery become one field
-  each, their parts switches on its screen; the listing draws Hechsher's
-  note and Certificate button in whatever box holds it. The user said the
-  drawings are good (rows: no kind word, no part lines, no choices under
-  Main dishes) but hasn't said to build. Held for now, the user's call:
-  boards A and E1b draw every box open, while the built Fields folds them
-  (one opens at a time), and no board shows a box's trash can (built: on
-  the opened box's + Add a field line).
+- **A field stays where it's put; a field with parts is one field**
+  (the user, Nov 10, round 3 boards E1b, E2, E3b, canvas
+  Y4Cn6WNqe54xHQpYGY6dPH; "let's build"). Built: no hidden rules move a
+  field. Hechsher and Delivery Details are one field each: the hechsher's
+  "Everything here is kosher?", what isn't, and its certificate link, and
+  Delivery's WhatsApp group, are parts (`src/lib/fieldParts.ts`), never
+  rows, and go wherever the field goes, in the admin list, the editor, the
+  listing and How it looks. The "What isn't kosher" and "Delivery" boxes
+  are gone; an unboxed hechsher sits in Contact, Delivery Details in
+  About. The listing draws the hechsher with its amber note and
+  Certificate button in whatever box holds it (Certificate is no longer
+  in the action row), and no caveat line under the header. Times and
+  items now outrank admin boxes as a listing's main thing, and box fields
+  respect show-if. Food on dev was converted to boxes Kosher (hechsher,
+  Food Type) and Delivery. **Food on the live site needs the same
+  conversion, after this deploys** (dry run shown; needs the user's
+  go-ahead, then revalidate). Still held, the user's call: boxes fold in
+  the built Fields (one open at a time) while the boards draw them open,
+  and no board shows a box's trash can.
 - **No Top** (the user, Nov 10, board A; "Yes, build it"). Fields lists
   only boxes and fields. A field's own Under the name switch puts it under
   the name, and a listing (an eruv's too) shows it only there, not again
   in its box (its row in admin says "Under the name").
   The photo goes with the name and isn't listed (its switch is in "Before
-  it's opened"). A hechsher and its certificate link are in the kosher
-  box ("What isn't kosher"), or in Contact once its questions are off; a
-  hechsher added from any box's + Add a field makes that box. A filter or
+  it's opened"). (Round 3 replaced how the hechsher is placed: see above.) A filter or
   short line that used to be Top's lands in Contact, and any box offers
   it. Not drawn on board 1b and still on the page: "Within a walk" and
   "Before it's opened".

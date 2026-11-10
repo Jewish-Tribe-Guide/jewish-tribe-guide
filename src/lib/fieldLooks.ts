@@ -4,6 +4,7 @@ import { listingRowFacts, type RowFact, type RowFactTone } from './listingRow'
 import { lineChoices, onThirdLine, underName } from './cardLines'
 import { isCertificateLink, kindField, listingActions, listingFacts, listingKind } from './listingView'
 import { fieldBoxes } from './fieldBoxes'
+import { ownerOfPart } from './fieldParts'
 import { parseListingParts } from './listingParts'
 import { editorRows } from './editorRows'
 import { formatHoursSummary, type StructuredHours } from './hours'
@@ -245,6 +246,15 @@ export type ListingLook =
 
 /** The field on the opened listing. */
 export function listingLook(category: CategoryConfig, field: CategoryField, item: DirectoryResource): ListingLook {
+  // A field's part (a hechsher's question or certificate, Delivery's group)
+  // is in its field's box, said with it (the user, Nov 10).
+  const owner = ownerOfPart(field.key, category.detailFields)
+  if (owner) {
+    const box = listingBoxes(category).find((b) => b.fields.includes(owner.key))
+    if (!box) return { at: 'none' }
+    const others = listingBoxes(category).filter((b) => b !== box && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
+    return { at: 'box', title: box.title, label: field.label, text: field.type === 'url' && field.linkLabel ? field.linkLabel : answerText(field, item[field.key]), others }
+  }
   if (field.renderAs === 'hidden') return { at: 'none' }
   const [restCategory, restItem] = without(category, item, field.key)
   const text = answerText(field, item[field.key])
@@ -256,12 +266,11 @@ export function listingLook(category: CategoryConfig, field: CategoryField, item
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null && answerText(f, item[f.key]))
   if (tagline?.key === field.key) return { at: 'tagline', text }
   // The listing's boxes as the editor's Fields box lays them out
-  // (fieldBoxes.ts): a link's own box (Delivery), What isn't kosher, the
-  // admin's boxes, Contact, About.
+  // (fieldBoxes.ts): the main thing, the admin's boxes, Contact, About.
   const boxes = listingBoxes(category)
   const box = boxes.find((b) => b.fields.includes(field.key))
-  // Up in the header: the photo, a certificate's button.
-  if (!box || field.type === 'image' || isCertificateLink(field)) return { at: 'tagline', text: text || field.label }
+  // Up in the header: the photo.
+  if (!box || field.type === 'image') return { at: 'tagline', text: text || field.label }
   const others = boxes.filter((b) => b !== box && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
   const inBox = box.fields.length + (box.basics?.length ?? 0) > 1
   return { at: 'box', title: box.title, label: inBox ? field.label : null, text: field.type === 'url' && field.linkLabel ? field.linkLabel : text, others }
@@ -322,10 +331,7 @@ export function listingScreen(category: CategoryConfig, field: CategoryField, it
   const byKey = new Map(category.detailFields.map((f) => [f.key, f]))
   const boxes = listingBoxes(category)
     .flatMap((b): ListingScreen['boxes'] => {
-      const mine = look.at === 'box' && b.fields.includes(field.key)
-      // What isn't kosher shows on a place where not everything is; the
-      // made-up place says everything is.
-      if (b.id === 'caveat' && !mine) return []
+      const mine = look.at === 'box' && b.fields.includes(ownerOfPart(field.key, category.detailFields)?.key ?? field.key)
       if (mine && look.at === 'box') return [{ title: b.title, lines: [look.text || 'A photo'], mine, label: look.label }]
       const lines = [
         ...(b.basics ?? []).flatMap((basic) => (basic === 'phone' && item.phone ? [formatPhone(item.phone)] : [])),

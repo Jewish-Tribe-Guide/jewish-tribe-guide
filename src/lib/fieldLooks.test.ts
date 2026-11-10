@@ -48,11 +48,13 @@ describe('fieldLooks: a field on a made-up place', () => {
       { text: 'Keystone-K', mine: false },
     ])
     expect(listingLook(page, delivery, item)).toMatchObject({ at: 'box', title: 'About', label: null })
-    // A link's own box, and its words (Food's Delivery).
+    // Delivery's group is its part: in whatever box Delivery is (Nov 10).
     const group: CategoryField = { key: 'group', label: 'Delivery WhatsApp Group', type: 'url', linkLabel: 'Join WhatsApp Group', leadBox: { title: 'Delivery', text: 'delivery' } }
     const withGroup = food([foodType, group, delivery, hours])
-    expect(listingLook(withGroup, delivery, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery', label: 'Delivery Details' })
-    expect(listingLook(withGroup, group, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery', text: 'Join WhatsApp Group' })
+    expect(listingLook(withGroup, delivery, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'About' })
+    expect(listingLook(withGroup, group, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'About', text: 'Join WhatsApp Group' })
+    const boxed = { ...withGroup, listingParts: { boxes: [{ title: 'Delivery', fields: ['delivery'] }] } }
+    expect(listingLook(boxed, group, madeUpPlace(boxed, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery' })
     expect(listingLook(page, hours, item)).toMatchObject({ at: 'box', title: 'Contact', label: 'Hours' })
     expect(listingLook(page, { ...delivery, renderAs: 'hidden' }, item)).toEqual({ at: 'none' })
   })
@@ -109,14 +111,14 @@ describe('fieldLooks: a field on a made-up place', () => {
     expect(about).toMatchObject({ title: 'About', lines: [expect.stringContaining('Orders by Wednesday')] })
   })
 
-  it('leaves out What isn’t kosher on a place where everything is', () => {
+  it('has no What isn’t kosher box: its question is the hechsher’s, in the hechsher’s box', () => {
     const flag: CategoryField = { key: 'all_kosher', label: 'Everything here is kosher', type: 'boolean' }
     const note: CategoryField = { key: 'not_kosher', label: 'What isn’t kosher?', type: 'textarea' }
     const cert: CategoryField = { ...hechsher, caveat: { flagField: 'all_kosher', noteField: 'not_kosher' } }
     const kosher = food([foodType, cert, flag, note])
     const place = madeUpPlace(kosher, 'A place')
     expect(listingScreen(kosher, foodType, place).boxes.map((b) => b.title)).not.toContain('What isn’t kosher')
-    expect(listingScreen(kosher, note, place).boxes.find((b) => b.mine)?.title).toBe('What isn’t kosher')
+    expect(listingScreen(kosher, note, place).boxes.find((b) => b.mine)?.title).toBe('Contact')
   })
 
   it('puts Open now first in Filters, then the page’s filters in order', () => {

@@ -15,7 +15,7 @@ import { useOptionalLocation } from '@/lib/locationContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { formatPhone } from '@/lib/validation'
-import { candlesToday, initialsOf, listingRowFacts, listingRowNote, type RowFact } from '@/lib/listingRow'
+import { candlesToday, initialsOf, listingRowFacts, type RowFact } from '@/lib/listingRow'
 import {
   audienceGroups,
   audienceStatus,
@@ -32,8 +32,6 @@ import {
   listingDistance,
   listingFacts,
   listingKind,
-  leadBox,
-  caveatTitle,
   mainThing,
   nearbyListings,
   primaryLink,
@@ -42,7 +40,7 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { arrange, boxesOf, boxOrderOf, fixedPlaceOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { arrange, boxesOf, boxOrderOf, fixedPlaceOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -76,7 +74,8 @@ import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
-import { FieldsBox, fieldText } from './FieldsBox'
+import { FieldWithParts, FieldsBox, fieldOrPartsFilled, fieldText, joinText } from './FieldsBox'
+import { hasParts, partKeys } from '@/lib/fieldParts'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
@@ -220,14 +219,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   const distance = listingDistance(item, community.region)
   const kindLine = [listingKind(item, category), category.hasAddress === false ? null : place].filter(Boolean).join(' · ')
   const facts = listingFacts(item, category)
-  const note = listingRowNote(item, category, now, { shulNote: shul?.note })
-  const caveat = note?.kind === 'exception' && note.tone === 'caution' ? note : null
-  // Food: what isn't kosher is its own box, first after the buttons (the
-  // user's note 9, agreed Oct 10): the one fact that does harm if missed.
-  // Said there in full, so not again under the name or in the details. A
-  // grocery's items are kosher items in a regular store: it stays as it was.
+  // What isn't kosher is said with the hechsher, in whichever box the admin
+  // put it (the user, Nov 10: a field with parts is one field), not as a
+  // box or a line of its own.
   const isFood = !!itemsF && itemWording(itemsF).noun === 'dish'
-  const caveatFirst = !!caveat && isFood
   // A short description the admin put in the row ("Sit-down glatt kosher
   // steakhouse"): one line, under the header.
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null && String(item[f.key] ?? '').trim())
@@ -309,13 +304,6 @@ export default function ListingView({ item, category, color, place = null, upvot
           {facts.length > 0 && !factsWithStatus && (
             <p className="mt-1 text-[14.5px] font-bold text-slate-900" data-testid="listing-facts">
               {facts.join(' · ')}
-            </p>
-          )}
-          {/* The warning alone, on one line: it decides the visit. What
-              isn't kosher is said in full in the details. */}
-          {caveat && !caveatFirst && (
-            <p className="mt-1 text-sm font-semibold text-caution" data-testid="listing-caveat">
-              {caveat.text}
             </p>
           )}
           {tagline && isFood && taglineText}
@@ -401,42 +389,6 @@ export default function ListingView({ item, category, color, place = null, upvot
     </div>
   )
 
-  // A place that comes to you (a delivery, board B, Oct 27): the admin's
-  // leadBox on a link, its own box right under the buttons, what it says
-  // and the link as one wide button. Dated on its own.
-  const lead = leadBox(item, category)
-  const leadKey = lead && (lead.text ?? lead.field).key
-  const leadBoxView = lead && (
-    <Card
-      testId="listing-lead-box"
-      title={lead.title}
-      footer={<FreshnessFooter resourceId={item.id} {...boxDate(item, leadKey!)} section={leadKey!} onEdit={editBox ? () => editBox({ title: lead.title, fields: lead.text ? [lead.text, lead.field] : [lead.field] }) : undefined} />}
-    >
-      {lead.text && <p className="whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
-      {lead.href && (
-        <a
-          href={lead.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => track('listing_action', { action: lead.field.linkLabel ?? lead.field.label })}
-          className={`mt-3 mb-1 flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-[15.5px] font-bold text-white transition-colors sm:max-w-sm ${
-            isWhatsAppLink(lead.href) ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-primary hover:bg-primary-dark'
-          }`}
-        >
-          {isWhatsAppLink(lead.href) ? <JoinIcon className="h-5 w-5" /> : <GlobeIcon className="h-5 w-5" />}
-          {joinLabel(lead.field, category, lead.href)}
-        </a>
-      )}
-    </Card>
-  )
-
-  const caveatBox = caveatFirst && (
-    <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
-      <h2 className="text-base font-extrabold text-caution">{caveatTitle(category.detailFields)}</h2>
-      <p className="mt-0.5 text-[15px] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
-    </section>
-  )
-
   // ── 3 · The main thing ─────────────────────────────────────────────────
   let mainSection: ReactNode = null
   const named = main === 'section' ? mainCardOf(category) : null
@@ -507,6 +459,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         item={item}
         title={b.title}
         fields={b.fields}
+        allFields={category.detailFields}
         footer={dated ? <FreshnessFooter resourceId={item.id} {...boxDate(item, key)} section={key} onEdit={edit} /> : undefined}
         onEdit={dated ? undefined : edit}
       />
@@ -537,7 +490,8 @@ export default function ListingView({ item, category, color, place = null, upvot
     ...(shabbosFields ?? []).map((f) => f.key),
     ...joinAbout.map((f) => f.key),
     ...(join ? [join.field.key] : []),
-    ...(lead ? [lead.field.key, ...(lead.text ? [lead.text.key] : [])] : []),
+    // A field's parts are said with it (FieldWithParts).
+    ...partKeys(category.detailFields),
     ...buttons.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
     ...extra.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
   ])
@@ -547,17 +501,30 @@ export default function ListingView({ item, category, color, place = null, upvot
   // Contact; its button under the name stays.
   const aboutLink = (a: ActionSpec) => (a.kind === 'link' || a.kind === 'email') && inAbout(a.field) && !placed.has(a.field.key)
   for (const a of [...buttons, ...extra]) if (aboutLink(a)) shownElsewhere.delete((a as { field: CategoryField }).field.key)
+  const withParts = (f: CategoryField) => hasParts(f, category.detailFields)
   const aboutFields = category.detailFields.filter(
     (f) =>
       ((f.type === 'textarea' && fixedPlace(f.key) !== 'contact') || inAbout(f)) &&
       f.renderAs !== 'hidden' &&
       !f.audienceKey &&
       !shownElsewhere.has(f.key) &&
-      fieldText(f, item[f.key]),
+      (withParts(f) ? fieldOrPartsFilled(f, item, category.detailFields) : fieldText(f, item[f.key])),
+  )
+  // A field with parts left in Contact (a hechsher, until it's put in a box
+  // of its own): said there whole.
+  const contactBlocks = category.detailFields.filter(
+    (f) =>
+      withParts(f) &&
+      !f.audienceKey &&
+      !inAbout(f) &&
+      !shownElsewhere.has(f.key) &&
+      (f.type !== 'textarea' || fixedPlace(f.key) === 'contact') &&
+      fieldOrPartsFilled(f, item, category.detailFields),
   )
   const contactExtra = extra.filter((a) => !aboutLink(a))
   const detailFields = category.detailFields.filter(
     (f) =>
+      !withParts(f) &&
       (f.type === 'text' || f.type === 'tel' || f.type === 'number' || (f.type === 'textarea' && fixedPlace(f.key) === 'contact')) &&
       !f.audienceKey &&
       !inAbout(f) &&
@@ -571,6 +538,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       (f.type === 'boolean' || f.type === 'select') &&
       (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge' &&
       !f.filterable &&
+      !withParts(f) &&
       !inAbout(f) &&
       !placed.has(f.key) &&
       (f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0),
@@ -590,7 +558,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const editDetails = editRows(otherHours.length > 0 ? 'Contact and hours' : contactTitle, [
     'contact',
     ...otherHours.map((f) => (rowIds.has(`hours:${f.key}`) ? `hours:${f.key}` : 'hours')),
-    ...(quietBadges.length > 0 || (caveat?.title && !caveatFirst) ? ['facts'] : []),
+    ...(quietBadges.length > 0 || contactBlocks.some((f) => f.caveat) ? ['facts'] : []),
     ...otherTags.map((f) => `field:${f.key}`),
   ])
   // Its foot: Google's date when the sync keeps it; otherwise, where it
@@ -604,15 +572,9 @@ export default function ListingView({ item, category, color, place = null, upvot
   ) : contactDated ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
   ) : undefined
-  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = (contactBlocks.length > 0 || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
     <div className="divide-y divide-slate-100">
-      {caveat?.title && !caveatFirst && (
-        <Row>
-          <span className="block text-[13px] font-semibold text-caution">{caveatTitle(category.detailFields)}</span>
-          <span className="text-caution" data-testid="listing-caveat-note">{caveat.title}</span>
-        </Row>
-      )}
       {showAddress && (
         // The address alone (Oct 6): how far is in the line under the name
         // already, and here it read as a second, duller copy of it.
@@ -669,6 +631,12 @@ export default function ListingView({ item, category, color, place = null, upvot
           )}
         </Row>
       ))}
+      {contactBlocks.map((f) => (
+        <Row key={f.key}>
+          {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
+          <FieldWithParts field={f} item={item} fields={category.detailFields} onAction={(action) => track('listing_action', { action })} />
+        </Row>
+      ))}
       {quietBadges.length > 0 && (
         <Row>
           {quietBadges
@@ -710,7 +678,11 @@ export default function ListingView({ item, category, color, place = null, upvot
     <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) =>
-          f.type === 'textarea' ? (
+          withParts(f) ? (
+            <div key={f.key}>
+              <FieldWithParts field={f} item={item} fields={category.detailFields} onAction={(action) => track('listing_action', { action })} />
+            </div>
+          ) : f.type === 'textarea' ? (
             <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
           ) : (
             // Put in About by the admin: its name over what it says.
@@ -772,7 +744,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const order = boxOrderOf(category)
   if (order) {
     const usual: { id: string; node: ReactNode }[] = [
-      ...leadOrderOf(category).map((slot) => ({ id: slot === 'link' ? 'lead' : slot, node: slot === 'link' ? leadBoxView : slot === 'caveat' ? caveatBox : mainSection })),
+      { id: 'main', node: mainSection },
       ...boxDefs.map((b, n) => ({ id: b.id, node: boxes[n] })),
       { id: 'walks', node: walks },
       { id: 'shabbos', node: shabbosFirst ? null : shabbos },
@@ -781,8 +753,8 @@ export default function ListingView({ item, category, color, place = null, upvot
       { id: 'about', node: about },
     ]
     // The admin's list has a box for each of the listing's own sections that
-    // the listing draws as one: a link's box, its main thing.
-    const tokens = order.map((t) => (t.startsWith('lead:') ? 'lead' : t === 'minyanim' || t === 'items' || t.startsWith('audience:') ? 'main' : t))
+    // the listing draws as one, its main thing.
+    const tokens = order.map((t) => (t === 'minyanim' || t === 'items' || t.startsWith('audience:') ? 'main' : t))
     const placed = arrange(usual, tokens)
     if (shabbosFirst && shabbos) placed.splice(placed.findIndex((p) => p.id === 'main') + 1, 0, { id: 'shabbos-first', node: shabbos })
     arranged = placed.map((p) => <Fragment key={p.id}>{p.node}</Fragment>)
@@ -796,11 +768,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {actions}
       {arranged ?? (
         <>
-      {/* A link's own box, what isn't kosher and the main thing, in the
-          order the admin put them (ListingParts.lead). */}
-      {leadOrderOf(category).map((slot) => (
-        <Fragment key={slot}>{slot === 'link' ? leadBoxView : slot === 'caveat' ? caveatBox : mainSection}</Fragment>
-      ))}
+      {mainSection}
       {shabbosFirst && shabbos}
       {boxesAndShabbos}
       {/* A hotel's walk list is its main thing; anywhere else, the places
@@ -922,22 +890,12 @@ function hasAny(v: unknown): boolean {
 }
 
 const isWhatsApp = (category: CategoryConfig) => /whatsapp/i.test(category.label)
-const isWhatsAppLink = (href: string) => /^https?:\/\/(chat\.)?whatsapp\.com\//i.test(href)
-
 /** The one link's button: "Join the group" for a WhatsApp group (one line
  *  on a phone, under "WhatsApp Group"); "Visit tribe12.org" for a website
  *  (Oct 6: a network's listing is its site, and "Website" in WhatsApp green
  *  read as a group); otherwise what the admin called it. A WhatsApp link
  *  is a group anywhere (a delivery's, board B). */
-function joinLabel(field: CategoryField, category: CategoryConfig, href: string): string {
-  const label = field.linkLabel ?? field.label
-  if ((isWhatsApp(category) || isWhatsAppLink(href)) && /^join/i.test(label)) return 'Join the group'
-  if (/website/i.test(label)) {
-    const site = siteName(href)
-    return site ? `Visit ${site}` : label
-  }
-  return label
-}
+const joinLabel = (field: CategoryField, category: CategoryConfig, href: string) => joinText(field, href, isWhatsApp(category))
 
 function actionKey(a: ActionSpec): string {
   return a.kind === 'link' || a.kind === 'email' ? `${a.kind}:${a.field.key}` : a.kind
