@@ -1351,6 +1351,40 @@ describe('CategoryEditor — renaming the listing’s own boxes', () => {
     expect(body.listingParts.boxes).toEqual([{ title: 'Main dishes', fields: ['dishes', 'parking'] }])
   })
 
+  // The user, Nov 10: "I added davening times under one box and then
+  // deleted it, made a new box and then tried to add it to that box and it
+  // went to the old box". The field taken off stayed named in its box, and
+  // the same field added again, under the same key, was put back there.
+  it('puts a field taken off and added again in the box it’s added to, not the one it was in', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={[food]} onSaved={onSaved} onCancel={vi.fn()} />)
+    const shul = { community: 'other', category: baseCategory({ id: 'synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Davening times', type: 'minyanim' }] }) }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [shul] }))))
+    const addDavening = async (box: string) => {
+      await addBoxNamed(user, box)
+      await user.click(addField())
+      await user.click(await screen.findByRole('button', { name: /^Davening times/ }))
+      await user.click(await screen.findByRole('button', { name: /^Add to / }))
+      await screen.findByRole('heading', { name: 'Food' })
+    }
+    // The admin's boxes come after Contact; their names are text boxes.
+    const added = () => boxesShown().slice(4).map(([, rows]) => rows)
+    await addDavening('Box A')
+    expect(added()).toEqual([['Davening times']])
+    await user.click(screen.getByRole('button', { name: /^Davening times/ }))
+    await user.click(await screen.findByRole('button', { name: 'Remove from Food' }))
+    await screen.findByRole('heading', { name: 'Food' })
+    expect(added()).toEqual([[]])
+    await addDavening('Box B')
+    expect(added()).toEqual([[], ['Davening times']])
+    await user.click(screen.getByRole('button', { name: 'Take Box A off' }))
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body)
+    expect(body.listingParts.boxes.map((b: { title: string; fields: string[] }) => [b.title, b.fields])).toEqual([['Box B', ['minyanim']]])
+  })
+
   // The user, Nov 10: "I clicked add a field under the delivery details box
   // and then chose davening times and the preview in that field didn't
   // show the davening times under the delivery details box."

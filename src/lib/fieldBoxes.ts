@@ -527,13 +527,44 @@ export function renameBox(parts: ListingParts, id: string, title: string): Listi
 /** A field added from a box's own "+ Add a field" goes in that box: one of
  *  the admin's, or Contact or About, by name. Taken out of any other. */
 export function addToBox(parts: ListingParts, id: string, key: string): ListingParts {
-  const put = (fields: string[]) => (fields.includes(key) ? fields : [...fields, key])
-  if (id === 'contact' || id === 'about') return putInPlace(parts, key, id)
-  if (id === 'main' && parts.main) return { ...parts, main: { ...parts.main, fields: put(parts.main.fields) } }
-  if (id === 'shabbos' && parts.shabbos) return { ...parts, shabbos: { ...parts.shabbos, fields: put(parts.shabbos.fields) } }
-  if (!id.startsWith('box:')) return parts
+  const out = dropKey(parts, key)
+  const put = (fields: string[]) => [...fields, key]
+  if (id === 'contact' || id === 'about') return putInPlace(out, key, id)
+  if (id === 'main' && out.main) return { ...out, main: { ...out.main, fields: put(out.main.fields) } }
+  if (id === 'shabbos' && out.shabbos) return { ...out, shabbos: { ...out.shabbos, fields: put(out.shabbos.fields) } }
+  if (!id.startsWith('box:')) return out
   const n = Number(id.slice(4))
-  return { ...parts, boxes: (parts.boxes ?? []).map((b, i) => (i === n ? { ...b, fields: put(b.fields) } : b)) }
+  return { ...out, boxes: (out.boxes ?? []).map((b, i) => (i === n ? { ...b, fields: put(b.fields) } : b)) }
+}
+
+/** A field's key out of every box and place. */
+function dropKey(parts: ListingParts, key: string): ListingParts {
+  const drop = (fields: string[]) => fields.filter((k) => k !== key)
+  const out: ListingParts = {
+    ...parts,
+    ...(parts.main && { main: { ...parts.main, fields: drop(parts.main.fields) } }),
+    ...(parts.shabbos && { shabbos: { ...parts.shabbos, fields: drop(parts.shabbos.fields) } }),
+    ...(parts.boxes && { boxes: parts.boxes.map((b) => ({ ...b, fields: drop(b.fields) })) }),
+  }
+  for (const p of FIXED_PLACES) {
+    const fields = drop(parts[p] ?? [])
+    if (fields.length) out[p] = fields
+    else delete out[p]
+  }
+  return out
+}
+
+/** A field taken off the page (its `key`, or `#i` for one not named yet):
+ *  out of every box, so a field added later under the same key lands
+ *  where it's added, not in the box this one was in (the user, Nov 10:
+ *  "made a new box and then tried to add it to that box and it went to the
+ *  old box"). The boxes keep, empty, for the admin to fill or take off.
+ *  Fields not named yet after it move up one place, as their `#` keys do. */
+export function removeFieldKey(parts: ListingParts, key: string): ListingParts {
+  const out = dropKey(parts, key)
+  if (!key.startsWith('#')) return out
+  const at = Number(key.slice(1))
+  return renameKeys(out, (k) => (k.startsWith('#') && Number(k.slice(1)) > at ? `#${Number(k.slice(1)) - 1}` : k))
 }
 
 /** Whether a box takes the address and phone: Contact, About, the admin's
@@ -579,7 +610,11 @@ function putInPlace(parts: ListingParts, key: string, place: FixedPlace | null):
 
 /** A field's key changed (its name, typed): the boxes follow it. */
 export function renameKey(parts: ListingParts, from: string, to: string): ListingParts {
-  const swap = (fields: string[]) => fields.map((k) => (k === from ? to : k))
+  return renameKeys(parts, (k) => (k === from ? to : k))
+}
+
+function renameKeys(parts: ListingParts, rename: (key: string) => string): ListingParts {
+  const swap = (fields: string[]) => fields.map(rename)
   return {
     ...parts,
     ...(parts.main && { main: { ...parts.main, fields: swap(parts.main.fields) } }),

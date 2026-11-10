@@ -113,6 +113,27 @@ The user's answers on Nov 10, evening, and what was done with them:
       inside that box's section (proposed fix, waiting on the user).
     - **A box's X is at the end of its name bar**, not a trash can on its
       + Add a field line (405aacd9).
+    - **Three Fields bugs fixed** (the user's report, Nov 10):
+      - A field taken off and added again went back into the box it had
+        been in, not the one it was added from: taking a field off left
+        its name in that box. Now a field taken off leaves every box (the
+        box stays, empty), and a field added to a box is taken out of any
+        other.
+      - Dragging a field down didn't scroll the page, so a box below the
+        window couldn't be reached. A row held near the top or bottom of
+        the window now scrolls the page that way (faster nearer the edge,
+        the bottom's zone taller for the Save bar), and only the way the
+        row is being taken. Every drag list in admin has it (Home page
+        too).
+      - A box with nothing in it (or no name) seemed to save. Save
+        dropped it without a word, and left its place in the saved order
+        behind, which could shift the boxes after it. Save now stops and
+        says "“Box A” has nothing in it. Add a field or take the box off."
+      - **Waiting on the user**: whether a box's X should go once it has
+        fields (taking the last field off then removes the box, or brings
+        the X back), and whether Home page's "+ Add a tab" and Within a
+        walk's "+ Add a page" should look like "+ Add a box". Questions so
+        far, not decisions.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

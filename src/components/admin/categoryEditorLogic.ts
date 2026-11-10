@@ -12,7 +12,7 @@ import { slugRejectionReason } from '@/lib/routes'
 import { groupByKey, parseGroupBy } from '@/lib/listGroups'
 import { parseQuestionCard, questionCardKey } from '@/lib/questionCards'
 import { parseWalkLists, walkListKey } from '@/lib/walkList'
-import { listingPartsKey, parseListingParts } from '@/lib/listingParts'
+import { listingPartsFromKey, listingPartsKey, parseListingParts } from '@/lib/listingParts'
 import { placeKindFromSlug, type PlaceKind } from '@/lib/placeKinds'
 
 // ── Pure logic behind CategoryEditor — draft shape, template/field
@@ -281,6 +281,13 @@ export function validateDraft(draft: Draft): string[] {
     if (f.type === 'tags' && f.fixedVocabulary && !(f.options && f.options.length > 0))
       errs.push(`Detail ${n} (“${f.label || 'unnamed'}”): a fixed-list Tags field needs at least one tag.`)
   })
+  // A box with no name or nothing in it isn't one the listing can show:
+  // said, not dropped on the way to the database (the user, Nov 10: "I was
+  // able to save a box with no fields").
+  for (const b of listingPartsFromKey(draft.listingParts).boxes ?? []) {
+    if (!b.title.trim()) errs.push('A box needs a name.')
+    else if (!b.fields.length) errs.push(`“${b.title.trim()}” has nothing in it. Add a field or take the box off.`)
+  }
   return errs
 }
 

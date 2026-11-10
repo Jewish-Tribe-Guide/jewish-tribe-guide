@@ -7,7 +7,7 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
-import { addToBox, madeField, renameKey } from '@/lib/fieldBoxes'
+import { addToBox, madeField, removeFieldKey, renameKey } from '@/lib/fieldBoxes'
 import { fieldRules } from '@/lib/fieldAbout'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT, kosherQuestions } from '@/lib/kosherQuestions'
@@ -156,8 +156,14 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     return draft.fields.length
   }
 
+  // Out of its box too, so one added later under its key isn't put back
+  // where this one was (removeFieldKey).
   function removeField(i: number) {
-    setDraft((d) => ({ ...d, fields: d.fields.filter((_, idx) => idx !== i) }))
+    setDraft((d) => ({
+      ...d,
+      fields: d.fields.filter((_, idx) => idx !== i),
+      listingParts: listingPartsKey(removeFieldKey(listingPartsFromKey(d.listingParts), d.fields[i]?.key || `#${i}`)),
+    }))
   }
 
   // Adds a standard Phone/Email/Hours/Notes set in one action, each tagged

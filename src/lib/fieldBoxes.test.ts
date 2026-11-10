@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, placeBasic, readOrder, removeBox, renameKey, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, ownBox, placeBasic, readOrder, removeBox, removeFieldKey, renameKey, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -491,6 +491,20 @@ describe('what a box’s + Add a field offers', () => {
     expect(addToBox({}, 'about', 'phone2')).toEqual({ about: ['phone2'] })
     expect(addToBox({ about: ['phone2'] }, 'contact', 'phone2')).toEqual({ contact: ['phone2'] })
     expect(renameKey({ contact: ['#3'] }, '#3', 'notes')).toEqual({ contact: ['notes'] })
+  })
+
+  it('puts one added to a box there and out of every other box', () => {
+    const parts = { boxes: [{ title: 'A', fields: ['minyanim'] }, { title: 'B', fields: [] }], about: ['minyanim'] }
+    expect(addToBox(parts, 'box:1', 'minyanim')).toEqual({ boxes: [{ title: 'A', fields: [] }, { title: 'B', fields: ['minyanim'] }] })
+  })
+
+  // The user, Nov 10: a field taken off and added again went back to the
+  // box it had been in.
+  it('takes a field taken off the page out of every box, its box kept', () => {
+    const parts = { boxes: [{ title: 'A', fields: ['minyanim', 'notes'] }], shabbos: { fields: ['minyanim'] }, contact: ['minyanim'] }
+    expect(removeFieldKey(parts, 'minyanim')).toEqual({ boxes: [{ title: 'A', fields: ['notes'] }], shabbos: { fields: [] } })
+    // One not named yet goes by its place; those after it move up one.
+    expect(removeFieldKey({ boxes: [{ title: 'A', fields: ['#1', '#2', '#4'] }] }, '#2')).toEqual({ boxes: [{ title: 'A', fields: ['#1', '#3'] }] })
   })
 
   it('takes into an admin’s box what a box can show', () => {

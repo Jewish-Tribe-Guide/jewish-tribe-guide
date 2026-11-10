@@ -224,6 +224,15 @@ describe('validateDraft', () => {
     expect(validateDraft(baseDraft({ pluralLabel: '' }))).toContain('Category name is required.')
   })
 
+  // The user, Nov 10: "I was able to save a box with no fields". The save
+  // dropped it without a word, and left its place in the order behind.
+  it('stops a box with nothing in it, or no name, from saving', () => {
+    const parts = (boxes: { title: string; fields: string[] }[]) => baseDraft({ pluralLabel: 'Groceries', id: 'grocery', listingParts: JSON.stringify({ boxes }) })
+    expect(validateDraft(parts([{ title: 'Box A', fields: [] }]))).toContain('“Box A” has nothing in it. Add a field or take the box off.')
+    expect(validateDraft(parts([{ title: ' ', fields: ['notes'] }]))).toContain('A box needs a name.')
+    expect(validateDraft(parts([{ title: 'Call us', fields: ['@phone'] }]))).toEqual([])
+  })
+
   it('requires every detail to have a name', () => {
     const errs = validateDraft(baseDraft({ pluralLabel: 'Groceries', fields: [field({ key: '', label: '' })] }))
     expect(errs).toContain('Detail 1: needs a name.')

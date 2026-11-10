@@ -18,6 +18,24 @@ import { Chevron } from './AdminUI'
 const HOLD_MS = 450
 /** Further than this and the finger is scrolling, not holding. */
 const HOLD_SLOP = 8
+/** A row held this near the top or bottom of the window scrolls the page
+ *  (the user, Nov 10: "The screen didn't drag down as I was moving the
+ *  field down"); the bottom's is taller, for the Save bar over it. */
+const EDGE_TOP = 64
+const EDGE_BOTTOM = 112
+/** The most the page scrolls in a frame, at the very edge. */
+const EDGE_SPEED = 18
+
+/** How far the page scrolls this frame for a pointer at `clientY` in a
+ *  window `height` tall, lifted at `startY`: none away from the edges,
+ *  faster nearer them, and only the way the row is being taken (one lifted
+ *  near an edge and taken the other way doesn't scroll). */
+export function edgeScroll(clientY: number, height: number, startY: number): number {
+  if (clientY < EDGE_TOP && clientY < startY) return -Math.ceil(EDGE_SPEED * Math.min(1, (EDGE_TOP - clientY) / EDGE_TOP))
+  const from = height - EDGE_BOTTOM
+  if (clientY > from && clientY > startY) return Math.ceil(EDGE_SPEED * Math.min(1, (clientY - from) / EDGE_BOTTOM))
+  return 0
+}
 
 const GRIP = (
   <svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor" aria-hidden="true">
@@ -33,6 +51,11 @@ const GRIP = (
 type Drag = {
   key: string
   pointerId: number
+  /** Where the pointer is, and how far the drag has scrolled the page:
+   *  the row follows both. Only its own scrolling: the browser moving the
+   *  page as rows reflow above isn't the row moving. */
+  clientY: number
+  scrolled: number
   startY: number
   startTop: number
   dy: number
@@ -140,7 +163,7 @@ export default function DragList<T>({
     function begin(key: string, pointerId: number, clientY: number) {
       const el = els.current.get(key)
       if (!el || dragRef.current) return
-      const d: Drag = { key, pointerId, startY: clientY, startTop: el.offsetTop, dy: 0, moved: false }
+      const d: Drag = { key, pointerId, clientY, scrolled: 0, startY: clientY, startTop: el.offsetTop, dy: 0, moved: false }
       const { items: all, keyOf: keyOfItem, dropEdge: edgeOf, carries: carriedBy } = latest.current
       const self = all.find((i) => keyOfItem(i) === key)
       const carried = self && carriedBy ? carriedBy(self, all) : []
@@ -170,9 +193,32 @@ export default function DragList<T>({
     }
     function move(e: PointerEvent) {
       const d = dragRef.current
+      if (!d || e.pointerId !== d.pointerId) return
+      d.clientY = e.clientY
+      follow()
+      if (!scrolling && edgeScroll(d.clientY, window.innerHeight, d.startY)) scrolling = requestAnimationFrame(scrollStep)
+    }
+    // Near an edge, the page scrolls a little each frame while the row is
+    // held there, and the row keeps up.
+    let scrolling = 0
+    function scrollStep() {
+      scrolling = 0
+      const d = dragRef.current
+      if (!d) return
+      const by = edgeScroll(d.clientY, window.innerHeight, d.startY)
+      if (!by) return
+      const was = window.scrollY
+      window.scrollBy(0, by)
+      if (window.scrollY === was) return
+      d.scrolled += window.scrollY - was
+      follow()
+      scrolling = requestAnimationFrame(scrollStep)
+    }
+    function follow() {
+      const d = dragRef.current
       const cur = orderRef.current
-      if (!d || !cur || e.pointerId !== d.pointerId) return
-      d.dy = e.clientY - d.startY
+      if (!d || !cur) return
+      d.dy = d.clientY - d.startY + d.scrolled
       if (Math.abs(d.dy) > 2) d.moved = true
       const el = els.current.get(d.key)
       if (!el) return
@@ -206,6 +252,8 @@ export default function DragList<T>({
       const d = dragRef.current
       if (!d || e.pointerId !== d.pointerId) return
       listen(false)
+      cancelAnimationFrame(scrolling)
+      scrolling = 0
       document.body.style.userSelect = ''
       for (const k of d.block ?? [d.key]) {
         const el = els.current.get(k)
@@ -256,6 +304,7 @@ export default function DragList<T>({
     function stop() {
       cancelHold()
       listen(false)
+      cancelAnimationFrame(scrolling)
       document.body.style.userSelect = ''
     }
     return { place, begin, startHold, stop }
