@@ -171,6 +171,16 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   Menu holding Main dishes). A listing's own sections that it draws as one (a mikvah's
   audience sections, the main thing) still render together, where the
   first of them is.
+- **Waiting on the user (Nov 10): round 3 boards E1b, E2, E3b** (canvas
+  Y4Cn6WNqe54xHQpYGY6dPH). A field stays in the box it's in, landing where
+  its + Add a field was clicked; Hechsher and Delivery become one field
+  each, their parts switches on its screen; the listing draws Hechsher's
+  note and Certificate button in whatever box holds it. The user said the
+  drawings are good (rows: no kind word, no part lines, no choices under
+  Main dishes) but hasn't said to build. Held for now, the user's call:
+  boards A and E1b draw every box open, while the built Fields folds them
+  (one opens at a time), and no board shows a box's trash can (built: on
+  the opened box's + Add a field line).
 - **No Top** (the user, Nov 10, board A; "Yes, build it"). Fields lists
   only boxes and fields. A field's own Under the name switch puts it under
   the name, and a listing (an eruv's too) shows it only there, not again
