@@ -963,6 +963,17 @@ describe('ListingView — a box that leads (board B)', () => {
     expect(screen.queryByTestId('listing-lead-box')).not.toBeInTheDocument()
     expect(screen.getByText('Directions')).toBeInTheDocument()
   })
+
+  // The user, Nov 10: Delivery is one field, and goes in any of the admin's
+  // boxes; there it's drawn the same, and not up top as well.
+  it('put in a box of the admin’s, drawn there, its group with it, and not up top', () => {
+    view({ item: mikes(), category: makeCategory({ ...delivery, listingParts: { boxes: [{ title: 'Ordering', fields: ['delivery_details'] }] } }) })
+    expect(screen.queryByTestId('listing-lead-box')).not.toBeInTheDocument()
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Ordering'))!
+    expect(within(box).getByText(said)).toBeInTheDocument()
+    expect(within(box).getByRole('link', { name: 'Join the group' })).toHaveAttribute('href', 'https://chat.whatsapp.com/Mikes')
+    expect(screen.getAllByText(said)).toHaveLength(1)
+  })
 })
 
 // The user, Nov 10: "I don't understand why all fields can't just go
@@ -993,6 +1004,16 @@ describe('ListingView — a field where the admin put it', () => {
     placed({})
     expect(screen.getByTestId('listing-about')).toHaveTextContent('Lot behind the building')
     expect(screen.getByTestId('listing-details')).toHaveTextContent('Night line')
+  })
+
+  // The user, Nov 10: the davening times can go in one of the admin's
+  // boxes, drawn as they are on their own ("Let's say same for now").
+  it('the davening times in a box of the admin’s, drawn there as they are', () => {
+    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }], listingParts: { boxes: [{ title: 'Services', fields: ['minyanim'] }] } })
+    view({ item: makeListing({ minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] }), category: shuls })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Services'))!
+    expect(within(box).getByTestId('davening-shabbos')).toHaveTextContent(/9 AM/)
+    expect(screen.getAllByTestId('davening-shabbos')).toHaveLength(1)
   })
 
   it('hours in a box of the admin’s, said there and not again in Contact', () => {

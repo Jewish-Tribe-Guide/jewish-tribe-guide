@@ -196,12 +196,13 @@ export function shabbosAfter(category: CategoryConfig): number | null {
   return parseListingParts(category.listingParts).shabbos?.after ?? null
 }
 
-/** The fields a card can show: what a person writes or picks. */
+/** The fields a card can show: what a person writes or picks, and the
+ *  ones that are a box of their own elsewhere, the davening times and a
+ *  list of items (the user, Nov 10: any field in any box). */
 export function cardFieldChoices(fields: readonly CategoryField[]): CategoryField[] {
   return fields.filter(
     (f) =>
-      ['text', 'textarea', 'select', 'boolean', 'tel', 'url', 'contacts', 'number', 'hours', 'tags'].includes(f.type) &&
-      !(f.type === 'tags' && f.showCountInHeader) &&
+      ['text', 'textarea', 'select', 'boolean', 'tel', 'url', 'contacts', 'number', 'hours', 'tags', 'minyanim'].includes(f.type) &&
       !f.audienceKey &&
       f.renderAs !== 'hidden',
   )

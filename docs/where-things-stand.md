@@ -52,17 +52,27 @@ The user's answers on Nov 10, evening, and what was done with them:
   parts of it; Delivery's WhatsApp link as a part of Delivery) stays.
   - So **converting Food on the live site to Kosher and Delivery boxes is
     no longer wanted**. Dev's Food `listing_parts` was put back to null.
-  - **Open:** the admin's Fields list and "How it looks" still describe
-    round 3 (fieldBoxes, fieldLooks), not the listing as restored. How
-    they should show the amber box, Delivery and Certification is the
-    user's call.
+  - **Fields and "How it looks" match the restored listing** (the user
+    left it to Claude: "If they are one field then they should be one
+    field always"). Delivery Details is one row in a "Delivery" box, and
+    the hechsher one row in "What isn't kosher", the boxes the listing
+    draws them in; their parts are no rows. Either can be put in one of
+    the admin's boxes, where the listing then draws it (Delivery's text
+    and Join button there, not up top too; the hechsher's amber box and
+    Certification button stay where they always are).
+  - **Limit, the user's call:** Contact and About don't take a field
+    that is a box of its own (Delivery, a hechsher, davening times, a
+    list of items or contacts). Their + Add a field doesn't offer one,
+    and a drag there says it can't go. To add one to a page, + Add a box
+    and add it there.
 - **"More" is gone from a field's screen**, for a superadmin too (the
   user: "yes remove it"). The old field form (CategoryFieldEditor) is
   deleted, so its settings can't be reached by anyone now.
 - **The Eruv's Add button** is right as built (the user, Nov 10).
-- **Davening times, item lists and contacts in any box** (the user: "that
-  is what I want"). Not built: how davening times look inside another box
-  on the listing is to be asked first.
+- **Davening times, item lists and contacts in any of the admin's boxes**
+  (the user: "that is what I want"), drawn there as they are on their own
+  (the user: "Let's say same for now and if we need to change that we
+  can").
 - **A shul's website watch files only the upcoming week**, as a calendar
   does: this week, and next week from Thursday (listingPageRun's
   `upcoming`). Later dates on the page still tell which weeks have no
@@ -72,12 +82,19 @@ The user's answers on Nov 10, evening, and what was done with them:
   "Nov 14", and Edit opened only the first. Now Edit opens every post the
   box shows a time from, and Edit listing's "This week's schedule" lists
   them all and saves them into one.
-  - **Waiting for a yes:** the live times themselves (Sat Nov 14 Shacharis
-    9:15 PM, read wrong off the website, should be 9:15 AM; Fri Nov 13
-    Mincha & Maariv 7:00 PM is the summer time).
+  - **The live times are fixed** (the user's yes, Nov 10): Sat Nov 14
+    Shacharis 9:15 PM → 9:15 AM, Fri Nov 13 Mincha 7:00 PM → 4:30 PM.
+    Backup of the row before: the session scratchpad's
+    `mekor-prod-backup-nov10.json`. Mekor's own site says "9:15PM", so the
+    website watch may file it again: reject it on To do.
   - Dev's Mekor holds the live times (copied to reproduce it).
-- **Rodeph Shalom's week** read as all new over notes in a different
-  order ("Online; until 8:40 AM"). Fix not built: waiting on the user.
+- **Rodeph Shalom's week** showed its 8:10 AM Shacharis crossed out and
+  new when only the note's words moved ("Online; until 8:40 AM" to
+  "until 8:40 AM; Online"). The user: still a change, but "Make it clear
+  that the suggestion is only on the note." The queue card now gives such
+  a minyan as one plain line marked "Note changed", the old note crossed
+  out above the new, and its heading says "a change to notes in the
+  schedule" (changeLines' `extras`; usual times the same).
 - Still held or open from before: boxes fold in Fields (held), a box's
   trash can on no board (held), big fields as rows inside any box, "Within
   a walk" and "Before it's opened" on no board, Mikvah sections not drawn,

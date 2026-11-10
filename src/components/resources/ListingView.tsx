@@ -43,6 +43,7 @@ import {
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
 import { arrange, boxesOf, boxOrderOf, fixedPlaceOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { isMinyanim } from '@/lib/davening'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -406,12 +407,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   // and the link as one wide button. Dated on its own.
   const lead = leadBox(item, category)
   const leadKey = lead && (lead.text ?? lead.field).key
-  const leadBoxView = lead && (
-    <Card
-      testId="listing-lead-box"
-      title={lead.title}
-      footer={<FreshnessFooter resourceId={item.id} {...boxDate(item, leadKey!)} section={leadKey!} onEdit={editBox ? () => editBox({ title: lead.title, fields: lead.text ? [lead.text, lead.field] : [lead.field] }) : undefined} />}
-    >
+  // Delivery is one field, its link a part of it: put in one of the
+  // admin's boxes, it's drawn there, the same, and not up here too.
+  const leadInBox = !!leadKey && boxesOf(category).some((b) => b.fields.some((f) => f.key === leadKey))
+  const leadBody = lead && (
+    <>
       {lead.text && <p className="whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
       {lead.href && (
         <a
@@ -427,6 +427,15 @@ export default function ListingView({ item, category, color, place = null, upvot
           {joinLabel(lead.field, category, lead.href)}
         </a>
       )}
+    </>
+  )
+  const leadBoxView = lead && !leadInBox && (
+    <Card
+      testId="listing-lead-box"
+      title={lead.title}
+      footer={<FreshnessFooter resourceId={item.id} {...boxDate(item, leadKey!)} section={leadKey!} onEdit={editBox ? () => editBox({ title: lead.title, fields: lead.text ? [lead.text, lead.field] : [lead.field] }) : undefined} />}
+    >
+      {leadBody}
     </Card>
   )
 
@@ -438,6 +447,18 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
 
   // ── 3 · The main thing ─────────────────────────────────────────────────
+  // The davening times and the items, as their own boxes or in one of the
+  // admin's (the user, Nov 10: "Let's say same for now").
+  const daveningOf = (f: CategoryField) => (
+    <DaveningCard
+      item={item}
+      minyanim={item[f.key]}
+      schedules={item[schedulesKey(f.key)]}
+      category={category}
+      onEditBox={editBox ? (box, title, weeks) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting, weeks }) : undefined}
+    />
+  )
+  const itemsBox = itemsF ? <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} /> : null
   let mainSection: ReactNode = null
   const named = main === 'section' ? mainCardOf(category) : null
   if (named) {
@@ -454,18 +475,9 @@ export default function ListingView({ item, category, color, place = null, upvot
       />
     )
   } else if (main === 'davening') {
-    const f = category.detailFields.find((x) => x.type === 'minyanim')!
-    mainSection = (
-      <DaveningCard
-        item={item}
-        minyanim={item[f.key]}
-        schedules={item[schedulesKey(f.key)]}
-        category={category}
-        onEditBox={editBox ? (box, title, weeks) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting, weeks }) : undefined}
-      />
-    )
+    mainSection = daveningOf(category.detailFields.find((x) => x.type === 'minyanim')!)
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
+    mainSection = itemsBox
   } else if (main === 'groups') {
     mainSection = (
       <GroupBoxes
@@ -509,6 +521,15 @@ export default function ListingView({ item, category, color, place = null, upvot
         fields={b.fields}
         footer={dated ? <FreshnessFooter resourceId={item.id} {...boxDate(item, key)} section={key} onEdit={edit} /> : undefined}
         onEdit={dated ? undefined : edit}
+        big={(f) =>
+          f.type === 'minyanim'
+            ? isMinyanim(item[f.key]) && (item[f.key] as unknown[]).length > 0 ? daveningOf(f) : null
+            : f.key === itemsF?.key
+              ? itemsBox
+              : f.key === lead?.text?.key || (lead && !lead.text && f.key === lead.field.key)
+                ? leadBody
+                : null
+        }
       />
     )
   })
@@ -762,7 +783,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const boxesAndShabbos = amongBoxes ? [...boxes.slice(0, after), <div key="shabbos">{shabbos}</div>, ...boxes.slice(after!)] : boxes
   // A place whose list has nothing on it yet: the box, with its Add, after
   // whatever it leads with.
-  const emptyItems = main !== 'items' && itemsF && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
+  const emptyItems = main !== 'items' && itemsF && !placed.has(itemsF.key) && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
 
   // Every box where the admin dragged it (ListingParts.order; the user,
   // Nov 10: "an admin can arrange how they want"), once they have. A box

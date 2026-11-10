@@ -105,6 +105,7 @@ export function FieldsBox({
   fields,
   footer,
   onEdit,
+  big,
 }: {
   item: DirectoryResource
   title: string
@@ -112,8 +113,16 @@ export function FieldsBox({
   footer?: ReactNode
   /** The box's Edit, where its footer doesn't carry one. */
   onEdit?: () => void
+  /** A field that's a box of its own elsewhere (the davening times, a list
+   *  of items, Delivery), drawn in this one as it is there (the user, Nov
+   *  10: "Let's say same for now"). Null for any other. */
+  big?: (f: CategoryField) => ReactNode | null
 }) {
-  const filled = fields.filter((f) => hasValue(f, item[f.key]))
+  const drawn = new Map(fields.flatMap((f) => {
+    const node = big?.(f)
+    return node ? [[f.key, node] as const] : []
+  }))
+  const filled = fields.filter((f) => drawn.has(f.key) || hasValue(f, item[f.key]))
   if (filled.length === 0) return null
   const count = (f: CategoryField) => (f.type === 'contacts' ? readContacts(item[f.key]).length : 0)
   const headed = fields.length > 1
@@ -128,7 +137,7 @@ export function FieldsBox({
               {count(f) > 1 && ` · ${count(f)}`}
             </p>
           )}
-          <BoxField field={f} item={item} />
+          {drawn.get(f.key) ?? <BoxField field={f} item={item} />}
         </div>
       ))}
     </Card>

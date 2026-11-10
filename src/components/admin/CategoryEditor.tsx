@@ -563,18 +563,15 @@ function CategoryEditorScreen({
           added(null)
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
-        // From a box's "+ Add a field": what lands in it (the user, Nov 9),
-        // and the fields that are a box themselves (the davening times, a
-        // list of contacts), which land as a box of their own (Nov 10: "+
-        // Add a box" is just an empty box now). Not one of a mikvah's
-        // sections' fields: a section comes with its switch, from + Add
-        // audience group.
+        // From a box's "+ Add a field": only what lands in it (the user,
+        // Nov 9 and 10), the davening times included in one of the
+        // admin's boxes. Not one of a mikvah's sections' fields: a section
+        // comes with its switch, from + Add audience group.
         into={addingBox ? {
           heading: `Add a field to ${addingBox.title || 'New box'}`,
           offers: (row) => {
             if (!row.field) return basicsLandIn(addingBox)
-            const where = whereAdded(addingBox, normalizeField(row.field), fieldPage)
-            return where === 'here' || (where === 'own' && !row.field.audienceKey)
+            return whereAdded(addingBox, normalizeField(row.field), fieldPage) === 'here'
           },
           kindFits: (type) => whereAdded(addingBox, madeField(type, '', '#new'), fieldPage) === 'here',
         } : undefined}
