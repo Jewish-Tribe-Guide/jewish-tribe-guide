@@ -144,6 +144,12 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   the page in 175ms, before the list's refresh comes back. Measured on
   the live site Nov 9: Supabase answers in about 0.1s; a preview
   deployment's API calls took 0.8–1.2s each, uncached.
+  Still slow on the preview after that (the user, Nov 9): each page's
+  address is rendered on Vercel's server the first time anyone opens it
+  after a deploy (Synagogues 0.93s, Mikvah 0.66s, then 0.10s), and the
+  click waited for it. The list now loads every row's address behind it
+  (`router.prefetch`), and a page loads the list's, so the click asks the
+  server for nothing (`e2e-admin-write/category-open.spec.ts`).
 - **An admin's field is filled in** in Places (a row of its own after
   Website, saved with Update the listing) and by anyone through Suggest an
   edit, which goes to the queue; the queue and the admin email show it

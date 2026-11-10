@@ -60,11 +60,15 @@ export default function CategoryManager({
   editingId: rawEditingId,
   onOpenEditor,
   onCloseEditor,
+  prefetch,
 }: {
   token: string
   editingId: string | null
   onOpenEditor: (id: string) => void
   onCloseEditor: () => void
+  /** Loads a screen's address ahead of a click: a row's page, or (null)
+   *  the list. */
+  prefetch?: (id: string | null) => void
 }) {
   // A page's own address without the prefix (/categories/restaurant) opens
   // it too; it used to fall through to the list.
@@ -142,6 +146,16 @@ export default function CategoryManager({
       ...screens,
     ].sort((a, b) => a.label.localeCompare(b.label))
   }, [categories, placeCounts])
+
+  // The rows' pages, while the list shows, and the list from a page (Back
+  // to it), so neither click waits on the server.
+  const rowKeys = entries?.map((e) => e.key).join(' ') ?? ''
+  useEffect(() => {
+    if (!prefetch) return
+    if (editingId) prefetch(null)
+    else for (const key of rowKeys.split(' ').filter(Boolean)) prefetch(key)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowKeys, editingId === null])
 
   // On makes the screen's row the first time and shows it after that; off
   // hides the row, so its name and photo are still there when it comes back.

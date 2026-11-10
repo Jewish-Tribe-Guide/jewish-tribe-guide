@@ -91,6 +91,22 @@ describe('CategoryManager — opening a page quickly', () => {
     expect(asked).toContain('/api/resources?category=restaurant')
   })
 
+  // Each page's address is rendered on the server the first time it's
+  // opened after a deploy, and a click waited for it (the user, Nov 9).
+  it('loads every row’s page behind the list, and the list behind a page', async () => {
+    const prefetch = vi.fn()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url })))
+    vi.mocked(parseOkJson).mockImplementation(async () => ({ categories: [shul, food], placeCounts: {} }))
+    renderWithProviders(<CategoryManager token="t" editingId={null} onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} prefetch={prefetch} />)
+    await screen.findByText('Food')
+    await waitFor(() => expect(prefetch.mock.calls.map(([id]) => id).sort()).toEqual(['cat:restaurant', 'cat:synagogue', 'screen:eruv', 'screen:zmanim']))
+    cleanup()
+    prefetch.mockClear()
+    renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} prefetch={prefetch} />)
+    await waitFor(() => expect(prefetch).toHaveBeenCalledWith(null))
+    expect(prefetch).not.toHaveBeenCalledWith('cat:synagogue')
+  })
+
   it('asks no places for the list or a new page', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url })))
     vi.mocked(parseOkJson).mockImplementation(never)
