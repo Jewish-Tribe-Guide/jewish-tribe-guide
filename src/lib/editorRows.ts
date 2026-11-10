@@ -4,7 +4,7 @@ import { readContacts, sameContacts } from './contacts'
 import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
 import { sameFieldValue } from './listingDiff'
-import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
+import { boxesOf, fixedPlaceOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
 import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
@@ -93,6 +93,8 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
     for (const f of list) placed.add(f.key)
     return list
   }
+  // Contact or About, where the admin put a field in one by name.
+  const fixedPlace = fixedPlaceOf(category)
   const caveatParts = new Set(fields.flatMap((f) => (f.caveat ? [f.caveat.flagField, f.caveat.noteField] : [])))
   const audienceFlags = new Set(fields.map((f) => f.audienceKey).filter((k): k is string => !!k))
   // Hidden fields stay out, but for a hechsher's caveat (its yes/no and
@@ -138,7 +140,8 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
       !placed.has(f.key) &&
       f.key !== items?.key &&
       !f.audienceKey &&
-      (isBadge(f) || caveatParts.has(f.key) || audienceFlags.has(f.key)),
+      (isBadge(f) || caveatParts.has(f.key) || audienceFlags.has(f.key)) &&
+      !(isBadge(f) && !f.filterable && fixedPlace(f.key) === 'about'),
   )
   const facts = factFields.filter((f) => !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key) && !(allSections && audienceFlags.has(f.key)))
   // The certificate's link goes under the hechsher, not with the website
@@ -191,8 +194,14 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
 
   // 5 · The contact box: address, phone, website and other links, and
   // short lines (an email).
+  // With what the admin put in Contact by name (a long text), and without
+  // what they put in About.
   const contact = fields.filter(
-    (f) => !placed.has(f.key) && !f.audienceKey && (f.type === 'url' || f.type === 'text' || f.type === 'tel' || f.type === 'number'),
+    (f) =>
+      !placed.has(f.key) &&
+      !f.audienceKey &&
+      fixedPlace(f.key) !== 'about' &&
+      (f.type === 'url' || f.type === 'text' || f.type === 'tel' || f.type === 'number' || (f.type === 'textarea' && fixedPlace(f.key) === 'contact')),
   )
   const hasAddress = category.hasAddress !== false
   const hasPhone = category.hasPhone !== false
@@ -207,11 +216,11 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   // 6 · Hours, on their own (the user, Oct 11): a week of them is its own
   // screen, and the thing most often wrong. A place with a section per
   // audience shows its hours in those, not here.
-  const hours = audienceFlags.size > 0 ? [] : fields.filter((f) => f.type === 'hours' && !placed.has(f.key) && !f.audienceKey)
+  const hours = audienceFlags.size > 0 ? [] : fields.filter((f) => f.type === 'hours' && !placed.has(f.key) && !f.audienceKey && fixedPlace(f.key) !== 'about')
   for (const f of hours) rows.push({ id: hours.length > 1 ? `hours:${f.key}` : 'hours', title: hours.length > 1 ? f.label : 'Hours', kind: 'fields', fields: take([f]) })
 
   // 7 · About: the descriptions.
-  const about = fields.filter((f) => !placed.has(f.key) && !f.audienceKey && f.type === 'textarea')
+  const about = fields.filter((f) => !placed.has(f.key) && !f.audienceKey && ((f.type === 'textarea' && fixedPlace(f.key) !== 'contact') || fixedPlace(f.key) === 'about'))
   if (about.length > 0) rows.push({ id: 'about', title: 'About', kind: 'fields', fields: take(about) })
 
   // Anything else the listing lists: another tags field, a yes/no or a

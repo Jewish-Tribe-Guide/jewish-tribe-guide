@@ -1,5 +1,5 @@
 import type { CategoryField, FieldType } from './categories'
-import { cardFieldChoices, LEAD_SLOTS, type LeadSlot, type ListingParts } from './listingParts'
+import { cardFieldChoices, FIXED_PLACES, LEAD_SLOTS, type FixedPlace, type LeadSlot, type ListingParts } from './listingParts'
 import { caveatTitle, isCertificateLink } from './listingView'
 
 // ── A page's fields, as its opened listing's boxes (Category pages step 3,
@@ -22,6 +22,11 @@ import { caveatTitle, isCertificateLink } from './listingView'
 //   a list of contacts in no box, as a box of its own.
 //   Contact       address, phone, hours, links, short lines. Always there.
 //   About         the descriptions. Always there once there is one.
+//
+// Any field goes in any box but Top (the user, Nov 10): a long text in
+// Contact, a phone in About, hours in "Who to call". Top is the header, and
+// a field that draws a whole box (the davening times, a list of items or
+// contacts, a link's own box) is a box, added from "+ Add a box".
 //
 // A field is moved by dragging it onto another box's row: one list, the
 // opened box's fields among the boxes (fieldItems), read back by readOrder.
@@ -76,6 +81,18 @@ export function homeOf(f: CategoryField, page: FieldPage): string {
   return 'contact'
 }
 
+/** Whether a field goes in whichever box it's put in: one whose own home
+ *  is Contact or About, not the header's or one that is a box itself. */
+export const movable = (f: CategoryField, page: FieldPage) => ['contact', 'about'].includes(homeOf(f, page))
+
+/** Where a field is: Contact or About when the admin put it there, else
+ *  its own home. */
+function placedHome(f: CategoryField, page: FieldPage, parts: ListingParts): string {
+  const home = homeOf(f, page)
+  if (home !== 'contact' && home !== 'about') return home
+  return FIXED_PLACES.find((p) => parts[p]?.includes(f.key)) ?? home
+}
+
 /** The boxes, in the listing's order. */
 export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const fields = page.fields
@@ -96,7 +113,7 @@ export function fieldBoxes(page: FieldPage, parts: ListingParts): FieldBox[] {
   const homes = new Map<string, string[]>()
   for (const f of [...fields, ...(page.hiddenFields ?? []).filter((h) => homeOf(h, page) === 'caveat')]) {
     if (placed.has(f.key)) continue
-    const home = homeOf(f, page)
+    const home = placedHome(f, page, parts)
     homes.set(home, [...(homes.get(home) ?? []), f.key])
   }
   const listing = (id: string, title: string): FieldBox[] => {
@@ -205,10 +222,12 @@ export function fieldLine(f: CategoryField): string | undefined {
   return undefined
 }
 
-/** Whether a box can take this field: the admin's take what a card can
- *  show; any other only what goes there anyway. */
+/** Whether a box can take this field: any of the admin's, Contact and
+ *  About take any field that isn't the header's or a box of its own; any
+ *  other only what goes there anyway. */
 function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
   if (box.kind === 'admin') return cardFieldChoices([f]).length > 0
+  if (box.id === 'contact' || box.id === 'about') return movable(f, page)
   return homeOf(f, page) === box.id
 }
 
@@ -220,8 +239,13 @@ function boxTakes(box: FieldBox, f: CategoryField, page: FieldPage): boolean {
  *  it gets added under a different box." */
 export function whereAdded(box: FieldBox, f: CategoryField, page: FieldPage): 'here' | 'own' | 'elsewhere' {
   if (boxTakes(box, f, page)) return 'here'
-  return ['top', 'contact', 'about', 'hidden'].includes(homeOf(f, page)) ? 'elsewhere' : 'own'
+  return makesBox(f, page) ? 'own' : 'elsewhere'
 }
+
+/** Whether a field is a box of its own: the davening times, a list of items
+ *  or contacts, a link's own box, an audience's section. What "+ Add a box"
+ *  offers. */
+export const makesBox = (f: CategoryField, page: FieldPage) => !['top', 'contact', 'about', 'hidden', 'caveat'].includes(homeOf(f, page))
 
 /** A field made here, from a box's + Add a field. A choice or a yes-or-no
  *  made from Top is a filter badge, as everything in Top is; anywhere else
@@ -343,6 +367,13 @@ export function readOrder(
     const order = boxIds.filter((id) => id.startsWith('box:')).map((id) => Number(id.slice(4)))
     out.boxes = order.map((n) => ({ ...parts.boxes![n], fields: fieldsOf(`box:${n}`, parts.boxes![n].fields) }))
   }
+  // A field moved into Contact or About is put there by name; one moved
+  // anywhere else is in neither.
+  let placedOut: ListingParts = out
+  for (const m of moved) placedOut = putInPlace(placedOut, m.key, m.to === 'contact' || m.to === 'about' ? m.to : null)
+  Object.assign(out, placedOut)
+  for (const p of FIXED_PLACES) if (!placedOut[p]) delete out[p]
+
   // The listing's own boxes, when they moved: their order, unless it's the
   // usual one.
   const leads = [...new Set(next.flatMap((i) => ('box' in i && i.box.lead ? [i.box.lead] : [])))]
@@ -413,15 +444,29 @@ export function renameBox(parts: ListingParts, id: string, title: string): Listi
   return { ...parts, boxes: (parts.boxes ?? []).map((b, i) => (i === n ? { ...b, title } : b)) }
 }
 
-/** A field added from a box's own "+ Add a field" goes in that box, when
- *  it's one of the admin's and the field can be shown in a card. */
+/** A field added from a box's own "+ Add a field" goes in that box: one of
+ *  the admin's, or Contact or About, by name. Taken out of any other. */
 export function addToBox(parts: ListingParts, id: string, key: string): ListingParts {
   const put = (fields: string[]) => (fields.includes(key) ? fields : [...fields, key])
+  if (id === 'contact' || id === 'about') return putInPlace(parts, key, id)
   if (id === 'main' && parts.main) return { ...parts, main: { ...parts.main, fields: put(parts.main.fields) } }
   if (id === 'shabbos' && parts.shabbos) return { ...parts, shabbos: { ...parts.shabbos, fields: put(parts.shabbos.fields) } }
   if (!id.startsWith('box:')) return parts
   const n = Number(id.slice(4))
   return { ...parts, boxes: (parts.boxes ?? []).map((b, i) => (i === n ? { ...b, fields: put(b.fields) } : b)) }
+}
+
+/** A field put in Contact or About by name (null: in neither), and out of
+ *  the other. */
+function putInPlace(parts: ListingParts, key: string, place: FixedPlace | null): ListingParts {
+  const out: ListingParts = { ...parts }
+  for (const p of FIXED_PLACES) {
+    const fields = (parts[p] ?? []).filter((k) => k !== key)
+    if (p === place) fields.push(key)
+    if (fields.length > 0) out[p] = fields
+    else delete out[p]
+  }
+  return out
 }
 
 /** A field's key changed (its name, typed): the boxes follow it. */
@@ -432,5 +477,7 @@ export function renameKey(parts: ListingParts, from: string, to: string): Listin
     ...(parts.main && { main: { ...parts.main, fields: swap(parts.main.fields) } }),
     ...(parts.shabbos && { shabbos: { ...parts.shabbos, fields: swap(parts.shabbos.fields) } }),
     ...(parts.boxes && { boxes: parts.boxes.map((b) => ({ ...b, fields: swap(b.fields) })) }),
+    ...(parts.contact && { contact: swap(parts.contact) }),
+    ...(parts.about && { about: swap(parts.about) }),
   }
 }

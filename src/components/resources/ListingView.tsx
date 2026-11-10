@@ -42,7 +42,7 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { boxesOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { boxesOf, fixedPlaceOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -76,7 +76,7 @@ import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
-import { FieldsBox } from './FieldsBox'
+import { FieldsBox, fieldText } from './FieldsBox'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
@@ -518,13 +518,17 @@ export default function ListingView({ item, category, color, place = null, upvot
   const showPhone = category.hasPhone !== false && !!item.phone
   // The place's hours, in the contact box: today, opening to the week. A
   // mikvah's are in its own boxes, one per audience.
-  const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
+  // Contact or About, where the admin put a field in one by name (the
+  // user, Nov 10: any field in any box but Top).
+  const fixedPlace = fixedPlaceOf(category)
+  const inAbout = (f: CategoryField) => fixedPlace(f.key) === 'about'
+  const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && !placed.has(f.key) && !inAbout(f) && hasAny(item[f.key]))
   // When Google last updated the box, at its foot (Oct 6): one date for
   // the box, not a list of which of its lines are Google's.
   const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
   // The website, by name, with the address and phone (Oct 6): its round
   // button above says only "Website".
-  const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field))
+  const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field) && !inAbout(a.field))
   const websiteName = website ? siteName(website.href) : null
   const shownElsewhere = new Set<string>([
     ...placed,
@@ -539,13 +543,24 @@ export default function ListingView({ item, category, color, place = null, upvot
   ])
   // Not a hidden field: a hechsher's "what isn't kosher" is one, said with
   // its caveat in the header, not a second time here.
+  // A link or an email put in About is said there, and not again in
+  // Contact; its button under the name stays.
+  const aboutLink = (a: ActionSpec) => (a.kind === 'link' || a.kind === 'email') && inAbout(a.field) && !placed.has(a.field.key)
+  for (const a of [...buttons, ...extra]) if (aboutLink(a)) shownElsewhere.delete((a as { field: CategoryField }).field.key)
   const aboutFields = category.detailFields.filter(
-    (f) => f.type === 'textarea' && f.renderAs !== 'hidden' && !f.audienceKey && !shownElsewhere.has(f.key) && String(item[f.key] ?? '').trim(),
+    (f) =>
+      ((f.type === 'textarea' && fixedPlace(f.key) !== 'contact') || inAbout(f)) &&
+      f.renderAs !== 'hidden' &&
+      !f.audienceKey &&
+      !shownElsewhere.has(f.key) &&
+      fieldText(f, item[f.key]),
   )
+  const contactExtra = extra.filter((a) => !aboutLink(a))
   const detailFields = category.detailFields.filter(
     (f) =>
-      (f.type === 'text' || f.type === 'tel' || f.type === 'number') &&
+      (f.type === 'text' || f.type === 'tel' || f.type === 'number' || (f.type === 'textarea' && fixedPlace(f.key) === 'contact')) &&
       !f.audienceKey &&
+      !inAbout(f) &&
       !shownElsewhere.has(f.key) &&
       (f.renderAs ?? 'row') === 'row' &&
       String(item[f.key] ?? '').trim(),
@@ -556,11 +571,13 @@ export default function ListingView({ item, category, color, place = null, upvot
       (f.type === 'boolean' || f.type === 'select') &&
       (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge' &&
       !f.filterable &&
+      !inAbout(f) &&
+      !placed.has(f.key) &&
       (f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0),
   )
   // Tags fields other than the items the main thing lists.
   const otherTags = category.detailFields.filter(
-    (f) => f.type === 'tags' && f.key !== itemsF?.key && selectValues(item[f.key]).length + selectValues(item[`${f.key}_sometimes`]).length > 0,
+    (f) => f.type === 'tags' && f.key !== itemsF?.key && !inAbout(f) && !placed.has(f.key) && selectValues(item[f.key]).length + selectValues(item[`${f.key}_sometimes`]).length > 0,
   )
   // The contact box: address, phone, hours, links. No heading: its icons
   // say what each line is (Oct 6).
@@ -581,13 +598,13 @@ export default function ListingView({ item, category, color, place = null, upvot
   // its hours), the box's own "Confirmed Sep 29 · Edit", "Still right?"
   // once old (the user, Oct 15: what someone typed is dated the way every
   // other box is), under the box's own key (migration 082).
-  const contactDated = !googleLead && (showAddress || showPhone || !!websiteName || extra.length > 0 || otherHours.length > 0)
+  const contactDated = !googleLead && (showAddress || showPhone || !!websiteName || contactExtra.length > 0 || otherHours.length > 0)
   const detailsFoot = googleLead ? (
     <span data-testid="listing-google">{googleLead}.</span>
   ) : contactDated ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
   ) : undefined
-  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
@@ -622,7 +639,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           <HoursRow value={item[f.key]} now={now} candlesAt={candlesAt} />
         </Row>
       ))}
-      {extra.map((a) => (
+      {contactExtra.map((a) => (
         <Row
           key={actionKey(a)}
           icon={
@@ -648,7 +665,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {f.type === 'tel' ? (
             <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
           ) : (
-            String(item[f.key])
+            <span className={f.type === 'textarea' ? 'whitespace-pre-line' : undefined}>{String(item[f.key]).trim()}</span>
           )}
         </Row>
       ))}
@@ -692,9 +709,25 @@ export default function ListingView({ item, category, color, place = null, upvot
   const about = aboutFields.length > 0 && (
     <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
-        {aboutFields.map((f) => (
-          <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
-        ))}
+        {aboutFields.map((f) =>
+          f.type === 'textarea' ? (
+            <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
+          ) : (
+            // Put in About by the admin: its name over what it says.
+            <div key={f.key} data-testid="about-field" className="text-[15px] text-slate-800">
+              {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
+              {f.type === 'tel' ? (
+                <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{fieldText(f, item[f.key])}</a>
+              ) : f.type === 'url' ? (
+                <a href={String(item[f.key]).trim()} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">{(isWebsite(f) && siteName(String(item[f.key]))) || f.linkLabel || f.label}</a>
+              ) : f.type === 'hours' ? (
+                <HoursRow value={item[f.key]} now={now} candlesAt={candlesAt} />
+              ) : (
+                fieldText(f, item[f.key])
+              )}
+            </div>
+          ),
+        )}
       </div>
     </Card>
   )

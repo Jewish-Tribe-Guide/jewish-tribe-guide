@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, basicsLandIn, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -112,10 +112,21 @@ describe('fieldBoxes', () => {
   })
 
   it('leaves a field the admin can’t put in a card where it goes, and counts no empty box before the Shabbos card', () => {
-    const boxes = fieldBoxes(hospital, { boxes: [{ title: 'New box', fields: [] }, { title: 'Odd', fields: ['hours', 'liaisons'] }], shabbos: { after: 1, fields: ['eruv'] } })
+    const boxes = fieldBoxes(hospital, { boxes: [{ title: 'New box', fields: [] }, { title: 'Odd', fields: ['photo', 'liaisons'] }], shabbos: { after: 1, fields: ['eruv'] } })
     expect(boxes.map((b) => b.id).slice(0, 4)).toEqual(['top', 'box:0', 'box:1', 'shabbos'])
     expect(boxes.find((b) => b.id === 'box:1')!.fields).toEqual(['liaisons'])
-    expect(boxes.find((b) => b.id === 'contact')!.fields).toContain('hours')
+    expect(boxes.find((b) => b.id === 'top')!.fields).toContain('photo')
+  })
+
+  it('puts a field in Contact or About by name, whatever kind it is (the user, Nov 10)', () => {
+    const boxes = fieldBoxes(hospital, { contact: ['sukkah'], about: ['w'] })
+    expect(boxes.find((b) => b.id === 'contact')!.fields).toEqual(['hours', 'r', 'eruv', 'sukkah'])
+    expect(boxes.find((b) => b.id === 'about')!.fields).toEqual(['w'])
+    // Not the header's, nor a field that is a box itself.
+    const kept = fieldBoxes(hospital, { about: ['photo', 'liaisons'] })
+    expect(kept.find((b) => b.id === 'top')!.fields).toContain('photo')
+    expect(kept.find((b) => b.id === 'contacts:liaisons')).toBeTruthy()
+    expect(kept.find((b) => b.id === 'about')!.fields).toEqual(['sukkah'])
   })
 
   it('says what a field is, where its name doesn’t', () => {
@@ -160,13 +171,32 @@ describe('dragging', () => {
 
   it('turns a field down where it can’t go, saying so', () => {
     const items = fieldItems(boxes, 'box:1')
-    // Pantry under Contact's row.
+    // Pantry, a list of contacts, under Contact's row.
     const next = drop(items, 'field:pantry', items.findIndex((i) => itemKey(i) === 'box:contact'))
     expect(orderProblem(items, next, hospital)).toEqual({ at: 'contact', why: 'Pantry can’t go in Contact' })
-    // Hours, from Contact, into a box.
+  })
+
+  it('takes any field into any box but Top, and says where it went (the user, Nov 10)', () => {
+    // Hours, from Contact, into Who to call.
     const open = fieldItems(boxes, 'contact')
     const hours = drop(open, 'field:hours', 2)
-    expect(orderProblem(open, hours, hospital)).toEqual({ at: 'box:0', why: 'Hours can’t go in Who to call' })
+    expect(orderProblem(open, hours, hospital)).toBeNull()
+    expect(readOrder(open, hours, hospitalParts, hospital).parts.boxes![0].fields).toEqual(['liaisons', 'hours'])
+    // The Refuah link, from Contact, to About; then back.
+    const page: FieldPage = { ...hospital, fields: hospital.fields.filter((f) => f.key !== 'sukkah') }
+    const plain = fieldBoxes(page, { about: ['w'] })
+    const before = fieldItems(plain, 'contact')
+    const toAbout = drop(before, 'field:r', before.length - 1)
+    expect(orderProblem(before, toAbout, page)).toBeNull()
+    const read = readOrder(before, toAbout, { about: ['w'] }, page).parts
+    expect(read.about).toEqual(['w', 'r'])
+    const after = fieldItems(fieldBoxes(page, read), 'about')
+    const back = drop(after, 'field:w', after.findIndex((i) => itemKey(i) === 'box:contact') + 1)
+    expect(orderProblem(after, back, page)).toBeNull()
+    expect(readOrder(after, back, read, page).parts).toEqual({ about: ['r'], contact: ['w'] })
+    // Never into Top.
+    const top = drop(before, 'field:r', 1)
+    expect(orderProblem(before, top, page)).toEqual({ at: 'top', why: 'Refuah Link can’t go in Top' })
   })
 
   it('keeps the address, phone and the end of the opened box under it', () => {
@@ -343,11 +373,19 @@ describe('what a box’s + Add a field offers', () => {
   const box = (id: string) => boxes.find((b) => b.id === id)!
   const kind = (type: CategoryField['type']): CategoryField => ({ key: 'x', label: 'X', type })
 
-  it('never lands a long text in Contact, or a short one in About', () => {
-    expect(whereAdded(box('contact'), kind('textarea'), page)).toBe('elsewhere')
-    expect(whereAdded(box('contact'), kind('text'), page)).toBe('here')
-    expect(whereAdded(box('about'), kind('textarea'), page)).toBe('here')
-    expect(whereAdded(box('about'), kind('text'), page)).toBe('elsewhere')
+  it('lands a long text in Contact, or a short one in About (the user, Nov 10)', () => {
+    for (const type of ['textarea', 'text', 'tel', 'url', 'number', 'hours', 'tags'] as const) {
+      expect(whereAdded(box('contact'), kind(type), page)).toBe('here')
+      expect(whereAdded(box('about'), kind(type), page)).toBe('here')
+      expect(whereAdded(box('box:0'), kind(type), page)).toBe('here')
+    }
+    expect(whereAdded(box('top'), kind('text'), page)).toBe('elsewhere')
+  })
+
+  it('puts one added from Contact or About there by name, out of the other', () => {
+    expect(addToBox({}, 'about', 'phone2')).toEqual({ about: ['phone2'] })
+    expect(addToBox({ about: ['phone2'] }, 'contact', 'phone2')).toEqual({ contact: ['phone2'] })
+    expect(renameKey({ contact: ['#3'] }, '#3', 'notes')).toEqual({ contact: ['notes'] })
   })
 
   it('takes into an admin’s box what a box can show', () => {
@@ -355,9 +393,12 @@ describe('what a box’s + Add a field offers', () => {
     expect(whereAdded(box('box:0'), kind('image'), page)).toBe('elsewhere')
   })
 
-  it('keeps the fields that make a box of their own addable from any box', () => {
+  it('leaves the fields that are a box themselves to + Add a box', () => {
     expect(whereAdded(box('contact'), kind('contacts'), page)).toBe('own')
     expect(whereAdded(box('about'), kind('minyanim'), page)).toBe('own')
+    expect(makesBox(kind('minyanim'), page)).toBe(true)
+    expect(makesBox(kind('contacts'), page)).toBe(true)
+    expect(makesBox(kind('textarea'), page)).toBe(false)
   })
 
   it('puts the page’s address, phone, hours and website in Contact only', () => {

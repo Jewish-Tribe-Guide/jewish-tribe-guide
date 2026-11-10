@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
-import { boxesOf, cardFieldChoices, leadOrderOf, listingPartsFromKey, listingPartsKey, listingPartsToSave, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from './listingParts'
+import { boxesOf, cardFieldChoices, fixedPlaceOf, leadOrderOf, listingPartsFromKey, listingPartsKey, listingPartsToSave, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from './listingParts'
 
 const who: CategoryField = { key: 'who', label: 'Who to call first', type: 'text' }
 const phone: CategoryField = { key: 'who_phone', label: 'Their phone', type: 'tel' }
@@ -39,8 +39,20 @@ describe('the cards’ fields', () => {
     expect(shabbosFieldsOf(makeCategory({ detailFields: [who] }))).toBeNull()
     expect(mainCardOf(makeCategory({ detailFields: [hours], listingParts: { main: { title: 'Who', fields: ['who'] } } }))).toBeNull()
   })
-  it('offers what a person writes or picks, not hours or a hidden field', () => {
-    expect(cardFieldChoices([who, phone, eruv, hours, secret])).toEqual([who, phone, eruv])
+  it('offers what a person writes or picks, hours too (Nov 10), not a hidden field', () => {
+    expect(cardFieldChoices([who, phone, eruv, hours, secret])).toEqual([who, phone, eruv, hours])
+  })
+})
+
+describe('Contact and About, by name (Nov 10)', () => {
+  it('reads and keeps the fields put in each', () => {
+    expect(parseListingParts({ contact: ['notes', 'notes', 1], about: [] })).toEqual({ contact: ['notes'] })
+    const key = listingPartsKey({ about: ['phone2'] })
+    expect(key).not.toBe('')
+    expect(listingPartsFromKey(key)).toEqual({ about: ['phone2'] })
+    expect(listingPartsToSave(key)).toEqual({ about: ['phone2'] })
+    const place = fixedPlaceOf(makeCategory({ listingParts: { contact: ['notes'], about: ['phone2'] } }))
+    expect([place('notes'), place('phone2'), place('x')]).toEqual(['contact', 'about', null])
   })
 })
 
@@ -84,8 +96,9 @@ describe('boxes', () => {
     expect(shabbosAfter(makeCategory({ listingParts: { shabbos: { fields: [] } } }))).toBeNull()
     expect(boxesOf(makeCategory({ detailFields: [pantry] }))).toEqual([])
   })
-  it('offers a list of contacts for a box', () => {
-    expect(cardFieldChoices([pantry, hours])).toEqual([pantry])
+  it('offers a list of contacts for a box, not a list of items', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true }
+    expect(cardFieldChoices([pantry, dishes])).toEqual([pantry])
   })
   it('keeps a box the admin hasn’t finished in the draft, and saves only finished ones', () => {
     const draft = listingPartsKey({ boxes: [{ title: 'Rides', fields: ['rides'] }, { title: '', fields: [] }], shabbos: { fields: [], after: 2 } })

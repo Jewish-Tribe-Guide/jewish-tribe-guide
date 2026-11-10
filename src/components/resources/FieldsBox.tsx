@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryField } from '@/lib/categories'
 import { formatPhone } from '@/lib/validation'
+import { formatHoursSummary, hasAnyHours } from '@/lib/hours'
 import { readContacts, webLink, type ContactEntry } from '@/lib/contacts'
 import { PhoneIcon } from '@/components/icons'
 import { Card } from './listingParts'
@@ -15,6 +16,9 @@ export function fieldText(f: CategoryField, v: unknown): string {
   if (f.type === 'boolean') return v === true ? (f.filterLabel ?? f.label) : ''
   if (f.type === 'select') return selectValues(v).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ')
   if (f.type === 'tel') return String(v ?? '').trim() ? formatPhone(String(v)) : ''
+  if (f.type === 'tags') return selectValues(v).join(', ')
+  if (f.type === 'hours') return hasAnyHours(v) || (typeof v === 'string' && v.trim()) ? formatHoursSummary(v) : ''
+  if (v !== null && typeof v === 'object') return ''
   return String(v ?? '').trim()
 }
 

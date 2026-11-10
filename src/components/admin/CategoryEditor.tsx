@@ -8,7 +8,7 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, basicsLandIn, fieldBoxes, madeField, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, basicsLandIn, fieldBoxes, madeField, makesBox, removeBox, renameBox, renameListingBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -80,6 +80,9 @@ export function CategoryEditor(props: Props) {
 
 /** Draft keys that move with another, so one edit counts once: the
  *  singular follows the name, and the map follows the address. */
+/** The picker's `in` from "+ Add a box": a box not made yet. */
+const NEW_BOX = 'box'
+
 const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'capabilities'])
 
 function changedKeys(draft: Draft, saved: Draft): number {
@@ -496,6 +499,9 @@ function CategoryEditorScreen({
   const parts = listingPartsFromKey(draft.listingParts)
   const boxes = fieldBoxes(fieldPage, parts)
   const addingBox = addingTo ? boxes.find((b) => b.id === addingTo) : undefined
+  // "+ Add a box" opens a picker of the fields that are boxes themselves
+  // (the davening times, a list of contacts), and an empty box to fill.
+  const addingABox = addingTo === NEW_BOX
   // Just added: the box it landed in opens, its row there to see.
   if (landing) {
     const key = pageFields.find((f) => !landing.has(f.key))?.key
@@ -567,12 +573,26 @@ function CategoryEditorScreen({
           added(null)
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
-        // From a box's "+ Add a field": only what lands in it, then what
-        // makes a box of its own (the user, Nov 9).
+        // From a box's "+ Add a field": only what lands in it (the user,
+        // Nov 9). From "+ Add a box": the fields that are a box (Nov 10).
         into={addingBox ? {
-          title: addingBox.title || 'New box',
-          where: (row) => (row.field ? whereAdded(addingBox, normalizeField(row.field), fieldPage) : basicsLandIn(addingBox) ? 'here' : 'elsewhere'),
+          heading: `Add a field to ${addingBox.title || 'New box'}`,
+          offers: (row) => (row.field ? whereAdded(addingBox, normalizeField(row.field), fieldPage) === 'here' : basicsLandIn(addingBox)),
           kindFits: (type) => whereAdded(addingBox, madeField(type, '', '#new', addingBox.id), fieldPage) === 'here',
+        } : addingABox ? {
+          heading: 'Add a box',
+          // Not one of a mikvah's sections' fields: a section comes with its
+          // switch, from + Add audience group.
+          offers: (row) => !!row.field && !row.field.audienceKey && makesBox(normalizeField(row.field), fieldPage),
+          kindFits: () => false,
+          emptyBox: () => {
+            const { parts: next, id } = addBox(parts)
+            set('listingParts', listingPartsKey(next))
+            void screens.back().then(() => {
+              setOpenBox(id)
+              setFreshBox(id)
+            })
+          },
         } : undefined}
         // A field before adding: the page beside with it there.
         besides={
@@ -802,12 +822,7 @@ function CategoryEditorScreen({
           <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => {
-                const { parts: next, id } = addBox(parts)
-                set('listingParts', listingPartsKey(next))
-                setOpenBox(id)
-                setFreshBox(id)
-              }}
+              onClick={() => showAdding({ at: 'list' }, NEW_BOX)}
               className={addButton}
             >
               + Add a box

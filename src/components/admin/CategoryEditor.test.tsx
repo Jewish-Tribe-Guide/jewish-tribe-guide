@@ -814,9 +814,12 @@ describe('CategoryEditor — Fields, in boxes', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload())).not.toHaveProperty('listingParts')
 
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [] }))))
     await user.click(screen.getByRole('button', { name: '+ Add a box' }))
+    await screen.findByRole('heading', { name: 'Add a box' })
+    await user.click(screen.getByRole('button', { name: 'Make an empty box' }))
     // Open, its name ready to type over, nothing in it yet (board 19).
-    expect(screen.getByText('Nothing in it yet')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing in it yet')).toBeInTheDocument()
     const title = screen.getByDisplayValue('New box')
     expect(title).toHaveFocus()
     await user.clear(title)
@@ -1106,6 +1109,7 @@ describe('CategoryEditor — + Add a field', () => {
       'ChoicesLike Food Type: Meat, Dairy, Parve',
       'Yes or noLike Shabbat friendly',
       'A list of itemsLike Main dishes',
+      'TextLike Delivery Details',
       'LinkLike Join group',
     ])
     await user.click(screen.getByRole('button', { name: /^Yes or no/ }))
@@ -1114,9 +1118,9 @@ describe('CategoryEditor — + Add a field', () => {
 
   // The user, Nov 9: "I'll click add a field under a specific box and it gets
   // added under a different box." Each box offers what lands in it.
-  it('offers from a box only what lands in it, and what makes a box of its own', async () => {
+  it('offers from a box any field but the header’s, and none that is a box itself', async () => {
     const user = userEvent.setup()
-    const hospital = { community: 'other', category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'notes', label: 'Visiting notes', type: 'textarea' }, { key: 'liaisons', label: 'Liaisons', type: 'contacts', renderAs: 'row' }] }) }
+    const hospital = { community: 'other', category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'notes', label: 'Visiting notes', type: 'textarea' }, { key: 'liaisons', label: 'Liaisons', type: 'contacts', renderAs: 'row' }, { key: 'night', label: 'Night line', type: 'tel' }] }) }
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [...everywhere, hospital] }))))
     const page = baseCategory({ detailFields: [{ key: 'about', label: 'About us', type: 'textarea' }] })
     renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
@@ -1124,16 +1128,60 @@ describe('CategoryEditor — + Add a field', () => {
     await user.click(screen.getByRole('button', { name: '+ Add a field' }))
     await screen.findByRole('heading', { name: 'Add a field to About' })
     expect(await screen.findByText('Visiting notes')).toBeInTheDocument()
-    // Top's and Contact's, never About's.
+    // Any field (the user, Nov 10), one that would be Contact's too.
+    expect(screen.getByText('Night line')).toBeInTheDocument()
+    // Not Top's, nor one that is a box itself: that's + Add a box's.
     expect(screen.queryByText('Denomination')).toBeNull()
-    expect(screen.queryByText('Website')).toBeNull()
-    // Its own box, wherever it's added from.
-    expect(within(screen.getByRole('region', { name: 'In a box of their own' })).getByText('Liaisons')).toBeInTheDocument()
+    expect(screen.queryByText('Liaisons')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'In a box of their own' })).toBeNull()
     // A reload comes back to the same box's list.
     expect(new URLSearchParams(window.location.search).get('in')).toBe('about')
     await user.type(screen.getByRole('searchbox', { name: 'Search fields' }), 'parking')
     await user.click(screen.getByRole('button', { name: 'Make your own: Parking' }))
-    expect(listed()).toEqual(['TextLike Delivery Details'])
+    expect(listed()).toEqual([
+      'ChoicesLike Food Type: Meat, Dairy, Parve',
+      'Yes or noLike Shabbat friendly',
+      'A list of itemsLike Main dishes',
+      'TextLike Delivery Details',
+      'LinkLike Join group',
+    ])
+  })
+
+  it('puts a short field added from About in About', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [] }))))
+    const page = baseCategory({ detailFields: [{ key: 'about', label: 'About us', type: 'textarea' }] })
+    renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openBox(user, 'About')
+    await user.click(screen.getByRole('button', { name: '+ Add a field' }))
+    await user.type(await screen.findByRole('searchbox', { name: 'Search fields' }), 'Parking')
+    await user.click(screen.getByRole('button', { name: 'Make your own: Parking' }))
+    await user.click(screen.getByRole('button', { name: /^Link/ }))
+    await screen.findByRole('heading', { name: /^Parking/ })
+    await saveNow(user)
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(JSON.parse((vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body).listingParts).toEqual({ about: ['parking'] })
+  })
+
+  it('adds a box from the fields that are one, or an empty one (the user, Nov 10)', async () => {
+    const user = userEvent.setup()
+    const hospital = { community: 'other', category: baseCategory({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'notes', label: 'Visiting notes', type: 'textarea' }, { key: 'liaisons', label: 'Liaisons', type: 'contacts', renderAs: 'row' }, { key: 'w_hours', label: 'Women’s Hours', type: 'hours', audienceKey: 'women' }] }) }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, pages: [...everywhere, hospital] }))))
+    const page = baseCategory({ detailFields: [{ key: 'about', label: 'About us', type: 'textarea' }] })
+    renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: '+ Add a box' }))
+    await screen.findByRole('heading', { name: 'Add a box' })
+    expect(await screen.findByText('Liaisons')).toBeInTheDocument()
+    expect(screen.queryByText('Visiting notes')).toBeNull()
+    // A mikvah section's own field comes with its section, not alone.
+    expect(screen.queryByText('Women’s Hours')).toBeNull()
+    expect(screen.queryByText('Make your own field')).toBeNull()
+    await user.click(screen.getByRole('button', { name: /^Liaisons/ }))
+    await user.click(await screen.findByRole('button', { name: /^Add to / }))
+    await screen.findByRole('heading', { name: 'Groceries' })
+    // A box of its own.
+    expect(screen.getAllByRole('button', { name: /^Liaisons/ }).length).toBeGreaterThan(0)
   })
 
   it('makes a choice from Top a filter, so it stays in Top', async () => {

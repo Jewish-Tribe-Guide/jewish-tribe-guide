@@ -23,6 +23,10 @@ import type { CategoryConfig, CategoryField } from './categories'
 //                 ("Delivery"), what isn't kosher, and the main thing ("Main
 //                 dishes", the davening times, the card above). Unset, that
 //                 order.
+//   contact,      fields put in Contact or About that wouldn't go there by
+//   about         themselves (the user, Nov 10: "why all fields can't just
+//                 go anywhere"): a long text in Contact, a phone in About.
+//                 Anything not listed goes where its kind puts it.
 //
 // Stored as it came from the database and read through parseListingParts,
 // so an unknown shape means none of them rather than an error.
@@ -38,6 +42,8 @@ export type ListingParts = {
   shabbos?: { fields: string[]; after?: number }
   boxes?: ListingBox[]
   lead?: LeadSlot[]
+  contact?: string[]
+  about?: string[]
 }
 
 export function parseListingParts(raw: unknown): ListingParts {
@@ -65,6 +71,10 @@ export function parseListingParts(raw: unknown): ListingParts {
   if (boxes.length > 0) parts.boxes = boxes
   const lead = leadOf(r.lead)
   if (lead) parts.lead = lead
+  for (const box of FIXED_PLACES) {
+    const fields = keys(r[box])
+    if (fields.length > 0) parts[box] = fields
+  }
   return parts
 }
 
@@ -82,13 +92,23 @@ export function leadOrderOf(category: Pick<CategoryConfig, 'listingParts'>): rea
   return parseListingParts(category.listingParts).lead ?? LEAD_SLOTS
 }
 
+/** The boxes every listing has that a field can be put in by name. */
+export const FIXED_PLACES = ['contact', 'about'] as const
+export type FixedPlace = (typeof FIXED_PLACES)[number]
+
+/** Which of Contact and About the admin put a field in, when they did. */
+export function fixedPlaceOf(category: Pick<CategoryConfig, 'listingParts'>): (key: string) => FixedPlace | null {
+  const parts = parseListingParts(category.listingParts)
+  return (key) => FIXED_PLACES.find((p) => parts[p]?.includes(key)) ?? null
+}
+
 function keys(raw: unknown): string[] {
   return Array.isArray(raw) ? [...new Set(raw.filter((f): f is string => typeof f === 'string' && !!f))] : []
 }
 
 /** Whether there's anything to store: none of them is null in the column. */
 export function hasListingParts(parts: ListingParts): boolean {
-  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length || !!parts.lead
+  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length || !!parts.lead || !!parts.contact?.length || !!parts.about?.length
 }
 
 /** The named main thing: its title and its fields, in the category's
@@ -127,7 +147,13 @@ export function shabbosAfter(category: CategoryConfig): number | null {
 
 /** The fields a card can show: what a person writes or picks. */
 export function cardFieldChoices(fields: readonly CategoryField[]): CategoryField[] {
-  return fields.filter((f) => ['text', 'textarea', 'select', 'boolean', 'tel', 'url', 'contacts'].includes(f.type) && !f.audienceKey && f.renderAs !== 'hidden')
+  return fields.filter(
+    (f) =>
+      ['text', 'textarea', 'select', 'boolean', 'tel', 'url', 'contacts', 'number', 'hours', 'tags'].includes(f.type) &&
+      !(f.type === 'tags' && f.showCountInHeader) &&
+      !f.audienceKey &&
+      f.renderAs !== 'hidden',
+  )
 }
 
 // ── In the category editor's draft ──────────────────────────────────────────
@@ -156,6 +182,7 @@ export function listingPartsFromKey(key: string): ListingParts {
       // stays in the draft.
       ...(boxes.length > 0 ? { boxes: boxes.map((b) => ({ title: title(b?.title), fields: keys(b?.fields) })) } : {}),
       ...(leadOf(r.lead) ? { lead: leadOf(r.lead)! } : {}),
+      ...Object.fromEntries(FIXED_PLACES.flatMap((p) => (keys(r[p]).length > 0 ? [[p, keys(r[p])]] : []))),
     }
   } catch {
     return {}

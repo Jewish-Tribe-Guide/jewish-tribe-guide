@@ -951,3 +951,42 @@ describe('ListingView — a box that leads (board B)', () => {
     expect(screen.getByText('Directions')).toBeInTheDocument()
   })
 })
+
+// The user, Nov 10: "I don't understand why all fields can't just go
+// anywhere." A field the admin put in Contact or About is drawn there,
+// whatever its kind; one put in a box of theirs, there.
+describe('ListingView — a field where the admin put it', () => {
+  const notes: CategoryField = { key: 'notes', label: 'Parking', type: 'textarea', renderAs: 'row' }
+  const night: CategoryField = { key: 'night', label: 'Night line', type: 'tel', renderAs: 'row' }
+  const menu: CategoryField = { key: 'menu', label: 'Menu', type: 'url', renderAs: 'row', linkLabel: 'See the menu' }
+  const item = { ...judah, notes: 'Lot behind the building', night: '2155550100', menu: 'https://judahgrill.com/menu' }
+  const placed = (listingParts: object, detailFields = [...food.detailFields, notes, night, menu]) =>
+    view({ item, category: makeCategory({ ...food, detailFields, listingParts }) })
+
+  it('a long text in Contact, a phone and a link in About', () => {
+    placed({ contact: ['notes'], about: ['night', 'menu'] })
+    const contact = screen.getByTestId('listing-details')
+    const about = screen.getByTestId('listing-about')
+    expect(contact).toHaveTextContent('Lot behind the building')
+    expect(about).not.toHaveTextContent('Lot behind the building')
+    expect(within(about).getByRole('link', { name: '(215) 555-0100' })).toHaveAttribute('href', 'tel:2155550100')
+    expect(within(about).getByRole('link', { name: 'See the menu' })).toHaveAttribute('href', 'https://judahgrill.com/menu')
+    // Said once.
+    expect(contact).not.toHaveTextContent('Night line')
+    expect(within(contact).queryByRole('link', { name: 'See the menu' })).toBeNull()
+  })
+
+  it('where its kind puts it, when it wasn’t put anywhere', () => {
+    placed({})
+    expect(screen.getByTestId('listing-about')).toHaveTextContent('Lot behind the building')
+    expect(screen.getByTestId('listing-details')).toHaveTextContent('Night line')
+  })
+
+  it('hours in a box of the admin’s, said there and not again in Contact', () => {
+    const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
+    view({ item: { ...judah, hours: everyDay }, category: makeCategory({ ...food, listingParts: { boxes: [{ title: 'When to come', fields: ['hours'] }] } }) })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('When to come'))!
+    expect(box).toHaveTextContent(/11:00 AM/)
+    expect(screen.getByTestId('listing-details')).not.toHaveTextContent(/11:00 AM/)
+  })
+})

@@ -133,6 +133,19 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   address (`in=`), so a reload keeps it. Changing a ready-made field's
   settings before adding it (turning In the filter on, say) can still
   move it, as it would after adding.
+- **Any field goes in any box but Top** (the user, Nov 10: "I don't
+  understand why all fields can't just go anywhere"). Contact, About and
+  the admin's boxes take any field that isn't the header's: a long text in
+  Contact, a phone or a link in About, hours in "Who to call". Saved as
+  `listingParts.contact` / `.about` (fields put there by name); the
+  listing, the admin preview and the place editor's rows draw them there.
+  Top keeps its rule (photo, short line, filters). Fields that are a box
+  themselves (davening times, a list of contacts or items, a lead link's
+  box) are added from "+ Add a box", which now lists them first and offers
+  "Make an empty box" second; "In a box of their own" is gone from each
+  box's picker. Not changed: the page's own address, phone, hours and
+  website are still added from Contact (they can be dragged after), and a
+  mikvah section's fields come with their section (+ Add audience group).
 - **A category page in admin opens without waiting on the list again**
   (the user, Nov 9: "Most noticable is lcikcing on a category page in
   admin"). Each Category pages screen is its own address, so every open
