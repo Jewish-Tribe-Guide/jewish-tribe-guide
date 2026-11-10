@@ -74,7 +74,7 @@ test('creating a category through the real editor makes it live, and deleting it
   // + Add a field, from a box of Fields (board 17): the ready-made list
   // loads (boards 7 and 11), and a field from it is saved onto the page, in
   // the box it shows in, opened.
-  await visible(page.getByRole('button', { name: 'Top', exact: true })).click()
+  await visible(page.getByRole('button', { name: 'Contact', exact: true })).click()
   await visible(page.getByRole('button', { name: '+ Add a field' })).click()
   await visible(page.getByRole('button', { name: /^Hours/ })).click()
   await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
