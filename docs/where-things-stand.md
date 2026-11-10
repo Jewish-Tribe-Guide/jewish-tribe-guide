@@ -98,13 +98,19 @@ The user's answers on Nov 10, evening, and what was done with them:
     - **Editing follows the listing; admins arrange it** (the user: "an
       admin should have customization power to organize the website how
       it works for them", with simplicity for visitors first; 8bdf3495).
-      The add/edit screen's sections are the listing's boxes: same order,
-      same names, the address and phone in whichever box holds them.
-      Kept: name and photo first, the kind and facts rows under them,
-      davening's usual-weekday / usual-Shabbos / this-week / next-week
-      sections, and hours in Contact as a section of their own after it
-      (Oct 11). A hospital's Shabbos section is named "This Shabbos", as
-      its box is.
+      The rule, whole: the add/edit screen follows the listing's boxes
+      (their order, their names, where each field sits, the address and
+      phone included), and anything that is a screen of its own gets its
+      own section right where its box is: davening (as usual weekday,
+      usual Shabbos, this week, next week), an item list (Main dishes),
+      a list of people to call, and hours (Oct 11). Also not a box: the
+      top keeps name and photo first, then the kind and the kosher row,
+      as the listing's top does (the amber "What isn't kosher" box is
+      edited in that kosher row); adding, sections still empty wait under
+      "Not on the listing yet". A hospital's Shabbos section is named
+      "This Shabbos", as its box is. Not yet true in the code: hours are
+      broken out only from Contact; in an admin's own box they're edited
+      inside that box's section (proposed fix, waiting on the user).
     - **A box's X is at the end of its name bar**, not a trash can on its
       + Add a field line (405aacd9).
 - **The Add box's steps are in the address, and its first link is "Find
