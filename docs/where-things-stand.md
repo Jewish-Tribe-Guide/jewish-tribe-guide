@@ -81,11 +81,47 @@ The user's answers on Nov 10, evening, and what was done with them:
     - **Address and phone move to any box** ("we should also be able to
       move all fields. Including address and phone"; deab70a7). Saved as
       `@address` / `@phone` in the box's list, Contact when nowhere. The
-      listing draws them in that box; the place editor still edits them
-      with the contact. Hours and website are still added from Contact
-      (they drag after, as before).
+      listing draws them in that box, first in it, address before phone,
+      as Fields lists them; the place editor edits them there too (see
+      "Editing follows the listing" below). A keyboard move that would
+      change nothing (the phone one step inside Contact) is skipped, so
+      the phone leaves Contact in one press (d72a1943). Hours and website
+      are still added from Contact (they drag after, as before).
+    - **No repeated headings** (c98028e6). A list drawn in a box of the
+      same name is named once (Main dishes made an admin box said "Main
+      dishes" three times); in a box of another name it's named small
+      under it.
+    - **How it looks is honest** (69bcc7d3): a field picked from a box's
+      + Add a field is shown in that box, as it really looks (the
+      davening table), on this page's own places, the one answering it
+      first; "On X, its answer made up" when none do.
+    - **Editing follows the listing; admins arrange it** (the user: "an
+      admin should have customization power to organize the website how
+      it works for them", with simplicity for visitors first; 8bdf3495).
+      The add/edit screen's sections are the listing's boxes: same order,
+      same names, the address and phone in whichever box holds them.
+      Kept: name and photo first, the kind and facts rows under them,
+      davening's usual-weekday / usual-Shabbos / this-week / next-week
+      sections, and hours in Contact as a section of their own after it
+      (Oct 11). A hospital's Shabbos section is named "This Shabbos", as
+      its box is.
     - **A box's X is at the end of its name bar**, not a trash can on its
       + Add a field line (405aacd9).
+- **The Add flow: a recommendation, waiting on the user** (looked at
+  Nov 10, nothing changed). Today: + Add → "Add or update a place" (paste
+  or photo, or "Fill it in yourself") → "Find the place" (Google search,
+  or "Not on Google? Fill it in yourself") → "Add to Food" (Name and
+  Address needed, the rest under "Not on the listing yet", now in the
+  listing's order). Two findings: "Fill it in yourself" is on two screens
+  and means a different thing on each, and the three steps are React
+  state only, so the browser's Back from "Add to Food" closes the whole
+  box and loses what was typed (against "every screen of its own has an
+  address"). Recommended: put the steps in the address
+  (`useStepsInAddress`), and call the first screen's link "Find the place"
+  (what it opens), leaving "Fill it in yourself" to mean the empty form.
+  Keep "Find the place" itself: it is the one search that finds a place
+  already in the guide and opens its edit (agreed Oct 5), which the add
+  form's address box doesn't.
 - **"More" is gone from a field's screen**, for a superadmin too (the
   user: "yes remove it"). The old field form (CategoryFieldEditor) is
   deleted, so its settings can't be reached by anyone now.
