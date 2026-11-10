@@ -146,6 +146,16 @@ invent any questions or other things." (`src/lib/eruvFields.ts`)
   box's picker. Not changed: the page's own address, phone, hours and
   website are still added from Contact (they can be dragged after), and a
   mikvah section's fields come with their section (+ Add audience group).
+- **"Under the name" on a field's own screen** (the user, Nov 10, board
+  D2 of canvas Y4Cn6WNqe54xHQpYGY6dPH: keep today's field screens, no Box
+  menu). A ready-made Choices, Yes-or-no or short-text field gets an
+  "Under the name" switch in What you can change ("Shows on its row in
+  the list"); a field you made gets "Show it under the name?" Yes / No.
+  It sets the field's second line (`onCard`) or third line
+  (`showInHeader`), whichever it is. How it looks switches to List when
+  it changes. Not on the Eruv page, which has no rows. Still to build from
+  boards A and B: no Top, every box moves, + Add a box in place, and how
+  a box is removed.
 - **A category page in admin opens without waiting on the list again**
   (the user, Nov 9: "Most noticable is lcikcing on a category page in
   admin"). Each Category pages screen is its own address, so every open

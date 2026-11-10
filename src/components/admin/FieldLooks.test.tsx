@@ -138,6 +138,21 @@ describe('FieldLooks: a field, how it looks, as tabs (boards 33d–34c)', () => 
     expect(shown()).toHaveAccessibleName('A listing')
   })
 
+  // Nov 10: the field's own "Under the name" switch puts it on its row or
+  // takes it off, and How it looks shows the List, where that's seen.
+  it('shows the List when the field goes on its row or comes off it, whatever tab was showing', async () => {
+    const { rerender, ...props } = show(foodType, [foodType, delivery])
+    await open('Adding')
+    const off = { ...foodType, onCard: false }
+    rerender(<FieldLooks {...props} category={food([off, delivery])} field={off} />)
+    expect(shown()).toHaveAccessibleName('List')
+    expect(shown()).toHaveTextContent('Not shown in the list.')
+    await open('A listing')
+    rerender(<FieldLooks {...props} category={food([foodType, delivery])} field={foodType} />)
+    expect(shown()).toHaveAccessibleName('List')
+    expect(marks()).toEqual(['Meat', 'Dairy', 'Parve'])
+  })
+
   it('opens the whole page', async () => {
     const user = userEvent.setup()
     const { onWholePage } = show(foodType, [foodType])

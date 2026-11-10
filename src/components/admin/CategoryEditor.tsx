@@ -645,6 +645,8 @@ function CategoryEditorScreen({
         onChange={(patch) => updateField(i, patch)}
         onKosherQuestions={(on) => toggleFieldCaveat(i, on)}
         partner={partnerRule(field) ? { on: !!partnerOf(draft.fields, field), onChange: (on) => togglePartner(i, on) } : undefined}
+        // An eruv isn't listed on rows (no "Before it's opened").
+        rows={!eruvPage}
         onRemove={removeIt}
         onBack={() => void screens.back()}
         more={

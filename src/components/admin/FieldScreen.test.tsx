@@ -18,11 +18,11 @@ const foodType: CategoryField = {
   multiSelect: true,
 }
 
-function Screen({ field, onRemove = vi.fn(), canRequire = true }: { field: CategoryField; onRemove?: () => void; canRequire?: boolean }) {
+function Screen({ field, onRemove = vi.fn(), canRequire = true, rows = false }: { field: CategoryField; onRemove?: () => void; canRequire?: boolean; rows?: boolean }) {
   const [f, setF] = useState(field)
   return (
     <>
-      <FieldScreen field={f} pageName="Food" canRequire={canRequire} onChange={(p) => setF({ ...f, ...p })} onRemove={onRemove} onBack={vi.fn()} />
+      <FieldScreen field={f} pageName="Food" canRequire={canRequire} onChange={(p) => setF({ ...f, ...p })} onRemove={onRemove} onBack={vi.fn()} rows={rows} />
       <output data-testid="field">{JSON.stringify(f)}</output>
     </>
   )
@@ -255,5 +255,39 @@ describe('FieldScreen — a field made here', () => {
     expect(screen.queryByText('Choices', { selector: 'h2' })).not.toBeInTheDocument()
     expect(screen.queryByRole('radiogroup', { name: 'Should it be part of the filter?' })).not.toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: 'Is it a required field?' })).toBeInTheDocument()
+  })
+})
+
+// D2 (Nov 10): a field says itself whether it shows under a place's name on
+// its row, beside whether it's in the filter. The same setting the page's
+// "Before it's opened" sets (cardLines.ts), so the two never disagree.
+describe('FieldScreen — Under the name', () => {
+  it('a ready-made choice: a switch at its setting, which puts it on the row or takes it off', async () => {
+    const user = userEvent.setup()
+    render(<Screen field={foodType} rows />)
+    const under = within(box('What you can change')).getByRole('switch', { name: 'Under the name' })
+    // A filter's badge is on the row until someone says otherwise.
+    expect(under).toHaveAttribute('aria-checked', 'true')
+    await user.click(under)
+    expect(saved().onCard).toBe(false)
+    expect(under).toHaveAttribute('aria-checked', 'false')
+    await user.click(under)
+    expect(saved().onCard).toBe(true)
+  })
+
+  it('a short line goes on the row as its third line', async () => {
+    const user = userEvent.setup()
+    render(<Screen field={{ key: 'tagline', label: 'Tagline', type: 'text', madeHere: true }} rows />)
+    const q = screen.getByRole('radiogroup', { name: 'Show it under the name?' })
+    await user.click(within(q).getByRole('radio', { name: 'Yes' }))
+    expect(saved().showInHeader).toBe(true)
+  })
+
+  it('is not asked of what can’t go on a row, or where places aren’t listed on rows', () => {
+    render(<Screen field={{ key: 'menu', label: 'Menu', type: 'url' }} rows />)
+    expect(screen.queryByRole('switch', { name: 'Under the name' })).not.toBeInTheDocument()
+    cleanup()
+    render(<Screen field={foodType} />)
+    expect(screen.queryByRole('switch', { name: 'Under the name' })).not.toBeInTheDocument()
   })
 })

@@ -80,11 +80,20 @@ export default function FieldLooks({
 
   const tabs: Tab[] = ['list', ...(filters.some((f) => f.mine) ? (['filters'] as const) : []), 'listing', ...(canAdd ? (['adding'] as const) : [])]
   // Opens on the first tab the field is in: a field off the row opens on
-  // its listing.
+  // its listing. Put on its row or taken off ("Under the name", Nov 10), it
+  // shows the List, where that's seen, rather than jumping to whichever tab
+  // it's still in.
   const shows: Record<Tab, boolean> = { list: row.onRow, filters: true, listing: listing.at !== 'none', adding: true }
   const first = tabs.find((t) => shows[t]) ?? 'list'
   const [picked, setPicked] = useState<{ key: string; tab: Tab } | null>(null)
-  const tab = picked && picked.key === field.key && tabs.includes(picked.tab) ? picked.tab : first
+  const [seen, setSeen] = useState({ key: field.key, onRow: row.onRow, tab: null as Tab | null })
+  if (seen.key !== field.key) setSeen({ key: field.key, onRow: row.onRow, tab: null })
+  else if (seen.onRow !== row.onRow) {
+    setSeen({ key: field.key, onRow: row.onRow, tab: 'list' })
+    setPicked(null)
+  }
+  const start = seen.key === field.key && seen.tab ? seen.tab : first
+  const tab = picked && picked.key === field.key && tabs.includes(picked.tab) ? picked.tab : start
 
   return (
     <aside aria-label="How it looks" className="shrink-0 sticky top-8 self-start flex w-[376px] flex-col gap-3">

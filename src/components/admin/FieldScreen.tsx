@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { adminBase } from '@/lib/adminNav'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { MINYAN_PARTS, slugifyFieldKey, TYPE_IS_FILTERABLE, type CategoryField, type FieldType } from '@/lib/categories'
+import { canGoUnderName, cardPatch, underName } from '@/lib/cardLines'
 import { fieldAbout, fieldRules } from '@/lib/fieldAbout'
 import { partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT } from '@/lib/kosherQuestions'
@@ -52,6 +53,7 @@ export default function FieldScreen({
   more,
   onKosherQuestions,
   partner,
+  rows = false,
 }: {
   field: CategoryField
   pageName: string
@@ -66,9 +68,11 @@ export default function FieldScreen({
   onKosherQuestions?: (on: boolean) => void
   /** The field that comes with it (fieldPartners.ts): on the page, and its switch. */
   partner?: PartnerSwitch
+  /** The page lists its places on rows, so "Under the name" means something. */
+  rows?: boolean
 }) {
-  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} onKosherQuestions={onKosherQuestions} partner={partner} />
-  return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} />
+  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
+  return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} rows={rows} />
 }
 
 type ScreenProps = Parameters<typeof FieldScreen>[0]
@@ -106,12 +110,12 @@ function RemoveFrom({ pageName, onRemove }: { pageName: string; onRemove: () => 
   )
 }
 
-function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, onKosherQuestions, partner }: ScreenProps) {
+function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, onKosherQuestions, partner, rows }: ScreenProps) {
   return (
     <>
       <AdminBack back={{ label: pageName, onClick: onBack }} title={<FieldTitle field={f} />} />
       <WhatThisIs field={f} partnerOn={!!partner?.on} />
-      <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} partner={partner} />
+      <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
       <More more={more} />
       <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
@@ -196,6 +200,7 @@ export function FieldChanges({
   fixed = false,
   onKosherQuestions,
   partner,
+  rows = false,
 }: {
   field: CategoryField
   canRequire: boolean
@@ -206,6 +211,8 @@ export function FieldChanges({
   onKosherQuestions?: (on: boolean) => void
   /** The field that comes with it, when it has one. */
   partner?: PartnerSwitch
+  /** The page lists its places on rows: "Under the name" is offered. */
+  rows?: boolean
 }) {
   // A photo, a list, contacts or davening times aren't a thing a place can't
   // do without. A yes or no can be required (the user, Nov 8): it starts
@@ -217,11 +224,12 @@ export function FieldChanges({
   const kosher = !fixed && !!rules.asksEverythingKosher
   const partnerSays = !fixed && partner ? partnerRule(f) : undefined
   const minyan = !fixed && f.type === 'minyanim'
+  const under = !fixed && rows && canGoUnderName(f)
   const off = f.minyanOff ?? []
   return (
     <>
       <AdminBox title="What you can change">
-        {!required && !filter && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
+        {!required && !filter && !under && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
         {required && (
           <Change label="Required" hint="A place can’t be added without it">
             <AdminSwitch checked={!!f.required} onChange={(on) => onChange({ required: on })} label="Required" />
@@ -238,6 +246,11 @@ export function FieldChanges({
               onChange={(on) => onChange(on && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: on })}
               label={f.type === 'hours' ? 'Open now in the filter' : 'In the filter'}
             />
+          </Change>
+        )}
+        {under && (
+          <Change label="Under the name" hint="Shows on its row in the list">
+            <AdminSwitch checked={underName(f)} onChange={(on) => onChange(cardPatch(f, on))} label="Under the name" />
           </Change>
         )}
         {kosher && (
@@ -273,7 +286,7 @@ export function FieldChanges({
   )
 }
 
-function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more }: ScreenProps) {
+function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, rows }: ScreenProps) {
   // A new field's key follows its name until the name is left, then never
   // changes, so a rename never strands its answers (CategoryFieldEditor's
   // keyFrozenRef has the history).
@@ -315,7 +328,7 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, on
         </div>
       </AdminBox>
       {choices && <ChoiceList field={f} onChange={onChange} />}
-      {(canRequire && f.type !== 'boolean' && f.type !== 'image') || TYPE_IS_FILTERABLE(f.type) || f.type === 'select' ? (
+      {(canRequire && f.type !== 'boolean' && f.type !== 'image') || TYPE_IS_FILTERABLE(f.type) || f.type === 'select' || (rows && canGoUnderName(f)) ? (
         <AdminBox title="Questions">
           {canRequire && f.type !== 'boolean' && f.type !== 'image' && (
             <AdminYesNo question="Is it a required field?" value={!!f.required} onChange={(yes) => onChange({ required: yes })} />
@@ -323,6 +336,7 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, on
           {TYPE_IS_FILTERABLE(f.type) && (
             <AdminYesNo question={f.type === 'hours' ? 'Should “Open now” be part of the filter?' : 'Should it be part of the filter?'} value={!!f.filterable} onChange={filter} />
           )}
+          {rows && canGoUnderName(f) && <AdminYesNo question="Show it under the name?" value={underName(f)} onChange={(yes) => onChange(cardPatch(f, yes))} />}
           {f.type === 'select' && <AdminYesNo question={both} value={!!f.multiSelect} onChange={(yes) => onChange({ multiSelect: yes })} />}
         </AdminBox>
       ) : null}
