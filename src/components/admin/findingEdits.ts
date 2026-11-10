@@ -2,7 +2,7 @@ import { companionKeys, type CategoryConfig } from '@/lib/categories'
 import { contactBoxName } from '@/lib/contactRead'
 import { editorRows } from '@/lib/editorRows'
 import { websiteKeyOf, type GooglePlace } from '@/lib/googleJob'
-import { kosherBoxKeys, kosherRowId } from '@/lib/kosherBox'
+import { kosherBoxKeys } from '@/lib/kosherBox'
 import { itemsField } from '@/lib/listingView'
 import { minyanWriting } from '@/lib/minyanText'
 import { schedulesKey } from '@/lib/schedules'
@@ -118,7 +118,7 @@ export function kosherEdit(f: Finding, item: DirectoryResource, category: Catego
   const editable = category.detailFields.flatMap((x) => [x.key, ...companionKeys(x)])
   const own = item as unknown as Details
   return {
-    edit: { title: 'Kosher', fields: [], rows: [kosherRowId(category)], preset: Object.fromEntries([...keys].map((k) => [k, next[k] ?? null])) },
+    edit: { title: 'Kosher', fields: [], rows: ['facts'], preset: Object.fromEntries([...keys].map((k) => [k, next[k] ?? null])) },
     send:
       f.operation === 'delete'
         ? { path: KOSHER_API, method: 'POST', body: (p) => ({ action: 'edit', id: f.id, details: pick(detailsOf(p), [...keys]) }) }

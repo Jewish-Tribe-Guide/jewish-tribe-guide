@@ -25,17 +25,12 @@ export type KosherRow = {
   mark: KosherRowMark
 }
 
-/** The listing's Kosher box: the editor's row the hechsher is in (its
- *  facts, or the box the admin put it in, Nov 10), its parts with it;
+/** The listing's Kosher box: its facts row, when a hechsher heads it;
  *  none for a category with no hechsher (a grocery's "Kosher Store"). */
 export function kosherBoxFields(category: CategoryConfig): CategoryField[] {
-  return kosherRow(category)?.fields ?? []
+  const row = editorRows(category, {}).find((r) => r.id === 'facts')
+  return row && row.fields.some((f) => f.caveat) ? row.fields : []
 }
-
-/** That row's id, for opening the editor on it. */
-export const kosherRowId = (category: CategoryConfig): string => kosherRow(category)?.id ?? 'facts'
-
-const kosherRow = (category: CategoryConfig) => editorRows(category, {}).find((r) => r.kind === 'fields' && r.fields.some((f) => f.caveat))
 
 export const kosherBoxKeys = (category: CategoryConfig): string[] => kosherBoxFields(category).map((f) => f.key)
 

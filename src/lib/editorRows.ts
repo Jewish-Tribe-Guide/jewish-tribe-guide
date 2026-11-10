@@ -5,8 +5,7 @@ import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
 import { sameFieldValue } from './listingDiff'
 import { boxesOf, fixedPlaceOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
-import { isWebsite, itemsField, kindField, siteName } from './listingView'
-import { partKeys, partsOf } from './fieldParts'
+import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
 import { MENU_LINK_KEY, MENU_LINK_LABEL } from './menuLink'
@@ -90,21 +89,17 @@ const BROUGHT_UP: Partial<Record<FieldType, true>> = { url: true, text: true, te
 export function editorRows(category: CategoryConfig, details: Record<string, unknown>, { week, nextWeek, splitContact, allSections }: { week?: EditWeek | null; nextWeek?: EditWeek | null; splitContact?: boolean; allSections?: boolean } = {}): EditorRow[] {
   const fields = category.detailFields
   const placed = new Set<string>()
-  // A field's parts (a hechsher's questions and certificate, Delivery's
-  // WhatsApp group: fieldParts.ts) are in whichever row it is, right after
-  // it, and in no row of their own (the user, Nov 10).
-  const parts = partKeys(fields)
-  for (const k of parts) placed.add(k)
   const take = (list: CategoryField[]) => {
-    const out = list.flatMap((f) => (parts.has(f.key) ? [] : [f, ...partsOf(f, fields)]))
-    for (const f of out) placed.add(f.key)
-    return out
+    for (const f of list) placed.add(f.key)
+    return list
   }
   // Contact or About, where the admin put a field in one by name.
   const fixedPlace = fixedPlaceOf(category)
+  const caveatParts = new Set(fields.flatMap((f) => (f.caveat ? [f.caveat.flagField, f.caveat.noteField] : [])))
   const audienceFlags = new Set(fields.map((f) => f.audienceKey).filter((k): k is string => !!k))
-  // Hidden fields stay out (a part that is one comes with its field).
-  for (const f of fields) if (f.renderAs === 'hidden') placed.add(f.key)
+  // Hidden fields stay out, but for a hechsher's caveat (its yes/no and
+  // note), which the listing says in its own box.
+  for (const f of fields) if (f.renderAs === 'hidden' && !caveatParts.has(f.key)) placed.add(f.key)
 
   const rows: EditorRow[] = []
 
@@ -145,12 +140,19 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
       !placed.has(f.key) &&
       f.key !== items?.key &&
       !f.audienceKey &&
-      (isBadge(f) || audienceFlags.has(f.key)) &&
+      (isBadge(f) || caveatParts.has(f.key) || audienceFlags.has(f.key)) &&
       !(isBadge(f) && !f.filterable && fixedPlace(f.key) === 'about'),
   )
-  // The certificate's link goes under the hechsher, not with the website
-  // (the user, Oct 11): it's the hechsher's part.
   const facts = factFields.filter((f) => !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key) && !(allSections && audienceFlags.has(f.key)))
+  // The certificate's link goes under the hechsher, not with the website
+  // (the user, Oct 11), unless the admin put it in a box of its own.
+  const hechsher = facts.findIndex((f) => f.caveat)
+  if (hechsher >= 0) {
+    const links = fields.filter(
+      (f) => isCertificateLink(f) && !placed.has(f.key) && !f.audienceKey && !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key),
+    )
+    facts.splice(hechsher + 1, 0, ...links)
+  }
   if (allSections) take(fields.filter((f) => audienceFlags.has(f.key)))
   if (facts.length > 0) rows.push({ id: 'facts', title: factsTitle(facts), kind: 'fields', fields: take(facts) })
 

@@ -88,70 +88,68 @@ describe('ListingView — who and whether', () => {
     expect(screen.getByTestId('listing-tagline').parentElement).not.toBe(screen.getByTestId('listing-status').parentElement)
   })
 
-  // Round 3 (the user, Nov 10): a hechsher is one field, its question and
-  // certificate its parts, said with it in whichever box it's in (E2).
-  const partial = { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' }
-  const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
-  const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+  it('says a hechsher’s caveat under the facts, on its own; what isn’t kosher, in full, in the details', () => {
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' } })
+    expect(screen.getByTestId('listing-caveat')).toHaveTextContent(/^Not everything here is kosher$/)
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
+  })
 
-  it('says the hechsher whole in Contact while it’s in no box: which, what isn’t kosher, its certificate', () => {
-    view({ item: partial })
-    const details = screen.getByTestId('listing-details')
-    const hechsher = within(details).getByTestId('listing-hechsher')
-    expect(hechsher).toHaveTextContent('Keystone-K')
-    expect(within(hechsher).getByTestId('listing-caveat-box')).toHaveTextContent('What isn’t kosher')
-    expect(within(hechsher).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
-    expect(within(hechsher).getByRole('link', { name: 'Certificate' })).toHaveAttribute('href', 'https://keystone-k.org/judah')
-    // Not a line under the name, nor a box of its own.
+  // The user's note 9 (agreed Oct 10): on Food, what isn't kosher is its
+  // own box, first after the buttons, said once.
+  it('on Food, what isn’t kosher is its own box first after the buttons, said once', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes] }) })
+    const box = screen.getByTestId('listing-caveat-box')
+    expect(within(box).getByRole('heading', { name: 'What isn’t kosher' })).toBeInTheDocument()
+    expect(box).toHaveTextContent('The bar is not supervised')
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(after(screen.getByTestId('listing-actions'), box)).toBe(true)
+    expect(after(box, screen.getByTestId('listing-items'))).toBe(true)
     expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('listing-caveat-note')).not.toBeInTheDocument()
     expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
   })
 
-  it('in the admin’s Kosher box (E1b): which, what isn’t kosher, its certificate, said once', () => {
-    const kosher = makeCategory({ ...food, detailFields: [...food.detailFields, dishes], listingParts: { boxes: [{ title: 'Kosher', fields: ['kosherCert', 't'] }] } })
-    view({ item: { ...partial, dishes: ['Shawarma'] }, category: kosher })
-    const box = screen.getAllByTestId('listing-box').find((b) => within(b).queryByRole('heading', { name: 'Kosher' }))!
-    expect(within(box).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
-    expect(within(box).getByRole('link', { name: 'Certificate' })).toBeInTheDocument()
-    expect(box).toHaveTextContent('Meat')
-    expect(within(screen.getByTestId('listing-details')).queryByTestId('listing-hechsher')).not.toBeInTheDocument()
-    expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
-    expect(screen.getAllByRole('link', { name: 'Certificate' })).toHaveLength(1)
-  })
-
-  it('heads what isn’t kosher with the name the admin gave it', () => {
+  it('heads what isn’t kosher with the name the admin gave its box', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
     const named = food.detailFields.map((f) => (f.caveat ? { ...f, caveat: { ...f.caveat, title: 'Not kosher here' } } : f))
-    view({ item: partial, category: makeCategory({ ...food, detailFields: named }) })
-    expect(within(screen.getByTestId('listing-caveat-box')).getByText('Not kosher here')).toBeInTheDocument()
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'] }, category: makeCategory({ ...food, detailFields: [...named, dishes] }) })
+    expect(within(screen.getByTestId('listing-caveat-box')).getByRole('heading', { name: 'Not kosher here' })).toBeInTheDocument()
+    // A grocery's says it in the details.
+    cleanup()
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' }, category: makeCategory({ ...food, detailFields: named }) })
+    expect(within(screen.getByTestId('listing-details')).getByText('Not kosher here')).toBeInTheDocument()
   })
 
-  // E3b: dragged from Kosher into Contact; its question and link come along.
-  it('goes where the hechsher is dragged, its parts with it', () => {
-    const moved = makeCategory({ ...food, listingParts: { boxes: [{ title: 'Kosher', fields: ['t'] }], contact: ['kosherCert'] } })
-    view({ item: partial, category: moved })
-    const details = screen.getByTestId('listing-details')
-    expect(within(details).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
-    expect(within(details).getByRole('link', { name: 'Certificate' })).toBeInTheDocument()
-    const kosherBox = screen.getAllByTestId('listing-box').find((b) => within(b).queryByRole('heading', { name: 'Kosher' }))!
-    expect(kosherBox).not.toHaveTextContent('The bar is not supervised')
+  // Board 4's handles: the listing's own boxes in the order the admin put them.
+  it('puts the dishes and what isn’t kosher in the order the admin saved', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const item = { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'] }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes], listingParts: { lead: ['main', 'caveat', 'link'] } }) })
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(after(screen.getByTestId('listing-items'), screen.getByTestId('listing-caveat-box'))).toBe(true)
+    expect(after(screen.getByTestId('listing-actions'), screen.getByTestId('listing-items'))).toBe(true)
   })
 
   // The user, Nov 10: any box anywhere. Contact and About above the rest.
   it('puts every box where the admin dragged it, Contact and About included', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
     const about: CategoryField = { key: 'about', label: 'About', type: 'textarea' }
-    const item = { ...partial, dishes: ['Shawarma'], about: 'Family run since 1990.' }
-    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes, about], listingParts: { boxes: [{ title: 'Kosher', fields: ['kosherCert'] }], order: ['about', 'contact', 'items', 'box'] } }) })
+    const item = { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'], about: 'Family run since 1990.' }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes, about], listingParts: { order: ['about', 'contact', 'items', 'caveat'] } }) })
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
     const aboutBox = screen.getByText('Family run since 1990.')
     expect(after(aboutBox, screen.getByTestId('listing-details'))).toBe(true)
     expect(after(screen.getByTestId('listing-details'), screen.getByTestId('listing-items'))).toBe(true)
     expect(after(screen.getByTestId('listing-items'), screen.getByTestId('listing-caveat-box'))).toBe(true)
   })
 
-  it('a grocery’s is said the same way: with its hechsher, not under the name', () => {
+  it('a grocery’s caveat stays under the name and in the details', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     view({ item: { ...judah, kosherPartial: true, kosherNote: 'The deli is not supervised', m: ['Challah'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, m] }) })
-    expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('listing-hechsher')).getByTestId('listing-caveat-note')).toHaveTextContent('The deli is not supervised')
+    expect(screen.queryByTestId('listing-caveat-box')).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-caveat')).toHaveTextContent('Not everything here is kosher')
+    expect(screen.getByTestId('listing-caveat-note')).toHaveTextContent('The deli is not supervised')
   })
 
   it('says what isn’t kosher once: not again in About', () => {
@@ -162,12 +160,9 @@ describe('ListingView — who and whether', () => {
     expect(screen.getByTestId('listing-about')).not.toHaveTextContent('The bar is not supervised')
   })
 
-  it('has no What isn’t kosher where everything is', () => {
+  it('has no caveat line without one', () => {
     view()
     expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('listing-caveat-box')).not.toBeInTheDocument()
-    // The hechsher and its certificate are still said.
-    expect(within(screen.getByTestId('listing-hechsher')).getByRole('link', { name: 'Certificate' })).toBeInTheDocument()
   })
 })
 
@@ -201,8 +196,7 @@ describe('ListingView — actions', () => {
   it('Directions, Call, each link, then Share', () => {
     view()
     const labels = [...screen.getByTestId('listing-actions').querySelectorAll('a, button')].map((el) => el.textContent)
-    // The certificate is said with the hechsher (Nov 10), not up here.
-    expect(labels).toEqual(['Directions', 'Call', 'Website', 'Share'])
+    expect(labels).toEqual(['Directions', 'Call', 'Website', 'Certificate', 'Share'])
   })
 })
 
@@ -932,46 +926,41 @@ describe('ListingView — Edit under every box (Oct 15)', () => {
   })
 })
 
-// Board B, Oct 27: a delivery's WhatsApp group is how it's ordered. Round 3
-// (the user, Nov 10): Delivery is one field, its group its part: what it
-// says, then Join the group, in whichever box holds it.
-describe('ListingView — Delivery and its group', () => {
+// Board B, Oct 27: a delivery's WhatsApp group is how it's ordered, and was
+// a blue line 1.6 screens down. The admin's leadBox on the link: its own
+// box first, under the buttons, the link a wide green Join in it.
+describe('ListingView — a box that leads (board B)', () => {
   const kind: CategoryField = { key: 'foodType', label: 'Store Type', type: 'select', renderAs: 'badge', filterable: true, multiSelect: true, options: [{ value: 'Restaurant', label: 'Restaurant' }, { value: 'Scheduled Deliveries', label: 'Scheduled Deliveries' }] }
   const showIf = { field: 'foodType', equals: 'Scheduled Deliveries' }
   const group: CategoryField = { key: 'delivery_whatsapp_group', label: 'Delivery WhatsApp Group', type: 'url', renderAs: 'row', linkLabel: 'Join WhatsApp Group', showIf, leadBox: { title: 'Delivery', text: 'delivery_details' } }
   const details: CategoryField = { key: 'delivery_details', label: 'Delivery Details', type: 'textarea', renderAs: 'row', showIf }
-  const delivery = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [website, kind, certLink, group, details], listingParts: { boxes: [{ title: 'Delivery', fields: ['delivery_details'] }] } })
+  const delivery = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [website, kind, certLink, group, details] })
   const said = 'Delivers on Thursday around 5:30pm. $10 delivery fee.'
   const mikes = (over: Record<string, unknown> = {}) =>
     makeListing({ id: 'mikes', name: 'Mike’s Chicken', phone: '(469) 278-6249', website: 'https://mikeschicken.com/', foodType: ['Scheduled Deliveries'], delivery_whatsapp_group: 'https://chat.whatsapp.com/Mikes', delivery_details: said, geo: { lat: 33, lng: -96 }, ...over })
-  const deliveryBox = () => screen.queryAllByTestId('listing-box').find((b) => within(b).queryByRole('heading', { name: 'Delivery' }))
 
-  it('in the admin’s Delivery box: what it says, then Join the group, said once', () => {
+  it('its box right under the buttons: the title, what it says, then Join the group', () => {
     view({ item: mikes(), category: delivery })
-    const box = deliveryBox()!
+    const box = screen.getByTestId('listing-lead-box')
+    expect(screen.getByTestId('listing-actions').nextElementSibling).toBe(box)
+    expect(within(box).getByRole('heading', { name: 'Delivery' })).toBeInTheDocument()
     const join = within(box).getByRole('link', { name: 'Join the group' })
     expect(join).toHaveAttribute('href', 'https://chat.whatsapp.com/Mikes')
     expect(within(box).getByText(said).compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // Said once: not again in About, the contact box or the buttons.
+    expect(within(box).getByTestId('freshness')).toBeInTheDocument()
+    // Said once: not again in About or the contact box.
     expect(screen.getAllByText(said)).toHaveLength(1)
     expect(screen.getAllByRole('link').filter((a) => a.getAttribute('href') === 'https://chat.whatsapp.com/Mikes')).toHaveLength(1)
     // It comes to you: no Directions to the kitchen.
     expect(screen.queryByText('Directions')).not.toBeInTheDocument()
   })
 
-  it('in About while it’s in no box, the group with it', () => {
-    view({ item: mikes(), category: makeCategory({ ...delivery, listingParts: undefined }) })
-    const about = screen.getByTestId('listing-about')
-    expect(within(about).getByText(said)).toBeInTheDocument()
-    expect(within(about).getByRole('link', { name: 'Join the group' })).toBeInTheDocument()
-  })
-
   it('with only what it says, no button; none on a place it isn’t for', () => {
     view({ item: mikes({ delivery_whatsapp_group: '' }), category: delivery })
-    expect(within(deliveryBox()!).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('listing-lead-box')).queryByRole('link')).not.toBeInTheDocument()
     cleanup()
     view({ item: mikes({ foodType: ['Restaurant'] }), category: delivery })
-    expect(deliveryBox()).toBeUndefined()
+    expect(screen.queryByTestId('listing-lead-box')).not.toBeInTheDocument()
     expect(screen.getByText('Directions')).toBeInTheDocument()
   })
 })
