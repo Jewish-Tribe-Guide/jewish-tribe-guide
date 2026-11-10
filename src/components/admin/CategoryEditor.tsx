@@ -12,18 +12,16 @@ import { addBox, basicsLandIn, fieldBoxes, madeField, removeBox, renameBox, rena
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
-import FieldBoxes from './FieldBoxes'
+import FieldBoxes, { addBoxButton, PlusIcon } from './FieldBoxes'
 import WalkBox from './WalkBox'
 import CardBox, { ShowOnLine, type CardLine } from './CardBox'
 import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview, { type PreviewView } from './CategoryPreview'
 import { sampleName } from '@/lib/fieldLooks'
 import { CardBandImageField, IconField } from './CategoryFormFields'
-import { FieldEditor } from './CategoryFieldEditor'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import FieldLooks from './FieldLooks'
-import { useIsSuperAdmin } from './AdminAuthGate'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
 import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
@@ -107,7 +105,6 @@ function CategoryEditorScreen({
   const [previewing, setPreviewing] = useState(false)
   // Page, A listing or Adding, beside the settings and opened full size.
   const [previewView, setPreviewView] = useState<PreviewView>('page')
-  const superAdmin = useIsSuperAdmin()
   // The field whose own screen is open (board "Field"), by its place in
   // draft.fields, or the page's address or phone.
   const [openField, setOpenField] = useState<OpenField | null>(null)
@@ -118,7 +115,8 @@ function CategoryEditorScreen({
   // Back from a field or the picker, the Fields box is still open on a phone,
   // with the box it was in (boards 17-19).
   const [fieldsOpen, setFieldsOpen] = useState(false)
-  const [openBox, setOpenBox] = useState<string | null>(null)
+  // The row just added, lit in its box (E1b: every box is open).
+  const [landed, setLanded] = useState<string | null>(null)
   // A box just added, its name selected to type over (board 19).
   const [freshBox, setFreshBox] = useState<string | null>(null)
   // The fields there were before an add, to find the one added.
@@ -187,7 +185,6 @@ function CategoryEditorScreen({
     toggleWebsiteField,
     toggleFieldCaveat,
     togglePartner,
-    moveField,
   } = useCategoryFieldEditing(initial, seed)
 
   // The screen the address names, on opening: a reload, a link, or Back
@@ -496,12 +493,11 @@ function CategoryEditorScreen({
   const parts = listingPartsFromKey(draft.listingParts)
   const boxes = fieldBoxes(fieldPage, parts)
   const addingBox = addingTo ? boxes.find((b) => b.id === addingTo) : undefined
-  // Just added: the box it landed in opens, its row there to see.
+  // Just added: its row is scrolled to and lit.
   if (landing) {
     const key = pageFields.find((f) => !landing.has(f.key))?.key
-    const box = key !== undefined && boxes.find((b) => b.fields.includes(key))
     setLanding(null)
-    if (box) setOpenBox(box.id)
+    if (key !== undefined) setLanded(`field:${key}`)
   }
   // A hechsher's caveat is set on the hechsher's own screen.
   const fieldIndex = (key: string) => {
@@ -555,7 +551,7 @@ function CategoryEditorScreen({
         onScreen={(next) => showAdding(next)}
         onBack={() => void screens.back()}
         onAdd={(row) => {
-          if (row.basic === 'address' || row.basic === 'phone') setOpenBox('contact')
+          if (row.basic === 'address' || row.basic === 'phone') setLanded(`basic:${row.basic}`)
           else setLanding(new Set(pageFields.map((f) => f.key)))
           if (row.basic === 'address') {
             set('hasAddress', true)
@@ -637,45 +633,6 @@ function CategoryEditorScreen({
         rows={!eruvPage}
         onRemove={removeIt}
         onBack={() => void screens.back()}
-        more={
-          superAdmin ? (
-            <FieldEditor
-              field={field}
-              index={i}
-              total={draft.fields.length}
-              // "Required" only matters if people can add or edit listings.
-              canRequire={draft.capabilities.add || draft.capabilities.edit}
-              // Boolean fields make sense as an "audience" a field is scoped to
-              // (e.g. "Women's Tevillah") — a field can't be scoped to itself.
-              audienceOptions={draft.fields
-                .filter((other) => other.type === 'boolean' && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label }))}
-              // Choice fields make sense as a "show only when this equals that
-              // option" trigger — a field can't be scoped to itself.
-              showIfOptions={draft.fields
-                .filter((other) => other.type === 'select' && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
-              // Yes/No and Choice fields are the ones that can render as a badge
-              // — a field can't replace its own badge.
-              badgeFieldOptions={draft.fields
-                .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label }))}
-              // Words a link's own box could say (CategoryField.leadBox).
-              textFieldOptions={draft.fields
-                .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label }))}
-              onChange={(patch) => updateField(i, patch)}
-              onRemove={removeIt}
-              onMove={(dir) => {
-                moveField(i, dir)
-                setOpenField(i + dir)
-                void screens.replace({ field: field.key || `#${i + dir}` })
-              }}
-              hasCaveat={!!field.caveat}
-              onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
-            />
-          ) : undefined
-        }
       />
     )
   } else {
@@ -782,12 +739,8 @@ function CategoryEditorScreen({
             page={fieldPage}
             boxes={boxes}
             parts={parts}
-            openId={openBox}
             freshId={freshBox}
-            onOpen={(id) => {
-              setOpenBox(id)
-              setFreshBox(null)
-            }}
+            landed={landed}
             onChange={(next, order) => {
               set('listingParts', listingPartsKey(next))
               if (order) set('fields', order.map((k) => draftFieldByKey.get(k)!))
@@ -815,7 +768,6 @@ function CategoryEditorScreen({
                 setCap('map', false)
               }
               if (box.basics?.includes('phone')) set('hasPhone', false)
-              setOpenBox(null)
             }}
             onAddField={(id) => {
               showAdding({ at: 'list' }, id)
@@ -824,25 +776,25 @@ function CategoryEditorScreen({
             onShowBasic={showField}
           />
 
-          <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
+          <div className="flex flex-col gap-2.5 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => {
                 // In place, at the end, its name ready to type (board B).
                 const { parts: next, id } = addBox(parts, boxes)
                 set('listingParts', listingPartsKey(next))
-                setOpenBox(id)
                 setFreshBox(id)
               }}
-              className={addButton}
+              className={addBoxButton}
             >
-              + Add a box
+              {PlusIcon}
+              Add a box
             </button>
             {!eruvPage && draft.fields.some((f) => f.type === 'boolean') && (
               <button
                 type="button"
                 onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
-                className={addButton}
+                className={`${addButton} self-start`}
               >
                 + Add audience group
               </button>

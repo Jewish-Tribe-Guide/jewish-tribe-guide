@@ -1,33 +1,44 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type { CategoryField } from '@/lib/categories'
-import { boxLine, boxName, boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
+import { boxName, boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
-import DragList, { addButton, OrderRow, RowActions, type DragRow } from './DragList'
+import DragList, { RowActions, RowName, type DragRow } from './DragList'
 
-// Site → Category pages → a page → Fields (boards 17-19): the boxes of one
-// of its opened listings, in the order a visitor sees them (fieldBoxes.ts).
-// A box opens in place to its fields, each opening that field's screen; the
-// admin's own, and the listing's own from a field made here, are renamed in
-// place (a ready-made field's keeps its name). Every box but Top and "Not
-// on the listing" is dragged anywhere and has a trash can. No Top (Nov 10):
-// the photo is with the name, and Under the name is each field's own. A field moves by
-// dragging it onto another box's row, which is drawn dashed while it's
-// over it, or red with why when that box can't take it.
+// Site → Category pages → a page → Fields, as board E1b draws it (the user,
+// Nov 10: "I like the creativity. I just want you to implement it"): every
+// box is open, a card of its own with its name on a grey head, its fields
+// as rows under it (each with its Filter and Under the name tags, opening
+// its own screen), and "+ Add a field" across its foot. A box's handle
+// carries the box with its fields; a field's moves it, into another box
+// too, which turns blue while it's over it, or red with why when it can't
+// take it. The admin's boxes, and the listing's own from a field made here,
+// are renamed by tapping the name; a ready-made field's keeps its name.
 
 /** Where the handle would be: rows that don't move keep their names lined
  *  up with the ones that do. */
 const NO_HANDLE = <span aria-hidden="true" className="h-11 w-8 shrink-0" />
 const still = (row: DragRow): DragRow => ({ ...row, handle: NO_HANDLE, rowProps: { onPointerDown: () => {}, onContextMenu: () => {} } })
 
+const PLUS = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+
+/** E1b's "+ Add a box": a dashed button as wide as the list. */
+export const addBoxButton =
+  'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50'
+export { PLUS as PlusIcon }
+
 export default function FieldBoxes({
   page,
   boxes,
   parts,
-  openId,
   freshId,
-  onOpen,
+  landed,
   onChange,
   onRename,
   onRemoveBox,
@@ -38,10 +49,10 @@ export default function FieldBoxes({
   page: FieldPage
   boxes: FieldBox[]
   parts: ListingParts
-  openId: string | null
   /** A box just added: its name starts selected (board 19). */
   freshId: string | null
-  onOpen: (id: string | null) => void
+  /** The row just added (`field:…`, `basic:…`): scrolled to and lit. */
+  landed?: string | null
   /** A drop: the admin's boxes, and the page's fields' new order when a box
    *  of the listing's own was reordered. */
   onChange: (parts: ListingParts, order: string[] | null) => void
@@ -51,112 +62,123 @@ export default function FieldBoxes({
   onShowField: (key: string) => void
   onShowBasic: (basic: 'address' | 'phone') => void
 }) {
-  const items = fieldItems(boxes, openId)
+  const items = fieldItems(boxes)
   const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
   const hidden = new Set((page.hiddenFields ?? []).map((f) => f.key))
-  const lastBox = boxes.at(-1)?.id
+  const list = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (landed) list.current?.querySelector(`[data-drag-row="${CSS.escape(landed)}"]`)?.scrollIntoView?.({ block: 'center' })
+  }, [landed])
 
-  function slot(item: FieldItem, _i: number, shown: readonly FieldItem[], dragKey: string | null, refused: readonly FieldItem[] | null) {
+  function slot(item: FieldItem, i: number, shown: readonly FieldItem[], dragKey: string | null, refused: readonly FieldItem[] | null) {
     const key = itemKey(item)
-    if ('box' in item) {
-      const no = refused && orderProblem(items, refused, page)
-      if (no?.at === item.box.id)
-        return {
-          className: 'rounded-[10px] bg-red-50 outline-2 outline-dashed outline-red-400 -outline-offset-4',
-          note: <p className="m-0 px-4 pb-2.5 text-[13px] font-semibold text-red-700">{no.why}</p>,
-        }
-      // The box a lifted field is over, when it isn't the one it came from.
-      const over = dragKey?.startsWith('field:') && boxOf(shown, dragKey) === item.box.id && boxOf(items, dragKey) !== item.box.id && item.box.id !== openId
-      if (over) return { className: 'rounded-[10px] bg-blue-50 outline-2 outline-dashed outline-primary -outline-offset-4' }
-      return { className: item.box.id === openId || item.box.id === lastBox ? '' : 'border-b border-slate-100' }
-    }
-    if ('end' in item) return { className: `px-4 pb-4 pt-2.5 sm:pl-12 ${item.end === lastBox ? '' : 'border-b border-slate-100'}` }
-    // A field or the address and phone: in a box of their own, under its row.
-    const inside = shown.filter((i) => !('box' in i) && !('end' in i) && boxOf(shown, itemKey(i)) === openId)
-    const first = inside[0] && itemKey(inside[0]) === key
-    const last = inside.at(-1) && itemKey(inside.at(-1)!) === key
-    return {
-      className: ['mx-4 sm:ml-12 border-x border-slate-200 bg-white', first ? 'rounded-t-[10px] border-t' : 'border-t', last ? 'rounded-b-[10px] border-b' : ''].join(' '),
-    }
+    const owner = 'box' in item ? item.box.id : boxOf(shown, key)
+    // The box a lifted field is over, when it isn't the one it came from.
+    const no = refused && orderProblem(items, refused, page)
+    const turnedDown = no?.at === owner
+    const over = !turnedDown && dragKey?.startsWith('field:') && boxOf(shown, dragKey) === owner && boxOf(items, dragKey) !== owner
+    const edge = turnedDown ? 'border-red-400 bg-red-50' : over ? 'border-primary bg-blue-50' : 'border-slate-200'
+    if ('box' in item)
+      return {
+        className: `${i === 0 ? '' : 'mt-3'} overflow-hidden rounded-t-xl border border-b-slate-100 ${turnedDown || over ? edge : 'border-slate-200 bg-slate-50'}`,
+        note: turnedDown ? <p className="m-0 px-4 pb-2.5 text-[13px] font-semibold text-red-700">{no!.why}</p> : undefined,
+      }
+    const afterHead = i > 0 && 'box' in shown[i - 1]
+    if ('end' in item) return { className: `rounded-b-xl border-x border-b ${edge} ${afterHead ? '' : 'border-t border-t-slate-100'} ${turnedDown || over ? '' : 'bg-white'}` }
+    const lit = landed === key ? 'bg-blue-50' : turnedDown || over ? '' : 'bg-white'
+    return { className: `border-x ${edge} ${afterHead ? '' : 'border-t border-t-slate-100'} ${lit}` }
   }
 
   return (
-    <DragList
-      items={items}
-      keyOf={itemKey}
-      nameOf={(i) => ('box' in i ? i.box.title : 'field' in i ? byKey.get(i.field)?.label || 'New field' : '')}
-      canMove={(next) => orderProblem(items, next, page) === null}
-      onReorder={(next) => {
-        const read = readOrder(items, next, parts, page)
-        onChange(read.parts, read.order)
-      }}
-      slot={slot}
-    >
-      {(item, row) => {
-        if ('box' in item) {
-          const box = item.box
-          const open = box.id === openId
-          const renames = boxRenames(box, page)
-          return (
-            <OrderRow
-              row={box.moves ? row : still(row)}
-              name={box.title || 'New box'}
-              line={boxLine(box, page) || undefined}
-              open={open}
-              onToggle={() => onOpen(open ? null : box.id)}
-              rename={renames ? { ...boxName(page, box), onChange: (t) => onRename(box.id, t), fresh: box.id === freshId } : undefined}
-            />
-          )
-        }
-        if ('end' in item) {
-          const box = boxes.find((b) => b.id === item.end)!
-          const add = (
-            <button type="button" onClick={() => onAddField(box.id)} className={addButton}>
-              + Add a field
-            </button>
-          )
-          const empty = box.fields.length === 0 && !box.basics?.length && <span className="block pb-2.5 text-[13px] text-slate-500">Nothing in it yet</span>
-          // Every box but "Not on the listing" comes off, its fields with it
-          // (the user, Nov 10).
-          if (box.moves)
+    <div ref={list} className="px-4 pb-1 pt-4">
+      <DragList
+        items={items}
+        keyOf={itemKey}
+        nameOf={(i) => ('box' in i ? i.box.title || 'New box' : 'field' in i ? byKey.get(i.field)?.label || 'New field' : 'basic' in i ? (i.basic === 'address' ? 'Address' : 'Phone') : '')}
+        canMove={(next) => orderProblem(items, next, page) === null}
+        carries={(i, all) => ('box' in i ? rowsOfBox(all, i.box.id) : [])}
+        onReorder={(next) => {
+          const read = readOrder(items, next, parts, page)
+          onChange(read.parts, read.order)
+        }}
+        slot={slot}
+      >
+        {(item, row) => {
+          if ('box' in item) {
+            const box = item.box
+            const name = box.title || 'New box'
+            const renames = boxRenames(box, page)
+            return (
+              <div className="flex min-h-[52px] items-center gap-1 py-1.5 pl-1 pr-3">
+                {box.moves ? row.handle : NO_HANDLE}
+                {renames ? (
+                  <RowName name={name} rename={{ ...boxName(page, box), onChange: (t) => onRename(box.id, t), fresh: box.id === freshId }} />
+                ) : (
+                  <h3 {...(box.moves ? row.rowProps : {})} className="m-0 min-w-0 flex-1 select-none text-base font-semibold text-slate-900">
+                    {name}
+                  </h3>
+                )}
+              </div>
+            )
+          }
+          if ('end' in item) {
+            const box = boxes.find((b) => b.id === item.end)!
+            const name = box.title || 'New box'
+            const add = (
+              <button type="button" onClick={() => onAddField(box.id)} aria-label={`Add a field to ${name}`} className="flex min-h-[46px] flex-1 cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[15px] font-semibold text-primary hover:bg-blue-50/60">
+                {PLUS}
+                Add a field
+              </button>
+            )
+            const empty = box.fields.length === 0 && !box.basics?.length && <span className="block px-10 pt-3 text-[13px] text-slate-500">Nothing in it yet</span>
+            // Every box but "Not on the listing" comes off, its fields with
+            // it (the user, Nov 10). Its trash can stays on this line, at
+            // the far end of it.
+            if (!box.moves) return <div className="h-1" />
             return (
               <div>
                 {empty}
-                <RowActions name={box.title || 'New box'} onRemove={() => onRemoveBox(box.id)}>
-                  {add}
-                </RowActions>
+                <div className="flex items-center pr-2">
+                  <RowActions name={name} onRemove={() => onRemoveBox(box.id)} wide>
+                    {add}
+                  </RowActions>
+                </div>
               </div>
             )
-          return <div className="h-1" />
-        }
-        if ('basic' in item) {
-          const name = item.basic === 'address' ? 'Address' : 'Phone'
-          return <Inner row={still(row)} name={name} line={item.basic === 'address' ? 'Puts the page on the map' : undefined} onOpen={() => onShowBasic(item.basic)} />
-        }
-        const f = byKey.get(item.field)
-        return (
-          <Inner
-            row={hidden.has(item.field) ? still(row) : row}
-            name={f?.label || 'New field'}
-            line={f && fieldLine(f)}
-            onOpen={() => onShowField(item.field)}
-          />
-        )
-      }}
-    </DragList>
+          }
+          if ('basic' in item) {
+            const name = item.basic === 'address' ? 'Address' : 'Phone'
+            return <Inner row={still(row)} name={name} onOpen={() => onShowBasic(item.basic)} />
+          }
+          const f = byKey.get(item.field)
+          return <Inner row={hidden.has(item.field) ? still(row) : row} name={f?.label || 'New field'} tags={f ? tagsOf(f) : []} onOpen={() => onShowField(item.field)} />
+        }}
+      </DragList>
+    </div>
   )
 }
 
-/** A field in an opened box: its handle, name and line, and a chevron to
- *  its own screen. */
-function Inner({ row, name, line, onOpen }: { row: DragRow; name: string; line?: string; onOpen: () => void }) {
+/** A field's tags on its row (E1b): Filter, Under the name. Nothing else
+ *  under a field's name (the user, Nov 10: "I don't think we need those
+ *  descriptions underneath the fields"). */
+function tagsOf(f: CategoryField): string[] {
+  return (fieldLine(f) ?? '').split(' · ').filter((t) => t === 'Filter' || t === 'Under the name')
+}
+
+/** A field in its box: its handle, name and tags, and a chevron to its own
+ *  screen. */
+function Inner({ row, name, tags = [], onOpen }: { row: DragRow; name: string; tags?: string[]; onOpen: () => void }) {
   return (
-    <div className="flex min-h-12 items-center gap-1 pl-1 pr-2">
+    <div className="flex min-h-[46px] items-center gap-1 pl-1 pr-3">
       {row.handle}
-      <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-12 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-2 text-left">
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[15px] font-medium text-slate-900">{name}</span>
-          {line && <span className="text-[13px] text-slate-600">{line}</span>}
+      <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-1.5 text-left">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className="text-[15px] text-slate-900">{name}</span>
+          {tags.map((t) => (
+            <span key={t} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+              {t}
+            </span>
+          ))}
         </span>
         <Chevron />
       </button>

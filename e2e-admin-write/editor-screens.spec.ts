@@ -57,16 +57,11 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   const title = (t: string | RegExp) => visible(page.getByRole('heading', { name: t }))
   const thePage = title(name)
   // In the Fields box, not the preview beside it, which has an Hours too.
-  // On a computer one of its boxes is open at a time, and a reload or a
-  // Back closes it.
+  // Every box is open (E1b).
   const fields = page.getByRole('region', { name: 'Fields' })
-  const inBox = async (box: string, row: Locator) => {
-    if (!(await visible(row).count())) await visible(fields.getByRole('button', { name: box, exact: true, expanded: false })).click()
-    await visible(row).click()
-  }
-  const openHours = () => inBox('Contact', fields.getByRole('button', { name: /^Hours/ }))
-  // Hours lands in Contact, so Contact's + offers it (Nov 9).
-  const addAField = () => inBox('Contact', fields.getByRole('button', { name: '+ Add a field' }))
+  const openHours = () => visible(fields.getByRole('button', { name: /^Hours/ })).click()
+  // Hours lands in Contact, so Contact's Add a field offers it (Nov 9).
+  const addAField = () => visible(fields.getByRole('button', { name: 'Add a field to Contact' })).click()
 
   // Add a field: the list, then a field looked at, each its own entry.
   await addAField()

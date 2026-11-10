@@ -20,8 +20,8 @@ import ChoiceList from './ChoiceList'
 // name and the note under it on Add a place), its choices as rows, and the
 // questions its kind asks, each a No / Yes. What the boards take off a
 // community admin's screen (only for some places, an audience, a link's own
-// box, a badge in place of another) keeps working, and a superadmin still
-// has it under "More" (`more`).
+// box, a badge in place of another) keeps working, set or not. No "More"
+// for a superadmin either (the user, Nov 10: "yes remove it").
 
 const KIND: Record<FieldType, string> = {
   select: 'Choices',
@@ -50,7 +50,6 @@ export default function FieldScreen({
   onChange,
   onRemove,
   onBack,
-  more,
   onKosherQuestions,
   partner,
   rows = false,
@@ -62,8 +61,6 @@ export default function FieldScreen({
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onBack: () => void
-  /** A superadmin's other settings. */
-  more?: React.ReactNode
   /** Turns a hechsher's questions on or off, with the page's hidden fields. */
   onKosherQuestions?: (on: boolean) => void
   /** The field that comes with it (fieldPartners.ts): on the page, and its switch. */
@@ -71,8 +68,8 @@ export default function FieldScreen({
   /** The page lists its places on rows, so "Under the name" means something. */
   rows?: boolean
 }) {
-  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
-  return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} more={more} rows={rows} />
+  if (!f.madeHere) return <ReadyFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
+  return <OwnFieldScreen field={f} pageName={pageName} canRequire={canRequire} onChange={onChange} onRemove={onRemove} onBack={onBack} rows={rows} />
 }
 
 type ScreenProps = Parameters<typeof FieldScreen>[0]
@@ -89,19 +86,6 @@ export function FieldTitle({ field: f }: { field: CategoryField }) {
   )
 }
 
-function More({ more }: { more?: React.ReactNode }) {
-  const [moreOpen, setMoreOpen] = useState(false)
-  if (!more) return null
-  return (
-    <div>
-      <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen(!moreOpen)} className="min-h-11 px-1 text-[15px] font-semibold text-primary hover:underline cursor-pointer">
-        {moreOpen ? 'Less' : 'More'}
-      </button>
-      {moreOpen && more}
-    </div>
-  )
-}
-
 function RemoveFrom({ pageName, onRemove }: { pageName: string; onRemove: () => void }) {
   return (
     <button type="button" onClick={onRemove} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
@@ -110,13 +94,12 @@ function RemoveFrom({ pageName, onRemove }: { pageName: string; onRemove: () => 
   )
 }
 
-function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, onKosherQuestions, partner, rows }: ScreenProps) {
+function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, onKosherQuestions, partner, rows }: ScreenProps) {
   return (
     <>
       <AdminBack back={{ label: pageName, onClick: onBack }} title={<FieldTitle field={f} />} />
       <WhatThisIs field={f} partnerOn={!!partner?.on} />
       <FieldChanges field={f} canRequire={canRequire} onChange={onChange} onKosherQuestions={onKosherQuestions} partner={partner} rows={rows} />
-      <More more={more} />
       <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
   )
@@ -286,7 +269,7 @@ export function FieldChanges({
   )
 }
 
-function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, more, rows }: ScreenProps) {
+function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, onBack, rows }: ScreenProps) {
   // A new field's key follows its name until the name is left, then never
   // changes, so a rename never strands its answers (CategoryFieldEditor's
   // keyFrozenRef has the history).
@@ -340,7 +323,6 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onRemove, on
           {f.type === 'select' && <AdminYesNo question={both} value={!!f.multiSelect} onChange={(yes) => onChange({ multiSelect: yes })} />}
         </AdminBox>
       ) : null}
-      <More more={more} />
       <RemoveFrom pageName={pageName} onRemove={onRemove} />
     </>
   )

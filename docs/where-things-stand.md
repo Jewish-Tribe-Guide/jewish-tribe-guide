@@ -41,22 +41,47 @@ Small open items from Nov 9:
 
 ## Open from the boxes and fields work (Nov 10)
 
-Each is written up in its entry below; this is the one list of them.
+The user's answers on Nov 10, evening, and what was done with them:
 
-- **Food on the live site** needs converting to the Kosher and Delivery
-  boxes once round 3 (02ad751b) deploys. Dry run shown; waits on the
-  user's yes, then revalidate.
-- **Boxes fold in Fields, the boards draw them open.** Held by the user
-  (Nov 10: "let's actually hold off on that for now").
-- **A box's trash can isn't on any board** (built: on the opened box's
-  + Add a field line). Held with the folding.
-- **Big fields as rows inside any box** (board A's Menu holding Main
-  dishes). Not built; Main dishes is still a box of its own.
-- **"Within a walk" and "Before it's opened"** are still on the page but
-  on no board.
-- **Mikvah sections** aren't drawn in the boxes boards yet.
-- **"How it looks" on a phone** isn't built (nothing sits beside a field
-  there).
+- **The listing is back to how it was before round 3** (the user: "I like
+  it the way it was before. The only thing we were thinking of changing is
+  just grouping fields together. Experience shouldn't change."). The
+  hechsher under the name, the amber "What isn't kosher" box after the
+  buttons, Delivery's own box and the Certification button are all back.
+  Only the admin's grouping (a hechsher's caveat, note and certificate as
+  parts of it; Delivery's WhatsApp link as a part of Delivery) stays.
+  - So **converting Food on the live site to Kosher and Delivery boxes is
+    no longer wanted**. Dev's Food `listing_parts` was put back to null.
+  - **Open:** the admin's Fields list and "How it looks" still describe
+    round 3 (fieldBoxes, fieldLooks), not the listing as restored. How
+    they should show the amber box, Delivery and Certification is the
+    user's call.
+- **"More" is gone from a field's screen**, for a superadmin too (the
+  user: "yes remove it"). The old field form (CategoryFieldEditor) is
+  deleted, so its settings can't be reached by anyone now.
+- **The Eruv's Add button** is right as built (the user, Nov 10).
+- **Davening times, item lists and contacts in any box** (the user: "that
+  is what I want"). Not built: how davening times look inside another box
+  on the listing is to be asked first.
+- **A shul's website watch files only the upcoming week**, as a calendar
+  does: this week, and next week from Thursday (listingPageRun's
+  `upcoming`). Later dates on the page still tell which weeks have no
+  minyan. The newsletter path isn't limited.
+- **Mekor's Shabbos 9:15 PM couldn't be found to change.** This Shabbos's
+  times came from two posts, a person's "Nov 8 – Nov 13" and the website's
+  "Nov 14", and Edit opened only the first. Now Edit opens every post the
+  box shows a time from, and Edit listing's "This week's schedule" lists
+  them all and saves them into one.
+  - **Waiting for a yes:** the live times themselves (Sat Nov 14 Shacharis
+    9:15 PM, read wrong off the website, should be 9:15 AM; Fri Nov 13
+    Mincha & Maariv 7:00 PM is the summer time).
+  - Dev's Mekor holds the live times (copied to reproduce it).
+- **Rodeph Shalom's week** read as all new over notes in a different
+  order ("Online; until 8:40 AM"). Fix not built: waiting on the user.
+- Still held or open from before: boxes fold in Fields (held), a box's
+  trash can on no board (held), big fields as rows inside any box, "Within
+  a walk" and "Before it's opened" on no board, Mikvah sections not drawn,
+  "How it looks" on a phone not built.
 
 ## Done Nov 9: the Eruv page is a category page, eruvs are only in Places
 

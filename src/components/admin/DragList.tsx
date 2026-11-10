@@ -37,6 +37,9 @@ type Drag = {
   startTop: number
   dy: number
   moved: boolean
+  /** The rows that move with it (`carries`), and where each started. */
+  block?: string[]
+  starts?: Map<string, number>
   /** With dropEdge: where each other row is passed, measured as the row was
    *  lifted. */
   lines?: Map<string, number>
@@ -60,6 +63,7 @@ export default function DragList<T>({
   canMove,
   slot,
   dropEdge,
+  carries,
 }: {
   items: readonly T[]
   keyOf: (item: T) => string
@@ -81,6 +85,9 @@ export default function DragList<T>({
    *  gaps use their outer edges, so the whole space between two boxes is
    *  "a row of its own". */
   dropEdge?: (item: T) => 'top' | 'bottom' | undefined
+  /** The rows under this one that move with it, as one (a box's fields
+   *  under its head: Fields, board E1b). */
+  carries?: (item: T, items: readonly T[]) => string[]
 }) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
@@ -91,9 +98,9 @@ export default function DragList<T>({
   const orderRef = useRef<string[] | null>(null)
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; pointerId: number } | null>(null)
   const swallowClick = useRef(false)
-  const latest = useRef({ items, keyOf, onReorder, canMove, dropEdge })
+  const latest = useRef({ items, keyOf, onReorder, canMove, dropEdge, carries })
   useEffect(() => {
-    latest.current = { items, keyOf, onReorder, canMove, dropEdge }
+    latest.current = { items, keyOf, onReorder, canMove, dropEdge, carries }
   })
 
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
@@ -106,8 +113,12 @@ export default function DragList<T>({
     // The lifted row sits under the finger wherever its slot has moved to.
     function place() {
       const d = dragRef.current
-      const el = d && els.current.get(d.key)
-      if (d && el) el.style.transform = `translateY(${d.startTop + d.dy - el.offsetTop}px)`
+      if (!d) return
+      for (const k of d.block ?? [d.key]) {
+        const el = els.current.get(k)
+        const start = d.starts?.get(k) ?? d.startTop
+        if (el) el.style.transform = `translateY(${start + d.dy - el.offsetTop}px)`
+      }
     }
     function stopScroll(e: TouchEvent) {
       if (dragRef.current) e.preventDefault()
@@ -130,7 +141,13 @@ export default function DragList<T>({
       const el = els.current.get(key)
       if (!el || dragRef.current) return
       const d: Drag = { key, pointerId, startY: clientY, startTop: el.offsetTop, dy: 0, moved: false }
-      const { items: all, keyOf: keyOfItem, dropEdge: edgeOf } = latest.current
+      const { items: all, keyOf: keyOfItem, dropEdge: edgeOf, carries: carriedBy } = latest.current
+      const self = all.find((i) => keyOfItem(i) === key)
+      const carried = self && carriedBy ? carriedBy(self, all) : []
+      if (carried.length) {
+        d.block = [key, ...carried]
+        d.starts = new Map(d.block.map((k) => [k, els.current.get(k)?.offsetTop ?? 0]))
+      }
       if (edgeOf) {
         // Measured once, as it was lifted: rows of different heights (a box
         // shrinking as a card leaves it) would otherwise move the lines
@@ -159,19 +176,22 @@ export default function DragList<T>({
       if (Math.abs(d.dy) > 2) d.moved = true
       const el = els.current.get(d.key)
       if (!el) return
+      const block = d.block ?? [d.key]
+      const last = els.current.get(block.at(-1)!) ?? el
+      const height = (d.starts?.get(block.at(-1)!) ?? d.startTop) + last.offsetHeight - d.startTop
       const middles = cur
-        .filter((k) => k !== d.key)
+        .filter((k) => !block.includes(k))
         .map((k) => {
           const line = d.lines?.get(k)
           if (line !== undefined) return line
           const o = els.current.get(k)
           return o ? o.offsetTop + o.offsetHeight / 2 : 0
         })
-      const to = dropIndex(middles, d.startTop + d.dy + el.offsetHeight / 2)
+      const to = dropIndex(middles, d.startTop + d.dy + height / 2)
       const from = cur.indexOf(d.key)
       let turnedDown: string[] | null = null
       if (to !== from) {
-        const next = moveItem(cur, from, to)
+        const next = moveBlock(cur, block, to)
         const { items: now, keyOf: keyFor, canMove: allowed } = latest.current
         const byKey = new Map(now.map((i) => [keyFor(i), i]))
         if (!allowed || allowed(next.map((k) => byKey.get(k)!), 'pointer')) {
@@ -187,8 +207,10 @@ export default function DragList<T>({
       if (!d || e.pointerId !== d.pointerId) return
       listen(false)
       document.body.style.userSelect = ''
-      const el = els.current.get(d.key)
-      if (el) el.style.transform = ''
+      for (const k of d.block ?? [d.key]) {
+        const el = els.current.get(k)
+        if (el) el.style.transform = ''
+      }
       const { items: now, keyOf: keyFor, onReorder: done } = latest.current
       const next = orderRef.current
       if (next && next.join('\n') !== now.map(keyFor).join('\n')) {
@@ -261,6 +283,7 @@ export default function DragList<T>({
       {shown.map((item, i) => {
         const key = keyOf(item)
         const lifted = drag?.key === key
+        const carried = !lifted && !!drag?.block?.includes(key)
         const name = nameOf(item)
         const handle = (
           <button
@@ -278,9 +301,11 @@ export default function DragList<T>({
               const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : null
               if (step === null) return
               e.preventDefault()
-              // The nearest place it can go that way.
-              for (let to = i + step; to >= 0 && to < items.length; to += step) {
-                const next = moveItem(items, i, to)
+              // The nearest place it can go that way, with what it carries.
+              const block = [key, ...(carries?.(item, items) ?? [])]
+              const room = items.length - block.length
+              for (let to = i + step; to >= 0 && to <= room; to += step) {
+                const next = block.length > 1 ? moveBlock(items.map(keyOf), block, to).map((k) => byKey.get(k)!) : moveItem(items, i, to)
                 if (canMove && !canMove(next, 'key')) continue
                 onReorder(next)
                 break
@@ -308,7 +333,7 @@ export default function DragList<T>({
               else els.current.delete(key)
             }}
             data-drag-row={key}
-            className={`[-webkit-touch-callout:none] ${lifted ? 'relative z-10 rounded-[10px] bg-white shadow-[0_10px_24px_rgb(15_23_42/0.18)] ring-1 ring-primary' : ''}`}
+            className={`[-webkit-touch-callout:none] ${lifted ? 'relative z-10 rounded-[10px] bg-white shadow-[0_10px_24px_rgb(15_23_42/0.18)] ring-1 ring-primary' : carried ? 'relative z-10 bg-white' : ''}`}
           >
             {children(item, { handle, rowProps, lifted })}
           </div>
@@ -326,6 +351,13 @@ export default function DragList<T>({
   )
 }
 
+/** The order with `block` (contiguous, its first the lifted row) taken out
+ *  and put back at `to`, counted among the rows left. */
+function moveBlock(order: readonly string[], block: readonly string[], to: number): string[] {
+  const rest = order.filter((k) => !block.includes(k))
+  return [...rest.slice(0, to), ...block, ...rest.slice(to)]
+}
+
 const TRASH = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
@@ -338,9 +370,9 @@ const trashButton =
 /** The bottom of an open row: what can go in (its Adds, a width), then the
  *  trash can right after them (the user, Nov 4: "move the garbage down to
  *  where we have those add buttons", and not off at the far end). */
-export function RowActions({ name, onRemove, children }: { name: string; onRemove: () => void; children?: React.ReactNode }) {
+export function RowActions({ name, onRemove, children, wide }: { name: string; onRemove: () => void; children?: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
+    <div className={wide ? 'flex flex-1 items-center gap-2.5' : 'flex flex-wrap items-center gap-2.5'}>
       {children}
       <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={trashButton}>
         {TRASH}
@@ -383,7 +415,7 @@ export type RowRename = {
 /** Open, the name reads as the name; a tap on it edits it, and leaving
  *  the box (or Enter) puts it back (the user, Nov 4: "being able to edit the
  *  name right away is a throw off"). Just added, it starts in the box. */
-function RowName({ rename, name }: { rename: RowRename; name: string }) {
+export function RowName({ rename, name }: { rename: RowRename; name: string }) {
   const [editing, setEditing] = useState(!!rename.fresh)
   // The box's padding hangs to the left, so the name sits where it did closed.
   const pad = '-ml-2.5 rounded-md border px-2.5 py-1.5 text-[15px] font-semibold'

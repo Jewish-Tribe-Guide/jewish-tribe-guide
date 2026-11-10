@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
-import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
+import { addBox, addToBox, basicsLandIn, makesBox, boxLine, boxName, boxRenames, fieldBoxes, fieldItems, rowsOfBox, fieldLine, homeOf, itemKey, orderProblem, readOrder, removeBox, renameKey, renameListingBox, whereAdded, type FieldItem, type FieldPage } from './fieldBoxes'
 import type { ListingParts } from './listingParts'
 import { moveItem } from './reorder'
 
@@ -177,7 +177,7 @@ describe('dragging', () => {
 
   it('moves a field onto another box’s row (board 18)', () => {
     const items = fieldItems(boxes, 'box:1')
-    expect(keys(items).slice(0, 6)).toEqual(['box:box:0', 'box:box:1', 'field:pantry', 'field:food_packages', 'end', 'box:box:2'])
+    expect(keys(items).slice(0, 6)).toEqual(['box:box:0', 'box:box:1', 'field:pantry', 'field:food_packages', 'end:box:1', 'box:box:2'])
     // Food packages, just under A place to stay's row.
     const next = drop(items, 'field:food_packages', 5)
     expect(orderProblem(items, next, hospital)).toBeNull()
@@ -244,6 +244,54 @@ describe('dragging', () => {
     const contact = drop(items, 'box:contact', 0)
     expect(orderProblem(items, contact, hospital)).toBeNull()
     expect(fieldBoxes(hospital, readOrder(items, contact, hospitalParts, hospital).parts).map((b) => b.title).slice(0, 2)).toEqual(['Contact', 'Who to call'])
+  })
+
+  // Board E1b (Nov 10): every box open, a box's head carrying its rows.
+  describe('every box open (E1b)', () => {
+    const all = fieldItems(boxes)
+    const block = (id: string) => [`box:${id}`, ...rowsOfBox(all, id)]
+    const moveBox = (id: string, beforeBox: string) => {
+      const b = block(id)
+      const rest = keys(all).filter((k) => !b.includes(k))
+      const at = rest.indexOf(`box:${beforeBox}`)
+      const order = [...rest.slice(0, at), ...b, ...rest.slice(at)]
+      const byKey = new Map(all.map((i) => [itemKey(i), i]))
+      return order.map((k) => byKey.get(k)!)
+    }
+
+    it('lists every box with its rows, each ending in its own end', () => {
+      expect(keys(all).slice(0, 7)).toEqual(['box:box:0', 'field:liaisons', 'end:box:0', 'box:box:1', 'field:pantry', 'field:food_packages', 'end:box:1'])
+      expect(rowsOfBox(all, 'box:1')).toEqual(['field:pantry', 'field:food_packages', 'end:box:1'])
+    })
+
+    it('moves a box with its fields, and saves the order', () => {
+      const next = moveBox('box:3', 'box:0')
+      expect(orderProblem(all, next, hospital)).toBeNull()
+      const read = readOrder(all, next, hospitalParts, hospital).parts
+      expect(read.boxes!.map((b) => [b.title, b.fields])).toEqual([
+        ['Rides', ['transportation']],
+        ['Who to call', ['liaisons']],
+        ['Kosher food', ['pantry', 'food_packages']],
+        ['A place to stay', ['accommodations']],
+        ['Also', ['miscellaneous']],
+      ])
+    })
+
+    it('turns down a box head dropped without its fields', () => {
+      expect(orderProblem(all, drop(all, 'box:box:3', 0), hospital)).toEqual({})
+    })
+
+    it('moves a field from one open box into another', () => {
+      const into = all.findIndex((i) => itemKey(i) === 'end:box:2')
+      const next = drop(all, 'field:food_packages', into - 1)
+      expect(orderProblem(all, next, hospital)).toBeNull()
+      expect(readOrder(all, next, hospitalParts, hospital).parts.boxes!.map((b) => b.fields)).toEqual([['liaisons'], ['pantry'], ['accommodations', 'food_packages'], ['transportation'], ['miscellaneous']])
+    })
+
+    it('never puts a field after a box’s end, outside any box', () => {
+      const end = all.findIndex((i) => itemKey(i) === 'end:box:0')
+      expect(orderProblem(all, drop(all, 'field:pantry', end + 1), hospital)).toEqual({})
+    })
   })
 
   it('keeps "Not on the listing" last', () => {
@@ -314,7 +362,7 @@ describe('the listing’s own boxes', () => {
   it('drags a hechsher from its box into Contact, its parts with it', () => {
     const boxed: ListingParts = { boxes: [{ title: 'Kosher', fields: ['kosherCert', 't'] }] }
     const items = fieldItems(fieldBoxes(food, boxed), 'box:0')
-    expect(keys(items).slice(0, 5)).toEqual(['box:items', 'box:box:0', 'field:kosherCert', 'field:t', 'end'])
+    expect(keys(items).slice(0, 5)).toEqual(['box:items', 'box:box:0', 'field:kosherCert', 'field:t', 'end:box:0'])
     const next = drop(items, 'field:kosherCert', items.findIndex((i) => itemKey(i) === 'box:contact'))
     expect(orderProblem(items, next, food)).toBeNull()
     const read = readOrder(items, next, boxed, food).parts

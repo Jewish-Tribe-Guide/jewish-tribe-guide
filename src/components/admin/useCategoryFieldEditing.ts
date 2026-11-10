@@ -352,16 +352,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     })
   }
 
-  function moveField(i: number, dir: -1 | 1) {
-    setDraft((d) => {
-      const j = i + dir
-      if (j < 0 || j >= d.fields.length) return d
-      const next = [...d.fields]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return { ...d, fields: next }
-    })
-  }
-
   // Only the FIRST field matching each shape is "owned" by its checkbox
   // above (hidden from the Details list, and all toggleHoursField/
   // toggleWebsiteField ever touch) — if a second one exists, whether from an
@@ -394,7 +384,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     togglePhotoField,
     toggleFieldCaveat,
     togglePartner,
-    moveField,
     managedHoursIndex,
     managedWebsiteIndex,
     managedPhotoIndex,

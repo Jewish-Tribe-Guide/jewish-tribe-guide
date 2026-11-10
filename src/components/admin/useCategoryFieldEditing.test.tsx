@@ -171,20 +171,6 @@ describe('useCategoryFieldEditing — field list CRUD', () => {
     expect(result.current.draft.fields.map((f) => f.key)).not.toContain('a')
     expect(result.current.draft.fields.map((f) => f.key)).toContain('b')
   })
-
-  it('swaps two adjacent fields on moveField, and is a no-op past either end', () => {
-    // An explicit image field up front keeps toDraft from re-seeding its own
-    // Photo elsewhere in the list, so a/b/c's positions are exactly as given.
-    const initial = baseCategory({
-      detailFields: [field({ key: 'photo', type: 'image' }), field({ key: 'a' }), field({ key: 'b' }), field({ key: 'c' })],
-    })
-    const { result } = renderHook(() => useCategoryFieldEditing(initial))
-    const idxA = result.current.draft.fields.findIndex((f) => f.key === 'a')
-    act(() => result.current.moveField(idxA, 1))
-    expect(result.current.draft.fields.map((f) => f.key)).toEqual(['photo', 'b', 'a', 'c'])
-    act(() => result.current.moveField(0, -1)) // already at the front
-    expect(result.current.draft.fields.map((f) => f.key)).toEqual(['photo', 'b', 'a', 'c'])
-  })
 })
 
 describe('useCategoryFieldEditing — managed Hours/Website/Photo checkboxes', () => {

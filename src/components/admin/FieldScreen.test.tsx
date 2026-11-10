@@ -194,12 +194,11 @@ describe('FieldScreen — a ready-made field', () => {
     expect(screen.queryByRole('switch', { name: 'Everything here is kosher?' })).toBeNull()
   })
 
-  it('folds a superadmin’s other settings under More', async () => {
-    const user = userEvent.setup()
-    render(<FieldScreen field={foodType} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} more={<p>Only for some places</p>} />)
-    expect(screen.queryByText('Only for some places')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'More' }))
-    expect(screen.getByText('Only for some places')).toBeInTheDocument()
+  // The user, Nov 10: "what's this 'more' thing on email field?" … "yes
+  // remove it". Not for a superadmin either.
+  it('has no More', () => {
+    render(<Screen field={foodType} />)
+    expect(screen.queryByRole('button', { name: /^(More|Less)$/ })).toBeNull()
   })
 })
 

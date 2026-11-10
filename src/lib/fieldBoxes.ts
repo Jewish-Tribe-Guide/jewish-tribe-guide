@@ -256,16 +256,31 @@ export const basicsLandIn = (box: FieldBox) => box.id === 'contact'
 
 // ── Dragging ─────────────────────────────────────────────────────────────────
 
-/** One row of the drag list: a box, or, under the opened one, its address
- *  and phone, its fields and the end of it (its Add and trash can). */
+/** One row of the drag list: a box's head, its address and phone, its
+ *  fields, and the end of it (its + Add a field and trash can). Every box
+ *  is open (the user, Nov 10, board E1b); a box given as `open` alone is
+ *  for the tests that still read one box at a time. */
 export type FieldItem = { box: FieldBox } | { basic: 'address' | 'phone' } | { field: string } | { end: string }
 
-export const itemKey = (i: FieldItem) => ('box' in i ? `box:${i.box.id}` : 'basic' in i ? `basic:${i.basic}` : 'field' in i ? `field:${i.field}` : 'end')
+export const itemKey = (i: FieldItem) => ('box' in i ? `box:${i.box.id}` : 'basic' in i ? `basic:${i.basic}` : 'field' in i ? `field:${i.field}` : `end:${i.end}`)
 
-export function fieldItems(boxes: readonly FieldBox[], openId: string | null): FieldItem[] {
+export function fieldItems(boxes: readonly FieldBox[], open: string | null | 'all' = 'all'): FieldItem[] {
   return boxes.flatMap((box): FieldItem[] =>
-    box.id === openId ? [{ box }, ...(box.basics ?? []).map((basic) => ({ basic })), ...box.fields.map((field) => ({ field })), { end: box.id }] : [{ box }],
+    open === 'all' || box.id === open ? [{ box }, ...(box.basics ?? []).map((basic) => ({ basic })), ...box.fields.map((field) => ({ field })), { end: box.id }] : [{ box }],
   )
+}
+
+/** The rows a box's head carries when it's dragged: everything under it,
+ *  to its end. */
+export function rowsOfBox(items: readonly FieldItem[], id: string): string[] {
+  const at = items.findIndex((i) => 'box' in i && i.box.id === id)
+  if (at < 0) return []
+  const out: string[] = []
+  for (const i of items.slice(at + 1)) {
+    if ('box' in i) break
+    out.push(itemKey(i))
+  }
+  return out
 }
 
 /** The box a row is under in this order, or null. */
@@ -303,14 +318,9 @@ export function orderProblem(prev: readonly FieldItem[], next: readonly FieldIte
     for (const [k, box] of now) if (was.get(k) !== box) return {}
     return null
   }
-  // The opened box's address, phone and end stay under it, the end last.
-  const open = prev.find((i): i is { end: string } => 'end' in i)?.end
-  const end = next.findIndex((i) => 'end' in i)
-  for (const [k, box] of now) {
-    if (k.startsWith('basic:') || k === 'end') {
-      if (box !== open) return {}
-    } else if (box === open && end >= 0 && next.findIndex((i) => itemKey(i) === k) > end) return {}
-  }
+  // A box's address, phone and end stay under it, the end last.
+  for (const [k, box] of now) if ((k.startsWith('basic:') || k.startsWith('end:')) && box !== was.get(k)) return {}
+  for (let n = 0; n < next.length - 1; n++) if ('end' in next[n] && !('box' in next[n + 1])) return {}
   const byKey = new Map([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
   for (const [k, box] of now) {
     if (!k.startsWith('field:') || box === was.get(k)) continue
@@ -334,12 +344,12 @@ export function readOrder(
 ): { parts: ListingParts; order: string[] | null } {
   const was = owners(prev)
   const now = owners(next)
-  const open = prev.find((i): i is { end: string } => 'end' in i)?.end ?? null
+  const open = new Set(prev.flatMap((i) => ('end' in i ? [i.end] : [])))
   const shownIn = (id: string) => next.flatMap((i) => ('field' in i && now.get(itemKey(i)) === id ? [i.field] : []))
   const moved = [...now].filter(([k, box]) => k.startsWith('field:') && box !== was.get(k)).map(([k, box]) => ({ key: k.slice(6), to: box! }))
   const movedKeys = new Set(moved.map((m) => m.key))
   const fieldsOf = (id: string, current: readonly string[]) => {
-    if (id === open) return shownIn(id)
+    if (open.has(id)) return shownIn(id)
     return [...current.filter((k) => !movedKeys.has(k)), ...moved.filter((m) => m.to === id).map((m) => m.key)]
   }
 
@@ -369,15 +379,15 @@ export function readOrder(
   // A box of the listing's own, reordered: its fields take each other's
   // places among the page's fields.
   let order: string[] | null = null
-  const openBox = prev.find((i): i is { box: FieldBox } => 'box' in i && i.box.id === open)?.box
-  if (openBox && openBox.kind !== 'admin' && moved.length === 0) {
-    const shown = shownIn(openBox.id)
-    if (shown.join('\n') !== openBox.fields.join('\n')) {
-      const keys = page.fields.map((f) => f.key)
-      const slots = keys.flatMap((k, n) => (shown.includes(k) ? [n] : []))
-      order = [...keys]
-      slots.forEach((slot, n) => (order![slot] = shown[n]))
-    }
+  for (const i of prev) {
+    if (!('box' in i) || !open.has(i.box.id) || i.box.kind === 'admin' || moved.length > 0) continue
+    const shown = shownIn(i.box.id)
+    if (shown.join('\n') === i.box.fields.join('\n')) continue
+    const keys = page.fields.map((f) => f.key)
+    const slots = keys.flatMap((k, n) => (shown.includes(k) ? [n] : []))
+    order = [...keys]
+    slots.forEach((slot, n) => (order![slot] = shown[n]))
+    break
   }
   return { parts: out, order }
 }
