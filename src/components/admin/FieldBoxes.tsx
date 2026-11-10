@@ -5,7 +5,7 @@ import type { CategoryField } from '@/lib/categories'
 import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
 import { Chevron } from './AdminUI'
-import DragList, { addListButton, PLUS, RowName, X, type DragRow } from './DragList'
+import DragList, { addListButton, PLUS, RowName, useBarToggle, X, type DragRow } from './DragList'
 
 // Site → Category pages → a page → Fields, as board E1b draws it (the user,
 // Nov 10: "I like the creativity. I just want you to implement it"): every
@@ -67,6 +67,7 @@ export default function FieldBoxes({
 }) {
   // Folded boxes, by id: just their name bar in the list.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const barToggle = useBarToggle()
   const items = boxes.flatMap((box) => (folded.has(box.id) ? [{ box }] : fieldItems([box])))
   const all = fieldItems(boxes)
   const fold = (id: string, on: boolean) =>
@@ -131,8 +132,14 @@ export default function FieldBoxes({
             const box = item.box
             const name = box.title || 'New box'
             const renames = boxRenames(box, page)
+            const folds = box.fields.length > 0 || (box.basics?.length ?? 0) > 0
             return (
-              <div className="flex min-h-[52px] items-center gap-1 py-1.5 pl-1 pr-3">
+              <div
+                // The whole name bar folds a box with something in it, as a
+                // Home page tab's does; the chevron is the keyboard's way.
+                onClick={folds ? (e) => barToggle(e, () => fold(box.id, !folded.has(box.id))) : undefined}
+                className={`flex min-h-[52px] items-center gap-1 py-1.5 pl-1 pr-3 ${folds ? 'cursor-pointer' : ''}`}
+              >
                 {box.moves ? row.handle : NO_HANDLE}
                 {renames ? (
                   <span className="flex min-w-0 flex-1">
@@ -157,7 +164,7 @@ export default function FieldBoxes({
                     back once its last field is taken off or dragged out
                     (the user, Nov 10: "once we add a field ... we remove
                     the x"). Not "Not on the listing". */}
-                {(box.fields.length > 0 || (box.basics?.length ?? 0) > 0) && (
+                {folds && (
                   <button
                     type="button"
                     onClick={() => fold(box.id, !folded.has(box.id))}

@@ -158,8 +158,10 @@ The user's answers on Nov 10, evening, and what was done with them:
     - **Boxes fold; tabs come off like boxes; adds inside one thing look
       like "Add a field"** (the user, Nov 10). The rule as built, whole:
       - Fields: every box starts open. A box with something in it folds
-        and opens by a chevron at the end of its name bar; an empty box has
-        its X there instead. A field dragged onto a folded box goes in at
+        and opens by a press anywhere on its name bar, as a Home page tab
+        does (the user, Nov 10: "we want the top part"), the chevron at
+        its end included; a renameable box's name still renames it. An
+        empty box has its X there instead. A field dragged onto a folded box goes in at
         its end. Folding isn't saved or in the address; it's how the list
         is showing, and a field added to a folded box opens it.
       - "Nothing in it yet" is gone everywhere it was: an empty field box

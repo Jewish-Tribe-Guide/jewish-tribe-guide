@@ -449,6 +449,17 @@ function listenForPresses() {
   )
 }
 
+/** A whole bar that opens and closes, as a row's does: a press on a button,
+ *  link or box in it does its own thing, and a press that only finishes
+ *  typing a name does nothing (the user, Nov 10: "we want the top part"). */
+export function useBarToggle() {
+  useEffect(listenForPresses, [])
+  return (e: React.MouseEvent, onToggle: () => void) => {
+    if (typingAtPress || (e.target as HTMLElement).closest('input, textarea, button, select, a')) return
+    onToggle()
+  }
+}
+
 const iconButton = 'grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-800'
 
 /** A row's name, edited in the row itself while it's open (the user, Nov 4:

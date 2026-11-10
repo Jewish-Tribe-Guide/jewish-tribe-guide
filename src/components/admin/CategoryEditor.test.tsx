@@ -901,6 +901,27 @@ describe('CategoryEditor — Fields, in boxes', () => {
     expect(screen.getByRole('button', { name: 'Add a field to Call us' })).toBeInTheDocument()
   })
 
+  // The user, Nov 10: "we don't just want a button to collapse and bring it
+  // back. we want the top part", as a Home page tab's name bar does.
+  it('folds and opens a box by a press anywhere on its name bar, not only the chevron', async () => {
+    const user = userEvent.setup()
+    const page = baseCategory({
+      detailFields: [{ key: 'night', label: 'Night line', type: 'tel' }],
+      listingParts: { boxes: [{ title: 'Call us', fields: ['night'] }] },
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={page} siblings={null} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const bar = () => screen.getByRole('button', { name: 'Call us' }).parentElement!
+    await user.click(bar())
+    expect(screen.getByRole('button', { name: 'Call us', expanded: false })).toBeInTheDocument()
+    expect(shownIn('Call us')).toEqual([])
+    await user.click(bar())
+    expect(shownIn('Call us')).toEqual(['Night line'])
+    // Its name renames it, as a Home page tab's does, and folds nothing.
+    await user.click(within(bar()).getByRole('button', { name: 'Rename Call us' }))
+    expect(within(bar()).getByRole('textbox', { name: 'Name' })).toHaveValue('Call us')
+    expect(screen.getByRole('button', { name: 'Call us', expanded: true })).toBeInTheDocument()
+  })
+
   it('has no X on a box with fields; taking off its last field brings it back', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
