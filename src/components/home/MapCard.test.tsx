@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import MapCard, { mapCardLine } from './MapCard'
 
@@ -12,8 +12,24 @@ describe('mapCardLine', () => {
   })
 })
 
+/** A screen that measures as a phone (true) or a computer (false). */
+function screenIsPhone(phone: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: phone, media: query, addEventListener: () => {}, removeEventListener: () => {} }))
+}
+
 describe('MapCard (board G3)', () => {
-  afterEach(cleanup)
+  beforeEach(() => screenIsPhone(false))
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('never puts the picture on a phone, where the card isn’t shown', () => {
+    screenIsPhone(true)
+    render(<MapCard href="/philly/map" photo={{ url: 'https://example.com/osm.jpg', alt: '', credit: '© OpenStreetMap contributors' }} categoryNames={[]} />)
+    expect(screen.getByTestId('home-map-card-picture').querySelector('img')).toBeNull()
+    expect(screen.queryByTestId('home-map-card-credit')).toBeNull()
+  })
 
   it('is one link to the map, with nothing else to press inside it', () => {
     render(<MapCard href="/philly/map" photo={null} categoryNames={['Food']} />)
@@ -28,6 +44,14 @@ describe('MapCard (board G3)', () => {
     render(<MapCard href="/philly/map" photo={{ url: 'https://example.com/city-hall.jpg', alt: '' }} categoryNames={[]} />)
     const img = screen.getByTestId('home-map-card-picture').querySelector('img')
     expect(img?.getAttribute('src')).toContain('city-hall.jpg')
+  })
+
+  it('shows the credit a picture’s licence asks for, and none for a photo without one', () => {
+    render(<MapCard href="/philly/map" photo={{ url: 'https://example.com/osm.jpg', alt: '', credit: '© OpenStreetMap contributors' }} categoryNames={[]} />)
+    expect(screen.getByTestId('home-map-card-credit')).toHaveTextContent('© OpenStreetMap contributors')
+    cleanup()
+    render(<MapCard href="/philly/map" photo={{ url: 'https://example.com/city-hall.jpg', alt: '' }} categoryNames={[]} />)
+    expect(screen.queryByTestId('home-map-card-credit')).toBeNull()
   })
 
   it('with no photo, the plain map glyph and never a drawn map', () => {

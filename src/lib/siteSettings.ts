@@ -15,6 +15,12 @@ import { community } from '@/community.config'
 // an async, per-request lookup; out of scope for now.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The map card's picture. `credit` is the line its licence asks to be shown
+ *  on it ("© OpenStreetMap contributors" for the street map that
+ *  scripts/map-card-picture.mjs makes); an admin's own photo has none, and
+ *  replacing the picture drops it. */
+export type MapCardPhoto = { url: string; alt: string; credit?: string }
+
 export type SiteSettings = {
   /** Site name — the header title, footer name, and copyright line. */
   name: string
@@ -65,7 +71,7 @@ export type SiteSettings = {
   /** Desktop only — the photo on the home's "Everything on one map" card
    *  (board G3, Nov 11). Null draws the card's plain map glyph instead.
    *  Needs migration 095; reads as null without it. */
-  desktopMapImage: { url: string; alt: string } | null
+  desktopMapImage: MapCardPhoto | null
   /** Which home page visitors get: the home as it was ('classic'), or the
    *  one that changes with the day ('today', step 6). Previewed from the Site
    *  tab before it's saved; one save switches back. */

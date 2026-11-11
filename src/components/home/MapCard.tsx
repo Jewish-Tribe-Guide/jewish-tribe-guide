@@ -3,6 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { isOptimizableImage } from '@/lib/imageHosts'
+import { useIsDesktop } from '@/lib/useIsMobile'
+import type { MapCardPhoto } from '@/lib/siteSettings'
 import { LIFT_ON_HOVER } from './AnswerCard'
 
 // ── "Everything on one map" — the computer home's map card (boards G3, then
@@ -16,12 +18,15 @@ import { LIFT_ON_HOVER } from './AnswerCard'
 // every home visit for a card that only links. With no photo set, the left
 // side is the plain map glyph on tinted ground, never a made-up map.
 //
+// A picture whose licence asks for a credit (the OpenStreetMap street map,
+// G5c follow-up, the user's pick Nov 11) shows it small in the corner.
+//
 // The line under the heading names the community's own biggest categories,
 // so it reads right in every community with no one-category copy.
 
 type Props = {
   href: string
-  photo: { url: string; alt: string } | null
+  photo: MapCardPhoto | null
   /** Category names, most places first; the first five are named. */
   categoryNames: readonly string[]
   onOpen?: () => void
@@ -39,6 +44,11 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
   // Board G5b (Nov 11): the map is the page's one big stop, so the card is
   // tall (540px) and the picture fills it, fading to white under the words
   // on the left. With no picture, plain tinted ground and the map glyph.
+  //
+  // The picture waits until the screen is measured as a computer's: a
+  // phone's first render is the computer layout, and the card in it was
+  // enough to start the picture's download on phones that never show it.
+  const desktop = useIsDesktop()
   return (
     <Link
       href={href}
@@ -48,6 +58,7 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
     >
       <div data-testid="home-map-card-picture" aria-hidden={photo ? undefined : true} className="absolute inset-0">
         {photo ? (
+          desktop && (
           <>
             <Image
               src={photo.url}
@@ -59,12 +70,18 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(248,250,252,0.97)_0%,rgba(248,250,252,0.9)_36%,rgba(248,250,252,0.25)_56%,rgba(248,250,252,0)_66%)]" />
           </>
+          )
         ) : (
           <span className="absolute inset-y-0 right-[12%] flex items-center text-primary/40">
             <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z" />
               <path d="M9 4v14M15 6v14" />
             </svg>
+          </span>
+        )}
+        {desktop && photo?.credit && (
+          <span data-testid="home-map-card-credit" className="absolute bottom-2.5 right-3.5 rounded bg-white/80 px-1.5 py-0.5 text-[11px] text-slate-600">
+            {photo.credit}
           </span>
         )}
       </div>

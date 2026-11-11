@@ -330,6 +330,14 @@ describe('the map card photo (migration 095)', () => {
     expect((await getSiteSettingsUncached('philly')).desktopMapImage).toEqual(photo)
   })
 
+  it('keeps a saved picture’s credit, and ignores a blank one', async () => {
+    const osm = { url: 'https://example.com/osm.jpg', alt: 'Street map', credit: '© OpenStreetMap contributors' }
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_map_image: osm }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopMapImage).toEqual(osm)
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_map_image: { ...photo, credit: '  ' } }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopMapImage).toEqual(photo)
+  })
+
   it('a save that doesn’t change it leaves the column out, so a database without 095 still saves', async () => {
     const write = saveWith(rawRow)
     await updateSiteSettings('philly', { heroTitle: 'New Hero', desktopMapImage: null })

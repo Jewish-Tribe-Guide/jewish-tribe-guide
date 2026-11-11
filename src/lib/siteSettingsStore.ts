@@ -15,6 +15,7 @@ import {
   type DesktopNavItem,
   type TodayBlockId,
   type MobileTabConfig,
+  type MapCardPhoto,
   type SiteSettings,
 } from './siteSettings'
 
@@ -111,6 +112,14 @@ function toHeroImage(raw: unknown): { url: string; alt: string } | null {
   return { url, alt: typeof alt === 'string' ? alt : '' }
 }
 
+/** The map card's picture, keeping the credit its licence asks for. */
+export function toMapCardPhoto(raw: unknown): MapCardPhoto | null {
+  const photo = toHeroImage(raw)
+  if (!photo) return null
+  const { credit } = raw as Record<string, unknown>
+  return typeof credit === 'string' && credit.trim() ? { ...photo, credit: credit.trim() } : photo
+}
+
 /** The admin's item names: trimmed, no blanks or repeats, at most
  *  MAX_BEFORE_CANDLE_ITEMS. Null (never set, or 067 not applied) is the
  *  starting list; an empty list is the admin's own "none". */
@@ -163,7 +172,7 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     // plain gradient, not the bootstrap community's photo from code (which
     // put Philadelphia's City Hall on every other community's home).
     desktopHeroImage: toHeroImage(row.desktop_hero_image),
-    desktopMapImage: toHeroImage(row.desktop_map_image),
+    desktopMapImage: toMapCardPhoto(row.desktop_map_image),
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
     todayHidden: toTodayHidden(row.today_hidden),

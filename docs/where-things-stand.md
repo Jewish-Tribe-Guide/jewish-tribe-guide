@@ -300,17 +300,30 @@ The user's answers on Nov 10, evening, and what was done with them:
     date, place, Hebcal.com), kept for visible trust. Fixed on the way:
     the minyan card linked to (and drew the glyph of) the first category
     with a minyan field, Food on dev, instead of the shuls page the
-    schedule reads. **Next:** a picture for the map card, an
-    OpenStreetMap view without our pins (the user's worry: it may look
-    unlike the Google map a visitor lands on; Google's Static Maps is the
-    other choice). Dev's map photo was removed to match the no-picture
-    board.
+    schedule reads. The map card's picture came after (below).
   - **Computer home, more room** (board G5c, the user, Nov 11: "Yes, build
     G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), the
     first still 32px under the trust strip. "Know a place we're missing?"
     is a 240px-tall section with a 38px heading, bigger line and a 56px
     button; the navy Stay in the Loop box is 260px tall with a 38px
     heading, a 320px email box and 56px controls. Phone unchanged.
+  - **Map card picture: an OpenStreetMap street map** (the user, Nov 11:
+    "OSM, farther out", picked over a close-in Center City view and over
+    Google's Static Maps). BUILT Nov 11. `scripts/map-card-picture.mjs
+    <slug>` makes one saved picture from the community's map centre,
+    framed about as wide as the map page opens, centre 70% across (right
+    of the words), and sets it as the card's photo with the credit
+    OpenStreetMap asks for; the card shows "© OpenStreetMap contributors"
+    small in the corner. An admin's own photo replaces both. It differs
+    from the Google map page in colour (pink and orange main roads, more
+    green), not framing; the user accepted that. The picture fades to the
+    card's ground under the words (180 KB on the home before, over the
+    150 KB image budget; 110 KB after), and waits until the screen
+    measures as a computer: fixed on the way, phones were downloading
+    the card's picture, any picture, though the card is computer-only
+    (since G3; unseen until a picture was set). **Dev has it. Live needs
+    migration 095 first, then the script with `--prod --apply`: both need
+    the user's go-ahead.**
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three
