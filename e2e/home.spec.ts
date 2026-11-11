@@ -59,10 +59,6 @@ test.describe('home — Browse everything grid', () => {
   })
 })
 
-// The "Kept by the Community" (now Update Listings) card's Add/Edit/Report
-// buttons — and the container-query short/long label swap this suite used
-// to cover — are gone entirely (Phase 6c, docs/desktop-mockup-plan.md): that
-// action moved to the new, dedicated Suggest a Listing card beside this one
-// in the community row (see Landing.tsx's own doc), and UpdateListingsCard
-// went back to being a short statement with a single "Learn More" link. The
-// UI these two tests exercised no longer exists.
+// The "Kept by the Community" card is gone (Nov 11): the computer home says
+// how it stays right in the trust band under the photo instead (TrustBand's
+// DesktopTrustBand; Landing.test covers it).

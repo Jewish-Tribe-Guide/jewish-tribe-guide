@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
 import MobileSheet from '@/components/resources/MobileSheet'
+import ActionDialog from '@/components/resources/ActionDialog'
 import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { routes } from '@/lib/routes'
@@ -32,16 +33,18 @@ type Props = {
   communitySlug: string
 }
 
-export default function TrustBand({ facts, region, communitySlug }: Props) {
-  const [open, setOpen] = useState(false)
-  // What the sheet names, asked for once the home has loaded rather than on
-  // the tap, so the sheet opens whole instead of with a loading bar each
-  // time (the user, Oct 20). Small, and cached by the CDN. The rest it
-  // names is read off the places the home already has (trustFacts).
+/** What the sheet names, asked for once the home has loaded rather than on
+ *  the tap, so the sheet opens whole instead of with a loading bar each
+ *  time (the user, Oct 20). Small, and cached by the CDN. The rest it
+ *  names is read off the places the home already has (trustFacts). True
+ *  once asked. */
+function useReadWhenIdle(communitySlug: string): boolean {
+  const [asked, setAsked] = useState(false)
   useEffect(() => {
     const read = () => {
       fetchEruvStatuses(communitySlug)
       fetchChecksRun(communitySlug)
+      setAsked(true)
     }
     if (typeof requestIdleCallback === 'function') {
       const id = requestIdleCallback(read, { timeout: 3000 })
@@ -50,6 +53,22 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
     const id = setTimeout(read, 1000)
     return () => clearTimeout(id)
   }, [communitySlug])
+  return asked
+}
+
+/** What the guide checked this week, as the sheet's first line; undefined
+ *  while it's still being read, null when nothing was checked. */
+function useSourcesSentence(facts: TrustFacts, communitySlug: string, wanted: boolean): string | null | undefined {
+  const eruv = useEruvStatuses(communitySlug, wanted)
+  const ran = useChecksRun(communitySlug, wanted)
+  const now = useNow()
+  if (!eruv || !ran || now === null) return undefined
+  return sourcesSentence(sourcesRead(facts, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], now, ran))
+}
+
+export default function TrustBand({ facts, region, communitySlug }: Props) {
+  const [open, setOpen] = useState(false)
+  useReadWhenIdle(communitySlug)
   return (
     <>
       <button
@@ -80,16 +99,12 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
 // check, no source named): what the guide checks every day, and only
 // what it checked this week; people fill in the rest, reviewed; every
 // listing is dated.
-function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boolean; facts: TrustFacts; region: string; communitySlug: string; onClose: () => void }) {
-  const eruv = useEruvStatuses(communitySlug, open)
-  const ran = useChecksRun(communitySlug, open)
-  const now = useNow()
-  const read = eruv && ran && now !== null ? sourcesRead(facts, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], now, ran) : null
-  const sentence = read ? sourcesSentence(read) : null
-  return (
-    <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">
+function TrustSheet({ open, facts, region, communitySlug, onClose, desktop = false }: { open: boolean; facts: TrustFacts; region: string; communitySlug: string; onClose: () => void; desktop?: boolean }) {
+  const sentence = useSourcesSentence(facts, communitySlug, open)
+  const body = (
+    <>
       <ul className="space-y-4" data-testid="trust-sheet">
-        {read === null ? (
+        {sentence === undefined ? (
           <li aria-hidden="true" className="h-14 animate-pulse rounded-xl bg-slate-100" />
         ) : (
           sentence && (
@@ -111,7 +126,84 @@ function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boo
         About the guide
         <ChevronRightIcon className="h-4 w-4 text-slate-400" />
       </Link>
+    </>
+  )
+  // A computer gets the site's centred dialog (as Add and Edit do), not a
+  // sheet the width of the screen.
+  return desktop ? (
+    <ActionDialog isOpen={open} onClose={onClose} title="How this guide stays right">
+      {body}
+    </ActionDialog>
+  ) : (
+    <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">
+      {body}
     </MobileSheet>
+  )
+}
+
+// ── The computer's band (the user, Nov 11: F1b on the desk canvas) ──────────
+// "How can I trust this" is the first question anyone has, so the computer
+// home answers it right under the photo, as the phone does at its top: the
+// trust line, then the sheet's three points in short. Its own section below
+// the hero, not over its edge ("Desktop sites afford a lot of space"). The
+// whole band opens the same sheet, as a dialog. It replaces the "Kept by
+// the Community" card in the row of cards, which said the same thing.
+export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
+  const [open, setOpen] = useState(false)
+  const asked = useReadWhenIdle(communitySlug)
+  const sentence = useSourcesSentence(facts, communitySlug, asked)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          track('trust_opened', { source: 'desktop-band' })
+          setOpen(true)
+        }}
+        aria-haspopup="dialog"
+        data-testid="desktop-trust-band"
+        className="flex w-full cursor-pointer items-center gap-6 rounded-2xl bg-white px-6 py-5 text-left ring-1 ring-slate-900/5 transition-colors hover:bg-slate-50"
+      >
+        <span className="flex shrink-0 items-center gap-3 border-r border-slate-200 pr-6">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+            <ShieldCheck className="h-6 w-6" />
+          </span>
+          <span>
+            <span className="block whitespace-nowrap text-[17px] font-extrabold text-ink">Kept up by the community</span>
+            <span className="block text-[13px] text-slate-500">{trustLine(facts)}</span>
+          </span>
+        </span>
+        {sentence === undefined ? (
+          <span aria-hidden="true" className="h-10 flex-1 animate-pulse rounded-xl bg-slate-100" />
+        ) : (
+          sentence && (
+            <Point icon={<ShieldCheck className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" title="We check it every day">
+              {sentence}
+            </Point>
+          )
+        )}
+        <Point icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={sentence === null ? `People in ${region} keep it up` : 'People fill in the rest'}>
+          A person reviews every change before it shows
+        </Point>
+        <Point icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title="Every listing is dated">
+          Each place says when it was last checked
+        </Point>
+        <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+      </button>
+      <TrustSheet open={open} facts={facts} region={region} communitySlug={communitySlug} onClose={() => setOpen(false)} desktop />
+    </>
+  )
+}
+
+function Point({ icon, tone, title, children }: { icon: React.ReactNode; tone: string; title: string; children: React.ReactNode }) {
+  return (
+    <span className="flex min-w-0 flex-1 items-start gap-2.5">
+      <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-[14px] font-extrabold text-ink">{title}</span>
+        <span className="line-clamp-2 block text-[12.5px] leading-snug text-slate-600">{children}</span>
+      </span>
+    </span>
   )
 }
 

@@ -41,7 +41,7 @@ describe('PATCH /api/admin/site-settings', () => {
     },
   )
 
-  it.each(['desktopListingsHeading', 'desktopSubscribeHeading', 'desktopJewishTimesHeading'])(
+  it.each(['desktopSubscribeHeading', 'desktopJewishTimesHeading'])(
     'a blank %s, which the site shows, is still refused',
     async (key) => {
       const res = await patch({ ...SITE_SETTINGS_DEFAULTS, [key]: '' })

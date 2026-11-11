@@ -42,8 +42,6 @@ type Row = {
   desktop_browse_heading: string | null
   desktop_davening_eyebrow: string | null
   desktop_davening_heading: string | null
-  desktop_listings_eyebrow: string | null
-  desktop_listings_heading: string | null
   desktop_map_eyebrow: string | null
   desktop_map_heading: string | null
   desktop_subscribe_eyebrow: string | null
@@ -149,8 +147,6 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     mobileTabs: toMobileTabs(row.mobile_tabs),
     searchPlaceholder: row.search_placeholder || fallback.searchPlaceholder,
     desktopNavItems: toDesktopNavItems(row.desktop_nav_items),
-    desktopListingsEyebrow: row.desktop_listings_eyebrow || fallback.desktopListingsEyebrow,
-    desktopListingsHeading: row.desktop_listings_heading || fallback.desktopListingsHeading,
     desktopSubscribeEyebrow: row.desktop_subscribe_eyebrow || fallback.desktopSubscribeEyebrow,
     desktopSubscribeHeading: row.desktop_subscribe_heading || fallback.desktopSubscribeHeading,
     desktopJewishTimesHeading: row.desktop_jewish_times_heading || fallback.desktopJewishTimesHeading,
@@ -262,8 +258,6 @@ export async function updateSiteSettings(
         mobile_tabs: merged.mobileTabs,
         search_placeholder: merged.searchPlaceholder,
         desktop_nav_items: merged.desktopNavItems,
-        desktop_listings_eyebrow: merged.desktopListingsEyebrow,
-        desktop_listings_heading: merged.desktopListingsHeading,
         desktop_subscribe_eyebrow: merged.desktopSubscribeEyebrow,
         desktop_subscribe_heading: merged.desktopSubscribeHeading,
         desktop_jewish_times_heading: merged.desktopJewishTimesHeading,

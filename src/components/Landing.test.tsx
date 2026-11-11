@@ -483,13 +483,44 @@ describe('Landing', () => {
     expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
   })
 
-  it('renders Update Listings and (once a minyanim category exists) Davening Times with no zmanim category at all', () => {
-    // Regression: both used to share a component with the Jewish
-    // Times/Shabbat pair and were needlessly gated on zmanimCategory even
-    // though neither reads zmanim data — see homeSections.ts's own doc.
+  it('renders Davening Times with no zmanim category at all', () => {
+    // Regression: it used to share a component with the Jewish
+    // Times/Shabbat pair and was needlessly gated on zmanimCategory even
+    // though it reads no zmanim data — see homeSections.ts's own doc.
     renderLanding(undefined, { content: { categories: [makeCategory()] } }) // grocery only, no zmanim category
-    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).toBeInTheDocument()
     expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
+  })
+
+  // Nov 11 (board F1b): the computer home says how it stays right in a band
+  // under the photo, the phone's trust line grown to the width, and the
+  // "Kept by the Community" card it replaces is gone.
+  describe('the computer trust band', () => {
+    const groc = makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' })
+    const place = makeListing({ id: 'g1', name: 'Test Grocery', category: 'grocery' })
+
+    it('shows under the hero on a computer, with its three points, and opens the sheet', async () => {
+      vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [], checks: [] }))))
+      mockViewport(false)
+      renderLanding(undefined, { content: { categories: [groc], homeSections: [] } }, [place])
+
+      const band = screen.getByTestId('desktop-trust-band')
+      expect(band).toHaveTextContent('Kept up by the community')
+      expect(band).toHaveTextContent('People fill in the rest')
+      expect(band).toHaveTextContent('Every listing is dated')
+      expect(screen.getByTestId('desktop-hero').compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
+
+      await userEvent.setup().click(band)
+      expect(await screen.findByRole('dialog')).toHaveTextContent('How this guide stays right')
+      vi.unstubAllGlobals()
+    })
+
+    it('is not drawn on a phone, which keeps its own trust line', () => {
+      mockViewport(true)
+      renderLanding(undefined, { content: { categories: [groc], homeSections: [] } }, [place])
+      expect(screen.queryByTestId('desktop-trust-band')).not.toBeInTheDocument()
+      mockViewport(false)
+    })
   })
 
   // The admin sets the cards in rows (the user, Nov 4; artifact
@@ -509,18 +540,28 @@ describe('Landing', () => {
 
     it('three cards in one row, in order', () => {
       const { container } = renderLanding(undefined, {
-        content: { categories: cats, homeSections: [row('davening', 100), row('listings', 200, true), row('suggest', 300, true)] },
+        content: { categories: cats, homeSections: [row('davening', 100), row('suggest', 200, true), row('subscribe', 300, true)] },
       })
 
       const grid = screen.getByTestId('davening-stub').closest('.grid')!
       expect(grid).toHaveClass('min-[900px]:grid-cols-3')
-      expect(grid).toContainElement(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading }))
       expect(grid).toContainElement(screen.getByRole('heading', { name: 'Suggest a Listing' }))
-      expect(spots(container)).toEqual(['cards card-davening card-listings card-suggest'])
+      expect(grid).toContainElement(subscribeHeading())
+      expect(spots(container)).toEqual(['cards card-davening card-suggest card-subscribe'])
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading))
-      expect(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)).toBeLessThan(html.indexOf('Suggest a Listing'))
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('Suggest a Listing'))
+      expect(html.indexOf('Suggest a Listing')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading))
+    })
+
+    // Retired Nov 11 for the trust band: a community that saved it keeps the
+    // row, and the row draws nothing.
+    it('a saved Kept by the Community card draws nothing', () => {
+      const { container } = renderLanding(undefined, {
+        content: { categories: cats, homeSections: [row('davening', 100), row('listings', 200, true)] },
+      })
+      expect(spots(container)).toEqual(['cards card-davening'])
+      expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
     })
 
     it('two cards in one row', () => {
@@ -558,31 +599,31 @@ describe('Landing', () => {
       const { container } = renderLanding(undefined, {
         content: {
           categories: cats,
-          homeSections: [row('browse', 100), row('davening', 200, true), row('listings', 300, true), row('suggest', 400, true), row('subscribe', 500, true)],
+          homeSections: [row('browse', 100), row('davening', 200, true), row('suggest', 300, true), row('subscribe', 400, true), row('jewishTimes', 500, true)],
         },
       })
 
       expect(spots(container)).toEqual([
         'cards card-browse',
-        'cards card-davening card-listings card-suggest',
-        'cards card-subscribe',
+        'cards card-davening card-suggest card-subscribe',
+        'cards card-jewishTimes',
       ])
     })
 
     // A card of its own now, so the admin can take it off.
     it('Suggest a Listing shows only where it has a row', () => {
-      renderLanding(undefined, { content: { categories: cats, homeSections: [row('listings', 100)] } })
+      renderLanding(undefined, { content: { categories: cats, homeSections: [row('subscribe', 100)] } })
 
-      expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading }).closest('.grid')).toBeNull()
+      expect(subscribeHeading().closest('.grid')).toBeNull()
       expect(screen.queryByRole('heading', { name: 'Suggest a Listing' })).not.toBeInTheDocument()
     })
 
-    it('with no rows saved, the home is as it was: Davening Times, Kept by the Community and Suggest a Listing share a row', () => {
+    it('with no rows saved: Davening Times and Suggest a Listing share a row', () => {
       const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
 
       expect(spots(container)).toEqual([
         'cards card-browse',
-        'cards card-davening card-listings card-suggest',
+        'cards card-davening card-suggest',
         'cards card-subscribe',
         'cards card-jewishTimes',
       ])

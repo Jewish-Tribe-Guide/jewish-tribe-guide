@@ -110,8 +110,6 @@ export async function PATCH(request: Request) {
   // The desktop card texts have nowhere sensible to fall back to if saved
   // blank, so they're required.
   const REQUIRED_CARD_TEXT_FIELDS: { key: keyof SiteSettings; label: string }[] = [
-    { key: 'desktopListingsEyebrow', label: 'The Update Listings card’s eyebrow' },
-    { key: 'desktopListingsHeading', label: 'The Update Listings card’s heading' },
     { key: 'desktopSubscribeEyebrow', label: 'The Email Signup card’s eyebrow' },
     { key: 'desktopSubscribeHeading', label: 'The Email Signup card’s heading' },
     { key: 'desktopJewishTimesHeading', label: 'The Jewish Times card’s heading' },

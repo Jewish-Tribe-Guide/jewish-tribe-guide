@@ -32,13 +32,14 @@ import DragList, { AddListButton, InnerRow } from './DragList'
 type CardKind = Exclude<HomeBlockKind, 'section' | 'map'>
 
 /** The cards offered, in the order "+ Add" lists them. 'map' (the map on the
- *  home screen) is retired: Landing.tsx renders nothing for a leftover row. */
-const CARD_KINDS: CardKind[] = ['browse', 'davening', 'listings', 'suggest', 'subscribe', 'jewishTimes']
+ *  home screen) and 'listings' (Kept by the Community, now the trust band
+ *  under the hero, Nov 11) are retired: Landing.tsx renders nothing for a
+ *  leftover row, and this list keeps one aside, untouched, like a section. */
+const CARD_KINDS: CardKind[] = ['browse', 'davening', 'suggest', 'subscribe', 'jewishTimes']
 const CARD_KIND_SET = new Set<string>(CARD_KINDS)
 
 /** The setting that names a card on the site, where it has one. */
 const HEADING_KEY: Partial<Record<CardKind, keyof SiteSettings>> = {
-  listings: 'desktopListingsHeading',
   subscribe: 'desktopSubscribeHeading',
   jewishTimes: 'desktopJewishTimesHeading',
 }

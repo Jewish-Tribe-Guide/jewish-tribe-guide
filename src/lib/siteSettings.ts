@@ -50,10 +50,6 @@ export type SiteSettings = {
    *  More, by default), in order. Empty falls back to
    *  DEFAULT_DESKTOP_NAV_ITEMS. Mobile has no top nav and ignores this. */
   desktopNavItems: DesktopNavItem[]
-  /** Desktop only — the Update Listings card's eyebrow/heading (the
-   *  Add/Edit/Report card, "Kept by the Community" by default). */
-  desktopListingsEyebrow: string
-  desktopListingsHeading: string
   /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
    *  heading. */
   desktopSubscribeEyebrow: string
@@ -219,8 +215,6 @@ export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, m
 // strings, so nothing changes on screen until an admin edits one. See
 // DesktopTopicsManager's CARD_META for the admin labels ("Davening Times
 // Card", etc.) these fields' inputs are grouped under.
-export const DEFAULT_DESKTOP_LISTINGS_EYEBROW = 'Community run'
-export const DEFAULT_DESKTOP_LISTINGS_HEADING = 'Kept by the Community'
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
 export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
@@ -262,8 +256,6 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   mobileTabs: DEFAULT_MOBILE_TABS,
   searchPlaceholder: DEFAULT_SEARCH_PLACEHOLDER,
   desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
-  desktopListingsEyebrow: DEFAULT_DESKTOP_LISTINGS_EYEBROW,
-  desktopListingsHeading: DEFAULT_DESKTOP_LISTINGS_HEADING,
   desktopSubscribeEyebrow: DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW,
   desktopSubscribeHeading: DEFAULT_DESKTOP_SUBSCRIBE_HEADING,
   desktopJewishTimesHeading: DEFAULT_DESKTOP_JEWISH_TIMES_HEADING,

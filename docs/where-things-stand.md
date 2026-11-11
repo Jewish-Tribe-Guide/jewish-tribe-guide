@@ -240,12 +240,14 @@ The user's answers on Nov 10, evening, and what was done with them:
     thing), BUILT.
   - Explore by Category showing every category instead of "More": held,
     to ask visitors.
-  - "Kept up by the community" on the computer: drawn on the desk canvas
-    (row "How it stays right, up top"). The user likes F1b, a full-width
-    band below the hero photo, not overlapping it: shield, the trust line,
-    and the phone sheet's three points, opening the same sheet. The
-    "Kept by the Community" card in the row of three goes with it, in the
-    same change. Not built: waiting on the user's go-ahead.
+  - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
+    user's "Let's do F1b for now"). A full-width band below the hero photo,
+    not overlapping it: shield, the trust line, and the phone sheet's three
+    points, the whole band opening the same sheet as a centred dialog. The
+    phone is unchanged. The "Kept by the Community" card is gone with it:
+    a saved row of it draws nothing, the admin's card list no longer offers
+    it, and its eyebrow and heading settings are removed (no migration; the
+    two columns just stop being read).
   - The big map: G2 on the canvas, a card in words only (map glyph, "ONE
     MAP", "Everything on one map", one line, "Open the map"), the whole
     card tappable, under the categories. The user didn't want a drawn

@@ -109,9 +109,9 @@ describe('getSiteSettingsUncached', () => {
   })
 
   it('maps a full row, falling back to defaults for any per-card copy column not yet set', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_listings_eyebrow: null }, error: null }))
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_subscribe_eyebrow: null }, error: null }))
     const settings = await getSiteSettingsUncached('philly')
-    expect(settings.desktopListingsEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopListingsEyebrow)
+    expect(settings.desktopSubscribeEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopSubscribeEyebrow)
     expect(settings.name).toBe('My Community')
     expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
   })

@@ -20,11 +20,10 @@ import HeroHeading from '@/components/home/HeroHeading'
 import TodayBlocks from '@/components/home/TodayBlocks'
 import CategoryTiles from '@/components/home/CategoryTiles'
 import RightNow from '@/components/home/RightNow'
-import TrustBand from '@/components/home/TrustBand'
+import TrustBand, { DesktopTrustBand } from '@/components/home/TrustBand'
 import { trustFacts } from '@/lib/phoneHome'
 import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
-import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
@@ -74,11 +73,11 @@ export type LandingProps = {
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
-//   Desktop — a two-column warm hero (headline + subhead + search beside a
-//   photo, see HeroHeading) → five independent, admin-orderable cards (see
-//   builtInOrder): Categories & Search (a flat "Browse everything" grid,
-//   full weight — every card, always visible, no hover needed), Davening
-//   Times, Update Listings ("kept by the community"), Email Signup (Stay in
+//   Desktop — the hero (headline + search over a dimmed photo, see
+//   HeroHeading) → the trust band (DesktopTrustBand, Nov 11) → the
+//   admin-orderable cards (see builtInOrder): Categories & Search (a flat
+//   "Browse everything" grid, full weight — every card, always visible, no
+//   hover needed), Davening Times, Suggest a Listing, Email Signup (Stay in
 //   the Loop), and Jewish Times (Shabbat & Holiday Times) — → footer. The map
 //   itself lives at its own full-screen route (the hero's "View Map" button,
 //   header nav, or the mobile tab bar), never embedded here — that used to be
@@ -303,15 +302,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, sharesRow: s.sharesRow }))
-  // With none set: Categories, then Davening Times, Kept by the Community
-  // and Suggest a Listing in one row, then a row each.
+  // With none set: Categories, then Davening Times and Suggest a Listing in
+  // one row, then a row each.
   const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'listings', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'davening', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
-          sharesRow: kind === 'listings' || kind === 'suggest',
+          sharesRow: kind === 'suggest',
         }))
   // On the Today home its own blocks answer what Browse, Davening Times and
   // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
@@ -502,6 +501,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           trust={!today && trust ? <TrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} /> : null}
         />
 
+        {/* ── How it stays right, on a computer (F1b, Nov 11): its own
+                band under the photo, before the cards. It took over from
+                the "Kept by the Community" card ('listings' below). */}
+        {!today && !isMobile && trust && (
+          <div className="mt-10 hidden desktop:block">
+            <DesktopTrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} />
+          </div>
+        )}
+
         {/* ── Seasonal campaign banner ─────────────────────────────────────────
                 Renders nothing outside its own admin-set date range (see the
                 component's own doc). Common to both layouts — sits above the
@@ -651,9 +659,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             )
           }
           if (kind === 'davening') return !today && !isMobile && <DaveningTimesCard coords={coords} />
-          if (kind === 'listings') {
-            return !isMobile && <UpdateListingsCard eyebrow={settings.desktopListingsEyebrow} heading={settings.desktopListingsHeading} />
-          }
+          // 'listings' (the "Kept by the Community" card) is retired: the
+          // trust band under the hero says it, with its evidence (Nov 11).
+          // A community's leftover row draws nothing, as 'map' below.
           if (kind === 'suggest') return !isMobile && <SuggestListingCard />
           if (kind === 'subscribe') {
             // Also unconditional — SubscribeSection doesn't read zmanim
