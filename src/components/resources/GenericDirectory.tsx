@@ -42,7 +42,7 @@ import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityCon
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
-import NextMinyanCard from './NextMinyanCard'
+import MinyanSwitch from './MinyanSwitch'
 import CategoryMap, { createHighlight, useWide } from './CategoryMap'
 import { WalkOnMapContext, type WalkShown } from './walkOnMap'
 import RowLookSwitch, { useRowLook } from './RowLookSwitch'
@@ -542,8 +542,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Opened from the page, the view is a step Back undoes (Oct 6): the
   // browser's, and on a phone a swipe. It used to replace the address, so
   // Back left Synagogues altogether. Its own ways back (the header's ‹ on a
-  // phone, "‹ Synagogues" on a computer) take that same step when there is
-  // one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
+  // phone, the switch's first half anywhere) take that same step when there
+  // is one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
   // none, and they just close it.
   const showMinyanimView = () => {
     openedHere.current = true
@@ -1250,14 +1250,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (see listingRowNote).
   const flagUnconfirmed = !!now && items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
 
-  // Synagogues' Next minyan card, while some shul the list holds keeps times.
-  // It's above the search (Nov 2) and stays while typing, so the box never
-  // jumps up under a finger; it answers for every shul, not what's typed.
-  // Wherever it isn't, All davening times is back in the list heading, so
-  // it's never gone.
-  const minyanCardItems = typed ? items : filtered
-  const showMinyanCard =
-    hasMinyanim && !minyanimViewOn && minyanCardItems.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+  // Synagogues' "16 synagogues | By time" (Nov 11): where the list's count
+  // was, in both views, so the way between them is never gone. It replaced
+  // the green Next minyan card above the search (see MinyanSwitch).
+  const minyanSwitch = (byTime: boolean) =>
+    hasMinyanim ? (
+      <MinyanSwitch
+        count={filtered.length}
+        singular={category.label}
+        plural={category.pluralLabel}
+        byTime={byTime}
+        onChange={(on) => (on ? showMinyanimView() : closeMinyanimView())}
+      />
+    ) : undefined
   // The Minyanim view in place of the list, typing included: its search
   // narrows the minyanim (the user's note 4, agreed Oct 2). It used to drop
   // back to the list of shuls.
@@ -1636,7 +1641,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const minyanimTitle = 'Minyanim by time'
   useSetScreenHeader(
     true,
-    minyanimView && !phonePage ? minyanimTitle : category.pluralLabel,
+    category.pluralLabel,
     phonePage && columnItem ? () => closeColumn(columnItem.id) : minyanimView ? closeMinyanimView : onUp,
     { named: phonePage },
   )
@@ -1693,8 +1698,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         total={filtered.length}
         filters={hasActualFilters ? { active: sheetFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
         sort={upvotes ? { byPopular, onSelect: selectSort } : undefined}
-        // Only while the Next minyan card, which carries it, is gone.
-        onDaveningTimes={hasMinyanim && !showMinyanCard ? showMinyanimView : undefined}
+        lead={minyanSwitch(false)}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
       />
   )
@@ -1723,14 +1727,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
           <div hidden={phonePage}>
           <DirectoryHeader
-            title={minyanimView ? minyanimTitle : category.pluralLabel}
+            title={category.pluralLabel}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
             titleInHeader
             banner={categoryBadge}
-            // A computer's way back from the Minyanim view: small, over the
-            // title it replaced. A phone's is the header's ‹.
-            up={minyanimView && !columnItem && !isMobile ? { label: category.pluralLabel, onClick: closeMinyanimView } : undefined}
             titleOnly={deskListing}
           />
           </div>
@@ -1819,18 +1820,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             : 'lg:translate-y-0'
         }`}
       >
-        {/* Synagogues' "Minyanim by time" row, then the page's one search box,
-            limited to this category, with example searches under it and,
+        {/* The page's one search box, limited to this category, with example searches under it and,
             once something is typed, the sentence answering it (see
             CategoryAsk). */}
-        <div className={showMinyanCard ? 'space-y-3' : undefined}>
-          {/* "Minyanim by time", with the next minyan under it: the way in
-              to every minyan, on every screen size (Oct 6). */}
-          {showMinyanCard && (
-            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
-              <NextMinyanCard items={minyanCardItems} onDaveningTimes={showMinyanimView} />
-            </div>
-          )}
+        <div>
           {showSearch && (
             <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
               <CategoryAsk
@@ -1912,6 +1905,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           filters={{ active: sheetFilterCount + minyanFilterCount, onOpen: () => setFiltersOpen(true) }}
           onShowing={setMinyanimShowing}
           kindOf={(item) => kindText(item, category)}
+          heading={minyanSwitch(true)}
         />
       ) : searchFoundNothing ? (
         // The search found nothing: the box under the search says so, with

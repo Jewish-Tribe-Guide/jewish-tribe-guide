@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 10, 2026.
+Last updated: Nov 11, 2026.
 
 ## The branch
 
@@ -224,6 +224,17 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
+- **"16 synagogues | By time" replaces the green Minyanim card** (BUILT
+  Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
+  drawn"). The list's heading is a two-part switch on phone and computer;
+  By time is the Minyanim view at `?davening=1`, a history step as before.
+  The page title stays the category's name in both (it used to turn into
+  "Minyanim by time"). The view keeps its "5 minyanim left today" count
+  beside the switch, from 440px wide up (my call, to keep Oct 15's count;
+  under that width Filters would wrap). Named change: on Oct 6 the user
+  dropped a toggle because "if we need a sign the toggle isn't
+  noticeable"; reminded of that, they still chose plain. Held off for a
+  look with real people: next minyan in rows, one map switch, side by side.
 - **Minyanim by time opens on the page whose places have minyanim** (fixed
   Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
   test project's Food was, ahead of Synagogues. The search's "next maariv"

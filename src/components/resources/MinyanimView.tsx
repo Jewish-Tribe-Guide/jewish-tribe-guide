@@ -1,5 +1,7 @@
 'use client'
 
+import type { ReactNode } from 'react'
+
 import { useEffect, useRef, useState } from 'react'
 import type { Tefillah } from '@/lib/davening'
 import Link from 'next/link'
@@ -75,6 +77,7 @@ export default function MinyanimView({
   filters,
   onShowing,
   kindOf = () => '',
+  heading,
 }: {
   items: readonly DirectoryResource[]
   categoryId: string
@@ -113,6 +116,9 @@ export default function MinyanimView({
   /** A shul's denomination, said on each of its minyanim (Oct 15: the
    *  list no longer groups shuls by it). */
   kindOf?: (item: DirectoryResource) => string
+  /** Synagogues' switch back to the list (MinyanSwitch): it heads the
+   *  view, over the days, in place of the count of minyanim. */
+  heading?: ReactNode
 }) {
   const schedule = useMinyanSchedule(null, items)
   const { community } = useActiveCommunity()
@@ -223,6 +229,25 @@ export default function MinyanimView({
 
   return (
     <div data-testid="minyanim-view">
+      {/* The switch heads the view, with how many it shows quietly beside
+          it (Oct 15's count, kept when the switch came, Nov 11): where it
+          fits on the line, so a phone's Filters doesn't wrap under it. */}
+      {heading && (
+        <ListHeading
+          count={upcoming.length}
+          total={upcoming.length}
+          lead={
+            <span className="flex items-center gap-2.5">
+              {heading}
+              <span className="hidden whitespace-nowrap text-[14px] font-medium text-slate-500 min-[440px]:inline" data-testid="minyanim-count">
+                {upcoming.length} {upcoming.length === 1 ? 'minyan' : 'minyanim'}
+                {isToday ? ' left today' : ''}
+              </span>
+            </span>
+          }
+          filters={filters}
+        />
+      )}
       <DayTabs
         days={days}
         index={index}
@@ -233,7 +258,7 @@ export default function MinyanimView({
       />
       {/* How many the list shows, with Filters beside it (Oct 15): today,
           what's still ahead; Earlier today is folded away and not counted. */}
-      <div className="mt-2">
+      {!heading && <div className="mt-2">
         <ListHeading
           count={upcoming.length}
           total={upcoming.length}
@@ -243,7 +268,7 @@ export default function MinyanimView({
           suffix={isToday ? 'left today' : undefined}
           filters={filters}
         />
-      </div>
+      </div>}
       {onShowing && <Showing count={upcoming.length} onShowing={onShowing} />}
 
       {(upcoming.length === 0 || named?.length === 0) && (

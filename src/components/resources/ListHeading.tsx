@@ -1,7 +1,6 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ClockIcon } from '@/components/icons'
 import SortMenu, { headingButton } from './SortMenu'
 
 // ── The list's own heading: what it is, how many, and how it's arranged ─────
@@ -33,7 +32,9 @@ type Props = {
   filters?: { active: number; onOpen: () => void }
   /** Sort, where there's more than one way to (likes on). */
   sort?: { byPopular: boolean; onSelect: (byPopular: boolean) => void }
-  onDaveningTimes?: () => void
+  /** In place of the count: Synagogues' "16 synagogues | By time" switch
+   *  (MinyanSwitch), which says the count itself. */
+  lead?: ReactNode
   /** "Show map", at the right end, once the map beside the list has been
    *  hidden. Only on a screen wide enough to show it. */
   onShowMap?: () => void
@@ -43,12 +44,13 @@ type Props = {
   suffix?: string
 }
 
-export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap, units = ['listing', 'listings'], suffix }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, lead, onShowMap, units = ['listing', 'listings'], suffix }: Props) {
   const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
   return (
     <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3">
+        {lead ?? (
         <h2 className="shrink-0 text-[15px] font-bold text-ink">
           {label ? (
             <>
@@ -59,17 +61,8 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           )}
           {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
         </h2>
+        )}
         <div className="ml-auto flex items-center gap-2">
-          {onDaveningTimes && (
-            <TextAction>
-              <button type="button" onClick={onDaveningTimes} aria-label="Minyanim by time" className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
-                <ClockIcon className="h-4 w-4" />
-                {/* The words once there's room; the clock alone on the
-                    narrowest phones, so Filters never gets crowded out. */}
-                <span className="hidden min-[390px]:inline">Minyanim by time</span>
-              </button>
-            </TextAction>
-          )}
           {filters && (
             <button
               type="button"
