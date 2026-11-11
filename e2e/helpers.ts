@@ -1,5 +1,6 @@
 import type { Locator, Page, APIRequestContext } from '@playwright/test'
 import { listingActions } from '../src/lib/listingView'
+import { minyanimPage } from '../src/lib/davening'
 import type { CategoryConfig } from '../src/lib/categories'
 import type { DirectoryResource } from '../src/types'
 
@@ -100,6 +101,21 @@ export async function categories(request: APIRequestContext, community: string):
   const body = await apiGet(request, `/api/categories?community=${community}`)
   if (!body.ok) throw new Error('Could not read categories')
   return body.categories as Category[]
+}
+
+/** The page Minyanim by time opens on, by the app's own rule
+ *  (minyanimPage): of the listing pages with a minyanim field, the one
+ *  whose places carry the most minyanim. Not just the first with the
+ *  field: any page can be given it, and the test project's Food was. */
+export async function minyanimCategory(request: APIRequestContext, community: string): Promise<Category | undefined> {
+  const all = (await categories(request, community)) as (Category & { detailFields?: { key: string; type: string }[] })[]
+  const withField = all.filter((c) => c.kind === 'listing' && (c.detailFields ?? []).some((f) => f.type === 'minyanim'))
+  const listings: ({ category: string } & Record<string, unknown>)[] = []
+  for (const c of withField) {
+    const body = await apiGet(request, `/api/resources?category=${c.id}&community=${community}`)
+    if (body.ok) listings.push(...(body.resources as ({ category: string } & Record<string, unknown>)[]))
+  }
+  return minyanimPage(withField.map((c) => ({ ...c, detailFields: c.detailFields ?? [] })), listings)
 }
 
 /** A listing-kind category that actually has listings, so directory tests

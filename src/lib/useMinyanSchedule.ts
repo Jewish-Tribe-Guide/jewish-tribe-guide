@@ -7,6 +7,7 @@ import { useNow } from '@/lib/useNow'
 import { currentSeason, type Season } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone, type DayKey } from '@/lib/hours'
 import type { MinyanDayKey } from '@/lib/davening'
+import { minyanimPage } from '@/lib/davening'
 import { dateKey, factsFor, readSchedules, regularMinyanim, schedulesKey, shabbosIsOver, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
 import { dayInTimezone } from '@/lib/activity'
 import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
@@ -76,7 +77,7 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const minyanimCategories: { category: CategoryConfig; field: CategoryField }[] = (categories ?? [])
     .map((c) => ({ category: c, field: c.detailFields.find((f) => f.type === 'minyanim') }))
     .filter((x): x is { category: CategoryConfig; field: CategoryField } => !!x.field)
-  const linkCategoryId = minyanimCategories[0]?.category.id
+  const linkCategoryId = minyanimPage(categories ?? [], listings)?.id
 
   const categoryFieldKey: Record<string, string> = {}
   for (const { category, field } of minyanimCategories) categoryFieldKey[category.id] = field.key

@@ -498,3 +498,28 @@ export function formatMinyanimSummary(minyanim: Minyan[]): string {
     )
     .join('\n')
 }
+
+/** The page Minyanim by time opens on: of the pages with a minyanim
+ *  field, the one whose places carry the most minyanim. Any page can be
+ *  given the field (Nov 10: any field goes in any box), so the first page
+ *  holding it may have no minyanim at all — Food did, on the test project,
+ *  and "next maariv" landed on Food with nothing to show. With no places
+ *  read yet, or none with minyanim, the first page holding the field. */
+export function minyanimPage<C extends { id: string; detailFields: readonly { key: string; type: string }[] }>(
+  categories: readonly C[],
+  listings: readonly ({ category: string } & Record<string, unknown>)[] | null | undefined,
+): C | undefined {
+  const withField = categories
+    .map((c) => ({ c, key: c.detailFields.find((f) => f.type === 'minyanim')?.key }))
+    .filter((x): x is { c: C; key: string } => !!x.key)
+  let best = withField[0]
+  let most = 0
+  for (const x of withField) {
+    const n = (listings ?? []).filter((l) => l.category === x.c.id && isMinyanim(l[x.key]) && (l[x.key] as Minyan[]).length > 0).length
+    if (n > most) {
+      best = x
+      most = n
+    }
+  }
+  return best?.c
+}

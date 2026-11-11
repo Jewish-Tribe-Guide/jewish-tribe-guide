@@ -224,6 +224,13 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
+- **Minyanim by time opens on the page whose places have minyanim** (fixed
+  Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
+  test project's Food was, ahead of Synagogues. The search's "next maariv"
+  and the home's davening link took the first page holding the field, so
+  they landed on Food with nothing to show. They now take the page whose
+  places carry the most minyanim (`minyanimPage`), the first holding the
+  field only when none has any. The e2e tests pick the page the same way.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
