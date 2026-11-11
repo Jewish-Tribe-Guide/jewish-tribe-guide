@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-import { statSync } from 'node:fs'
-import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -20,13 +18,13 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-// Photo-card redesign (matching a reference image the user supplied): fixed
-// "Upcoming"/"Davening Times"/"See minyanim near you." copy and a "View
-// Times" button — no specific next-minyan time/shul/countdown on the card
-// face any more (see upcomingDavening.test.ts for that aggregation logic,
-// still exercised here only through the seeAllHref `&day=` routing below).
-// This card's own remaining job is gating on whether the community has a
-// minyanim category at all, and linking to the right place.
+// Board G5b (Nov 11): an answer card. The next minyan big ("Mincha 2:00 PM"),
+// where under it, and the whole card one link to that day's minyanim. The
+// time logic has its own tests (upcomingDavening.test.ts); these check the
+// card shows what it picks and links where it should.
+const answer = () => screen.getByTestId('home-next-minyan-answer')
+const detail = () => screen.getByTestId('home-next-minyan-detail')
+
 describe('DaveningTimesCard', () => {
   const synagogue = makeCategory({
     id: 'synagogue',
@@ -34,50 +32,32 @@ describe('DaveningTimesCard', () => {
     detailFields: [{ key: 'minyanim', label: 'Davening Times (Minyanim)', type: 'minyanim', renderAs: 'row' }],
   })
 
-  it('renders its fixed copy', () => {
-    const shul = makeListing({
-      id: 'shul-1',
-      category: 'synagogue',
-      name: 'Kahal Kadosh Mikveh Israel',
-      minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }],
-    })
-    renderWithProviders(
-      <ListingsProvider listings={[shul]}>
-        <DaveningTimesCard coords={null} />
-      </ListingsProvider>,
-      { content: { categories: [synagogue] } },
-    )
+  it('answers with the next minyan, its shul under it, and no photo or heading', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-09-08T13:00:00'))
+      const shul = makeListing({
+        id: 'shul-1',
+        category: 'synagogue',
+        name: 'Kahal Kadosh Mikveh Israel',
+        minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }],
+      })
+      const { container } = renderWithProviders(
+        <ListingsProvider listings={[shul]}>
+          <DaveningTimesCard coords={null} />
+        </ListingsProvider>,
+        { content: { categories: [synagogue] } },
+      )
 
-    expect(screen.getByText('Upcoming')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Davening Times' })).toBeInTheDocument()
-    expect(screen.getByText('See minyanim near you.')).toBeInTheDocument()
-  })
-
-  // The photo used to hotlink a 6000x4000, 1.6 MB JPEG from pexels.com for a
-  // slot under 500px wide — 24 megapixels to decode, and the heaviest asset on
-  // the desktop home screen. It is self-hosted at the size it is shown.
-  it('uses a self-hosted, right-sized photo, not a hotlinked original', () => {
-    const shul = makeListing({
-      id: 'shul-1',
-      category: 'synagogue',
-      name: 'Kahal Kadosh Mikveh Israel',
-      minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }],
-    })
-    const { container } = renderWithProviders(
-      <ListingsProvider listings={[shul]}>
-        <DaveningTimesCard coords={null} />
-      </ListingsProvider>,
-      { content: { categories: [synagogue] } },
-    )
-
-    const src = container.querySelector('img')!.getAttribute('src')!
-    expect(src.startsWith('/')).toBe(true)
-
-    // ...and the file it points at exists and stays small, so swapping the
-    // original back in (or a new oversized one) fails here rather than
-    // silently costing every desktop visitor a megabyte and a half.
-    const bytes = statSync(join(process.cwd(), 'public', src)).size
-    expect(bytes).toBeLessThan(120 * 1024)
+      expect(screen.getByTestId('home-next-minyan-eyebrow')).toHaveTextContent('Next minyan')
+      expect(answer()).toHaveTextContent(/^Mincha 2 PM$/)
+      expect(detail()).toHaveTextContent('Kahal Kadosh Mikveh Israel')
+      expect(container.querySelector('img')).toBeNull()
+      expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('link')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not render when no category has a minyanim field — a real "not set up", not a loading state', () => {
@@ -88,10 +68,10 @@ describe('DaveningTimesCard', () => {
       { content: { categories: [makeCategory()] } }, // grocery only, no minyanim field
     )
 
-    expect(screen.queryByRole('heading', { name: 'Davening Times' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-next-minyan')).not.toBeInTheDocument()
   })
 
-  it('links "View Times" to the category page with the minyanim field, opening the Minyanim view on arrival', () => {
+  it('links the card to the category page with the minyanim field, opening the Minyanim view on arrival', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date('2026-09-08T13:00:00'))
@@ -113,7 +93,7 @@ describe('DaveningTimesCard', () => {
       // button names, rather than a bare category page the visitor then has
       // to find the same button on again — see GenericDirectory's own
       // `openMinyanimView` doc.
-      const link = screen.getByRole('link', { name: /View Times/ })
+      const link = screen.getByTestId('home-next-minyan')
       expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1')
     } finally {
       vi.useRealTimers()
@@ -121,12 +101,11 @@ describe('DaveningTimesCard', () => {
   })
 
   // When every minyan today has already passed, nextUpcomingDavening rolls
-  // over to tomorrow's earliest — "View Times" needs `&day=` or it lands
+  // over to tomorrow's earliest — the card's link needs `&day=` or it lands
   // the visitor on the Minyanim view's Today, showing nothing left
   // and no visible reason why. See this component's own `seeAllHref` doc.
-  // The card face itself no longer shows which day that is, but the link
-  // still has to route there correctly.
-  it('adds &day= to "View Times" when the next minyan is tomorrow\'s', () => {
+  // The card says "tomorrow" under the time, and the link routes there.
+  it('adds &day= to the card link when the next minyan is tomorrow’s', () => {
     vi.useFakeTimers()
     try {
       // Tuesday 11pm — every minyan today has passed, so the next one is
@@ -146,29 +125,36 @@ describe('DaveningTimesCard', () => {
         { content: { categories: [synagogue] } },
       )
 
-      const link = screen.getByRole('link', { name: /View Times/ })
+      const link = screen.getByTestId('home-next-minyan')
       expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1&day=wed')
+      expect(detail()).toHaveTextContent(/tomorrow$/)
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('has no photo placeholder overlapping the text column', () => {
+  // Seen on dev (Nov 11): Food also had a minyanim field and came first, so
+  // the card linked to Food and drew its fork and knife. It goes where the
+  // shuls are, the same page the schedule reads.
+  it('links to the category that holds the shuls, not the first with a minyanim field', () => {
+    const food = makeCategory({
+      id: 'restaurant',
+      pluralLabel: 'Food',
+      detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim', renderAs: 'row' }],
+    })
     const shul = makeListing({
       id: 'shul-1',
       category: 'synagogue',
       name: 'Kahal Kadosh Mikveh Israel',
       minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }],
     })
-    const { container } = renderWithProviders(
+    renderWithProviders(
       <ListingsProvider listings={[shul]}>
         <DaveningTimesCard coords={null} />
       </ListingsProvider>,
-      { content: { categories: [synagogue] } },
+      { content: { categories: [food, synagogue] } },
     )
 
-    const textColumn = screen.getByRole('heading', { name: 'Davening Times' }).closest('div')!
-    expect(textColumn.className).toMatch(/max-w-\[58%\]/)
-    expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    expect(screen.getByTestId('home-next-minyan').getAttribute('href')).toMatch(/^\/test-community\/synagogue\?davening=1/)
   })
 })

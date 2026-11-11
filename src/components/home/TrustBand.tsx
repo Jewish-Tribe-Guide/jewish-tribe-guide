@@ -7,6 +7,7 @@ import MobileSheet from '@/components/resources/MobileSheet'
 import ActionDialog from '@/components/resources/ActionDialog'
 import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
+import { LIFT_ON_HOVER } from './AnswerCard'
 import { routes } from '@/lib/routes'
 import { sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
 import { fetchEruvStatuses, useEruvStatuses } from '@/lib/useEruvStatuses'
@@ -162,7 +163,7 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
         }}
         aria-haspopup="dialog"
         data-testid="desktop-trust-band"
-        className="flex w-full cursor-pointer items-center gap-6 rounded-2xl bg-white px-6 py-5 text-left ring-1 ring-slate-900/5 transition-colors hover:bg-slate-50"
+        className={`flex w-full cursor-pointer items-center gap-6 rounded-2xl bg-white px-6 py-5 text-left ring-1 ring-slate-900/5 ${LIFT_ON_HOVER}`}
       >
         <span className="flex shrink-0 items-center gap-3 border-r border-slate-200 pr-6">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
@@ -188,7 +189,8 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
         <Point icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title="Every listing is dated">
           Each place says when it was last checked
         </Point>
-        <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+        {/* No chevron: it lifts on hover, like the cards below (the user,
+            Nov 11). */}
       </button>
       <TrustSheet open={open} facts={facts} region={region} communitySlug={communitySlug} onClose={() => setOpen(false)} desktop />
     </>

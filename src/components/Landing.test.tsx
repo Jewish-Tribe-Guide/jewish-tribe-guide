@@ -476,11 +476,11 @@ describe('Landing', () => {
   it('renders the Jewish Times card only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
     const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
-    expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
+    expect(screen.getByTestId('home-shabbos')).toBeInTheDocument()
     unmount()
 
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
   })
 
   it('renders Davening Times with no zmanim category at all', () => {
@@ -540,8 +540,8 @@ describe('Landing', () => {
       makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
     ]
     const row = (kind: HomeBlockKind, sortOrder: number, sharesRow = false) => ({ id: kind, kind, title: kind, sortOrder, cardIds: [], sharesRow })
-    const subscribeHeading = () => screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
-    const timesHeading = () => screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
+    const subscribeHeading = () => screen.getByTestId('home-subscribe')
+    const timesHeading = () => screen.getByTestId('home-shabbos')
     const spots = (container: HTMLElement) => [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
 
     it('three cards in one row, in order', () => {
@@ -551,13 +551,13 @@ describe('Landing', () => {
 
       const grid = screen.getByTestId('davening-stub').closest('.grid')!
       expect(grid).toHaveClass('min-[900px]:grid-cols-3')
-      expect(grid).toContainElement(screen.getByRole('heading', { name: 'Suggest a Listing' }))
+      expect(grid).toContainElement(screen.getByTestId('home-suggest'))
       expect(grid).toContainElement(subscribeHeading())
       expect(spots(container)).toEqual(['cards card-davening card-suggest card-subscribe'])
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('Suggest a Listing'))
-      expect(html.indexOf('Suggest a Listing')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading))
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('data-testid="home-suggest"'))
+      expect(html.indexOf('data-testid="home-suggest"')).toBeLessThan(html.indexOf('data-testid="home-subscribe"'))
     })
 
     // Retired Nov 11 for the trust band: a community that saved it keeps the
@@ -618,7 +618,7 @@ describe('Landing', () => {
       })
 
       expect(subscribeHeading().closest('.grid')).toBeNull()
-      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
     })
 
     it('Categories stays alone, and no row holds a fourth card, whatever was saved', () => {
@@ -641,18 +641,20 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories: cats, homeSections: [row('subscribe', 100)] } })
 
       expect(subscribeHeading().closest('.grid')).toBeNull()
-      expect(screen.queryByRole('heading', { name: 'Suggest a Listing' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('home-suggest')).not.toBeInTheDocument()
     })
 
-    it('with no rows saved: Davening Times and Suggest a Listing share a row', () => {
+    // Board G5b (Nov 11): Categories, the two answer cards side by side,
+    // the map, Suggest a listing, Stay in the Loop last.
+    it('with no rows saved: the next minyan and this Shabbat share a row, then the map', () => {
       const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
 
       expect(spots(container)).toEqual([
         'cards card-browse',
+        'cards card-davening card-jewishTimes',
         'cards card-map',
-        'cards card-davening card-suggest',
+        'cards card-suggest',
         'cards card-subscribe',
-        'cards card-jewishTimes',
       ])
     })
   })
@@ -664,14 +666,14 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
 
       const daveningStub = screen.getByTestId('davening-stub')
-      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      const jewishTimesHeading = screen.getByTestId('home-shabbos')
       expect(daveningStub.compareDocumentPosition(jewishTimesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
-    it('with nothing configured, the map card comes straight after Categories (board G3)', () => {
+    it('with nothing configured, the map card comes after the two answer cards (board G5b)', () => {
       const { container } = renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
       const spots = [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
-      expect(spots.slice(0, 2)).toEqual(['cards card-browse', 'cards card-map'])
+      expect(spots.slice(0, 3)).toEqual(['cards card-browse', 'cards card-davening card-jewishTimes', 'cards card-map'])
     })
 
     it('follows the admin-configured order — jewishTimes before davening', () => {
@@ -686,7 +688,7 @@ describe('Landing', () => {
       })
 
       const daveningStub = screen.getByTestId('davening-stub')
-      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      const jewishTimesHeading = screen.getByTestId('home-shabbos')
       expect(jewishTimesHeading.compareDocumentPosition(daveningStub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
@@ -707,7 +709,7 @@ describe('Landing', () => {
       expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
       // Jewish Times has no row of its own here, so it doesn't render at
       // all — configuring one kind doesn't implicitly configure the rest.
-      expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
     })
   })
 
@@ -776,7 +778,7 @@ describe('Landing', () => {
 
   // Phase 5 of the desktop mockup rework, revised twice after user review:
   // the flat grid is a single non-scrolling, non-wrapping row by default —
-  // the first COLLAPSED_TILE_COUNT (9) cards, sorted by listing count (most
+  // the first COLLAPSED_TILE_COUNT (14) cards, sorted by listing count (most
   // to least places), plus a trailing "More" tile when there are more than
   // that. The header row's own "View all" link is gone (the "More" tile
   // does that job now); "Show fewer categories" there is the only way back
@@ -785,33 +787,33 @@ describe('Landing', () => {
     // Listing counts, not creation order, decide the order — deliberately
     // NOT already-sorted category ids, so a test that accidentally read
     // insertion order instead of the real sort would still pass by
-    // accident. cat9 (the 10th, over COLLAPSED_TILE_COUNT) gets the fewest
+    // accident. cat14 (the 15th, over COLLAPSED_TILE_COUNT) gets the fewest
     // listings, so it's the one pushed behind "More".
-    function tenCategoriesWithCounts() {
-      const categories = Array.from({ length: 10 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      // Descending counts: cat0 has the most listings, cat9 the fewest.
+    function fifteenCategoriesWithCounts() {
+      const categories = Array.from({ length: 15 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      // Descending counts: cat0 has the most listings, cat14 the fewest.
       const listings = categories.flatMap((c, i) =>
-        Array.from({ length: 10 - i }, (_, j) => makeListing({ id: `${c.id}-l${j}`, category: c.id! })),
+        Array.from({ length: 15 - i }, (_, j) => makeListing({ id: `${c.id}-l${j}`, category: c.id! })),
       )
       return { categories, listings }
     }
 
-    it('sorts by listing count (most to least), caps at 9, and shows a trailing "All categories" tile', () => {
-      const { categories, listings } = tenCategoriesWithCounts()
+    it('sorts by listing count (most to least), caps at 14, and shows a trailing "All categories" tile', () => {
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
       const tileLinks = within(card).getAllByRole('link', { name: /Category \d/ })
-      // Exactly the first 9, in descending-count order — cat9 (fewest
+      // Exactly the first 14, in descending-count order — cat14 (fewest
       // listings) is the one left out, behind "More".
       expect(tileLinks.map((l) => l.textContent)).toEqual(
-        Array.from({ length: 9 }, (_, i) => expect.stringContaining(`Category ${i}`)),
+        Array.from({ length: 14 }, (_, i) => expect.stringContaining(`Category ${i}`)),
       )
-      expect(within(card).queryByText('Category 9')).not.toBeInTheDocument()
+      expect(within(card).queryByText('Category 14')).not.toBeInTheDocument()
 
       const moreButton = within(card).getByRole('button', { name: 'All categories' })
       expect(moreButton).toBeInTheDocument()
-      // Board H1 (Nov 11): photo tiles five across, two rows with the
+      // Boards H1 and G5b (Nov 11): photo tiles five across, three rows with the
       // "All categories" tile last, and nothing under a name.
       const row = tileLinks[0]!.parentElement!
       expect(row).toHaveClass('grid', 'grid-cols-5')
@@ -821,34 +823,34 @@ describe('Landing', () => {
 
     it('the "All categories" tile expands the grid to every card, no cap', async () => {
       const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
       await user.click(within(card).getByRole('button', { name: 'All categories' }))
 
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(15)
       expect(within(card).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
     })
 
     it('collapses back to the capped tiles + "All categories" on "Show fewer categories"', async () => {
       const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
       await user.click(within(card).getByRole('button', { name: 'All categories' }))
       await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
 
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(14)
       expect(within(card).getByRole('button', { name: 'All categories' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
     })
 
-    it('shows no "More" tile and no "Show fewer" control with 9 or fewer cards', () => {
-      const nine = Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      renderLanding(undefined, { content: { categories: nine } })
+    it('shows no "More" tile and no "Show fewer" control with 14 or fewer cards', () => {
+      const fourteen = Array.from({ length: 14 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: fourteen } })
 
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
       expect(within(screen.getByTestId('browse-everything-card')).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
@@ -856,14 +858,14 @@ describe('Landing', () => {
 
     it('tile clicks still track category_opened with source "grid" once expanded', async () => {
       const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
       await user.click(within(card).getByRole('button', { name: 'All categories' }))
-      await user.click(within(card).getByText('Category 9'))
+      await user.click(within(card).getByText('Category 14'))
 
-      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat14', source: 'grid' })
     })
   })
 

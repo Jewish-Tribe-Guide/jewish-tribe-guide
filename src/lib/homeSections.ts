@@ -45,7 +45,7 @@ export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: st
   suggest: { id: 'suggest', title: 'Suggest a Listing Card' },
   map: { id: 'map', title: 'Map Card' },
   subscribe: { id: 'subscribe', title: 'Email Signup Card' },
-  jewishTimes: { id: 'jewishTimes', title: 'Jewish Times Card' },
+  jewishTimes: { id: 'jewishTimes', title: 'Shabbat & Holiday Times Card' },
 }
 
 export type HomeSection = {

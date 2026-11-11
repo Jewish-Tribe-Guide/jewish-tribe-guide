@@ -112,7 +112,6 @@ export async function PATCH(request: Request) {
   const REQUIRED_CARD_TEXT_FIELDS: { key: keyof SiteSettings; label: string }[] = [
     { key: 'desktopSubscribeEyebrow', label: 'The Email Signup card’s eyebrow' },
     { key: 'desktopSubscribeHeading', label: 'The Email Signup card’s heading' },
-    { key: 'desktopJewishTimesHeading', label: 'The Jewish Times card’s heading' },
   ]
   for (const { key, label } of REQUIRED_CARD_TEXT_FIELDS) {
     const value = body[key]

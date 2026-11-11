@@ -248,8 +248,9 @@ export function CompactCardGrid({
 }
 
 // How many cards show before the trailing "All categories" tile, collapsed:
-// two rows of five with that tile last (board H1, Nov 11).
-const COLLAPSED_TILE_COUNT = 9
+// three rows of five with that tile last (board G5b, Nov 11: the rows fill
+// the screen and match the map card below).
+const COLLAPSED_TILE_COUNT = 14
 
 /** A category's photo, cut to its 16:10 tile. Supabase uploads go through the
  *  storage thumbnail (falling back to the original if that fails, as

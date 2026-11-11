@@ -49,7 +49,7 @@ describe('PATCH /api/admin/site-settings', () => {
     expect((await res.json()).errors).toEqual(['The map card’s photo isn’t set up on this site yet.'])
   })
 
-  it.each(['desktopSubscribeHeading', 'desktopJewishTimesHeading'])(
+  it.each(['desktopSubscribeEyebrow', 'desktopSubscribeHeading'])(
     'a blank %s, which the site shows, is still refused',
     async (key) => {
       const res = await patch({ ...SITE_SETTINGS_DEFAULTS, [key]: '' })

@@ -54,11 +54,6 @@ export type SiteSettings = {
    *  heading. */
   desktopSubscribeEyebrow: string
   desktopSubscribeHeading: string
-  /** Desktop only — the Jewish Times (ShabbatTimesCard) card's heading. No
-   *  matching eyebrow field: that card's own eyebrow is the computed
-   *  Hebrew date + location, not static text there's anything useful to
-   *  override. */
-  desktopJewishTimesHeading: string
   /** Desktop only — the warm hero band's bold headline. */
   desktopHeroHeadline: string
   /** Desktop only — the smaller supporting line under the headline. Empty
@@ -221,7 +216,6 @@ export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, m
 // Card", etc.) these fields' inputs are grouped under.
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
-export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
 
 // Same split HeroHeading.tsx's own splitMission() does, duplicated rather
 // than imported: that's a 'use client' component and this defaults object is
@@ -262,7 +256,6 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
   desktopSubscribeEyebrow: DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW,
   desktopSubscribeHeading: DEFAULT_DESKTOP_SUBSCRIBE_HEADING,
-  desktopJewishTimesHeading: DEFAULT_DESKTOP_JEWISH_TIMES_HEADING,
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,

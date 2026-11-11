@@ -275,6 +275,36 @@ The user's answers on Nov 10, evening, and what was done with them:
     appears there once this deploys; move it in the admin. Fixed on the
     way (found on dev): the card moved by keyboard could land inside a row
     of two and be squeezed to a third of the width; it now passes rows.
+  - **Computer home, one thing at a time** (board G5b on the desk canvas,
+    the user, Nov 11: "Let's first build out the drawing with no
+    picture"): BUILT Nov 11. Top to bottom: the photo, the trust strip
+    (no chevron, lifts on hover), Explore by Category in three rows of
+    five (14 tiles and "All categories"), two white answer cards side by
+    side ("Next minyan / Maariv 7 PM / the shul · distance" and "This
+    Shabbos / Candles 4:28 PM / Friday · Havdalah Saturday 5:28 PM", each
+    one link, no chevron, lifting on hover), the map card 540px tall, a
+    plain "Know a place we're missing?" card with "Suggest a listing", and
+    a navy "Stay in the Loop" box (email and Sign up only: every category,
+    new places and closures). Named changes: the minyan and Shabbat cards
+    lose their photos, headings and buttons ("View Times", Minyanim / All
+    zmanim / Eruv); the Shabbat card is white, not night ink; Suggest
+    loses its photo; Stay in the Loop loses its category picker and
+    switches on the home page (they stay on the manage page every email
+    links to); the "Jewish Times card heading" setting is removed (no
+    migration; the column is no longer read). The default order for a
+    community with no cards saved is the G5b order; **Philly's live order
+    is the admin's** (Categories, Davening + Suggest, Map, Shabbat, Stay in
+    the Loop), so it needs moving in the live admin to match (dev is
+    moved). Differs from the board: "This Shabbos" (the site's word) not
+    "This Shabbat"; a small source line under the Shabbat time (Hebrew
+    date, place, Hebcal.com), kept for visible trust. Fixed on the way:
+    the minyan card linked to (and drew the glyph of) the first category
+    with a minyan field, Food on dev, instead of the shuls page the
+    schedule reads. **Next:** a picture for the map card, an
+    OpenStreetMap view without our pins (the user's worry: it may look
+    unlike the Google map a visitor lands on; Google's Static Maps is the
+    other choice). Dev's map photo was removed to match the no-picture
+    board.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three

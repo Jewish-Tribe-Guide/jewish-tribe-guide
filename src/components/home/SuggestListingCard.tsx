@@ -1,72 +1,31 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import ContributePicker from './ContributePicker'
-import { isOptimizableImage } from '@/lib/imageHosts'
 
-// ── "Suggest a Listing" — desktop mockup match (Phase 6, docs/desktop-
-// mockup-plan.md). New card, always the third in the community row beside
-// Davening Times/Update Listings (see Landing.tsx's own community-row doc)
-// — the Add action UpdateListingsCard used to carry directly, now with a
-// card of its own instead of sharing one with "kept by the community"'s
-// statement copy. Fixed, non-admin-editable copy (the user's own call for
-// this rework — every other card in this row still takes its eyebrow/
-// heading from settings).
-//
-// "Submit a Listing" opens the same ContributePicker (category search →
-// that category's Add form) UpdateListingsCard's own Add button used to —
-// same state pattern (a `null | 'open'`-shaped boolean, not a full
-// ContributeAction union, since this card only ever offers the one action).
-//
-// The right ~42% is a real photo (a blue-fronted local shopfront —
-// Unsplash, same sourcing/licensing as the category tile photos elsewhere),
-// masked to fade into the card the same way the Sukkah banner's own photo
-// does (see CampaignBannerCard) — the text column is capped at
-// `max-w-[58%]` so real copy at any length never runs under it. Replaces
-// the plain orange/amber gradient placeholder every other card without a
-// real photo yet still falls back to.
-//
-// unoptimized={!isOptimizableImage(...)}: this went out with no gate at all
-// for a while, unlike every other hardcoded photo on this screen
-// (CampaignBannerCard, DaveningTimesCard, HeroHeading) — worked fine until
-// the deployed site's Image Optimization quota was actually exhausted, at
-// which point Vercel returned a 402 for this one request and the card just
-// showed nothing. NEXT_PUBLIC_IMAGES_UNOPTIMIZED (see imageHosts.ts) is set
-// for exactly this, but only for images that actually check it.
-const PHOTO_URL =
-  'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3RvcmV8ZW58MHx8MHx8fDA%3D'
-
+// ── Suggest a Listing, on its own after the map (board G5b, Nov 11) ─────────
+// The turn from using the guide to adding to it, so it stands alone rather
+// than sharing a row with the times: a heading, one line and one button,
+// with no photo (the user: "maybe the davening times and candles and stuff
+// don't need pictures"). The button opens the same picker as the "+ Add"
+// button, so a visitor chooses what to add before any form.
 export default function SuggestListingCard() {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
-      <div
-        aria-hidden="true"
-        className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
+    <div data-testid="home-suggest" className="flex items-center gap-7 rounded-2xl bg-white px-9 py-[30px] ring-1 ring-slate-900/5">
+      <div className="min-w-0 flex-1">
+        <p className="text-[12.5px] font-bold uppercase tracking-[0.12em] text-slate-500">Kept up by the community</p>
+        <h3 className="mt-1.5 text-[28px] font-extrabold text-ink">Know a place we’re missing?</h3>
+        <p className="mt-1 text-[15px] text-slate-600">Add it, or fix one that’s out of date. A person checks every change.</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex h-[50px] shrink-0 cursor-pointer items-center rounded-full bg-primary px-[26px] text-base font-bold text-white transition-colors hover:bg-primary-dark"
       >
-        <Image
-          src={PHOTO_URL}
-          alt=""
-          fill
-          sizes="(min-width: 640px) 42vw, 0px"
-          className="object-cover"
-          unoptimized={!isOptimizableImage(PHOTO_URL)}
-        />
-      </div>
-      <div className="relative max-w-[58%]">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">Get involved</p>
-        <h3 className="text-lg font-bold text-ink">Suggest a Listing</h3>
-        <p className="mt-2 text-sm text-slate-600">Help keep our community guide accurate and useful.</p>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="mt-4 inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
-        >
-          Submit a Listing
-        </button>
-      </div>
+        Suggest a listing
+      </button>
 
       {open && <ContributePicker onClose={() => setOpen(false)} />}
     </div>

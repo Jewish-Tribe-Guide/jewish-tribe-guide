@@ -46,7 +46,9 @@ type Row = {
   desktop_map_heading: string | null
   desktop_subscribe_eyebrow: string | null
   desktop_subscribe_heading: string | null
-  desktop_jewish_times_heading: string | null
+  /** Unread since board G5b (Nov 11): the Shabbat card lost its heading.
+   *  The column stays; nothing writes it. */
+  desktop_jewish_times_heading?: string | null
   desktop_hero_headline: string | null
   desktop_hero_subhead: string | null
   desktop_hero_image: unknown
@@ -151,7 +153,6 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     desktopNavItems: toDesktopNavItems(row.desktop_nav_items),
     desktopSubscribeEyebrow: row.desktop_subscribe_eyebrow || fallback.desktopSubscribeEyebrow,
     desktopSubscribeHeading: row.desktop_subscribe_heading || fallback.desktopSubscribeHeading,
-    desktopJewishTimesHeading: row.desktop_jewish_times_heading || fallback.desktopJewishTimesHeading,
     // Pre-migration/pre-first-save rows have no desktop hero fields of their
     // own yet — fall back to splitting this row's real mission, same as the
     // defaults object does at seed time, so an existing community's hero
@@ -270,7 +271,6 @@ export async function updateSiteSettings(
         desktop_nav_items: merged.desktopNavItems,
         desktop_subscribe_eyebrow: merged.desktopSubscribeEyebrow,
         desktop_subscribe_heading: merged.desktopSubscribeHeading,
-        desktop_jewish_times_heading: merged.desktopJewishTimesHeading,
         desktop_hero_headline: merged.desktopHeroHeadline,
         desktop_hero_subhead: merged.desktopHeroSubhead,
         desktop_hero_image: merged.desktopHeroImage,

@@ -302,15 +302,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, sharesRow: s.sharesRow }))
-  // With none set: Categories, the map card (board G3), then Davening Times
-  // and Suggest a Listing in one row, then a row each.
+  // With none set (board G5b, Nov 11): Categories, the next minyan and this
+  // Shabbat side by side, the map card, Suggest a listing, Stay in the Loop
+  // last.
   const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'map', 'davening', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'davening', 'jewishTimes', 'map', 'suggest', 'subscribe'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
-          sharesRow: kind === 'suggest',
+          sharesRow: kind === 'jewishTimes',
         }))
   // On the Today home its own blocks answer what Browse, Davening Times and
   // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
@@ -667,13 +668,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             // ShabbatTimesCard, not depend on it.
             return (
               !isMobile && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                  <SubscribeSection
-                    bare
-                    eyebrow={settings.desktopSubscribeEyebrow}
-                    heading={settings.desktopSubscribeHeading}
-                  />
-                </div>
+                <SubscribeSection
+                  band
+                  eyebrow={settings.desktopSubscribeEyebrow}
+                  heading={settings.desktopSubscribeHeading}
+                />
               )
             )
           }
@@ -690,7 +689,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 <ShabbatTimesCard
                   coords={coords ?? community.mapCenter}
                   locationLabel={zmanimLocationLabel}
-                  heading={settings.desktopJewishTimesHeading}
                 />
               )
             )

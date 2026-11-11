@@ -42,7 +42,6 @@ const CARD_KIND_SET = new Set<string>(CARD_KINDS)
 /** The setting that names a card on the site, where it has one. */
 const HEADING_KEY: Partial<Record<CardKind, keyof SiteSettings>> = {
   subscribe: 'desktopSubscribeHeading',
-  jewishTimes: 'desktopJewishTimesHeading',
 }
 
 type Card = DraftHomeSection & { kind: CardKind }

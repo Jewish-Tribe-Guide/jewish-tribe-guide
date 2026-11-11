@@ -50,80 +50,56 @@ const readyData: ZmanimData = {
   holidayPeriod: null,
 }
 
+const card = () => screen.getByTestId('home-shabbos')
+const eyebrow = () => screen.getByTestId('home-shabbos-eyebrow')
+const detail = () => screen.getByTestId('home-shabbos-detail')
+
+// Board G5b (Nov 11): a white answer card beside Next minyan. The whole card
+// is one link to the zmanim page; no heading, no buttons inside it.
 describe('ShabbatTimesCard', () => {
-  it('renders as its own headed section', () => {
+  it('is one link to the zmanim page, with no buttons inside it', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const eruv = makeCategory({ id: 'eruv-info', kind: 'eruv' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [shuls, eruv] } })
 
-    expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
-  })
-
-  it('renders a custom heading when given one — admin-editable (Desktop tab)', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" heading="Zmanim & Holidays" />)
-
-    expect(screen.getByRole('heading', { name: 'Zmanim & Holidays' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toEqual([card()])
+    expect(card()).toHaveAttribute('href', '/test-community/zmanim')
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
   it('shows only candle lighting and havdalah — not the old five-row daily zmanim grid', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText(/22 Elul 5786/)).toBeInTheDocument()
-    expect(screen.getByText(/Philadelphia/)).toBeInTheDocument()
-    expect(screen.getByText('7:09 PM')).toBeInTheDocument()
-    expect(screen.getByText('8:07 PM')).toBeInTheDocument()
+    expect(card()).toHaveTextContent('7:09 PM')
+    expect(card()).toHaveTextContent('8:07 PM')
     // The five daily rows nobody asked about — gone.
-    expect(screen.queryByText('Sunrise')).not.toBeInTheDocument()
-    expect(screen.queryByText('6:31 AM')).not.toBeInTheDocument()
-    expect(screen.queryByText('7:27 PM')).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Sunrise')
+    expect(card()).not.toHaveTextContent('6:31 AM')
+    expect(card()).not.toHaveTextContent('7:27 PM')
   })
 
-  it('credits Hebcal.com, same as the real Zmanim & Shabbos page, once ready', () => {
+  it('names the Hebrew date, the place and Hebcal.com as the source, once ready', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    const link = screen.getByRole('link', { name: 'Hebcal.com' })
-    expect(link).toHaveAttribute('href', 'https://www.hebcal.com')
+    expect(detail()).toHaveTextContent('22 Elul 5786 · Philadelphia · from Hebcal.com')
   })
 
-  it('links out to the full Zmanim & Shabbos page', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
-
-    const link = screen.getByRole('link', { name: 'All zmanim' })
-    expect(link).toHaveAttribute('href', '/test-community/zmanim')
-  })
-
-  it('links to the minyanim and the eruv only when the community has those pages', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const eruv = makeCategory({ id: 'eruv-info', kind: 'eruv' })
-    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [shuls, eruv] } })
-
-    expect(screen.getByRole('link', { name: 'Minyanim' })).toHaveAttribute('href', '/test-community/synagogue?davening=1')
-    expect(screen.getByRole('link', { name: 'Eruv' })).toHaveAttribute('href', '/test-community/eruv')
-    cleanup()
-
-    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [makeCategory({ id: 'grocery' })] } })
-    expect(screen.queryByRole('link', { name: 'Minyanim' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Eruv' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'All zmanim' })).toBeInTheDocument()
-  })
-
-  it('shows a loading state while zmanim are in flight', () => {
+  it('shows a loading bar while zmanim are in flight', () => {
     mockUseZmanim.mockReturnValue({ data: null, status: 'loading' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Loading zmanim…')).toBeInTheDocument()
+    expect(screen.getByTestId('home-shabbos-loading')).toBeInTheDocument()
+    expect(screen.queryByTestId('home-shabbos-answer')).not.toBeInTheDocument()
   })
 
   it('shows a plain error message when zmanim fail to load', () => {
     mockUseZmanim.mockReturnValue({ data: null, status: 'error' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText(/unavailable right now/)).toBeInTheDocument()
+    expect(detail()).toHaveTextContent(/unavailable right now/i)
   })
 })
 
@@ -133,7 +109,7 @@ describe('ShabbatTimesCard', () => {
 // Date.now().
 const HOUR_MS = 60 * 60 * 1000
 const isoOffset = (ms: number) => new Date(Date.now() + ms).toISOString()
-const next = () => screen.getByTestId('shabbos-next')
+const next = () => screen.getByTestId('home-shabbos-answer')
 
 describe('ShabbatTimesCard — the big time', () => {
   const friday: ZmanimData = {
@@ -148,11 +124,9 @@ describe('ShabbatTimesCard — the big time', () => {
     mockUseZmanim.mockReturnValue({ data: friday, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Shabbos')).toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('This Shabbos')
     expect(next()).toHaveTextContent('Candles 7:09 PM')
-    expect(screen.getByText('in 2 h 54 min · Friday')).toBeInTheDocument()
-    expect(screen.getByText('Havdalah Saturday')).toBeInTheDocument()
-    expect(screen.getByText('8:07 PM')).toBeInTheDocument()
+    expect(detail()).toHaveTextContent('in 2 h 54 min · Friday · Havdalah Saturday 8:07 PM')
   })
 
   it('once candles are lit: havdalah big, and the past candle lighting gone', () => {
@@ -163,7 +137,7 @@ describe('ShabbatTimesCard — the big time', () => {
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(next()).toHaveTextContent('Havdalah 8:07 PM')
-    expect(screen.queryByText('7:09 PM')).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('7:09 PM')
   })
 
   it('a day or more off: the day, no countdown', () => {
@@ -171,8 +145,8 @@ describe('ShabbatTimesCard — the big time', () => {
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(next()).toHaveTextContent('Candles 7:09 PM')
-    expect(screen.getByText('Friday')).toBeInTheDocument()
-    expect(screen.queryByText(/^in /)).not.toBeInTheDocument()
+    expect(detail()).toHaveTextContent(/^Friday · /)
+    expect(detail()).not.toHaveTextContent(/\bin \d/)
   })
 })
 
@@ -199,31 +173,30 @@ describe('ShabbatTimesCard — the holiday block', () => {
     mockUseZmanim.mockReturnValue({ data: withHoliday, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Rosh Hashana')).toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('This Rosh Hashana')
     expect(next()).toHaveTextContent('Candles 6:57 PM')
-    expect(screen.getByText('Fri, Sep 11')).toBeInTheDocument()
-    expect(screen.getByText('Ends Sun, Sep 13')).toBeInTheDocument()
-    expect(screen.getByText('7:53 PM')).toBeInTheDocument()
+    expect(detail()).toHaveTextContent('Fri, Sep 11')
+    expect(detail()).toHaveTextContent('Ends Sun, Sep 13 7:53 PM')
   })
 
   it('replaces the Shabbos times entirely, never shows both', () => {
     mockUseZmanim.mockReturnValue({ data: withHoliday, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.queryByText('Shabbos')).not.toBeInTheDocument()
-    expect(screen.queryByText(/^Havdalah/)).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Shabbos')
+    expect(card()).not.toHaveTextContent('Havdalah')
     // The regular times are a different value from the holiday's on purpose,
     // so a leftover Shabbos row can't hide behind an identical one.
-    expect(screen.queryByText('7:09 PM')).not.toBeInTheDocument()
-    expect(screen.queryByText('8:07 PM')).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('7:09 PM')
+    expect(card()).not.toHaveTextContent('8:07 PM')
   })
 
   it('falls back to the Shabbos times when there is no holiday in the window', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' }) // holidayPeriod: null
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Shabbos')).toBeInTheDocument()
-    expect(screen.getByText('Havdalah Saturday')).toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('This Shabbos')
+    expect(detail()).toHaveTextContent('Havdalah Saturday 8:07 PM')
   })
 
   // A holiday within the lookahead window used to replace the Shabbos
@@ -250,7 +223,7 @@ describe('ShabbatTimesCard — the holiday block', () => {
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(next()).toHaveTextContent('Havdalah 8:07 PM')
-    expect(screen.queryByText('Rosh Hashana')).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Rosh Hashana')
   })
 })
 
@@ -271,10 +244,9 @@ describe('ShabbatTimesCard — the fast block', () => {
     mockUseZmanim.mockReturnValue({ data: fastWith(HOUR_MS, 15 * HOUR_MS), status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('Tzom Gedaliah')
     expect(next()).toHaveTextContent('Fast begins 5:19 AM')
-    expect(screen.getByText('Fast ends Mon, Sep 14')).toBeInTheDocument()
-    expect(screen.getByText('7:44 PM')).toBeInTheDocument()
+    expect(detail()).toHaveTextContent('Fast ends Mon, Sep 14 7:44 PM')
   })
 
   it('under way: the end big, and it replaces the Shabbos times', () => {
@@ -282,8 +254,8 @@ describe('ShabbatTimesCard — the fast block', () => {
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(next()).toHaveTextContent('Fast ends 7:44 PM')
-    expect(screen.queryByText('Shabbos')).not.toBeInTheDocument()
-    expect(screen.queryByText('7:09 PM')).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Shabbos')
+    expect(card()).not.toHaveTextContent('7:09 PM')
   })
 
   it('keeps the start when Hebcal has no end time (Ta’anit Bechorot)', () => {
@@ -296,33 +268,33 @@ describe('ShabbatTimesCard — the fast block', () => {
     })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Ta’anit Bechorot')).toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('Ta’anit Bechorot')
     expect(next()).toHaveTextContent('Fast began 4:47 AM')
-    expect(screen.queryByText(/^Fast ends/)).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Fast ends')
   })
 
   it('shows nothing about a fast when there is none in the window', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.queryByText(/^Fast /)).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Fast')
   })
 
   it('keeps showing the fast for 90 minutes after it ends', () => {
     mockUseZmanim.mockReturnValue({ data: fastWith(-14 * HOUR_MS, -HOUR_MS), status: 'ready' }) // ended 60 min ago
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
-    expect(screen.queryByText('Shabbos')).not.toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('Tzom Gedaliah')
+    expect(card()).not.toHaveTextContent('Shabbos')
   })
 
   it('falls back to the Shabbos times once the fast has ended', () => {
     mockUseZmanim.mockReturnValue({ data: fastWith(-30 * HOUR_MS, -6 * HOUR_MS), status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Shabbos')).toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('This Shabbos')
     expect(next()).toHaveTextContent('Candles 7:09 PM')
-    expect(screen.queryByText('Tzom Gedaliah')).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('Tzom Gedaliah')
   })
 
   it('shows the holiday block instead when a holiday is also upcoming, once the fast has ended', () => {
@@ -340,7 +312,7 @@ describe('ShabbatTimesCard — the fast block', () => {
     })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText('Sukkot')).toBeInTheDocument()
-    expect(screen.queryByText('Tzom Gedaliah')).not.toBeInTheDocument()
+    expect(eyebrow()).toHaveTextContent('This Sukkot')
+    expect(card()).not.toHaveTextContent('Tzom Gedaliah')
   })
 })

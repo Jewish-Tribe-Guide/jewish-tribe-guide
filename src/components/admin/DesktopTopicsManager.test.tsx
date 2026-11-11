@@ -43,7 +43,7 @@ function card(kind: HomeBlockKind, sharesRow = false): DraftHomeSection {
   return { id: kind, kind, title: TITLES[kind] ?? kind, cardIds: [], sharesRow }
 }
 
-const TIMES = SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading
+const TIMES = 'Shabbat & Holiday Times'
 const SUBSCRIBE = SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading
 
 /** Each row's cards by name, as the list draws them: a box per shared row. */

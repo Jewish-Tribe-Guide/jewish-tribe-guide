@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { categories, defaultCommunity, dismissLocationPrompt, previewSettings, ready } from './helpers'
 
 // "Explore by Category" (CategoryTileRow, desktop only): photo tiles, five
-// across (board H1, Nov 11) — the first 9 cards and an "All categories" tile
+// across (boards H1 and G5b, Nov 11) — the first 14 cards and an "All categories" tile
 // that expands to every card; "Show fewer categories" (shown only once
 // expanded) goes back. Deriving the expected count from the real,
 // admin-configured category list (via `categories()` below) rather than
@@ -11,7 +11,7 @@ import { categories, defaultCommunity, dismissLocationPrompt, previewSettings, r
 test.describe('home — Browse everything grid', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop-only feature (hidden below the desktop breakpoint)')
 
-  test('caps at 9 photo tiles, five across, with "All categories" last; it expands to every tile', async ({ page, request }) => {
+  test('caps at 14 photo tiles, five across, with "All categories" last; it expands to every tile', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const cats = await categories(request, community)
     // The classic home's grid, whichever home the admin has chosen.
@@ -26,37 +26,39 @@ test.describe('home — Browse everything grid', () => {
     const more = card.getByRole('button', { name: 'All categories' })
 
     // This community's own category (+ built-in entry card) count decides
-    // whether there's an "All categories" tile to test at all (9 or fewer hides it
+    // whether there's an "All categories" tile to test at all (14 or fewer hides it
     // entirely — see Landing.tsx's own doc) — skip rather than fail if
     // there isn't, since the point is the mechanism, not this fixture data
     // forcing it.
     if ((await more.count()) === 0) {
-      test.skip(cats.length < 9, "this community doesn't have enough categories for the \"All categories\" tile to show")
+      test.skip(cats.length < 14, "this community doesn't have enough categories for the \"All categories\" tile to show")
     }
 
-    expect(await tiles.count()).toBe(9)
-    // Two rows of five: the first five tiles share a top, the sixth starts
-    // the second row under the first, and "All categories" ends that row
-    // under the fifth. Layout, so only a real browser can say.
+    expect(await tiles.count()).toBe(14)
+    // Three rows of five: the first five tiles share a top, the sixth starts
+    // the second row under the first, the eleventh the third, and "All
+    // categories" ends that row under the fifth. Layout, so only a real browser can say.
     const boxes = await tiles.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as DOMRect))
     const moreBox = (await more.boundingBox())!
     expect(new Set(boxes.slice(0, 5).map((b) => Math.round(b.top))).size).toBe(1)
     expect(boxes[5]!.top).toBeGreaterThan(boxes[0]!.bottom)
     expect(Math.round(boxes[5]!.left)).toBe(Math.round(boxes[0]!.left))
-    expect(Math.round(moreBox.y)).toBe(Math.round(boxes[5]!.top))
+    expect(boxes[10]!.top).toBeGreaterThan(boxes[5]!.bottom)
+    expect(Math.round(boxes[10]!.left)).toBe(Math.round(boxes[0]!.left))
+    expect(Math.round(moreBox.y)).toBe(Math.round(boxes[10]!.top))
     expect(Math.abs(moreBox.x - boxes[4]!.left)).toBeLessThan(2)
 
     await more.click()
     await expect(page.getByRole('button', { name: 'Show fewer categories' })).toBeVisible()
     await expect(more).not.toBeVisible()
     const expandedCount = await tiles.count()
-    expect(expandedCount).toBeGreaterThan(9)
+    expect(expandedCount).toBeGreaterThan(14)
     // Expanded: every tile, in the same grid.
     const grid = card.locator('.grid').first()
     await expect(grid).toBeVisible()
 
     await page.getByRole('button', { name: 'Show fewer categories' }).click()
-    expect(await tiles.count()).toBe(9)
+    expect(await tiles.count()).toBe(14)
     await expect(more).toBeVisible()
   })
 })

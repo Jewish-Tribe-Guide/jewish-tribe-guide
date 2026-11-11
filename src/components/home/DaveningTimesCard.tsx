@@ -1,13 +1,16 @@
 'use client'
 
-import Link from 'next/link'
 import { useIsDesktop } from '@/lib/useIsMobile'
-import Image from 'next/image'
+import AnswerCard from './AnswerCard'
+import { CategoryGlyph } from '@/lib/categoryIcons'
+import { haversineMiles, milesText } from '@/lib/geo'
 import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
-import { nextUpcomingDavening } from '@/lib/upcomingDavening'
+import { clockTime, nextUpcomingDavening } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useCategories } from '@/lib/useCategories'
+import { useAllListings } from '@/lib/useAllListings'
+import { minyanimPage } from '@/lib/davening'
 import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
 
@@ -26,19 +29,11 @@ import { routes } from '@/lib/routes'
 // job is wiring real data into that logic and rendering the result as one
 // row.
 //
-// Deliberately NOT the three-lines-per-tefillah design floated earlier —
-// still true, but the "one fact to glance at" itself (the specific next
-// minyan's time/shul/countdown) was cut in a later pass, matching a
-// photo-card reference the user supplied: fixed "Upcoming"/"Davening
-// Times"/"See minyanim near you." copy, a photo placeholder on the right
-// (same warm-gradient-plus-mask treatment as SuggestListingCard/
-// CampaignBannerCard's own placeholders), and "View Times" as a real
-// outline button instead of a text link — matching Suggest a Listing/Kept
-// by the Community's own button treatment now that all three sit together
-// in one row (see Landing.tsx's own community-row doc). The underlying
-// nextUpcomingDavening computation stays (still needed for
-// tomorrowHoliday/seeAllHref's `&day=` param — see below), it just isn't
-// rendered on the card face any more. Not admin-editable either — same
+// On the computer home (board G5b, Nov 11) it answers with the next minyan
+// itself, big: "Mincha 4:15 PM", the shul and how far it is. An earlier pass
+// had cut that for fixed "Davening Times / See minyanim near you" copy and a
+// photo; G5b brings the answer back and drops the photo. The whole card is
+// the link to every shul's times (AnswerCard). Not admin-editable, the same
 // call the user made for the Browse card's "Explore by Category".
 export default function DaveningTimesCard({ coords }: { coords: LatLng | null }) {
   const timezone = useCommunityTimezone()
@@ -51,7 +46,13 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   const categories = useCategories()
   const desktop = useIsDesktop()
   // Where "All davening times" lives, as useMinyanSchedule picks it.
-  const linkCategoryId = categories?.find((c) => c.detailFields.some((f) => f.type === 'minyanim'))?.id
+  // The same page the schedule reads (minyanimPage: the category with the
+  // most shuls). It used to be the first category with a minyanim field,
+  // which on a community whose Food category also has one sent the card,
+  // and its glyph, to Food (seen on dev, Nov 11).
+  const allListings = useAllListings()
+  const linkCategory = minyanimPage(categories ?? [], allListings)
+  const linkCategoryId = linkCategory?.id
 
   const result = schedule
     ? nextUpcomingDavening(schedule.shuls, {
@@ -87,62 +88,32 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   const tomorrowDayParam = [schedule?.tomorrowKey, ...(tomorrowHoliday ? ['holiday'] : [])].join(',')
   const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowDayParam}` : ''}`
 
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
-      {/* A real photo (tzitzit/siddur), not the gradient placeholder every
-          other card in this row still uses — the user's own choice, a
-          Pexels photo (free to use commercially, no attribution required,
-          unlike an unlicensed/watermarked stock preview tried first). Not
-          admin-editable — hardcoded the same way this card's copy already
-          is.
+  // Where the visitor is, the nearest of the shuls the time is shared by.
+  const nearest =
+    result && coords
+      ? Math.min(...result.shulGeos.flatMap((g) => (g ? [haversineMiles(coords, g)] : [])))
+      : Infinity
+  const where = result
+    ? [
+        result.shul ? result.shul.name : `${result.shulCount} shuls`,
+        ...(Number.isFinite(nearest) ? [milesText(nearest)] : []),
+        ...(result.isTomorrow ? ['tomorrow'] : []),
+      ].join(' · ')
+    : null
 
-          Self-hosted (public/images/davening-times.webp), resized to 960px
-          wide. It used to hotlink pexels.com's original: a 6000x4000 JPEG,
-          1.6 MB on the wire and ~24 megapixels for the browser to decode, for
-          a slot under 500px wide — the heaviest single asset on the desktop
-          home screen. `unoptimized` because it is already the right size:
-          there is nothing left for the optimizer to do, and going through it
-          would only spend transformation quota. Source photo:
-          https://www.pexels.com/photo/6340893/ . The mask lives on this wrapper, not
-          the `fill`ed Image itself — `fill` sets its own inset-0/100%
-          sizing via inline style, which would fight a width/position class
-          placed directly on it. No `z-index` (not even a negative one, tried
-          first): this card div never establishes its own stacking context
-          (plain `position: relative`, no z-index of its own), so a negative
-          z-index on this wrapper escaped UP to the nearest ancestor that
-          actually does establish one — landing it behind page-level layers
-          instead of just behind the text column, and the photo vanished
-          entirely. Sibling cards (SuggestListingCard/CampaignBannerCard) get
-          the same "behind the text" result for free from plain DOM order —
-          this wrapper renders first, the text column second, and two
-          z-index:auto positioned/relative siblings paint in that order. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
-      >
-        <Image
-          src="/images/davening-times.webp"
-          alt=""
-          fill
-          sizes="(min-width: 640px) 42vw, 0px"
-          className="object-cover"
-          unoptimized
-        />
-      </div>
-      <div className="relative max-w-[58%]">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">Upcoming</p>
-        <h3 className="text-lg font-bold text-ink">Davening Times</h3>
-        <p className="mt-2 text-sm text-slate-600">See minyanim near you.</p>
-        <Link
-          href={seeAllHref}
-          // Prefetched on a computer only: a phone draws this card for a moment
-          // before it has measured itself (see useIsDesktop).
-          prefetch={desktop ? undefined : false}
-          className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
-        >
-          View Times
-        </Link>
-      </div>
-    </div>
+  return (
+    <AnswerCard
+      href={seeAllHref}
+      // Prefetched on a computer only: a phone draws this card for a moment
+      // before it has measured itself (see useIsDesktop).
+      prefetch={desktop ? undefined : false}
+      testId="home-next-minyan"
+      icon={<CategoryGlyph categoryId={linkCategoryId} icon={linkCategory?.icon ?? ''} className="h-7 w-7" />}
+      eyebrow="Next minyan"
+      // Until the schedule is read, a bar; with nothing left today or
+      // tomorrow, the card still leads to every shul's times.
+      answer={schedule === null ? null : result ? `${result.label} ${clockTime(result.minutes)}` : 'Minyan times'}
+      detail={where ?? (schedule ? 'Every shul in the guide' : undefined)}
+    />
   )
 }
