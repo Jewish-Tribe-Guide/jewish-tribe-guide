@@ -49,7 +49,6 @@ import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-import { ui } from '@/lib/uiConfig'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import { dayLine } from '@/lib/todayHome'
 
@@ -612,17 +611,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             // listing count (most to least places) rather than the source
             // order resourceCards/entryCards happens to build — matching
             // the user's own reference image. Collapsed shows the first
-            // COLLAPSED_TILE_COUNT plus a trailing "More" tile (no
-            // scrolling, no wrap — see CategoryTileRow's own doc); "View
-            // all" (here or the "More" tile itself) expands it into a full
-            // wrapped grid instead.
+            // nine as photo tiles and an "All categories" tile (board H1,
+            // see CategoryTileRow's own doc), which expands it.
             const browseCards = [...(loading ? entryCards : (allCards ?? []))].sort(
               (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
             )
             return (
               <div
                 data-testid="browse-everything-card"
-                className="hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
+                className="hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-8 ring-1 ring-slate-900/5"
               >
                   {/* Hardcoded — the user's own reference image titles this
                       "Explore by Category" with no small eyebrow label above
@@ -645,7 +642,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                     )}
                   </div>
                   {!isMobile && (
-                    <div className={ui.search.landing ? 'mt-3' : ''}>
+                    <div className="mt-4">
                       <CategoryTileRow
                         cards={browseCards}
                         categories={categories}

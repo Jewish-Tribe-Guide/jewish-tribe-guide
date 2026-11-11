@@ -44,6 +44,34 @@ describe('a category’s picture on the home', () => {
     expect(pictureIn(container, '/philly/grocery')).toBeNull()
   })
 
+  // Board H1 (Nov 11): the computer tiles are photos. A category with no
+  // picture of its own uses its wide card photo; with neither, its line
+  // icon on grey, or its initial, never its emoji.
+  it('computer home: a category with only a card photo shows that', () => {
+    const hotel = makeCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', icon: '🏨', cardImageUrl: 'https://images.unsplash.com/photo-hotel' })
+    const { container } = render(<CategoryTileRow cards={[card('hotel', 'Hotels')]} categories={[hotel]} expanded onExpand={() => {}} />)
+    expect(pictureIn(container, '/philly/hotel')).toContain('photo-hotel')
+  })
+
+  it('computer home: the eruv card finds the eruv category, whatever its id', () => {
+    const eruv = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruv Information', icon: '⭕', cardImageUrl: 'https://images.unsplash.com/photo-eruv' })
+    const { container } = render(<CategoryTileRow cards={[card('eruv', 'Eruv Information')]} categories={[eruv]} expanded onExpand={() => {}} />)
+    expect(pictureIn(container, '/philly/eruv')).toContain('photo-eruv')
+  })
+
+  it('computer home: no picture at all draws the line icon or the initial, never the emoji', () => {
+    const sukkahs = makeCategory({ id: 'sukkahs', label: 'Sukkah', pluralLabel: 'Sukkahs', icon: '📋' })
+    const { container } = render(
+      <CategoryTileRow cards={[card('grocery', 'Grocery'), card('sukkahs', 'Sukkahs')]} categories={[grocery, sukkahs]} expanded onExpand={() => {}} />,
+    )
+    const glyphs = container.querySelectorAll('[data-testid="category-tile-glyph"]')
+    expect(glyphs).toHaveLength(2)
+    expect(glyphs[0]!.querySelector('svg')).not.toBeNull()
+    expect(glyphs[1]).toHaveTextContent(/^S$/)
+    expect(container.textContent).not.toMatch(/🛒|📋|🍽️/u)
+    expect(container.querySelector('a[href="/philly/sukkahs"]')).toHaveAccessibleName('Sukkahs')
+  })
+
   it('search rows (the compact index) show it too', () => {
     const { container } = render(<CompactCardGrid cards={[card('restaurant', 'Food'), card('grocery', 'Grocery')]} categories={[food, grocery]} />)
     expect(pictureIn(container, '/philly/restaurant')).toContain('category-icon/food-pic')

@@ -95,8 +95,17 @@ export function getCategoryColor(categories: CategoryConfig[] | null | undefined
  *  setting one picture changes the category everywhere at once; a tile that
  *  forgot to pass it is how Food's picture once showed only in search. */
 export function getCategoryPicture(categories: readonly CategoryConfig[] | null | undefined, categoryId: string | undefined): string | null {
-  if (!categoryId) return null
-  return (categories ?? []).find((c) => c.id === categoryId)?.iconImageUrl?.trim() || null
+  return cardCategory(categories, categoryId)?.iconImageUrl?.trim() || null
+}
+
+/** The category a home card stands for. Cards are keyed by category id,
+ *  except the eruv card, which is always `eruv` (cardSearch.ts) whatever the
+ *  community's eruv category is called: Philly's is `eruv-information`, so
+ *  matching on id alone lost its picture. */
+function cardCategory(categories: readonly CategoryConfig[] | null | undefined, cardId: string | undefined): CategoryConfig | undefined {
+  if (!cardId) return undefined
+  const list = categories ?? []
+  return list.find((c) => c.id === cardId) ?? (cardId === 'eruv' ? list.find((c) => c.kind === 'eruv') : undefined)
 }
 
 /** The palette offered in the category editor's colour picker. Exported so the
@@ -193,3 +202,12 @@ export function categoryColorUsage(
 // and all, into every category page's code.
 export const HOSPITAL_COLOR = '#b6302b'
 export const HOSPITAL_ICON = '🏥'
+
+/** The photo for a category's tile on the computer home's Explore by
+ *  Category (board H1, Nov 11): its own icon-spot picture, else the wide
+ *  card photo an older setup pasted (at tile size, unlike at badge size, a
+ *  wide photo crops fine), else null for the plain glyph on grey. */
+export function getCategoryTilePhoto(categories: readonly CategoryConfig[] | null | undefined, categoryId: string | undefined): string | null {
+  const c = cardCategory(categories, categoryId)
+  return c?.iconImageUrl?.trim() || c?.cardImageUrl?.trim() || null
+}

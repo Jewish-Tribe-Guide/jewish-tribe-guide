@@ -240,6 +240,19 @@ The user's answers on Nov 10, evening, and what was done with them:
     thing), BUILT.
   - Explore by Category showing every category instead of "More": held,
     to ask visitors.
+  - Explore by Category as photo tiles (board H1 on the desk canvas, the
+    user: "soooo much better. let's do it"): BUILT Nov 11. Five across, the
+    name under each photo, no counts; the first nine and an "All
+    categories" tile (was "More"), which expands to every tile. A tile's
+    photo is the category's own picture, else its wide card photo, else its
+    line icon on grey, else its initial (never its emoji). Changes to
+    earlier decisions: the 64px circles with listing counts are gone on the
+    computer. Fixed with it: the eruv card never found Philly's eruv
+    category's picture (its id is `eruv-information`; the card is always
+    `eruv`), and the trust band's point text ignored its two-line clamp.
+    Open: the phone's category tiles still mix photos and tinted icons;
+    H1 didn't cover them. Networking's and Eruv Information's pictures
+    don't work as tiles (generic tech art; a blurry thumbnail).
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three

@@ -201,7 +201,7 @@ function Point({ icon, tone, title, children }: { icon: React.ReactNode; tone: s
       <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
       <span className="min-w-0">
         <span className="block text-[14px] font-extrabold text-ink">{title}</span>
-        <span className="line-clamp-2 block text-[12.5px] leading-snug text-slate-600">{children}</span>
+        <span className="line-clamp-2 text-[12.5px] leading-snug text-slate-600">{children}</span>
       </span>
     </span>
   )

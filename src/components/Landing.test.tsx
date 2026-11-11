@@ -507,6 +507,12 @@ describe('Landing', () => {
       expect(band).toHaveTextContent('Kept up by the community')
       expect(band).toHaveTextContent('People fill in the rest')
       expect(band).toHaveTextContent('Every listing is dated')
+      // Each point's line stops at two lines. `block` beside line-clamp-2
+      // undid the clamp (it needs display: -webkit-box), and the first
+      // point ran to three, pushing the categories below a laptop's fold.
+      const subs = band.querySelectorAll('.line-clamp-2')
+      expect(subs.length).toBeGreaterThan(0)
+      for (const el of subs) expect(el).not.toHaveClass('block')
       expect(screen.getByTestId('desktop-hero').compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
 
@@ -707,14 +713,14 @@ describe('Landing', () => {
     // against the user's own reference image, which shows plain icon+label
     // with no box, closer to CompactCard's own borderless-at-rest treatment
     // than a card grid.
-    it('tiles have no border, at rest or on hover — just the icon and label', () => {
+    it('tiles have no border, at rest or on hover — just the photo and name', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
       const card = screen.getByTestId('browse-everything-card')
       const tile = within(card).getByText('Grocery Stores').closest('a')!
       expect(tile.className).not.toMatch(/\bborder\b/)
-      expect(tile.className).toMatch(/hover:bg-slate-50/)
+      expect(within(card).getByText('Grocery Stores')).toHaveClass('group-hover:text-primary')
     })
 
     // "Explore by Category" titles the whole merged card — unlike the flat
@@ -748,7 +754,7 @@ describe('Landing', () => {
   // that. The header row's own "View all" link is gone (the "More" tile
   // does that job now); "Show fewer categories" there is the only way back
   // once expanded, since there's no "More" tile to click in that state.
-  describe('the capped row + "More" tile vs. full grid', () => {
+  describe('the capped tiles + "All categories" tile vs. every tile', () => {
     // Listing counts, not creation order, decide the order — deliberately
     // NOT already-sorted category ids, so a test that accidentally read
     // insertion order instead of the real sort would still pass by
@@ -763,7 +769,7 @@ describe('Landing', () => {
       return { categories, listings }
     }
 
-    it('sorts by listing count (most to least), caps at 9, and shows a trailing "More" tile', () => {
+    it('sorts by listing count (most to least), caps at 9, and shows a trailing "All categories" tile', () => {
       const { categories, listings } = tenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
@@ -776,39 +782,40 @@ describe('Landing', () => {
       )
       expect(within(card).queryByText('Category 9')).not.toBeInTheDocument()
 
-      const moreButton = within(card).getByRole('button', { name: /More/ })
+      const moreButton = within(card).getByRole('button', { name: 'All categories' })
       expect(moreButton).toBeInTheDocument()
-      // Single row: no scroll container, no wrap — a plain flex row.
+      // Board H1 (Nov 11): photo tiles five across, two rows with the
+      // "All categories" tile last, and nothing under a name.
       const row = tileLinks[0]!.parentElement!
-      expect(row).toHaveClass('flex')
-      expect(row).not.toHaveClass('overflow-x-auto')
-      expect(row).not.toHaveClass('flex-wrap')
+      expect(row).toHaveClass('grid', 'grid-cols-5')
+      expect(row.lastElementChild).toBe(moreButton)
+      expect(card).not.toHaveTextContent(/listings?\b|places\b|See all/)
     })
 
-    it('the trailing "More" tile expands the grid to every card, no cap', async () => {
+    it('the "All categories" tile expands the grid to every card, no cap', async () => {
       const user = userEvent.setup()
       const { categories, listings } = tenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByRole('button', { name: 'All categories' }))
 
       expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
-      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(within(card).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
     })
 
-    it('collapses back to the capped row + "More" tile on "Show fewer categories"', async () => {
+    it('collapses back to the capped tiles + "All categories" on "Show fewer categories"', async () => {
       const user = userEvent.setup()
       const { categories, listings } = tenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByRole('button', { name: 'All categories' }))
       await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
 
       expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
-      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
+      expect(within(card).getByRole('button', { name: 'All categories' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
     })
 
@@ -817,7 +824,7 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories: nine } })
 
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
     })
 
     it('tile clicks still track category_opened with source "grid" once expanded', async () => {
@@ -826,7 +833,7 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByRole('button', { name: 'All categories' }))
       await user.click(within(card).getByText('Category 9'))
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
