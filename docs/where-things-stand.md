@@ -266,8 +266,20 @@ The user's answers on Nov 10, evening, and what was done with them:
   from before the correction, so To do showed Friday going back to 7pm.
   Approving was always safe (`rebasePart` puts on the finding's own week
   only); the queue list and job pages now show it the same way. The live
-  item's own week (Nov 20-21) is right. Open idea, not built: flag a
-  Friday Mincha read later than candle lighting.
+  item's own week (Nov 20-21) is right. A candle-lighting check was
+  proposed and turned down (the user: "We are supposed to be an
+  aggregator. If someone posts a wrong time that's not on us").
+- **A website that changed after the newsletter corrects it** (the user,
+  Nov 11, changing Oct 20's "the newsletter wins": "if they correct it
+  then we should be correcting too"). On a day both give, a website page
+  that changed after the newsletter's week was posted corrects that
+  week's time for each tefillah it gives (`correctOlderWeeks` in
+  listingPageRun.ts): one minyan each side, same tefillah or both evening
+  ones; the week's other times that day stay. A page unchanged since, a
+  week with no posted time, or a page with no change on record leaves
+  the newsletter's week as it was. "Changed" is the whole page's
+  fingerprint, so a page edited for anything else counts as newer too;
+  the admin still approves each change.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
@@ -2162,7 +2174,9 @@ Settled with the user so far:
   The website usually gives the usual times; the newsletter gives this
   week's, as a week beside the usual times. For the same days a week from
   the newsletter or a person wins over the website's (the user, Oct 20;
-  `postedBy` in schedules.ts). An agreeing website read confirms and
+  `postedBy` in schedules.ts), unless the website's page changed after
+  that week was posted: then a time it gives corrects the week's
+  (`correctOlderWeeks`, the user, Nov 11). An agreeing website read confirms and
   clears older findings; an approved newsletter change shows "Confirmed
   by <shul>".
 - **Waiting for you, in order**: a place off a certifier's list first
@@ -5305,7 +5319,8 @@ build").
   they disagree"). What the website reads is marked as the website's. The
   website leaves out any day the newsletter (or a person, through Update
   their times) has given a week for, and a newsletter's week takes the
-  website's times off its days.
+  website's times off its days. Changed Nov 11: the newer one wins a day
+  (see "A website that changed after the newsletter corrects it").
 - **Gaps, plainly:** if a website suggestion and a newsletter suggestion
   for one shul are both waiting in the queue, whichever is approved last
   wins (the website watch never files while anything is waiting, so this
