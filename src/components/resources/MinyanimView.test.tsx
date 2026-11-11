@@ -157,7 +157,7 @@ describe('the Minyanim view (step 4)', () => {
     expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')[0].className).toMatch(/\bpx-4\b/)
     // Small round pills, the day picked filled in.
     for (const tab of screen.getAllByRole('tab')) expect(tab.className).toMatch(/\brounded-full\b/)
-    expect(screen.getByRole('tab', { selected: true }).className).toMatch(/\bbg-ink\b/)
+    expect(screen.getByRole('tab', { selected: true }).className).toMatch(/\bbg-primary\b/)
   })
 
   it('the days on one line: swiped on a phone, arrows on desktop, never wrapped', () => {

@@ -101,7 +101,7 @@ export default function HeroHeading({
   today,
   trust = null,
 }: Props) {
-  const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
+  const { desktopHeroHeadline: headline, desktopHeroImage: heroImage } = settings
 
   // Start fetching the hero photo from <head> — but only where it will be
   // shown. The <img> below is deliberately lazy (a lazy image in a display:none
@@ -277,7 +277,6 @@ export default function HeroHeading({
         <div className="mx-auto flex min-h-[360px] max-w-[720px] flex-col items-center px-4 pt-[72px] pb-14 text-center">
           {today && <p className="mb-2 min-h-6 text-[16px] font-semibold text-white/80">{today.dayLine}</p>}
           <h1 className="text-[40px] font-extrabold leading-tight tracking-tight text-white text-balance">{headline}</h1>
-          {subhead && !today && <p className="mt-2 max-w-[46ch] text-[17px] text-white/85">{subhead}</p>}
           {ui.search.landing && (
             <div ref={searchShellRef} className="relative mt-6 w-full text-left">
               <SearchBox

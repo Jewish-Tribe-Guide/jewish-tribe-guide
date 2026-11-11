@@ -295,10 +295,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                     <AdminField label="Big line">
                       <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={adminInputClass} />
                     </AdminField>
-                    {/* Wraps, so the whole line shows (the user, Nov 4). */}
-                    <AdminField label="Line under it">
-                      <textarea rows={2} value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={adminInputClass} />
-                    </AdminField>
+                    {/* No line under it: the big line, then the search (the
+                        user, Nov 11). */}
                     {/* No description: the photo is decoration (HeroHeading). */}
                     <div>
                       <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>

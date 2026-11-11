@@ -148,9 +148,8 @@ describe('SiteSettingsEditor — Home page', () => {
       searchPlaceholder: 'Ask: challah',
     })
     expect(screen.getByLabelText('Big line')).toHaveValue('Your guide')
-    // Wraps, so a long line shows whole (the user, Nov 4).
-    expect(screen.getByLabelText('Line under it')).toHaveValue('Kept current by you')
-    expect(screen.getByLabelText('Line under it').tagName).toBe('TEXTAREA')
+    // No line under the big line any more (the user, Nov 11).
+    expect(screen.queryByLabelText('Line under it')).toBeNull()
     expect(screen.getByLabelText('Words in the search box')).toHaveValue('Ask: challah')
   })
 

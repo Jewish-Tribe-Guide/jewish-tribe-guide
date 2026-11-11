@@ -230,11 +230,21 @@ The user's answers on Nov 10, evening, and what was done with them:
   now full width and dimmed; white type. Named changes: Browse Categories
   and View Map are gone from the hero (the header has Categories and Map),
   and the header no longer goes see-through over the hero (dark header
-  text can't sit on a dimmed photo; the board draws it white). The admin's
-  sub line still shows under the headline when set (the board drew none;
-  the field is the admin's). Everything below the hero is unchanged, and the
+  text can't sit on a dimmed photo; the board draws it white). No line
+  under the headline (the user, Nov 11), and the admin's "Line under it"
+  field is gone (the stored value is left, unused). Everything below the hero is unchanged, and the
   phone home is untouched. Held off for a look with real people: the
   showcase sections, search in the header.
+- **Open from Nov 11's home review** (the user's notes on the built hero):
+  - The switch and day pills are blue (the site's colour for a picked
+    thing), BUILT.
+  - Explore by Category showing every category instead of "More": held,
+    to ask visitors.
+  - "Kept up by the community" (the phone's trust line) somewhere on the
+    computer: where is open.
+  - The big map, "everything on one map": the user wonders if a
+    Mekor-style feature card (picture, small label, big title, one line,
+    one button) would call it out. Needs a drawing.
 - **"By synagogue | By time" replaces the green Minyanim card** (BUILT
   Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
   drawn"). The list's heading is a two-part switch on phone and computer;

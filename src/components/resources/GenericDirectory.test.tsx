@@ -2197,6 +2197,8 @@ describe('GenericDirectory — each shul’s next minyan', () => {
 
       expect(listButton()).toHaveTextContent(new RegExp(`^By ${shulCategory.label.toLowerCase()}$`))
       expect(byTimeButton()).toHaveTextContent(/^By time$/)
+      // Picked is the site's blue, as Sort's and the filters' choices are (Nov 11).
+      expect(listButton().className).toMatch(/\bbg-primary\b/)
       await user.click(byTimeButton())
       const viewHeading = within(screen.getByTestId('minyanim-view')).getByTestId('list-heading')
       expect(viewHeading).not.toHaveTextContent(/minyan|left today/)

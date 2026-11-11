@@ -27,7 +27,7 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     desktopHeroImage: null,
   }
 
-  it('desktop: renders desktopHeroHeadline as a bold <h1> and desktopHeroSubhead as a smaller paragraph; the site name and mission are not repeated here at all', () => {
+  it('desktop: renders desktopHeroHeadline as the <h1> and nothing under it (the user, Nov 11); the site name and mission are not repeated here at all', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
 
     // Both layouts render at once (CSS-only mobile/desktop split — see the
@@ -36,7 +36,7 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     // heroTitle (a different <h1> — see the mobile assertion below).
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s.some((h) => h.textContent === settings.desktopHeroHeadline)).toBe(true)
-    expect(screen.getByText(settings.desktopHeroSubhead).tagName).toBe('P')
+    expect(screen.queryByText(settings.desktopHeroSubhead)).not.toBeInTheDocument()
 
     // The site name doesn't render anywhere in this component any more —
     // SiteHeader is where it lives now, once and only once.
@@ -46,19 +46,6 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     // any more, since search (and the label heading it) moved out to its own
     // section entirely rather than staying folded into the hero band.
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
-  })
-
-  it('desktop: renders the headline alone when desktopHeroSubhead is empty', () => {
-    render(
-      <HeroHeading
-        settings={{ ...settings, desktopHeroSubhead: '' }}
-        query=""
-        onQueryChange={vi.fn()}
-      />,
-    )
-    expect(screen.getAllByRole('heading', { level: 1 }).some((h) => h.textContent === settings.desktopHeroHeadline)).toBe(
-      true,
-    )
   })
 
   // The phone home (the user, Oct 17): no headline and no mission on show.
@@ -436,6 +423,7 @@ describe('HeroHeading — the Today home', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
     expect(screen.queryByTestId('today-hero')).not.toBeInTheDocument()
     expect(screen.getByTestId('phone-hero')).toBeInTheDocument()
-    expect(screen.getByText(settings.desktopHeroSubhead)).toBeInTheDocument()
+    // No line under the computer's headline (the user, Nov 11).
+    expect(screen.queryByText(settings.desktopHeroSubhead)).not.toBeInTheDocument()
   })
 })
