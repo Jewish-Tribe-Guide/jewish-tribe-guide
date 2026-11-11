@@ -474,6 +474,8 @@ export type RowRename = {
    *  another's (a box of the listing's own becoming the admin's), which
    *  then starts `fresh`. */
   onStart?: () => void
+  /** Done typing (left, Enter or Escape), with the name as it stands. */
+  onEnd?: (value: string) => void
 }
 
 /** Open, the name reads as the name; a tap on it edits it, and leaving
@@ -481,6 +483,13 @@ export type RowRename = {
  *  name right away is a throw off"). Just added, it starts in the box. */
 export function RowName({ rename, name }: { rename: RowRename; name: string }) {
   const [editing, setEditing] = useState(!!rename.fresh)
+  // Made fresh after it was drawn (a box of the listing's own just made the
+  // admin's, taking an id another row had): it starts editing then too.
+  const [wasFresh, setWasFresh] = useState(!!rename.fresh)
+  if (!!rename.fresh !== wasFresh) {
+    setWasFresh(!!rename.fresh)
+    if (rename.fresh) setEditing(true)
+  }
   // The box's padding hangs to the left, so the name sits where it did closed.
   const pad = '-ml-2.5 rounded-md border px-2.5 py-1.5 text-[15px] font-semibold'
   if (!editing)
@@ -502,7 +511,10 @@ export function RowName({ rename, name }: { rename: RowRename; name: string }) {
       autoFocus
       onFocus={(e) => rename.fresh && e.target.select()}
       onChange={(e) => rename.onChange(e.target.value)}
-      onBlur={() => setEditing(false)}
+      onBlur={(e) => {
+        setEditing(false)
+        rename.onEnd?.(e.target.value)
+      }}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
       // As wide as the name, so the rest of the row is there to tap closed.
       size={Math.max(rename.value.length || (rename.placeholder?.length ?? 0), 6) + 2}

@@ -96,6 +96,19 @@ function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onBack, on
 
 const chip = 'rounded-full bg-slate-100 px-3 py-1 text-[14px] font-semibold text-slate-700'
 
+/** "In the filter": on, a choice shows as a chip, the filter's own look; off
+ *  again, it shows as it did when its screen opened, so a switch put back
+ *  changes nothing (the user, Nov 10). */
+function useFilterSwitch(f: CategoryField, onChange: (patch: Partial<CategoryField>) => void) {
+  const opened = useRef(f.renderAs)
+  return (on: boolean) =>
+    onChange(
+      on && (f.type === 'select' || f.type === 'boolean')
+        ? { filterable: true, renderAs: 'badge' }
+        : { filterable: on, ...(!on && { renderAs: opened.current }) },
+    )
+}
+
 /** "A, B and C". */
 const andList = (names: readonly string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
@@ -198,6 +211,7 @@ export function FieldChanges({
   const minyan = !fixed && f.type === 'minyanim'
   const under = !fixed && rows && canGoUnderName(f)
   const off = f.minyanOff ?? []
+  const filterSwitch = useFilterSwitch(f, onChange)
   return (
     <>
       {/* Its choices before its switches: they're what the field is (the
@@ -218,7 +232,7 @@ export function FieldChanges({
             <AdminSwitch
               checked={!!f.filterable}
               // A choice in the filter shows at the top of a place, as a chip.
-              onChange={(on) => onChange(on && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: on })}
+              onChange={filterSwitch}
               label={f.type === 'hours' ? 'Open now in the filter' : 'In the filter'}
             />
           </Change>
@@ -269,7 +283,7 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onBack, rows
   const options = f.options ?? []
   const both = options.length >= 2 ? `Can a place be both ${options[0].label} and ${options[1].label}?` : 'Can a place have more than one?'
   // A choice in the filter shows at the top of a place, as a chip.
-  const filter = (yes: boolean) => onChange(yes && (f.type === 'select' || f.type === 'boolean') ? { filterable: true, renderAs: 'badge' } : { filterable: yes })
+  const filter = useFilterSwitch(f, onChange)
 
   return (
     <>

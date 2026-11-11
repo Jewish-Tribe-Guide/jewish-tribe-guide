@@ -1532,22 +1532,35 @@ describe('CategoryEditor — a hechsher’s kosher questions', () => {
   // The certificate link comes with its field, with a switch (the user, Nov 9).
   const link: CategoryField = { key: 'k', label: 'Kosher Certification URL', type: 'url', renderAs: 'row', linkLabel: 'Certification', filterable: false }
 
-  it('the certificate link’s switch takes it off, and puts it back next to its field', async () => {
-    const onSaved = vi.fn()
+  it('the certificate link’s switch takes it off, and puts it back as it was saved, where it was', async () => {
     const user = userEvent.setup()
     const short: CategoryField = { key: 'short', label: 'Short Description', type: 'text', renderAs: 'row' }
-    const withLink = { ...food, detailFields: [cert, short, flag, note, link] }
-    renderWithProviders(<CategoryEditor token="t" initial={withLink} siblings={[withLink]} onSaved={onSaved} onCancel={vi.fn()} />)
+    const withLink = { ...food, detailFields: [cert, short, flag, note, { ...link, formSection: 'kosher' }] }
+    renderWithProviders(<CategoryEditor token="t" initial={withLink} siblings={[withLink]} onSaved={vi.fn()} onCancel={vi.fn()} />)
     await openCert(user)
     const linkSwitch = () => screen.getByRole('switch', { name: 'Link to the certificate' })
     expect(linkSwitch()).toHaveAttribute('aria-checked', 'true')
     await user.click(linkSwitch())
     expect(linkSwitch()).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('region', { name: 'Save' })).toHaveTextContent('1 change')
     await user.click(linkSwitch())
+    // The page as it was, its name and form section kept: no change (the
+    // user, Nov 10: "undoing something still says a change happened").
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+  })
+
+  it('a certificate link the page didn’t have goes right after its field', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const short: CategoryField = { key: 'short', label: 'Short Description', type: 'text', renderAs: 'row' }
+    const noLink = { ...food, detailFields: [cert, short, flag, note] }
+    renderWithProviders(<CategoryEditor token="t" initial={noLink} siblings={[noLink]} onSaved={onSaved} onCancel={vi.fn()} />)
+    await openCert(user)
+    await user.click(screen.getByRole('switch', { name: 'Link to the certificate' }))
     await saveNow(user)
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    // The link goes back right after its field (and its kosher questions).
-    expect(saved().map((f) => f.key)).toEqual(['kosherCert', 'kosherPartial', 'kosherNote', 'k', 'short'])
+    // Right after its field (and its kosher questions).
+    expect(saved().map((f) => f.key)).toEqual(['kosherCert', 'kosherPartial', 'kosherNote', expect.any(String), 'short'])
   })
 
   it('switched off, the page stops asking for the link', async () => {

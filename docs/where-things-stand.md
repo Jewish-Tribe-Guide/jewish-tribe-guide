@@ -205,6 +205,25 @@ The user's answers on Nov 10, evening, and what was done with them:
       again's rows); and the picture of a visitor's row in Add a field
       keeps its chevron, since visitors' rows have one. A touch-screen
       computer counts as a phone.
+    - **Save and Undo count only real changes** (the user, Nov 10: "even
+      just clicking something triggers a change. And undoing something
+      still says a change happened"). The rule as built, whole: the Save
+      bar counts a change only when what would be saved means something
+      different. A switch turned on and back off, a box's name pressed
+      and left as it was, and fields in a new key order are no change.
+      How: a category page compares by meaning (`draftMeaning`,
+      `FIELD_FLAG_MEANS` spells out every switch, so a new one is a
+      compile error until it's classified; `stableJson` ignores key order
+      and unset keys); a form compares its questions the same way
+      (`stepMeaning`). Where switching back was really lossy, it now puts
+      back what was saved: Kosher questions and the certificate link
+      turned back on come back as the page had them (their form section
+      and the link's name kept, the link in its saved place; a link the
+      page never had still goes right after its field); a filter turned
+      off puts back how the field showed. Campaigns, Feedback and Pages
+      already compared plain values. Swept by
+      `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
+      every switch on every field's screen and every box name.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

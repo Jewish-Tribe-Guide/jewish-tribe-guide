@@ -24,7 +24,7 @@ import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import FieldLooks from './FieldLooks'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
-import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
+import { draftMeaning, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
@@ -82,7 +82,7 @@ export function CategoryEditor(props: Props) {
 const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'capabilities'])
 
 function changedKeys(draft: Draft, saved: Draft): number {
-  return (Object.keys(draft) as (keyof Draft)[]).filter((k) => !FOLLOWING_KEYS.has(k) && JSON.stringify(draft[k]) !== JSON.stringify(saved[k])).length
+  return (Object.keys(draft) as (keyof Draft)[]).filter((k) => !FOLLOWING_KEYS.has(k) && draftMeaning(k, draft[k]) !== draftMeaning(k, saved[k])).length
 }
 
 function CategoryEditorScreen({
@@ -116,6 +116,9 @@ function CategoryEditorScreen({
   // Back from a field or the picker, the Fields box is still open on a phone,
   // with the box it was in (boards 17-19).
   const [fieldsOpen, setFieldsOpen] = useState(false)
+  // A box of the listing's own just made the admin's by a press on its name:
+  // its id now, its name then, and the boxes before.
+  const owned = useRef<{ id: string; title: string; before: string } | null>(null)
   // The row just added, lit in its box (E1b: every box is open).
   const [landed, setLanded] = useState<string | null>(null)
   // A box just added, its name selected to type over (board 19).
@@ -759,8 +762,18 @@ function CategoryEditorScreen({
               // Renamed: a box of the listing's own becomes the admin's, its
               // name ready to type.
               const own = ownBox(parts, boxes, id, fieldPage)
+              owned.current = { id: own.id, title: boxes.find((b) => b.id === id)?.title ?? '', before: draft.listingParts }
               set('listingParts', listingPartsKey(own.parts))
               setFreshBox(own.id)
+            }}
+            onRenameEnd={(id, title) => {
+              // Left as it was: the box is the listing's own again, as if
+              // its name was never pressed (the user, Nov 10: "even just
+              // clicking something triggers a change").
+              const was = owned.current
+              owned.current = null
+              setFreshBox(null)
+              if (was?.id === id && title.trim() === was.title) set('listingParts', was.before)
             }}
             onRemoveBox={(id) => {
               // Its fields come off the page with it (the user, Nov 10), the

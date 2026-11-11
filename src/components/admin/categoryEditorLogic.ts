@@ -14,6 +14,8 @@ import { parseQuestionCard, questionCardKey } from '@/lib/questionCards'
 import { parseWalkLists, walkListKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, parseListingParts } from '@/lib/listingParts'
 import { placeKindFromSlug, type PlaceKind } from '@/lib/placeKinds'
+import { onSecondLine } from '@/lib/cardLines'
+import { stableJson } from '@/lib/stableJson'
 
 // ── Pure logic behind CategoryEditor — draft shape, template/field
 // normalization, and the two destructive-change detectors (option rename,
@@ -351,4 +353,53 @@ export function fieldsWithRenamedShowIf(
     if (!match) return f
     return { ...f, showIf: { ...f.showIf, equals: match.newValue } }
   })
+}
+
+// ── Whether the draft is what was saved (the user, Nov 10: "even just
+// clicking something triggers a change. And undoing something still says a
+// change happened"). A yes/no left unset means something: Required off,
+// a photo on its row, a choice in the filter under the name. A switch
+// turned on and off again sets it outright, so the raw values differ while
+// the page is the same. Each field is compared by what its yes/nos mean. ──
+
+/** The keys of a field that hold a yes or no. */
+type FieldFlag = { [K in keyof CategoryField]-?: NonNullable<CategoryField[K]> extends boolean ? K : never }[keyof CategoryField]
+
+/** What each of a field's yes/nos means, set or not (on a field already
+ *  through normalizeField). Keyed on every one, so a new yes/no on
+ *  CategoryField doesn't compile until it says what unset means here. */
+export const FIELD_FLAG_MEANS: Record<FieldFlag, (f: CategoryField) => boolean> = {
+  required: (f) => !!f.required,
+  madeHere: (f) => !!f.madeHere,
+  fixedVocabulary: (f) => !!f.fixedVocabulary,
+  linkInDetails: (f) => !!f.linkInDetails,
+  hideLabel: (f) => !!f.hideLabel,
+  filterable: (f) => !!f.filterable,
+  multiSelect: (f) => !!f.multiSelect,
+  allowOther: (f) => !!f.allowOther,
+  showInHeader: (f) => !!f.showInHeader,
+  // A photo is on its row unless turned off (photoOnCard); a choice is under
+  // the name when it's a badge in the filter, unless set (onSecondLine).
+  onCard: (f) => (f.type === 'image' ? f.onCard !== false : onSecondLine(f) || !!f.onCard),
+  showCountInHeader: (f) => !!f.showCountInHeader,
+  coreSection: (f) => !!f.coreSection,
+  invertDisplay: (f) => !!f.invertDisplay,
+  entryFrom: (f) => !!f.entryFrom,
+  minyanOnly: (f) => !!f.minyanOnly,
+}
+
+/** A field as what it does: normalized, every yes/no spelled out. */
+export function fieldMeaning(f: CategoryField): CategoryField {
+  const n = normalizeField(f)
+  const out: Record<string, unknown> = { ...n }
+  for (const k of Object.keys(FIELD_FLAG_MEANS) as FieldFlag[]) out[k] = FIELD_FLAG_MEANS[k](n)
+  return out as CategoryField
+}
+
+/** One of the draft's settings, as what it does. */
+export function draftMeaning<K extends keyof Draft>(k: K, v: Draft[K]): string {
+  if (k === 'fields') return stableJson((v as CategoryField[]).map(fieldMeaning))
+  // Kept as they were; where they go is worked out from their caveat.
+  if (k === 'hiddenFields') return stableJson([...(v as CategoryField[])].sort((a, b) => a.key.localeCompare(b.key)))
+  return stableJson(v)
 }

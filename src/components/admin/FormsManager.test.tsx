@@ -217,4 +217,13 @@ describe('form wording', () => {
     expect(countFormChanges(support, { ...support, steps: [needs] })).toBe(support.steps.length - 1)
     expect(countFormChanges(support, { ...support, title: 'x', icon: undefined })).toBe(1)
   })
+
+  // The user, Nov 10: "undoing something still says a change happened". A
+  // question's Optional turned on and off, or a hint typed and cleared, is
+  // the question as it was.
+  it('counts a question put back as it was as no change', () => {
+    const put = support.steps.map((s) => ({ ...s, optional: !!s.optional, hint: s.hint ?? '', when: s.when ?? [] }))
+    expect(countFormChanges(support, { ...support, steps: put })).toBe(0)
+    expect(countFormChanges(support, { ...support, steps: [{ ...support.steps[0], optional: !support.steps[0].optional }, ...support.steps.slice(1)] })).toBe(1)
+  })
 })

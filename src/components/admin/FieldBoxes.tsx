@@ -41,6 +41,7 @@ export default function FieldBoxes({
   onChange,
   onRename,
   onOwnBox,
+  onRenameEnd,
   onRemoveBox,
   onAddField,
   onShowField,
@@ -59,6 +60,8 @@ export default function FieldBoxes({
   onRename: (id: string, title: string) => void
   /** A box of the listing's own, tapped to rename: it becomes the admin's. */
   onOwnBox?: (id: string) => void
+  /** A box's name left, as it stands. */
+  onRenameEnd?: (id: string, title: string) => void
   onRemoveBox: (id: string) => void
   onAddField: (boxId: string) => void
   onShowField: (key: string) => void
@@ -151,6 +154,7 @@ export default function FieldBoxes({
                         onChange: (t) => onRename(box.id, t),
                         fresh: box.id === freshId,
                         ...(box.kind === 'listing' && onOwnBox && { onStart: () => onOwnBox(box.id) }),
+                        ...(onRenameEnd && { onEnd: (t: string) => onRenameEnd(box.id, t) }),
                       }}
                     />
                   </span>

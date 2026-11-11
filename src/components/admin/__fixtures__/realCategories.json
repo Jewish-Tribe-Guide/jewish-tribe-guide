@@ -1,0 +1,943 @@
+[
+ {
+  "id": "restaurant",
+  "label": "Food",
+  "pluralLabel": "Food",
+  "icon": "🍽️",
+  "description": "Kosher and nearby dining options",
+  "detailFields": [
+   {
+    "key": "hours",
+    "type": "hours",
+    "label": "Hours",
+    "renderAs": "row",
+    "filterable": true,
+    "coreSection": true
+   },
+   {
+    "key": "website",
+    "type": "url",
+    "label": "Website",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true,
+    "showInHeader": false
+   },
+   {
+    "key": "photo",
+    "type": "image",
+    "label": "Photo",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "googleDescription",
+    "type": "textarea",
+    "label": "Description",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true,
+    "showInHeader": false
+   },
+   {
+    "key": "s",
+    "type": "text",
+    "label": "Short Description",
+    "renderAs": "row",
+    "required": false,
+    "filterable": false,
+    "showInHeader": true,
+    "headerMaxLength": 27
+   },
+   {
+    "key": "t",
+    "type": "select",
+    "label": "Food Type",
+    "options": [
+     {
+      "label": "Meat",
+      "value": "Meat"
+     },
+     {
+      "label": "Dairy",
+      "value": "Dairy"
+     },
+     {
+      "label": "Parve",
+      "value": "Parve"
+     }
+    ],
+    "renderAs": "badge",
+    "filterable": true,
+    "formSection": "storeType",
+    "multiSelect": true
+   },
+   {
+    "key": "kosherCert",
+    "type": "select",
+    "label": "Kosher Certification",
+    "caveat": {
+     "flagField": "kosherPartial",
+     "noteField": "kosherNote"
+    },
+    "options": [
+     {
+      "label": "IKC",
+      "value": "IKC"
+     },
+     {
+      "label": "Keystone-K",
+      "value": "Keystone-K"
+     },
+     {
+      "label": "Cherry-K",
+      "value": "Cherry-K"
+     },
+     {
+      "label": "OU",
+      "value": "OU"
+     },
+     {
+      "label": "Star-K",
+      "value": "Star-K"
+     },
+     {
+      "label": "OK Kosher",
+      "value": "OK Kosher"
+     },
+     {
+      "label": "cRc",
+      "value": "cRc"
+     },
+     {
+      "label": "Kof-K",
+      "value": "Kof-K"
+     },
+     {
+      "label": "KCL",
+      "value": "KCL"
+     },
+     {
+      "label": "Tartikov",
+      "value": "Tartikov"
+     }
+    ],
+    "renderAs": "badge",
+    "allowOther": true,
+    "filterable": true,
+    "filterLabel": "Kosher Cert",
+    "formSection": "kosher",
+    "multiSelect": true
+   },
+   {
+    "key": "kosherPartial",
+    "type": "boolean",
+    "label": "Everything here is kosher",
+    "renderAs": "hidden",
+    "formSection": "kosher",
+    "invertDisplay": true
+   },
+   {
+    "key": "kosherNote",
+    "type": "textarea",
+    "label": "What isn’t kosher?",
+    "showIf": {
+     "field": "kosherPartial",
+     "equals": true
+    },
+    "renderAs": "hidden",
+    "formSection": "kosher",
+    "placeholder": "e.g. The dairy menu is certified; the meat counter is not under supervision."
+   },
+   {
+    "key": "foodType",
+    "help": "Pick \"Scheduled Deliveries\" if this business is based outside the area but coordinates bulk orders and delivery to Philadelphia.",
+    "type": "select",
+    "label": "Store Type",
+    "options": [
+     {
+      "label": "Restaurant",
+      "value": "Restaurant"
+     },
+     {
+      "label": "Bakery",
+      "value": "Bakery"
+     },
+     {
+      "label": "Ice Cream & Treats",
+      "value": "Ice Cream & Treats"
+     },
+     {
+      "label": "Catering",
+      "value": "Catering"
+     },
+     {
+      "label": "Scheduled Deliveries",
+      "value": "Scheduled Deliveries"
+     },
+     {
+      "label": "Food Truck",
+      "value": "Food Truck"
+     }
+    ],
+    "renderAs": "badge",
+    "filterable": true,
+    "filterLabel": "Type",
+    "formSection": "storeType",
+    "multiSelect": true
+   },
+   {
+    "key": "k",
+    "type": "url",
+    "label": "Kosher Certification URL",
+    "renderAs": "row",
+    "required": false,
+    "linkLabel": "Certification",
+    "filterable": false,
+    "formSection": "kosher"
+   },
+   {
+    "key": "delivery_whatsapp_group",
+    "type": "url",
+    "label": "Delivery WhatsApp Group",
+    "showIf": {
+     "field": "foodType",
+     "equals": "Scheduled Deliveries"
+    },
+    "leadBox": {
+     "text": "delivery_details",
+     "title": "Delivery"
+    },
+    "renderAs": "row",
+    "linkLabel": "Join WhatsApp Group",
+    "filterable": false,
+    "formSection": "storeType"
+   },
+   {
+    "key": "delivery_details",
+    "help": "e.g. \"Delivers to Philadelphia — min. 10 orders, drop-off coordinated in the WhatsApp group above.\"",
+    "type": "textarea",
+    "label": "Delivery Details",
+    "showIf": {
+     "field": "foodType",
+     "equals": "Scheduled Deliveries"
+    },
+    "renderAs": "row",
+    "filterable": false,
+    "formSection": "storeType"
+   },
+   {
+    "key": "dishes",
+    "type": "tags",
+    "label": "Main dishes",
+    "renderAs": "badge",
+    "tagGroup": "dishes",
+    "countLabel": "dish",
+    "filterable": false,
+    "expandedOnly": true,
+    "showCountInHeader": true
+   },
+   {
+    "key": "minyanim",
+    "type": "minyanim",
+    "label": "Davening Times (Minyanim)",
+    "renderAs": "row",
+    "filterable": false
+   }
+  ],
+  "kind": "listing",
+  "sortOrder": 20,
+  "hasAddress": true,
+  "hasPhone": true,
+  "upvotesEnabled": true,
+  "capabilities": {
+   "add": true,
+   "edit": true,
+   "report": true,
+   "directorySearch": true,
+   "map": true
+  },
+  "externalLink": null,
+  "cardImageUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+  "cardBandImageUrl": "https://lzkulpwawxneelhwvych.supabase.co/storage/v1/object/public/site-assets/category-band/1789017283236-qhjtpu.jpeg",
+  "pinColor": "#257d96",
+  "iconImageUrl": null,
+  "mapZoomRadiusMiles": null,
+  "active": true,
+  "formSections": [
+   {
+    "key": "kosher",
+    "label": "Kosher details"
+   },
+   {
+    "key": "storeType",
+    "label": "Store type and delivery"
+   }
+  ],
+  "questionCard": {
+   "kind": "field",
+   "key": "t"
+  },
+  "listingParts": {
+   "boxes": [
+    {
+     "title": "Main Dishers",
+     "fields": [
+      "dishes",
+      "minyanim"
+     ]
+    },
+    {
+     "title": "Davening Timers",
+     "fields": [
+      "minyanim"
+     ]
+    }
+   ],
+   "order": [
+    "lead:delivery_whatsapp_group",
+    "caveat",
+    "box",
+    "contact",
+    "about",
+    "box"
+   ]
+  },
+  "placeKind": "food"
+ },
+ {
+  "id": "grocery",
+  "label": "Grocery",
+  "pluralLabel": "Grocery",
+  "icon": "🛒",
+  "description": "Kosher and local grocery stores near the hospital",
+  "detailFields": [
+   {
+    "key": "hours",
+    "type": "hours",
+    "label": "Hours",
+    "renderAs": "row",
+    "filterable": true,
+    "coreSection": true
+   },
+   {
+    "key": "website",
+    "type": "url",
+    "label": "Website",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true
+   },
+   {
+    "key": "photo",
+    "type": "image",
+    "label": "Photo",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "googleDescription",
+    "type": "textarea",
+    "label": "Description",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true,
+    "showInHeader": false,
+    "headerMaxLength": 60
+   },
+   {
+    "key": "isKosher",
+    "help": "Is this a fully kosher store?",
+    "type": "select",
+    "label": "Kosher Store",
+    "options": [
+     {
+      "label": "Kosher Store",
+      "value": "Kosher Store"
+     },
+     {
+      "label": "Kosher Items",
+      "value": "Kosher Items"
+     }
+    ],
+    "renderAs": "badge",
+    "required": true,
+    "filterable": true,
+    "filterLabel": "Kosher Type"
+   },
+   {
+    "key": "m",
+    "help": "Which kosher products can people find here?",
+    "type": "tags",
+    "label": "Kosher items available",
+    "renderAs": "badge",
+    "tagGroup": "more_kosher_items",
+    "countLabel": "kosher item",
+    "filterable": false,
+    "expandedOnly": true,
+    "countReplacesKey": "isKosher",
+    "showCountInHeader": true
+   }
+  ],
+  "kind": "listing",
+  "sortOrder": 10,
+  "hasAddress": true,
+  "hasPhone": true,
+  "upvotesEnabled": true,
+  "capabilities": {
+   "add": true,
+   "edit": true,
+   "report": true,
+   "directorySearch": true,
+   "map": true
+  },
+  "externalLink": null,
+  "cardImageUrl": "https://plus.unsplash.com/premium_photo-1683121938935-118d0a16a469?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+  "cardBandImageUrl": null,
+  "pinColor": "#b63167",
+  "iconImageUrl": null,
+  "mapZoomRadiusMiles": null,
+  "active": true,
+  "placeKind": "groceries"
+ },
+ {
+  "id": "hospital",
+  "label": "Hospital",
+  "pluralLabel": "Hospitals",
+  "icon": "🏥",
+  "description": "See Jewish medical resources in hospitals around Philadelphia",
+  "detailFields": [
+   {
+    "key": "hours",
+    "type": "hours",
+    "label": "Hours",
+    "renderAs": "row",
+    "filterable": true
+   },
+   {
+    "key": "w",
+    "type": "url",
+    "label": "Website",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "photo",
+    "type": "image",
+    "label": "Photo",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "r",
+    "type": "url",
+    "label": "Refuah Link",
+    "renderAs": "row",
+    "required": true,
+    "linkLabel": "On Refuah",
+    "filterable": false,
+    "linkInDetails": true
+   },
+   {
+    "key": "liaisons",
+    "type": "contacts",
+    "label": "Liaisons",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "pantry",
+    "type": "contacts",
+    "label": "Pantry",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "food_packages",
+    "type": "contacts",
+    "label": "Food packages",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "accommodations",
+    "type": "contacts",
+    "label": "Accommodations",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "transportation",
+    "type": "contacts",
+    "label": "Transportation",
+    "renderAs": "row",
+    "entryFrom": true,
+    "filterable": false
+   },
+   {
+    "key": "miscellaneous",
+    "type": "contacts",
+    "label": "Miscellaneous",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "eruv",
+    "type": "select",
+    "label": "Eruv",
+    "options": [
+     {
+      "label": "University City Eruv",
+      "value": "University City Eruv"
+     },
+     {
+      "label": "Center City Eruv",
+      "value": "Center City Eruv"
+     },
+     {
+      "label": "Not inside an eruv",
+      "value": "Not inside an eruv"
+     }
+    ],
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "sukkah",
+    "type": "textarea",
+    "label": "Sukkah",
+    "renderAs": "row",
+    "filterable": false,
+    "shownAround": "sukkos"
+   }
+  ],
+  "kind": "listing",
+  "sortOrder": 100,
+  "hasAddress": true,
+  "hasPhone": true,
+  "upvotesEnabled": false,
+  "capabilities": {
+   "add": true,
+   "edit": true,
+   "report": true,
+   "directorySearch": true,
+   "map": true
+  },
+  "externalLink": {
+   "label": "Other Hospitals",
+   "url": "https://refuah.com/?q=Philadelphia"
+  },
+  "cardImageUrl": "https://plus.unsplash.com/premium_photo-1661580574627-9211124e5c3f?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8bWVkaWNhbCUyMHJlc291cmNlc3xlbnwwfHwwfHx8MA%3D%3D",
+  "cardBandImageUrl": null,
+  "pinColor": "#ad7c29",
+  "iconImageUrl": null,
+  "mapZoomRadiusMiles": null,
+  "active": true,
+  "walkList": [
+   {
+    "categoryId": "restaurant",
+    "maxMinutes": 30,
+    "groupBy": "foodType"
+   },
+   {
+    "categoryId": "synagogue",
+    "maxMinutes": 30
+   },
+   {
+    "categoryId": "hotel",
+    "maxMinutes": 30,
+    "groupBy": "shabbatFriendly"
+   },
+   {
+    "categoryId": "mikvah",
+    "maxMinutes": 30
+   }
+  ],
+  "listingParts": {
+   "shabbos": {
+    "fields": [
+     "eruv",
+     "sukkah"
+    ],
+    "after": 3
+   },
+   "boxes": [
+    {
+     "title": "Who to call",
+     "fields": [
+      "liaisons"
+     ]
+    },
+    {
+     "title": "Kosher food",
+     "fields": [
+      "pantry",
+      "food_packages"
+     ]
+    },
+    {
+     "title": "A place to stay",
+     "fields": [
+      "accommodations"
+     ]
+    },
+    {
+     "title": "Rides",
+     "fields": [
+      "transportation"
+     ]
+    },
+    {
+     "title": "Also",
+     "fields": [
+      "miscellaneous"
+     ]
+    }
+   ]
+  },
+  "placeKind": "hospitals"
+ },
+ {
+  "id": "hotel",
+  "label": "Hotel",
+  "pluralLabel": "Hotels",
+  "icon": "🏨",
+  "description": "Lodging with shuttle and Shabbat-friendly options",
+  "detailFields": [
+   {
+    "key": "website",
+    "type": "url",
+    "label": "Website",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true
+   },
+   {
+    "key": "photo",
+    "type": "image",
+    "label": "Photo",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "shabbatFriendly",
+    "type": "boolean",
+    "label": "Shabbat friendly",
+    "renderAs": "badge",
+    "filterable": true,
+    "filterLabel": "Shabbat friendly"
+   },
+   {
+    "key": "notes",
+    "type": "textarea",
+    "label": "Notes",
+    "renderAs": "row",
+    "filterable": false,
+    "placeholder": "Anything else worth knowing"
+   }
+  ],
+  "kind": "listing",
+  "sortOrder": 30,
+  "hasAddress": true,
+  "hasPhone": true,
+  "upvotesEnabled": true,
+  "capabilities": {
+   "add": true,
+   "edit": true,
+   "report": true,
+   "directorySearch": true,
+   "map": true
+  },
+  "externalLink": null,
+  "cardImageUrl": "https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+  "cardBandImageUrl": null,
+  "pinColor": "#423fb8",
+  "iconImageUrl": null,
+  "mapZoomRadiusMiles": null,
+  "active": true,
+  "walkList": [
+   {
+    "categoryId": "synagogue",
+    "maxMinutes": 30
+   },
+   {
+    "categoryId": "restaurant",
+    "maxMinutes": 30,
+    "groupBy": "foodType"
+   },
+   {
+    "categoryId": "mikvah",
+    "maxMinutes": 30
+   }
+  ],
+  "listingParts": {
+   "main": {
+    "title": "Shabbos friendly",
+    "fields": [
+     "shabbatFriendly",
+     "notes"
+    ]
+   }
+  },
+  "placeKind": "hotels"
+ },
+ {
+  "id": "mikvah",
+  "label": "Mikvah",
+  "pluralLabel": "Mikvah",
+  "icon": "💧",
+  "description": "Mikvah locations, hours, and contact information",
+  "detailFields": [
+   {
+    "key": "hours",
+    "type": "hours",
+    "label": "Hours",
+    "renderAs": "row",
+    "filterable": true,
+    "coreSection": true
+   },
+   {
+    "key": "website",
+    "type": "url",
+    "label": "Website",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true
+   },
+   {
+    "key": "photo",
+    "type": "image",
+    "label": "Photo",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "e",
+    "type": "text",
+    "label": "Email",
+    "renderAs": "row",
+    "filterable": false,
+    "showInHeader": false
+   },
+   {
+    "key": "womenTevillah",
+    "type": "boolean",
+    "label": "Women's Tevillah",
+    "renderAs": "badge",
+    "filterable": true,
+    "filterLabel": "Women's"
+   },
+   {
+    "key": "menTevillah",
+    "type": "boolean",
+    "label": "Men's Tevillah",
+    "renderAs": "badge",
+    "filterable": true,
+    "filterLabel": "Men's"
+   },
+   {
+    "key": "keilim",
+    "type": "boolean",
+    "label": "Keilim",
+    "renderAs": "badge",
+    "filterable": true,
+    "filterLabel": "Keilim"
+   },
+   {
+    "key": "women_s_hours",
+    "type": "hours",
+    "label": "Women’s Hours",
+    "renderAs": "row",
+    "filterable": true,
+    "shortLabel": "Hours",
+    "audienceKey": "womenTevillah"
+   },
+   {
+    "key": "women_s_phone",
+    "type": "tel",
+    "label": "Women’s Phone",
+    "renderAs": "row",
+    "filterable": false,
+    "shortLabel": "Phone",
+    "audienceKey": "womenTevillah"
+   },
+   {
+    "key": "women_s_email",
+    "type": "text",
+    "label": "Women’s Email",
+    "renderAs": "row",
+    "filterable": false,
+    "shortLabel": "Email",
+    "audienceKey": "womenTevillah"
+   },
+   {
+    "key": "women_s_notes",
+    "type": "textarea",
+    "label": "Women’s Notes",
+    "renderAs": "row",
+    "filterable": false,
+    "shortLabel": "Notes",
+    "audienceKey": "womenTevillah"
+   },
+   {
+    "key": "men_s_hours",
+    "type": "hours",
+    "label": "Men's Hours",
+    "renderAs": "row",
+    "filterable": true,
+    "shortLabel": "Hours",
+    "audienceKey": "menTevillah"
+   },
+   {
+    "key": "men_s_phone",
+    "type": "tel",
+    "label": "Men's Phone",
+    "renderAs": "row",
+    "filterable": false,
+    "shortLabel": "Phone",
+    "audienceKey": "menTevillah"
+   },
+   {
+    "key": "men_s_notes",
+    "type": "textarea",
+    "label": "Men's Notes",
+    "renderAs": "row",
+    "filterable": false,
+    "shortLabel": "Notes",
+    "audienceKey": "menTevillah"
+   },
+   {
+    "key": "keilim_hours",
+    "type": "hours",
+    "label": "Keilim Hours",
+    "renderAs": "row",
+    "filterable": true,
+    "shortLabel": "Hours",
+    "audienceKey": "keilim"
+   },
+   {
+    "key": "keilim_notes",
+    "type": "textarea",
+    "label": "Keilim Notes",
+    "renderAs": "row",
+    "filterable": false,
+    "shortLabel": "Notes",
+    "audienceKey": "keilim"
+   }
+  ],
+  "kind": "listing",
+  "sortOrder": 40,
+  "hasAddress": true,
+  "hasPhone": true,
+  "upvotesEnabled": false,
+  "capabilities": {
+   "add": true,
+   "edit": true,
+   "report": true,
+   "directorySearch": true,
+   "map": true
+  },
+  "externalLink": {
+   "label": "Other Mikvahs",
+   "url": "https://mikvah.org/directory/philadelphia?lat=39.952584&lng=-75.165222&type=locality&country=US"
+  },
+  "cardImageUrl": "https://media.istockphoto.com/id/509170748/photo/purity-mikveh.webp?a=1&b=1&s=612x612&w=0&k=20&c=2fb7aMGs-sLLaBnA-d6eEAzUK75Me66jIr1dEeuTTao=",
+  "cardBandImageUrl": null,
+  "pinColor": "#a11956",
+  "iconImageUrl": null,
+  "mapZoomRadiusMiles": null,
+  "active": true,
+  "placeKind": "mikvahs"
+ },
+ {
+  "id": "synagogue",
+  "label": "Synagogue",
+  "pluralLabel": "Synagogues",
+  "icon": "✡️",
+  "description": "Nearby shuls with davening times, contacts, and WhatsApp groups",
+  "detailFields": [
+   {
+    "key": "website",
+    "type": "url",
+    "label": "Website",
+    "renderAs": "row",
+    "filterable": false,
+    "coreSection": true
+   },
+   {
+    "key": "photo",
+    "type": "image",
+    "label": "Photo",
+    "renderAs": "row",
+    "filterable": false
+   },
+   {
+    "key": "denomination",
+    "type": "select",
+    "label": "Denomination",
+    "options": [
+     {
+      "label": "Orthodox (Ashkenazi)",
+      "value": "Orthodox (Ashkenazi)"
+     },
+     {
+      "label": "Orthodox (Sephardic)",
+      "value": "Orthodox (Sephardic)"
+     },
+     {
+      "label": "Conservative",
+      "value": "Conservative"
+     },
+     {
+      "label": "Non-Denominational",
+      "value": "Non-Denominational"
+     },
+     {
+      "label": "Reconstructionist",
+      "value": "Reconstructionist"
+     },
+     {
+      "label": "Reform",
+      "value": "Reform"
+     },
+     {
+      "label": "Other",
+      "value": "Other"
+     }
+    ],
+    "renderAs": "badge",
+    "allowOther": true,
+    "filterable": true,
+    "filterLabel": "Denomination",
+    "multiSelect": false
+   },
+   {
+    "key": "minyanim",
+    "type": "minyanim",
+    "label": "Davening Times (Minyanim)",
+    "renderAs": "row",
+    "filterable": false
+   }
+  ],
+  "kind": "listing",
+  "sortOrder": 5,
+  "hasAddress": true,
+  "hasPhone": true,
+  "upvotesEnabled": false,
+  "capabilities": {
+   "add": true,
+   "edit": true,
+   "report": true,
+   "directorySearch": true,
+   "map": true
+  },
+  "externalLink": null,
+  "cardImageUrl": "https://images.unsplash.com/photo-1612388839403-4d732790455b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+  "cardBandImageUrl": "https://lzkulpwawxneelhwvych.supabase.co/storage/v1/object/public/site-assets/category-band/1789017578214-ml6yse.jpeg",
+  "pinColor": "#4c7b0d",
+  "iconImageUrl": null,
+  "mapZoomRadiusMiles": null,
+  "active": true,
+  "placeKind": "shuls"
+ }
+]
