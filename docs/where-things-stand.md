@@ -224,7 +224,7 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
-- **"16 synagogues | By time" replaces the green Minyanim card** (BUILT
+- **"By synagogue | By time" replaces the green Minyanim card** (BUILT
   Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
   drawn"). The list's heading is a two-part switch on phone and computer;
   By time is the Minyanim view at `?davening=1`, a history step as before.
@@ -233,7 +233,9 @@ The user's answers on Nov 10, evening, and what was done with them:
   "we don't need to say how many minyanim left today"). The days are small
   pills across the top of the white box, as board D1 drew them (the user,
   Nov 11); a Yom Tov keeps its name on the pill, a plain date is only its
-  hover title (changes the two-line day + date tabs). Named change: on Oct 6 the user
+  hover title (changes the two-line day + date tabs). No number in the
+  switch either (the user's yes, Nov 11: "By synagogue instead of the
+  number"), so the list no longer says how many places it holds. Named change: on Oct 6 the user
   dropped a toggle because "if we need a sign the toggle isn't
   noticeable"; reminded of that, they still chose plain. Held off for a
   look with real people: next minyan in rows, one map switch, side by side.

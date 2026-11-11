@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { categories, defaultCommunity, dismissLocationPrompt } from './helpers'
 
-// The Minyanim view, reached from Synagogues' "16 synagogues | By time"
+// The Minyanim view, reached from Synagogues' "By synagogue | By time"
 // switch (Nov 11; the green "Minyanim by time" row before), is a step Back
 // undoes (Oct 6). It used to replace the address, so the browser's Back,
 // and a phone's swipe, left Synagogues altogether. A reload and Forward land

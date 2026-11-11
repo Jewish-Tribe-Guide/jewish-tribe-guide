@@ -1250,15 +1250,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (see listingRowNote).
   const flagUnconfirmed = !!now && items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
 
-  // Synagogues' "16 synagogues | By time" (Nov 11): where the list's count
+  // Synagogues' "By synagogue | By time" (Nov 11): where the list's count
   // was, in both views, so the way between them is never gone. It replaced
   // the green Next minyan card above the search (see MinyanSwitch).
   const minyanSwitch = (byTime: boolean) =>
     hasMinyanim ? (
       <MinyanSwitch
-        count={filtered.length}
         singular={category.label}
-        plural={category.pluralLabel}
         byTime={byTime}
         onChange={(on) => (on ? showMinyanimView() : closeMinyanimView())}
       />

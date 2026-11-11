@@ -233,7 +233,7 @@ async function chooseSort(user: ReturnType<typeof userEvent.setup>, choice: 'Pop
   await user.click(screen.getByRole('menuitemradio', { name: choice }))
 }
 
-// Synagogues' "16 synagogues | By time" (MinyanSwitch): its two halves.
+// Synagogues' "By synagogue | By time" (MinyanSwitch): its two halves.
 // Wherever the view is showing, the switch is its heading's, and the
 // list's heading isn't there; one switch on the page either way.
 const minyanSwitch = () => screen.getByTestId('minyan-switch')
@@ -928,7 +928,7 @@ describe('GenericDirectory', () => {
   const shulItem = () =>
     ({ ...makeListing(), minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00 AM' }] }) as unknown as DirectoryResource
 
-  // Nov 11: "16 synagogues | By time", where the list's count was, in
+  // Nov 11: "By synagogue | By time", where the list's count was, in
   // place of the green Minyanim card. The page stays the category's: its
   // title doesn't change, and the switch is the way back.
   it('opens the Minyanim view from the switch’s “By time”, in place of the list, and its first half comes back', async () => {
@@ -976,10 +976,10 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
-    // The switch says how many places, in the category's own word, on the
+    // The switch says "By <place>", in the category's own word, on the
     // list's heading; the green card above the search is gone.
     expect(within(screen.getByTestId('list-heading')).getByTestId('minyan-switch')).toBeInTheDocument()
-    expect(listButton()).toHaveTextContent(`1 ${shulCategory().label.toLowerCase()}`)
+    expect(listButton()).toHaveTextContent(`By ${shulCategory().label.toLowerCase()}`)
     expect(listButton()).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
   })
@@ -2173,7 +2173,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     expect(screen.getByText('next minyan at Gamma Shul: No davening times listed')).toBeInTheDocument()
   })
 
-  // Nov 11: "16 synagogues | By time" replaced the green "Minyanim · 3 left
+  // Nov 11: "By synagogue | By time" replaced the green "Minyanim · 3 left
   // today" card above the search (the user's pick, D1/D2 on the desk canvas).
   describe('the switch to By time', () => {
     // A Monday at 5 PM in Philadelphia.
@@ -2189,12 +2189,13 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     // The plain switch (the user, Nov 11): no count on "By time", and the
     // view says nothing of how many are left ("we don't need to say how
     // many minyanim left today").
-    it('says how many places on the list, and By time no count at all', async () => {
+    // And "By synagogue", not "3 synagogues" (the user, Nov 11).
+    it('counts nothing: "By <place> | By time", and no count in the view', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      expect(listButton()).toHaveTextContent(`3 ${shulCategory.pluralLabel.toLowerCase()}`)
+      expect(listButton()).toHaveTextContent(new RegExp(`^By ${shulCategory.label.toLowerCase()}$`))
       expect(byTimeButton()).toHaveTextContent(/^By time$/)
       await user.click(byTimeButton())
       const viewHeading = within(screen.getByTestId('minyanim-view')).getByTestId('list-heading')
@@ -2231,25 +2232,6 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       expect(within(screen.getByTestId('list-heading')).queryByRole('heading')).not.toBeInTheDocument()
     })
 
-    it('follows the list’s filters', () => {
-      fivePm()
-      const withEruv = makeCategory({
-        id: 'synagogue',
-        detailFields: [
-          { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
-          { key: 'eruv', label: 'In the eruv', type: 'boolean', filterable: true },
-        ],
-      })
-      const items = shuls().map((s) => ({ ...s, eruv: s.id === 'mid' }))
-      renderWithProviders(<GenericDirectory category={withEruv} items={items} initialFilters={{ f_eruv: '1' }} {...handlers} />, {
-        content: { categories: [withEruv] },
-      })
-
-      expect(listButton()).toHaveTextContent(`1 ${withEruv.label.toLowerCase()}`)
-    })
-
-    // The card went when no shul left kept times; the switch is the
-    // page's, so it stays, and By time says there are none.
     it('stays when no shul the filters leave keeps times', () => {
       fivePm()
       const withEruv = makeCategory({
@@ -2613,12 +2595,12 @@ describe('GenericDirectory — the Minyanim tab', () => {
     expect(screen.queryByText('shacharis tomorrow')).not.toBeInTheDocument()
   })
 
-  it('the switch’s “2 synagogues” goes back from the Minyanim view to the list of shuls', async () => {
+  it('the switch’s “By synagogue” goes back from the Minyanim view to the list of shuls', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onParamsChange = vi.fn()
     renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
     expect(screen.getByTestId('minyanim-view')).toBeVisible()
-    await user.click(within(minyanSwitch()).getByRole('button', { name: '2 synagogues' }))
+    await user.click(within(minyanSwitch()).getByRole('button', { name: `By ${shulCat.label.toLowerCase()}` }))
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
     expect(screen.getByText('Aleph Shul')).toBeVisible()
   })
