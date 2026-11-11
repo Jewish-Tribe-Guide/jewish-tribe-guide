@@ -114,11 +114,7 @@ function renderLanding(
   listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
-    // HeaderCollapseProvider: Landing now calls useHeaderOverlay (Phase 2 —
-    // transparent desktop header over the hero), which needs the same
-    // provider SiteChrome always wraps it in for real. Not asserted on
-    // directly here — see SiteHeader.test.tsx for the overlay behavior
-    // itself — just required for Landing to render at all.
+    // HeaderCollapseProvider: what SiteChrome always wraps Landing in.
     <HeaderCollapseProvider>
       <LocationProvider>
         <ListingsProvider listings={listings}>
@@ -471,21 +467,6 @@ describe('Landing', () => {
     }
   })
 
-  // The map is retired as a home-screen card (the user's own call — it only
-  // ever lives at its own full-screen route now), so the hero's "View Map"
-  // button has one job unconditionally: navigate there. No more "scroll to
-  // an embedded band, falling back to navigation only once the admin's
-  // removed it" branching.
-  it('the hero\'s "View Map" button navigates to the full map page', async () => {
-    const user = userEvent.setup()
-    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    renderLanding(undefined, { content: { categories: [withMap] } })
-
-    await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
-
-    expect(handlers.onNavigate).toHaveBeenCalledWith(null, 'map')
-  })
-
   // Jewish Times (ShabbatTimesCard, not mocked) is the one remaining card
   // still gated on a real Zmanim pseudo-category — it needs candle-lighting
   // data that has nowhere to come from otherwise. Davening Times/Update
@@ -808,27 +789,6 @@ describe('Landing', () => {
       await user.click(within(card).getByText('Category 9'))
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
-    })
-
-    // The hero's own "Browse Categories" button used to only scroll to this
-    // card, landing a visitor on the same capped 9+"More" row they'd have
-    // scrolled to on their own — defeating a button whose whole promise is
-    // "show me everything." It now expands the grid too, same as clicking
-    // "More" directly.
-    it('the hero\'s "Browse Categories" button expands the grid, not just scrolls to it', async () => {
-      // jsdom doesn't implement scrollIntoView at all (not even a no-op).
-      Element.prototype.scrollIntoView = vi.fn()
-      const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
-      renderLanding(undefined, { content: { categories } }, listings)
-
-      const card = screen.getByTestId('browse-everything-card')
-      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
-
-      await user.click(screen.getByRole('button', { name: 'Browse Categories' }))
-
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
-      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
     })
   })
 

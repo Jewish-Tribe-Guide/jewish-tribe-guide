@@ -17,7 +17,6 @@ import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
-import { linksToMap } from '@/lib/navTabs'
 import TodayBlocks from '@/components/home/TodayBlocks'
 import CategoryTiles from '@/components/home/CategoryTiles'
 import RightNow from '@/components/home/RightNow'
@@ -45,7 +44,6 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useLocation } from '@/lib/locationContext'
-import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
 import { useActiveCommunity, useCommunitySlug } from '@/lib/communityContext'
 import { countEvent } from '@/lib/countEvent'
@@ -124,23 +122,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // tile), so the state has to be shared rather than owned by the grid
   // alone.
   const [browseExpanded, setBrowseExpanded] = useState(false)
-  // The hero's "Browse Categories" button scrolls here.
-  const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
   // The Today home (step 6), when the admin has switched it on — and it
   // isn't held back from the site (see features.ts).
   const today = features.todayHome && settings.homeStyle === 'today'
   const timezone = useCommunityTimezone()
-  // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
-  // transparent over this screen's photo hero until scrolled past it.
-  useHeaderOverlay(true)
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
   const navTransition = useNavTransitionProps()
   const { anchor } = useLocation()
-  // The hero's "View Map" shows wherever the header or a tab links to the
-  // Map, the same rule as those links.
-  const showMap = linksToMap(settings)
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
   // Same as the real Zmanim & Shabbos category page (FindResources' own
   // locationLabel) — the visitor's typed address, or the community's region,
@@ -503,17 +493,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           query={query}
           onQueryChange={changeQuery}
           onSearchSubmit={submit}
-          showMap={showMap}
-          onViewMap={() => onNavigate(null, 'map')}
-          onBrowseCategories={() => {
-            // Also expands the row (the same thing the "More" tile's own
-            // click does), not just a scroll — "Browse Categories" reads as
-            // "show me everything," so landing on the same capped 9+More
-            // row a visitor would've scrolled to on their own defeats the
-            // button's own promise.
-            setBrowseExpanded(true)
-            browseCardRef.current?.scrollIntoView({ block: 'start' })
-          }}
           searchPanel={linesNode || nothingNode || null}
           searchDismissed={searchDismissed}
           onSearchDismissedChange={setSearchDismissed}
@@ -531,7 +510,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 banner "near the top" on both. Not part of builtInOrder/
                 cardKindContent: it isn't admin-orderable among those cards,
                 just a plain "is one active" check, same shape as
-                showMap/zmanimCategory above.
+                zmanimCategory above.
 
                 Hidden on mobile while actively searching (`isMobile && q`):
                 mobile has no HeroSearchDropdown of its own — typing re-filters
@@ -633,12 +612,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
               (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
             )
             return (
-              // scroll-mt-24 clears the sticky site header when this card is
-              // scrolled into view (the "Browse Categories" hero button).
               <div
-                ref={browseCardRef}
                 data-testid="browse-everything-card"
-                className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
+                className="hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
               >
                   {/* Hardcoded — the user's own reference image titles this
                       "Explore by Category" with no small eyebrow label above

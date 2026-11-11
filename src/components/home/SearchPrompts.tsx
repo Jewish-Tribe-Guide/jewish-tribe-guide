@@ -19,16 +19,19 @@ export default function SearchPrompts({
   onPick,
   className = '',
   oneLine = false,
+  onDark = false,
 }: {
   prompts: string[]
   onPick: (prompt: string) => void
   className?: string
   /** A phone: up to six, swiped sideways. Otherwise up to three that fit. */
   oneLine?: boolean
+  /** Over the desktop hero's dimmed photo: see-through white chips. */
+  onDark?: boolean
 }) {
   if (prompts.length === 0) return null
   if (oneLine) return <SwipedPrompts prompts={prompts.slice(0, PHONE_MOST)} onPick={onPick} className={className} />
-  return <FittedPrompts prompts={prompts} onPick={onPick} className={className} />
+  return <FittedPrompts prompts={prompts} onPick={onPick} className={className} onDark={onDark} />
 }
 
 /** How many a phone's row holds. */
@@ -37,9 +40,12 @@ export const PHONE_MOST = 6
 const chip =
   'cursor-pointer whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-medium text-ink shadow-sm transition-colors hover:border-primary/50 hover:text-primary-dark'
 
-function Label() {
+const darkChip =
+  'cursor-pointer whitespace-nowrap rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-[13.5px] font-medium text-white transition-colors hover:bg-white/25'
+
+function Label({ onDark = false }: { onDark?: boolean }) {
   return (
-    <span data-prompt-label className="text-[13px] font-medium text-slate-500">
+    <span data-prompt-label className={`text-[13px] font-medium ${onDark ? 'text-white/75' : 'text-slate-500'}`}>
       Try asking
     </span>
   )
@@ -64,7 +70,7 @@ function SwipedPrompts({ prompts, onPick, className }: { prompts: string[]; onPi
   )
 }
 
-function FittedPrompts({ prompts, onPick, className }: { prompts: string[]; onPick: (prompt: string) => void; className: string }) {
+function FittedPrompts({ prompts, onPick, className, onDark }: { prompts: string[]; onPick: (prompt: string) => void; className: string; onDark: boolean }) {
   const row = useRef<HTMLDivElement>(null)
   // Which prompts show on one line; all of them until measured.
   const [fitting, setFitting] = useState<number[] | null>(null)
@@ -107,7 +113,7 @@ function FittedPrompts({ prompts, onPick, className }: { prompts: string[]; onPi
       className={`relative flex items-center gap-2 overflow-hidden whitespace-nowrap [&>*]:shrink-0 ${className}`}
       data-testid="search-prompts"
     >
-      <Label />
+      <Label onDark={onDark} />
       {offered.map((p, i) => {
         // Measured where it would sit, but out of the line, unseen and out
         // of reach of a tab or a screen reader, when it doesn't fit.
@@ -121,7 +127,7 @@ function FittedPrompts({ prompts, onPick, className }: { prompts: string[]; onPi
             onClick={() => onPick(p)}
             aria-hidden={left || undefined}
             tabIndex={left ? -1 : undefined}
-            className={`${chip} ${left ? 'invisible absolute' : ''}`}
+            className={`${onDark ? darkChip : chip} ${left ? 'invisible absolute' : ''}`}
           >
             {p}
           </button>

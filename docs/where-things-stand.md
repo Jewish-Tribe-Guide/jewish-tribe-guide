@@ -224,6 +224,17 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
+- **Computer home: the hero centred** (BUILT Nov 11, the user's yes to
+  board C on the desk canvas: "much calmer and more directs my attention").
+  The headline, the big search and what to try are centred over the photo,
+  now full width and dimmed; white type. Named changes: Browse Categories
+  and View Map are gone from the hero (the header has Categories and Map),
+  and the header no longer goes see-through over the hero (dark header
+  text can't sit on a dimmed photo; the board draws it white). The admin's
+  sub line still shows under the headline when set (the board drew none;
+  the field is the admin's). Everything below the hero is unchanged, and the
+  phone home is untouched. Held off for a look with real people: the
+  showcase sections, search in the header.
 - **"By synagogue | By time" replaces the green Minyanim card** (BUILT
   Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
   drawn"). The list's heading is a two-part switch on phone and computer;
