@@ -25,7 +25,7 @@ type Props = {
 
 export default function MinyanSwitch({ singular, byTime, onChange }: Props) {
   const part = (on: boolean) =>
-    `h-8 cursor-pointer whitespace-nowrap px-3.5 text-[13.5px] font-semibold transition-colors ${on ? 'bg-ink text-white' : 'bg-white text-ink hover:bg-slate-50'}`
+    `h-8 cursor-pointer whitespace-nowrap px-3.5 text-[13.5px] font-semibold transition-colors ${on ? 'bg-primary text-white' : 'bg-white text-ink hover:bg-slate-50'}`
   return (
     <div role="group" aria-label="Show" data-testid="minyan-switch" className="inline-flex shrink-0 overflow-hidden rounded-full border border-slate-300">
       <button type="button" aria-pressed={!byTime} onClick={() => byTime && onChange(false)} className={part(!byTime)}>

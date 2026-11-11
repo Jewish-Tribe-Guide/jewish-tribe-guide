@@ -516,7 +516,7 @@ function DayTabs({ days, index, onPick }: { days: readonly DateFacts[]; index: n
               aria-selected={on}
               title={date}
               onClick={() => onPick(i)}
-              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-semibold ${on ? 'border-ink bg-ink text-white' : 'border-slate-300 bg-white text-ink hover:bg-slate-50'}`}
+              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-semibold ${on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-ink hover:bg-slate-50'}`}
             >
               {day}
               {name && <span className={`font-medium ${on ? 'text-white/80' : 'text-slate-500'}`}> · {name}</span>}
