@@ -73,8 +73,28 @@ describe('the whole-listing editor’s rows', () => {
     expect(rows.filter((r) => r.kind === 'minyans').map((r) => r.box)).toEqual(['weekday', 'shabbos'])
   })
 
+  // The user, Nov 10: "our boxes on our listing is not always the same as
+  // our boxes on adding/editing". Editing follows the listing; admins
+  // arrange it.
+  it('follows the listing’s boxes: their order, their names, the phone where it was put', () => {
+    const parts = { boxes: [{ title: 'Call us', fields: ['@phone', 'website'] }], order: ['items', 'box', 'about', 'contact'] }
+    const rows = editorRows({ ...FOOD, listingParts: parts }, {})
+    expect(titles(rows)).toEqual(['Name', 'Store type and delivery', 'Kosher', 'Main dishes', 'Call us', 'About', 'Address', 'Hours'])
+    const call = rows.find((r) => r.id === 'box:Call us')!
+    const contact = rows.find((r) => r.id === 'contact')!
+    expect([call.kind, call.basics, keys(rows, 'box:Call us')]).toEqual(['contact', ['phone'], ['website']])
+    expect(contact.basics).toEqual(['address'])
+    // Each says, is empty with and is changed by its own one.
+    const v = values({}, { address: '1 Main St, Philadelphia', phone: '(215) 555-0100' })
+    expect(rowSummary(call, v, timeText)).toBe('(215) 555-0100')
+    expect(rowSummary(contact, v, timeText)).toBe('1 Main St')
+    expect(rowIsEmpty(contact, values({}, { phone: '(215) 555-0100' }))).toBe(true)
+    const item = { name: 'A place', address: '1 Main St, Philadelphia', phone: '(215) 555-0199' } as DirectoryResource
+    expect([rowChanged(call, item, v), rowChanged(contact, item, v)]).toEqual([true, false])
+  })
+
   it('a hospital: the admin’s boxes in order, Shabbos where the admin put it', () => {
-    expect(titles(editorRows(HOSPITAL, {}))).toEqual(['Name', 'Who to call', 'Kosher food', 'Shabbos', 'Rides', 'Address, phone, website and links', 'Hours'])
+    expect(titles(editorRows(HOSPITAL, {}))).toEqual(['Name', 'Who to call', 'Kosher food', 'This Shabbos', 'Rides', 'Address, phone, website and links', 'Hours'])
     expect(keys(editorRows(HOSPITAL, {}), 'box:Kosher food')).toEqual(['pantry', 'food_packages'])
   })
 })

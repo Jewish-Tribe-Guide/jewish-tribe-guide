@@ -9,13 +9,16 @@ const m = vi.hoisted(() => ({
   resolveCommunity: vi.fn(),
   getResourceById: vi.fn(),
   getCategoryById: vi.fn(),
+  listCategories: vi.fn(async () => [] as unknown[]),
   validateSubmission: vi.fn(),
   hasListingChanged: vi.fn(),
   submitListingCreate: vi.fn(),
   submitListingUpdate: vi.fn(),
   submitListingDelete: vi.fn(),
   submitEruvUpdate: vi.fn(),
+  submitEruvCreate: vi.fn(),
   listEruvim: vi.fn(),
+  listEruvimForAdmin: vi.fn(),
   sendSubmissionNotification: vi.fn(),
   sendSubmissionConfirmation: vi.fn(),
   after: vi.fn(),
@@ -29,15 +32,16 @@ vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
 }))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById, validateSubmission: m.validateSubmission }))
-vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
+vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById, listCategories: m.listCategories }))
 vi.mock('@/lib/listingDiff', () => ({ hasListingChanged: m.hasListingChanged }))
 vi.mock('@/lib/submissionStore', () => ({
   submitListingCreate: m.submitListingCreate,
   submitListingUpdate: m.submitListingUpdate,
   submitListingDelete: m.submitListingDelete,
   submitEruvUpdate: m.submitEruvUpdate,
+  submitEruvCreate: m.submitEruvCreate,
 }))
-vi.mock('@/lib/eruvStore', () => ({ listEruvim: m.listEruvim }))
+vi.mock('@/lib/eruvStore', () => ({ listEruvim: m.listEruvim, listEruvimForAdmin: m.listEruvimForAdmin }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.sendSubmissionNotification }))
 vi.mock('@/lib/confirmationEmail', () => ({ sendSubmissionConfirmation: m.sendSubmissionConfirmation }))
 vi.mock('next/server', () => ({ after: m.after }))
@@ -71,6 +75,8 @@ beforeEach(() => {
   m.submitListingDelete.mockResolvedValue({ id: 's3' })
   m.submitEruvUpdate.mockResolvedValue({ id: 's4' })
   m.listEruvim.mockResolvedValue({ available: true, eruvim: [eruv] })
+  m.listEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [eruv, { ...eruv, id: 'old-york-road', name: 'Old York Road Eruv', active: false }] })
+  m.submitEruvCreate.mockResolvedValue({ id: 's5' })
   m.sendSubmissionNotification.mockResolvedValue(undefined)
   m.sendSubmissionConfirmation.mockResolvedValue(undefined)
 })
@@ -280,9 +286,8 @@ describe('POST /api/submissions — an eruv', () => {
     expect(m.submitEruvUpdate).not.toHaveBeenCalled()
   })
 
-  it('only an edit: no adding or removing an eruv', async () => {
+  it('no removing an eruv', async () => {
     expect((await post({ ...fix, operation: 'delete' })).status).toBe(400)
-    expect((await post({ ...fix, operation: 'create' })).status).toBe(400)
     expect(m.submitEruvUpdate).not.toHaveBeenCalled()
   })
 
@@ -290,6 +295,77 @@ describe('POST /api/submissions — an eruv', () => {
     m.contributions.edit = false
     expect((await post(fix)).status).toBe(403)
     expect(m.submitEruvUpdate).not.toHaveBeenCalled()
+  })
+})
+
+// A new eruv (Nov 9, the user: "why can't a user add an eruv?"): anyone can
+// suggest one from the Eruv page's "+", as a new place is suggested; it is
+// added only when an admin approves it.
+describe('POST /api/submissions — a new eruv', () => {
+  const eruvPage = { id: 'eruv', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', kind: 'eruv', detailFields: [{ key: 'certifiedBy', label: 'Certified by', type: 'text' }] }
+  const add = { operation: 'create', targetType: 'eruv', payload: { name: ' Overbrook  Eruv ', covers: 'Overbrook.', website: 'overbrookeruv.org', statusAt: 'overbrookeruv.org/status', map: 'https://overbrookeruv.org/map.kml', details: { certifiedBy: 'Rabbi A' } } }
+  beforeEach(() => m.listCategories.mockResolvedValue([eruvPage]))
+
+  it('files it, tidied, under the id adding it will give it, with its status, map and the page’s own fields', async () => {
+    const res = await post({ ...add, note: 'New this year', submittedBy: { email: 'a@b.c' } }, '?community=philly')
+    expect(await res.json()).toEqual({ ok: true, id: 's5' })
+    expect(m.submitEruvCreate).toHaveBeenCalledWith(
+      'philly',
+      expect.objectContaining({
+        eruvId: 'overbrook',
+        name: 'Overbrook Eruv',
+        covers: 'Overbrook.',
+        website: 'https://overbrookeruv.org',
+        statusAt: 'https://overbrookeruv.org/status',
+        map: 'https://overbrookeruv.org/map.kml',
+        details: { certifiedBy: 'Rabbi A' },
+      }),
+      'New this year',
+      { email: 'a@b.c' },
+    )
+    expect(m.after).toHaveBeenCalledTimes(1)
+    expect(m.submitEruvUpdate).not.toHaveBeenCalled()
+  })
+
+  it('keeps an email address as where its status comes from', async () => {
+    await post({ ...add, payload: { ...add.payload, statusAt: 'Eruv Committee <status@overbrookeruv.org>' } })
+    expect(m.submitEruvCreate.mock.calls[0][1]).toMatchObject({ statusAt: 'status@overbrookeruv.org' })
+  })
+
+  it('400s one with no name, or one already listed, hidden ones too', async () => {
+    const errors = async (payload: object) => {
+      const res = await post({ ...add, payload: { ...add.payload, ...payload } })
+      expect(res.status).toBe(400)
+      return (await res.json()).errors
+    }
+    expect(await errors({ name: '  ' })).toEqual(['Give the eruv a name.'])
+    expect(await errors({ name: 'center city eruv' })).toEqual(['Center City Eruv is already listed. Suggest an edit to it instead.'])
+    expect(await errors({ name: 'Old York Road Eruv' })).toEqual(['Old York Road Eruv is already listed. Suggest an edit to it instead.'])
+    expect(m.submitEruvCreate).not.toHaveBeenCalled()
+  })
+
+  it('400s a status or map that isn’t a link', async () => {
+    const res = await post({ ...add, payload: { ...add.payload, statusAt: 'ask Moshe', map: 'the one on the fridge' } })
+    expect(res.status).toBe(400)
+    expect((await res.json()).errors).toEqual(['Status isn’t a web address or an email address.', 'Map isn’t a web address.'])
+    expect(m.submitEruvCreate).not.toHaveBeenCalled()
+  })
+
+  it('403s where adding is off: the community’s switch, the Eruv page’s, or no Eruv page', async () => {
+    m.contributions.add = false
+    expect((await post(add)).status).toBe(403)
+    m.contributions.add = true
+    m.listCategories.mockResolvedValue([{ ...eruvPage, capabilities: { add: false } }])
+    expect((await post(add)).status).toBe(403)
+    m.listCategories.mockResolvedValue([])
+    expect((await post(add)).status).toBe(403)
+    expect(m.submitEruvCreate).not.toHaveBeenCalled()
+  })
+
+  it('502s when it can’t be filed, and tells no one', async () => {
+    m.submitEruvCreate.mockRejectedValue(new Error('down'))
+    expect((await post(add)).status).toBe(502)
+    expect(m.after).not.toHaveBeenCalled()
   })
 })
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { DirectoryResource } from '@/types'
 import Link from 'next/link'
 import { DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -8,34 +9,34 @@ import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
 import { listingPartsFromKey, listingPartsKey, listingPartsToSave } from '@/lib/listingParts'
-import { addBox, fieldBoxes, removeBox, renameBox, renameListingBox, type FieldPage } from '@/lib/fieldBoxes'
+import { addBox, addToBox, basicLandsIn, basicsLandIn, fieldBoxes, madeField, ownBox, placeBasic, removeBox, renameBox, whereAdded, type FieldPage } from '@/lib/fieldBoxes'
 import { adminBase } from '@/lib/adminNav'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import CategoryIcon from '@/components/CategoryIcon'
-import FieldBoxes from './FieldBoxes'
+import FieldBoxes, { addBoxButton, PlusIcon } from './FieldBoxes'
 import WalkBox from './WalkBox'
 import CardBox, { ShowOnLine, type CardLine } from './CardBox'
 import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview, { type PreviewView } from './CategoryPreview'
 import { sampleName } from '@/lib/fieldLooks'
 import { CardBandImageField, IconField } from './CategoryFormFields'
-import { FieldEditor } from './CategoryFieldEditor'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import FieldLooks from './FieldLooks'
-import { useIsSuperAdmin } from './AdminAuthGate'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
-import { mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
+import { draftMeaning, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminSwitch, AdminYesNo, Chevron, adminInputClass } from './AdminUI'
-import { addButton } from './DragList'
+import { AddListButton } from './DragList'
 import DeletePage from './DeletePage'
 import RemoveField, { type Removing } from './RemoveField'
 import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
+import { takeCategoryListings } from '@/lib/categoryListings'
 import { fieldFromRef, fieldRef, screenFromSearch, type EditorScreen } from '@/lib/editorScreenUrl'
 import { focusOn } from '@/lib/previewFocus'
 import { useScreenHistory } from './useScreenHistory'
@@ -81,7 +82,7 @@ export function CategoryEditor(props: Props) {
 const FOLLOWING_KEYS = new Set<keyof Draft>(['label', 'capabilities'])
 
 function changedKeys(draft: Draft, saved: Draft): number {
-  return (Object.keys(draft) as (keyof Draft)[]).filter((k) => !FOLLOWING_KEYS.has(k) && JSON.stringify(draft[k]) !== JSON.stringify(saved[k])).length
+  return (Object.keys(draft) as (keyof Draft)[]).filter((k) => !FOLLOWING_KEYS.has(k) && draftMeaning(k, draft[k]) !== draftMeaning(k, saved[k])).length
 }
 
 function CategoryEditorScreen({
@@ -97,11 +98,14 @@ function CategoryEditorScreen({
   onUndo,
 }: Props & { onUndo: () => void }) {
   const isNew = initial === null
+  // The Eruv's page (Nov 9): its fields and boxes, as every page's, and
+  // none of what a page of places has besides (Within a walk, Before it's
+  // opened, Questions). Its preview is the page alone.
+  const eruvPage = initial?.kind === 'eruv'
   const community = useCommunitySlug()
   const [previewing, setPreviewing] = useState(false)
   // Page, A listing or Adding, beside the settings and opened full size.
   const [previewView, setPreviewView] = useState<PreviewView>('page')
-  const superAdmin = useIsSuperAdmin()
   // The field whose own screen is open (board "Field"), by its place in
   // draft.fields, or the page's address or phone.
   const [openField, setOpenField] = useState<OpenField | null>(null)
@@ -112,7 +116,11 @@ function CategoryEditorScreen({
   // Back from a field or the picker, the Fields box is still open on a phone,
   // with the box it was in (boards 17-19).
   const [fieldsOpen, setFieldsOpen] = useState(false)
-  const [openBox, setOpenBox] = useState<string | null>(null)
+  // A box of the listing's own just made the admin's by a press on its name:
+  // its id now, its name then, and the boxes before.
+  const owned = useRef<{ id: string; title: string; before: string } | null>(null)
+  // The row just added, lit in its box (E1b: every box is open).
+  const [landed, setLanded] = useState<string | null>(null)
   // A box just added, its name selected to type over (board 19).
   const [freshBox, setFreshBox] = useState<string | null>(null)
   // The fields there were before an add, to find the one added.
@@ -121,6 +129,13 @@ function CategoryEditorScreen({
   const [openLine, setOpenLine] = useState<CardLine | null>(null)
   const [showLine, setShowLine] = useState<'second' | 'third' | null>(null)
   const [placeCount, setPlaceCount] = useState<number | null>(null)
+  // This page's places, for How it looks to draw a field on a real one (the
+  // user, Nov 10: "it's not previewing with the fields we actually have").
+  const [realPlaces, setRealPlaces] = useState<DirectoryResource[]>([])
+  const setPlaces = (places: DirectoryResource[]) => {
+    setPlaceCount(places.length)
+    setRealPlaces(places)
+  }
   // "Remove this field" on one places have answered: its own step first
   // (board 16), and the removals answered there, so Save doesn't ask again.
   const [removing, setRemoving] = useState<Removing | null>(null)
@@ -132,14 +147,30 @@ function CategoryEditorScreen({
   const wide = useIsDesktop('(max-width: 1023px)')
   // Beside, the page's own preview counts its places; without it (a phone),
   // count them here.
-  const countId = !wide && !isNew ? initial.id : null
+  const countId = !wide && !isNew && !eruvPage ? initial.id : null
+  // The Eruv's are eruvim, not listings: counted as Places counts them.
+  useEffect(() => {
+    if (!eruvPage) return
+    let cancelled = false
+    fetch(withCommunity('/api/admin/eruvim', community), { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        const body = await res.json()
+        if (!cancelled && res.ok && body.ok) setPlaceCount((body.eruvim as { active: boolean }[]).filter((e) => e.active).length)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [eruvPage, community, token])
   useEffect(() => {
     if (!countId) return
     let cancelled = false
-    fetch(`/api/resources?category=${encodeURIComponent(countId)}`)
-      .then(async (res) => {
-        const body = await res.json()
-        if (!cancelled && res.ok && body.ok) setPlaceCount((body.resources as unknown[]).length)
+    takeCategoryListings(countId)
+      .then(({ ok, resources }) => {
+        if (!cancelled && ok) {
+          setPlaceCount(resources.length)
+          setRealPlaces(resources)
+        }
       })
       .catch(() => {})
     return () => {
@@ -168,7 +199,6 @@ function CategoryEditorScreen({
     toggleWebsiteField,
     toggleFieldCaveat,
     togglePartner,
-    moveField,
   } = useCategoryFieldEditing(initial, seed)
 
   // The screen the address names, on opening: a reload, a link, or Back
@@ -187,6 +217,7 @@ function CategoryEditorScreen({
       if (open !== null || s.add) setFieldsOpen(true)
       setOpenField(open)
       setAdding(s.add ?? null)
+      setAddingTo(s.into ?? null)
       setShowLine(s.line ?? null)
       setPreviewing(!!s.preview)
     }
@@ -222,6 +253,7 @@ function CategoryEditorScreen({
       setPreviewing(!!s.preview)
       setOpenField(fieldFromRef(fieldsNow.current, s.field))
       setAdding(s.add ?? null)
+      setAddingTo(s.into ?? null)
       setShowLine(s.line ?? null)
       if (s.remove) removeStep.current(s.field)
       else setRemoving(null)
@@ -233,6 +265,7 @@ function CategoryEditorScreen({
   const screenNow = (): EditorScreen => ({
     ...(openField !== null && { field: fieldRef(draft.fields, openField) }),
     ...(adding && { add: adding }),
+    ...(adding && addingTo && { into: addingTo }),
     ...(showLine && { line: showLine }),
   })
   // Through Next's router, so the entry is one it made (editorScreenUrl.ts),
@@ -253,10 +286,11 @@ function CategoryEditorScreen({
     window.scrollTo?.(0, 0)
   }
 
-  function showAdding(next: FieldPickerScreen) {
+  function showAdding(next: FieldPickerScreen, into: string | null = addingTo) {
     setFieldsOpen(true)
     setAdding(next)
-    go({ add: next })
+    setAddingTo(into)
+    go({ add: next, ...(into && { into }) })
     window.scrollTo?.(0, 0)
   }
 
@@ -302,13 +336,15 @@ function CategoryEditorScreen({
       // Nothing to lose is answered too; not knowing leaves it to Save.
       setConfirmed((c) => (count === 0 ? new Set(c).add(confirmKey(target)) : new Set([...c].filter((k) => k !== confirmKey(target)))))
       takeOff(target)
-      void screens.back()
       return
     }
     const next: Removing = { target, label, count, filter }
     lastRemoving.current = next
     setRemoving(next)
-    go({ ...screenNow(), remove: true })
+    // From the list, by the row's X (the user, Nov 10): the step is the
+    // field's address with remove, and Back is to the list.
+    const at = typeof target === 'object' ? fieldsNow.current.findIndex((f) => f.key === target.field) : target
+    go({ field: fieldRef(fieldsNow.current, at), remove: true })
     window.scrollTo?.(0, 0)
   }
 
@@ -357,7 +393,7 @@ function CategoryEditorScreen({
     iconImageUrl: draft.iconImageUrl.trim() || null,
     description: draft.description,
     detailFields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
-    kind: 'listing',
+    kind: initial?.kind ?? 'listing',
     hasAddress: draft.hasAddress,
     hasPhone: draft.hasPhone,
     upvotesEnabled: draft.upvotesEnabled,
@@ -377,11 +413,19 @@ function CategoryEditorScreen({
 
   // Page, A listing or Adding (boards 4 and 5): the page on a computer, the
   // other two as a phone shows them. No Adding where visitors can't add.
-  const views: { view: PreviewView; label: string }[] = [
-    { view: 'page', label: 'Page' },
-    { view: 'listing', label: 'A listing' },
-    ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
-  ]
+  // The Eruv page's Editing is an eruv's Edit listing: visitors don't add
+  // eruvim, they suggest edits to them.
+  const views: { view: PreviewView; label: string }[] = eruvPage
+    ? [
+        { view: 'page', label: 'Page' },
+        { view: 'listing', label: 'A listing' },
+        { view: 'adding', label: 'Editing' },
+      ]
+    : [
+        { view: 'page', label: 'Page' },
+        { view: 'listing', label: 'A listing' },
+        ...(draft.capabilities.add ? [{ view: 'adding' as const, label: 'Adding' }] : []),
+      ]
   const shownView = views.some((v) => v.view === previewView) ? previewView : 'page'
   const name = draft.pluralLabel.trim() || (isNew ? 'New category page' : initial!.pluralLabel)
   const pinColor = draft.pinColor || fallbackPinColor
@@ -397,14 +441,18 @@ function CategoryEditorScreen({
   // The page beside the settings, on a computer only: there's no room on
   // anything narrower. Clicking it opens it full size, to try.
   // `focus`: the field an admin is looking at, which Adding opens on.
-  const previewOf = (category: CategoryConfig, focus?: string) =>
-    previewing ? (
+  // `onField`: beside one of the Eruv page's fields, which isn't on its
+  // list of eruvim, so only where it is: A listing and Editing.
+  const previewOf = (category: CategoryConfig, focus?: string, onField = false) => {
+    const tabs = onField ? views.filter((v) => v.view !== 'page') : views
+    const shownView = tabs.some((v) => v.view === previewView) ? previewView : tabs[0].view
+    return previewing ? (
       <CategoryPreview category={category} focusField={focus} view={shownView} onClose={() => void screens.back()} />
     ) : (
     <aside aria-label="Preview" className="shrink-0 sticky top-8 self-start flex w-[340px] flex-col gap-3">
-      {(
+      {tabs.length > 1 && (
         <div role="group" aria-label="Preview of" className="flex rounded-lg border border-slate-300 bg-white p-0.5">
-          {views.map((v) => (
+          {tabs.map((v) => (
             <button
               key={v.view}
               type="button"
@@ -418,14 +466,18 @@ function CategoryEditorScreen({
         </div>
       )}
       <PreviewBeside onOpen={openPreview} device={shownView === 'page' ? 'computer' : 'phone'} shownWidth={340}>
-        {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaceCount} />}
+        {() => <CategoryPreview inline view={shownView} category={category} focusField={focus} onClose={() => {}} onListings={setPlaces} />}
       </PreviewBeside>
     </aside>
   )
+  }
   // Beside a field, the field where a visitor meets it, on a made-up place
   // (boards 33c and 34, FieldLooks.tsx); the whole page one link away.
   const looksOf = (look: { category: CategoryConfig; focus?: string }, onShowOnRow?: (line: 'second' | 'third') => void) => {
     const f = look.category.detailFields.find((x) => x.key === look.focus)
+    // An eruv isn't a made-up place to draw a field on: a real one, opened
+    // and in its Edit listing, instead.
+    if (eruvPage) return previewOf(look.category, look.focus, !!f)
     if (previewing || !f) return previewOf(look.category, look.focus)
     return (
       <FieldLooks
@@ -434,6 +486,7 @@ function CategoryEditorScreen({
         placeName={sampleName(draft.label, draft.pluralLabel)}
         askedWhen={field?.showIf}
         canAdd={draft.capabilities.add}
+        realPlaces={realPlaces}
         onShowOnRow={onShowOnRow}
         onWholePage={() => {
           setPreviewView('page')
@@ -456,12 +509,20 @@ function CategoryEditorScreen({
   const fieldPage: FieldPage = { fields: pageFields, hiddenFields: draft.hiddenFields, hasAddress: draft.hasAddress, hasPhone: draft.hasPhone }
   const parts = listingPartsFromKey(draft.listingParts)
   const boxes = fieldBoxes(fieldPage, parts)
-  // Just added: the box it landed in opens, its row there to see.
+  const addingBox = addingTo ? boxes.find((b) => b.id === addingTo) : undefined
+  // A field added to a box of the listing's own makes it the admin's, in
+  // its place (ownBox): the box it lands in.
+  const ownAddingBox = () => {
+    if (!addingTo) return addingTo
+    const own = ownBox(parts, boxes, addingTo, fieldPage)
+    if (own.id !== addingTo) set('listingParts', listingPartsKey(own.parts))
+    return own.id
+  }
+  // Just added: its row is scrolled to and lit.
   if (landing) {
     const key = pageFields.find((f) => !landing.has(f.key))?.key
-    const box = key !== undefined && boxes.find((b) => b.fields.includes(key))
     setLanding(null)
-    if (box) setOpenBox(box.id)
+    if (key !== undefined) setLanded(`field:${key}`)
   }
   // A hechsher's caveat is set on the hechsher's own screen.
   const fieldIndex = (key: string) => {
@@ -485,8 +546,7 @@ function CategoryEditorScreen({
         onRemove={() => {
           takeOff(removing.target)
           setConfirmed((c) => new Set(c).add(confirmKey(removing.target)))
-          // Past the field's screen too, to the page.
-          void screens.back(2)
+          void screens.back()
         }}
       />
     )
@@ -510,63 +570,68 @@ function CategoryEditorScreen({
         pageName={name}
         pageLabel={draft.label}
         page={{ hasAddress: draft.hasAddress, hasPhone: draft.hasPhone, fields: draft.fields }}
+        kind={eruvPage ? 'eruv' : 'listing'}
         screen={adding}
-        onScreen={showAdding}
+        onScreen={(next) => showAdding(next)}
         onBack={() => void screens.back()}
         onAdd={(row) => {
-          if (row.basic === 'address' || row.basic === 'phone') setOpenBox('contact')
+          if (row.basic === 'address' || row.basic === 'phone') setLanded(`basic:${row.basic}`)
           else setLanding(new Set(pageFields.map((f) => f.key)))
-          if (row.basic === 'address') {
-            set('hasAddress', true)
-            setCap('map', true)
-          } else if (row.basic === 'phone') set('hasPhone', true)
+          if (row.basic === 'address' || row.basic === 'phone') {
+            // In the box it was added from (the user, Nov 10: "move all
+            // fields. Including address and phone").
+            if (addingTo && addingTo !== 'contact') {
+              const own = ownBox(parts, boxes, addingTo, fieldPage)
+              set('listingParts', listingPartsKey(placeBasic(own.parts, row.basic, own.id)))
+            }
+            if (row.basic === 'address') {
+              set('hasAddress', true)
+              setCap('map', true)
+            } else set('hasPhone', true)
+          }
           else if (row.basic === 'hours') toggleHoursField(true)
           else if (row.basic === 'website') toggleWebsiteField(true)
-          else if (row.field) addReadyField(row.field, row.companions, addingTo, row.partner)
+          else if (row.field) addReadyField(row.field, row.companions, ownAddingBox(), row.partner)
           added(null)
         }}
         canRequire={draft.capabilities.add || draft.capabilities.edit}
+        // From a box's "+ Add a field": only what lands in it (the user,
+        // Nov 9 and 10), the davening times included in one of the
+        // admin's boxes. Not one of a mikvah's sections' fields: a section
+        // comes with its switch, from + Add audience group.
+        into={addingBox ? {
+          heading: `Add a field to ${addingBox.title || 'New box'}`,
+          offers: (row) => {
+            if (row.basic === 'address' || row.basic === 'phone') return basicLandsIn(addingBox, fieldPage)
+            if (!row.field) return basicsLandIn(addingBox)
+            return whereAdded(addingBox, normalizeField(row.field), fieldPage) === 'here'
+          },
+          kindFits: (type) => whereAdded(addingBox, madeField(type, '', '#new'), fieldPage) === 'here',
+        } : undefined}
         // A field before adding: the page beside with it there.
         besides={
           wide
             ? (f) => {
-                return looksOf(focusOn(previewCategory, normalizeField(f)))
+                // In the box it's being added to, as Add would put it.
+                const look = focusOn(previewCategory, normalizeField(f))
+                if (!addingTo || !look.focus) return looksOf(look)
+                const own = ownBox(parts, boxes, addingTo, fieldPage)
+                const placed = listingPartsToSave(listingPartsKey(addToBox(own.parts, own.id, look.focus))) ?? undefined
+                return looksOf({ ...look, category: { ...look.category, listingParts: placed } })
               }
             : undefined
         }
         onMakeOwn={(type, label) => {
           setLanding(new Set(pageFields.map((f) => f.key)))
-          added(addOwnField(type, label, addingTo))
+          added(addOwnField(type, label, ownAddingBox()))
         }}
       />
-    )
-  } else if (openField === 'address' || openField === 'phone') {
-    // The page's address or phone (board 17's Contact): on, or taken off.
-    const address = openField === 'address'
-    screen = (
-      <>
-        <AdminBack back={{ label: name, onClick: () => void screens.back() }} title={address ? 'Address' : 'Phone'} />
-        <button
-          type="button"
-          onClick={() => void askRemove(openField, address ? 'Address' : 'Phone', false)}
-          className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer"
-        >
-          Remove this field
-        </button>
-      </>
     )
   } else if (field && typeof openField === 'number') {
     // A field's own screen (board 13). What the board leaves off (only for
     // some places, an audience, a link's own box, a badge in place of
     // another, the order) is a superadmin's, under More.
     const i = openField
-    const removeIt = () => {
-      if (field.key) void askRemove({ field: field.key }, field.label || 'New field', !!normalizeField(field).filterable)
-      else {
-        removeField(i)
-        void screens.back()
-      }
-    }
     screen = (
       <FieldScreen
         key={i}
@@ -577,47 +642,9 @@ function CategoryEditorScreen({
         onChange={(patch) => updateField(i, patch)}
         onKosherQuestions={(on) => toggleFieldCaveat(i, on)}
         partner={partnerRule(field) ? { on: !!partnerOf(draft.fields, field), onChange: (on) => togglePartner(i, on) } : undefined}
-        onRemove={removeIt}
+        // An eruv isn't listed on rows (no "Before it's opened").
+        rows={!eruvPage}
         onBack={() => void screens.back()}
-        more={
-          superAdmin ? (
-            <FieldEditor
-              field={field}
-              index={i}
-              total={draft.fields.length}
-              // "Required" only matters if people can add or edit listings.
-              canRequire={draft.capabilities.add || draft.capabilities.edit}
-              // Boolean fields make sense as an "audience" a field is scoped to
-              // (e.g. "Women's Tevillah") — a field can't be scoped to itself.
-              audienceOptions={draft.fields
-                .filter((other) => other.type === 'boolean' && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label }))}
-              // Choice fields make sense as a "show only when this equals that
-              // option" trigger — a field can't be scoped to itself.
-              showIfOptions={draft.fields
-                .filter((other) => other.type === 'select' && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
-              // Yes/No and Choice fields are the ones that can render as a badge
-              // — a field can't replace its own badge.
-              badgeFieldOptions={draft.fields
-                .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label }))}
-              // Words a link's own box could say (CategoryField.leadBox).
-              textFieldOptions={draft.fields
-                .filter((other) => (other.type === 'textarea' || other.type === 'text') && other.key !== field.key)
-                .map((other) => ({ key: other.key, label: other.label }))}
-              onChange={(patch) => updateField(i, patch)}
-              onRemove={removeIt}
-              onMove={(dir) => {
-                moveField(i, dir)
-                setOpenField(i + dir)
-                void screens.replace({ field: field.key || `#${i + dir}` })
-              }}
-              hasCaveat={!!field.caveat}
-              onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
-            />
-          ) : undefined
-        }
       />
     )
   } else {
@@ -724,61 +751,89 @@ function CategoryEditorScreen({
             page={fieldPage}
             boxes={boxes}
             parts={parts}
-            openId={openBox}
             freshId={freshBox}
-            onOpen={(id) => {
-              setOpenBox(id)
-              setFreshBox(null)
-            }}
+            landed={landed}
             onChange={(next, order) => {
               set('listingParts', listingPartsKey(next))
               if (order) set('fields', order.map((k) => draftFieldByKey.get(k)!))
             }}
-            onRename={(id, title) => {
-              const named = renameListingBox(fieldPage, id, title)
-              if (named) set('fields', draft.fields.map((f, i) => (pageFields[i]?.key === named.key ? { ...f, ...named.patch } : f)))
-              else set('listingParts', listingPartsKey(renameBox(parts, id, title)))
+            onRename={(id, title) => set('listingParts', listingPartsKey(renameBox(parts, id, title)))}
+            onOwnBox={(id) => {
+              // Renamed: a box of the listing's own becomes the admin's, its
+              // name ready to type.
+              const own = ownBox(parts, boxes, id, fieldPage)
+              owned.current = { id: own.id, title: boxes.find((b) => b.id === id)?.title ?? '', before: draft.listingParts }
+              set('listingParts', listingPartsKey(own.parts))
+              setFreshBox(own.id)
+            }}
+            onRenameEnd={(id, title) => {
+              // Left as it was: the box is the listing's own again, as if
+              // its name was never pressed (the user, Nov 10: "even just
+              // clicking something triggers a change").
+              const was = owned.current
+              owned.current = null
+              setFreshBox(null)
+              if (was?.id === id && title.trim() === was.title) set('listingParts', was.before)
             }}
             onRemoveBox={(id) => {
+              // Its fields come off the page with it (the user, Nov 10), the
+              // address and phone too; nothing's gone until Save, and Undo
+              // brings it back.
+              const box = boxes.find((b) => b.id === id)
+              if (!box) return
+              const gone = new Set(box.fields)
+              const kept = draft.fields.filter((_, i) => !gone.has(pageFields[i].key))
               set('listingParts', listingPartsKey(removeBox(parts, id)))
-              setOpenBox(null)
+              if (kept.length !== draft.fields.length) set('fields', kept)
+              // A hechsher's "what isn't kosher" is its switch on the hechsher.
+              const owner = kept.findIndex((f) => f.caveat && (gone.has(f.caveat.flagField) || gone.has(f.caveat.noteField)))
+              if (owner >= 0) toggleFieldCaveat(owner, false)
+              if (box.basics?.includes('address')) {
+                set('hasAddress', false)
+                setCap('map', false)
+              }
+              if (box.basics?.includes('phone')) set('hasPhone', false)
             }}
             onAddField={(id) => {
-              setAddingTo(id)
-              showAdding({ at: 'list' })
+              showAdding({ at: 'list' }, id)
             }}
             onShowField={(key) => showField(fieldIndex(key))}
-            onShowBasic={showField}
+            onRemoveRow={(r) => {
+              if (r === 'address' || r === 'phone') return void askRemove(r, r === 'address' ? 'Address' : 'Phone', false)
+              const i = fieldIndex(r.field)
+              const f = draft.fields[i]
+              if (!f) return
+              // A field not named yet has nothing anyone has answered.
+              if (!f.key) return removeField(i)
+              void askRemove({ field: f.key }, f.label || 'New field', !!normalizeField(f).filterable)
+            }}
           />
 
-          <div className="flex flex-wrap gap-2.5 px-4 py-3 border-t border-slate-100">
+          <div className="flex flex-col gap-2.5 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => {
-                const { parts: next, id } = addBox(parts)
+                // In place, at the end, its name ready to type (board B).
+                const { parts: next, id } = addBox(parts, boxes)
                 set('listingParts', listingPartsKey(next))
-                setOpenBox(id)
                 setFreshBox(id)
               }}
-              className={addButton}
+              className={addBoxButton}
             >
-              + Add a box
+              {PlusIcon}
+              Add a box
             </button>
-            {draft.fields.some((f) => f.type === 'boolean') && (
-              <button
-                type="button"
-                onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
-                className={addButton}
-              >
-                + Add audience group
-              </button>
+            {!eruvPage && draft.fields.some((f) => f.type === 'boolean') && (
+              <AddListButton onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}>
+                Add audience group
+              </AddListButton>
             )}
           </div>
         </AdminBox>
 
         {!isNew && draft.hasAddress && <WalkBox value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />}
 
-        <CardBox
+        {!eruvPage && <CardBox
           page={cardPage}
           sampleName={sampleName(draft.label, draft.pluralLabel)}
           open={openLine}
@@ -790,9 +845,9 @@ function CategoryEditorScreen({
             go({ line })
             window.scrollTo?.(0, 0)
           }}
-        />
+        />}
 
-        <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
+        {!eruvPage && <AdminBox title="Questions" foldOnPhone summary={draft.upvotesEnabled ? 'Upvotes on' : 'Upvotes off'}>
           <AdminYesNo question="Can visitors upvote places?" value={draft.upvotesEnabled} onChange={(yes) => set('upvotesEnabled', yes)} />
           <AdminYesNo question="A link for places not listed here?" value={draft.externalLinkEnabled} onChange={(yes) => set('externalLinkEnabled', yes)} />
           {draft.externalLinkEnabled && (
@@ -815,7 +870,7 @@ function CategoryEditorScreen({
               </AdminField>
             </div>
           )}
-        </AdminBox>
+        </AdminBox>}
 
         {isNew ? (
           <button type="button" onClick={leave} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">

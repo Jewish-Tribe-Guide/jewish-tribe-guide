@@ -7,7 +7,7 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
-import { addToBox, renameKey } from '@/lib/fieldBoxes'
+import { addToBox, madeField, removeFieldKey, renameKey } from '@/lib/fieldBoxes'
 import { fieldRules } from '@/lib/fieldAbout'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import { KOSHER_CAVEAT, kosherQuestions } from '@/lib/kosherQuestions'
@@ -25,12 +25,14 @@ import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEd
 export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: CategoryConfig | null = null) {
   const isNew = initial === null
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial ?? seed))
+  // The page as saved, for a switch turned back on to put back what it had.
+  const [savedDraft] = useState<Draft>(() => toDraft(initial ?? seed))
   // Whether the admin has directly edited the id field on a NEW category —
   // once true, typing a name no longer overwrites whatever they chose. Only
   // matters for isNew: an existing category's id already exists and never
   // auto-follows the name, touched or not.
   const [idTouched, setIdTouched] = useState(false)
-  // The "+ Add audience group" mini-form's own draft state — separate from
+  // The "Add audience group" mini-form's own draft state — separate from
   // `draft` since it's discarded on cancel and only ever produces a batch of
   // new fields, never edits an existing one.
   const [groupForm, setGroupForm] = useState<{
@@ -143,6 +145,16 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
       const has = partnerOf(d.fields, field)
       if (!on) return has ? { ...d, fields: d.fields.filter((f) => f !== has) } : d
       if (has) return d
+      // Turned back on: the one the page had saved, as it was.
+      const savedField = savedDraft.fields.find((f) => f.key === field.key)
+      const was = savedField && partnerOf(savedDraft.fields, savedField)
+      if (was && ![...d.fields, ...d.hiddenFields].some((f) => f.key === was.key)) {
+        const at = savedDraft.fields.indexOf(was)
+        // Where it was, among the fields that are still here.
+        const before = savedDraft.fields.slice(0, at).map((f) => f.key)
+        const after = Math.max(-1, ...before.map((k) => d.fields.findIndex((f) => f.key === k)))
+        return { ...d, fields: [...d.fields.slice(0, after + 1), was, ...d.fields.slice(after + 1)] }
+      }
       const placed = placedPartner(rule.make(field), field, [...d.fields, ...d.hiddenFields])
       return { ...d, fields: [...d.fields.slice(0, i + 1), placed, ...d.fields.slice(i + 1)] }
     })
@@ -152,12 +164,18 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
   // with no name yet takes its key from the name typed on its screen.
   function addOwnField(type: FieldType, label = '', box?: string | null): number {
     const key = label.trim() ? nextFieldKey(draft.fields, draft.hiddenFields, slugifyFieldKey(label)) : ''
-    setDraft((d) => ({ ...d, fields: [...d.fields, { key, label, type, renderAs: 'row', madeHere: true }], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
+    setDraft((d) => ({ ...d, fields: [...d.fields, madeField(type, label, key)], listingParts: inBox(d, box, key || `#${d.fields.length}`) }))
     return draft.fields.length
   }
 
+  // Out of its box too, so one added later under its key isn't put back
+  // where this one was (removeFieldKey).
   function removeField(i: number) {
-    setDraft((d) => ({ ...d, fields: d.fields.filter((_, idx) => idx !== i) }))
+    setDraft((d) => ({
+      ...d,
+      fields: d.fields.filter((_, idx) => idx !== i),
+      listingParts: listingPartsKey(removeFieldKey(listingPartsFromKey(d.listingParts), d.fields[i]?.key || `#${i}`)),
+    }))
   }
 
   // Adds a standard Phone/Email/Hours/Notes set in one action, each tagged
@@ -317,6 +335,18 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
         }
       }
       if (field.caveat) return d
+      // Turned back on: the questions the page had saved, as they were (the
+      // user, Nov 10: "undoing something still says a change happened").
+      const was = savedDraft.fields.find((f) => f.key === field.key)?.caveat
+      const wasQuestions = was && savedDraft.hiddenFields.filter((f) => f.key === was.flagField || f.key === was.noteField)
+      const taken = new Set([...d.fields, ...d.hiddenFields].map((f) => f.key))
+      if (was && wasQuestions?.length === 2 && !taken.has(was.flagField) && !taken.has(was.noteField)) {
+        return {
+          ...d,
+          fields: d.fields.map((f, idx) => (idx === i ? { ...f, caveat: was } : f)),
+          hiddenFields: [...d.hiddenFields, ...wasQuestions],
+        }
+      }
       // A hechsher's are its own two questions, as Food asks them.
       if (fieldRules(field).asksEverythingKosher) {
         const flagField = nextFieldKey(d.fields, d.hiddenFields, KOSHER_CAVEAT.flagField)
@@ -352,16 +382,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     })
   }
 
-  function moveField(i: number, dir: -1 | 1) {
-    setDraft((d) => {
-      const j = i + dir
-      if (j < 0 || j >= d.fields.length) return d
-      const next = [...d.fields]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return { ...d, fields: next }
-    })
-  }
-
   // Only the FIRST field matching each shape is "owned" by its checkbox
   // above (hidden from the Details list, and all toggleHoursField/
   // toggleWebsiteField ever touch) — if a second one exists, whether from an
@@ -394,7 +414,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     togglePhotoField,
     toggleFieldCaveat,
     togglePartner,
-    moveField,
     managedHoursIndex,
     managedWebsiteIndex,
     managedPhotoIndex,

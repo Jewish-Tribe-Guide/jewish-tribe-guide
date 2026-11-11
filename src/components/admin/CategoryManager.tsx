@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { prefetchCategoryListings } from '@/lib/categoryListings'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -13,11 +14,8 @@ import { CategoryEditor } from './CategoryEditor'
 import NewPagePicker from './NewPagePicker'
 import { useReadyMade } from './useReadyMade'
 import { pageToCopy } from '@/lib/readyMade'
-import CategoryPreview from './CategoryPreview'
-import EruvimManager from './EruvimManager'
-import DeletePage from './DeletePage'
-import { CardBandImageField, IconField } from './CategoryFormFields'
 import { AdminBack, AdminBox, AdminEmpty, AdminRow, AdminSwitch } from './AdminUI'
+import { withEruvFields } from '@/lib/eruvFields'
 import { LISTED_SCREENS, screenState, type SiteScreen } from '@/lib/siteScreens'
 
 // ── The categories manager: Site's Category pages tab (the Category pages
@@ -44,25 +42,44 @@ const SCREEN_LINES: Record<SiteScreen['kind'], string> = { eruv: 'Eruv page', zm
 /** The category a save just moved to: see `justSaved` below. */
 let savedHandOff: string | null = null
 
+// The list of pages as last loaded, kept between screens. Each screen of
+// Category pages is its own address, and a new address is a new
+// CategoryManager, so every open waited for the list again before showing
+// anything (the user, Nov 9: "Most noticable is clicking on a category page
+// in admin"). The kept list shows at once; the screen still asks again, and
+// what comes back replaces it.
+let kept: { community: string; categories: CategoryConfig[]; placeCounts: Record<string, number> } | null = null
+
+/** Tests: no list kept from the one before. */
+export function forgetCategoryList(): void {
+  kept = null
+}
+
 export default function CategoryManager({
   token,
   editingId: rawEditingId,
   onOpenEditor,
   onCloseEditor,
+  prefetch,
 }: {
   token: string
   editingId: string | null
   onOpenEditor: (id: string) => void
   onCloseEditor: () => void
+  /** Loads a screen's address ahead of a click: a row's page, or (null)
+   *  the list. */
+  prefetch?: (id: string | null) => void
 }) {
   // A page's own address without the prefix (/categories/restaurant) opens
   // it too; it used to fall through to the list.
   const editingId = rawEditingId && !rawEditingId.includes(':') ? `${CAT_PREFIX}${rawEditingId}` : rawEditingId
   const community = useCommunitySlug()
-  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
-  const [placeCounts, setPlaceCounts] = useState<Record<string, number>>({})
+  const keptHere = kept?.community === community ? kept : null
+  const [categories, setCategories] = useState<CategoryConfig[] | null>(keptHere?.categories ?? null)
+  const [placeCounts, setPlaceCounts] = useState<Record<string, number>>(keptHere?.placeCounts ?? {})
   const [error, setError] = useState<string | null>(null)
   const [switching, setSwitching] = useState<string | null>(null)
+  const [listRound, setListRound] = useState(0)
   // The category just saved, and how many saves there have been: its screen
   // starts again from the saved settings, and its Save bar says "Saved."
   // A save that moves to another address (made, or a new web address) lands
@@ -84,14 +101,31 @@ export default function CategoryManager({
     try {
       const catRes = await fetch(withCommunity('/api/admin/categories?counts=1', community), { headers: { Authorization: `Bearer ${token}` } })
       const catBody = await parseOkJson<{ categories: CategoryConfig[]; placeCounts?: Record<string, number> }>(catRes, 'Failed to load categories.')
+      // A kept list that turns out stale (changed in another tab) starts
+      // the open page again from what's saved, before anything's typed.
+      if (keptHere && JSON.stringify(keptHere.categories) !== JSON.stringify(catBody.categories)) setListRound((r) => r + 1)
       setCategories(catBody.categories)
       setPlaceCounts(catBody.placeCounts ?? {})
+      kept = { community, categories: catBody.categories, placeCounts: catBody.placeCounts ?? {} }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
+    // keptHere: the list this screen opened with, read once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, community])
 
   useLoadOnMount(load)
+
+  // Opened from its address, with no list kept: the page's places are asked
+  // for beside the list, not after it (categoryListings.ts). With a list
+  // kept, the editor shows at once and asks itself.
+  const openedId = editingId?.startsWith(CAT_PREFIX) && !editingId.startsWith(NEW_PREFIX) && editingId !== `${CAT_PREFIX}new` ? editingId.slice(CAT_PREFIX.length) : null
+  const listKept = categories !== null
+  useEffect(() => {
+    if (openedId && !listKept) prefetchCategoryListings(openedId)
+    // Only as the page opens: once the list is here, the editor has asked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openedId])
 
   // Every page in one list by name (board 1): the categories that hold
   // places, and the Eruv and Candle Lighting, with or without a row yet
@@ -112,6 +146,16 @@ export default function CategoryManager({
       ...screens,
     ].sort((a, b) => a.label.localeCompare(b.label))
   }, [categories, placeCounts])
+
+  // The rows' pages, while the list shows, and the list from a page (Back
+  // to it), so neither click waits on the server.
+  const rowKeys = entries?.map((e) => e.key).join(' ') ?? ''
+  useEffect(() => {
+    if (!prefetch) return
+    if (editingId) prefetch(null)
+    else for (const key of rowKeys.split(' ').filter(Boolean)) prefetch(key)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowKeys, editingId === null])
 
   // On makes the screen's row the first time and shows it after that; off
   // hides the row, so its name and photo are still there when it comes back.
@@ -167,6 +211,30 @@ export default function CategoryManager({
     }} onCancel={() => onOpenEditor(`${CAT_PREFIX}new`)} />
   }
 
+  // A page with fields: a page of places, or the Eruv's (Nov 9: its fields
+  // and boxes, as every page's; eruvFields.ts).
+  const editorFor = (initial: CategoryConfig) => (
+    <CategoryEditor
+      // Saved: start again from what's now saved, staying on the screen.
+      key={`${initial.id}:${savedRound}:${listRound}`}
+      token={token}
+      initial={withEruvFields(initial)}
+      siblings={categories}
+      justSaved={justSaved === initial.id}
+      onSaved={async (savedId) => {
+        await load()
+        setJustSaved(savedId)
+        setSavedRound((r) => r + 1)
+        if (savedId !== initial.id) {
+          savedHandOff = savedId
+          onOpenEditor(`${CAT_PREFIX}${savedId}`)
+        }
+      }}
+      onCancel={onCloseEditor}
+      onDeleted={deleted}
+    />
+  )
+
   // Candle Lighting, and an Eruv with no row yet: the page's own switch and
   // nothing else (neither has anything to change, Nov 3). The Map's old
   // address is the list: it has no page (board 1).
@@ -175,10 +243,8 @@ export default function CategoryManager({
     const screen = listedScreen
     if (!categories) return <p className="text-sm text-muted">Loading…</p>
     const st = screenState(categories, screen)
-    // The Eruv has its eruvim to keep once it has a row.
-    if (screen.kind === 'eruv' && st.row) {
-      return <SingletonEditor token={token} category={st.row} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
-    }
+    // The Eruv, once it has a row, is a page with fields.
+    if (screen.kind === 'eruv' && st.row) return editorFor(st.row)
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: 'Category pages', onClick: onCloseEditor }} title={st.row?.pluralLabel ?? screen.label} />
@@ -196,9 +262,7 @@ export default function CategoryManager({
     // An old address of the Eruv or Candle Lighting (the Map's is the list).
     if (initial.kind !== 'listing') {
       const screen = LISTED_SCREENS.find((sc) => sc.kind === initial.kind)
-      if (screen?.kind === 'eruv') {
-        return <SingletonEditor token={token} category={initial} onToggleActive={(on) => void switchScreen(screen, on)} onSaved={() => void load()} onCancel={onCloseEditor} onDeleted={deleted} />
-      }
+      if (screen?.kind === 'eruv') return editorFor(initial)
       return (
         <div className="flex flex-col gap-4">
           <AdminBack back={{ label: 'Category pages', onClick: onCloseEditor }} title={initial.pluralLabel} />
@@ -206,27 +270,7 @@ export default function CategoryManager({
         </div>
       )
     }
-    return (
-      <CategoryEditor
-        // Saved: start again from what's now saved, staying on the screen.
-        key={`${initial.id}:${savedRound}`}
-        token={token}
-        initial={initial}
-        siblings={categories}
-        justSaved={justSaved === initial.id}
-        onSaved={async (savedId) => {
-          await load()
-          setJustSaved(savedId)
-          setSavedRound((r) => r + 1)
-          if (savedId !== initial.id) {
-            savedHandOff = savedId
-            onOpenEditor(`${CAT_PREFIX}${savedId}`)
-          }
-        }}
-        onCancel={onCloseEditor}
-        onDeleted={deleted}
-      />
-    )
+    return editorFor(initial)
   }
 
   return (
@@ -288,7 +332,7 @@ function NewPageEditor({
   const community = useCommunitySlug()
   const { pages, error } = useReadyMade(token, community)
   const own = from === OWN_PAGE
-  const source = own ? null : (pages?.filter((p) => p.category.id === from).sort((a, b) => Number(b.community === community) - Number(a.community === community))[0]?.category ?? null)
+  const source = own ? null : (pages?.filter((p) => p.category.kind === 'listing' && p.category.id === from).sort((a, b) => Number(b.community === community) - Number(a.community === community))[0]?.category ?? null)
   if (!own && !source) {
     if (error) return <p className="m-0 bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
     return <p className="text-sm text-muted">{pages ? 'No ready-made page here.' : 'Loading…'}</p>
@@ -296,192 +340,20 @@ function NewPageEditor({
   return <CategoryEditor token={token} initial={null} seed={source && pageToCopy(source)} siblings={categories} onSaved={onSaved} onCancel={onCancel} backLabel="What kind of places?" />
 }
 
-/** A page's "On the site" switch, in its own box. */
+/** A page's "On the site" switch (Candle Lighting, an Eruv with no row
+ *  yet), laid out as a category page's (board 21b): on a phone, a box with
+ *  the switch on the right; on a computer, the switch and its words. */
 function OnTheSite({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
-    <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px]">
-      <span aria-hidden="true" className="flex-1 text-[15px] font-semibold text-slate-900">On the site</span>
-      <AdminSwitch checked={on} onChange={onChange} label="On the site" />
+    <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
+      <span aria-hidden="true" className="flex-1 min-w-0 md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
+      <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+        <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
+        <AdminSwitch checked={on} onChange={onChange} label="On the site" />
+      </span>
     </div>
   )
 }
 
-// A lightweight editor for Map/Zmanim/Eruv — no fields to change (it's
-// a fixed, code-driven screen), just the card's name, icon, and home-screen
-// photo/text color, reusing the exact same fields as the full category editor.
-// The Eruv's also holds its eruvim (EruvimManager), which live in their own
-// table rather than as listings.
-export function SingletonEditor({
-  token,
-  category,
-  onSaved,
-  onCancel,
-  onToggleActive,
-  onDeleted,
-}: {
-  token: string
-  category: CategoryConfig
-  onSaved: () => void
-  onCancel: () => void
-  /** The page's "On the site" switch, saved at once. */
-  onToggleActive?: (on: boolean) => void
-  onDeleted?: () => void
-}) {
-  const community = useCommunitySlug()
-  const [name, setName] = useState(category.pluralLabel)
-  const [icon, setIcon] = useState(category.icon || '')
-  const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
-  const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
-  const [cardBandImageUrl, setCardBandImageUrl] = useState(category.cardBandImageUrl ?? '')
-  const [saving, setSaving] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
-
-  // Live preview, same pattern as CategoryEditor's own (history entry so
-  // Back/the preview's own Up button land here instead of skipping past to
-  // the category list). Only the Eruv opens this screen from the list now
-  // (Nov 3); the Map and Candle Lighting are switches with nothing to edit,
-  // so an old link to either still lands here but has nothing to preview.
-  const previewSupported = category.kind === 'eruv'
-  const [previewing, setPreviewing] = useState(false)
-
-  useEffect(() => {
-    if (!previewSupported) return
-    function onPopState(e: PopStateEvent) {
-      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [previewSupported])
-
-  function openPreview() {
-    setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
-  }
-
-  function closePreview() {
-    history.back()
-  }
-
-  if (previewing) {
-    const previewCategory: CategoryConfig = {
-      ...category,
-      label: name.trim() || category.label,
-      pluralLabel: name.trim() || category.pluralLabel,
-      icon: icon.trim() || category.icon,
-      iconImageUrl: iconImageUrl.trim() || null,
-      cardImageUrl: cardImageUrl.trim() || null,
-      cardBandImageUrl: cardBandImageUrl.trim() || null,
-    }
-    return <CategoryPreview category={previewCategory} onClose={closePreview} />
-  }
-
-  async function save() {
-    setErrors([])
-    if (!name.trim()) {
-      setErrors(['Name is required.'])
-      return
-    }
-    setSaving(true)
-    try {
-      await fetchJson(
-        withCommunity(`/api/admin/categories/${category.id}`, community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            label: name.trim(),
-            pluralLabel: name.trim(),
-            icon,
-            iconImageUrl: iconImageUrl.trim() || null,
-            cardImageUrl: cardImageUrl.trim() || null,
-            cardBandImageUrl: cardBandImageUrl.trim() || null,
-          }),
-        },
-        'Save failed.',
-      )
-      onSaved()
-    } catch (err) {
-      setErrors([err instanceof Error ? err.message : 'Save failed.'])
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <AdminBack back={{ label: 'Category pages', onClick: onCancel }} title={category.pluralLabel} />
-      {onToggleActive && <OnTheSite on={category.active !== false} onChange={onToggleActive} />}
-
-      <AdminBox title="Basics">
-        <div className="flex flex-col gap-4 p-4">
-          <label className="block">
-            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </label>
-          <IconField icon={icon} onChange={setIcon} iconImageUrl={iconImageUrl} onIconImageUrl={setIconImageUrl} token={token} />
-          <div>
-            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Banner photo</span>
-            <CardBandImageField
-              cardBandImageUrl={cardBandImageUrl}
-              cardImageUrl={cardImageUrl}
-              onChange={(band, card) => {
-                setCardBandImageUrl(band)
-                setCardImageUrl(card)
-              }}
-              token={token}
-            />
-          </div>
-        </div>
-      </AdminBox>
-
-      {errors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-1">
-          {errors.map((e) => (
-            <p key={e} className="text-sm text-red-700">{e}</p>
-          ))}
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        {previewSupported && (
-          <button
-            onClick={openPreview}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Preview
-          </button>
-        )}
-        <button
-          onClick={save}
-          disabled={saving}
-          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-        >
-          Cancel
-        </button>
-      </div>
-
-      {/* The eruvim themselves, each saved on its own: what was the Eruvim
-          tab until Oct 22, so everything about the Eruv page is here. */}
-      {category.kind === 'eruv' && (
-        <div className="mt-4 border-t border-slate-200 pt-6">
-          <EruvimManager token={token} />
-        </div>
-      )}
-
-      {onDeleted && <DeletePage token={token} category={category} onDeleted={onDeleted} />}
-    </div>
-  )
-}
 
 

@@ -18,6 +18,24 @@ import { Chevron } from './AdminUI'
 const HOLD_MS = 450
 /** Further than this and the finger is scrolling, not holding. */
 const HOLD_SLOP = 8
+/** A row held this near the top or bottom of the window scrolls the page
+ *  (the user, Nov 10: "The screen didn't drag down as I was moving the
+ *  field down"); the bottom's is taller, for the Save bar over it. */
+const EDGE_TOP = 64
+const EDGE_BOTTOM = 112
+/** The most the page scrolls in a frame, at the very edge. */
+const EDGE_SPEED = 18
+
+/** How far the page scrolls this frame for a pointer at `clientY` in a
+ *  window `height` tall, lifted at `startY`: none away from the edges,
+ *  faster nearer them, and only the way the row is being taken (one lifted
+ *  near an edge and taken the other way doesn't scroll). */
+export function edgeScroll(clientY: number, height: number, startY: number): number {
+  if (clientY < EDGE_TOP && clientY < startY) return -Math.ceil(EDGE_SPEED * Math.min(1, (EDGE_TOP - clientY) / EDGE_TOP))
+  const from = height - EDGE_BOTTOM
+  if (clientY > from && clientY > startY) return Math.ceil(EDGE_SPEED * Math.min(1, (clientY - from) / EDGE_BOTTOM))
+  return 0
+}
 
 const GRIP = (
   <svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor" aria-hidden="true">
@@ -33,10 +51,18 @@ const GRIP = (
 type Drag = {
   key: string
   pointerId: number
+  /** Where the pointer is, and how far the drag has scrolled the page:
+   *  the row follows both. Only its own scrolling: the browser moving the
+   *  page as rows reflow above isn't the row moving. */
+  clientY: number
+  scrolled: number
   startY: number
   startTop: number
   dy: number
   moved: boolean
+  /** The rows that move with it (`carries`), and where each started. */
+  block?: string[]
+  starts?: Map<string, number>
   /** With dropEdge: where each other row is passed, measured as the row was
    *  lifted. */
   lines?: Map<string, number>
@@ -60,6 +86,7 @@ export default function DragList<T>({
   canMove,
   slot,
   dropEdge,
+  carries,
 }: {
   items: readonly T[]
   keyOf: (item: T) => string
@@ -81,6 +108,9 @@ export default function DragList<T>({
    *  gaps use their outer edges, so the whole space between two boxes is
    *  "a row of its own". */
   dropEdge?: (item: T) => 'top' | 'bottom' | undefined
+  /** The rows under this one that move with it, as one (a box's fields
+   *  under its head: Fields, board E1b). */
+  carries?: (item: T, items: readonly T[]) => string[]
 }) {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
@@ -91,9 +121,9 @@ export default function DragList<T>({
   const orderRef = useRef<string[] | null>(null)
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; pointerId: number } | null>(null)
   const swallowClick = useRef(false)
-  const latest = useRef({ items, keyOf, onReorder, canMove, dropEdge })
+  const latest = useRef({ items, keyOf, onReorder, canMove, dropEdge, carries })
   useEffect(() => {
-    latest.current = { items, keyOf, onReorder, canMove, dropEdge }
+    latest.current = { items, keyOf, onReorder, canMove, dropEdge, carries }
   })
 
   const byKey = new Map(items.map((i) => [keyOf(i), i]))
@@ -106,8 +136,12 @@ export default function DragList<T>({
     // The lifted row sits under the finger wherever its slot has moved to.
     function place() {
       const d = dragRef.current
-      const el = d && els.current.get(d.key)
-      if (d && el) el.style.transform = `translateY(${d.startTop + d.dy - el.offsetTop}px)`
+      if (!d) return
+      for (const k of d.block ?? [d.key]) {
+        const el = els.current.get(k)
+        const start = d.starts?.get(k) ?? d.startTop
+        if (el) el.style.transform = `translateY(${start + d.dy - el.offsetTop}px)`
+      }
     }
     function stopScroll(e: TouchEvent) {
       if (dragRef.current) e.preventDefault()
@@ -129,8 +163,14 @@ export default function DragList<T>({
     function begin(key: string, pointerId: number, clientY: number) {
       const el = els.current.get(key)
       if (!el || dragRef.current) return
-      const d: Drag = { key, pointerId, startY: clientY, startTop: el.offsetTop, dy: 0, moved: false }
-      const { items: all, keyOf: keyOfItem, dropEdge: edgeOf } = latest.current
+      const d: Drag = { key, pointerId, clientY, scrolled: 0, startY: clientY, startTop: el.offsetTop, dy: 0, moved: false }
+      const { items: all, keyOf: keyOfItem, dropEdge: edgeOf, carries: carriedBy } = latest.current
+      const self = all.find((i) => keyOfItem(i) === key)
+      const carried = self && carriedBy ? carriedBy(self, all) : []
+      if (carried.length) {
+        d.block = [key, ...carried]
+        d.starts = new Map(d.block.map((k) => [k, els.current.get(k)?.offsetTop ?? 0]))
+      }
       if (edgeOf) {
         // Measured once, as it was lifted: rows of different heights (a box
         // shrinking as a card leaves it) would otherwise move the lines
@@ -153,25 +193,51 @@ export default function DragList<T>({
     }
     function move(e: PointerEvent) {
       const d = dragRef.current
+      if (!d || e.pointerId !== d.pointerId) return
+      d.clientY = e.clientY
+      follow()
+      if (!scrolling && edgeScroll(d.clientY, window.innerHeight, d.startY)) scrolling = requestAnimationFrame(scrollStep)
+    }
+    // Near an edge, the page scrolls a little each frame while the row is
+    // held there, and the row keeps up.
+    let scrolling = 0
+    function scrollStep() {
+      scrolling = 0
+      const d = dragRef.current
+      if (!d) return
+      const by = edgeScroll(d.clientY, window.innerHeight, d.startY)
+      if (!by) return
+      const was = window.scrollY
+      window.scrollBy(0, by)
+      if (window.scrollY === was) return
+      d.scrolled += window.scrollY - was
+      follow()
+      scrolling = requestAnimationFrame(scrollStep)
+    }
+    function follow() {
+      const d = dragRef.current
       const cur = orderRef.current
-      if (!d || !cur || e.pointerId !== d.pointerId) return
-      d.dy = e.clientY - d.startY
+      if (!d || !cur) return
+      d.dy = d.clientY - d.startY + d.scrolled
       if (Math.abs(d.dy) > 2) d.moved = true
       const el = els.current.get(d.key)
       if (!el) return
+      const block = d.block ?? [d.key]
+      const last = els.current.get(block.at(-1)!) ?? el
+      const height = (d.starts?.get(block.at(-1)!) ?? d.startTop) + last.offsetHeight - d.startTop
       const middles = cur
-        .filter((k) => k !== d.key)
+        .filter((k) => !block.includes(k))
         .map((k) => {
           const line = d.lines?.get(k)
           if (line !== undefined) return line
           const o = els.current.get(k)
           return o ? o.offsetTop + o.offsetHeight / 2 : 0
         })
-      const to = dropIndex(middles, d.startTop + d.dy + el.offsetHeight / 2)
+      const to = dropIndex(middles, d.startTop + d.dy + height / 2)
       const from = cur.indexOf(d.key)
       let turnedDown: string[] | null = null
       if (to !== from) {
-        const next = moveItem(cur, from, to)
+        const next = moveBlock(cur, block, to)
         const { items: now, keyOf: keyFor, canMove: allowed } = latest.current
         const byKey = new Map(now.map((i) => [keyFor(i), i]))
         if (!allowed || allowed(next.map((k) => byKey.get(k)!), 'pointer')) {
@@ -186,9 +252,13 @@ export default function DragList<T>({
       const d = dragRef.current
       if (!d || e.pointerId !== d.pointerId) return
       listen(false)
+      cancelAnimationFrame(scrolling)
+      scrolling = 0
       document.body.style.userSelect = ''
-      const el = els.current.get(d.key)
-      if (el) el.style.transform = ''
+      for (const k of d.block ?? [d.key]) {
+        const el = els.current.get(k)
+        if (el) el.style.transform = ''
+      }
       const { items: now, keyOf: keyFor, onReorder: done } = latest.current
       const next = orderRef.current
       if (next && next.join('\n') !== now.map(keyFor).join('\n')) {
@@ -234,6 +304,7 @@ export default function DragList<T>({
     function stop() {
       cancelHold()
       listen(false)
+      cancelAnimationFrame(scrolling)
       document.body.style.userSelect = ''
     }
     return { place, begin, startHold, stop }
@@ -261,6 +332,7 @@ export default function DragList<T>({
       {shown.map((item, i) => {
         const key = keyOf(item)
         const lifted = drag?.key === key
+        const carried = !lifted && !!drag?.block?.includes(key)
         const name = nameOf(item)
         const handle = (
           <button
@@ -278,9 +350,11 @@ export default function DragList<T>({
               const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : null
               if (step === null) return
               e.preventDefault()
-              // The nearest place it can go that way.
-              for (let to = i + step; to >= 0 && to < items.length; to += step) {
-                const next = moveItem(items, i, to)
+              // The nearest place it can go that way, with what it carries.
+              const block = [key, ...(carries?.(item, items) ?? [])]
+              const room = items.length - block.length
+              for (let to = i + step; to >= 0 && to <= room; to += step) {
+                const next = block.length > 1 ? moveBlock(items.map(keyOf), block, to).map((k) => byKey.get(k)!) : moveItem(items, i, to)
                 if (canMove && !canMove(next, 'key')) continue
                 onReorder(next)
                 break
@@ -308,7 +382,7 @@ export default function DragList<T>({
               else els.current.delete(key)
             }}
             data-drag-row={key}
-            className={`[-webkit-touch-callout:none] ${lifted ? 'relative z-10 rounded-[10px] bg-white shadow-[0_10px_24px_rgb(15_23_42/0.18)] ring-1 ring-primary' : ''}`}
+            className={`[-webkit-touch-callout:none] ${lifted ? 'relative z-10 rounded-[10px] bg-white shadow-[0_10px_24px_rgb(15_23_42/0.18)] ring-1 ring-primary' : carried ? 'relative z-10 bg-white' : ''}`}
           >
             {children(item, { handle, rowProps, lifted })}
           </div>
@@ -326,6 +400,13 @@ export default function DragList<T>({
   )
 }
 
+/** The order with `block` (contiguous, its first the lifted row) taken out
+ *  and put back at `to`, counted among the rows left. */
+function moveBlock(order: readonly string[], block: readonly string[], to: number): string[] {
+  const rest = order.filter((k) => !block.includes(k))
+  return [...rest.slice(0, to), ...block, ...rest.slice(to)]
+}
+
 const TRASH = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
@@ -338,9 +419,9 @@ const trashButton =
 /** The bottom of an open row: what can go in (its Adds, a width), then the
  *  trash can right after them (the user, Nov 4: "move the garbage down to
  *  where we have those add buttons", and not off at the far end). */
-export function RowActions({ name, onRemove, children }: { name: string; onRemove: () => void; children?: React.ReactNode }) {
+export function RowActions({ name, onRemove, children, wide }: { name: string; onRemove: () => void; children?: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
+    <div className={wide ? 'flex flex-1 items-center gap-2.5' : 'flex flex-wrap items-center gap-2.5'}>
       {children}
       <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={trashButton}>
         {TRASH}
@@ -368,6 +449,17 @@ function listenForPresses() {
   )
 }
 
+/** A whole bar that opens and closes, as a row's does: a press on a button,
+ *  link or box in it does its own thing, and a press that only finishes
+ *  typing a name does nothing (the user, Nov 10: "we want the top part"). */
+export function useBarToggle() {
+  useEffect(listenForPresses, [])
+  return (e: React.MouseEvent, onToggle: () => void) => {
+    if (typingAtPress || (e.target as HTMLElement).closest('input, textarea, button, select, a')) return
+    onToggle()
+  }
+}
+
 const iconButton = 'grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-800'
 
 /** A row's name, edited in the row itself while it's open (the user, Nov 4:
@@ -378,13 +470,26 @@ export type RowRename = {
   placeholder?: string
   /** Just added: the name is selected, ready to type over. */
   fresh?: boolean
+  /** Tapped to rename, in place of editing here: the row is about to be
+   *  another's (a box of the listing's own becoming the admin's), which
+   *  then starts `fresh`. */
+  onStart?: () => void
+  /** Done typing (left, Enter or Escape), with the name as it stands. */
+  onEnd?: (value: string) => void
 }
 
 /** Open, the name reads as the name; a tap on it edits it, and leaving
  *  the box (or Enter) puts it back (the user, Nov 4: "being able to edit the
  *  name right away is a throw off"). Just added, it starts in the box. */
-function RowName({ rename, name }: { rename: RowRename; name: string }) {
+export function RowName({ rename, name }: { rename: RowRename; name: string }) {
   const [editing, setEditing] = useState(!!rename.fresh)
+  // Made fresh after it was drawn (a box of the listing's own just made the
+  // admin's, taking an id another row had): it starts editing then too.
+  const [wasFresh, setWasFresh] = useState(!!rename.fresh)
+  if (!!rename.fresh !== wasFresh) {
+    setWasFresh(!!rename.fresh)
+    if (rename.fresh) setEditing(true)
+  }
   // The box's padding hangs to the left, so the name sits where it did closed.
   const pad = '-ml-2.5 rounded-md border px-2.5 py-1.5 text-[15px] font-semibold'
   if (!editing)
@@ -392,7 +497,7 @@ function RowName({ rename, name }: { rename: RowRename; name: string }) {
       <button
         type="button"
         aria-label={`Rename ${name}`}
-        onClick={() => setEditing(true)}
+        onClick={() => (rename.onStart ? rename.onStart() : setEditing(true))}
         className={`${pad} min-w-0 cursor-text truncate border-transparent text-left text-slate-900 hover:border-slate-200 hover:bg-slate-50`}
       >
         {rename.value || <span className="text-slate-400">{rename.placeholder}</span>}
@@ -406,7 +511,10 @@ function RowName({ rename, name }: { rename: RowRename; name: string }) {
       autoFocus
       onFocus={(e) => rename.fresh && e.target.select()}
       onChange={(e) => rename.onChange(e.target.value)}
-      onBlur={() => setEditing(false)}
+      onBlur={(e) => {
+        setEditing(false)
+        rename.onEnd?.(e.target.value)
+      }}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
       // As wide as the name, so the rest of the row is there to tap closed.
       size={Math.max(rename.value.length || (rename.placeholder?.length ?? 0), 6) + 2}
@@ -430,6 +538,7 @@ export function OrderRow({
   onToggle,
   rename,
   openLine,
+  onRemove,
   children,
 }: {
   row: DragRow
@@ -442,6 +551,9 @@ export function OrderRow({
   open: boolean
   onToggle: () => void
   rename?: RowRename
+  /** An X at the end of its name bar: given only while it's empty, as a
+   *  field box's X is (the user, Nov 10). */
+  onRemove?: () => void
   /** What it opens to. */
   children?: React.ReactNode
 }) {
@@ -450,6 +562,11 @@ export function OrderRow({
   useEffect(listenForPresses, [])
   const toggle = () => !typingAtPress && onToggle()
   const iconBox = icon && <span className="grid h-7 w-7 shrink-0 place-items-center text-slate-600">{icon}</span>
+  const x = onRemove && (
+    <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={iconButton}>
+      {X}
+    </button>
+  )
   return (
     <div className={`border-b border-slate-100 last:border-b-0 ${row.lifted ? 'border-transparent' : ''}`}>
       <div className="flex items-center pl-1.5 pr-2">
@@ -493,6 +610,8 @@ export function OrderRow({
           </span>
         </button>
         )}
+        {/* Last, open or closed. */}
+        {x}
       </div>
       {open && Children.toArray(children).length > 0 && <div className="flex flex-col gap-3 px-4 pb-4 pt-1 sm:pl-10">{children}</div>}
     </div>
@@ -523,11 +642,14 @@ export function InnerRow({ row, name, line, onRemove, className }: { row: DragRo
 }
 
 /** "+ Add a card" and the like: a button that opens the native list of what
- *  can be added (a phone's own picker), with no ▾ (the user, Nov 4). */
-export function AddMenu({ label, options, onPick }: { label: string; options: { id: string; label: string }[]; onPick: (id: string) => void }) {
+ *  can be added (a phone's own picker), with no ▾ (the user, Nov 4). `wide`:
+ *  under a whole list, as "+ Add a box" is (`addListButton`), its label
+ *  without the "+", which the icon is. */
+export function AddMenu({ label, options, onPick, wide, row }: { label: string; options: { id: string; label: string }[]; onPick: (id: string) => void; wide?: boolean; row?: boolean }) {
   if (options.length === 0) return null
   return (
-    <label className={`relative ${addButton}`}>
+    <label className={`relative ${wide ? addListButton : row ? addRowButton : addButton}`}>
+      {(wide || row) && PLUS}
       {label}
       <select
         aria-label={label}
@@ -551,3 +673,57 @@ const plainButton = 'inline-flex min-h-10 items-center rounded-lg border border-
 export const rowButton = `${plainButton} text-slate-900`
 /** The same in blue, for adding ("+ Add a group"). */
 export const addButton = `${plainButton} text-primary`
+
+/** Adding one more to a whole list ("+ Add a box", "+ Add a tab", "+ Add a
+ *  page"): a dashed button as wide as the list, a plus before its words, the
+ *  same on every admin screen (the user, Nov 10: "Should we apply that to
+ *  the site homepage part of admin?"). Adding inside one row stays that
+ *  row's own button. */
+export const addListButton =
+  'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50'
+
+/** A box's or a tab's X (FieldBoxes, OrderRow). */
+export const X = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+)
+
+export const PLUS = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+
+/** `addListButton` as a button. */
+export function AddListButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={`${addListButton} disabled:cursor-default disabled:opacity-50 disabled:hover:border-slate-300 disabled:hover:bg-transparent`}>
+      {PLUS}
+      {children}
+    </button>
+  )
+}
+
+/** Adding inside one thing, as a field box's "Add a field" is: a row across
+ *  the foot of its list, a plus before its words, lined up with the names
+ *  above it (the user, Nov 10: "can add a link be the same as add a field
+ *  in design?"). */
+export const addRowButton =
+  'flex min-h-[46px] w-full cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[15px] font-semibold text-primary hover:bg-blue-50/60'
+
+/** `addRowButton` as a button. */
+export function AddRowButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={addRowButton}>
+      {PLUS}
+      {children}
+    </button>
+  )
+}
+
+/** A list in a white card with its adds across its foot, as a field box is
+ *  its fields and then "Add a field". */
+export function ListCard({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">{children}</div>
+}

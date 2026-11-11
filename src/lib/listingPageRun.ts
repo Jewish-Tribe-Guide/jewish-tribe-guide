@@ -396,6 +396,13 @@ function weekText(w: Pick<CalendarWeek, 'from' | 'to'>): string {
   return w.from === w.to ? dateText(w.from) : `${fromMonth} ${fromDay}–${toMonth === fromMonth ? toDay : `${toMonth} ${toDay}`}`
 }
 
+/** Whether a week read from a page is one the watch reads: it overlaps
+ *  this week, or next week from Thursday (calendarWeeks). */
+export function upcoming(u: { from?: string | null; to?: string | null }, today: string): boolean {
+  if (!u.from || !u.to) return true
+  return calendarWeeks(today).some((w) => u.from! <= w.to && u.to! >= w.from)
+}
+
 /** A result's lines that change the listing. */
 const changing = (u: TimesUpdate | null) => (u ? u.rows.filter((r) => r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && !r.keep)).length : 0)
 
@@ -417,6 +424,7 @@ async function readTimesText(
   // (the user, Oct 20, on Leyv Ha-Ir's monthly services).
   // Its dated times go on as their week's schedule, apart from its usual
   // times (datedAsWeeks).
+  const today = dayIn(now)
   const read = await readShulWeek(listing, key, text !== null ? { text } : { pdf: source.pdf! }, apiKey, { others })
   const sk = schedulesKey(key)
   let minyanim = regularMinyanim(listing[key])
@@ -427,11 +435,16 @@ async function readTimesText(
   let held = false
   let heldByDate = false
   // What a date gives: the listing's weeks, one waiting, and this page's own.
-  const today = dayIn(now)
   const datedRead = read.updates.flatMap((u) => (u.kind === 'week' ? u.rows.filter((r) => r.status !== 'gone' && r.status !== 'kept').map((r) => ({ on: r.day, tefillah: r.tefillah, time: r.time, anchor: r.anchor })) : []))
   const onDates = [...datedTimes(schedules), ...dated, ...datedRead]
   for (const u of read.updates) {
     const week = u.kind === 'week'
+    // Only the upcoming week's dates go to the queue, as a calendar's
+    // (calendarWeeks): this week, and next week from Thursday. A page's
+    // events list runs weeks ahead (the user, Nov 10, on Mekor's Nov 20
+    // card: "I thought we only read for the upcoming week"). Later dates
+    // still tell what a week between them doesn't have (noMinyanWeeks).
+    if (week && !upcoming(u, today)) continue
     // A week's own times stay in it: one the listing has that weekday
     // still belongs to that week's schedule.
     const listed = week ? keepUncovered(u) : dropListed(keepUncovered(u), minyanim, schedules)

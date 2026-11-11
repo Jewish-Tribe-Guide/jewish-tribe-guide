@@ -1,5 +1,6 @@
 import type { Minyan } from './davening'
-import { dateText, weekPostRows, withWeekRows, type SpecialSchedule } from './schedules'
+import { DAY_KEYS } from './hours'
+import { dateText, datesOf, firstCovering, weekPostRows, withWeekRows, type SpecialSchedule } from './schedules'
 
 // ── This week's schedule, added in Edit listing (agreed Oct 23) ─────────────
 // Drawing SwWk3BLEYTtVu2k3w2UJ5s v3. Any shul's Edit listing has a "This
@@ -56,15 +57,35 @@ export function weekPostFor(schedules: readonly SpecialSchedule[], w: EditWeek):
 /** Whether a week post says there's no minyan that week. */
 export const isNoMinyan = (post: SpecialSchedule | null) => !!post?.whole && post.minyanim.length === 0
 
-/** The rows the row's list shows: the post's times dated in the week. */
-export function weekRowsFor(post: SpecialSchedule | null, w: EditWeek): Minyan[] {
-  return post ? weekPostRows(post, w) : []
+/** The week posts covering the week, the one the row edits first. */
+function weekPostsFor(schedules: readonly SpecialSchedule[], w: EditWeek): SpecialSchedule[] {
+  const covering = schedules.filter((s) => s.kind === 'week' && s.from <= w.to && s.to >= w.from)
+  const first = weekPostFor(schedules, w)
+  return first ? [first, ...covering.filter((s) => s !== first)] : []
+}
+
+/**
+ * The rows the row's list shows: every time the box shows in the week, from
+ * whichever post gives it that day (firstCovering, as the box does). Two
+ * posts can cover one week: Mekor's "Times for Nov 8 – Nov 13" from a person
+ * and "Times for Nov 14" off their website, whose Shabbos 9:15 the Edit
+ * never listed (the user, Nov 10: "I couldn't find that minyan time").
+ */
+export function weekRowsFor(schedules: readonly SpecialSchedule[], w: EditWeek): Minyan[] {
+  const posts = weekPostsFor(schedules, w)
+  if (posts.length <= 1) return posts[0] ? weekPostRows(posts[0], w) : []
+  const dates = datesOf(w)
+  const winner = new Map(dates.map((d) => [d, firstCovering(posts.filter((s) => s.from <= d && s.to >= d))]))
+  const dateOf = (on: string) => (/^\d{4}-/.test(on) ? on : dates[DAY_KEYS.indexOf(on as (typeof DAY_KEYS)[number])])
+  return posts.flatMap((post) =>
+    weekPostRows({ ...post, minyanim: post.minyanim.map((m) => ({ ...m, on: m.on.filter((on) => winner.get(dateOf(on)) === post) })) }, w),
+  )
 }
 
 /** Whether two sets of schedules say something different about the week. */
 export function weekDiffers(a: readonly SpecialSchedule[], b: readonly SpecialSchedule[], w: EditWeek): boolean {
   const [was, now] = [weekPostFor(a, w), weekPostFor(b, w)]
-  return isNoMinyan(was) !== isNoMinyan(now) || !sameRows(weekRowsFor(was, w), weekRowsFor(now, w))
+  return isNoMinyan(was) !== isNoMinyan(now) || !sameRows(weekRowsFor(a, w), weekRowsFor(b, w))
 }
 
 /**
@@ -82,7 +103,10 @@ export function withWeekTimes(
   const post = weekPostFor(schedules, w)
   const isNew = !!post && !stored.some((s) => s.id === post.id)
   if (isNew && rows.length === 0 && !post.whole) return schedules.filter((s) => s.id !== post.id)
-  if (post) return withWeekRows(schedules, post.id, rows, w)
+  if (post && sameRows(weekRowsFor(schedules, w), rows)) return [...schedules]
+  // The week's times all go in the one post; another post covering the week
+  // gives its days in it up, and goes when it has nothing left.
+  if (post) return withWeekRows(withoutWeek(schedules, post, w), post.id, rows, w)
   if (rows.length === 0) return [...schedules]
   return withWeekRows([...schedules, newWeek(w, id, now)], id, rows, w)
 }
@@ -95,6 +119,18 @@ export function withNoMinyan(schedules: readonly SpecialSchedule[], w: EditWeek,
   // One running past the week keeps its other dates; this week goes on its own.
   if (post.from < w.from || post.to > w.to) return [...withWeekRows(schedules, post.id, [], w), { ...newWeek(w, id, now), whole: true }]
   return schedules.map((s) => (s.id === post.id ? { ...s, minyanim: [], whole: true as const } : s))
+}
+
+/** The other week posts covering the week, with nothing in it left. */
+function withoutWeek(schedules: readonly SpecialSchedule[], keep: SpecialSchedule, w: EditWeek): SpecialSchedule[] {
+  const others = new Set(weekPostsFor(schedules, w).filter((s) => s !== keep))
+  if (others.size === 0) return [...schedules]
+  return schedules.flatMap((s) => {
+    if (!others.has(s)) return [s]
+    const left = withWeekRows([s], s.id, [], w)[0]
+    if (left.minyanim.length === 0 && left.from >= w.from && left.to <= w.to) return []
+    return [left]
+  })
 }
 
 function newWeek(w: EditWeek, id: string, now: string): SpecialSchedule {

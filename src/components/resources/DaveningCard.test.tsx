@@ -339,7 +339,21 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(box).not.toHaveTextContent('Posted')
     expect(within(box).queryByRole('button', { name: 'Update their times' })).not.toBeInTheDocument()
     fireEvent.click(within(box).getByTestId('box-edit-button'))
-    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'Shabbos Bereishis')
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', ['Shabbos Bereishis'])
+  })
+
+  // Nov 10, Mekor: Friday night from a person's week, Shabbos morning's
+  // 9:15 PM from a one-day post off their website. Edit opened only the
+  // first, so the 9:15 PM couldn't be found to change.
+  it('Edit opens every post the box shows a time from', () => {
+    const onEditBox = vi.fn()
+    const person = { ...weekPost('Times for Oct 4 – Oct 9', '2026-10-04', '2026-10-09', { postedAt: '2026-10-06T15:00:00.000Z' }), minyanim: [{ id: 'p1', tefillah: 'mincha_maariv', on: ['2026-10-09'], time: '7:00pm' }] }
+    const site = { ...weekPost('Times for Oct 10', '2026-10-10', '2026-10-10', { postedBy: 'website', postedAt: '2026-10-07T15:00:00.000Z' }), minyanim: [{ id: 's1', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:15pm' }] }
+    show([...before, person, site], { onEditBox })
+    const box = screen.getByTestId('davening-this-shabbos')
+    expect(within(box).getByTestId('davening-this-week-days')).toHaveTextContent('Sat Oct 10Shacharis9:15 PM')
+    fireEvent.click(within(box).getByTestId('box-edit-button'))
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', expect.arrayContaining(['Times for Oct 4 – Oct 9', 'Times for Oct 10']))
   })
 
   // Oct 19: opened, the usual times stayed open, and read as if current.
@@ -433,7 +447,7 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
     expect(screen.getAllByTestId('davening-folded').map((f) => f.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Not this week: no minyan this week')]))
     fireEvent.click(within(box).getByTestId('box-edit-button'))
-    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'Times for Oct 4 – Oct 10')
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', ['Times for Oct 4 – Oct 10'])
   })
 
   // Drawn Oct 26 (boards 2, 3 and 3b): the week's weekdays and This
@@ -628,7 +642,7 @@ describe('this week’s one-day additions (Oct 20)', () => {
     const box = screen.getByTestId('davening-this-week')
     expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed by BZBI, Oct 5/)
     fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
-    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', '2026-10-08')
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', ['2026-10-08'])
   })
 
   it('keeps an occasion’s name beside its date', () => {
@@ -700,9 +714,9 @@ describe('one week, from the newsletter and the website (Oct 20)', () => {
     const onEditBox = vi.fn()
     show([website, newsletter], onEditBox)
     fireEvent.click(within(screen.getByTestId('davening-this-shabbos')).getByTestId('box-edit-button'))
-    expect(onEditBox).toHaveBeenLastCalledWith('this_week', 'This week’s schedule', 'news')
+    expect(onEditBox).toHaveBeenLastCalledWith('this_week', 'This week’s schedule', ['news'])
     fireEvent.click(within(screen.getByTestId('davening-this-week')).getByTestId('box-edit-button'))
-    expect(onEditBox).toHaveBeenLastCalledWith('this_week', 'This week’s schedule', 'site')
+    expect(onEditBox).toHaveBeenLastCalledWith('this_week', 'This week’s schedule', ['site'])
   })
 })
 

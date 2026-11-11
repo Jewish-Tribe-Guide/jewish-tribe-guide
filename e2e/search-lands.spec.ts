@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt, minyanimCategory } from './helpers'
 import { fixedViewSlug } from '../src/lib/routes'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ test('Back to home, then a search to another page: that page has the search', as
 
 test('a minyan: Minyanim by time, the words in its box, no sentence over the list', async ({ page, request }) => {
   const community = await defaultCommunity(page)
-  const shuls = ((await categories(request, community)) as Cat[]).find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
+  const shuls = await minyanimCategory(request, community)
   test.skip(!shuls, 'no category with minyanim')
 
   const box = await homeBox(page, community)

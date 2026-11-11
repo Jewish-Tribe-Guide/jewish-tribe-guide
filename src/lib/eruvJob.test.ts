@@ -11,7 +11,7 @@ const ago = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISO
 const BASE: AdminEruv = {
   id: 'lower-merion', name: 'Lower Merion Eruv', covers: 'Bala Cynwyd', website: 'https://lowermerioneruv.org/', hotline: '(610) 664-5626, option 3', alertsUrl: null,
   statusUrl: 'https://lowermerioneruv.org/', statusDated: false, status: 'up', statusWords: 'The eruv is up', statusPostedOn: null, statusCheckedAt: ago(1), statusErrorAt: null, statusError: null,
-  lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+  lineUrl: null, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [],
   statusEmail: null, statusEmailKept: null,
 }
 const NO_SOURCE: AdminEruv = { ...BASE, id: 'northeast', name: 'Northeast Eruv', statusUrl: null, status: null, statusWords: null, statusCheckedAt: null }

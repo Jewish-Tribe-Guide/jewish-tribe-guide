@@ -5,7 +5,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import SiteAddButton, { showsSiteAdd } from './SiteAddButton'
-import TellUsSheet from './TellUsSheet'
+import TellUsSheet, { addableCategories } from './TellUsSheet'
 import { track } from '@vercel/analytics'
 
 vi.mock('@/components/resources/useListingSubmit', async (original) => ({ ...(await original<object>()), TURNSTILE_ACTIVE: false }))
@@ -503,7 +503,7 @@ describe('Saw something? Tell us', () => {
     const find = (props: Partial<Parameters<typeof TellUsSheet>[0]> = {}) => {
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
       renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...props} />, { community: { slug: 'philly' }, content: { categories: [grocery, shuls] } })
-      fireEvent.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
     }
 
     it('finds a place the guide has and opens its edit, with Back to the search and back to the box', async () => {
@@ -547,9 +547,33 @@ describe('Saw something? Tell us', () => {
       expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     })
 
+    // Nov 9, the user: "why didn't you just make an add an eruv as an
+    // option within the regular add button just like the other categories".
+    it('offers an eruv as a kind of place where the Eruv page takes additions, with its own form', () => {
+      const eruv = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim' })
+      respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
+      renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, { community: { slug: 'philly' }, content: { categories: [grocery, eruv] } })
+      fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      fireEvent.click(within(screen.getByTestId('pick-kind')).getByRole('button', { name: 'Eruv' }))
+      expect(screen.getByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('eruv-adding')).getByLabelText('Status page or email')).toBeInTheDocument()
+      // Back goes to the place search, as from any kind.
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.getByTestId('find-place')).toBeInTheDocument()
+    })
+
+    it('leaves the eruv out where the Eruv page takes none, or is hidden', () => {
+      const eruv = (over = {}) => makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv', ...over })
+      expect(addableCategories([grocery, eruv()]).map((c) => c.id)).toEqual(['grocery', 'eruv'])
+      expect(addableCategories([grocery, eruv({ capabilities: { add: false } })]).map((c) => c.id)).toEqual(['grocery'])
+      expect(addableCategories([grocery, eruv({ active: false })]).map((c) => c.id)).toEqual(['grocery'])
+      expect(addableCategories([grocery, makeCategory({ id: 'zmanim', kind: 'zmanim' })]).map((c) => c.id)).toEqual(['grocery'])
+    })
+
     it('isn’t offered over a listing, where it’s that listing’s edit', () => {
       open({ about: { id: 'tj', name: 'Trader Joe’s' }, onEditYourself: () => {} })
-      expect(screen.queryByRole('button', { name: 'Fill it in yourself' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Edit it yourself' })).toBeInTheDocument()
     })
   })
@@ -573,10 +597,10 @@ describe('Saw something? Tell us', () => {
       expect(edit).toHaveBeenCalled()
     })
 
-    it('from a page or the site’s “+”, adds or updates a place, filling it in yourself being the other path', () => {
+    it('from a page or the site’s “+”, adds or updates a place, finding the place being the other path', () => {
       open()
       expect(screen.getByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Fill it in yourself' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Find the place' })).toBeInTheDocument()
     })
 
     it('says the reader isn’t answering, keeps what was written, and tries again', async () => {
@@ -643,8 +667,9 @@ describe('showsSiteAdd', () => {
   it('shows on every screen but the Map, a category or listing, and the site’s own pages', () => {
     const cats = ['grocery', 'synagogue']
     expect(['/philly', '/philly/browse', '/philly/pinned', '/philly/changes', '/philly/ask'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual([true, true, true, true, true])
-    expect(['/philly/map', '/philly/grocery', '/philly/grocery/abc', '/philly/feedback', '/philly/about', '/philly/privacy', '/ues', '/admin'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual(
-      Array(8).fill(false),
+    // The Eruv page has its own "+" (Nov 9), as a category page does.
+    expect(['/philly/map', '/philly/grocery', '/philly/grocery/abc', '/philly/eruv', '/philly/feedback', '/philly/about', '/philly/privacy', '/ues', '/admin'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual(
+      Array(9).fill(false),
     )
   })
 })

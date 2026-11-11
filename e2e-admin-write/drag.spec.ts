@@ -34,6 +34,33 @@ test('a row dragged by its handle lands where it is dropped', async ({ page }) =
   await expect(tabs.getByRole('button', { expanded: true })).toHaveCount(0)
 })
 
+// The user, Nov 10: "The screen didn't drag down as I was moving the field
+// down. So box off the screen couldn't be accessed". A row held near the
+// bottom of the window scrolls the page, and stays under the pointer.
+test('a row held at the bottom of the window scrolls the page and stays under the pointer', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 420 })
+  await page.goto('/philly/admin/home')
+  await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
+  const tabs = page.getByRole('region', { name: 'Tabs' })
+  const handle = tabs.getByRole('button', { name: /^Move / }).first()
+  await expect(handle).toBeVisible({ timeout: 20_000 })
+  await handle.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+  await page.evaluate(() => window.scrollBy(0, -80))
+  const name = await handle.getAttribute('aria-label')
+  const from = await middle(handle)
+  const top = await page.evaluate(() => window.scrollY)
+
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  const atEdge = 420 - 12
+  await page.mouse.move(from.x, atEdge, { steps: 8 })
+  // Held there, not moving: the page keeps scrolling on its own.
+  await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 5_000 }).toBeGreaterThan(top + 150)
+  const lifted = await middle(tabs.getByRole('button', { name: name! }))
+  expect(Math.abs(lifted.y - atEdge)).toBeLessThan(40)
+  await page.mouse.up()
+})
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 

@@ -2,9 +2,10 @@ import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryField } from '@/lib/categories'
 import { formatPhone } from '@/lib/validation'
+import { formatHoursSummary, hasAnyHours } from '@/lib/hours'
 import { readContacts, webLink, type ContactEntry } from '@/lib/contacts'
 import { PhoneIcon } from '@/components/icons'
-import { Card } from './listingParts'
+import { Card, InBoxProvider } from './listingParts'
 
 // Kept light (no data hooks), so the "+ Add" box can show a list as the
 // listing will, without the listing's own cards coming with it.
@@ -15,12 +16,15 @@ export function fieldText(f: CategoryField, v: unknown): string {
   if (f.type === 'boolean') return v === true ? (f.filterLabel ?? f.label) : ''
   if (f.type === 'select') return selectValues(v).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ')
   if (f.type === 'tel') return String(v ?? '').trim() ? formatPhone(String(v)) : ''
+  if (f.type === 'tags') return selectValues(v).join(', ')
+  if (f.type === 'hours') return hasAnyHours(v) || (typeof v === 'string' && v.trim()) ? formatHoursSummary(v) : ''
+  if (v !== null && typeof v === 'object') return ''
   return String(v ?? '').trim()
 }
 
 // ── An admin's box: "Who to call", "Kosher food" (Oct 6) ────────────────────
 
-function hasValue(f: CategoryField, v: unknown): boolean {
+export function hasValue(f: CategoryField, v: unknown): boolean {
   return f.type === 'contacts' ? readContacts(v).length > 0 : fieldText(f, v) !== ''
 }
 
@@ -63,7 +67,7 @@ function ContactLines({ entry }: { entry: ContactEntry }) {
 
 /** A field in a box: a list's entries, one under another; anything else
  *  as the named card says it. */
-function BoxField({ field: f, item }: { field: CategoryField; item: DirectoryResource }) {
+export function BoxField({ field: f, item }: { field: CategoryField; item: DirectoryResource }) {
   if (f.type === 'contacts') {
     return (
       <div className="divide-y divide-slate-100">
@@ -101,6 +105,7 @@ export function FieldsBox({
   fields,
   footer,
   onEdit,
+  big,
 }: {
   item: DirectoryResource
   title: string
@@ -108,8 +113,16 @@ export function FieldsBox({
   footer?: ReactNode
   /** The box's Edit, where its footer doesn't carry one. */
   onEdit?: () => void
+  /** A field that's a box of its own elsewhere (the davening times, a list
+   *  of items, Delivery), drawn in this one as it is there (the user, Nov
+   *  10: "Let's say same for now"). Null for any other. */
+  big?: (f: CategoryField) => ReactNode | null
 }) {
-  const filled = fields.filter((f) => hasValue(f, item[f.key]))
+  const drawn = new Map(fields.flatMap((f) => {
+    const node = big?.(f)
+    return node ? [[f.key, node] as const] : []
+  }))
+  const filled = fields.filter((f) => drawn.has(f.key) || hasValue(f, item[f.key]))
   if (filled.length === 0) return null
   const count = (f: CategoryField) => (f.type === 'contacts' ? readContacts(item[f.key]).length : 0)
   const headed = fields.length > 1
@@ -118,13 +131,14 @@ export function FieldsBox({
     <Card title={heading} testId="listing-box" footer={footer} onEdit={onEdit}>
       {filled.map((f, i) => (
         <div key={f.key} className={headed && i > 0 ? 'mt-1 border-t border-slate-200' : ''}>
-          {headed && (
+          {/* A box drawn in this one names itself (Card, inside one). */}
+          {headed && !drawn.has(f.key) && (
             <p className="pt-2.5 text-[12px] font-extrabold uppercase tracking-wide text-muted">
               {f.label}
               {count(f) > 1 && ` · ${count(f)}`}
             </p>
           )}
-          <BoxField field={f} item={item} />
+          {drawn.has(f.key) ? <InBoxProvider value={{ title }}>{drawn.get(f.key)}</InBoxProvider> : <BoxField field={f} item={item} />}
         </div>
       ))}
     </Card>

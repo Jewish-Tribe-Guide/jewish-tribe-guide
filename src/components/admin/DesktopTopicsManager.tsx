@@ -2,7 +2,7 @@
 
 import { BUILT_IN_BLOCKS, canShareRow, cardRows, fromCardRows, MAX_CARDS_IN_ROW, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
-import DragList, { addButton, InnerRow } from './DragList'
+import DragList, { AddListButton, InnerRow } from './DragList'
 
 // ── The computer home's cards under the search, in rows (the user, Nov 4;
 // drawn as artifact 8HpeQANzsQyGbyHVPsXrc5). A card on its own fills its
@@ -188,11 +188,11 @@ export default function DesktopTopicsManager({
       </DragList>
 
       {missing.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-3 pt-1.5 pb-3">
+        <div className="flex flex-col gap-2.5 px-3 pt-1.5 pb-3">
           {missing.map((k) => (
-            <button key={k} type="button" onClick={() => addCard(k)} className={addButton}>
-              + Add {nameOf(k)}
-            </button>
+            <AddListButton key={k} onClick={() => addCard(k)}>
+              Add {nameOf(k)}
+            </AddListButton>
           ))}
         </div>
       )}

@@ -110,6 +110,11 @@ the narrower or wider reading rather than applying it silently.
 - When building from a drawing, screenshot each built screen beside its
   board, on desktop and phone, before calling it built. Reusing an old screen
   inside a new frame is not following the drawing.
+- A board's look is part of the drawing. When the user approves a board,
+  build what it shows, its buttons and boxes included, not just its
+  arrangement. Don't assume the screen should keep today's look (Nov 10,
+  E1b: "I like the creativity. I just want you to implement it"). Name
+  any visual change the board makes when showing it.
 - When revising a drawing the user has seen, add a new board rather than
   overwriting it. Take settled or built boards off the canvas.
 - Measure a board's height from a real render (headless Playwright on the

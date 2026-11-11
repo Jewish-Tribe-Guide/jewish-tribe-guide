@@ -1,0 +1,106 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
+import type { Eruv } from '@/lib/eruv'
+import type { CategoryConfig } from '@/lib/categories'
+import { EruvListing } from './EruvListing'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community/eruv',
+  useSearchParams: () => new URLSearchParams(),
+}))
+
+afterEach(cleanup)
+
+// Nov 9: an opened eruv shows the Eruv page's Fields, in its boxes, after
+// its name and status (eruvFields.ts). A page never saved shows the rows an
+// eruv always had.
+
+const eruv: Eruv = {
+  id: 'center-city', name: 'Center City Eruv', covers: 'Center City and South Philadelphia.', website: 'https://www.centercityeruv.com/', hotline: '2155550100', alertsUrl: null,
+  statusUrl: null, statusDated: false, status: 'up', statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
+  details: { certifiedBy: 'Rabbi A', area: 'Philadelphia' },
+}
+const page = (over: Partial<CategoryConfig> = {}): CategoryConfig => ({ id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv', ...over })
+const open = (categories: CategoryConfig[]) =>
+  renderWithProviders(<EruvListing eruv={eruv} color="#000" now={new Date('2026-11-09T15:00:00Z')} timezone="America/New_York" candles={null} />, { content: { categories } })
+
+describe('EruvListing — the Eruv page’s fields', () => {
+  it('never saved, shows the rows an eruv always had: Where it goes in its box, then its contacts', () => {
+    open([page()])
+    expect(screen.getByRole('heading', { name: 'Where it goes' })).toBeInTheDocument()
+    expect(screen.getByText('Center City and South Philadelphia.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /centercityeruv\.com/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /2155550100/ })).toBeInTheDocument()
+    expect(screen.queryByText('Rabbi A')).not.toBeInTheDocument()
+  })
+
+  it('follows a saved page: its boxes and its own fields, and nothing taken off it', () => {
+    open([
+      page({
+        detailFields: [
+          { key: 'area', label: 'Area', type: 'text', showInHeader: true },
+          { key: 'hotline', label: 'Hotline', type: 'tel' },
+          { key: 'certifiedBy', label: 'Certified by', type: 'text' },
+        ],
+        listingParts: { boxes: [{ title: 'Who checks it', fields: ['certifiedBy'] }] },
+      }),
+    ])
+    expect(screen.getByRole('heading', { name: 'Who checks it' })).toBeInTheDocument()
+    expect(screen.getByText('Rabbi A')).toBeInTheDocument()
+    expect(screen.getByText(/Eruv · Philadelphia/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /2155550100/ })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Where it goes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /centercityeruv\.com/ })).not.toBeInTheDocument()
+  })
+
+  // Found on dev, Nov 9: a Text field made on the Eruv page lands in About,
+  // as long text does on any page, and showed as "About" over "Rabbi A",
+  // never saying who Rabbi A is. A listing's About is its description; an
+  // eruv has none, so the box says what it holds.
+  it('heads a long-text field in no box with its own name, not "About"', () => {
+    open([page({ detailFields: [{ key: 'certifiedBy', label: 'Certified by', type: 'textarea' }] })])
+    expect(screen.getByRole('heading', { name: 'Certified by' })).toBeInTheDocument()
+    expect(screen.getByText('Rabbi A')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
+  })
+
+  it('names each long-text field when there are several', () => {
+    open([
+      page({
+        detailFields: [
+          { key: 'certifiedBy', label: 'Certified by', type: 'textarea' },
+          { key: 'area', label: 'Area', type: 'textarea' },
+        ],
+      }),
+    ])
+    expect(screen.getByText('Certified by')).toBeInTheDocument()
+    expect(screen.getByText('Area')).toBeInTheDocument()
+  })
+
+  // The admin preview's Editing tab opens an eruv on its Edit listing. Its
+  // Back there has no step of its own to go back over: going back in the
+  // history would leave the admin's page.
+  it('opened on its Edit listing, Back shows the listing and leaves the history alone', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    renderWithProviders(<EruvListing startEditing eruv={eruv} color="#000" now={new Date('2026-11-09T15:00:00Z')} timezone="America/New_York" candles={null} />, { content: { categories: [page()] } })
+    expect(screen.getByTestId('eruv-editing')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Edit listing/ })).toBeInTheDocument()
+    expect(back).not.toHaveBeenCalled()
+    back.mockRestore()
+  })
+
+  it('opened by Edit listing, Back goes back over its step', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    open([page()])
+    fireEvent.click(screen.getByRole('button', { name: /Edit listing/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(back).toHaveBeenCalledTimes(1)
+    back.mockRestore()
+  })
+})

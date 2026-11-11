@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryField, FieldType } from './categories'
-import { listLine, matchesSearch, pageMenu, pageToCopy, readyMadeFields, readyMadePages } from './readyMade'
+import { eruvPageMenu, listLine, matchesSearch, pageMenu, pageToCopy, readyEruvFields, readyMadeFields, readyMadePages } from './readyMade'
 
 const denomination = (options: string[]): CategoryField => ({
   key: 'denomination',
@@ -148,5 +148,56 @@ describe('readyMadeFields', () => {
   it('searches by every word typed, in the name or the line', () => {
     expect(matchesSearch({ label: 'Kosher Store', line: 'Grocery · a list' }, 'kosher groc')).toBe(true)
     expect(matchesSearch({ label: 'Kosher Store', line: 'Grocery' }, 'parking')).toBe(false)
+  })
+})
+
+// Nov 9: the Eruv page's Add a field offers what an eruv has: its own four
+// rows, what other communities' Eruv pages made, and, as on every page (the
+// user, Nov 9: "when I add more fields I don't see the fields existing
+// showing up as options"), every listing page's field an eruv can hold.
+describe('readyEruvFields', () => {
+  const otherEruv = makeCategory({
+    id: 'eruv',
+    kind: 'eruv',
+    pluralLabel: 'Eruv info',
+    detailFields: [
+      { key: 'certifiedBy', label: 'Certified by', type: 'text' },
+      { key: 'photo', label: 'Photo', type: 'image' },
+    ],
+  })
+  const pages = [...everywhere, { community: 'dc', category: otherEruv }]
+  const covers = { ...bare, fields: [{ key: 'covers', label: 'Where it goes', type: 'textarea' as const }] }
+
+  it('lists the four rows the page doesn’t have, other Eruv pages’ fields and listing pages’ an eruv can hold, no basics', () => {
+    const offered = readyEruvFields(pages, covers)
+    expect(offered.map((f) => f.label)).toEqual(['Certified by', 'Denomination', 'Email alerts', 'Hotline', 'Short Description', 'Website'])
+    expect(offered.every((f) => !f.basic)).toBe(true)
+    expect(offered.find((f) => f.label === 'Denomination')!.line).toBe('Schools, Synagogues · Orthodox, Conservative, Reform and 1 more')
+  })
+
+  it('leaves out what belongs to a listing’s own boxes: a caveat, a link’s box and its words, an audience’s, davening times, a photo', () => {
+    const delivery = makeCategory({
+      id: 'delivery',
+      pluralLabel: 'Delivery',
+      detailFields: [
+        { key: 'orderUrl', label: 'Order online', type: 'url', leadBox: { title: 'Delivery', text: 'deliveryNote' } },
+        { key: 'deliveryNote', label: 'Delivery details', type: 'textarea' },
+        { key: 'womensHours', label: 'Women’s note', type: 'text', audienceKey: 'women' },
+        { key: 'parking', label: 'Parking', type: 'boolean', showIf: { field: 'orderUrl', equals: true } },
+      ],
+    })
+    const offered = readyEruvFields([...pages, { community: 'philly', category: delivery }], covers)
+    const labels = offered.map((f) => f.label)
+    for (const gone of ['Kosher Certification', 'Not everything here is kosher', 'What is the exception?', 'Order online', 'Delivery details', 'Women’s note', 'Davening Times (Minyanim)', 'Photo']) {
+      expect(labels).not.toContain(gone)
+    }
+    // Asked after a listing field's answer there; on an eruv, always asked.
+    expect(offered.find((f) => f.label === 'Parking')!.field).not.toHaveProperty('showIf')
+  })
+
+  it('narrows to one page, “Eruv” being the four and other Eruv pages’', () => {
+    expect(readyEruvFields(pages, covers, 'Eruv').map((f) => f.label)).toEqual(['Certified by', 'Email alerts', 'Hotline', 'Website'])
+    expect(readyEruvFields(pages, covers, 'Schools').map((f) => f.label)).toEqual(['Denomination'])
+    expect(eruvPageMenu(pages)).toEqual(['Eruv', 'Food', 'Schools', 'Synagogues'])
   })
 })

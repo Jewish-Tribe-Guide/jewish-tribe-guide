@@ -23,6 +23,17 @@ import type { CategoryConfig, CategoryField } from './categories'
 //                 ("Delivery"), what isn't kosher, and the main thing ("Main
 //                 dishes", the davening times, the card above). Unset, that
 //                 order.
+//   order         every box's place on the listing, as the admin dragged
+//                 them (the user, Nov 10: "Can't we just have boxes and
+//                 fields and an admin can arrange how they want?"). One
+//                 token per box, the box's id (fieldBoxes.ts) but 'box' for
+//                 each of the admin's, in turn. Once set, it decides the
+//                 order and `lead` and `shabbos.after` are left out. A box
+//                 it doesn't name goes after the one it follows anyway.
+//   contact,      fields put in Contact or About that wouldn't go there by
+//   about         themselves (the user, Nov 10: "why all fields can't just
+//                 go anywhere"): a long text in Contact, a phone in About.
+//                 Anything not listed goes where its kind puts it.
 //
 // Stored as it came from the database and read through parseListingParts,
 // so an unknown shape means none of them rather than an error.
@@ -38,6 +49,53 @@ export type ListingParts = {
   shabbos?: { fields: string[]; after?: number }
   boxes?: ListingBox[]
   lead?: LeadSlot[]
+  order?: string[]
+  contact?: string[]
+  about?: string[]
+}
+
+// ── The page's address and phone, as a box holds them ──────────────────────
+// The user, Nov 10: "we should also be able to move all fields. Including
+// address and phone." They're the place's own (item.address, item.phone),
+// not fields, so a box names them by token. In Contact unless put elsewhere.
+
+export const BASICS = ['address', 'phone'] as const
+export type Basic = (typeof BASICS)[number]
+export const basicToken = (b: Basic) => `@${b}`
+
+/** Where the address or phone is: Contact, About, or the admin's nth box. */
+export function basicPlace(parts: ListingParts, b: Basic): 'contact' | 'about' | `box:${number}` {
+  const t = basicToken(b)
+  if (parts.about?.includes(t)) return 'about'
+  const n = (parts.boxes ?? []).findIndex((x) => x.fields.includes(t))
+  return n >= 0 ? `box:${n}` : 'contact'
+}
+
+/** The address or phone as a field a box draws: the place's own value. */
+const BASIC_FIELDS: Record<string, CategoryField> = {
+  '@address': { key: 'address', label: 'Address', type: 'text' },
+  '@phone': { key: 'phone', label: 'Phone', type: 'tel' },
+}
+
+/** Whether a box's field is the place's address or phone (BASIC_FIELDS):
+ *  edited with the place's contact, not as a field. */
+export const isBasicField = (f: CategoryField) => Object.values(BASIC_FIELDS).includes(f)
+
+/** The address and phone, as fields, put in Contact or About. */
+export function basicsIn(category: CategoryConfig, place: 'contact' | 'about'): CategoryField[] {
+  const parts = parseListingParts(category.listingParts)
+  const has = { address: category.hasAddress !== false, phone: category.hasPhone !== false }
+  return BASICS.filter((b) => has[b] && basicPlace(parts, b) === place).map((b) => BASIC_FIELDS[basicToken(b)])
+}
+
+/** A box's fields by key, the address and phone among them where the page
+ *  has them. */
+function boxFieldsByKey(category: CategoryConfig): Map<string, CategoryField> {
+  return new Map([
+    ...category.detailFields.filter((f) => f.renderAs !== 'hidden').map((f): [string, CategoryField] => [f.key, f]),
+    ...(category.hasAddress !== false ? [['@address', BASIC_FIELDS['@address']] as [string, CategoryField]] : []),
+    ...(category.hasPhone !== false ? [['@phone', BASIC_FIELDS['@phone']] as [string, CategoryField]] : []),
+  ])
 }
 
 export function parseListingParts(raw: unknown): ListingParts {
@@ -65,6 +123,12 @@ export function parseListingParts(raw: unknown): ListingParts {
   if (boxes.length > 0) parts.boxes = boxes
   const lead = leadOf(r.lead)
   if (lead) parts.lead = lead
+  const order = orderOf(r.order)
+  if (order) parts.order = order
+  for (const box of FIXED_PLACES) {
+    const fields = keys(r[box])
+    if (fields.length > 0) parts[box] = fields
+  }
   return parts
 }
 
@@ -77,9 +141,50 @@ function leadOf(raw: unknown): LeadSlot[] | null {
   return order.join() === LEAD_SLOTS.join() ? null : order
 }
 
+/** A saved order: its tokens, once each but 'box', which is one per box. */
+function orderOf(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null
+  const seen = new Set<string>()
+  const order = raw.filter((t): t is string => typeof t === 'string' && !!t && (t === 'box' || (!seen.has(t) && !!seen.add(t))))
+  return order.length > 0 ? order : null
+}
+
+/** The order the admin dragged the boxes into, or null for the usual one. */
+export function boxOrderOf(category: Pick<CategoryConfig, 'listingParts'>): string[] | null {
+  return parseListingParts(category.listingParts).order ?? null
+}
+
+/** The boxes in the saved order. One it doesn't name (a box just made by
+ *  adding a field) goes after the box it follows in the usual order. */
+export function arrange<B extends { id: string }>(boxes: readonly B[], order: readonly string[]): B[] {
+  const byId = new Map(boxes.map((b) => [b.id, b]))
+  let n = 0
+  const out: B[] = []
+  for (const t of order) {
+    const b = byId.get(t === 'box' ? `box:${n++}` : t)
+    if (b && !out.includes(b)) out.push(b)
+  }
+  boxes.forEach((b, i) => {
+    if (out.includes(b)) return
+    const prev = boxes.slice(0, i).reverse().find((p) => out.includes(p))
+    out.splice(prev ? out.indexOf(prev) + 1 : 0, 0, b)
+  })
+  return out
+}
+
 /** The order the listing shows its own boxes in. */
 export function leadOrderOf(category: Pick<CategoryConfig, 'listingParts'>): readonly LeadSlot[] {
   return parseListingParts(category.listingParts).lead ?? LEAD_SLOTS
+}
+
+/** The boxes every listing has that a field can be put in by name. */
+export const FIXED_PLACES = ['contact', 'about'] as const
+export type FixedPlace = (typeof FIXED_PLACES)[number]
+
+/** Which of Contact and About the admin put a field in, when they did. */
+export function fixedPlaceOf(category: Pick<CategoryConfig, 'listingParts'>): (key: string) => FixedPlace | null {
+  const parts = parseListingParts(category.listingParts)
+  return (key) => FIXED_PLACES.find((p) => parts[p]?.includes(key)) ?? null
 }
 
 function keys(raw: unknown): string[] {
@@ -88,7 +193,7 @@ function keys(raw: unknown): string[] {
 
 /** Whether there's anything to store: none of them is null in the column. */
 export function hasListingParts(parts: ListingParts): boolean {
-  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length || !!parts.lead
+  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length || !!parts.lead || !!parts.order?.length || !!parts.contact?.length || !!parts.about?.length
 }
 
 /** The named main thing: its title and its fields, in the category's
@@ -112,10 +217,20 @@ export function shabbosFieldsOf(category: CategoryConfig): CategoryField[] | nul
  *  box's order is the admin's, not the category's: "Pantry" before "Food
  *  packages"), the ones that still exist. A box left with none isn't one. */
 export function boxesOf(category: CategoryConfig): { title: string; fields: CategoryField[] }[] {
-  const byKey = new Map(category.detailFields.filter((f) => f.renderAs !== 'hidden').map((f) => [f.key, f]))
+  const byKey = boxFieldsByKey(category)
   return (parseListingParts(category.listingParts).boxes ?? []).flatMap((b) => {
     const fields = b.fields.map((k) => byKey.get(k)).filter((f): f is CategoryField => !!f)
     return fields.length > 0 ? [{ title: b.title, fields }] : []
+  })
+}
+
+/** The same, each with its id in the admin's list ('box:<n>', its place
+ *  among all of them, empty ones included), for the saved order. */
+export function boxesWithIds(category: CategoryConfig): { id: string; title: string; fields: CategoryField[] }[] {
+  const byKey = boxFieldsByKey(category)
+  return (parseListingParts(category.listingParts).boxes ?? []).flatMap((b, n) => {
+    const fields = b.fields.map((k) => byKey.get(k)).filter((f): f is CategoryField => !!f)
+    return fields.length > 0 ? [{ id: `box:${n}`, title: b.title, fields }] : []
   })
 }
 
@@ -125,9 +240,16 @@ export function shabbosAfter(category: CategoryConfig): number | null {
   return parseListingParts(category.listingParts).shabbos?.after ?? null
 }
 
-/** The fields a card can show: what a person writes or picks. */
+/** The fields a card can show: what a person writes or picks, and the
+ *  ones that are a box of their own elsewhere, the davening times and a
+ *  list of items (the user, Nov 10: any field in any box). */
 export function cardFieldChoices(fields: readonly CategoryField[]): CategoryField[] {
-  return fields.filter((f) => ['text', 'textarea', 'select', 'boolean', 'tel', 'url', 'contacts'].includes(f.type) && !f.audienceKey && f.renderAs !== 'hidden')
+  return fields.filter(
+    (f) =>
+      ['text', 'textarea', 'select', 'boolean', 'tel', 'url', 'contacts', 'number', 'hours', 'tags', 'minyanim'].includes(f.type) &&
+      !f.audienceKey &&
+      f.renderAs !== 'hidden',
+  )
 }
 
 // ── In the category editor's draft ──────────────────────────────────────────
@@ -156,6 +278,8 @@ export function listingPartsFromKey(key: string): ListingParts {
       // stays in the draft.
       ...(boxes.length > 0 ? { boxes: boxes.map((b) => ({ title: title(b?.title), fields: keys(b?.fields) })) } : {}),
       ...(leadOf(r.lead) ? { lead: leadOf(r.lead)! } : {}),
+      ...(orderOf(r.order) ? { order: orderOf(r.order)! } : {}),
+      ...Object.fromEntries(FIXED_PLACES.flatMap((p) => (keys(r[p]).length > 0 ? [[p, keys(r[p])]] : []))),
     }
   } catch {
     return {}

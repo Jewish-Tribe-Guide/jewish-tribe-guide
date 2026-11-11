@@ -287,7 +287,7 @@ export type EnrichedSubmission = SubmissionRow & {
   current?: ResourceRow | null
   categoryLabel?: string
   /** An eruv suggestion's eruv as it is now (eruvSuggestion.ts). */
-  currentEruv?: { name: string; covers: string | null; website: string | null; hotline: string | null; alertsUrl: string | null } | null
+  currentEruv?: { name: string; covers: string | null; website: string | null; hotline: string | null; alertsUrl: string | null; details?: Record<string, unknown> } | null
 }
 
 /** Payload for a `category` create submission: the proposed category + its first

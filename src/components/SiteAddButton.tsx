@@ -17,13 +17,14 @@ import { ui } from '@/lib/uiConfig'
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
 
 /** Screens without this "+": the Map, a category page or a listing (their
- *  own), and the site's own pages (Feedback, About, Privacy). */
+ *  own), the Eruv page (its own +, opening this same box beside its list), and the site's own
+ *  pages (Feedback, About, Privacy). */
 export function showsSiteAdd(pathname: string, community: string, categoryIds: readonly string[]): boolean {
   const parts = pathname.split('/').filter(Boolean)
   if (parts[0] !== community) return false
   const screen = parts[1]
   if (!screen) return true
-  if (['map', 'feedback', 'about', 'privacy'].includes(screen)) return false
+  if (['map', 'eruv', 'feedback', 'about', 'privacy'].includes(screen)) return false
   if (categoryIds.includes(screen)) return false
   return true
 }

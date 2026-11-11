@@ -11,6 +11,7 @@ import { INBOX_BASE, adminBase } from '@/lib/adminNav'
 import { AdminBox, AdminRow } from './AdminUI'
 import FeedbackEditor from './FeedbackEditor'
 import FormEditor from './FormEditor'
+import { AddListButton } from './DragList'
 
 // Site's Forms tab (the admin redesign's board "Forms 2"): Feedback first,
 // then each form, a row each saying where it shows and whether it's on;
@@ -97,10 +98,10 @@ export default function FormsManager({
             aside={<OnPill on={f.active !== false} />}
           />
         ))}
+        <div className="px-4 pb-4 pt-2">
+          <AddListButton onClick={() => onOpen(`${FORM_PREFIX}new`)}>Add a form</AddListButton>
+        </div>
       </AdminBox>
-      <button type="button" onClick={() => onOpen(`${FORM_PREFIX}new`)} className="self-start min-h-11 text-sm font-semibold text-primary cursor-pointer">
-        + Add a form
-      </button>
     </div>
   )
 }

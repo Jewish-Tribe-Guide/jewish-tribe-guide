@@ -120,7 +120,8 @@ export async function listListingPagesEverywhere(): Promise<{ community: string;
   const { data, error } = await getAdminClient()
     .from('category')
     .select('*')
-    .eq('kind', 'listing')
+    // And every Eruv page, for an Eruv page's own ready-made fields (Nov 9).
+    .in('kind', ['listing', 'eruv'])
     .eq('active', true)
     .order('plural_label', { ascending: true })
 

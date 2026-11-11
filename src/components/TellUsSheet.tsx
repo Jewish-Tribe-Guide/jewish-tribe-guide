@@ -21,7 +21,12 @@ import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
 import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 import { FieldsBox } from '@/components/resources/FieldsBox'
-import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
+import ListingEditor, { type EditorStep, type StepAsk } from '@/components/resources/ListingEditor'
+import { useStepsInAddress } from '@/components/admin/useStepsInAddress'
+import { moveBackTo } from '@/components/admin/useScreenHistory'
+import { stepCount, withoutSteps } from '@/lib/stepAddress'
+import { useRouter } from 'next/navigation'
+import EruvEditor from '@/components/resources/EruvEditor'
 import { useListingDraft } from '@/components/resources/useListingDraft'
 import type { SendVia } from '@/components/resources/useListingSubmit'
 import FindPlace from '@/components/FindPlace'
@@ -157,12 +162,21 @@ export default function TellUsSheet({
       setHasBack(false)
     }
   }
+  // Closed, by its X or by tapping outside it: its steps leave the address,
+  // back over their entries, so Back from the page doesn't reopen nothing.
+  const router = useRouter()
+  useEffect(() => {
+    if (isOpen) return
+    const steps = () => stepCount(window.location.search, ['box'])
+    if (steps() > 0) void moveBackTo(router, steps, () => withoutSteps(window.location.pathname, window.location.search, ['box']))
+  }, [isOpen, router])
   // Named for what it does (Oct 10): "Tell us about…" read like feedback.
   const title = stepTitle ?? heading ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
   const onBack = hasBack ? () => back.current() : undefined
   const body = (
     <TellUsBody
       key={opens}
+      open={isOpen}
       about={about}
       pageCategory={category}
       placeholder={placeholder}
@@ -191,9 +205,18 @@ export default function TellUsSheet({
 // The form's title, by the category's plural name (Oct 5): "Add a Food"
 // read badly, and "Add to Food", "Add to Synagogues", "Add to WhatsApp
 // Groups" read well for every category, a place or not.
-const addTitle = (c: CategoryConfig) => `Add to ${c.pluralLabel || c.label}`
+const addTitle = (c: CategoryConfig) => (c.kind === 'eruv' ? 'Add an eruv' : `Add to ${c.pluralLabel || c.label}`)
+
+/** What + Add can add: every category of places that takes additions, and
+ *  the Eruv page when it does (Nov 9, the user: "why didn't you just make
+ *  an add an eruv as an option within the regular add button just like the
+ *  other categories"). An eruv is added with its own form, not a listing's. */
+export function addableCategories(categories: readonly CategoryConfig[] | null | undefined): CategoryConfig[] {
+  return (categories ?? []).filter((c) => (c.kind === 'listing' || c.kind === 'eruv') && c.active !== false && resolveCapabilities(c.capabilities).add)
+}
 
 type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
+const STEPS: readonly Step[] = ['write', 'result', 'sent', 'find', 'kind', 'add', 'edit']
 export type TellKind = 'times' | 'menu'
 
 /** Why the box can't use a reading, as a code for the log; null when it can. */
@@ -252,6 +275,7 @@ export function whyOf(p: Proposal, i: number): { head: string; line: string; act
 }
 
 export function TellUsBody({
+  open = true,
   about,
   pageCategory,
   placeholder,
@@ -276,6 +300,8 @@ export function TellUsBody({
   /** Back from the first step, when the box was opened from another one:
    *  "Add a minyan"'s whole-schedule link (Oct 6). */
   backFromStart?: () => void
+  /** Whether the box is open: closed, its steps leave the address. */
+  open?: boolean
 }) {
   const community = useCommunitySlug()
   const categories = useCategories()
@@ -290,7 +316,7 @@ export function TellUsBody({
     setStepOnly(next)
     onTitle(title)
   }
-  const addable = (categories ?? []).filter((c) => c.kind === 'listing' && c.active !== false && resolveCapabilities(c.capabilities).add)
+  const addable = addableCategories(categories)
   // `back`: returning to the search from what was found, keeping where the
   // search itself goes back to.
   // What a place found is added as: the page's category, or the one the
@@ -355,6 +381,41 @@ export function TellUsBody({
   // the header, and Back closes it (Oct 11).
   const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
   const editorTitle = editorStep?.title ?? null
+  // A row, a minyan or a person the address asks the editor to open.
+  const [editorAsk, setEditorAsk] = useState<StepAsk | null>(null)
+  const askEditor = (path: readonly string[]) => setEditorAsk((a) => ({ path, n: (a?.n ?? 0) + 1 }))
+
+  // Each step is an entry in the browser's history, with its own address
+  // (?box=find/add, then the editor's row: ?box=find/add/hours), so the
+  // browser's Back goes back a step, as the header's does, instead of
+  // closing the box and losing what was typed (the user, Nov 10). The path
+  // is where the header's Back goes from each step, read the other way.
+  const findPath = (): string[] => (findFrom === 'result' ? ['result', 'find'] : ['find'])
+  const pathOf = (s: Step): string[] | null => {
+    if (s === 'write') return []
+    if (s === 'result') return reading ? ['result'] : null
+    if (s === 'sent') return ['sent']
+    if (s === 'find') return findPath()
+    if (!adding && (s === 'kind' || s === 'add')) return null
+    if (s === 'kind') return [...findPath(), 'kind']
+    if (s === 'add') return adding?.category.kind === 'eruv' && pageCategory?.kind === 'eruv' ? ['add'] : [...findPath(), 'add']
+    return editing ? (editFrom === 'result' ? ['result', 'edit'] : [...findPath(), 'edit']) : null
+  }
+  const inEditor = step === 'add' || step === 'edit'
+  const boxPath = open ? [...(pathOf(step) ?? []), ...(inEditor ? (editorStep?.path ?? []) : [])] : []
+  const titleOf = (s: Step): string | null =>
+    s === 'find' ? 'Find the place' : s === 'kind' ? 'What kind of place?' : s === 'add' && adding ? addTitle(adding.category) : s === 'edit' && editing ? editing.name : null
+  useStepsInAddress('box', boxPath, (to) => {
+    for (const s of STEPS) {
+      const at = pathOf(s)
+      if (!at || to.length < at.length || at.some((x, i) => x !== to[i])) continue
+      const rest = to.slice(at.length)
+      if (rest.length > 0 && s !== 'add' && s !== 'edit') continue
+      setStep(s, titleOf(s))
+      if (s === 'add' || s === 'edit') askEditor(rest)
+      return
+    }
+  })
   useLayoutEffect(() => {
     if (step === 'edit' && editing) onTitle(editorTitle ?? editing.name)
     else if (step === 'add' && adding) onTitle(editorTitle ?? addTitle(adding.category))
@@ -595,7 +656,7 @@ export function TellUsBody({
       result: () => setStep('write'),
       find: () => setStep(findFrom),
       kind: () => openFind(true),
-      add: editorStep ? editorStep.back : () => openFind(true),
+      add: editorStep ? editorStep.back : adding?.category.kind === 'eruv' && pageCategory?.kind === 'eruv' ? () => setStep('write') : () => openFind(true),
       edit: editorStep ? editorStep.back : () => (editFrom === 'result' ? setStep('result') : openFind(true)),
     }
     onBack(go[step])
@@ -629,10 +690,16 @@ export function TellUsBody({
     ? { label: yourselfLabel ?? 'Edit it yourself', run: onEditYourself }
     : !about && addable.length > 0
       ? {
-          label: 'Fill it in yourself',
+          // Named for what it opens (the user, Nov 10): "Fill it in
+          // yourself" here and again on the search meant two things. The
+          // Eruv page's goes straight to the form, so it keeps that name.
+          label: pageCategory?.kind === 'eruv' ? 'Fill it in yourself' : 'Find the place',
           run: () => {
             setAiPlace(null)
-            openFind()
+            // An eruv isn't on Google: the Eruv page's own goes straight to
+            // its form.
+            if (pageCategory?.kind === 'eruv') startAdding({}, pageCategory)
+            else openFind()
           },
         }
       : null
@@ -937,7 +1004,12 @@ export function TellUsBody({
           </div>
         </div>
       )}
-      {step === 'add' && adding && (
+      {step === 'add' && adding?.category.kind === 'eruv' && (
+        <div data-testid="eruv-adding">
+          <EruvEditor eruv={null} page={adding.category} name={adding.place?.name ?? aiPlace?.query ?? ''} onClose={onClose} />
+        </div>
+      )}
+      {step === 'add' && adding && adding.category.kind !== 'eruv' && (
         <AddByHand
           key={`${adding.category.id}:${adding.place?.placeId ?? ''}`}
           category={adding.category}
@@ -948,6 +1020,7 @@ export function TellUsBody({
           existing={(listings ?? []).filter((l) => l.category === adding.category.id)}
           onClose={onClose}
           onStep={setEditorStep}
+          reopen={editorAsk}
           // A place the reader found goes in labelled with what it was read
           // from, and the box goes back to the rest of what it read.
           via={aiPlace ? viaMessage : undefined}
@@ -964,7 +1037,7 @@ export function TellUsBody({
         />
       )}
       {step === 'edit' && editing && categories?.find((c) => c.id === editing.category) && (
-        <ListingEditor item={editing} category={categories.find((c) => c.id === editing.category)!} onClose={onClose} onStep={setEditorStep} />
+        <ListingEditor item={editing} category={categories.find((c) => c.id === editing.category)!} onClose={onClose} onStep={setEditorStep} reopen={editorAsk} />
       )}
 
       {error && (
@@ -1403,6 +1476,7 @@ function AddByHand({
   existing,
   onClose,
   onStep,
+  reopen,
   via,
   onSent,
 }: {
@@ -1414,10 +1488,11 @@ function AddByHand({
   existing: DirectoryResource[]
   onClose: () => void
   onStep: (step: EditorStep | null) => void
+  reopen: StepAsk | null
   via?: SendVia
   onSent?: (body: unknown) => void
 }) {
   const [seed] = useState(() => ({ ...values, address: address || values?.address || '', ...(coords ? { geo: coords } : {}) }) as DirectoryResource)
   const draft = useListingDraft(category, seed, place)
-  return <ListingEditor category={category} draft={draft} fromGoogle={!!place} existingListings={existing} onClose={onClose} onStep={onStep} via={via} onSent={onSent} />
+  return <ListingEditor category={category} draft={draft} fromGoogle={!!place} existingListings={existing} onClose={onClose} onStep={onStep} reopen={reopen} via={via} onSent={onSent} />
 }

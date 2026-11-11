@@ -57,19 +57,15 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   const title = (t: string | RegExp) => visible(page.getByRole('heading', { name: t }))
   const thePage = title(name)
   // In the Fields box, not the preview beside it, which has an Hours too.
-  // On a computer one of its boxes is open at a time, and a reload or a
-  // Back closes it.
+  // Every box is open (E1b).
   const fields = page.getByRole('region', { name: 'Fields' })
-  const inBox = async (box: string, row: Locator) => {
-    if (!(await visible(row).count())) await visible(fields.getByRole('button', { name: box, exact: true, expanded: false })).click()
-    await visible(row).click()
-  }
-  const openHours = () => inBox('Contact', fields.getByRole('button', { name: /^Hours/ }))
-  const addAField = () => inBox('Top', fields.getByRole('button', { name: '+ Add a field' }))
+  const openHours = () => visible(fields.getByRole('button', { name: /^Hours/ })).click()
+  // Hours lands in Contact, so Contact's Add a field offers it (Nov 9).
+  const addAField = () => visible(fields.getByRole('button', { name: 'Add a field to Contact' })).click()
 
   // Add a field: the list, then a field looked at, each its own entry.
   await addAField()
-  await at('?add=list')
+  await at('?add=list&in=contact')
   await visible(page.getByRole('button', { name: /^Hours/ })).click()
   await expect(title(/^Hours/)).toBeVisible()
   // The screen shows at once; the address follows once the router lands.
@@ -77,7 +73,7 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   const look = new URL(page.url()).search
   await page.goBack()
   await expect(title('Add a field')).toBeVisible()
-  await at('?add=list')
+  await at('?add=list&in=contact')
   await page.goForward()
   await expect(title(/^Hours/)).toBeVisible()
   await page.reload()
@@ -138,7 +134,7 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   await addAField()
   await visible(page.getByRole('searchbox', { name: 'Search fields' })).fill('Night line')
   await visible(page.getByRole('button', { name: 'Make your own: Night line' })).click()
-  await visible(page.getByRole('button', { name: /^Text/ })).click()
+  await visible(page.getByRole('button', { name: /^Link/ })).click()
   await expect(title(/^Night line/)).toBeVisible()
   await at('?field=night_line')
   await page.goBack()

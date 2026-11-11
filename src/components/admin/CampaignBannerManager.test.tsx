@@ -29,10 +29,10 @@ const sukkot: CampaignBanner = {
 const always: CampaignBanner = { ...sukkot, id: 'b2', title: 'Always on', startDate: '2000-01-01', endDate: '2999-12-31' }
 const categories = [makeCategory({ id: 'sukkahs', pluralLabel: 'Sukkahs', active: false }), makeCategory({ id: 'food', pluralLabel: 'Food' })]
 
-function renderCampaigns(openId: string | null, banners = [sukkot, always]) {
+function renderCampaigns(openId: string | null, banners = [sukkot, always], cats = categories) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('campaign') ? { ok: true, banners } : { ok: true, categories }), { status: 200 })),
+    vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('campaign') ? { ok: true, banners } : { ok: true, categories: cats }), { status: 200 })),
   )
   vi.mocked(fetchJson).mockResolvedValue({ ok: true })
   const onOpen = vi.fn()
@@ -57,8 +57,15 @@ describe('Campaigns', () => {
     expect(row).not.toHaveTextContent('On now')
     await user.click(row)
     expect(onOpen).toHaveBeenCalledWith('b1')
-    await user.click(screen.getByRole('button', { name: '+ Add a campaign' }))
+    expect(screen.getByRole('button', { name: 'Add a campaign' })).toHaveClass('border-dashed', 'w-full')
+    await user.click(screen.getByRole('button', { name: 'Add a campaign' }))
     expect(onOpen).toHaveBeenCalledWith('new')
+  })
+
+  it('can’t add one until there’s a category for it to open', async () => {
+    renderCampaigns(null, [], [])
+    expect(await screen.findByText('Make a category first.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add a campaign' })).toBeDisabled()
   })
 
   it('makes a new one: Not saved until Save, which sends it and goes back', async () => {

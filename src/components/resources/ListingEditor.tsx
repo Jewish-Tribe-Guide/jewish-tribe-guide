@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
+import { editorRows, opensInPlace, rowChanged, rowHas, rowIsEmpty, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { sameFieldValue } from '@/lib/listingDiff'
 import { fmt } from '@/lib/submissionDiff'
 import { isMinyanim, type Minyan } from '@/lib/davening'
@@ -363,8 +363,7 @@ export default function ListingEditor({
     // The address or phone: its own row, or the contact row it's part of.
     const first =
       rows.find((r) => r.fields.some((f) => f.key === startOpen)) ??
-      rows.find((r) => r.part === startOpen) ??
-      (startOpen === 'address' || startOpen === 'phone' ? rows.find((r) => r.kind === 'contact' && !r.part) : undefined)
+      (startOpen === 'address' || startOpen === 'phone' ? rows.find((r) => rowHas(r, startOpen)) : undefined)
     if (first) {
       setStartTaken(true)
       setOpenId(first.id)
@@ -574,7 +573,7 @@ export default function ListingEditor({
 
   const needed = (r: EditorRow) =>
     creating &&
-    ((r.kind === 'name' && !draft.name.trim()) || (r.kind === 'contact' && r.part !== 'phone' && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
+    ((r.kind === 'name' && !draft.name.trim()) || (rowHas(r, 'address') && hasAddress && !draft.address.trim()) || r.fields.some((f) => requiredMissing.includes(f)))
   const nothingToSend = creating ? missing.length > 0 : changed.size === 0
 
   async function send() {
@@ -774,7 +773,7 @@ export default function ListingEditor({
     if (r.kind === 'contact') {
       return (
         <>
-          {hasAddress && r.part !== 'phone' && (
+          {hasAddress && rowHas(r, 'address') && (
             <div>
               {markedLabel('Address', 'edit-address', marked('address', item.address, draft.address))}
               <AddressInput
@@ -789,7 +788,7 @@ export default function ListingEditor({
               {wasLine(marked('address', item.address, draft.address))}
             </div>
           )}
-          {hasPhone && r.part !== 'address' && (
+          {hasPhone && rowHas(r, 'phone') && (
             <div>
               {markedLabel('Phone', 'edit-phone', marked('phone', item.phone, draft.phone))}
               <input id="edit-phone" type="tel" value={draft.phone} onChange={(e) => draft.setPhone(formatPhone(e.target.value))} placeholder="(555) 555-0100" className={inputClass} />
@@ -827,8 +826,8 @@ export default function ListingEditor({
       const post = weekPostFor(readSchedules(details[sk]), week)
       return (
         <MinyanBoxEditor
-          original={weekRowsFor(weekPostFor(readSchedules(item[sk]), week), week)}
-          initial={weekRowsFor(post, week)}
+          original={weekRowsFor(readSchedules(item[sk]), week)}
+          initial={weekRowsFor(readSchedules(details[sk]), week)}
           box="this_week"
           boxTitle={r.title}
           heading={weekDates(week)}

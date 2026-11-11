@@ -6,11 +6,17 @@ const fields = [{ key: 'kosher', label: 'Kosher', type: 'text' }, { key: '', lab
 
 describe('editorScreenUrl', () => {
   it('writes each screen into the address and reads it back', () => {
-    const screens = [{}, { field: 'kosher' }, { field: '#1' }, { field: 'phone' }, { add: { at: 'list' as const } }, { add: { at: 'make' as const } }, { add: { at: 'look' as const, id: 'select:denomination' } }, { line: 'second' as const }, { field: 'kosher', preview: true }, { field: 'kosher', remove: true }]
+    const screens = [{}, { field: 'kosher' }, { field: '#1' }, { field: 'phone' }, { add: { at: 'list' as const } }, { add: { at: 'make' as const } }, { add: { at: 'list' as const }, into: 'contact' }, { add: { at: 'look' as const, id: 'select:denomination' } }, { line: 'second' as const }, { field: 'kosher', preview: true }, { field: 'kosher', remove: true }]
     for (const screen of screens) {
       const href = screenHref('/philly/admin/categories/cat:food', '', screen)
       expect(screenFromSearch(href.slice(href.indexOf('?') + 1 || href.length))).toEqual(screen)
     }
+  })
+
+  it('keeps the box an add was opened from only while adding', () => {
+    expect(screenFromSearch('add=list&in=box:2')).toEqual({ add: { at: 'list' }, into: 'box:2' })
+    expect(screenFromSearch('in=box:2')).toEqual({})
+    expect(screenHref('/p', '?add=list&in=contact', { field: 'kosher' })).toBe('/p?field=kosher')
   })
 
   it('keeps the address’s other parameters, and drops a screen’s own', () => {

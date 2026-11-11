@@ -82,6 +82,8 @@ const page = { url: URL_, type: 'html', body: html }
 const watch = { communityId: 'philly', url: URL_, resourceId: 's1', pageHash: null as string | null }
 const changed = { ...watch, pageHash: 'old' }
 const NOW = Date.parse('2026-10-20T11:00:00Z')
+// Next week is read from Thursday on (calendarWeeks).
+const THU_OCT_22 = Date.parse('2026-10-22T11:00:00Z')
 /** NOW's week's Sunday: a shul's page read this week (readWeek), as
  *  checks before Oct 26 kept it. */
 const THIS_WEEK = '2026-10-18'
@@ -303,7 +305,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
   it('a page of one week’s times goes to the queue as that week’s times, marked as from the website', async () => {
     m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
     // Said of the page, so Reads names it "This week’s schedule".
-    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1, check: { parts: [{ part: 'week', size: 1 }] } })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU_OCT_22 })).toMatchObject({ ok: true, filed: 1, check: { parts: [{ part: 'week', size: 1 }] } })
     const payload = m.submitListingUpdate.mock.calls[0][2]
     expect(payload.details.minyanim).toEqual([expect.objectContaining({ days: ['sun'], time: '6:15pm' })])
     expect(payload.details.minyanim_schedules).toEqual([
@@ -314,7 +316,7 @@ describe('runListingPageWatch: a shul’s page of times', () => {
   it('a week the newsletter already gave wins: the website’s week for those days is left out', async () => {
     m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [newsletterWeek] } })
     m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
-    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU_OCT_22 })).toMatchObject({
       ok: true,
       filed: 0,
       pageHash: await hashOfPage(),
@@ -396,6 +398,21 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: payload.details.minyanim_schedules } })
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees' } })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // The user, Nov 10, on Mekor Habracha's Fri Nov 20 card, read Tue Nov
+  // 10: "I thought we only read for the upcoming week". A page's events
+  // list runs weeks ahead; only this week, and next week from Thursday,
+  // go to the queue, as a calendar's do.
+  it('a page’s dated times past the upcoming week wait for their week', async () => {
+    const nov20 = { id: 'n', day: '2026-11-20', tefillah: 'mincha_maariv' as const, time: '4:25pm', status: 'new' as const, quote: 'Mincha/Maariv 4:25 PM' }
+    const later: TimesUpdate = { ...moved, kind: 'week', from: '2026-11-20', to: '2026-11-21', rows: [nov20] }
+    m.readShulWeek.mockResolvedValue({ update: calendar([...agrees.rows, nov20]), updates: [agrees, later], model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: Date.parse('2026-11-10T12:00:00Z') })).toMatchObject({ ok: true, filed: 0 })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    // Thursday the week before, it's next week's.
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: Date.parse('2026-11-19T12:00:00Z') })).toMatchObject({ ok: true, filed: 1 })
+    expect(m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules).toEqual([expect.objectContaining({ from: '2026-11-20', to: '2026-11-21', minyanim: [expect.objectContaining({ on: ['2026-11-20'], time: '4:25pm' })] })])
   })
 
   // The user, Oct 28: "Never fill this week's schedule with usual times …

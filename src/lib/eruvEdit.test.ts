@@ -2,30 +2,27 @@ import { describe, expect, it } from 'vitest'
 import { eruvIdFor, readEruvEdit, readingsToReset } from './eruvEdit'
 
 describe('readEruvEdit', () => {
-  it('keeps what an admin may set, tidied', () => {
-    expect(readEruvEdit({ name: ' Lower Merion Eruv ', covers: '', website: 'lowermerioneruv.org', statusDated: true, sortOrder: '3', lineLeaveOut: ['Fall 2025 Reroute Alert', 'Fall 2025 Reroute Alert', ''], status: 'up' })).toEqual({
+  // An order and a line colour are no longer an admin's (Nov 9): eruvim
+  // list by name, and a too-pale line is darkened by itself.
+  it('keeps what an admin may set, tidied, and nothing else', () => {
+    expect(readEruvEdit({ name: ' Lower Merion Eruv ', covers: '', website: 'lowermerioneruv.org', statusDated: true, sortOrder: '3', lineColor: '#1d4ed8', lineLeaveOut: ['Fall 2025 Reroute Alert', 'Fall 2025 Reroute Alert', ''], status: 'up' })).toEqual({
       ok: true,
-      edit: { name: 'Lower Merion Eruv', covers: null, website: 'https://lowermerioneruv.org/', statusDated: true, sortOrder: 3, lineLeaveOut: ['Fall 2025 Reroute Alert'] },
+      edit: { name: 'Lower Merion Eruv', covers: null, website: 'https://lowermerioneruv.org/', statusDated: true, lineLeaveOut: ['Fall 2025 Reroute Alert'] },
     })
+  })
+  // Nov 9: what it keeps for the Eruv page's own fields (eruvFields.ts).
+  it('the page’s own fields, as an eruv keeps them; never an object’s worth of anything', () => {
+    expect(readEruvEdit({ details: { certifiedBy: ' Rabbi A ', covers: 'not here', empty: '' } })).toEqual({ ok: true, edit: { details: { certifiedBy: 'Rabbi A' } } })
+    expect(readEruvEdit({ details: 'Rabbi A' })).toMatchObject({ ok: false })
   })
   it('refuses what isn’t one', () => {
     expect(readEruvEdit({ name: '' })).toEqual({ ok: false, error: 'The eruv needs a name.' })
     expect(readEruvEdit({ statusUrl: 'not a site' })).toMatchObject({ ok: false })
-    expect(readEruvEdit({ sortOrder: 'first' })).toMatchObject({ ok: false })
     expect(readEruvEdit(null)).toMatchObject({ ok: false })
   })
   it('whether its markers are hidden: only a real yes hides them', () => {
     expect(readEruvEdit({ lineHidePoints: true })).toEqual({ ok: true, edit: { lineHidePoints: true } })
     expect(readEruvEdit({ lineHidePoints: 'yes' })).toEqual({ ok: true, edit: { lineHidePoints: false } })
-  })
-  it('a line colour: a colour, tidied, or none for its own', () => {
-    expect(readEruvEdit({ lineColor: '#1D4ED8' })).toEqual({ ok: true, edit: { lineColor: '#1d4ed8' } })
-    expect(readEruvEdit({ lineColor: ' #0af ' })).toEqual({ ok: true, edit: { lineColor: '#00aaff' } })
-    expect(readEruvEdit({ lineColor: null })).toEqual({ ok: true, edit: { lineColor: null } })
-    expect(readEruvEdit({ lineColor: '' })).toEqual({ ok: true, edit: { lineColor: null } })
-    expect(readEruvEdit({ lineColor: 'blue' })).toMatchObject({ ok: false })
-    expect(readEruvEdit({ lineColor: 'red;background:url(x)' })).toMatchObject({ ok: false })
-    expect(readEruvEdit({ lineColor: 7 })).toMatchObject({ ok: false })
   })
   // Oct 19: an eruv with no status page, its status emailed instead.
   it('the address its status emails come from, tidied; never with a status page too', () => {

@@ -415,9 +415,11 @@ describe('SiteSettingsEditor — the header', () => {
     await renderEditor()
     const warning = /The nav needs at least one item/
     const top = screen.getByRole('region', { name: 'Header' })
-    for (let i = 0; i < 10 && !screen.queryByText(warning); i++) {
-      await user.click(within(top).getAllByRole('button', { expanded: false })[0])
-      // The open tab's trash can is last, after its links' ×s.
+    for (let i = 0; i < 40 && !screen.queryByText(warning); i++) {
+      if (!within(top).queryAllByRole('button', { expanded: true }).length) await user.click(within(top).getAllByRole('button', { expanded: false })[0])
+      // A tab comes off by its X once its links are out (the user, Nov 10):
+      // the last × is a link's while it has one, then the tab's own. The
+      // Categories menu keeps its trash can, last.
       await user.click(within(top).getAllByRole('button', { name: /^Take .* off$/ }).at(-1)!)
     }
     expect(screen.getByText(warning)).toBeInTheDocument()

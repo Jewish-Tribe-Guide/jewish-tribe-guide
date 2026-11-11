@@ -7,7 +7,8 @@ import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { CategoryConfig } from '@/lib/categories'
-import CategoryManager from './CategoryManager'
+import CategoryManager, { forgetCategoryList } from './CategoryManager'
+import { forgetCategoryListings } from '@/lib/categoryListings'
 import { forgetReadyMade } from './useReadyMade'
 
 vi.mock('next/navigation', () => ({
@@ -24,6 +25,8 @@ afterEach(() => {
   vi.clearAllMocks()
   vi.unstubAllGlobals()
   forgetReadyMade()
+  forgetCategoryList()
+  forgetCategoryListings()
 })
 
 function show(
@@ -50,6 +53,70 @@ const sukkah = makeCategory({ id: 'childcare', pluralLabel: 'Childcare', active:
 const map = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map', active: true })
 const eruv = makeCategory({ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv', active: false })
 const medical = makeCategory({ id: 'jewish-medical-resources', kind: 'medical', pluralLabel: 'Jewish Medical Resources', active: true })
+
+// The user, Nov 9: "Most noticable is clicking on a category page in
+// admin." Each screen is its own address, so a new CategoryManager, which
+// waited for the list again; opened from its address, its places waited for
+// the list too.
+describe('CategoryManager — opening a page quickly', () => {
+  const never = () => new Promise<never>(() => {})
+
+  it('shows a page at once from the list the last screen loaded, and asks again', async () => {
+    show([shul, food])
+    await screen.findByText('Food')
+    cleanup()
+    // The list's second ask hasn't answered.
+    vi.mocked(parseOkJson).mockImplementation(never)
+    renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: 'Food' })).toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/api/admin/categories?counts=1'))).toBe(true)
+  })
+
+  it('starts the page again from the list as it comes back, when it changed', async () => {
+    show([shul, food])
+    await screen.findByText('Food')
+    cleanup()
+    vi.mocked(parseOkJson).mockImplementation(async () => ({ categories: [shul, { ...food, pluralLabel: 'Eats' }], placeCounts: {} }))
+    renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} />)
+    expect(await screen.findByRole('heading', { name: 'Eats' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Name')).toHaveValue('Eats')
+  })
+
+  it('opened from its address, asks for its places beside the list, not after', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url })))
+    vi.mocked(parseOkJson).mockImplementation(never)
+    renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} />)
+    const asked = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(asked.some((u) => u.includes('/api/admin/categories?counts=1'))).toBe(true)
+    expect(asked).toContain('/api/resources?category=restaurant')
+  })
+
+  // Each page's address is rendered on the server the first time it's
+  // opened after a deploy, and a click waited for it (the user, Nov 9).
+  it('loads every row’s page behind the list, and the list behind a page', async () => {
+    const prefetch = vi.fn()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url })))
+    vi.mocked(parseOkJson).mockImplementation(async () => ({ categories: [shul, food], placeCounts: {} }))
+    renderWithProviders(<CategoryManager token="t" editingId={null} onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} prefetch={prefetch} />)
+    await screen.findByText('Food')
+    await waitFor(() => expect(prefetch.mock.calls.map(([id]) => id).sort()).toEqual(['cat:restaurant', 'cat:synagogue', 'screen:eruv', 'screen:zmanim']))
+    cleanup()
+    prefetch.mockClear()
+    renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} prefetch={prefetch} />)
+    await waitFor(() => expect(prefetch).toHaveBeenCalledWith(null))
+    expect(prefetch).not.toHaveBeenCalledWith('cat:synagogue')
+  })
+
+  it('asks no places for the list or a new page', () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url })))
+    vi.mocked(parseOkJson).mockImplementation(never)
+    for (const editingId of [null, 'cat:new', 'cat:new:own']) {
+      renderWithProviders(<CategoryManager token="t" editingId={editingId} onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} />)
+      cleanup()
+    }
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/resources'))).toEqual([])
+  })
+})
 
 describe('CategoryManager', () => {
   // Board 1: one list by name, each row saying its places or what kind of

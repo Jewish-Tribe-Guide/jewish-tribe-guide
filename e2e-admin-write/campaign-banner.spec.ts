@@ -72,7 +72,7 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // has no live campaign promoting it, so this is exactly the case the fix
   // covers: it must still be a selectable option, not filtered out.
   await page.goto('/philly/admin/campaigns')
-  await visible(page.getByRole('button', { name: '+ Add a campaign' })).click()
+  await visible(page.getByRole('button', { name: 'Add a campaign' })).click()
 
   // Scoped to the form itself (data-testid="campaign-banner-form") and
   // located structurally, not via getByLabel: this form's <select>/<input>

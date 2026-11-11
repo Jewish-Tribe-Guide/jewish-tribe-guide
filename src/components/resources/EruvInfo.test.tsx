@@ -362,3 +362,62 @@ describe('EruvInfo', () => {
     })
   })
 })
+
+// Nov 9, the user: "why can't a user add an eruv? like on main site?", and
+// then "why didn't you just make an add an eruv as an option within the
+// regular add button just like the other categories". The page's "+ Add" is
+// every category page's + Add box; its "Fill it in yourself" here is Add an
+// eruv, and what's sent goes to the queue.
+describe('EruvInfo — Add an eruv', () => {
+  const eruvPage = (over = {}) => ({ content: { categories: [makeCategory({ id: 'eruv', kind: 'eruv', pluralLabel: 'Eruvim', ...over })] } })
+  const showAdding = ({ isMobile = false, over = {} } = {}) =>
+    renderWithProviders(
+      <ForcedViewport isMobile={isMobile}>
+        <EruvInfo onUp={() => {}} title="Eruvim" onParamsChange={vi.fn()} />
+      </ForcedViewport>,
+      eruvPage(over),
+    )
+
+  it('+ Add opens the + Add box; Fill it in yourself goes straight to Add an eruv, and sends a new eruv', async () => {
+    const user = userEvent.setup()
+    showAdding()
+    await screen.findAllByTestId('eruv-row')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    const box = await screen.findByRole('dialog', { name: 'Add or update a place' })
+    await user.click(within(box).getByRole('button', { name: 'Fill it in yourself' }))
+    const adding = await screen.findByTestId('eruv-adding')
+    expect(screen.getByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
+    // No place search first: an eruv isn't on Google.
+    expect(screen.queryByText('Find the place')).not.toBeInTheDocument()
+    await user.type(await within(adding).findByLabelText('Name'), 'Overbrook Eruv')
+    await user.click(within(adding).getByRole('button', { name: 'Send' }))
+    await vi.waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ operation: 'create', targetType: 'eruv', payload: { name: 'Overbrook Eruv' } })
+  })
+
+  it('Back from Add an eruv goes back to the box’s first step', async () => {
+    const user = userEvent.setup()
+    showAdding()
+    await screen.findAllByTestId('eruv-row')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(await screen.findByRole('button', { name: 'Fill it in yourself' }))
+    await screen.findByTestId('eruv-adding')
+    await user.click(within(screen.getByRole('dialog', { name: 'Add an eruv' })).getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
+    expect(screen.queryByTestId('eruv-adding')).not.toBeInTheDocument()
+  })
+
+  it('on a phone, the box is a sheet', async () => {
+    const user = userEvent.setup()
+    showAdding({ isMobile: true })
+    await screen.findAllByTestId('eruv-row')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
+  })
+
+  it('has no + where the Eruv page takes no additions', async () => {
+    showAdding({ over: { capabilities: { add: false } } })
+    await screen.findAllByTestId('eruv-row')
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+  })
+})

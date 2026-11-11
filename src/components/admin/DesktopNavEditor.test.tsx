@@ -58,7 +58,7 @@ const show = (initial: DesktopNavItem[] = DEFAULT_DESKTOP_NAV_ITEMS, more: { sec
 }
 
 const row = (name: string) => screen.getByRole('button', { name })
-const adds = () => screen.queryAllByRole('button', { name: /^\+ Add a heading$/ }).length + screen.queryAllByLabelText('+ Add a link').length
+const adds = () => screen.queryAllByRole('button', { name: /^Add a heading$/ }).length + screen.queryAllByLabelText('Add a link').length
 
 afterEach(() => cleanup())
 
@@ -74,7 +74,7 @@ describe('DesktopNavEditor — tabs', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 
-  it('open, a tab shows its name, not its line; a tap on the name edits it, beside a trash can', async () => {
+  it('open, a tab shows its name, not its line; a tap on the name edits it', async () => {
     const { user, onChange } = show()
     await user.click(row('Map'))
     // What the line summed up is showing under it, so it goes.
@@ -88,13 +88,32 @@ describe('DesktopNavEditor — tabs', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(row('Rename Find on map')).toHaveTextContent('Find on map')
     expect(screen.getByRole('button', { name: 'Find on map', expanded: true })).toBeInTheDocument()
-    // Its trash can is last, at the bottom with the Adds (its one link, the
-    // tab saved before tabs, carries its name).
-    const trash = screen.getAllByRole('button', { name: 'Take Find on map off' }).at(-1)!
-    expect(trash.parentElement).toContainElement(screen.getByLabelText('+ Add a link'))
-    await user.click(trash)
-    expect(onChange).toHaveBeenLastCalledWith(DEFAULT_DESKTOP_NAV_ITEMS.filter((i) => i.id !== 'map'))
+    expect(onChange.mock.lastCall![0][1]).toMatchObject({ id: 'map', label: 'Find on map' })
+  })
+
+  // The user, Nov 10: a tab comes off as a field box does, by an X that's
+  // there only while it's empty.
+  it('a tab with something in it has no X; taking its last link off brings the X, which takes the tab off', async () => {
+    const { user, onChange } = show()
+    await user.click(row('Map'))
     expect(screen.queryByRole('button', { name: 'Take it off' })).toBeNull()
+    // Only its link's ×: the tab itself can't be taken off yet.
+    expect(screen.getAllByRole('button', { name: 'Take Map off' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Take Map off' }))
+    const x = screen.getByRole('button', { name: 'Take Map off' })
+    expect(x.parentElement).toContainElement(screen.getByRole('button', { name: 'Map', expanded: true }))
+    await user.click(x)
+    expect(onChange.mock.lastCall![0].map((i: { id: string }) => i.id)).toEqual(DEFAULT_DESKTOP_NAV_ITEMS.filter((i) => i.id !== 'map').map((i) => i.id))
+  })
+
+  it('an empty tab says nothing under its name, and its X takes it off closed too', async () => {
+    const { user, onChange } = show()
+    await user.click(row('Add a tab'))
+    await user.click(screen.getByRole('button', { name: 'New tab', expanded: true }))
+    expect(row('New tab')).toHaveAccessibleDescription('')
+    expect(screen.queryByText('Nothing in it yet')).toBeNull()
+    await user.click(row('Take New tab off'))
+    expect(onChange.mock.lastCall![0]).toEqual(DEFAULT_DESKTOP_NAV_ITEMS)
   })
 
   it('a tap anywhere in the open row but its name and buttons closes it', async () => {
@@ -121,19 +140,23 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('+ Add a tab adds an empty New tab, open with its name ready to type over, offering a link or a heading', async () => {
     const { user } = show()
-    await user.click(row('+ Add a tab'))
+    // Dashed and as wide as the list, as "+ Add a box" is (the user, Nov 10).
+    expect(row('Add a tab')).toHaveClass('border-dashed', 'w-full')
+    await user.click(row('Add a tab'))
     const name = screen.getByRole('textbox', { name: 'Name' })
     expect(name).toHaveValue('New tab')
     expect(name).toHaveFocus()
-    expect(screen.getByLabelText('+ Add a link')).toBeInTheDocument()
-    expect(row('+ Add a heading')).toBeInTheDocument()
+    // Rows across the foot of its list, as a box's "Add a field" is (the
+    // user, Nov 10), not small buttons.
+    expect(screen.getByLabelText('Add a link').closest('label')).toHaveClass('pl-10', 'w-full')
+    expect(row('Add a heading')).toHaveClass('pl-10', 'w-full')
   })
 
   it('what goes in first decides: a link leaves only links, emptying it brings both back', async () => {
     const { user, onChange } = show()
-    await user.click(row('+ Add a tab'))
-    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'map')
-    expect(screen.queryByRole('button', { name: '+ Add a heading' })).toBeNull()
+    await user.click(row('Add a tab'))
+    await user.selectOptions(screen.getByLabelText('Add a link'), 'map')
+    expect(screen.queryByRole('button', { name: 'Add a heading' })).toBeNull()
     expect(onChange.mock.lastCall![0].at(-1)).toMatchObject({ label: 'New tab', kind: 'more-menu', items: [{ kind: 'link', target: 'map' }] })
     await user.click(screen.getByRole('button', { name: 'Take Map off' }))
     expect(adds()).toBe(2)
@@ -141,15 +164,15 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('what goes in first decides: a heading leaves only headings, and opens with its name ready', async () => {
     const { user, onChange } = show()
-    await user.click(row('+ Add a tab'))
-    await user.click(row('+ Add a heading'))
+    await user.click(row('Add a tab'))
+    await user.click(row('Add a heading'))
     const name = screen.getAllByRole('textbox', { name: 'Name' }).at(-1)!
     expect(name).toHaveValue('New heading')
     expect(name).toHaveFocus()
     // The heading's own Add, and the tab's Add a heading; no link for the tab.
-    expect(screen.getAllByLabelText('+ Add a link')).toHaveLength(1)
-    expect(row('+ Add a heading')).toBeInTheDocument()
-    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'bakery')
+    expect(screen.getAllByLabelText('Add a link')).toHaveLength(1)
+    expect(row('Add a heading')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Add a link'), 'bakery')
     expect(onChange.mock.lastCall![0].at(-1)).toMatchObject({
       kind: 'more-menu',
       items: [{ label: 'New heading', kind: 'heading', items: [{ kind: 'link', target: 'bakery', label: 'Bakeries' }] }],
@@ -160,10 +183,10 @@ describe('DesktopNavEditor — tabs', () => {
     const { user, onChange } = show()
     await user.click(row('Map'))
     // Its one link is a name and an ×, and doesn't open.
-    // (The tab's trash can, then the link's ×.)
-    expect(screen.getAllByRole('button', { name: 'Take Map off' })).toHaveLength(2)
+    // (Only the link's ×: a tab with something in it has no X.)
+    expect(screen.getAllByRole('button', { name: 'Take Map off' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Map', expanded: false })).toBeNull()
-    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'you')
+    await user.selectOptions(screen.getByLabelText('Add a link'), 'you')
     expect(screen.getByRole('button', { name: 'Map', expanded: true })).toBeInTheDocument()
     expect(onChange.mock.lastCall![0][1]).toMatchObject({
       id: 'map',
@@ -190,8 +213,8 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('a link added is named as the site calls it', async () => {
     const { user, onChange } = show()
-    await user.click(row('+ Add a tab'))
-    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'you')
+    await user.click(row('Add a tab'))
+    await user.selectOptions(screen.getByLabelText('Add a link'), 'you')
     expect(onChange.mock.lastCall![0].at(-1).items).toEqual([expect.objectContaining({ label: 'You', target: 'you' })])
   })
 
@@ -210,10 +233,10 @@ describe('DesktopNavEditor — tabs', () => {
 
   it('offers the Categories menu back only once it has been taken off', async () => {
     const { user } = show()
-    expect(screen.queryByRole('button', { name: '+ Add the Categories menu' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add the Categories menu' })).toBeNull()
     await user.click(row('Categories'))
     await user.click(screen.getByRole('button', { name: 'Take Categories off' }))
-    expect(row('+ Add the Categories menu')).toBeInTheDocument()
+    expect(row('Add the Categories menu')).toBeInTheDocument()
   })
 
   it('shows an empty-nav warning when there are no tabs', () => {
@@ -239,7 +262,7 @@ describe('DesktopNavEditor — Categories’ headings (the groups)', () => {
   it('+ Add a heading adds one before the home page’s own blocks, open with its name ready', async () => {
     const { user, onSectionsChange } = show(DEFAULT_DESKTOP_NAV_ITEMS, { sections: [food, map] })
     await open(user)
-    await user.click(row('+ Add a heading'))
+    await user.click(row('Add a heading'))
     expect(onSectionsChange.mock.lastCall![0]).toEqual([food, expect.objectContaining({ title: 'New heading', kind: 'section' }), map])
     const name = screen.getAllByRole('textbox', { name: 'Name' }).at(-1)!
     expect(name).toHaveValue('New heading')
@@ -277,7 +300,7 @@ describe('DesktopNavEditor — Categories’ headings (the groups)', () => {
     await open(user)
     await user.click(row('Drinks'))
     expect(screen.getByRole('option', { name: 'Grocery Stores (move here)' })).toBeInTheDocument()
-    await user.selectOptions(screen.getByLabelText('+ Add a link'), 'grocery')
+    await user.selectOptions(screen.getByLabelText('Add a link'), 'grocery')
     expect(onSectionsChange).toHaveBeenLastCalledWith([{ ...food, cardIds: [] }, { ...drinks, cardIds: ['grocery'] }])
     await user.click(row('Food'))
     expect(screen.getByRole('button', { name: 'Food', expanded: true })).toBeInTheDocument()
@@ -294,6 +317,6 @@ describe('DesktopNavEditor — Categories’ headings (the groups)', () => {
     await user.click(screen.getByRole('button', { name: 'Take Grocery Stores off' }))
     expect(onSectionsChange).toHaveBeenLastCalledWith([drinks, { ...food, cardIds: [] }, map])
     await user.click(screen.getByRole('button', { name: 'Food', expanded: true }))
-    expect(row('Food')).toHaveAccessibleDescription('Nothing in it yet')
+    expect(row('Food')).toHaveAccessibleDescription('')
   })
 })

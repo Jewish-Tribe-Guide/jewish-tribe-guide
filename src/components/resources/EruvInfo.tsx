@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ParamsOpts } from './GenericDirectory'
 import { ListingBar } from './ListingColumn'
 import { mapQueryString, routes } from '@/lib/routes'
@@ -14,6 +14,8 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { eruvView, localParts, type Eruv } from '@/lib/eruv'
+import { fullestEruv } from '@/lib/eruvFields'
+import { useCategories } from '@/lib/useCategories'
 import MobileSheet from './MobileSheet'
 import ListHeading from './ListHeading'
 import { useWide } from './CategoryMap'
@@ -28,6 +30,13 @@ import SavedBadge from '@/components/SavedBadge'
 import { initialsOf } from '@/lib/listingRow'
 import { usePinned } from '@/lib/pinnedContext'
 import { pointerHover } from '@/lib/pointerHover'
+import { AddButton } from '@/components/AddButton'
+import { resolveCapabilities } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
+import dynamic from 'next/dynamic'
+
+// Loaded on the first tap of "+ Add", as every category page loads it.
+const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
 
 // ── The Eruv page (Oct 7, canvas page "eruv") ───────────────────────────────
 // The eruvim's own maps, as each eruv draws them, with the visitor's dot;
@@ -45,6 +54,11 @@ import { pointerHover } from '@/lib/pointerHover'
 // maps from /api/eruv/maps. Until migration 074 is run there are none, and
 // it says so: the old list with its links (Oct 15) was Philadelphia's,
 // written into the code, and showed in every community.
+//
+// Its "+ Add" (Nov 9, the user: "why can't a user add an eruv?") is every
+// category page's: the + Add box, whose "Fill it in yourself" here is Add
+// an eruv (TellUsSheet). What they send goes to the moderation queue, and
+// the eruv is listed when an admin approves it.
 
 type Props = {
   onUp: () => void
@@ -59,6 +73,11 @@ type Props = {
   bandImageUrl?: string | null
   /** `?item=`: the eruv open. */
   itemId?: string | null
+  /** The admin preview's A listing and Editing tabs: the eruv holding the
+   *  most of the page's fields open, as a listing page's preview opens its
+   *  fullest place, and with Editing, on its Edit listing. */
+  openFullest?: boolean
+  startEditing?: boolean
   onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
@@ -67,7 +86,7 @@ const ERUV_STEP = 'eruv'
 /** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
 type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
-export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
+export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange, openFullest = false, startEditing = false }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -123,7 +142,14 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
 
   const now = clock === null ? null : new Date(clock)
   const ready = loaded?.available && now ? loaded : null
-  const open = ready?.eruvim.find((e) => e.id === openId) ?? null
+  const eruvPage = useCategories()?.find((c) => c.kind === 'eruv')
+  const open = ready?.eruvim.find((e) => e.id === openId) ?? (ready && openFullest && eruvPage ? fullestEruv(ready.eruvim, eruvPage) : null)
+  const canAdd = !!ready && ui.contributions.add && !!eruvPage && resolveCapabilities(eruvPage.capabilities).add
+  // The + Add box, kept on the page once opened so it slides away when
+  // closed (SiteAddButton's note).
+  const [tellOpen, setTellOpen] = useState(false)
+  const [tellMounted, setTellMounted] = useState(false)
+  if (tellOpen && !tellMounted) setTellMounted(true)
   const shabbosSide = ready && now ? [5, 6].includes(localParts(now, ready.timezone).weekday) : false
   const openIndex = ready && open ? ready.eruvim.indexOf(open) : -1
 
@@ -148,7 +174,23 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   }
   // Escape goes back, and ← → step, as on any opened listing; never from
   // inside a text field.
-  const column = !isMobile && !!open
+  // On a computer, an open eruv takes the list's place beside the map; on a
+  // phone it's a sheet, except in the admin preview's tabs, where it is the
+  // screen (as a listing page's preview shows its opened place).
+  const column = (!isMobile || openFullest) && !!open
+  // What's opened in the list's column is at its top: brought back into
+  // view if the page was scrolled past it, as a category's opened listing
+  // is (GenericDirectory's scrollItemIntoView). An eruv tapped low in the
+  // list otherwise opened out of sight.
+  const columnRef = useRef<HTMLElement | null>(null)
+  const columnShows = column ? `eruv:${open?.id}` : null
+  useEffect(() => {
+    const el = columnRef.current
+    if (!columnShows || !el) return
+    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+    const top = el.getBoundingClientRect().top
+    if (top < headerH) window.scrollTo({ top: Math.max(0, window.scrollY + top - headerH) })
+  }, [columnShows])
   useEffect(() => {
     if (!column) return
     const onKey = (e: KeyboardEvent) => {
@@ -223,9 +265,9 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
         // people come here for.
         <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
           <div className="min-w-0 space-y-3.5">
-            {!mapBeside && !(wide && mapHidden) && mapped.length > 0 && eruvMap('h-[300px]')}
+            {!mapBeside && !(wide && mapHidden) && !(isMobile && column) && mapped.length > 0 && eruvMap('h-[300px]')}
             {column && open && (
-              <section aria-label={open.name} data-testid="eruv-column">
+              <section ref={columnRef} aria-label={open.name} data-testid="eruv-column">
                 {!editing && (
                   <ListingBar
                     backLabel={title}
@@ -235,7 +277,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
                     onShowMap={wide && mapHidden ? () => setMapHidden(false) : undefined}
                   />
                 )}
-                <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} onEditingChange={setEditing} />
+                <EruvListing startEditing={startEditing} eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} onEditingChange={setEditing} />
               </section>
             )}
             {ready.eruvim.length > 0 && (
@@ -301,9 +343,12 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
         </div>
       )}
 
-      {ready && now && open && isMobile && (
+      {canAdd && (!open || column) && <AddButton onClick={() => setTellOpen(true)} />}
+      {tellMounted && eruvPage && <TellUsSheet isOpen={tellOpen} onClose={() => setTellOpen(false)} category={eruvPage} />}
+
+      {ready && now && open && isMobile && !column && (
         <MobileSheet isOpen onClose={closeEruv} title={open.name} titleHidden draggable>
-          <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
+          <EruvListing startEditing={startEditing} eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
         </MobileSheet>
       )}
     </CategoryBandFrame>

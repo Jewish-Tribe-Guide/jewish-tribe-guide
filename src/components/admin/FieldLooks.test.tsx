@@ -138,10 +138,45 @@ describe('FieldLooks: a field, how it looks, as tabs (boards 33d–34c)', () => 
     expect(shown()).toHaveAccessibleName('A listing')
   })
 
+  // Nov 10: the field's own "Under the name" switch puts it on its row or
+  // takes it off, and How it looks shows the List, where that's seen.
+  it('shows the List when the field goes on its row or comes off it, whatever tab was showing', async () => {
+    const { rerender, ...props } = show(foodType, [foodType, delivery])
+    await open('Adding')
+    const off = { ...foodType, onCard: false }
+    rerender(<FieldLooks {...props} category={food([off, delivery])} field={off} />)
+    expect(shown()).toHaveAccessibleName('List')
+    expect(shown()).toHaveTextContent('Not shown in the list.')
+    await open('A listing')
+    rerender(<FieldLooks {...props} category={food([foodType, delivery])} field={foodType} />)
+    expect(shown()).toHaveAccessibleName('List')
+    expect(marks()).toEqual(['Meat', 'Dairy', 'Parve'])
+  })
+
   it('opens the whole page', async () => {
     const user = userEvent.setup()
     const { onWholePage } = show(foodType, [foodType])
     await user.click(screen.getByRole('button', { name: 'See the whole page' }))
     expect(onWholePage).toHaveBeenCalled()
+  })
+})
+
+// The user, Nov 10: "davening times isn't in the format we actually have",
+// and "it's not previewing with the fields we actually have".
+describe('FieldLooks: the real thing', () => {
+  const minyanim: CategoryField = { key: 'minyanim', label: 'Davening times', type: 'minyanim', renderAs: 'row' }
+
+  it('draws davening times on the listing as the listing does: the weekday table and the Shabbos lines', async () => {
+    show(minyanim, [minyanim, delivery])
+    await open('A listing')
+    const times = within(shown()).getByTestId('usual-times')
+    expect(within(times).getByTestId('davening-week-table')).toHaveTextContent(/Shacharis/i)
+    expect(within(times).getByText('Usual weekday times')).toBeInTheDocument()
+  })
+
+  it('draws on one of the page’s own places, by name', () => {
+    show(foodType, [foodType, hechsher], { realPlaces: [{ id: 'r', category: 'food', name: 'Bar Bombón', anchorId: 'all', distance: 1, address: '', food_type: 'Parve' }] })
+    expect(looks()).toHaveTextContent('On Bar Bombón')
+    expect(marks()[0]).toBe('Parve')
   })
 })

@@ -81,7 +81,7 @@ export const fieldRules = (f: Pick<CategoryField, 'label' | 'type'>): FieldRules
 /** Paragraphs that follow what a page has switched on. */
 const WRITTEN_BY_SETTINGS: Record<string, (f: CategoryField) => string> = {
   'select:kosher certification': (f) =>
-    `Which hechsher a place is under. ${kindHow(f)}${f.caveat ? ' They also say whether everything there is kosher. When it isn’t, they say what isn’t, and the listing shows that in a box of its own.' : ''}`,
+    `Which hechsher a place is under. ${kindHow(f)}${f.caveat ? ' They also say whether everything there is kosher. When it isn’t, they say what isn’t, and the listing shows that under the hechsher, wherever it is.' : ''}`,
 }
 
 const KIND_LEAD: Record<FieldType, string> = {
@@ -178,7 +178,7 @@ export function fieldAbout(f: CategoryField, { partnerOn = false }: { partnerOn?
   const watched = watchedBy(f)
   const partner = partnerOn ? partnerRule(f)?.name : undefined
   // A hechsher comes with whether everything there is kosher, and if not,
-  // what isn't: two questions the listing shows as one box of its own.
+  // what isn't: two questions the listing shows under the hechsher.
   const caveat = f.type === 'select' && f.caveat ? ['Everything here is kosher?', f.caveat.title?.trim() || 'What isn’t kosher'] : []
   const parts = f.type === 'minyanim' ? ['Usual weekday times', 'Usual Shabbos times', 'This week’s schedule'] : []
   const comesWith = [...parts, ...caveat, ...(partner ? [partner] : [])]

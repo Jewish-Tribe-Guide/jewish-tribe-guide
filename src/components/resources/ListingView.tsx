@@ -42,7 +42,8 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { boxesOf, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { arrange, basicsIn, boxesOf, boxOrderOf, fixedPlaceOf, isBasicField, leadOrderOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { isMinyanim } from '@/lib/davening'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -76,10 +77,10 @@ import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
-import { FieldsBox } from './FieldsBox'
+import { BoxField, FieldsBox, fieldText, hasValue } from './FieldsBox'
 import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
-import { Card, shortDate } from './listingParts'
+import { Card, InBoxProvider, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -168,6 +169,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { isPinned, toggle: toggleSaved } = usePinned()
 
   const main = mainThing(item, category)
+  // Contact or About, where the admin put a field there by name.
+  const fixedPlace = fixedPlaceOf(category)
   // A listing's items and this visitor's answers about them, shared by the
   // items card and the one question below it.
   const itemsF = itemsField(category)
@@ -406,12 +409,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   // and the link as one wide button. Dated on its own.
   const lead = leadBox(item, category)
   const leadKey = lead && (lead.text ?? lead.field).key
-  const leadBoxView = lead && (
-    <Card
-      testId="listing-lead-box"
-      title={lead.title}
-      footer={<FreshnessFooter resourceId={item.id} {...boxDate(item, leadKey!)} section={leadKey!} onEdit={editBox ? () => editBox({ title: lead.title, fields: lead.text ? [lead.text, lead.field] : [lead.field] }) : undefined} />}
-    >
+  // Delivery is one field, its link a part of it: put in one of the
+  // admin's boxes, it's drawn there, the same, and not up here too.
+  const leadInBox = !!leadKey && (boxesOf(category).some((b) => b.fields.some((f) => f.key === leadKey)) || !!fixedPlace(leadKey))
+  const leadBody = lead && (
+    <>
       {lead.text && <p className="whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
       {lead.href && (
         <a
@@ -427,6 +429,15 @@ export default function ListingView({ item, category, color, place = null, upvot
           {joinLabel(lead.field, category, lead.href)}
         </a>
       )}
+    </>
+  )
+  const leadBoxView = lead && !leadInBox && (
+    <Card
+      testId="listing-lead-box"
+      title={lead.title}
+      footer={<FreshnessFooter resourceId={item.id} {...boxDate(item, leadKey!)} section={leadKey!} onEdit={editBox ? () => editBox({ title: lead.title, fields: lead.text ? [lead.text, lead.field] : [lead.field] }) : undefined} />}
+    >
+      {leadBody}
     </Card>
   )
 
@@ -438,6 +449,18 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
 
   // ── 3 · The main thing ─────────────────────────────────────────────────
+  // The davening times and the items, as their own boxes or in one of the
+  // admin's (the user, Nov 10: "Let's say same for now").
+  const daveningOf = (f: CategoryField) => (
+    <DaveningCard
+      item={item}
+      minyanim={item[f.key]}
+      schedules={item[schedulesKey(f.key)]}
+      category={category}
+      onEditBox={editBox ? (box, title, weeks) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting, weeks }) : undefined}
+    />
+  )
+  const itemsBox = itemsF ? <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} /> : null
   let mainSection: ReactNode = null
   const named = main === 'section' ? mainCardOf(category) : null
   if (named) {
@@ -454,18 +477,9 @@ export default function ListingView({ item, category, color, place = null, upvot
       />
     )
   } else if (main === 'davening') {
-    const f = category.detailFields.find((x) => x.type === 'minyanim')!
-    mainSection = (
-      <DaveningCard
-        item={item}
-        minyanim={item[f.key]}
-        schedules={item[schedulesKey(f.key)]}
-        category={category}
-        onEditBox={editBox ? (box, title, week) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting, weeks: week ? [week] : undefined }) : undefined}
-      />
-    )
+    mainSection = daveningOf(category.detailFields.find((x) => x.type === 'minyanim')!)
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
+    mainSection = itemsBox
   } else if (main === 'groups') {
     mainSection = (
       <GroupBoxes
@@ -493,6 +507,37 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromItem={item} /> : null
   }
 
+  // A field that's a box of its own elsewhere, drawn in another box as it
+  // is there (the user, Nov 10: "Let's say same for now").
+  const bigOf = (f: CategoryField): ReactNode | null =>
+    f.type === 'minyanim'
+      ? isMinyanim(item[f.key]) && (item[f.key] as unknown[]).length > 0 ? daveningOf(f) : null
+      : f.key === itemsF?.key
+        ? itemsBox
+        : f.key === lead?.text?.key || (lead && !lead.text && f.key === lead.field.key)
+          ? <Card title={lead.title}>{leadBody}</Card>
+          : null
+  const isBig = (f: CategoryField) => f.type === 'minyanim' || f.type === 'contacts' || !!f.caveat || f.key === itemsF?.key || f.key === lead?.text?.key || f.key === lead?.field.key
+  // Those put in Contact or About: drawn there, under their names.
+  const bigIn = (where: 'contact' | 'about') =>
+    category.detailFields
+      .filter((f) => fixedPlace(f.key) === where && isBig(f) && f.renderAs !== 'hidden')
+      .flatMap((f) => {
+        const big = bigOf(f)
+        // A box drawn in this one names itself (Card, inside one).
+        if (big) return [{ f, node: <InBoxProvider value={{ title: '' }}>{big}</InBoxProvider>, named: true }]
+        return hasValue(f, item[f.key]) ? [{ f, node: <BoxField field={f} item={item} />, named: false }] : []
+      })
+  const bigShown = (where: 'contact' | 'about') =>
+    bigIn(where).map(({ f, node, named }) => (
+      <div key={f.key} data-testid="placed-big" className="py-2.5">
+        {!named && <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{f.label}</p>}
+        {node}
+      </div>
+    ))
+  const contactBig = bigShown('contact')
+  const aboutBig = bigShown('about')
+
   // The admin's boxes, and lists of contacts in none (listingBoxes). Each
   // dated on its own.
   const placed = new Set([...boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
@@ -509,22 +554,29 @@ export default function ListingView({ item, category, color, place = null, upvot
         fields={b.fields}
         footer={dated ? <FreshnessFooter resourceId={item.id} {...boxDate(item, key)} section={key} onEdit={edit} /> : undefined}
         onEdit={dated ? undefined : edit}
+        big={bigOf}
       />
     )
   })
 
   // ── 4 · Details ────────────────────────────────────────────────────────
-  const showAddress = category.hasAddress !== false && !!item.address
-  const showPhone = category.hasPhone !== false && !!item.phone
+  // In Contact unless the admin put them elsewhere (the user, Nov 10:
+  // "move all fields. Including address and phone").
+  const inContact = new Set(basicsIn(category, 'contact').map((f) => f.key))
+  const showAddress = inContact.has('address') && !!item.address
+  const showPhone = inContact.has('phone') && !!item.phone
   // The place's hours, in the contact box: today, opening to the week. A
   // mikvah's are in its own boxes, one per audience.
-  const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
+  // Contact or About, where the admin put a field in one by name (the
+  // user, Nov 10: any field in any box but Top).
+  const inAbout = (f: CategoryField) => fixedPlace(f.key) === 'about'
+  const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && !placed.has(f.key) && !inAbout(f) && hasAny(item[f.key]))
   // When Google last updated the box, at its foot (Oct 6): one date for
   // the box, not a list of which of its lines are Google's.
   const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
   // The website, by name, with the address and phone (Oct 6): its round
   // button above says only "Website".
-  const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field))
+  const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field) && !inAbout(a.field))
   const websiteName = website ? siteName(website.href) : null
   const shownElsewhere = new Set<string>([
     ...placed,
@@ -539,14 +591,27 @@ export default function ListingView({ item, category, color, place = null, upvot
   ])
   // Not a hidden field: a hechsher's "what isn't kosher" is one, said with
   // its caveat in the header, not a second time here.
-  const aboutFields = category.detailFields.filter(
-    (f) => f.type === 'textarea' && f.renderAs !== 'hidden' && !f.audienceKey && !shownElsewhere.has(f.key) && String(item[f.key] ?? '').trim(),
-  )
-  const detailFields = category.detailFields.filter(
+  // A link or an email put in About is said there, and not again in
+  // Contact; its button under the name stays.
+  const aboutLink = (a: ActionSpec) => (a.kind === 'link' || a.kind === 'email') && inAbout(a.field) && !placed.has(a.field.key)
+  for (const a of [...buttons, ...extra]) if (aboutLink(a)) shownElsewhere.delete((a as { field: CategoryField }).field.key)
+  const aboutFields = [...basicsIn(category, 'about').filter((f) => fieldText(f, item[f.key])), ...category.detailFields.filter(
     (f) =>
-      (f.type === 'text' || f.type === 'tel' || f.type === 'number') &&
+      ((f.type === 'textarea' && fixedPlace(f.key) !== 'contact') || inAbout(f)) &&
+      f.renderAs !== 'hidden' &&
       !f.audienceKey &&
       !shownElsewhere.has(f.key) &&
+      !(isBig(f) && fixedPlace(f.key)) &&
+      fieldText(f, item[f.key]),
+  )]
+  const contactExtra = extra.filter((a) => !aboutLink(a))
+  const detailFields = category.detailFields.filter(
+    (f) =>
+      (f.type === 'text' || f.type === 'tel' || f.type === 'number' || (f.type === 'textarea' && fixedPlace(f.key) === 'contact')) &&
+      !f.audienceKey &&
+      !inAbout(f) &&
+      !shownElsewhere.has(f.key) &&
+      !(isBig(f) && fixedPlace(f.key)) &&
       (f.renderAs ?? 'row') === 'row' &&
       String(item[f.key] ?? '').trim(),
   )
@@ -556,11 +621,14 @@ export default function ListingView({ item, category, color, place = null, upvot
       (f.type === 'boolean' || f.type === 'select') &&
       (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge' &&
       !f.filterable &&
+      !inAbout(f) &&
+      !placed.has(f.key) &&
+      !(isBig(f) && fixedPlace(f.key)) &&
       (f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0),
   )
   // Tags fields other than the items the main thing lists.
   const otherTags = category.detailFields.filter(
-    (f) => f.type === 'tags' && f.key !== itemsF?.key && selectValues(item[f.key]).length + selectValues(item[`${f.key}_sometimes`]).length > 0,
+    (f) => f.type === 'tags' && f.key !== itemsF?.key && !inAbout(f) && !placed.has(f.key) && selectValues(item[f.key]).length + selectValues(item[`${f.key}_sometimes`]).length > 0,
   )
   // The contact box: address, phone, hours, links. No heading: its icons
   // say what each line is (Oct 6).
@@ -581,13 +649,13 @@ export default function ListingView({ item, category, color, place = null, upvot
   // its hours), the box's own "Confirmed Sep 29 · Edit", "Still right?"
   // once old (the user, Oct 15: what someone typed is dated the way every
   // other box is), under the box's own key (migration 082).
-  const contactDated = !googleLead && (showAddress || showPhone || !!websiteName || extra.length > 0 || otherHours.length > 0)
+  const contactDated = !googleLead && (showAddress || showPhone || !!websiteName || contactExtra.length > 0 || otherHours.length > 0)
   const detailsFoot = googleLead ? (
     <span data-testid="listing-google">{googleLead}.</span>
   ) : contactDated ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
   ) : undefined
-  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0 || contactBig.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
@@ -622,7 +690,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           <HoursRow value={item[f.key]} now={now} candlesAt={candlesAt} />
         </Row>
       ))}
-      {extra.map((a) => (
+      {contactExtra.map((a) => (
         <Row
           key={actionKey(a)}
           icon={
@@ -648,7 +716,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {f.type === 'tel' ? (
             <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
           ) : (
-            String(item[f.key])
+            <span className={f.type === 'textarea' ? 'whitespace-pre-line' : undefined}>{String(item[f.key]).trim()}</span>
           )}
         </Row>
       ))}
@@ -665,6 +733,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {[...selectValues(item[f.key]), ...selectValues(item[`${f.key}_sometimes`]).map((t) => `${t} (sometimes)`)].join(', ')}
         </Row>
       ))}
+      {contactBig}
     </div>
     </Card>
   )
@@ -683,18 +752,35 @@ export default function ListingView({ item, category, color, place = null, upvot
   // asked about once that's old, under its first description's key
   // (migration 078). Edit beside either.
   const editAbout = editRows('About', ['about'])
-  const aboutKey = aboutFields[0]?.key
+  const aboutKey = aboutFields.find((f) => !isBasicField(f))?.key
   const aboutFoot = fromGoogle ? (
     <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
   ) : aboutKey ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined
-  const about = aboutFields.length > 0 && (
+  const about = (aboutFields.length > 0 || aboutBig.length > 0) && (
     <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
-        {aboutFields.map((f) => (
-          <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
-        ))}
+        {aboutFields.map((f) =>
+          f.type === 'textarea' ? (
+            <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
+          ) : (
+            // Put in About by the admin: its name over what it says.
+            <div key={f.key} data-testid="about-field" className="text-[15px] text-slate-800">
+              {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
+              {f.type === 'tel' ? (
+                <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{fieldText(f, item[f.key])}</a>
+              ) : f.type === 'url' ? (
+                <a href={String(item[f.key]).trim()} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">{(isWebsite(f) && siteName(String(item[f.key]))) || f.linkLabel || f.label}</a>
+              ) : f.type === 'hours' ? (
+                <HoursRow value={item[f.key]} now={now} candlesAt={candlesAt} />
+              ) : (
+                fieldText(f, item[f.key])
+              )}
+            </div>
+          ),
+        )}
+        {aboutBig}
       </div>
     </Card>
   )
@@ -727,6 +813,33 @@ export default function ListingView({ item, category, color, place = null, upvot
   const after = shabbosAfter(category)
   const amongBoxes = !!shabbos && !shabbosFirst && after !== null && boxes.length > 0
   const boxesAndShabbos = amongBoxes ? [...boxes.slice(0, after), <div key="shabbos">{shabbos}</div>, ...boxes.slice(after!)] : boxes
+  // A place whose list has nothing on it yet: the box, with its Add, after
+  // whatever it leads with.
+  const emptyItems = main !== 'items' && itemsF && !placed.has(itemsF.key) && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
+
+  // Every box where the admin dragged it (ListingParts.order; the user,
+  // Nov 10: "an admin can arrange how they want"), once they have. A box
+  // the order doesn't name follows the one it follows anyway. The Shabbos
+  // card still comes right after the main thing on a Friday, until candles.
+  let arranged: ReactNode = null
+  const order = boxOrderOf(category)
+  if (order) {
+    const usual: { id: string; node: ReactNode }[] = [
+      ...leadOrderOf(category).map((slot) => ({ id: slot === 'link' ? 'lead' : slot, node: slot === 'link' ? leadBoxView : slot === 'caveat' ? caveatBox : mainSection })),
+      ...boxDefs.map((b, n) => ({ id: b.id, node: boxes[n] })),
+      { id: 'walks', node: walks },
+      { id: 'shabbos', node: shabbosFirst ? null : shabbos },
+      { id: 'items-empty', node: emptyItems },
+      { id: 'contact', node: details },
+      { id: 'about', node: about },
+    ]
+    // The admin's list has a box for each of the listing's own sections that
+    // the listing draws as one: a link's box, its main thing.
+    const tokens = order.map((t) => (t.startsWith('lead:') ? 'lead' : t === 'minyanim' || t === 'items' || t.startsWith('audience:') ? 'main' : t))
+    const placed = arrange(usual, tokens)
+    if (shabbosFirst && shabbos) placed.splice(placed.findIndex((p) => p.id === 'main') + 1, 0, { id: 'shabbos-first', node: shabbos })
+    arranged = placed.map((p) => <Fragment key={p.id}>{p.node}</Fragment>)
+  }
 
   return (
     <div className="space-y-5" data-testid="listing-view">
@@ -734,6 +847,8 @@ export default function ListingView({ item, category, color, place = null, upvot
       {foundBox}
       <TappedMinyanBox item={item} category={category} />
       {actions}
+      {arranged ?? (
+        <>
       {/* A link's own box, what isn't kosher and the main thing, in the
           order the admin put them (ListingParts.lead). */}
       {leadOrderOf(category).map((slot) => (
@@ -747,9 +862,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       {!shabbosFirst && !amongBoxes && shabbos}
       {/* A place whose list has nothing on it yet: the box, with its Add,
           after whatever it leads with. */}
-      {main !== 'items' && itemsF && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />}
+      {emptyItems}
       {details}
       {about}
+        </>
+      )}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
           answer (pickListingQuestion); nothing when there's nothing. */}
       <QuestionCard category={category} listing={item} items={main === 'items' && itemsF ? { field: itemsF, api: itemApi } : undefined} />

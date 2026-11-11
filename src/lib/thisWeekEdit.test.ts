@@ -46,11 +46,33 @@ const straddling: SpecialSchedule = {
 
 describe('the rows a week shows', () => {
   it('nothing posted is empty: the usual times aren’t in it', () => {
-    expect(weekRowsFor(null, WEEK)).toEqual([])
+    expect(weekRowsFor([], WEEK)).toEqual([])
   })
 
   it('only the times dated in the week', () => {
-    expect(weekRowsFor(straddling, WEEK)).toEqual([{ id: 'this', tefillah: 'mincha_maariv', days: ['mon', 'tue'], time: '4:45pm' }])
+    expect(weekRowsFor([straddling], WEEK)).toEqual([{ id: 'this', tefillah: 'mincha_maariv', days: ['mon', 'tue'], time: '4:45pm' }])
+  })
+
+  // Mekor, Nov 10: a person's "Times for Nov 8 – Nov 13" and the website's
+  // "Times for Nov 14" both in the week; its Edit listed only the first, so
+  // Shabbos's 9:15 PM couldn't be found to change.
+  const person: SpecialSchedule = { id: 'p', name: 'Times for Nov 8 – Nov 13', from: '2026-11-08', to: '2026-11-13', mode: 'replace', kind: 'week', minyanim: [{ id: 'mm', tefillah: 'mincha_maariv', on: ['2026-11-13'], time: '7:00pm' }] }
+  const site: SpecialSchedule = { id: 'w', name: 'Times for Nov 14', from: '2026-11-14', to: '2026-11-14', mode: 'replace', kind: 'week', postedBy: 'website', minyanim: [{ id: 'sh', tefillah: 'shacharis', on: ['2026-11-14'], time: '9:15pm' }] }
+  const NOV = { from: '2026-11-08', to: '2026-11-14' }
+
+  it('every post covering the week, each on the days the box shows it from', () => {
+    expect(weekRowsFor([person, site], NOV).map((m) => [m.id, m.days])).toEqual([['mm', ['fri']], ['sh', ['sat']]])
+  })
+
+  it('a change goes in the one post; the other gives its days up', () => {
+    const rows = weekRowsFor([person, site], NOV).map((m) => (m.id === 'sh' ? { ...m, time: '9:15am' } : m))
+    const got = withWeekTimes([person, site], [person, site], NOV, rows, OPTS)
+    expect(got.map((s) => s.id)).toEqual(['p'])
+    expect(weekRowsFor(got, NOV).map((m) => [m.tefillah, m.time, m.days])).toEqual([['mincha_maariv', '7:00pm', ['fri']], ['shacharis', '9:15am', ['sat']]])
+  })
+
+  it('opening it and sending nothing changes nothing', () => {
+    expect(withWeekTimes([person, site], [person, site], NOV, weekRowsFor([person, site], NOV), OPTS)).toEqual([person, site])
   })
 
   it('the week after is the next Sunday to Shabbos', () => {
@@ -95,11 +117,11 @@ describe('setting the week’s times', () => {
   })
 
   it('a post running past the week: opened and left as it is, nothing changes', () => {
-    expect(withWeekTimes([straddling], [straddling], WEEK, weekRowsFor(straddling, WEEK), OPTS)).toEqual([straddling])
+    expect(withWeekTimes([straddling], [straddling], WEEK, weekRowsFor([straddling], WEEK), OPTS)).toEqual([straddling])
   })
 
   it('a post running past the week: a Saturday added goes on this Saturday only, and last week’s stays', () => {
-    const rows = [...weekRowsFor(straddling, WEEK), { id: 'k', tefillah: 'shacharis' as const, days: ['sat' as const], time: '9:00am' }]
+    const rows = [...weekRowsFor([straddling], WEEK), { id: 'k', tefillah: 'shacharis' as const, days: ['sat' as const], time: '9:00am' }]
     const [post] = withWeekTimes([straddling], [straddling], WEEK, rows, OPTS)
     expect(post.minyanim.find((m) => m.id === 'k')!.on).toEqual(['2026-10-31'])
     expect(post.minyanim.find((m) => m.id === 'last')!.on).toEqual(['2026-10-24'])

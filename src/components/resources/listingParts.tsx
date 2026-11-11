@@ -1,8 +1,18 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { community } from '@/community.config'
 import { PencilIcon } from '@/components/icons'
 
 // Small pieces an opened listing's sections share (ListingView, DaveningCard).
+
+/** A box drawn inside another (the davening times, the items, Delivery,
+ *  put in one of the admin's boxes): the box around it says its name.
+ *  Null outside one. */
+const InBox = createContext<{ title: string } | null>(null)
+export const InBoxProvider = InBox.Provider
+
+/** A title that only says the box's name again, a count aside ("Main
+ *  dishes · 10" in "Main dishes"). */
+const sameName = (title: string, box: string) => title.replace(/ · \d+$/, '').trim().toLowerCase() === box.trim().toLowerCase()
 
 /** One of an opened listing's boxes (Oct 6): white on the listing's grey,
  *  a title when what's in it needs naming ("Main dishes", "Women’s"), none
@@ -35,6 +45,37 @@ export function Card({
   muted?: boolean
 }) {
   const [why, ...rest] = Array.isArray(children) ? children : [children]
+  const inBox = useContext(InBox)
+  if (inBox) {
+    // Inside another box: no frame of its own, and its name small, as the
+    // box's other fields are, unless it only says the box's name again
+    // (the user, Nov 10: "Main dishes" three times).
+    const named = title && !sameName(title, inBox.title) ? title : null
+    return (
+      <div className="py-1" data-testid={testId} data-muted={muted || undefined}>
+        {(named || action) && (
+          <div className="flex items-baseline justify-between gap-3 pt-1.5">
+            {named ? <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{named}</p> : <span />}
+            {action}
+          </div>
+        )}
+        {muted ? (
+          <>
+            {why}
+            <div className="opacity-50">{rest}</div>
+          </>
+        ) : (
+          children
+        )}
+        {(footer || onEdit) && (
+          <div className="mt-1.5 flex items-center gap-2 pt-1 text-[13px] leading-snug text-muted">
+            <div className="min-w-0 flex-1">{footer}</div>
+            {onEdit && <EditButton onClick={onEdit} />}
+          </div>
+        )}
+      </div>
+    )
+  }
   return (
     <section
       className={`rounded-2xl border px-4 pb-3 ${muted ? 'border-dashed border-slate-300 bg-slate-200/50' : 'border-slate-200 bg-white'} ${title ? 'pt-3.5' : 'pt-1'}`}

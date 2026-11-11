@@ -90,6 +90,18 @@ describe('searchLines — where Enter goes', () => {
     )
   })
 
+  it('a minyan goes to the page whose places have minyanim, not the first page given the field', () => {
+    // Any page can be given Davening Times (Nov 10); Food on the test
+    // project was, ahead of Synagogues, with no minyanim in it.
+    const foodToo = { ...food, detailFields: [...food.detailFields, { key: 'minyanim', label: 'Davening Times', type: 'minyanim' as const }] }
+    const cats = [grocery, foodToo, shuls, zmanim, eruv]
+    const withTimes = listings.map((l) => (l.id === 'sh' ? { ...l, minyanim: [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '2:00pm' }] } : l))
+    const q = 'next mincha'
+    const options = { now: NOW }
+    const [first] = searchLines(q, { slug: 'philly', categories: cats, listings: withTimes, result: searchAsk(withTimes, cats, q, options), options })
+    expect(first.href).toMatch(/^\/philly\/synagogue\?davening=1/)
+  })
+
   it('a zman: the times page, that time picked out (board 6b)', () => {
     expect(brief('when is candle lighting', { timesSub: 'Candles Friday 6:01 PM' })).toEqual([
       'Prayer & Shabbat Times · Candles Friday 6:01 PM → /philly/zmanim?time=candles',

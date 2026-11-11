@@ -97,6 +97,20 @@ describe('a change as one list', () => {
     expect(screen.queryByText('Would show')).not.toBeInTheDocument()
   })
 
+  // Rodeph Shalom (the user, Nov 10): only the note's words moved. The
+  // time isn't crossed out or new; the note is.
+  it('a week’s note changed: the time plain, only the note old and new', () => {
+    const was = { minyanim: usual, minyanim_schedules: [{ ...post('2026-10-11', '2026-10-17', '2026-10-12'), minyanim: [{ id: 'x', tefillah: 'mincha', on: ['2026-10-12'], time: '4:45pm', notes: 'Online; until 5:15 PM' }] }] }
+    const now = { minyanim: usual, minyanim_schedules: [{ ...post('2026-10-11', '2026-10-17', '2026-10-12'), minyanim: [{ id: 'y', tefillah: 'mincha', on: ['2026-10-12'], time: '4:45pm', notes: 'until 5:15 PM; Online' }] }] }
+    show(now, was)
+    const list = screen.getByRole('region', { name: 'The schedule' })
+    expect(within(list).getByText('Note changed')).toBeInTheDocument()
+    expect(screen.getByRole('deletion')).toHaveTextContent(/^Online; until 5:15 PM$/)
+    expect(screen.getByRole('insertion')).toHaveTextContent(/^Until 5:15 PM; Online$/)
+    expect(within(list).getByText('Mincha 4:45 PM').closest('del, ins')).toBeNull()
+    expect(screen.getByText(/a change to notes in the schedule/)).toBeInTheDocument()
+  })
+
   it('a usual time: the rest of the box stays plain', () => {
     const more = [...usual, { id: 'b', tefillah: 'mincha', days: ['sat'], time: '1:00pm' }]
     show({ minyanim: [{ ...more[0], time: '9:30am' }, more[1]] }, { minyanim: more })

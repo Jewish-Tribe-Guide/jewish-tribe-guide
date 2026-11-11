@@ -616,7 +616,7 @@ describe('an eruv', () => {
   const BASE = {
     id: 'x', name: 'x', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false,
     status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
-    lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+    lineUrl: null, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [],
     statusEmail: null, statusEmailKept: null,
   }
   const LM = { ...BASE, id: 'lm', name: 'Lower Merion Eruv', covers: 'Bala Cynwyd', website: 'https://lowermerioneruv.org/', hotline: '(610) 664-5626', statusUrl: 'https://lowermerioneruv.org/status', status: 'up', statusWords: 'The Eruv is UP!', statusCheckedAt: at, lineUrl: 'https://maps.example/lm.kml', lineReadAt: at }
@@ -686,6 +686,30 @@ describe('an eruv', () => {
     await user.click(screen.getByRole('button', { name: 'Update the listing' }))
     expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { hotline: '215-555-0100' } }]])
     expect(mockRouter.push).toHaveBeenCalled()
+  })
+
+  // Nov 9: a field made on the Eruv page (eruvFields.ts) is a row of its
+  // own, after the eruv's, saved in its details with what else it keeps.
+  it('a field made on the Eruv page is a row, saved in its details', async () => {
+    const certified = { key: 'certifiedBy', label: 'Certified by', type: 'text' }
+    const page = { id: 'eruv-information', pluralLabel: 'Eruv Information', kind: 'eruv', detailFields: [{ key: 'website', label: 'Website', type: 'url' }, certified] }
+    await renderPage('lm', [], (url, init) => {
+      if (url.includes('/api/admin/categories')) return { ok: true, categories: [page] }
+      if (url.includes('/api/admin/watches/eruv') && !init?.method) return { available: true, timezone: 'America/New_York', eruvim: [{ ...LM, details: { certifiedBy: 'Rabbi A', kept: 'Untouched' } }], findings: [], watches: [site] }
+      if (init?.method === 'POST') {
+        posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+        return { ok: true }
+      }
+    })
+    const user = userEvent.setup()
+    const row = screen.getByTestId('editor-row-own-certifiedBy')
+    expect(row).toHaveTextContent('Certified by')
+    expect(row).toHaveTextContent('Rabbi A')
+    await user.click(row)
+    await user.clear(screen.getByLabelText('Certified by'))
+    await user.type(screen.getByLabelText('Certified by'), 'Rabbi B')
+    await user.click(screen.getByRole('button', { name: 'Update the listing' }))
+    expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { details: { certifiedBy: 'Rabbi B', kept: 'Untouched' } } }]])
   })
 
   it('the bin asks first, then archives it', async () => {

@@ -46,7 +46,7 @@ test('creating and publishing a form through the real editor makes it live, and 
 
   // Site's Forms tab (the admin redesign's step 4c).
   await page.goto('/philly/admin/forms')
-  await visible(page.getByRole('button', { name: '+ Add a form' })).click()
+  await visible(page.getByRole('button', { name: 'Add a form' })).click()
 
   const nameInput = visible(page.getByLabel('Name', { exact: true }))
   await nameInput.fill('') // NEW_FORM_DEFAULTS.title is "New form" — clear it first
@@ -66,7 +66,7 @@ test('creating and publishing a form through the real editor makes it live, and 
   await row.click()
   await visible(page.getByRole('button', { name: 'Delete this form' })).click()
   await visible(page.getByRole('button', { name: 'Delete it' })).click()
-  await expect(visible(page.getByRole('button', { name: '+ Add a form' }))).toBeVisible({ timeout: 10_000 })
+  await expect(visible(page.getByRole('button', { name: 'Add a form' }))).toBeVisible({ timeout: 10_000 })
   await expect(page.getByRole('button', { name: new RegExp(title) })).toHaveCount(0)
 
   const { data: afterDelete } = await supabase.from('form').select('id').eq('id', created!.id).maybeSingle()

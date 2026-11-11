@@ -396,7 +396,7 @@ describe('GenericDirectory', () => {
     const floatingAdd = screen.getByRole('button', { name: 'Add' })
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
-    await user.click(await screen.findByRole('button', { name: 'Fill it in yourself' }))
+    await user.click(await screen.findByRole('button', { name: 'Find the place' }))
     await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
     expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
@@ -470,7 +470,7 @@ describe('GenericDirectory', () => {
     expect(await screen.findByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
     // From a listing, editing it yourself, not adding a place: the
     // listing's own editor, in place, never the page's form.
-    expect(screen.queryByRole('button', { name: 'Fill it in yourself' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Edit it yourself' }))
     expect(columnEdit).toHaveBeenCalledWith(item.id)
     expect(handlers.onEdit).not.toHaveBeenCalled()

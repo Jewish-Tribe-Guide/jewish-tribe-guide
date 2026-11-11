@@ -8,11 +8,13 @@ import FormStepEditor from './FormStepEditor'
 import FormPreview, { resolvePreviewSteps } from './FormPreview'
 import { IconField } from './CategoryFormFields'
 import { fetchJson } from '@/lib/fetchJson'
+import { stableJson } from '@/lib/stableJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminSwitch, MoreToggle, adminInputClass } from './AdminUI'
 import { PreviewBeside } from './SitePreview'
+import { AddListButton } from './DragList'
 import SaveBar, { LEAVE_QUESTION, changesLabel, useLeaveGuard } from './SaveBar'
 
 // One form (the admin redesign's board "Forms"): its questions as rows, each
@@ -48,13 +50,19 @@ function published(f: FormConfig | null): FormContent {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '')
 
+/** A question as what it asks: its yes/no spelled out, and nothing for what
+ *  was cleared, so one put back as it was is no change (the user, Nov 10:
+ *  "undoing something still says a change happened"). */
+const stepMeaning = (s: FormStep | undefined) =>
+  s && stableJson({ ...s, optional: !!s.optional, hint: s.hint || undefined, placeholder: s.placeholder || undefined, section: s.section || undefined, when: s.when?.length ? s.when : undefined, options: s.options?.length ? s.options : undefined })
+
 /** How many things the draft changes from what's on the site: each piece of
  *  text, and each question that differs. */
 export function countFormChanges(live: FormContent, draft: FormContent): number {
   const text = (['title', 'submitLabel', 'successTitle', 'successMessage', 'icon'] as const).filter((k) => !same(live[k], draft[k])).length
   const n = Math.max(live.steps.length, draft.steps.length)
   let steps = 0
-  for (let i = 0; i < n; i++) if (!same(live.steps[i], draft.steps[i])) steps++
+  for (let i = 0; i < n; i++) if (stepMeaning(live.steps[i]) !== stepMeaning(draft.steps[i])) steps++
   return text + steps
 }
 
@@ -355,14 +363,7 @@ export default function FormEditor({
           </div>
         )}
 
-        <AdminBox
-          title="Questions"
-          action={
-            <button type="button" onClick={addStep} className="text-sm font-semibold text-primary cursor-pointer">
-              + Add a question
-            </button>
-          }
-        >
+        <AdminBox title="Questions">
           {shown.map((s, i) => {
             const section = sectionName(s.section)
             const heading = section && section !== sectionName(draft.steps[i - 1]?.section) ? section : null
@@ -374,6 +375,9 @@ export default function FormEditor({
             )
           })}
           {more > 0 && <MoreToggle open={allQuestions} more={more} onToggle={() => setAllQuestions((a) => !a)} />}
+          <div className="px-4 pb-4 pt-2">
+            <AddListButton onClick={addStep}>Add a question</AddListButton>
+          </div>
         </AdminBox>
 
         <AdminBox title="After sending">

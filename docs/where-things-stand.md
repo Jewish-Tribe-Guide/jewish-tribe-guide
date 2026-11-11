@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 9, 2026.
+Last updated: Nov 10, 2026.
 
 ## The branch
 
@@ -38,6 +38,467 @@ Small open items from Nov 9:
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
+
+## Open from the boxes and fields work (Nov 10)
+
+The user's answers on Nov 10, evening, and what was done with them:
+
+- **The listing is back to how it was before round 3** (the user: "I like
+  it the way it was before. The only thing we were thinking of changing is
+  just grouping fields together. Experience shouldn't change."). The
+  hechsher under the name, the amber "What isn't kosher" box after the
+  buttons, Delivery's own box and the Certification button are all back.
+  Only the admin's grouping (a hechsher's caveat, note and certificate as
+  parts of it; Delivery's WhatsApp link as a part of Delivery) stays.
+  - So **converting Food on the live site to Kosher and Delivery boxes is
+    no longer wanted**. Dev's Food `listing_parts` was put back to null.
+  - **Fields and "How it looks" match the restored listing** (the user
+    left it to Claude: "If they are one field then they should be one
+    field always"). Delivery Details is one row in a "Delivery" box, and
+    the hechsher one row in "What isn't kosher", the boxes the listing
+    draws them in; their parts are no rows. Either can be put in one of
+    the admin's boxes, where the listing then draws it (Delivery's text
+    and Join button there, not up top too; the hechsher's amber box and
+    Certification button stay where they always are).
+  - **Every box takes every field** (the user: "Yes, anything takes
+    anything"; then "I can not for the life of me understand why we're
+    still having existing boxes not being editable and those add a fields
+    not showing every field"). BUILT Nov 10:
+    - Contact and About take Delivery, a hechsher, davening times and
+      lists too, and the listing draws them there (f735af0e).
+    - Delivery, What isn't kosher, Main dishes, Davening times and a list
+      of contacts' own box take any field from their + Add a field and by
+      drag, and are renamed. Doing any of those makes the box one of the
+      admin's, in the same place with its name and fields (`ownBox`,
+      6a91cc56). Nov 7's "lock the name" was on fields only, so this
+      doesn't change it. Still taking only their own: a mikvah's section
+      and "Not on the listing".
+    - **Renaming a box never renames a field** (the user: "Boxes and
+      fields are separate. you can edit the name of a field you created,
+      yes. But not through renaming the box."). A field's name changes
+      only on its own screen. Before, a box named by a field made here
+      (Main dishes) renamed the field.
+    - **Address and phone move to any box** ("we should also be able to
+      move all fields. Including address and phone"; deab70a7). Saved as
+      `@address` / `@phone` in the box's list, Contact when nowhere. The
+      listing draws them in that box, first in it, address before phone,
+      as Fields lists them; the place editor edits them there too (see
+      "Editing follows the listing" below). A keyboard move that would
+      change nothing (the phone one step inside Contact) is skipped, so
+      the phone leaves Contact in one press (d72a1943). Hours and website
+      are still added from Contact (they drag after, as before).
+    - **No repeated headings** (c98028e6). A list drawn in a box of the
+      same name is named once (Main dishes made an admin box said "Main
+      dishes" three times); in a box of another name it's named small
+      under it.
+    - **How it looks is honest** (69bcc7d3): a field picked from a box's
+      + Add a field is shown in that box, as it really looks (the
+      davening table), on this page's own places, the one answering it
+      first; "On X, its answer made up" when none do.
+    - **Editing follows the listing; admins arrange it** (the user: "an
+      admin should have customization power to organize the website how
+      it works for them", with simplicity for visitors first; 8bdf3495).
+      The rule, whole: the add/edit screen follows the listing's boxes
+      (their order, their names, where each field sits, the address and
+      phone included), and anything that is a screen of its own gets its
+      own section right where its box is: davening (as usual weekday,
+      usual Shabbos, this week, next week), an item list (Main dishes),
+      a list of people to call, and hours (Oct 11). Also not a box: the
+      top keeps name and photo first, then the kind and the kosher row,
+      as the listing's top does (the amber "What isn't kosher" box is
+      edited in that kosher row); adding, sections still empty wait under
+      "Not on the listing yet". A hospital's Shabbos section is named
+      "This Shabbos", as its box is. Not yet true in the code: hours are
+      broken out only from Contact; in an admin's own box they're edited
+      inside that box's section (proposed fix, waiting on the user).
+    - **A box's X is at the end of its name bar**, not a trash can on its
+      + Add a field line (405aacd9).
+    - **Three Fields bugs fixed** (the user's report, Nov 10):
+      - A field taken off and added again went back into the box it had
+        been in, not the one it was added from: taking a field off left
+        its name in that box. Now a field taken off leaves every box (the
+        box stays, empty), and a field added to a box is taken out of any
+        other.
+      - Dragging a field down didn't scroll the page, so a box below the
+        window couldn't be reached. A row held near the top or bottom of
+        the window now scrolls the page that way (faster nearer the edge,
+        the bottom's zone taller for the Save bar), and only the way the
+        row is being taken. Every drag list in admin has it (Home page
+        too).
+      - A box with nothing in it (or no name) seemed to save. Save
+        dropped it without a word, and left its place in the saved order
+        behind, which could shift the boxes after it. Save now stops and
+        says "“Box A” has nothing in it. Add a field or take the box off."
+    - **A box's X is only on an empty box** (the user's yes, Nov 10). A box
+      with fields in it, or the address or phone, has no X. Taking off or
+      dragging out its last field leaves it empty, with its X back; it
+      doesn't go on its own, so moving the only field elsewhere never
+      makes a box vanish mid-move. A field comes off on its own screen
+      ("Remove from <page>"); rows have no X. A box of the site's own
+      (Davening times, Main dishes, Delivery) still goes when emptied, as
+      it always has: it has no box to keep once nothing is in it.
+    - **Adding one more to a whole list looks like "+ Add a box"** (the
+      user's yes, Nov 10): a dashed button as wide as the list, a plus
+      icon before its words, under the list (`AddListButton` /
+      `AddMenu wide`, DragList.tsx). Done for: Within a walk's Add a page
+      (moved from the box's header to under its list; "None yet" dropped,
+      the button says it), Site → Home page's computer Header (Add a tab,
+      Add the Categories menu), phone Tabs (Add a tab) and Cards under the
+      search (Add <card>), on computer and phone. Adding inside one opened
+      row keeps that row's own small button, as a box's "+ Add a field" is
+      its own line: a tab's "+ Add a link" / "+ Add a heading", the
+      Categories dropdown's "+ Add a heading". Then (the user's "do those
+      too", Nov 10) the rest of the lists: Fields' Add audience group
+      (under Add a box), a field's Add a choice (under its choices, above
+      Other; moved from the box's header), Forms' Add a form (into the
+      list's box, from under it), a form's Add a question (under its
+      questions, from the header), and Campaigns' Add a campaign (under
+      the list, from the header; still greyed out until there's a
+      category, `AddListButton disabled`).
+    - **Boxes fold; tabs come off like boxes; adds inside one thing look
+      like "Add a field"** (the user, Nov 10). The rule as built, whole:
+      - Fields: every box starts open. A box with something in it folds
+        and opens by a press anywhere on its name bar, as a Home page tab
+        does (the user, Nov 10: "we want the top part"), the chevron at
+        its end included; a renameable box's name still renames it. An
+        empty box has its X there instead. A field dragged onto a folded box goes in at
+        its end. Folding isn't saved or in the address; it's how the list
+        is showing, and a field added to a folded box opens it.
+      - "Nothing in it yet" is gone everywhere it was: an empty field box
+        shows only its Add a field, and an empty Home page tab or heading
+        has no line under its name.
+      - Home page, computer Header and phone Tabs: a tab comes off by an X
+        on its name bar, last, shown only while it's empty; one with links
+        or headings is emptied first (each link's × as before). A heading
+        inside an ordinary tab works the same. Exceptions: the Categories
+        menu and its headings keep their trash can (its headings are the
+        home sections, taking one off still asks and moves its links to
+        Other, and the menu always holds Other).
+      - Add a link and Add a heading, in a tab, a heading and Categories'
+        headings, on computer and phone, are rows across the foot of a
+        white card holding the links, as a box's Add a field is
+        (`ListCard`, `AddRowButton`, `AddMenu row`).
+    - **A field comes off by the X on its row** (the user's yes, Nov 10).
+      Every field row in a category's Fields ends in an X ("Take … off").
+      A field no place has answered goes at once; one with answers opens
+      "Remove … from …?" (`?field=…&remove=1`), and Remove it or the
+      browser's Back return to the list. The field's own screen no longer
+      has "Remove from …". Address and Phone rows are only the X (they
+      have no screen). Exceptions: the hidden hechsher-part rows have no
+      X, and a category's "Delete this page" stays a small red link.
+      Adds stay full width; removes stay small, on the thing they remove.
+    - **A field's editable Choices come before "What you can change"**
+      (the user's yes, Nov 10): Kosher Certification, Eruv and Services
+      read What this is, Choices, then the switches. Ready-made fields'
+      fixed choices were already chips in What this is. A field made here
+      keeps Basics, Choices, Questions.
+    - **Hover on a computer, chevron on a phone, admin-wide** (the user,
+      Nov 10). A row that opens a screen of its own shows its chevron only
+      where there's no mouse to hover with (`GoChevron`,
+      `pointer-fine:hidden`); with a mouse, its row shades under the
+      pointer (`slate-100`). That is every `AdminRow` (To do, Places,
+      Watches, Reports, Category pages, Forms, Campaigns and the rest),
+      the setup checklist and a category's field rows. Exceptions: a
+      chevron that folds something open in place stays everywhere, since
+      it turns to say whether it's open (field boxes, Home page tabs,
+      phone boxes, Repeated searches, Banner photo, Within a walk, Look
+      again's rows); and the picture of a visitor's row in Add a field
+      keeps its chevron, since visitors' rows have one. A touch-screen
+      computer counts as a phone.
+    - **Save and Undo count only real changes** (the user, Nov 10: "even
+      just clicking something triggers a change. And undoing something
+      still says a change happened"). The rule as built, whole: the Save
+      bar counts a change only when what would be saved means something
+      different. A switch turned on and back off, a box's name pressed
+      and left as it was, and fields in a new key order are no change.
+      How: a category page compares by meaning (`draftMeaning`,
+      `FIELD_FLAG_MEANS` spells out every switch, so a new one is a
+      compile error until it's classified; `stableJson` ignores key order
+      and unset keys); a form compares its questions the same way
+      (`stepMeaning`). Where switching back was really lossy, it now puts
+      back what was saved: Kosher questions and the certificate link
+      turned back on come back as the page had them (their form section
+      and the link's name kept, the link in its saved place; a link the
+      page never had still goes right after its field); a filter turned
+      off puts back how the field showed. Campaigns, Feedback and Pages
+      already compared plain values. Swept by
+      `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
+      every switch on every field's screen and every box name.
+- **Minyanim by time opens on the page whose places have minyanim** (fixed
+  Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
+  test project's Food was, ahead of Synagogues. The search's "next maariv"
+  and the home's davening link took the first page holding the field, so
+  they landed on Food with nothing to show. They now take the page whose
+  places carry the most minyanim (`minyanimPage`), the first holding the
+  field only when none has any. The e2e tests pick the page the same way.
+- **+ Add opening on Find the place, with AI a tap away: drawn, waiting
+  on the user** (Nov 10, canvas
+  https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
+  asked whether the box should start with AI; the recommendation was no.
+  The boards: the box opens on today's Find the place search, titled "Add
+  or update a place", with one row under it, "Paste a post or photo",
+  which opens today's reader (its own step, back chevron, "See what
+  changes"). "Not on Google? Fill it in yourself" shows only once
+  something is typed. The Eruv page's box is unchanged. Not built.
+  The user found that "a lot going on" (Nov 10: "I liek to stick to one
+  thing at a time that any customer is seeing"), so boards 1b-3b redraw
+  it as one box: the search with a camera button inside it, one list
+  while typing (the guide's places first, a Google place the guide has
+  shown once, "Not listed? Fill it in yourself" as its last row), and a
+  pasted post turning the same box into the reader with "See what
+  changes". Both rows wait on the user.
+- **The Add box's steps are in the address, and its first link is "Find
+  the place"** (the user's yes, Nov 10). Each step of the + Add box is an
+  entry in the browser's history (`?box=find`, `?box=find/add`, then the
+  editor's row, `?box=find/add/hours`), so the browser's Back and Forward
+  walk the steps as the header's Back does; before, Back from "Add to …"
+  closed the whole box and lost what was typed. Closing the box takes its
+  steps back off the address. Going back to the search and forward again
+  starts the form fresh, as the header's Back always has. A reload closes
+  the box (the box itself has no address). The first screen's link is
+  "Find the place", what it opens, so "Fill it in yourself" only means the
+  empty form; the Eruv page's keeps "Fill it in yourself", since it goes
+  straight to the form. "Find the place" stays: it is the one search that
+  finds a place already in the guide and opens its edit (Oct 5).
+- **"More" is gone from a field's screen**, for a superadmin too (the
+  user: "yes remove it"). The old field form (CategoryFieldEditor) is
+  deleted, so its settings can't be reached by anyone now.
+- **The Eruv's Add button** is right as built (the user, Nov 10).
+- **Davening times, item lists and contacts in any of the admin's boxes**
+  (the user: "that is what I want"), drawn there as they are on their own
+  (the user: "Let's say same for now and if we need to change that we
+  can").
+- **A shul's website watch files only the upcoming week**, as a calendar
+  does: this week, and next week from Thursday (listingPageRun's
+  `upcoming`). Later dates on the page still tell which weeks have no
+  minyan. The newsletter path isn't limited.
+- **Mekor's Shabbos 9:15 PM couldn't be found to change.** This Shabbos's
+  times came from two posts, a person's "Nov 8 – Nov 13" and the website's
+  "Nov 14", and Edit opened only the first. Now Edit opens every post the
+  box shows a time from, and Edit listing's "This week's schedule" lists
+  them all and saves them into one.
+  - **The live times are fixed** (the user's yes, Nov 10): Sat Nov 14
+    Shacharis 9:15 PM → 9:15 AM, Fri Nov 13 Mincha 7:00 PM → 4:30 PM.
+    Backup of the row before: the session scratchpad's
+    `mekor-prod-backup-nov10.json`. Mekor's own site says "9:15PM", so the
+    website watch may file it again: reject it on To do.
+  - Dev's Mekor holds the live times (copied to reproduce it).
+- **Rodeph Shalom's week** showed its 8:10 AM Shacharis crossed out and
+  new when only the note's words moved ("Online; until 8:40 AM" to
+  "until 8:40 AM; Online"). The user: still a change, but "Make it clear
+  that the suggestion is only on the note." The queue card now gives such
+  a minyan as one plain line marked "Note changed", the old note crossed
+  out above the new, and its heading says "a change to notes in the
+  schedule" (changeLines' `extras`; usual times the same).
+- Still held or open from before: boxes fold in Fields (held), a box's
+  trash can on no board (held), big fields as rows inside any box, "Within
+  a walk" and "Before it's opened" on no board, Mikvah sections not drawn,
+  "How it looks" on a phone not built.
+
+## Done Nov 9: the Eruv page is a category page, eruvs are only in Places
+
+The user, Nov 9: "a lot that doesn't need to be controlled by the admin."
+The Eruv page held a second, older editor for every eruv (the Eruvim tab
+moved there Oct 22), which Places had repeated since Nov 1.
+
+- **Admin → Site → Category pages → Eruv** is laid out as every category
+  page is (the user: "the same formatting as other category pages"): On the
+  site with "5 places" (opening them in Places), Basics as icon + name +
+  banner row (folded on a phone), the page beside it on a computer and
+  Preview on a phone, the save bar (Undo · Save) at the bottom instead of its
+  own Save/Cancel/Preview buttons, and Delete. Its Fields came later the
+  same day (next section); its preview is the Page tab only. Its Preview
+  has an address (`?preview=1`) through Next's router; it was a
+  `history.pushState` entry before.
+- **Places → an eruv → Map** holds what only an eruv has: its map drawn
+  small, "Parts shown" (ticked is shown; marker names only while its markers
+  show) and "Its markers". Saved with Update the listing.
+- **Line colour is no longer an admin's.** A line too pale to see (contrast
+  with white under 2, as Northeast's own `#ccffff`) is drawn in the default
+  dark red, on the site and in the admin (`readableLines`, eruvLine.ts). Live
+  values checked first: Northeast was the only eruv with a colour set, and it
+  was that same dark red, so nothing visible changes. `line_color` is no
+  longer read; the column is still there.
+- **Order is gone.** Eruvim list by name everywhere, so the public order goes
+  from Center City, University City, Lower Merion, Northeast, Elkins Park to
+  Center City, Elkins Park, Lower Merion, Northeast, University City.
+  `sort_order` is no longer read; the column is still there.
+- The Eruvs job page's "+ Add an eruv" opens Add a place in Places.
+- Kept on purpose (checked against live data): Center City leaves out ten
+  border lines, Elkins Park its driving directions; Elkins Park and
+  Northeast hide their markers (shuls), Lower Merion shows its crossings and
+  reroutes.
+
+## Done Nov 9: the Eruv page has Fields and boxes
+
+The user, Nov 9: "keep what we have but just have it on that category page
+that way someone can change it if they want. And an admin starting a new
+community can add or change things as they apply. I don't think we need to
+invent any questions or other things." (`src/lib/eruvFields.ts`)
+
+- **Admin → Category pages → Eruv → Fields** starts with the four rows an
+  eruv always had: Where it goes in its own box, then Website, Hotline and
+  Email alerts in Contact. The name and status always come first and
+  can't be moved or removed; since Nov 10 (no Top) they have no row. The four
+  are ready-made (name locked), so they can be taken off, moved, or put
+  back from + Add a field. Nothing visible changes until an admin does.
+- **+ Add a field** offers those four, fields other communities made on
+  their Eruv pages, and (the user, Nov 9: existing fields should show as
+  options) every listing page's field an eruv can hold: text, a link, a
+  phone, yes or no, choices. Not one tied to a listing's own boxes (a
+  hechsher's caveat, a link's own box and its words, an audience's, a
+  field that comes with another), and no photo, hours or website. The
+  Which page menu has Eruv first. Make your own takes Choices, Yes or no,
+  Text and Link. A field made or added there is kept on each eruv in a new
+  `details` column (migration 094).
+- **The preview** has Page · A listing · Editing, as other pages have Page
+  · A listing · Adding: A listing opens the eruv holding the most of the
+  page's fields, Editing its Edit listing. Beside a field, A listing and Editing only:
+  a field isn't on the list of eruvim. These are the real eruv screens, not
+  the drawn How it looks tabs a listing page's field has, so the field
+  isn't outlined in them.
+- **Places' Add a place for an eruv** has a row for each field made on the
+  Eruv page, after its own rows, and adds what they hold with it (the
+  user, Nov 9). Found on the way: typing the first letter in an empty row
+  there (Hotline, say) moved it up to the filled rows and dropped the rest
+  of what was typed; an open row now stays where it was opened.
+- **Visitors can suggest a new eruv** (the user, Nov 9: "why can't a user
+  add an eruv?"). It is in the regular + Add box, as every category is
+  (then: "why didn't you just make an add an eruv as an option within the
+  regular add button"): the Eruv page's + opens the box, whose "Fill it in
+  yourself" goes straight to Add an eruv, and the site-wide box's "What kind
+  of place?" lists the Eruv page when it takes additions. Add an eruv is a
+  name, the page's rows, and
+  where its status is posted (a page or an email address) and its map, if
+  they know. It goes to the queue as a New place in To do, the card and
+  the admin email listing what it gives. Approving adds it and reads its
+  status page (or kept email) and map at once, not on Friday. It is
+  refused when the name is already listed (hidden eruvim too), and where
+  the community or the Eruv page takes no additions. On the live site it
+  needs migration 077, the same as Suggest an edit (item 4 below). The
+  Eruv page's admin preview still has Page · A listing · Editing, no
+  Adding.
+- **+ Add a field adds to the box it was clicked under** (the user, Nov 9:
+  "I'll click add a field under a specific box and it gets added under a
+  different box"). A field's box follows from its kind, so Contact's +
+  used to offer a Text that landed in About. Now each box's picker is
+  "Add a field to <box>" and lists only what lands there, then "In a box
+  of their own" (contact lists, davening times, a lead link's box). Make
+  your own offers only the kinds that land there; a Choices or Yes-or-no
+  made from Top is a filter badge, so it stays in Top. The box is in the
+  address (`in=`), so a reload keeps it. Changing a ready-made field's
+  settings before adding it (turning In the filter on, say) can still
+  move it, as it would after adding.
+- **Any field goes in any box but Top** (the user, Nov 10: "I don't
+  understand why all fields can't just go anywhere"). Contact, About and
+  the admin's boxes take any field that isn't the header's: a long text in
+  Contact, a phone or a link in About, hours in "Who to call". Saved as
+  `listingParts.contact` / `.about` (fields put there by name); the
+  listing, the admin preview and the place editor's rows draw them there.
+  Top keeps its rule (photo, short line, filters). Fields that are a box
+  themselves (davening times, a list of contacts or items, a lead link's
+  box) are added from "+ Add a box", which now lists them first and offers
+  "Make an empty box" second; "In a box of their own" is gone from each
+  box's picker. Not changed: the page's own address, phone, hours and
+  website are still added from Contact (they can be dragged after), and a
+  mikvah section's fields come with their section (+ Add audience group).
+- **"Under the name" on a field's own screen** (the user, Nov 10, board
+  D2 of canvas Y4Cn6WNqe54xHQpYGY6dPH: keep today's field screens, no Box
+  menu). A ready-made Choices, Yes-or-no or short-text field gets an
+  "Under the name" switch in What you can change ("Shows on its row in
+  the list"); a field you made gets "Show it under the name?" Yes / No.
+  It sets the field's second line (`onCard`) or third line
+  (`showInHeader`), whichever it is. How it looks switches to List when
+  it changes. Not on the Eruv page, which has no rows.
+- **Every box moves, any box comes off, + Add a box adds in place** (the
+  user, Nov 10, boards A and B: "Can't we just have boxes and fields and
+  an admin can arrange how they want?"; "Yes, build it" to removing a box
+  taking its fields). Every box but Top and "Not on the listing" has a
+  handle and goes anywhere between them, Contact and About included; the
+  order is saved as `listingParts.order` and the listing draws its boxes
+  in it (a box it doesn't name follows the one it usually follows; the
+  Shabbos card still leads on a Friday). Every box has a trash can: its
+  fields come off the page with it, Contact's address and phone too, and
+  Save asks before clearing answers, as for any field. "+ Add a box" adds
+  an empty box at the end, open, its name ready to type, with no screen
+  in between; a field that is a box itself (davening times, a list of
+  contacts) is offered by any box's "+ Add a field" and lands as a box of
+  its own. Not built yet: big fields as rows inside any box (board A's
+  Menu holding Main dishes). A listing's own sections that it draws as one (a mikvah's
+  audience sections, the main thing) still render together, where the
+  first of them is.
+- **A field stays where it's put; a field with parts is one field**
+  (the user, Nov 10, round 3 boards E1b, E2, E3b, canvas
+  Y4Cn6WNqe54xHQpYGY6dPH; "let's build"). Built: no hidden rules move a
+  field. Hechsher and Delivery Details are one field each: the hechsher's
+  "Everything here is kosher?", what isn't, and its certificate link, and
+  Delivery's WhatsApp group, are parts (`src/lib/fieldParts.ts`), never
+  rows, and go wherever the field goes, in the admin list, the editor, the
+  listing and How it looks. The "What isn't kosher" and "Delivery" boxes
+  are gone; an unboxed hechsher sits in Contact, Delivery Details in
+  About. The listing draws the hechsher with its amber note and
+  Certificate button in whatever box holds it (Certificate is no longer
+  in the action row), and no caveat line under the header. Times and
+  items now outrank admin boxes as a listing's main thing, and box fields
+  respect show-if. Food on dev was converted to boxes Kosher (hechsher,
+  Food Type) and Delivery. **Food on the live site needs the same
+  conversion, after this deploys** (dry run shown; needs the user's
+  go-ahead, then revalidate). Still held, the user's call: boxes fold in
+  the built Fields (one open at a time) while the boards draw them open,
+  and no board shows a box's trash can.
+- **No Top** (the user, Nov 10, board A; "Yes, build it"). Fields lists
+  only boxes and fields. A field's own Under the name switch puts it under
+  the name, and a listing (an eruv's too) shows it only there, not again
+  in its box (its row in admin says "Under the name").
+  The photo goes with the name and isn't listed (its switch is in "Before
+  it's opened"). (Round 3 replaced how the hechsher is placed: see above.) A filter or
+  short line that used to be Top's lands in Contact, and any box offers
+  it. Not drawn on board 1b and still on the page: "Within a walk" and
+  "Before it's opened".
+- **A category page in admin opens without waiting on the list again**
+  (the user, Nov 9: "Most noticable is lcikcing on a category page in
+  admin"). Each Category pages screen is its own address, so every open
+  fetched the list of pages before showing anything, and opened from its
+  address the page then fetched its places after that. The list is kept
+  between screens and refreshed behind it (a page changed in another tab
+  starts again from the fresh copy), and a page opened from its address
+  asks for its places beside the list. Locally a click from the list shows
+  the page in 175ms, before the list's refresh comes back. Measured on
+  the live site Nov 9: Supabase answers in about 0.1s; a preview
+  deployment's API calls took 0.8–1.2s each, uncached.
+  Still slow on the preview after that (the user, Nov 9): each page's
+  address is rendered on Vercel's server the first time anyone opens it
+  after a deploy (Synagogues 0.93s, Mikvah 0.66s, then 0.10s), and the
+  click waited for it. The list now loads every row's address behind it
+  (`router.prefetch`), and a page loads the list's, so the click asks the
+  server for nothing (`e2e-admin-write/category-open.spec.ts`).
+- **An admin's field is filled in** in Places (a row of its own after
+  Website, saved with Update the listing) and by anyone through Suggest an
+  edit, which goes to the queue; the queue and the admin email show it
+  before and after, named as the page named it when it was sent. Use this
+  takes it only when it's ticked.
+- **The opened eruv** follows the page: its boxes, a field taken off the
+  page isn't shown or offered in Suggest an edit, and a field set to show
+  in the header goes after "Eruv" under the name. The Eruv page's list of
+  eruvs is unchanged.
+- **Not added, on purpose:** Questions, Within a walk, Before it's opened
+  and audiences; an eruv has none today.
+- Found on the way: the editor added a Photo field to every page it opened,
+  the Eruv page included, which would have put a photo picker into eruv
+  Suggest an edit. The Eruv page no longer gets one.
+- Known edge: an Eruv page with every field and box taken off shows the
+  four rows again (there's no way to tell it from a page never saved).
+- A Text field lands in About, as long text does on every page. A
+  listing's About is its description, with no heading; an eruv has none,
+  so on an eruv a lone field there is headed by its own name ("Certified
+  by"), and several are each named under About. Found on dev after 094.
+- Opening "What kind of field?" from a pasted address, straight after
+  another admin screen, and picking a kind goes Back to that screen and
+  drops the draft. A reload there works. Every category page does this.
+- **Migration 094 (`eruv.details`) is on dev (Nov 9), not live.** Checked
+  on dev: a "Certified by" field made on the Eruv page, filled in from
+  Places, saved to `details`, shown on the opened eruv and in Edit
+  listing; then put back. Live needs a yes (see "Waiting for a yes").
 
 The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
@@ -127,6 +588,11 @@ for that exact change, in the same conversation. Show the dry run first.
 1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
    after PR 373 deployed: live's table has every column, no rows yet).
 
+1l. **Migration 094 (`eruv.details`, Nov 9):** on dev (the user ran it
+    Nov 9), not on live. One `add column if not exists`; nothing is read from it until an
+    admin makes a field on the Eruv page, so it can go any time after the
+    branch deploys. Needs a yes.
+
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -209,7 +675,7 @@ for that exact change, in the same conversation. Show the dry run first.
    Tables and columns through 081 are there. 077 (eruv suggestions, a
    database rule) and 082 (confirming a contact box, a database function)
    can't be seen through the API: without them a public eruv suggestion
-   fails to send and Yes under a contact box says "Didn't save". 067's
+   (a fix or, since Nov 9, a new eruv) fails to send and Yes under a contact box says "Didn't save". 067's
    columns (Today) are missing too, harmless while Today is held back.
 5. **Menu watches start on the live site Oct 18** (merged with #324, no
    migration). The first daily run, 07:00 UTC Oct 18, gives every live food
@@ -995,7 +1461,8 @@ after the deploy, dry run first, and needs its own go-ahead.
   there"): Adding opened on the first field, and a new field not named
   yet wasn't found at all. It now opens on the field the screen is on,
   including one just made (previewFocus.ts), beside and full size.
-- Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
+- (Changed Nov 10: every box renames now; see "Every box takes every
+  field" above.) Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
   field's box on the listing keeps its name. Delivery, What isn't kosher,
   Main dishes, a list of contacts and a mikvah's section have no Rename
   unless their field was made here with Make your own. The admin's own
@@ -2831,7 +3298,8 @@ names only its job ("Stopped" and "Nothing" in amber); its bubble holds one line
 Change. Fields Google keeps say "Google · Oct 19 · Stop", then Use Google's, and
 a cleared field stays blank. Archive is a red bin beside Update the listing.
 Eruvs are places: a category in Places, opened as a listing, and offered by Add
-a place. Their map colour and left-out parts stay on the category page. Eruv maps
+a place. Their map colour and left-out parts stay on the category page (Nov 9: the
+parts and markers moved to the Map row, and the colour is automatic). Eruv maps
 are read only by the nightly job.
 
 Differences from the drawing, decided while building: the button says "No changes
@@ -4307,6 +4775,9 @@ The user, Oct 22: Rodeph Shalom's watch "didn't pick up on … zoom link for
 - No counts on the To do tabs yet (Small open decisions, 8).
 
 ## Done Oct 22: the Eruvim tab is on the Eruv row
+
+(Superseded Nov 9: the Eruv page no longer lists eruvim; see "Done Nov 9:
+the Eruv page is a category page".)
 
 - **Admin → Categories → Eruv → Edit** now holds what was the Eruvim tab,
   under the card's own fields: each eruv's name, order, where it goes,

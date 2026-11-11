@@ -510,6 +510,23 @@ describe('ListingEditor — boxes with their own editors', () => {
     expect(schedules.find((x: { id: string; whole?: boolean }) => x.whole)).toMatchObject({ from: '2026-10-11', to: '2026-10-17', minyanim: [] })
   })
 
+  // The user, Nov 10: editing follows the listing. A phone the admin moved
+  // into a box of their own is edited there, not with the address.
+  it('edits the phone in the box the admin put it in, and the address where it stayed', async () => {
+    const u = user()
+    const parts = { boxes: [{ title: 'Call us', fields: ['@phone', 'website'] }] }
+    renderEditor({ category: { ...FOOD, listingParts: parts } })
+    expect(row('box:Call us')).toHaveTextContent('(267) 975-1711')
+    expect(row('contact')).not.toHaveTextContent('(267) 975-1711')
+    await u.click(row('box:Call us'))
+    expect(screen.getByLabelText('Phone')).toHaveValue('(267) 975-1711')
+    expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+    await u.click(done())
+    await u.click(row('contact'))
+    expect(screen.getByLabelText('Address')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
+  })
+
   it('a mikvah’s section: its hours and note, and a phone only once someone adds one', async () => {
     const u = user()
     const mikvah = makeListing({ id: 'lm', category: 'mikvah', name: 'Lower Merion Mikvah', womenTevillah: true, women_s_notes: 'By appointment' })

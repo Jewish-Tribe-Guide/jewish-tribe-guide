@@ -53,6 +53,9 @@ export type Eruv = {
    *  the status shown is no longer current. */
   statusErrorAt: string | null
   statusError: string | null
+  /** What it holds for the fields its page's admin made ("Certified by"),
+   *  by field key (eruvFields.ts). Absent when none. */
+  details?: Record<string, unknown>
 }
 
 // ── Reading a page ──────────────────────────────────────────────────────────

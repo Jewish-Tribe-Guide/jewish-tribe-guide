@@ -199,7 +199,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       {add.label}
     </button>
   ) : eruvKind ? (
-    <Link href={`${base}/categories/cat:${eruvKind.id}`} className={`${primary} whitespace-nowrap`}>
+    <Link href={`${base}/places?add=${encodeURIComponent(eruvKind.id)}`} className={`${primary} whitespace-nowrap`}>
       + Add an eruv
     </Link>
   ) : undefined

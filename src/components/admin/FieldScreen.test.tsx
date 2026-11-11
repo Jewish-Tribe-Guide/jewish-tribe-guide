@@ -18,11 +18,11 @@ const foodType: CategoryField = {
   multiSelect: true,
 }
 
-function Screen({ field, onRemove = vi.fn(), canRequire = true }: { field: CategoryField; onRemove?: () => void; canRequire?: boolean }) {
+function Screen({ field, canRequire = true, rows = false }: { field: CategoryField; canRequire?: boolean; rows?: boolean }) {
   const [f, setF] = useState(field)
   return (
     <>
-      <FieldScreen field={f} pageName="Food" canRequire={canRequire} onChange={(p) => setF({ ...f, ...p })} onRemove={onRemove} onBack={vi.fn()} />
+      <FieldScreen field={f} pageName="Food" canRequire={canRequire} onChange={(p) => setF({ ...f, ...p })} onBack={vi.fn()} rows={rows} />
       <output data-testid="field">{JSON.stringify(f)}</output>
     </>
   )
@@ -37,8 +37,7 @@ const box = (name: string) => screen.getByRole('region', { name })
 describe('FieldScreen — a ready-made field', () => {
   it('says what it is first, then what you can change, each a switch at its setting', async () => {
     const user = userEvent.setup()
-    const onRemove = vi.fn()
-    render(<Screen field={foodType} onRemove={onRemove} />)
+    render(<Screen field={foodType} />)
     expect(screen.getByRole('heading', { name: /^Food Type\s*Choices$/ })).toBeInTheDocument()
     const what = box('What this is')
     expect(what).toHaveTextContent('Whether a place is meat, dairy or parve.')
@@ -55,8 +54,8 @@ describe('FieldScreen — a ready-made field', () => {
     expect(within(change).getByRole('switch', { name: 'In the filter' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(change).getByRole('switch', { name: 'Required' }))
     expect(saved().required).toBe(true)
-    await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
-    expect(onRemove).toHaveBeenCalled()
+    // Removing is the field's X in the list (the user, Nov 10), not here.
+    expect(screen.queryByRole('button', { name: /^Remove from/ })).toBeNull()
   })
 
   // The user, Nov 9: "some fields have no edit and some have edit. If you
@@ -68,6 +67,8 @@ describe('FieldScreen — a ready-made field', () => {
     // The list is the choices box, not chips in What this is.
     expect(within(box('What this is')).queryByRole('list', { name: 'Choices' })).toBeNull()
     const choices = box('Choices')
+    // Before the switches, since they're what the field is (the user, Nov 10).
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label') ?? r.querySelector('h2')?.textContent)).toEqual(['What this is', 'Choices', 'What you can change'])
     // A rename changes only the words; places keep the stored value.
     const name = within(choices).getByRole('textbox', { name: 'Rename IKC' })
     await user.clear(name)
@@ -80,7 +81,8 @@ describe('FieldScreen — a ready-made field', () => {
     expect(ou).toHaveValue('OU')
     expect(saved().options![2]).toEqual({ value: 'OU', label: 'OU' })
     await user.click(within(choices).getByRole('button', { name: 'Remove Tartikov' }))
-    await user.click(within(choices).getByRole('button', { name: '+ Add a choice' }))
+    expect(within(choices).getByRole('button', { name: 'Add a choice' })).toHaveClass('border-dashed', 'w-full')
+    await user.click(within(choices).getByRole('button', { name: 'Add a choice' }))
     await user.type(within(choices).getByRole('textbox', { name: 'New choice' }), 'Star-K{Enter}')
     expect(saved().options).toEqual([{ value: 'IKC', label: 'IKC (Philadelphia)' }, { value: 'OU', label: 'OU' }, { value: 'Star-K', label: 'Star-K', own: true }])
     await user.click(within(choices).getByRole('switch', { name: 'Other, a box to type in' }))
@@ -147,11 +149,11 @@ describe('FieldScreen — a ready-made field', () => {
     const user = userEvent.setup()
     const onPartner = vi.fn()
     const cert: CategoryField = { key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [] }
-    const { rerender } = render(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} partner={{ on: true, onChange: onPartner }} />)
+    const { rerender } = render(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onBack={vi.fn()} partner={{ on: true, onChange: onPartner }} />)
     expect(box('What this is')).toHaveTextContent(/It comes with .*Link to the certificate\./)
     await user.click(within(box('What you can change')).getByRole('switch', { name: 'Link to the certificate' }))
     expect(onPartner).toHaveBeenCalledWith(false)
-    rerender(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} partner={{ on: false, onChange: onPartner }} />)
+    rerender(<FieldScreen field={cert} pageName="Food" canRequire onChange={vi.fn()} onBack={vi.fn()} partner={{ on: false, onChange: onPartner }} />)
     expect(box('What this is')).not.toHaveTextContent('Link to the certificate')
     expect(within(box('What you can change')).getByRole('switch', { name: 'Link to the certificate' })).toHaveAttribute('aria-checked', 'false')
   })
@@ -168,7 +170,7 @@ describe('FieldScreen — a ready-made field', () => {
     for (const field of [foodType, { ...foodType, key: 'size', label: 'Size' }, { ...foodType, key: 'storeType', label: 'Store Type' }]) {
       render(<Screen field={field} />)
       expect(screen.queryByRole('region', { name: 'Choices' })).toBeNull()
-      expect(screen.queryByRole('button', { name: '+ Add a choice' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Add a choice' })).toBeNull()
       expect(screen.queryByRole('textbox', { name: /^Rename/ })).toBeNull()
       expect(screen.getByRole('switch', { name: 'In the filter' })).toBeInTheDocument()
       cleanup()
@@ -194,12 +196,11 @@ describe('FieldScreen — a ready-made field', () => {
     expect(screen.queryByRole('switch', { name: 'Everything here is kosher?' })).toBeNull()
   })
 
-  it('folds a superadmin’s other settings under More', async () => {
-    const user = userEvent.setup()
-    render(<FieldScreen field={foodType} pageName="Food" canRequire onChange={vi.fn()} onRemove={vi.fn()} onBack={vi.fn()} more={<p>Only for some places</p>} />)
-    expect(screen.queryByText('Only for some places')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'More' }))
-    expect(screen.getByText('Only for some places')).toBeInTheDocument()
+  // The user, Nov 10: "what's this 'more' thing on email field?" … "yes
+  // remove it". Not for a superadmin either.
+  it('has no More', () => {
+    render(<Screen field={foodType} />)
+    expect(screen.queryByRole('button', { name: /^(More|Less)$/ })).toBeNull()
   })
 })
 
@@ -209,8 +210,7 @@ describe('FieldScreen — a field made here', () => {
 
   it('has Basics, the choices as rows, Other as a switch and the kind’s questions as No / Yes', async () => {
     const user = userEvent.setup()
-    const onRemove = vi.fn()
-    render(<Screen field={own} onRemove={onRemove} />)
+    render(<Screen field={own} />)
     expect(screen.getByRole('heading', { name: /^Food Type\s*Choices$/ })).toBeInTheDocument()
     expect(screen.getByLabelText('Note under it, on Add a place')).toHaveValue('Pick all that fit')
     expect(screen.queryByRole('region', { name: 'What this is' })).not.toBeInTheDocument()
@@ -218,7 +218,7 @@ describe('FieldScreen — a field made here', () => {
     expect(screen.getByRole('radiogroup', { name: 'Should it be part of the filter?' })).toBeInTheDocument()
     // A choice off, one added, Other on, one choice only.
     await user.click(screen.getByRole('button', { name: 'Remove Dairy' }))
-    await user.click(screen.getByRole('button', { name: '+ Add a choice' }))
+    await user.click(screen.getByRole('button', { name: 'Add a choice' }))
     await user.type(screen.getByRole('textbox', { name: 'New choice' }), 'Fish{Enter}')
     await user.click(screen.getByRole('switch', { name: 'Other, a box to type in' }))
     await user.click(within(screen.getByRole('radiogroup', { name: 'Can a place be both Meat and Parve?' })).getByRole('radio', { name: 'No' }))
@@ -226,8 +226,8 @@ describe('FieldScreen — a field made here', () => {
     expect(f.options!.map((o) => o.label)).toEqual(['Meat', 'Parve', 'Fish'])
     expect(f.allowOther).toBe(true)
     expect(f.multiSelect).toBe(false)
-    await user.click(screen.getByRole('button', { name: 'Remove from Food' }))
-    expect(onRemove).toHaveBeenCalled()
+    // Removing is the field's X in the list (the user, Nov 10), not here.
+    expect(screen.queryByRole('button', { name: /^Remove from/ })).toBeNull()
   })
 
   it('renames a choice where it is, keeping what places stored', async () => {
@@ -255,5 +255,39 @@ describe('FieldScreen — a field made here', () => {
     expect(screen.queryByText('Choices', { selector: 'h2' })).not.toBeInTheDocument()
     expect(screen.queryByRole('radiogroup', { name: 'Should it be part of the filter?' })).not.toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: 'Is it a required field?' })).toBeInTheDocument()
+  })
+})
+
+// D2 (Nov 10): a field says itself whether it shows under a place's name on
+// its row, beside whether it's in the filter. The same setting the page's
+// "Before it's opened" sets (cardLines.ts), so the two never disagree.
+describe('FieldScreen — Under the name', () => {
+  it('a ready-made choice: a switch at its setting, which puts it on the row or takes it off', async () => {
+    const user = userEvent.setup()
+    render(<Screen field={foodType} rows />)
+    const under = within(box('What you can change')).getByRole('switch', { name: 'Under the name' })
+    // A filter's badge is on the row until someone says otherwise.
+    expect(under).toHaveAttribute('aria-checked', 'true')
+    await user.click(under)
+    expect(saved().onCard).toBe(false)
+    expect(under).toHaveAttribute('aria-checked', 'false')
+    await user.click(under)
+    expect(saved().onCard).toBe(true)
+  })
+
+  it('a short line goes on the row as its third line', async () => {
+    const user = userEvent.setup()
+    render(<Screen field={{ key: 'tagline', label: 'Tagline', type: 'text', madeHere: true }} rows />)
+    const q = screen.getByRole('radiogroup', { name: 'Show it under the name?' })
+    await user.click(within(q).getByRole('radio', { name: 'Yes' }))
+    expect(saved().showInHeader).toBe(true)
+  })
+
+  it('is not asked of what can’t go on a row, or where places aren’t listed on rows', () => {
+    render(<Screen field={{ key: 'menu', label: 'Menu', type: 'url' }} rows />)
+    expect(screen.queryByRole('switch', { name: 'Under the name' })).not.toBeInTheDocument()
+    cleanup()
+    render(<Screen field={foodType} />)
+    expect(screen.queryByRole('switch', { name: 'Under the name' })).not.toBeInTheDocument()
   })
 })

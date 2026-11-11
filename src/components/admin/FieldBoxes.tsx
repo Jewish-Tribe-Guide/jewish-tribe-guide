@@ -1,162 +1,280 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
-import { boxLine, boxName, boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
+import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
-import { Chevron } from './AdminUI'
-import DragList, { addButton, OrderRow, RowActions, type DragRow } from './DragList'
+import { Chevron, GoChevron } from './AdminUI'
+import DragList, { addListButton, PLUS, RowName, useBarToggle, X, type DragRow } from './DragList'
 
-// Site → Category pages → a page → Fields (boards 17-19): the boxes of one
-// of its opened listings, in the order a visitor sees them (fieldBoxes.ts).
-// A box opens in place to its fields, each opening that field's screen; the
-// admin's own, and the listing's own from a field made here, are renamed in
-// place (a ready-made field's keeps its name); the admin's have a trash
-// can. A field moves by
-// dragging it onto another box's row, which is drawn dashed while it's
-// over it, or red with why when that box can't take it.
+// Site → Category pages → a page → Fields, as board E1b draws it (the user,
+// Nov 10: "I like the creativity. I just want you to implement it"): every
+// box is open, a card of its own with its name on a grey head, its fields
+// as rows under it (each with its Filter and Under the name tags, opening
+// its own screen), and "+ Add a field" across its foot. A box's handle
+// carries the box with its fields; a field's moves it, into another box
+// too, which turns blue while it's over it, or red with why when it can't
+// take it. The admin's boxes, and the listing's own from a field made here,
+// are renamed by tapping the name; a ready-made field's keeps its name.
+//
+// Every box starts open, as E1b draws it. A box with something in it folds
+// and opens by the chevron at the end of its name bar; an empty one has its
+// X there instead (the user, Nov 10: "once we add a field then a box turns
+// into an accordion and we remove the x"). A field dragged onto a folded
+// box goes in at its end.
 
 /** Where the handle would be: rows that don't move keep their names lined
  *  up with the ones that do. */
 const NO_HANDLE = <span aria-hidden="true" className="h-11 w-8 shrink-0" />
 const still = (row: DragRow): DragRow => ({ ...row, handle: NO_HANDLE, rowProps: { onPointerDown: () => {}, onContextMenu: () => {} } })
 
+
+/** E1b's "+ Add a box": a dashed button as wide as the list. */
+export { addListButton as addBoxButton, PLUS as PlusIcon }
+
 export default function FieldBoxes({
   page,
   boxes,
   parts,
-  openId,
   freshId,
-  onOpen,
+  landed,
   onChange,
   onRename,
+  onOwnBox,
+  onRenameEnd,
   onRemoveBox,
   onAddField,
   onShowField,
-  onShowBasic,
+  onRemoveRow,
 }: {
   page: FieldPage
   boxes: FieldBox[]
   parts: ListingParts
-  openId: string | null
   /** A box just added: its name starts selected (board 19). */
   freshId: string | null
-  onOpen: (id: string | null) => void
+  /** The row just added (`field:…`, `basic:…`): scrolled to and lit. */
+  landed?: string | null
   /** A drop: the admin's boxes, and the page's fields' new order when a box
    *  of the listing's own was reordered. */
   onChange: (parts: ListingParts, order: string[] | null) => void
   onRename: (id: string, title: string) => void
+  /** A box of the listing's own, tapped to rename: it becomes the admin's. */
+  onOwnBox?: (id: string) => void
+  /** A box's name left, as it stands. */
+  onRenameEnd?: (id: string, title: string) => void
   onRemoveBox: (id: string) => void
   onAddField: (boxId: string) => void
   onShowField: (key: string) => void
-  onShowBasic: (basic: 'address' | 'phone') => void
+  /** A row's X: a field (by key), or the page's address or phone. */
+  onRemoveRow: (row: { field: string } | 'address' | 'phone') => void
 }) {
-  const items = fieldItems(boxes, openId)
+  // Folded boxes, by id: just their name bar in the list.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const barToggle = useBarToggle()
+  const items = boxes.flatMap((box) => (folded.has(box.id) ? [{ box }] : fieldItems([box])))
+  const all = fieldItems(boxes)
+  const fold = (id: string, on: boolean) =>
+    setFolded((f) => {
+      const next = new Set(f)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
   const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
   const hidden = new Set((page.hiddenFields ?? []).map((f) => f.key))
-  const lastBox = boxes.at(-1)?.id
+  const list = useRef<HTMLDivElement>(null)
+  // A field landing in a folded box opens it, so it can be seen landing
+  // (set while rendering, as React's "adjusting state on a prop change").
+  const [seenLanded, setSeenLanded] = useState(landed)
+  if (landed !== seenLanded) {
+    setSeenLanded(landed)
+    const landedIn = landed ? boxOf(all, landed) : null
+    if (landedIn && folded.has(landedIn)) fold(landedIn, false)
+  }
+  useEffect(() => {
+    if (landed) list.current?.querySelector(`[data-drag-row="${CSS.escape(landed)}"]`)?.scrollIntoView?.({ block: 'center' })
+  }, [landed])
 
-  function slot(item: FieldItem, _i: number, shown: readonly FieldItem[], dragKey: string | null, refused: readonly FieldItem[] | null) {
+  function slot(item: FieldItem, i: number, shown: readonly FieldItem[], dragKey: string | null, refused: readonly FieldItem[] | null) {
     const key = itemKey(item)
-    if ('box' in item) {
-      const no = refused && orderProblem(items, refused, page)
-      if (no?.at === item.box.id)
-        return {
-          className: 'rounded-[10px] bg-red-50 outline-2 outline-dashed outline-red-400 -outline-offset-4',
-          note: <p className="m-0 px-4 pb-2.5 text-[13px] font-semibold text-red-700">{no.why}</p>,
-        }
-      // The box a lifted field is over, when it isn't the one it came from.
-      const over = dragKey?.startsWith('field:') && boxOf(shown, dragKey) === item.box.id && boxOf(items, dragKey) !== item.box.id && item.box.id !== openId
-      if (over) return { className: 'rounded-[10px] bg-blue-50 outline-2 outline-dashed outline-primary -outline-offset-4' }
-      return { className: item.box.id === openId || item.box.id === lastBox ? '' : 'border-b border-slate-100' }
-    }
-    if ('end' in item) return { className: `px-4 pb-4 pt-2.5 sm:pl-12 ${item.end === lastBox ? '' : 'border-b border-slate-100'}` }
-    // A field or the address and phone: in a box of their own, under its row.
-    const inside = shown.filter((i) => !('box' in i) && !('end' in i) && boxOf(shown, itemKey(i)) === openId)
-    const first = inside[0] && itemKey(inside[0]) === key
-    const last = inside.at(-1) && itemKey(inside.at(-1)!) === key
-    return {
-      className: ['mx-4 sm:ml-12 border-x border-slate-200 bg-white', first ? 'rounded-t-[10px] border-t' : 'border-t', last ? 'rounded-b-[10px] border-b' : ''].join(' '),
-    }
+    const owner = 'box' in item ? item.box.id : boxOf(shown, key)
+    // The box a lifted field is over, when it isn't the one it came from.
+    const no = refused && orderProblem(items, refused, page)
+    const turnedDown = no?.at === owner
+    const over = !turnedDown && dragKey?.startsWith('field:') && boxOf(shown, dragKey) === owner && boxOf(items, dragKey) !== owner
+    const edge = turnedDown ? 'border-red-400 bg-red-50' : over ? 'border-primary bg-blue-50' : 'border-slate-200'
+    if ('box' in item)
+      return {
+        className: `${i === 0 ? '' : 'mt-3'} overflow-hidden border ${folded.has(item.box.id) ? 'rounded-xl' : 'rounded-t-xl border-b-slate-100'} ${turnedDown || over ? edge : 'border-slate-200 bg-slate-50'}`,
+        note: turnedDown ? <p className="m-0 px-4 pb-2.5 text-[13px] font-semibold text-red-700">{no!.why}</p> : undefined,
+      }
+    const afterHead = i > 0 && 'box' in shown[i - 1]
+    if ('end' in item) return { className: `rounded-b-xl border-x border-b ${edge} ${afterHead ? '' : 'border-t border-t-slate-100'} ${turnedDown || over ? '' : 'bg-white'}` }
+    const lit = landed === key ? 'bg-blue-50' : turnedDown || over ? '' : 'bg-white'
+    return { className: `border-x ${edge} ${afterHead ? '' : 'border-t border-t-slate-100'} ${lit}` }
   }
 
   return (
-    <DragList
-      items={items}
-      keyOf={itemKey}
-      nameOf={(i) => ('box' in i ? i.box.title : 'field' in i ? byKey.get(i.field)?.label || 'New field' : '')}
-      canMove={(next) => orderProblem(items, next, page) === null}
-      onReorder={(next) => {
-        const read = readOrder(items, next, parts, page)
-        onChange(read.parts, read.order)
-      }}
-      slot={slot}
-    >
-      {(item, row) => {
-        if ('box' in item) {
-          const box = item.box
-          const open = box.id === openId
-          const renames = boxRenames(box, page)
-          return (
-            <OrderRow
-              row={box.moves ? row : still(row)}
-              name={box.title || 'New box'}
-              line={boxLine(box, page) || (box.id === 'top' ? 'Just the name' : undefined)}
-              open={open}
-              onToggle={() => onOpen(open ? null : box.id)}
-              rename={renames ? { ...boxName(page, box), onChange: (t) => onRename(box.id, t), fresh: box.id === freshId } : undefined}
-            />
-          )
-        }
-        if ('end' in item) {
-          const box = boxes.find((b) => b.id === item.end)!
-          const add = (
-            <button type="button" onClick={() => onAddField(box.id)} className={addButton}>
-              + Add a field
-            </button>
-          )
-          const empty = box.fields.length === 0 && !box.basics?.length && <span className="block pb-2.5 text-[13px] text-slate-500">Nothing in it yet</span>
-          if (box.kind === 'admin')
+    <div ref={list} className="px-4 pb-1 pt-4">
+      <DragList
+        items={items}
+        keyOf={itemKey}
+        nameOf={(i) => ('box' in i ? i.box.title || 'New box' : 'field' in i ? byKey.get(i.field)?.label || 'New field' : 'basic' in i ? (i.basic === 'address' ? 'Address' : 'Phone') : '')}
+        // From the keyboard, a step that changes nothing (the phone above
+        // the address, which always come first) is passed over.
+        canMove={(next, via) => orderProblem(items, next, page) === null && (via === 'pointer' || changes(readOrder(items, next, parts, page), parts))}
+        carries={(i, all) => ('box' in i ? rowsOfBox(all, i.box.id) : [])}
+        onReorder={(next) => {
+          const read = readOrder(items, next, parts, page)
+          onChange(read.parts, read.order)
+        }}
+        slot={slot}
+      >
+        {(item, row) => {
+          if ('box' in item) {
+            const box = item.box
+            const name = box.title || 'New box'
+            const renames = boxRenames(box, page)
+            const folds = box.fields.length > 0 || (box.basics?.length ?? 0) > 0
             return (
-              <div>
-                {empty}
-                <RowActions name={box.title || 'New box'} onRemove={() => onRemoveBox(box.id)}>
-                  {add}
-                </RowActions>
+              <div
+                // The whole name bar folds a box with something in it, as a
+                // Home page tab's does; the chevron is the keyboard's way.
+                onClick={folds ? (e) => barToggle(e, () => fold(box.id, !folded.has(box.id))) : undefined}
+                className={`flex min-h-[52px] items-center gap-1 py-1.5 pl-1 pr-3 ${folds ? 'cursor-pointer' : ''}`}
+              >
+                {box.moves ? row.handle : NO_HANDLE}
+                {renames ? (
+                  <span className="flex min-w-0 flex-1">
+                    <RowName
+                      name={name}
+                      rename={{
+                        value: box.title,
+                        placeholder: 'New box',
+                        onChange: (t) => onRename(box.id, t),
+                        fresh: box.id === freshId,
+                        ...(box.kind === 'listing' && onOwnBox && { onStart: () => onOwnBox(box.id) }),
+                        ...(onRenameEnd && { onEnd: (t: string) => onRenameEnd(box.id, t) }),
+                      }}
+                    />
+                  </span>
+                ) : (
+                  <h3 {...(box.moves ? row.rowProps : {})} className="m-0 min-w-0 flex-1 select-none text-base font-semibold text-slate-900">
+                    {name}
+                  </h3>
+                )}
+                {/* An empty box comes off by its X; one with fields in it
+                    has none, and folds by its chevron instead. Its X is
+                    back once its last field is taken off or dragged out
+                    (the user, Nov 10: "once we add a field ... we remove
+                    the x"). Not "Not on the listing". */}
+                {folds && (
+                  <button
+                    type="button"
+                    onClick={() => fold(box.id, !folded.has(box.id))}
+                    aria-expanded={!folded.has(box.id)}
+                    aria-label={name}
+                    className="grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-slate-100"
+                  >
+                    <span className={`transition-transform ${folded.has(box.id) ? '' : 'rotate-90'}`}>
+                      <Chevron />
+                    </span>
+                  </button>
+                )}
+                {box.moves && !box.fields.length && !box.basics?.length && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveBox(box.id)}
+                    aria-label={`Take ${name} off`}
+                    className="grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  >
+                    {X}
+                  </button>
+                )}
               </div>
             )
-          return box.kind === 'fixed' ? <div>{add}</div> : <div className="h-1" />
-        }
-        if ('basic' in item) {
-          const name = item.basic === 'address' ? 'Address' : 'Phone'
-          return <Inner row={still(row)} name={name} line={item.basic === 'address' ? 'Puts the page on the map' : undefined} onOpen={() => onShowBasic(item.basic)} />
-        }
-        const f = byKey.get(item.field)
-        return (
-          <Inner
-            row={hidden.has(item.field) ? still(row) : row}
-            name={f?.label || 'New field'}
-            line={f && fieldLine(f)}
-            onOpen={() => onShowField(item.field)}
-          />
-        )
-      }}
-    </DragList>
+          }
+          if ('end' in item) {
+            const box = boxes.find((b) => b.id === item.end)!
+            const name = box.title || 'New box'
+            const add = (
+              <button type="button" onClick={() => onAddField(box.id)} aria-label={`Add a field to ${name}`} className="flex min-h-[46px] flex-1 cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[15px] font-semibold text-primary hover:bg-blue-50/60">
+                {PLUS}
+                Add a field
+              </button>
+            )
+            if (!box.moves) return <div className="h-1" />
+            return <div className="flex items-center">{add}</div>
+          }
+          if ('basic' in item) {
+            const name = item.basic === 'address' ? 'Address' : 'Phone'
+            // Nothing to set on them: no screen, only the X.
+            return <Inner row={row} name={name} onRemove={() => onRemoveRow(item.basic)} />
+          }
+          const f = byKey.get(item.field)
+          // A hechsher's part is switched on the hechsher's own screen: no X.
+          const part = hidden.has(item.field)
+          return (
+            <Inner
+              row={part ? still(row) : row}
+              name={f?.label || 'New field'}
+              tags={f ? tagsOf(f) : []}
+              onOpen={() => onShowField(item.field)}
+              onRemove={part ? undefined : () => onRemoveRow({ field: item.field })}
+            />
+          )
+        }}
+      </DragList>
+    </div>
   )
 }
 
-/** A field in an opened box: its handle, name and line, and a chevron to
- *  its own screen. */
-function Inner({ row, name, line, onOpen }: { row: DragRow; name: string; line?: string; onOpen: () => void }) {
-  return (
-    <div className="flex min-h-12 items-center gap-1 pl-1 pr-2">
-      {row.handle}
-      <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-12 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-2 text-left">
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[15px] font-medium text-slate-900">{name}</span>
-          {line && <span className="text-[13px] text-slate-600">{line}</span>}
+/** A field's tags on its row (E1b): Filter, Under the name. Nothing else
+ *  under a field's name (the user, Nov 10: "I don't think we need those
+ *  descriptions underneath the fields"). */
+function tagsOf(f: CategoryField): string[] {
+  return (fieldLine(f) ?? '').split(' · ').filter((t) => t === 'Filter' || t === 'Under the name')
+}
+
+/** A field in its box: its handle, name and tags, a chevron to its own
+ *  screen, and last its X (the user, Nov 10: removing is where the field
+ *  is, as a link's × is), the way a tab's X sits after its chevron. */
+function Inner({ row, name, tags = [], onOpen, onRemove }: { row: DragRow; name: string; tags?: string[]; onOpen?: () => void; onRemove?: () => void }) {
+  const label = (
+    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <span data-row-name className="text-[15px] text-slate-900">{name}</span>
+      {tags.map((t) => (
+        <span key={t} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+          {t}
         </span>
-        <Chevron />
-      </button>
+      ))}
+    </span>
+  )
+  return (
+    <div className="flex min-h-[46px] items-center gap-1 pl-1 pr-1">
+      {row.handle}
+      {onOpen ? (
+        <button type="button" onClick={onOpen} {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-2 text-left hover:bg-slate-100">
+          {label}
+          <GoChevron />
+        </button>
+      ) : (
+        <span {...row.rowProps} className="flex min-h-11 min-w-0 flex-1 select-none items-center py-1.5 pl-2 pr-2">
+          {label}
+        </span>
+      )}
+      {onRemove ? (
+        <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className="grid h-11 w-10 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+          {X}
+        </button>
+      ) : (
+        <span aria-hidden="true" className="w-10 shrink-0" />
+      )}
     </div>
   )
+}
+
+/** Whether a reorder changes what's saved. */
+function changes(read: { parts: ListingParts; order: string[] | null }, parts: ListingParts): boolean {
+  return read.order !== null || JSON.stringify(read.parts) !== JSON.stringify(parts)
 }

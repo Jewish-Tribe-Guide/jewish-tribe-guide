@@ -7,6 +7,7 @@ import { itemName } from '@/lib/itemNames'
 import { itemCounts, itemFields, listingHas, searchItems } from '@/lib/itemFilter'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { listingSlug } from '@/lib/listingSlug'
+import { minyanimPage } from '@/lib/davening'
 import { fixedViewSlug, routes } from '@/lib/routes'
 import type { Reading } from '@/lib/questionReader'
 
@@ -379,7 +380,7 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
 
   // A minyan: Minyanim by time, which reads the words itself (a tefillah,
   // a day, a shul); then the shuls.
-  const shuls = categories.find((c) => c.kind === 'listing' && c.detailFields.some((f) => f.type === 'minyanim'))
+  const shuls = minyanimPage(categories.filter((c) => c.kind === 'listing'), listings)
   if (ask.minyan && shuls) {
     lines.push({
       key: 'minyanim',

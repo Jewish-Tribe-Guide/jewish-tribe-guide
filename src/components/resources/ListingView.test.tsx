@@ -131,6 +131,19 @@ describe('ListingView — who and whether', () => {
     expect(after(screen.getByTestId('listing-actions'), screen.getByTestId('listing-items'))).toBe(true)
   })
 
+  // The user, Nov 10: any box anywhere. Contact and About above the rest.
+  it('puts every box where the admin dragged it, Contact and About included', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const about: CategoryField = { key: 'about', label: 'About', type: 'textarea' }
+    const item = { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'], about: 'Family run since 1990.' }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes, about], listingParts: { order: ['about', 'contact', 'items', 'caveat'] } }) })
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const aboutBox = screen.getByText('Family run since 1990.')
+    expect(after(aboutBox, screen.getByTestId('listing-details'))).toBe(true)
+    expect(after(screen.getByTestId('listing-details'), screen.getByTestId('listing-items'))).toBe(true)
+    expect(after(screen.getByTestId('listing-items'), screen.getByTestId('listing-caveat-box'))).toBe(true)
+  })
+
   it('a grocery’s caveat stays under the name and in the details', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     view({ item: { ...judah, kosherPartial: true, kosherNote: 'The deli is not supervised', m: ['Challah'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, m] }) })
@@ -949,5 +962,114 @@ describe('ListingView — a box that leads (board B)', () => {
     view({ item: mikes({ foodType: ['Restaurant'] }), category: delivery })
     expect(screen.queryByTestId('listing-lead-box')).not.toBeInTheDocument()
     expect(screen.getByText('Directions')).toBeInTheDocument()
+  })
+
+  // The user, Nov 10: Delivery is one field, and goes in any of the admin's
+  // boxes; there it's drawn the same, and not up top as well.
+  it('put in a box of the admin’s, drawn there, its group with it, and not up top', () => {
+    view({ item: mikes(), category: makeCategory({ ...delivery, listingParts: { boxes: [{ title: 'Ordering', fields: ['delivery_details'] }] } }) })
+    expect(screen.queryByTestId('listing-lead-box')).not.toBeInTheDocument()
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Ordering'))!
+    expect(within(box).getByText(said)).toBeInTheDocument()
+    expect(within(box).getByRole('link', { name: 'Join the group' })).toHaveAttribute('href', 'https://chat.whatsapp.com/Mikes')
+    expect(screen.getAllByText(said)).toHaveLength(1)
+  })
+})
+
+// The user, Nov 10: "I don't understand why all fields can't just go
+// anywhere." A field the admin put in Contact or About is drawn there,
+// whatever its kind; one put in a box of theirs, there.
+describe('ListingView — a field where the admin put it', () => {
+  const notes: CategoryField = { key: 'notes', label: 'Parking', type: 'textarea', renderAs: 'row' }
+  const night: CategoryField = { key: 'night', label: 'Night line', type: 'tel', renderAs: 'row' }
+  const menu: CategoryField = { key: 'menu', label: 'Menu', type: 'url', renderAs: 'row', linkLabel: 'See the menu' }
+  const item = { ...judah, notes: 'Lot behind the building', night: '2155550100', menu: 'https://judahgrill.com/menu' }
+  const placed = (listingParts: object, detailFields = [...food.detailFields, notes, night, menu]) =>
+    view({ item, category: makeCategory({ ...food, detailFields, listingParts }) })
+
+  it('a long text in Contact, a phone and a link in About', () => {
+    placed({ contact: ['notes'], about: ['night', 'menu'] })
+    const contact = screen.getByTestId('listing-details')
+    const about = screen.getByTestId('listing-about')
+    expect(contact).toHaveTextContent('Lot behind the building')
+    expect(about).not.toHaveTextContent('Lot behind the building')
+    expect(within(about).getByRole('link', { name: '(215) 555-0100' })).toHaveAttribute('href', 'tel:2155550100')
+    expect(within(about).getByRole('link', { name: 'See the menu' })).toHaveAttribute('href', 'https://judahgrill.com/menu')
+    // Said once.
+    expect(contact).not.toHaveTextContent('Night line')
+    expect(within(contact).queryByRole('link', { name: 'See the menu' })).toBeNull()
+  })
+
+  it('where its kind puts it, when it wasn’t put anywhere', () => {
+    placed({})
+    expect(screen.getByTestId('listing-about')).toHaveTextContent('Lot behind the building')
+    expect(screen.getByTestId('listing-details')).toHaveTextContent('Night line')
+  })
+
+  // The user, Nov 10: the davening times can go in one of the admin's
+  // boxes, drawn as they are on their own ("Let's say same for now").
+  it('the davening times in a box of the admin’s, drawn there as they are', () => {
+    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }], listingParts: { boxes: [{ title: 'Services', fields: ['minyanim'] }] } })
+    view({ item: makeListing({ minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] }), category: shuls })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Services'))!
+    expect(within(box).getByTestId('davening-shabbos')).toHaveTextContent(/9 AM/)
+    expect(screen.getAllByTestId('davening-shabbos')).toHaveLength(1)
+  })
+
+  // The user, Nov 10: "anything takes anything", Contact and About too.
+  it('the davening times in About and a list of contacts in Contact, drawn there and nowhere else', () => {
+    const fields: CategoryField[] = [
+      { key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' },
+      { key: 'gabbaim', label: 'Gabbaim', type: 'contacts', renderAs: 'row' },
+    ]
+    const shuls = makeCategory({ id: 'synagogue', detailFields: fields, listingParts: { about: ['minyanim'], contact: ['gabbaim'] } })
+    view({ item: makeListing({ address: '1 Pine St', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }], gabbaim: [{ name: 'Reuven Levi', phone: '2155550111' }] }), category: shuls })
+    expect(within(screen.getByTestId('listing-about')).getByTestId('davening-shabbos')).toHaveTextContent(/9 AM/)
+    expect(screen.getAllByTestId('davening-shabbos')).toHaveLength(1)
+    expect(within(screen.getByTestId('listing-details')).getByText('Reuven Levi')).toBeInTheDocument()
+    expect(screen.getAllByText('Reuven Levi')).toHaveLength(1)
+  })
+
+  // The user, Nov 10: "move all fields. Including address and phone."
+  it('the address in About and the phone in a box of the admin’s, drawn there and not in Contact', () => {
+    const fields: CategoryField[] = [{ key: 'notes', label: 'Notes', type: 'textarea' }, { key: 'gabbaim', label: 'Gabbaim', type: 'contacts', renderAs: 'row' }]
+    const page = makeCategory({ id: 'synagogue', detailFields: fields, listingParts: { about: ['@address'], boxes: [{ title: 'Who to call', fields: ['gabbaim', '@phone'] }] } })
+    view({ item: makeListing({ address: '1 Pine St', phone: '2155550199', notes: 'Kiddush after', gabbaim: [{ name: 'Reuven Levi', phone: '2155550111' }] }), category: page })
+    expect(screen.getByTestId('listing-about')).toHaveTextContent('1 Pine St')
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Who to call'))!
+    expect(within(box).getByRole('link', { name: /555-0199/ })).toHaveAttribute('href', 'tel:2155550199')
+    expect(screen.queryByTestId('listing-details')?.textContent ?? '').not.toMatch(/1 Pine St|555-0199/)
+    expect(screen.getAllByText('1 Pine St')).toHaveLength(1)
+  })
+
+  // The user, Nov 10: Main dishes, made one of the admin's boxes, said
+  // "Main dishes" three times: the box, the field's small heading, and the
+  // items' own box inside it.
+  it('the items in a box of the same name, named once, with no box inside the box', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const page = makeCategory({ ...food, detailFields: [...food.detailFields, dishes], listingParts: { boxes: [{ title: 'Main dishes', fields: ['@phone', 'dishes'] }] } })
+    view({ item: { ...judah, dishes: ['Shawarma', 'Falafel'] }, category: page })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Shawarma'))!
+    expect(within(box).getAllByText(/Main dishes/i)).toHaveLength(1)
+    expect(within(box).getByText('Phone')).toBeInTheDocument()
+    // Drawn inside it, not as a framed box of its own.
+    expect(within(box).getByTestId('listing-items').tagName).not.toBe('SECTION')
+  })
+
+  it('the items in a box with another name, named small under it', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const page = makeCategory({ ...food, detailFields: [...food.detailFields, dishes], listingParts: { boxes: [{ title: 'Today’s food', fields: ['dishes'] }] } })
+    view({ item: { ...judah, dishes: ['Shawarma', 'Falafel'] }, category: page })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('Shawarma'))!
+    expect(within(box).getByRole('heading', { name: 'Today’s food' })).toBeInTheDocument()
+    expect(within(box).getAllByText(/Main dishes/)).toHaveLength(1)
+  })
+
+  it('hours in a box of the admin’s, said there and not again in Contact', () => {
+    const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
+    view({ item: { ...judah, hours: everyDay }, category: makeCategory({ ...food, listingParts: { boxes: [{ title: 'When to come', fields: ['hours'] }] } }) })
+    const box = screen.getAllByTestId('listing-box').find((b) => b.textContent?.includes('When to come'))!
+    expect(box).toHaveTextContent(/11:00 AM/)
+    expect(screen.getByTestId('listing-details')).not.toHaveTextContent(/11:00 AM/)
   })
 })

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { bandImageFor, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
+import { takeCategoryListings } from '@/lib/categoryListings'
 import type { Coords } from '@/lib/useStoredLocation'
 import { withMilesFromAddress } from '@/lib/listingTravel'
 import { community } from '@/community.config'
@@ -72,7 +73,7 @@ export default function CategoryPreview({
   inline?: boolean
   /** How many places the category has, once loaded: the editor's
    *  "N places". */
-  onListings?: (count: number) => void
+  onListings?: (listings: DirectoryResource[]) => void
   view?: PreviewView
   /** Adding opens on this field's row: the field an admin is looking at. */
   focusField?: string
@@ -124,13 +125,14 @@ export default function CategoryPreview({
     let cancelled = false
     // A brand-new, unsaved category's id has no matching rows — this just
     // resolves to an empty list, same as any other empty category.
-    fetch(`/api/resources?category=${encodeURIComponent(category.id)}`)
-      .then(async (res) => {
-        const body = await res.json()
-        const listings = res.ok && body.ok ? (body.resources as DirectoryResource[]) : []
+    // Already on its way when the manager asked as the page opened.
+    takeCategoryListings(category.id)
+      .then(({ resources: listings }) => {
         if (!cancelled) {
           setRealListings(listings)
-          onListingsRef.current?.(listings.length)
+          // The Eruv page's places are eruvim, counted by the editor
+          // itself; it has no listings to count over them.
+          if (category.kind !== 'eruv') onListingsRef.current?.(listings)
         }
       })
       .catch(() => {
@@ -139,7 +141,7 @@ export default function CategoryPreview({
     return () => {
       cancelled = true
     }
-  }, [category.id])
+  }, [category.id, category.kind])
 
   function goToDirectory() {
     setAction(null)
@@ -166,8 +168,15 @@ export default function CategoryPreview({
     // No Add/Edit/Report action state applies here — it's a single info
     // page, not a directory of listings — so this bypasses the action
     // switch below entirely, same as 'zmanim' just after it.
+    // A listing and Editing (Nov 9): its fullest eruv open, as a listing
+    // page opens its fullest place, and on its Edit listing, which sends
+    // nothing here (PreviewSendProvider below). An eruv isn't added by
+    // visitors; Edit listing is where they meet a field.
     content = (
       <EruvInfo
+        key={view}
+        openFullest={view !== 'page'}
+        startEditing={view === 'adding'}
         onUp={onClose}
         title={category.pluralLabel}
         icon={category.icon}

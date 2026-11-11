@@ -73,7 +73,9 @@ vi.mock('./activityStore', () => ({
 // approval.
 const mockListEruvimForAdmin = vi.hoisted(() => vi.fn())
 const mockUpdateEruv = vi.hoisted(() => vi.fn())
-vi.mock('./eruvStore', () => ({ listEruvimForAdmin: mockListEruvimForAdmin, updateEruv: mockUpdateEruv }))
+const mockAddEruv = vi.hoisted(() => vi.fn())
+const mockRemoveEruv = vi.hoisted(() => vi.fn())
+vi.mock('./eruvStore', () => ({ listEruvimForAdmin: mockListEruvimForAdmin, updateEruv: mockUpdateEruv, addEruv: mockAddEruv, removeEruv: mockRemoveEruv }))
 
 const {
   activityForApproval,
@@ -132,6 +134,8 @@ afterEach(() => {
   mockRpc.mockReset()
   mockListEruvimForAdmin.mockReset()
   mockUpdateEruv.mockReset()
+  mockAddEruv.mockReset()
+  mockRemoveEruv.mockReset()
 })
 
 // ── listPendingSubmissions: category-label resolution ───────────────────────
@@ -1907,11 +1911,12 @@ describe('an eruv suggestion', () => {
 
   // Oct 22, Eruv status: Use this takes only the rows its website changed,
   // so one edited since it was read isn't put back; Edit saves the admin's.
-  const approveWith = async (edited: unknown, only?: string[], now = eruv) => {
+  const approveWith = async (edited: unknown, only?: string[], now: typeof eruv & { details?: Record<string, unknown> } = eruv, sent = sub, pages: unknown[] = []) => {
     let calls = 0
-    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
-    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sub), error: null }) : approveBuilder))
+    const approveBuilder = chainable({ data: { ...sent, status: 'approved' }, error: null })
+    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sent), error: null }) : approveBuilder))
     mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [now] })
+    mockListCategories.mockResolvedValue(pages)
     mockUpdateEruv.mockResolvedValue(undefined)
     await approveSubmission('sub-1', 'philly', 'admin@example.org', edited, only)
     return { builder: approveBuilder }
@@ -1929,10 +1934,109 @@ describe('an eruv suggestion', () => {
     await expect(approveWith({ covers: 'Center City.', website: 'not a site at all' })).rejects.toThrow('isn’t a web address')
   })
 
+  // Nov 9: the Eruv page's own fields (eruvFields.ts), kept in `details`.
+  const certified = { key: 'certifiedBy', label: 'Certified by', type: 'text' as const }
+  const withOwn = baseSubmission({
+    operation: 'update',
+    target_type: 'eruv',
+    payload: { ...payload, website: 'https://old.example', hotline: null, details: { certifiedBy: 'Rabbi B', hours: null }, detailFields: [certified, { key: 'hours', label: 'Hours', type: 'text' }] },
+  })
+  const hasOwn = { ...eruv, details: { certifiedBy: 'Rabbi A', hours: 'All day', kept: 'Untouched' } }
+
+  it('approving puts the own fields it names on the eruv, and leaves the rest', async () => {
+    await approveWith(undefined, undefined, hasOwn, withOwn)
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', expect.objectContaining({ details: { certifiedBy: 'Rabbi B', kept: 'Untouched' } }), expect.anything())
+  })
+
+  it('a suggestion without own fields leaves the eruv’s as they are', async () => {
+    await approveWith(undefined, undefined, hasOwn)
+    expect(mockUpdateEruv.mock.calls[0][2]).not.toHaveProperty('details')
+  })
+
+  it('Use this takes an own field only when it’s given', async () => {
+    await approveWith(undefined, ['hours'], hasOwn, withOwn)
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', expect.objectContaining({ details: { certifiedBy: 'Rabbi A', kept: 'Untouched' } }), expect.anything())
+  })
+
+  it('an Edit that leaves the own fields out keeps what was sent for them', async () => {
+    const page = { id: 'eruv', label: 'Eruv', kind: 'eruv', detailFields: [certified] }
+    await approveWith({ covers: 'Center City.', website: 'https://old.example', hotline: '', alertsUrl: '' }, undefined, hasOwn, withOwn, [page])
+    expect(mockUpdateEruv).toHaveBeenCalledWith('philly', 'center-city', expect.objectContaining({ details: { certifiedBy: 'Rabbi B', hours: 'All day', kept: 'Untouched' } }), expect.anything())
+  })
+
   it('an eruv that’s gone can’t be approved', async () => {
     mockFrom.mockReturnValue(chainable({ data: sub, error: null }))
     mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [] })
     await expect(approveSubmission('sub-1')).rejects.toThrow('Eruv not found: center-city')
     expect(mockUpdateEruv).not.toHaveBeenCalled()
+  })
+})
+
+// A new eruv (Nov 9): suggested from the Eruv page's "+", added only when an
+// admin approves it, with what was suggested and where its status is posted.
+describe('a new eruv suggestion', () => {
+  const payload = {
+    eruvId: 'overbrook', name: 'Overbrook Eruv', covers: 'Overbrook.', website: 'https://overbrookeruv.org', hotline: null, alertsUrl: null,
+    details: { certifiedBy: 'Rabbi A', area: null }, statusAt: 'https://overbrookeruv.org/status', map: 'https://overbrookeruv.org/map.kml',
+  }
+  const sub = baseSubmission({ operation: 'create', target_type: 'eruv', target_id: null, payload })
+  const approve = async (sent = sub) => {
+    let calls = 0
+    const approveBuilder = chainable({ data: { ...sent, status: 'approved' }, error: null })
+    mockFrom.mockImplementation(() => (++calls === 1 ? chainable({ data: structuredClone(sent), error: null }) : approveBuilder))
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [] })
+    mockListCategories.mockResolvedValue([])
+    mockAddEruv.mockResolvedValue(true)
+    mockUpdateEruv.mockResolvedValue(undefined)
+    await approveSubmission('sub-1', 'philly', 'admin@example.org')
+    // Wrapped: the builder is a thenable, so awaiting it alone hands back its data.
+    return { builder: approveBuilder }
+  }
+
+  it('the queue reads it against nothing, even an eruv of its name', async () => {
+    mockFrom.mockImplementation((table: string) => chainable({ data: table === 'submission' ? [sub] : [], error: null }))
+    mockListCategories.mockResolvedValue([])
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [{ id: 'overbrook', name: 'Overbrook Eruv', covers: null, website: null, hotline: null, alertsUrl: null }] })
+    const [card] = await listPendingSubmissions('philly')
+    expect(card.categoryLabel).toBe('Eruv')
+    expect(card.currentEruv).toBeNull()
+  })
+
+  it('approving adds it under its id, with its rows, own fields, status page and map', async () => {
+    const { builder } = await approve()
+    expect(mockAddEruv).toHaveBeenCalledWith('philly', 'overbrook', { name: 'Overbrook Eruv' })
+    expect(mockUpdateEruv).toHaveBeenCalledWith(
+      'philly',
+      'overbrook',
+      {
+        covers: 'Overbrook.', website: 'https://overbrookeruv.org', hotline: null, alertsUrl: null,
+        details: { certifiedBy: 'Rabbi A' }, statusUrl: 'https://overbrookeruv.org/status', lineUrl: 'https://overbrookeruv.org/map.kml',
+      },
+      { statusUrl: null, lineUrl: null },
+    )
+    expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }))
+  })
+
+  it('an email address is where its status emails come from, not a page', async () => {
+    await approve(baseSubmission({ operation: 'create', target_type: 'eruv', target_id: null, payload: { ...payload, statusAt: 'status@overbrookeruv.org', map: null } }))
+    const edit = mockUpdateEruv.mock.calls[0][2]
+    expect(edit).toMatchObject({ statusEmail: 'status@overbrookeruv.org' })
+    expect(edit).not.toHaveProperty('statusUrl')
+    expect(edit).not.toHaveProperty('lineUrl')
+  })
+
+  it('one added since can’t be approved, and nothing of it is saved', async () => {
+    mockFrom.mockReturnValue(chainable({ data: sub, error: null }))
+    mockAddEruv.mockResolvedValue(false)
+    await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow('There’s already an eruv called Overbrook Eruv.')
+    expect(mockUpdateEruv).not.toHaveBeenCalled()
+  })
+
+  it('not filled in, it isn’t left added', async () => {
+    mockFrom.mockReturnValue(chainable({ data: sub, error: null }))
+    mockAddEruv.mockResolvedValue(true)
+    mockUpdateEruv.mockRejectedValue(new Error('Failed to save the eruv: down'))
+    await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow('down')
+    expect(mockRemoveEruv).toHaveBeenCalledWith('philly', 'overbrook')
   })
 })

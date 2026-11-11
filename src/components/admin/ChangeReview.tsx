@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { diffLines } from '@/lib/submissionDiff'
-import { scheduleChange, usualBoxChange, type ChangeGroup, type ChangeLine } from '@/lib/changeLines'
+import { onlyExtras, scheduleChange, usualBoxChange, type ChangeGroup, type ChangeLine } from '@/lib/changeLines'
 import { boxChangeCount, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { readSchedules } from '@/lib/schedules'
@@ -133,7 +133,14 @@ export default function ChangeReview({
   }
   // A shul's dated schedule, by the days it changes.
   const daysFor = (key: string) => (key.endsWith('_schedules') ? scheduleChange(readSchedules(before[key]), readSchedules(sent.details[key])) : [])
-  const what = changed.flatMap((r) => boxesFor(fieldKeyFor(r.key, fields) === r.key ? r.key : null)?.map((b) => b.title) ?? [daysFor(r.key).length > 0 ? 'the schedule' : r.label]).join(', ')
+  const what = changed
+    .flatMap((r) => {
+      const boxes = boxesFor(fieldKeyFor(r.key, fields) === r.key ? r.key : null)
+      if (boxes) return boxes.map((b) => (onlyExtras(usualBoxChange(b.was, b.now, b.box)) ? `notes in the ${b.title.toLowerCase()}` : b.title))
+      const days = daysFor(r.key)
+      return [days.length === 0 ? r.label : onlyExtras(days) ? 'notes in the schedule' : 'the schedule']
+    })
+    .join(', ')
   const who = source.readBy === 'person' && (s.submitted_by?.name || s.submitted_by?.email) ? s.submitted_by.name || s.submitted_by.email : source.from
   const marked = source.readBy === 'ai' && source.original ? markTimes(source.original, sent.details) : null
 
@@ -318,6 +325,20 @@ function Lines({ lines }: { lines: ChangeLine[] }) {
   return (
     <ul className="m-0 p-0 list-none flex flex-col gap-0.5">
       {lines.map((l) => {
+        // Only its note changes: the time plain, the note's old words
+        // crossed out above its new ones, and what changes said.
+        if (l.extras) {
+          return (
+            <li key={l.key} className="text-[15.5px] py-1 text-slate-900">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="break-words">{l.text}</span>
+                <span className="text-xs font-semibold text-amber-900 bg-amber-100 rounded-full px-2 py-0.5">{l.extras.says}</span>
+              </span>
+              {l.extras.was && <del className="block text-[13.5px] text-slate-500">{l.extras.was}</del>}
+              {l.extras.now && <ins className="block -mx-2 px-2 rounded bg-green-100 text-[13.5px] font-semibold text-green-950 no-underline">{l.extras.now}</ins>}
+            </li>
+          )
+        }
         const body = (
           <>
             <span className="block break-words whitespace-pre-wrap">{l.text}</span>

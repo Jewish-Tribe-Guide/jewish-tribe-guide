@@ -29,8 +29,56 @@ test('a category’s “+” opens the box, with filling it in yourself one link
   const box = page.getByRole('dialog', { name: 'Add or update a place' })
   await box.getByLabel('Your message').fill('Acme on 5th has challah')
   await expect(box.getByRole('button', { name: 'See what changes' })).toBeEnabled()
-  await box.getByRole('button', { name: 'Fill it in yourself' }).click()
+  await box.getByRole('button', { name: 'Find the place' }).click()
   await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
+})
+
+// The user, Nov 10: the box's steps were React state only, so the
+// browser's Back from "Add to …" closed the whole box and lost what was
+// typed (AGENTS.md: "A screen of its own is an entry in the browser's
+// history"). Each step has its own address now; Back and Forward walk them.
+test('the browser’s Back and Forward walk the box’s steps, a row’s Back keeping what was typed', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithListings(request, community)
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  await dismissLocationPrompt(page)
+
+  const page0 = page.url()
+  await categoryAddButton(page).click()
+  await page.getByRole('dialog', { name: 'Add or update a place' }).getByRole('button', { name: 'Find the place' }).click()
+  const find = page.getByRole('dialog', { name: 'Find the place' })
+  await expect(find).toBeVisible()
+  const box = () => new URL(page.url()).searchParams.get('box')
+  await expect.poll(box).toBe('find')
+  await find.getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
+  const adding = page.getByRole('dialog', { name: /^Add to / })
+  await expect(adding).toBeVisible()
+  await expect.poll(box).toBe('find/add')
+  await adding.getByTestId('editor-row-name').click()
+  await expect.poll(box).toBe('find/add/name')
+  await page.locator('#edit-name').fill('A place typed in')
+
+  await page.goBack()
+  await expect(adding).toBeVisible()
+  await expect(page.locator('#edit-name')).toBeHidden()
+  await expect(adding.getByTestId('editor-row-name')).toContainText('A place typed in')
+  await page.goBack()
+  await expect(find).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('dialog', { name: 'Add or update a place' })).toBeVisible()
+  expect(page.url()).toBe(page0)
+
+  await page.goForward()
+  await expect(find).toBeVisible()
+  await page.goForward()
+  await expect(adding).toBeVisible()
+
+  // Closing it takes its steps off the address (Escape: a phone's sheet
+  // has no X, it's dragged away).
+  await page.keyboard.press('Escape')
+  await expect(adding).toBeHidden()
+  await expect.poll(() => page.url()).toBe(page0)
 })
 
 // Oct 27, the user: on a phone "you don't necessarily notice the 'fill it
@@ -42,7 +90,7 @@ test('a category’s “+” opens the box, with filling it in yourself one link
 test.describe('the box on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'mobile viewport only')
 
-  test('opens tall enough to show Fill it in yourself, and no taller', async ({ page }) => {
+  test('opens tall enough to show Find the place, and no taller', async ({ page }) => {
     // A phone with Safari's bars showing: shorter than the emulated screen.
     await page.setViewportSize({ width: 375, height: 660 })
     const community = await defaultCommunity(page)
@@ -52,14 +100,14 @@ test.describe('the box on a phone', () => {
 
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     const box = page.getByRole('dialog', { name: 'Add or update a place' })
-    const link = box.getByRole('button', { name: 'Fill it in yourself' })
+    const link = box.getByRole('button', { name: 'Find the place' })
     await expect(link).toBeVisible()
     // Once it has finished sliding up.
     await expect.poll(async () => (await box.boundingBox())?.y).toBeLessThan(660)
     await page.waitForTimeout(400)
     const sheet = (await box.boundingBox())!
     const yourself = (await link.boundingBox())!
-    expect(yourself.y + yourself.height, 'Fill it in yourself is on the screen').toBeLessThanOrEqual(660)
+    expect(yourself.y + yourself.height, 'Find the place is on the screen').toBeLessThanOrEqual(660)
     expect(sheet.y + sheet.height - (yourself.y + yourself.height), 'and the box ends under it').toBeLessThan(60)
     expect(sheet.height, 'not the full height').toBeLessThan(660 - 76)
   })

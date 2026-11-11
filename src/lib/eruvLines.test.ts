@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { newlyMissing, readEruvMap, savedMap } from './eruvLines'
-import type { EruvLineFile } from './eruvLine'
+import { DEFAULT_LINE_COLOR, type EruvLineFile } from './eruvLine'
 
 const NOW = new Date('2026-10-12T11:00:00Z')
 const A: EruvLineFile = { lines: [{ name: 'Main', points: [[39.95, -75.19], [39.96, -75.18]] }, { name: 'Old border', points: [[39.95, -75.19], [39.94, -75.18]] }] }
 const B: EruvLineFile = { lines: [{ name: 'Main', points: [[39.95, -75.19], [39.97, -75.18]] }, { name: 'Old border', points: [[39.95, -75.19], [39.94, -75.18]] }] }
 const geo = (f: EruvLineFile) =>
-  JSON.stringify({ type: 'FeatureCollection', features: f.lines.map((l) => ({ type: 'Feature', properties: { name: l.name }, geometry: { type: 'LineString', coordinates: l.points.map(([lat, lng]) => [lng, lat]) } })) })
+  JSON.stringify({ type: 'FeatureCollection', features: f.lines.map((l) => ({ type: 'Feature', properties: { name: l.name, ...(l.color && { stroke: l.color }) }, geometry: { type: 'LineString', coordinates: l.points.map(([lat, lng]) => [lng, lat]) } })) })
 const serving = (f: EruvLineFile) => vi.fn(async () => new Response(geo(f))) as unknown as typeof fetch
-const source = (over = {}) => ({ lineUrl: 'https://example.org/line.geojson', rawLine: A, lineLeaveOut: ['Old border'], lineHidePoints: false, lineColor: null, ...over })
+const source = (over = {}) => ({ lineUrl: 'https://example.org/line.geojson', rawLine: A, lineLeaveOut: ['Old border'], lineHidePoints: false, ...over })
 
 describe('readEruvMap: the eruv’s own map, read now', () => {
   it('shown without what was left out; as it was, it saves only the date it was read', async () => {
@@ -22,13 +22,13 @@ describe('readEruvMap: the eruv’s own map, read now', () => {
     expect(read.map?.lines[0].points[1]).toEqual([39.97, -75.18])
     expect(read.save).toEqual({ ok: true, file: B, at: NOW.toISOString() })
   })
-  it('in the colour an admin chose, whether read now or from the last good read; what’s kept is their own', async () => {
-    const read = await readEruvMap(source({ lineColor: '#1d4ed8' }), NOW, serving(B))
-    expect(read.map!.lines.map((l) => l.color)).toEqual(['#1d4ed8'])
-    expect(read.save).toMatchObject({ ok: true, file: { lines: [{ name: 'Main' }, { name: 'Old border' }] } })
-    expect((read.save as { file: EruvLineFile }).file.lines.every((l) => l.color === undefined)).toBe(true)
+  it('a line too pale to see is darker, whether read now or from the last good read; what’s kept is their own', async () => {
+    const pale: EruvLineFile = { lines: B.lines.map((l) => ({ ...l, color: '#ccffff' })) }
+    const read = await readEruvMap(source(), NOW, serving(pale))
+    expect(read.map!.lines.map((l) => l.color)).toEqual([DEFAULT_LINE_COLOR])
+    expect((read.save as { file: EruvLineFile }).file.lines.every((l) => l.color === '#ccffff')).toBe(true)
     const down = vi.fn(async () => new Response('', { status: 503 })) as unknown as typeof fetch
-    expect((await readEruvMap(source({ lineColor: '#1d4ed8' }), NOW, down)).map!.lines.map((l) => l.color)).toEqual(['#1d4ed8'])
+    expect((await readEruvMap(source({ rawLine: pale }), NOW, down)).map!.lines.map((l) => l.color)).toEqual([DEFAULT_LINE_COLOR])
   })
 
   it('a map that can’t be read shows the last good read, and says why', async () => {

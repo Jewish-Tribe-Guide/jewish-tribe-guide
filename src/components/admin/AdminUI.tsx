@@ -190,8 +190,21 @@ export function Chevron() {
   )
 }
 
+/** The chevron of a row that opens a screen of its own. Only where there's
+ *  no hover to show it (a phone); with a mouse, the row's shading under the
+ *  pointer says it opens (the user, Nov 10: "hover for no phones and then
+ *  chevron for phones", admin-wide). A chevron that folds something open
+ *  in place stays everywhere: it turns to say whether it's open. */
+export function GoChevron() {
+  return (
+    <span data-go-chevron className="flex shrink-0 pointer-fine:hidden">
+      <Chevron />
+    </span>
+  )
+}
+
 const rowClass =
-  'w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-b border-slate-100 last:border-b-0 text-left text-slate-900 hover:bg-slate-50 cursor-pointer'
+  'w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] border-b border-slate-100 last:border-b-0 text-left text-slate-900 hover:bg-slate-100 cursor-pointer'
 
 /** One row: a name, at most one line under it, something short on the
  *  right, and a chevron. The whole row is the link, or a button with
@@ -223,7 +236,7 @@ export function AdminRow({
         {line && <span className="text-[13px] text-slate-600">{line}</span>}
       </span>
       {aside && <span className="text-[13px] text-slate-600">{aside}</span>}
-      <Chevron />
+      <GoChevron />
     </>
   )
   if (onClick || !href) {

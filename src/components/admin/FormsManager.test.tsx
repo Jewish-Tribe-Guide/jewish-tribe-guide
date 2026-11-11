@@ -86,7 +86,9 @@ describe('Forms list', () => {
     expect(onOpen).toHaveBeenCalledWith('feedback')
     await user.click(rows[1])
     expect(onOpen).toHaveBeenCalledWith('form:sukkah-signup')
-    await user.click(screen.getByRole('button', { name: '+ Add a form' }))
+    // Adding is the dashed full-width button at the foot of the list.
+    expect(screen.getByRole('button', { name: 'Add a form' })).toHaveClass('border-dashed', 'w-full')
+    await user.click(screen.getByRole('button', { name: 'Add a form' }))
     expect(onOpen).toHaveBeenCalledWith('form:new')
   })
 })
@@ -121,6 +123,7 @@ describe('A form', () => {
     expect(questions.getByRole('button', { name: /What do you need\?/ })).toHaveTextContent('Pick any · Meals, A ride')
     expect(questions.getByRole('button', { name: /Which hospital and room\?/ })).toHaveTextContent('Short answer · only if they picked Meals')
     expect(questions.getByText('Your details')).toBeInTheDocument()
+    expect(questions.getByRole('button', { name: 'Add a question' })).toHaveClass('border-dashed', 'w-full')
     expect(questions.getAllByText('Meals', { selector: 'p' })).toHaveLength(1)
     expect(questions.queryByRole('button', { name: /Question 2/ })).toBeNull()
     await user.click(questions.getByRole('button', { name: '3 more' }))
@@ -213,5 +216,14 @@ describe('form wording', () => {
     expect(sectionName('🍽️ Meals')).toBe('Meals')
     expect(countFormChanges(support, { ...support, steps: [needs] })).toBe(support.steps.length - 1)
     expect(countFormChanges(support, { ...support, title: 'x', icon: undefined })).toBe(1)
+  })
+
+  // The user, Nov 10: "undoing something still says a change happened". A
+  // question's Optional turned on and off, or a hint typed and cleared, is
+  // the question as it was.
+  it('counts a question put back as it was as no change', () => {
+    const put = support.steps.map((s) => ({ ...s, optional: !!s.optional, hint: s.hint ?? '', when: s.when ?? [] }))
+    expect(countFormChanges(support, { ...support, steps: put })).toBe(0)
+    expect(countFormChanges(support, { ...support, steps: [{ ...support.steps[0], optional: !support.steps[0].optional }, ...support.steps.slice(1)] })).toBe(1)
   })
 })

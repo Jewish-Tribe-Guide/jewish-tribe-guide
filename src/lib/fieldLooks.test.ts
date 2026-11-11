@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CategoryConfig, CategoryField } from './categories'
-import { addingScreen, answerText, filterLook, filtersScreen, listingLook, listingScreen, madeUpPlace, madeUpPlaces, rowLook } from './fieldLooks'
+import { addingScreen, answerText, filterLook, filtersScreen, listingLook, listingScreen, madeUpPlace, madeUpPlaces, rowLook, withRealPlaces } from './fieldLooks'
 
 const choices = (...values: string[]) => values.map((v) => ({ value: v, label: v }))
 const foodType: CategoryField = { key: 'food_type', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true, onCard: true, options: choices('Meat', 'Dairy', 'Parve') }
@@ -48,11 +48,14 @@ describe('fieldLooks: a field on a made-up place', () => {
       { text: 'Keystone-K', mine: false },
     ])
     expect(listingLook(page, delivery, item)).toMatchObject({ at: 'box', title: 'About', label: null })
-    // A link's own box, and its words (Food's Delivery).
+    // Delivery's group is its part: Delivery's own box, as the listing
+    // draws it, or whatever admin box Delivery is put in (Nov 10).
     const group: CategoryField = { key: 'group', label: 'Delivery WhatsApp Group', type: 'url', linkLabel: 'Join WhatsApp Group', leadBox: { title: 'Delivery', text: 'delivery' } }
     const withGroup = food([foodType, group, delivery, hours])
-    expect(listingLook(withGroup, delivery, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery', label: 'Delivery Details' })
+    expect(listingLook(withGroup, delivery, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery' })
     expect(listingLook(withGroup, group, madeUpPlace(withGroup, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery', text: 'Join WhatsApp Group' })
+    const boxed = { ...withGroup, listingParts: { boxes: [{ title: 'Delivery', fields: ['delivery'] }] } }
+    expect(listingLook(boxed, group, madeUpPlace(boxed, 'A place'))).toMatchObject({ at: 'box', title: 'Delivery' })
     expect(listingLook(page, hours, item)).toMatchObject({ at: 'box', title: 'Contact', label: 'Hours' })
     expect(listingLook(page, { ...delivery, renderAs: 'hidden' }, item)).toEqual({ at: 'none' })
   })
@@ -109,7 +112,9 @@ describe('fieldLooks: a field on a made-up place', () => {
     expect(about).toMatchObject({ title: 'About', lines: [expect.stringContaining('Orders by Wednesday')] })
   })
 
-  it('leaves out What isn’t kosher on a place where everything is', () => {
+  // The listing as it was before round 3 (the user, Nov 10): What isn't
+  // kosher shows only at a place where something isn't.
+  it('draws What isn’t kosher only where something isn’t, and the note in it', () => {
     const flag: CategoryField = { key: 'all_kosher', label: 'Everything here is kosher', type: 'boolean' }
     const note: CategoryField = { key: 'not_kosher', label: 'What isn’t kosher?', type: 'textarea' }
     const cert: CategoryField = { ...hechsher, caveat: { flagField: 'all_kosher', noteField: 'not_kosher' } }
@@ -133,5 +138,54 @@ describe('fieldLooks: a field on a made-up place', () => {
     expect(adding.before.map((r) => r.title)).toEqual(['Name', 'Type'])
     expect(adding.fields.map((f) => f.key)).toContain('food_type')
     expect(addingScreen(page, hours, item).big).toBe(true)
+  })
+
+  // The user, Nov 10: the Adding tab should show a field as the add form
+  // really does. Hours are a section of their own after the contact, and
+  // that row says the address and phone, as the form's own row does.
+  it('shows hours as their own section after the contact, which says the address and phone', () => {
+    const at = { ...item, address: '133 S 18th St, Philadelphia, PA', phone: '(267) 606-6612' }
+    const adding = addingScreen(page, hours, at)
+    expect(adding.title).toBe('Hours')
+    const contact = adding.before.at(-1)!
+    expect(contact.title).toMatch(/^Address(,| and) phone/)
+    expect(contact.text).toBe('133 S 18th St · (267) 606-6612')
+    expect(adding.after).toEqual([])
+  })
+
+  it('shows davening as the form asks it: usual weekday times open, usual Shabbos times under it', () => {
+    const minyanim: CategoryField = { key: 'minyanim', label: 'Davening Times', type: 'minyanim' }
+    const shul = { ...page, detailFields: [...page.detailFields, minyanim] }
+    const adding = addingScreen(shul, minyanim, item)
+    expect(adding.title).toBe('Usual weekday times')
+    expect(adding.after.map((r) => r.title)).toEqual(['Usual Shabbos times'])
+  })
+})
+
+// The user, Nov 10: "it's not previewing with the fields we actually have".
+describe('fieldLooks: the page’s own places', () => {
+  const page = food([foodType, hechsher, delivery])
+  const made = madeUpPlaces(page, 'A restaurant')
+  const real = (id: string, more: Record<string, unknown>) => ({ id, category: 'food', name: id, anchorId: 'all', distance: 1, address: '', ...more })
+
+  it('draws on those that answer the field first, then the fullest', () => {
+    const { places, answered } = withRealPlaces(page, delivery, [real('Bare', {}), real('Full', { food_type: 'Meat', hechsher: 'OU' }), real('Delivers', { delivery: 'Sundays' })], made)
+    expect(places.map((p) => p.item.name)).toEqual(['Delivers', 'Full', 'Bare'])
+    expect(places[0].item.delivery).toBe('Sundays')
+    expect(answered).toBe(true)
+  })
+
+  it('gives a place the made-up answer where none answers it, and says so', () => {
+    const { places, answered } = withRealPlaces(page, delivery, [real('Full', { food_type: 'Meat' })], made)
+    expect(places[0].item.name).toBe('Full')
+    expect(places[0].item.delivery).toBe(made[0].item.delivery)
+    expect(places[0].item.food_type).toBe('Meat')
+    expect(answered).toBe(false)
+    // Made-up places fill in the list's other rows.
+    expect(places.slice(1).map((p) => p.item.id)).toEqual(['made-up-1', 'made-up-2'])
+  })
+
+  it('is the made-up places with none of the page’s own', () => {
+    expect(withRealPlaces(page, delivery, [], made)).toEqual({ places: made, answered: null })
   })
 })

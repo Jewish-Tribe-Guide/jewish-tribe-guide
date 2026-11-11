@@ -1,14 +1,15 @@
 import type { DirectoryResource } from '@/types'
 import { fieldIsVisible, pickableOptions, selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { listingRowFacts, type RowFact, type RowFactTone } from './listingRow'
-import { lineChoices, onThirdLine } from './cardLines'
+import { lineChoices, onThirdLine, underName } from './cardLines'
 import { isCertificateLink, kindField, listingActions, listingFacts, listingKind } from './listingView'
 import { fieldBoxes } from './fieldBoxes'
+import { ownerOfPart } from './fieldParts'
 import { parseListingParts } from './listingParts'
-import { editorRows } from './editorRows'
+import { editorRows, rowHas } from './editorRows'
+import { formatPhone } from './validation'
 import { formatHoursSummary, type StructuredHours } from './hours'
 import { formatMinyanimSummary, type Minyan } from './davening'
-import { formatPhone } from './validation'
 import { itemFields } from './itemFilter'
 
 // ── A field, how it looks (boards 33c and 34, Nov 9) ─────────────────────────
@@ -174,6 +175,34 @@ export function madeUpPlaces(
   })
 }
 
+/** The page's own places in place of made-up ones (the user, Nov 10: "it's
+ *  not previewing with the fields we actually have"): those that answer
+ *  the field first, then the fullest. A place without an answer to it is
+ *  given the made-up one, which `answered` says. Made-up places fill in
+ *  when the page has fewer than three. */
+export function withRealPlaces(
+  category: CategoryConfig,
+  field: CategoryField,
+  real: readonly DirectoryResource[],
+  madeUp: readonly MadeUp[],
+): { places: MadeUp[]; answered: boolean | null } {
+  if (real.length === 0) return { places: [...madeUp], answered: null }
+  const answers = (r: DirectoryResource) => answerText(field, r[field.key]) !== ''
+  const fullness = (r: DirectoryResource) => category.detailFields.filter((f) => answerText(f, r[f.key]) !== '').length
+  const ranked = [...real].sort((a, b) => Number(answers(b)) - Number(answers(a)) || fullness(b) - fullness(a)).slice(0, madeUp.length)
+  const places = madeUp.map((m, i): MadeUp => {
+    const r = ranked[i]
+    if (!r) return m
+    const item: DirectoryResource = { ...r, distance: r.distance ?? SAMPLE_MILES[i] }
+    if (!answers(r)) {
+      const v = sampleAnswer(field, i)
+      if (v !== undefined) item[field.key] = v
+    }
+    return { item, where: null }
+  })
+  return { places, answered: answers(ranked[0]) }
+}
+
 /** The page and place with one field gone: what's left when it's taken
  *  off. */
 function without(category: CategoryConfig, item: DirectoryResource, key: string): [CategoryConfig, DirectoryResource] {
@@ -245,6 +274,15 @@ export type ListingLook =
 
 /** The field on the opened listing. */
 export function listingLook(category: CategoryConfig, field: CategoryField, item: DirectoryResource): ListingLook {
+  // A field's part (a hechsher's question or certificate, Delivery's group)
+  // is in its field's box, said with it (the user, Nov 10).
+  const owner = ownerOfPart(field.key, category.detailFields)
+  if (owner) {
+    const box = listingBoxes(category).find((b) => b.fields.includes(owner.key))
+    if (!box) return { at: 'none' }
+    const others = listingBoxes(category).filter((b) => b !== box && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
+    return { at: 'box', title: box.title, label: field.label, text: field.type === 'url' && field.linkLabel ? field.linkLabel : answerText(field, item[field.key]), others }
+  }
   if (field.renderAs === 'hidden') return { at: 'none' }
   const [restCategory, restItem] = without(category, item, field.key)
   const text = answerText(field, item[field.key])
@@ -256,13 +294,12 @@ export function listingLook(category: CategoryConfig, field: CategoryField, item
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null && answerText(f, item[f.key]))
   if (tagline?.key === field.key) return { at: 'tagline', text }
   // The listing's boxes as the editor's Fields box lays them out
-  // (fieldBoxes.ts): a link's own box (Delivery), What isn't kosher, the
-  // admin's boxes, Contact, About.
+  // (fieldBoxes.ts): the main thing, the admin's boxes, Contact, About.
   const boxes = listingBoxes(category)
   const box = boxes.find((b) => b.fields.includes(field.key))
-  // Up in the header: the photo, a short line, a certificate's link.
-  if (!box || box.id === 'top') return { at: 'tagline', text: text || field.label }
-  const others = boxes.filter((b) => b !== box && b.id !== 'top' && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
+  // Up in the header: the photo.
+  if (!box || field.type === 'image') return { at: 'tagline', text: text || field.label }
+  const others = boxes.filter((b) => b !== box && (b.fields.length > 0 || (b.basics?.length ?? 0) > 0)).map((b) => b.title)
   const inBox = box.fields.length + (box.basics?.length ?? 0) > 1
   return { at: 'box', title: box.title, label: inBox ? field.label : null, text: field.type === 'url' && field.linkLabel ? field.linkLabel : text, others }
 }
@@ -321,19 +358,16 @@ export function listingScreen(category: CategoryConfig, field: CategoryField, it
   actions.push({ label: 'Share', icon: 'share' })
   const byKey = new Map(category.detailFields.map((f) => [f.key, f]))
   const boxes = listingBoxes(category)
-    .filter((b) => b.id !== 'top')
     .flatMap((b): ListingScreen['boxes'] => {
-      const mine = look.at === 'box' && b.fields.includes(field.key)
-      // What isn't kosher shows on a place where not everything is; the
-      // made-up place says everything is.
-      if (b.id === 'caveat' && !mine) return []
+      const mine = look.at === 'box' && b.fields.includes(ownerOfPart(field.key, category.detailFields)?.key ?? field.key)
       if (mine && look.at === 'box') return [{ title: b.title, lines: [look.text || 'A photo'], mine, label: look.label }]
       const lines = [
         ...(b.basics ?? []).flatMap((basic) => (basic === 'phone' && item.phone ? [formatPhone(item.phone)] : [])),
         ...b.fields.flatMap((key) => {
           const f = byKey.get(key)
-          // A "Yes" alone says nothing out of its row.
-          const text = f && f.type !== 'image' && f.type !== 'boolean' ? answerText(f, item[key]) : ''
+          // A "Yes" alone says nothing out of its row; one under the name
+          // is said there.
+          const text = f && f.type !== 'image' && f.type !== 'boolean' && !underName(f) ? answerText(f, item[key]) : ''
           return text ? [text] : []
         }),
       ].slice(0, 2)
@@ -385,7 +419,7 @@ export function addingScreen(
   field: CategoryField,
   item: DirectoryResource,
   askedWhen?: CategoryField['showIf'],
-): { before: AddingRow[]; title: string; fields: CategoryField[]; big: boolean } {
+): { before: AddingRow[]; title: string; fields: CategoryField[]; big: boolean; after: AddingRow[] } {
   // Asked where the site asks it: a field asked after an answer sits with
   // the question it follows (Delivery Details with Store Type).
   const category = askedWhen ? { ...page, detailFields: page.detailFields.map((f) => (f.key === field.key ? { ...f, showIf: askedWhen } : f)) } : page
@@ -393,12 +427,26 @@ export function addingScreen(
   const at = rows.findIndex((r) => r.fields.some((f) => f.key === field.key))
   const summary = (r: (typeof rows)[number]): AddingRow => ({
     title: r.kind === 'name' ? 'Name' : r.title,
-    text: r.kind === 'name' ? item.name : r.fields.map((f) => (f.type === 'image' || f.type === 'boolean' ? '' : answerText(f, item[f.key]))).filter(Boolean).join(' · '),
+    // The address and phone, where the row edits them, as the add form's
+    // own row says them: the street, then the phone.
+    text:
+      r.kind === 'name'
+        ? item.name
+        : [
+            rowHas(r, 'address') && item.address ? item.address.split(',')[0].trim() : '',
+            rowHas(r, 'phone') && item.phone ? formatPhone(item.phone) : '',
+            ...r.fields.map((f) => (f.type === 'image' || f.type === 'boolean' ? '' : answerText(f, item[f.key]))),
+          ]
+            .filter(Boolean)
+            .join(' · '),
   })
   const big = field.type === 'hours' || field.type === 'minyanim' || field.type === 'contacts' || field.type === 'image' || field.type === 'tags'
-  if (at < 0) return { before: rows.slice(0, 1).map(summary), title: field.label, fields: [field], big }
+  if (at < 0) return { before: rows.slice(0, 1).map(summary), title: field.label, fields: [field], big, after: [] }
   const before = [rows[0], at > 1 ? rows[at - 1] : null].filter((r): r is (typeof rows)[number] => !!r && r !== rows[at]).map(summary)
   const row = rows[at]
   const asked = row.fields.filter((f) => f.key === field.key || (f.type !== 'image' && fieldIsVisible(f, item as Record<string, unknown>)))
-  return { before, title: row.title, fields: asked, big }
+  // The field's other sections, right under it (davening's usual Shabbos
+  // times): the form asks it in more than one.
+  const after = rows.slice(at + 1).filter((r) => r.fields.some((f) => f.key === field.key) && !r.week).map((r) => ({ title: r.title, text: '' }))
+  return { before, title: row.title, fields: asked, big, after }
 }

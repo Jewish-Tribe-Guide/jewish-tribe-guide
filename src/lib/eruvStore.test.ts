@@ -52,39 +52,42 @@ afterEach(() => {
   table.updates.length = 0
 })
 
-const NE = { community_id: 'philly', id: 'northeast', name: 'Northeast Eruv', line_url: 'https://www.google.com/maps/d/viewer?mid=abc', line: null, line_leave_out: [], sort_order: 4, active: true }
+const NE = { community_id: 'philly', id: 'northeast', name: 'Northeast Eruv', line_url: 'https://www.google.com/maps/d/viewer?mid=abc', line: null, line_leave_out: [], active: true }
 const stored = { statusUrl: null, lineUrl: NE.line_url }
 
-// Oct 15: an admin-set line colour (migration 081). The code goes out before
-// the migration is run, so the guide has to work without the column.
-describe('the eruv table before migration 081', () => {
-  it('reads every eruv, in its own colours', async () => {
-    table.missing.add('line_color')
-    table.rows = [{ ...NE, line_hide_points: true }]
+// Oct 15: an admin-set line colour (migration 081). Nov 9: no longer an
+// admin's (a too-pale line is darkened by itself), so its column is never
+// read, and a colour stored before then changes nothing.
+describe('the eruv table', () => {
+  it('never reads a stored line colour or order', async () => {
+    table.rows = [{ ...NE, line_color: '#1d4ed8', sort_order: 1, line_hide_points: true }]
     const [source] = await listEruvMapSources('philly')
-    expect(source).toMatchObject({ id: 'northeast', lineColor: null, lineHidePoints: true })
+    expect(source).toMatchObject({ id: 'northeast', lineHidePoints: true })
+    expect(source).not.toHaveProperty('lineColor')
     const { eruvim } = await listEruvimForAdmin('philly')
-    expect(eruvim[0]).toMatchObject({ id: 'northeast', lineColor: null, lineHidePoints: true })
+    expect(eruvim[0]).not.toHaveProperty('lineColor')
+    expect(eruvim[0]).not.toHaveProperty('sortOrder')
+    expect(table.selects.join(' ')).not.toMatch(/line_color|sort_order/)
   })
 
-  it('and before 076 too, one missing column at a time', async () => {
-    table.missing = new Set(['line_hide_points', 'line_missing', 'line_color'])
+  it('before 076, one missing column at a time', async () => {
+    table.missing = new Set(['line_hide_points', 'line_missing'])
     table.rows = [NE]
     const [source] = await listEruvMapSources('philly')
-    expect(source).toMatchObject({ id: 'northeast', lineColor: null, lineHidePoints: false, lineMissing: [] })
-    expect(table.selects.at(-1)).not.toMatch(/line_hide_points|line_missing|line_color/)
+    expect(source).toMatchObject({ id: 'northeast', lineHidePoints: false, lineMissing: [] })
+    expect(table.selects.at(-1)).not.toMatch(/line_hide_points|line_missing/)
   })
 
-  it('saves an edit that leaves the colour alone', async () => {
-    table.missing.add('line_color')
-    await updateEruv('philly', 'northeast', { name: 'Northeast', lineColor: null }, stored)
+  it('saves an edit that leaves hidden markers alone, before 076', async () => {
+    table.missing.add('line_hide_points')
+    await updateEruv('philly', 'northeast', { name: 'Northeast', lineHidePoints: false }, stored)
     expect(table.updates.at(-1)).toMatchObject({ name: 'Northeast' })
-    expect(table.updates.at(-1)).not.toHaveProperty('line_color')
+    expect(table.updates.at(-1)).not.toHaveProperty('line_hide_points')
   })
 
-  it('fails a colour it can’t keep, rather than dropping it without a word', async () => {
-    table.missing.add('line_color')
-    await expect(updateEruv('philly', 'northeast', { lineColor: '#1d4ed8' }, stored)).rejects.toThrow(/line_color/)
+  it('fails hidden markers it can’t keep, rather than dropping them without a word', async () => {
+    table.missing.add('line_hide_points')
+    await expect(updateEruv('philly', 'northeast', { lineHidePoints: true }, stored)).rejects.toThrow(/line_hide_points/)
   })
 })
 
@@ -133,16 +136,6 @@ describe('the eruv table after 084', () => {
   })
 })
 
-describe('the eruv table after it', () => {
-  it('reads and saves the colour', async () => {
-    table.rows = [{ ...NE, line_color: '#1d4ed8' }]
-    const [source] = await listEruvMapSources('philly')
-    expect(source.lineColor).toBe('#1d4ed8')
-    await updateEruv('philly', 'northeast', { lineColor: '#1d4ed8' }, stored)
-    expect(table.updates.at(-1)).toMatchObject({ line_color: '#1d4ed8' })
-  })
-})
-
 // Oct 15: a colour changed in the admin was still the old one on the map,
 // since /api/eruv/maps is kept at the CDN for an hour. The maps are asked
 // for under this fingerprint of what an admin chose about them.
@@ -154,7 +147,7 @@ describe('eruvMapsVersion', () => {
     // Its status read again (every few hours): the same maps, the same address.
     table.rows = [{ ...NE, status: 'down', status_checked_at: '2026-10-15T13:00:00Z' }]
     expect(await eruvMapsVersion('philly')).toBe(before)
-    for (const chosen of [{ line_color: '#1d4ed8' }, { line_leave_out: ['Old border'] }, { line_hide_points: true }, { active: false }, { line_url: 'https://www.google.com/maps/d/viewer?mid=new' }]) {
+    for (const chosen of [{ line_leave_out: ['Old border'] }, { line_hide_points: true }, { active: false }, { line_url: 'https://www.google.com/maps/d/viewer?mid=new' }]) {
       table.rows = [{ ...NE, ...chosen }]
       expect(await eruvMapsVersion('philly'), JSON.stringify(chosen)).not.toBe(before)
     }
@@ -163,8 +156,8 @@ describe('eruvMapsVersion', () => {
     expect(await eruvMapsVersion('philly')).not.toBe(before)
   })
 
-  it('before migration 081, still one; without the table, none', async () => {
-    table.missing.add('line_color')
+  it('before migration 076, still one; without the table, none', async () => {
+    table.missing.add('line_hide_points')
     table.rows = [NE]
     expect(await eruvMapsVersion('philly')).toMatch(/^[0-9a-f]{12}$/)
     table.missing.add('id')

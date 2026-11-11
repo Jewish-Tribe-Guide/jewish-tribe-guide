@@ -22,16 +22,27 @@ import { ArchiveBin, ArchivedPlace, RowJob, SourceScreen, SourceWords, type Sour
 import { sourceActions, type Attempt } from './sourceActions'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
+import EruvMapPreview from './EruvMapPreview'
+import { partNames } from '@/lib/eruvLine'
+import { ownEruvFields, readEruvDetails, withEruvFields } from '@/lib/eruvFields'
+import { ownWords } from '@/lib/eruvSuggestion'
+import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 
 // An eruv as Places opens it (boards PlacesEruv4, EruvListing6, EruvStatus5,
 // Nov 1), the same rows as any listing: each names the job that keeps it, and
-// opened, says where it's read from. What only an eruv has (its map's colour,
-// what's left out of it) stays on the category's own page.
+// opened, says where it's read from. Its Map row also holds what only an
+// eruv has: which parts of its map show, and whether its markers do (moved
+// here from the Eruv page on Nov 9, when that page stopped listing eruvim).
+// Its line colour is no longer an admin's: a too-pale one is darkened by
+// itself (eruvLine.ts).
+//
+// After them, a row for each field an admin made on the Eruv page (Nov 9,
+// eruvFields.ts), kept in the eruv's `details`.
 
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
 
 type Draft = { name: string; covers: string; hotline: string; alertsUrl: string; website: string }
-type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website'
+type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website' | `own-${string}`
 /** Which of a source line's controls opened a screen over its row. */
 type Which = 'change' | 'start' | 'add'
 type AddEruvRow = RowId
@@ -63,6 +74,9 @@ export default function EruvListing({
 }) {
   const community = useCommunitySlug()
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
+  const [details, setDetails] = useState<Record<string, unknown>>(() => ({ ...eruv.details }))
+  const [leaveOut, setLeaveOut] = useState<string[]>(eruv.lineLeaveOut)
+  const [hideMarks, setHideMarks] = useState(eruv.lineHidePoints)
   const [openRow, setOpenRow] = useState<RowId | null>(null)
   // `which`: the control on the open row's source line that opened it.
   const [screen, setScreen] = useState<{ title: string; which: Which; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
@@ -108,14 +122,30 @@ export default function EruvListing({
   }
 
   const was = draftOf(eruv)
-  const changes = (Object.keys(draft) as (keyof Draft)[]).filter((k) => draft[k].trim() !== was[k].trim())
-  const changedRow = (id: RowId) => (id === 'name' ? changes.includes('name') || changes.includes('covers') : (changes as string[]).includes(id))
+  const textChanges = (Object.keys(draft) as (keyof Draft)[]).filter((k) => draft[k].trim() !== was[k].trim())
+  const sameNames = (a: string[], b: string[]) => a.length === b.length && a.every((n) => b.includes(n))
+  const mapChanges = {
+    ...(!sameNames(leaveOut, eruv.lineLeaveOut) && { lineLeaveOut: leaveOut }),
+    ...(hideMarks !== eruv.lineHidePoints && { lineHidePoints: hideMarks }),
+  }
+  // The Eruv page's own fields, each as it would be saved.
+  const own = category ? ownEruvFields(withEruvFields(category).detailFields) : []
+  const kept = (key: string) => readEruvDetails({ [key]: details[key] })?.[key] ?? null
+  const ownChanges = own.filter((f) => ownWords(f, eruv.details?.[f.key]) !== ownWords(f, kept(f.key))).map((f) => `own-${f.key}` as const)
+  const changes = [...textChanges, ...Object.keys(mapChanges), ...ownChanges]
+  const changedRow = (id: RowId) => (id === 'name' ? changes.includes('name') || changes.includes('covers') : id === 'map' ? Object.keys(mapChanges).length > 0 : (changes as string[]).includes(id))
 
   async function update() {
     setBusy(true)
     setError(null)
     try {
-      await save(Object.fromEntries(changes.map((k) => [k, draft[k].trim()])))
+      const nextDetails = { ...eruv.details }
+      for (const f of own) {
+        const v = kept(f.key)
+        if (v === null) delete nextDetails[f.key]
+        else nextDetails[f.key] = v
+      }
+      await save({ ...Object.fromEntries(textChanges.map((k) => [k, draft[k].trim()])), ...mapChanges, ...(ownChanges.length > 0 && { details: nextDetails }) })
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save that.')
@@ -201,6 +231,42 @@ export default function EruvListing({
     </div>
   )
 
+  // Which parts of its map show (by name: Center City's borders, Elkins
+  // Park's driving directions) and whether its markers do (Lower Merion's
+  // crossings, yes; the shuls Northeast pins, no). Ticked is shown.
+  // A marker is a part too (Lower Merion's old reroute alerts), but not while
+  // its markers are hidden.
+  const names = eruv.rawLine ? (hideMarks ? partNames({ lines: eruv.rawLine.lines }) : partNames(eruv.rawLine)) : []
+  const mapBody: ReactNode = eruv.rawLine ? (
+    <>
+      <EruvMapPreview file={eruv.rawLine} leaveOut={leaveOut} hideMarks={hideMarks} />
+      {eruv.lineMissing.length > 0 && (
+        <p className="m-0 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="eruv-line-missing">
+          No longer in its map: {eruv.lineMissing.map((n) => `“${n}”`).join(', ')}
+        </p>
+      )}
+      {names.length > 1 && (
+        <fieldset className="m-0 border-0 p-0">
+          <legend className={editorFieldLabel}>Parts shown</legend>
+          <div className="mt-1 flex flex-col gap-1.5">
+            {names.map((n) => (
+              <label key={n} className="flex items-center gap-2 text-[15px] text-slate-800">
+                <input type="checkbox" checked={!leaveOut.includes(n)} onChange={(e) => setLeaveOut(e.target.checked ? leaveOut.filter((x) => x !== n) : [...leaveOut, n])} />
+                {n}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      {eruv.rawLine.marks?.length ? (
+        <label className="flex items-center gap-2 text-[15px] text-slate-800">
+          <input type="checkbox" checked={!hideMarks} onChange={(e) => setHideMarks(!e.target.checked)} />
+          Its markers
+        </label>
+      ) : null}
+    </>
+  ) : null
+
   const rows: { id: RowId; title: string; summary: string; source: RowSource | null; body: ReactNode }[] = [
     { id: 'name', title: draft.name.trim() || 'Name', summary: draft.covers.trim(), source: null, body: <>{input('name', 'Name')}{input('covers', 'What it covers', true)}</> },
     {
@@ -232,10 +298,17 @@ export default function EruvListing({
         </>
       ),
     },
-    { id: 'map', title: 'Map', summary: eruv.lineUrl ? (eruv.lineError ? 'As last read' : 'On the map') : 'None', source: sources.map, body: null },
+    { id: 'map', title: 'Map', summary: eruv.lineUrl ? (eruv.lineError ? 'As last read' : 'On the map') : 'None', source: sources.map, body: mapBody },
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim() || 'None', source: sources.details, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() ? shortUrl(draft.alertsUrl.trim()) : 'None', source: sources.details, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() ? shortUrl(draft.website.trim()) : 'None', source: sources.website, body: input('website', 'Website') },
+    ...own.map((f) => ({
+      id: `own-${f.key}` as const,
+      title: f.label,
+      summary: ownWords(f, kept(f.key)) || 'None',
+      source: null,
+      body: <DetailFieldInput field={f} labelHidden value={details[f.key]} onChange={(v) => setDetails({ ...details, [f.key]: v })} />,
+    })),
   ]
 
   if (screenAsked) {
@@ -304,10 +377,17 @@ type StatusRead =
   | { state: 'unclear'; on: string }
 
 /** Add a place, an eruv (boards AddEruv12, EruvStatusField12, AddEruvFilled12):
- *  the same Add screen, with no Google step. What's given goes on as it's added. */
-export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () => void; onAdded: () => Promise<void> | void }) {
+ *  the same Add screen, with no Google step. What's given goes on as it's added.
+ *  After its own rows, one for each field an admin made on the Eruv page
+ *  (`category`), as Places has once it's added (Nov 9). */
+export function AddEruv({ token, category, onBack, onAdded }: { token: string; category?: CategoryConfig; onBack: () => void; onAdded: () => Promise<void> | void }) {
   const community = useCommunitySlug()
   const [draft, setDraft] = useState({ name: '', covers: '', status: '', map: '', hotline: '', alertsUrl: '', website: '' })
+  const [details, setDetails] = useState<Record<string, unknown>>({})
+  /** The open row, when it was opened from the empty ones. */
+  const [openedEmpty, setOpenedEmpty] = useState<string | null>(null)
+  const own = category ? ownEruvFields(withEruvFields(category).detailFields) : []
+  const kept = readEruvDetails(Object.fromEntries(own.map((f) => [f.key, details[f.key]]))) ?? {}
   const [openRow, setOpenRow] = useState<AddEruvRow | null>(null)
   const [screen, setScreen] = useState<{ title: string; label: string; key: 'status' | 'map'; kind: WatchPurpose } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -361,6 +441,7 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
         ...statusAt,
         ...(draft.map.trim() ? { lineUrl: draft.map.trim() } : {}),
         ...Object.fromEntries((['covers', 'hotline', 'alertsUrl', 'website'] as const).filter((k) => draft[k].trim()).map((k) => [k, draft[k].trim()])),
+        ...(Object.keys(kept).length > 0 && { details: kept }),
       }
       if (Object.keys(edit).length) await post({ action: 'save', id: eruv.id, edit })
       // A page or a map is read as it's added.
@@ -448,13 +529,24 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim(), filled: !!draft.hotline.trim(), ...websiteRead, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() && shortUrl(draft.alertsUrl.trim()), filled: !!draft.alertsUrl.trim(), ...websiteRead, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() && shortUrl(draft.website.trim()), filled: !!draft.website.trim(), ...read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />), body: input('website', 'Website') },
+    ...own.map((f) => ({
+      id: `own-${f.key}` as const,
+      title: f.label,
+      summary: ownWords(f, kept[f.key]),
+      filled: f.key in kept,
+      body: <DetailFieldInput field={f} labelHidden value={details[f.key]} onChange={(v) => setDetails((d) => ({ ...d, [f.key]: v }))} />,
+    })),
   ]
   const opened = (r: (typeof rows)[number]) => (
     <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
       {r.body}
     </EditorOpenCard>
   )
-  const empty = rows.filter((r) => !r.filled)
+  // An open row stays where it was opened: the first letter typed in an
+  // empty one would move it to the filled ones and draw it afresh there,
+  // losing what's typed after.
+  const inEmpty = (r: (typeof rows)[number]) => (r.id === openRow ? openedEmpty === r.id : !r.filled)
+  const empty = rows.filter(inEmpty)
 
   return (
     <div className="flex flex-col gap-4">
@@ -479,13 +571,20 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
           <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>
           <ul className="space-y-2">
             {rows
-              .filter((r) => r.filled)
+              .filter((r) => !inEmpty(r))
               .map((r) => (
                 <li key={r.id}>
                   {openRow === r.id ? (
                     opened(r)
                   ) : (
-                    <EditorRowCard onOpen={() => setOpenRow(r.id)} testId={`editor-row-${r.id}`} opens="here" title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
+                    <EditorRowCard
+                      onOpen={() => {
+                        setOpenedEmpty(null)
+                        setOpenRow(r.id)
+                      }}
+                      testId={`editor-row-${r.id}`}
+                      opens="here"
+                      title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
                   )}
                 </li>
               ))}
@@ -493,7 +592,11 @@ export function AddEruv({ token, onBack, onAdded }: { token: string; onBack: () 
           {empty.length > 0 && (
             <EditorEmptyRows>
               {empty.map((r) => (
-                <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine onOpen={() => setOpenRow(r.id)} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
+                <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine
+                      onOpen={() => {
+                        setOpenedEmpty(r.id)
+                        setOpenRow(r.id)
+                      }} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
               ))}
             </EditorEmptyRows>
           )}

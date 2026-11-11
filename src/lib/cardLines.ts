@@ -34,6 +34,14 @@ export const onThirdLine = (f: CategoryField) => isLine(f) && !!f.showInHeader
 export const secondLineFields = (fields: readonly CategoryField[]) => fields.filter(onSecondLine)
 export const thirdLineFields = (fields: readonly CategoryField[]) => fields.filter(onThirdLine)
 
+/** Whether a field can go under a place's name on its row: a yes/no or
+ *  choice on the second line, a short line on the third. The field's own
+ *  "Under the name" switch (the user, Nov 10). */
+export const canGoUnderName = (f: CategoryField) => isChoice(f) || isLine(f)
+
+/** Whether it's there now. */
+export const underName = (f: CategoryField) => onSecondLine(f) || onThirdLine(f)
+
 /** What could go on a line, on it or not: the second's yes/no and choice
  *  fields, the third's short lines. */
 export function lineChoices(fields: readonly CategoryField[], line: 'second' | 'third'): CategoryField[] {

@@ -32,7 +32,7 @@ export function withTabItems(tab: DesktopNavItem, items: DesktopNavItem[]): Desk
 export function tabLine(tab: DesktopNavItem, opens: (target: string) => string): string {
   const items = tabItems(tab)
   const holds = tabHolds(tab)
-  if (holds === 'nothing') return 'Nothing in it yet'
+  if (holds === 'nothing') return ''
   if (holds === 'headings') return `Dropdown · ${headings(items.length)}`
   if (items.length === 1) return opens(items[0]!.target!)
   return `Dropdown · ${items.map((i) => i.label).join(', ')}`
@@ -42,7 +42,7 @@ export const headings = (n: number) => `${n} heading${n === 1 ? '' : 's'}`
 
 /** A heading's row line: its links, or that it has none. */
 export function headingLine(names: readonly string[]): string {
-  return names.length ? names.join(' · ') : 'Nothing in it yet'
+  return names.join(' · ')
 }
 
 /** Whether the header or a phone tab links to the Map, the one thing that
