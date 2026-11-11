@@ -233,6 +233,13 @@ The user's answers on Nov 10, evening, and what was done with them:
   which opens today's reader (its own step, back chevron, "See what
   changes"). "Not on Google? Fill it in yourself" shows only once
   something is typed. The Eruv page's box is unchanged. Not built.
+  The user found that "a lot going on" (Nov 10: "I liek to stick to one
+  thing at a time that any customer is seeing"), so boards 1b-3b redraw
+  it as one box: the search with a camera button inside it, one list
+  while typing (the guide's places first, a Google place the guide has
+  shown once, "Not listed? Fill it in yourself" as its last row), and a
+  pasted post turning the same box into the reader with "See what
+  changes". Both rows wait on the user.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the
