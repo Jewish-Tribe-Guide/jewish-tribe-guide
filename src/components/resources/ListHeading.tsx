@@ -32,7 +32,7 @@ type Props = {
   filters?: { active: number; onOpen: () => void }
   /** Sort, where there's more than one way to (likes on). */
   sort?: { byPopular: boolean; onSelect: (byPopular: boolean) => void }
-  /** In place of the count: Synagogues' "16 synagogues | By time" switch
+  /** In place of the count: Synagogues' "By synagogue | By time" switch
    *  (MinyanSwitch), which says the count itself. */
   lead?: ReactNode
   /** "Show map", at the right end, once the map beside the list has been
