@@ -258,6 +258,16 @@ The user's answers on Nov 10, evening, and what was done with them:
   the listing's note has now keeps the listing's (`keepListedNotes`); a
   new word still goes to the queue. The Nov 11 Shtiebel item in the live
   queue predates this and is the user's to reject.
+- **A shul's week finding no longer shows other weeks changed back**
+  (fixed Nov 11, Mekor Habracha). Mekor's Nov 6 newsletter printed
+  "7:00pm" for Friday Nov 13's Mincha (candle lighting 4:28); that was
+  approved as read, and the listing's copy was later corrected to 4:30.
+  The Nov 10 website read was filed with a copy of the whole schedule
+  from before the correction, so To do showed Friday going back to 7pm.
+  Approving was always safe (`rebasePart` puts on the finding's own week
+  only); the queue list and job pages now show it the same way. The live
+  item's own week (Nov 20-21) is right. Open idea, not built: flag a
+  Friday Mincha read later than candle lighting.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user

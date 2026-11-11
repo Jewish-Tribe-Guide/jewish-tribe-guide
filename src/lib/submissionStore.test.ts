@@ -331,6 +331,33 @@ describe('listSubmissionsByStatus', () => {
     // Decided, they're history like anything else.
     expect(await listSubmissionsByStatus('philly', 'approved')).toHaveLength(6)
   })
+
+  // Nov 11: Mekor Habracha's week from its website, filed with a copy of
+  // the newsletter's week as the listing had it then (a 7pm typo). The
+  // listing's copy was corrected to 4:30 since; To do showed it changed
+  // back to 7pm, though approving puts on the finding's own week only.
+  it('shows a shul’s week finding with its own week only, the others as the listing has them now', async () => {
+    const fri = (time: string) => ({ id: 'n', name: 'Times for Nov 8 – Nov 13', from: '2026-11-08', to: '2026-11-13', mode: 'replace', kind: 'week', minyanim: [{ id: 'm', on: ['2026-11-13'], tefillah: 'mincha_maariv', time }] })
+    const next = { id: 'w', name: 'Times for Nov 20 – Nov 21', from: '2026-11-20', to: '2026-11-21', mode: 'replace', kind: 'week', minyanim: [{ id: 'k', on: ['2026-11-20'], tefillah: 'mincha_maariv', time: '4:25pm' }] }
+    const sub = baseSubmission({
+      id: 'mekor',
+      operation: 'update',
+      target_id: 'res-mekor',
+      submitted_by: { name: LISTING_PAGE_WATCH_NAME },
+      payload: listingPayload({
+        category: 'synagogue',
+        details: { minyanim: [], minyanim_schedules: [fri('7:00 PM'), next] },
+        editedFields: ['minyanim_schedules'],
+        source: { readBy: 'ai', from: 'Mekor Habracha’s website', part: { part: 'week', field: 'minyanim', schedules: ['w'] } },
+      } as never) as never,
+    })
+    const listing = { id: 'res-mekor', category: 'synagogue', name: 'Mekor Habracha', address: '', phone: '', details: { minyanim: [], minyanim_schedules: [fri('4:30pm')] } }
+    mockFrom.mockImplementation((table: string) => chainable({ data: table === 'submission' ? [sub] : [listing], error: null }))
+    mockListCategories.mockResolvedValue([{ id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] }])
+
+    const [shown] = await listSubmissionsByStatus('philly', 'pending')
+    expect((shown.payload as { details: Record<string, unknown> }).details.minyanim_schedules).toEqual([fri('4:30pm'), next])
+  })
 })
 
 // ── approveSubmission: dispatch + error surfacing ───────────────────────────
