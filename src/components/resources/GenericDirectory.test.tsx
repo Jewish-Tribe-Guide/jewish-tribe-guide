@@ -2186,11 +2186,10 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       { ...shul('near', 'Mekor Habracha', '6:20pm'), milesFromCenter: 0.21 },
       { ...shul('mid', 'Lower Merion Synagogue', '6:25pm'), milesFromCenter: 5.1, confirmedAt: '2026-09-01' },
     ]
-    const count = () => screen.getByTestId('minyanim-count')
-
-    // The plain switch (the user, Nov 11): no count on "By time"; the view
-    // keeps Oct 15's "3 minyanim left today", quietly beside the switch.
-    it('says how many places on the list, and By time how many minyanim are left today', async () => {
+    // The plain switch (the user, Nov 11): no count on "By time", and the
+    // view says nothing of how many are left ("we don't need to say how
+    // many minyanim left today").
+    it('says how many places on the list, and By time no count at all', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
@@ -2198,7 +2197,8 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       expect(listButton()).toHaveTextContent(`3 ${shulCategory.pluralLabel.toLowerCase()}`)
       expect(byTimeButton()).toHaveTextContent(/^By time$/)
       await user.click(byTimeButton())
-      expect(count()).toHaveTextContent('3 minyanim left today')
+      const viewHeading = within(screen.getByTestId('minyanim-view')).getByTestId('list-heading')
+      expect(viewHeading).not.toHaveTextContent(/minyan|left today/)
     })
 
     it('is one switch, on the list’s heading and then on the view’s, opening every minyan by time', async () => {
@@ -2246,19 +2246,6 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       })
 
       expect(listButton()).toHaveTextContent(`1 ${withEruv.label.toLowerCase()}`)
-    })
-
-    it('counts only what’s still ahead today, and says when none is', () => {
-      fivePm()
-      const items = [
-        { ...shul('early', 'Early Shul', '1:30pm'), milesFromCenter: 1 },
-        { ...shul('late', 'Late Shul', '6:40pm'), milesFromCenter: 1 },
-      ]
-      renderWithProviders(<GenericDirectory category={shulCategory} items={items} openMinyanimView {...handlers} />, { content: { categories: [shulCategory] } })
-      expect(count()).toHaveTextContent('1 minyan left today')
-      cleanup()
-      renderWithProviders(<GenericDirectory category={shulCategory} items={[items[0]]} openMinyanimView {...handlers} />, { content: { categories: [shulCategory] } })
-      expect(count()).toHaveTextContent('0 minyanim left today')
     })
 
     // The card went when no shul left kept times; the switch is the
@@ -2310,11 +2297,10 @@ describe('GenericDirectory — each shul’s next minyan', () => {
           .getAllByRole('link')
           .map((a) => a.textContent!.replace(a.querySelector('[data-testid="minyan-whose"]')?.textContent ?? '', ''))
 
-      it('says how many are left today, and each minyan its shul’s denomination', async () => {
+      it('gives each minyan its shul’s denomination', async () => {
         fivePm()
         open()
         expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
-        expect(heading()).toHaveTextContent('3 minyanim left today')
         expect(rows()).toEqual([
           '6:20 PMMekor HabrachaMincha · Orthodox · 0.2 mi',
           '6:30 PMSociety Hill SynagogueMincha · Conservative · 0.7 mi',
@@ -2334,7 +2320,6 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         await user.click(within(sheet()).getByRole('button', { name: 'Orthodox' }))
         expect(within(sheet()).getByRole('button', { name: 'Show 1 minyan' })).toBeInTheDocument()
         await user.click(within(sheet()).getByRole('button', { name: 'Show 1 minyan' }))
-        expect(heading()).toHaveTextContent('1 minyan left today')
         expect(rows()).toEqual(['6:20 PMMekor HabrachaMincha · Orthodox · 0.2 mi'])
         expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
 
@@ -2356,7 +2341,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
         open()
         await user.type(screen.getByRole('searchbox'), 'mincha')
-        expect(heading()).toHaveTextContent('2 minyanim left today')
+        expect(rows()).toHaveLength(2)
         expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
         await user.click(within(heading()).getByRole('button', { name: /^Filters/ }))
         expect(within(sheet()).getByRole('button', { name: 'Mincha' })).toHaveAttribute('aria-pressed', 'true')
@@ -2379,7 +2364,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
         open()
         await user.type(screen.getByRole('searchbox'), 'orthodox mincha')
-        expect(heading()).toHaveTextContent('1 minyan left today')
+        expect(rows()).toHaveLength(1)
         expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
         await user.click(within(heading()).getByRole('button', { name: /^Filters/ }))
         expect(within(sheet()).getByRole('button', { name: 'Orthodox' })).toHaveAttribute('aria-pressed', 'true')

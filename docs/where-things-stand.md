@@ -229,9 +229,11 @@ The user's answers on Nov 10, evening, and what was done with them:
   drawn"). The list's heading is a two-part switch on phone and computer;
   By time is the Minyanim view at `?davening=1`, a history step as before.
   The page title stays the category's name in both (it used to turn into
-  "Minyanim by time"). The view keeps its "5 minyanim left today" count
-  beside the switch, from 440px wide up (my call, to keep Oct 15's count;
-  under that width Filters would wrap). Named change: on Oct 6 the user
+  "Minyanim by time"). No count beside it in the view (the user, Nov 11:
+  "we don't need to say how many minyanim left today"). The days are small
+  pills across the top of the white box, as board D1 drew them (the user,
+  Nov 11); a Yom Tov keeps its name on the pill, a plain date is only its
+  hover title (changes the two-line day + date tabs). Named change: on Oct 6 the user
   dropped a toggle because "if we need a sign the toggle isn't
   noticeable"; reminded of that, they still chose plain. Held off for a
   look with real people: next minyan in rows, one map switch, side by side.
