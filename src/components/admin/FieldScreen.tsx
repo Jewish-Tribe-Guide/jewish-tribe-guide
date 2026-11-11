@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import Link from 'next/link'
 import { adminBase } from '@/lib/adminNav'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
@@ -8,6 +8,7 @@ import { MINYAN_PARTS, slugifyFieldKey, TYPE_IS_FILTERABLE, type CategoryField, 
 import { canGoUnderName, cardPatch, underName } from '@/lib/cardLines'
 import { fieldAbout, fieldRules } from '@/lib/fieldAbout'
 import { partnerRule } from '@/lib/fieldPartners'
+import { inFilter } from '@/lib/fieldBoxes'
 import { KOSHER_CAVEAT } from '@/lib/kosherQuestions'
 import { AdminBack, AdminBox, AdminField, AdminSwitch, AdminYesNo } from './AdminUI'
 import ChoiceList from './ChoiceList'
@@ -103,7 +104,10 @@ function useFilterSwitch(f: CategoryField, onChange: (patch: Partial<CategoryFie
   const opened = useRef(f.renderAs)
   return (on: boolean) =>
     onChange(
-      on && (f.type === 'select' || f.type === 'boolean')
+      // A list of items: its own setting, left unset while on (itemFilter).
+      f.type === 'tags'
+        ? { itemFilter: on ? undefined : false }
+        : on && (f.type === 'select' || f.type === 'boolean')
         ? { filterable: true, renderAs: 'badge' }
         : { filterable: on, ...(!on && { renderAs: opened.current }) },
     )
@@ -203,7 +207,7 @@ export function FieldChanges({
   // do without. A yes or no can be required (the user, Nov 8): it starts
   // unanswered, so required means someone picks Yes or No.
   const required = !fixed && canRequire && !NEVER_REQUIRED.has(f.type)
-  const filter = !fixed && TYPE_IS_FILTERABLE(f.type)
+  const filter = !fixed && (TYPE_IS_FILTERABLE(f.type) || f.type === 'tags')
   const rules = fieldRules(f)
   const choices = !fixed && f.type === 'select' && !!rules.choicesEditable
   const kosher = !fixed && !!rules.asksEverythingKosher
@@ -230,7 +234,7 @@ export function FieldChanges({
             hint={f.type === 'hours' ? 'Visitors can show only places open now' : 'Visitors can narrow the list by it'}
           >
             <AdminSwitch
-              checked={!!f.filterable}
+              checked={f.type === 'tags' ? inFilter(f) : !!f.filterable}
               // A choice in the filter shows at the top of a place, as a chip.
               onChange={filterSwitch}
               label={f.type === 'hours' ? 'Open now in the filter' : 'In the filter'}
@@ -316,13 +320,13 @@ function OwnFieldScreen({ field: f, pageName, canRequire, onChange, onBack, rows
         </div>
       </AdminBox>
       {choices && <ChoiceList field={f} onChange={onChange} />}
-      {(canRequire && f.type !== 'boolean' && f.type !== 'image') || TYPE_IS_FILTERABLE(f.type) || f.type === 'select' || (rows && canGoUnderName(f)) ? (
+      {(canRequire && f.type !== 'boolean' && f.type !== 'image') || TYPE_IS_FILTERABLE(f.type) || f.type === 'tags' || f.type === 'select' || (rows && canGoUnderName(f)) ? (
         <AdminBox title="Questions">
           {canRequire && f.type !== 'boolean' && f.type !== 'image' && (
             <AdminYesNo question="Is it a required field?" value={!!f.required} onChange={(yes) => onChange({ required: yes })} />
           )}
-          {TYPE_IS_FILTERABLE(f.type) && (
-            <AdminYesNo question={f.type === 'hours' ? 'Should “Open now” be part of the filter?' : 'Should it be part of the filter?'} value={!!f.filterable} onChange={filter} />
+          {(TYPE_IS_FILTERABLE(f.type) || f.type === 'tags') && (
+            <AdminYesNo question={f.type === 'hours' ? 'Should “Open now” be part of the filter?' : 'Should it be part of the filter?'} value={f.type === 'tags' ? inFilter(f) : !!f.filterable} onChange={filter} />
           )}
           {rows && canGoUnderName(f) && <AdminYesNo question="Show it under the name?" value={underName(f)} onChange={(yes) => onChange(cardPatch(f, yes))} />}
           {f.type === 'select' && <AdminYesNo question={both} value={!!f.multiSelect} onChange={(yes) => onChange({ multiSelect: yes })} />}

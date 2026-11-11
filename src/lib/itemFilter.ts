@@ -10,9 +10,10 @@ import { itemName, namesItem } from '@/lib/itemNames'
 // doesn't load the home search's own code with them.
 
 /** The fields a category keeps an item list in (Grocery's items, Food's
- *  dishes): each is a "Has" filter on its page. */
+ *  dishes): each is a "Has" filter on its page, unless an admin turned
+ *  it off (itemFilter). */
 export function itemFields(category: CategoryConfig) {
-  return category.detailFields.filter((f) => f.type === 'tags')
+  return category.detailFields.filter((f) => f.type === 'tags' && f.itemFilter !== false)
 }
 
 /** The items on a listing in one item field, always and sometimes, each

@@ -260,11 +260,11 @@ export function boxLine(box: FieldBox, page: FieldPage): string {
  *  isn't plain from its name. */
 /** Whether visitors can narrow the page by a field, as the site does it
  *  (the user, Nov 11: Kosher items and Hours are in the filter but showed
- *  no Filter tag): a list of items is always "Has" (itemFields), Hours is
+ *  no Filter tag): a list of items is "Has" unless turned off (itemFields), Hours is
  *  "Open now" unless turned off, a Yes/No or Choice when it's a badge
  *  with its switch on. */
 export function inFilter(f: CategoryField): boolean {
-  if (f.type === 'tags') return true
+  if (f.type === 'tags') return f.itemFilter !== false
   if (f.type === 'hours') return f.filterable !== false
   return isBadge(f) && !!f.filterable
 }

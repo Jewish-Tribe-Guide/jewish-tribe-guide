@@ -84,14 +84,46 @@ export function mergeMinyanimBox(rows: readonly Minyan[], box: MinyanBox, edited
 // ── How many minyanim the box's edit changes (Oct 10) ───────────────────────
 // The list it's edited in is written by minyanText.ts's boxGroups.
 
+/** Each of `now`'s rows with the listing's own it is (by its id): the one
+ *  with its id, else one not yet taken on the same days, tefillah and time.
+ *  A week read again from a shul's website comes with every minyan under a
+ *  new id, so by id alone the same minyan was "New", a note reworded
+ *  included (the user, Nov 11: "is there any visual way to indicate that
+ *  this isn't a completely new row?"). */
+export function pairWithListing(was: readonly Minyan[], now: readonly Minyan[]): Map<string, Minyan> {
+  const out = new Map<string, Minyan>()
+  const left = new Map(was.map((m) => [m.id, m]))
+  for (const m of now) {
+    const own = left.get(m.id)
+    if (!own) continue
+    out.set(m.id, own)
+    left.delete(m.id)
+  }
+  const at = (m: Minyan) => `${[...m.days].sort().join(',')} ${m.tefillah} ${m.anchor ?? ''}${m.offsetMinutes ?? ''} ${m.time}`
+  // The same in every way first, so a twin doesn't take another's note.
+  for (const close of [(a: Minyan, b: Minyan) => same({ ...a, id: '' }, { ...b, id: '' }), (a: Minyan, b: Minyan) => at(a) === at(b)]) {
+    for (const m of now) {
+      if (out.has(m.id)) continue
+      const own = [...left.values()].find((w) => close(w, m))
+      if (!own) continue
+      out.set(m.id, own)
+      left.delete(own.id)
+    }
+  }
+  return out
+}
+
+/** Whether a row differs from the listing's own it's paired with. */
+export const differsFrom = (was: Minyan, m: Minyan) => !same({ ...was, id: '' }, { ...m, id: '' })
+
 /** How many minyanim the box's edit changes: each changed, added or taken
- *  out, for "Send 2 changes". */
+ *  out, for "Send 2 changes" (pairWithListing says which is which). */
 export function boxChangeCount(was: readonly Minyan[], now: readonly Minyan[]): number {
-  const before = new Map(was.map((m) => [m.id, m]))
-  const after = new Set(now.map((m) => m.id))
+  const pairs = pairWithListing(was, now)
+  const taken = new Set([...pairs.values()].map((m) => m.id))
   const touched = now.filter((m) => {
-    const old = before.get(m.id)
-    return !old || !same(old, m)
+    const old = pairs.get(m.id)
+    return !old || differsFrom(old, m)
   }).length
-  return touched + was.filter((m) => !after.has(m.id)).length
+  return touched + was.filter((m) => !taken.has(m.id)).length
 }

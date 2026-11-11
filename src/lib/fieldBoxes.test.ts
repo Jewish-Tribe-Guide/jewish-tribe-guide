@@ -159,6 +159,7 @@ describe('fieldBoxes', () => {
   it('tags each field visitors can filter by, the way the site filters', () => {
     // Grocery's items are always its "Has" filter, whatever was saved.
     expect(fieldLine({ key: 'm', label: 'Kosher items available', type: 'tags', renderAs: 'badge', filterable: false })).toBe('Filter')
+    expect(fieldLine({ key: 'm', label: 'Kosher items available', type: 'tags', renderAs: 'badge', itemFilter: false })).toBeUndefined()
     // Hours is "Open now", a row all the same; off only when turned off.
     expect(fieldLine({ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true })).toBe('Filter')
     expect(fieldLine({ key: 'hours', label: 'Hours', type: 'hours' })).toBe('Filter')

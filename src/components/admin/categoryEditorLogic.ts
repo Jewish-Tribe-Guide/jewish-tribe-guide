@@ -375,6 +375,8 @@ export const FIELD_FLAG_MEANS: Record<FieldFlag, (f: CategoryField) => boolean> 
   linkInDetails: (f) => !!f.linkInDetails,
   hideLabel: (f) => !!f.hideLabel,
   filterable: (f) => !!f.filterable,
+  // A list of items is the page's "Has" filter unless turned off.
+  itemFilter: (f) => f.itemFilter !== false,
   multiSelect: (f) => !!f.multiSelect,
   allowOther: (f) => !!f.allowOther,
   showInHeader: (f) => !!f.showInHeader,

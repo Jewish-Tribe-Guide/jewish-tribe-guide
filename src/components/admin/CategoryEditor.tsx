@@ -363,7 +363,7 @@ function CategoryEditorScreen({
     const still = screenFromSearch(window.location.search)
     if (!still.remove || still.field !== ref) return
     if (!count) return void screens.replace({ ...still, remove: false })
-    const next: Removing = { target, label: f ? f.label || 'New field' : open === 'address' ? 'Address' : 'Phone', count, filter: !!f && (!!normalizeField(f).filterable || f.type === 'tags') }
+    const next: Removing = { target, label: f ? f.label || 'New field' : open === 'address' ? 'Address' : 'Phone', count, filter: !!f && (f.type === 'tags' ? f.itemFilter !== false : !!normalizeField(f).filterable) }
     lastRemoving.current = next
     setRemoving(next)
   }
@@ -805,7 +805,7 @@ function CategoryEditorScreen({
               if (!f) return
               // A field not named yet has nothing anyone has answered.
               if (!f.key) return removeField(i)
-              void askRemove({ field: f.key }, f.label || 'New field', !!normalizeField(f).filterable || f.type === 'tags')
+              void askRemove({ field: f.key }, f.label || 'New field', f.type === 'tags' ? f.itemFilter !== false : !!normalizeField(f).filterable)
             }}
           />
 

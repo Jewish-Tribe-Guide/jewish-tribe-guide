@@ -151,6 +151,11 @@ export type CategoryField = {
   renderAs?: 'badge' | 'row' | 'hidden'
   /** Show a filter control for this field in the category list. */
   filterable?: boolean
+  /** For a list of items (`type: 'tags'`): whether it's the page's "Has"
+   *  filter. On unless an admin turned it off (the user, Nov 11: "I don't
+   *  want any hidden rules"). Apart from `filterable`, which saving forced
+   *  off for every list before Nov 11, so it can't say this. */
+  itemFilter?: boolean
   /** Label for the filter toggle/chip (e.g. "Kosher"). Defaults to `label`. */
   filterLabel?: string
   /** For `type: 'select'`: whether a single listing can hold more than one

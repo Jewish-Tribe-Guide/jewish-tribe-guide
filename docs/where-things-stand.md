@@ -236,9 +236,20 @@ The user's answers on Nov 10, evening, and what was done with them:
   Choice shown as a badge, so Hours ("Open now") and a list of items
   (Grocery's Kosher items, always the page's "Has" filter) showed none.
   The row now says Filter the way the site filters (`inFilter`), and
-  removing a list of items warns that the filter loses it. Whether an
-  admin should be able to take a list of items out of "Has" is the user's
-  call; today it is always in.
+  removing a list of items warns that the filter loses it. A list of items
+  has the "In the filter" switch like any filter now (the user: "I don't
+  want any hidden rules"), saved as `itemFilter: false` when off, since
+  saving had forced `filterable` off on every list; off, it leaves Filters
+  and a search for an item no longer ticks it.
+- **To do's week box marks only what changed** (Nov 11, the user on the
+  Shtiebel item). A week read again comes with every minyan under a new id,
+  and the box matched the site's by id, so all of them said "New". It now
+  pairs by id, else by day, tefillah and time (`pairWithListing`, also in
+  the change count): an unchanged minyan has no mark, and a note-only
+  change says Changed with the old note crossed out under the new one, the
+  way a changed time shows what it was. Two admin-write flakes seen while
+  running it, each green alone: todo-scroll's resize line and
+  category-open's no-request check.
 - **A shul's week read again with its notes only reworded files nothing**
   (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
   a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;

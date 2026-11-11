@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import { BOX_DAYS, boxChangeCount, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
+import { BOX_DAYS, boxChangeCount, mergeMinyanimBox, minyanimForBox, pairWithListing } from './minyanimBox'
 import { boxGroups } from './minyanText'
 
 const shacharis: Minyan = { id: 's', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '6:45am' }
@@ -82,5 +82,26 @@ describe('Yom Tov is in neither usual box (the user, Oct 10): its dated schedule
       { ...row, days: ['yom_tov'] },
       { ...row, id: 'y-weekday', days: ['mon'], time: '7:15am' },
     ])
+  })
+})
+
+describe('pairWithListing', () => {
+  // A week read again from a shul's website: the same minyanim, new ids.
+  const site: Minyan[] = [
+    { id: 'a', tefillah: 'shacharis', days: ['wed'], time: '7:30am', notes: 'until 8:00 AM; coffee and learning' },
+    { id: 'b', tefillah: 'shacharis', days: ['thu'], time: '7:15am' },
+  ]
+  it('pairs by id, else by day, tefillah and time, so a reworded note is one change', () => {
+    const read: Minyan[] = [
+      { id: 'x', tefillah: 'shacharis', days: ['wed'], time: '7:30am', notes: 'until 8:00 AM' },
+      { id: 'y', tefillah: 'shacharis', days: ['thu'], time: '7:15am' },
+    ]
+    expect([...pairWithListing(site, read)].map(([k, v]) => [k, v.id])).toEqual([['y', 'b'], ['x', 'a']])
+    expect(boxChangeCount(site, read)).toBe(1)
+  })
+  it('a moved time is still a new minyan and one gone, as before', () => {
+    const read: Minyan[] = [{ ...site[0], id: 'x', time: '7:45am' }, { ...site[1], id: 'y' }]
+    expect(pairWithListing(site, read).has('x')).toBe(false)
+    expect(boxChangeCount(site, read)).toBe(2)
   })
 })
