@@ -68,7 +68,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 
-const { runListingPageWatch, listedAs, weeklyReadDue } = await import('./listingPageRun')
+const { runListingPageWatch, listedAs, weeklyReadDue, correctOlderWeeks } = await import('./listingPageRun')
 const { pageReadsFor } = await import('./listingPageWatch')
 const { newMenuReadBudget } = await import('./menuWatchRun')
 
@@ -322,6 +322,32 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       pageHash: await hashOfPage(),
       check: { result: 'agrees', note: 'Some days differ, but the newsletter has given those days, and it wins.' },
     })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // The user, Nov 11, changing Oct 20's rule: "If someone posts a wrong
+  // time that's not on us. But if they correct it then we should be
+  // correcting too." Mekor Habracha's newsletter said 7pm for a Friday's
+  // Mincha, its website (changed since) 4:30, and the website was held off.
+  it('a website that changed after the newsletter’s week was posted corrects that week’s time, and keeps its others', async () => {
+    const posted = { ...newsletterWeek, postedAt: '2026-10-20T09:00:00.000Z', minyanim: [...newsletterWeek.minyanim, { id: 'y', tefillah: 'shacharis', on: ['2026-10-25'], time: '8:00am' }] }
+    m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [posted] } })
+    m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU_OCT_22 })).toMatchObject({ ok: true, filed: 1 })
+    expect(m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules).toEqual([
+      { ...posted, minyanim: [{ id: 'x', tefillah: 'mincha', on: ['2026-10-25'], time: '6:05pm' }, posted.minyanim[1]] },
+    ])
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Times for Oct 25: mincha · Sun Oct 25 · 6:05pm, was 6:10pm')
+  })
+
+  it('a website unchanged since before the newsletter’s week leaves it as the newsletter gave it', async () => {
+    const posted = { ...newsletterWeek, postedAt: '2026-10-20T09:00:00.000Z' }
+    m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [posted] } })
+    m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
+    const lastWeek = { ...lastRead(shul, shulCategory, 'differs'), at: '2026-10-13T11:00:00Z', readWeek: '2026-10-11' }
+    const out = await runListingPageWatch({ ...watch, pageHash: await hashOfPage(), pageChangedAt: '2026-10-19T09:00:00.000Z', lastCheck: lastWeek }, newMenuReadBudget(), { apiKey: 'k', now: THU_OCT_22 })
+    expect(out).toMatchObject({ ok: true, filed: 0, check: { note: 'Some days differ, but the newsletter has given those days, and it wins.' } })
+    expect(m.readShulWeek).toHaveBeenCalledTimes(1)
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
@@ -1687,5 +1713,43 @@ describe('runListingPageWatch: a page’s phone and email', () => {
     expect(m.readMessage).not.toHaveBeenCalled()
     expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', contact: { same: [], changes: ['phone', 'front_desk_email'] } } })
     expect(m.submitListingUpdate.mock.calls[0][2]).toMatchObject({ phone: '(215) 555-0100', details: { front_desk_email: 'stay@hotel.example' }, source: { section: { section: 'contact' } } })
+  })
+})
+
+// Nov 11: what a newer website corrects in an older newsletter week.
+describe('correctOlderWeeks', () => {
+  const letter = (minyanim: object[], over: object = {}) => ({ id: 'n', name: 'Times for Nov 8 – Nov 13', from: '2026-11-08', to: '2026-11-13', mode: 'replace', kind: 'week', postedAt: '2026-11-06T16:00:00.000Z', minyanim, ...over }) as never
+  const read = (rows: object[]) => ({ kind: 'week', complete: true, season: null, title: null, startsOn: null, from: '2026-11-13', to: '2026-11-14', otherSeason: 0, rows: rows.map((r, i) => ({ id: `r${i}`, status: 'new', ...r })) }) as never
+  const AFTER = '2026-11-08T07:47:00.000Z'
+
+  it('Mekor’s Friday: the website’s Mincha Kabbalat Shabbat corrects the newsletter’s Mincha/Maariv, Shacharis kept', () => {
+    const was = letter([{ id: 's', tefillah: 'shacharis', on: ['2026-11-13'], time: '6:55am' }, { id: 'm', tefillah: 'mincha_maariv', on: ['2026-11-13'], time: '7:00 PM' }])
+    const out = correctOlderWeeks([was], read([{ day: '2026-11-13', tefillah: 'kabbalas_shabbos', time: '4:30PM' }]), AFTER)
+    expect(out.schedules[0].minyanim).toEqual([{ id: 's', tefillah: 'shacharis', on: ['2026-11-13'], time: '6:55am' }, { id: 'm', tefillah: 'mincha_maariv', on: ['2026-11-13'], time: '4:30PM' }])
+    expect(out.changes).toEqual(['Times for Nov 8 – Nov 13: mincha maariv · Fri Nov 13 · 4:30PM, was 7:00 PM'])
+  })
+
+  it('a minyan on several dates is corrected on the website’s date only', () => {
+    const out = correctOlderWeeks([letter([{ id: 'm', tefillah: 'mincha', on: ['2026-11-12', '2026-11-13'], time: '4:30pm', notes: 'in the library' }])], read([{ day: '2026-11-13', tefillah: 'mincha', time: '4:20pm' }]), AFTER)
+    const ms = out.schedules[0].minyanim
+    expect(ms).toHaveLength(2)
+    expect(ms[0]).toEqual({ id: 'm', tefillah: 'mincha', on: ['2026-11-12'], time: '4:30pm', notes: 'in the library' })
+    expect(ms[1]).toMatchObject({ tefillah: 'mincha', on: ['2026-11-13'], time: '4:20pm', notes: 'in the library' })
+    expect(ms[1].id).not.toBe('m')
+  })
+
+  it('corrects nothing when it can’t tell which: two evening minyanim, and a page with only an evening one', () => {
+    const two = letter([{ id: 'a', tefillah: 'mincha', on: ['2026-11-13'], time: '4:20pm' }, { id: 'b', tefillah: 'maariv', on: ['2026-11-13'], time: '5:30pm' }])
+    expect(correctOlderWeeks([two], read([{ day: '2026-11-13', tefillah: 'kabbalas_shabbos', time: '4:30pm' }]), AFTER).changes).toEqual([])
+  })
+
+  it('corrects nothing in a week posted after the page changed, one with no posted time, a website week, or with no change on record', () => {
+    const fri = [{ id: 'm', tefillah: 'mincha', on: ['2026-11-13'], time: '7:00 PM' }]
+    const page = read([{ day: '2026-11-13', tefillah: 'mincha', time: '4:30pm' }])
+    expect(correctOlderWeeks([letter(fri, { postedAt: '2026-11-09T00:00:00.000Z' })], page, AFTER).changes).toEqual([])
+    expect(correctOlderWeeks([letter(fri, { postedAt: undefined })], page, AFTER).changes).toEqual([])
+    expect(correctOlderWeeks([letter(fri, { postedBy: 'website' })], page, AFTER).changes).toEqual([])
+    expect(correctOlderWeeks([letter(fri)], page, null).changes).toEqual([])
+    expect(correctOlderWeeks([letter(fri)], page, AFTER).changes).toHaveLength(1)
   })
 })
