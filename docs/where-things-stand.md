@@ -224,6 +224,15 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
+- **+ Add opening on Find the place, with AI a tap away: drawn, waiting
+  on the user** (Nov 10, canvas
+  https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
+  asked whether the box should start with AI; the recommendation was no.
+  The boards: the box opens on today's Find the place search, titled "Add
+  or update a place", with one row under it, "Paste a post or photo",
+  which opens today's reader (its own step, back chevron, "See what
+  changes"). "Not on Google? Fill it in yourself" shows only once
+  something is typed. The Eruv page's box is unchanged. Not built.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the
