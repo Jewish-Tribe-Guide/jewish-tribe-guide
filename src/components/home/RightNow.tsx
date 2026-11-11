@@ -68,7 +68,7 @@ export default function RightNow(props: Props) {
         {rows.map((row) => (
           <li key={row.category.id} className="border-t border-slate-100 first:border-t-0">
             <Link href={`${routes.slug(communitySlug, row.category.id)}?openNow=1`} prefetch={false} className="flex items-center gap-3 px-3.5 py-3 hover:bg-slate-50">
-              <CategoryIcon icon={row.category.icon} categoryId={row.category.id} color={getCategoryColor(categories as CategoryConfig[], row.category.id)} className="h-9 w-9 text-base" sizePx={36} />
+              <CategoryIcon icon={row.category.icon} categoryId={row.category.id} iconImageUrl={row.category.iconImageUrl} color={getCategoryColor(categories as CategoryConfig[], row.category.id)} className="h-9 w-9 text-base" sizePx={36} />
               <span className="min-w-0 flex-1">
                 <span className="block text-[13px] font-semibold text-slate-500">{row.category.pluralLabel}</span>
                 <span className="block text-[16px] font-extrabold leading-snug text-ink">{row.open} open now</span>

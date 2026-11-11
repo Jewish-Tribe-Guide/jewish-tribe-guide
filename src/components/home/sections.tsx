@@ -12,7 +12,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import CategoryIcon from '@/components/CategoryIcon'
 import { DotsIcon } from '@/components/icons'
-import { getCategoryColor } from '@/lib/categoryColor'
+import { getCategoryColor, getCategoryPicture } from '@/lib/categoryColor'
 
 export type CardDef = {
   title: string
@@ -56,14 +56,21 @@ export type CardDef = {
  *  can make out, and at 32px there is no subject, only average colour. The
  *  glyph is legible at that size and the category's own `pinColor` makes each
  *  row distinguishable at a glance, which is what an index is for. See
- *  `count` below for the other half of what a row here should say. */
+ *  `count` below for the other half of what a row here should say.
+ *
+ *  `picture` is a different field: the one an admin sets for the icon spot
+ *  itself ("Or use a picture instead"), so it is chosen to read at badge
+ *  size, unlike the wide home-screen photo above. When set it replaces the
+ *  glyph here as on every other badge of the category (Nov 11). */
 function CompactCard({
   card,
   color,
+  picture,
   onCardClick,
 }: {
   card: CardDef
   color: string
+  picture: string | null
   onCardClick?: (card: CardDef) => void
 }) {
   return (
@@ -97,10 +104,10 @@ function CompactCard({
         // just skip the wrap and render plainly.
         card.id ? (
           <ViewTransition name={`category-badge-${card.id}`}>
-            <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+            <CategoryIcon icon={card.icon} categoryId={card.id} iconImageUrl={picture} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
           </ViewTransition>
         ) : (
-          <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+          <CategoryIcon icon={card.icon} categoryId={card.id} iconImageUrl={picture} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
         )
       ) : (
         <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
@@ -216,6 +223,7 @@ export function CompactCardGrid({
             key={card.id ?? card.title}
             card={card}
             color={getCategoryColor(categories, card.id ?? '')}
+            picture={getCategoryPicture(categories, card.id)}
             onCardClick={onCardClick}
           />
         ))}
@@ -324,6 +332,7 @@ export function CategoryTileRow({
                 <CategoryIcon
                   icon={card.icon}
                   categoryId={card.id}
+                  iconImageUrl={getCategoryPicture(categories, card.id)}
                   color={getCategoryColor(categories, card.id)}
                   className="h-16 w-16 text-[28px]"
                   sizePx={64}
@@ -333,6 +342,7 @@ export function CategoryTileRow({
               <CategoryIcon
                 icon={card.icon}
                 categoryId={card.id}
+                iconImageUrl={getCategoryPicture(categories, card.id)}
                 color={getCategoryColor(categories, card.id ?? '')}
                 className="h-16 w-16 text-[28px]"
                 sizePx={64}

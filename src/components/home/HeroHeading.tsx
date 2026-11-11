@@ -274,11 +274,13 @@ export default function HeroHeading({
           {/* Dims the photo so white type reads anywhere on it. */}
           <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.7))]" />
         </div>
-        <div className="mx-auto flex min-h-[360px] max-w-[720px] flex-col items-center px-4 pt-[72px] pb-14 text-center">
+        {/* Wider than the search (880 against 688) so the 48px headline sits on
+            one line, about the box's width, instead of wrapping (Nov 11). */}
+        <div className="mx-auto flex min-h-[360px] max-w-[880px] flex-col items-center px-4 pt-[72px] pb-14 text-center">
           {today && <p className="mb-2 min-h-6 text-[16px] font-semibold text-white/80">{today.dayLine}</p>}
-          <h1 className="text-[40px] font-extrabold leading-tight tracking-tight text-white text-balance">{headline}</h1>
+          <h1 className="text-[48px] font-extrabold leading-tight tracking-tight text-white text-balance">{headline}</h1>
           {ui.search.landing && (
-            <div ref={searchShellRef} className="relative mt-6 w-full text-left">
+            <div ref={searchShellRef} className="relative mt-6 w-full max-w-[688px] text-left">
               <SearchBox
                 query={query}
                 onQueryChange={handleQueryChange}

@@ -240,11 +240,26 @@ The user's answers on Nov 10, evening, and what was done with them:
     thing), BUILT.
   - Explore by Category showing every category instead of "More": held,
     to ask visitors.
-  - "Kept up by the community" (the phone's trust line) somewhere on the
-    computer: where is open.
-  - The big map, "everything on one map": the user wonders if a
-    Mekor-style feature card (picture, small label, big title, one line,
-    one button) would call it out. Needs a drawing.
+  - "Kept up by the community" on the computer: drawn on the desk canvas
+    (row "How it stays right, up top"). The user likes F1b, a full-width
+    band below the hero photo, not overlapping it: shield, the trust line,
+    and the phone sheet's three points, opening the same sheet. The
+    "Kept by the Community" card in the row of three goes with it, in the
+    same change. Not built: waiting on the user's go-ahead.
+  - The big map: G2 on the canvas, a card in words only (map glyph, "ONE
+    MAP", "Everything on one map", one line, "Open the map"), the whole
+    card tappable, under the categories. The user didn't want a drawn
+    map. Not built: waiting on the user's go-ahead.
+  - The headline is 48px (was 40), in an 880px column so it stays on one
+    line about as wide as the 688px search box under it. BUILT.
+  - A category's own picture ("Or use a picture instead") now shows on
+    every home badge of it: computer tiles, search rows, phone tiles,
+    Browse, Right now, the Add picker. It used to show only in the search
+    dropdown, so Food's new picture never appeared. BUILT. Change to an
+    earlier decision: the search rows had dropped photos because the wide
+    home-screen photo turns to mush at 32px; this is the separate picture
+    chosen for the icon spot. Open: pictures for the other categories
+    (Food is the only one so far, so it stands out among icons).
 - **"By synagogue | By time" replaces the green Minyanim card** (BUILT
   Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
   drawn"). The list's heading is a two-part switch on phone and computer;

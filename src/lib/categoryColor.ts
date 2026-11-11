@@ -89,6 +89,16 @@ export function getCategoryColor(categories: CategoryConfig[] | null | undefined
   return stored || PALETTE[index % PALETTE.length]
 }
 
+/** The picture an admin set for this category's icon spot ("Or use a picture
+ *  instead"), or null to draw the glyph. Every place a category is drawn as
+ *  its badge (home tiles, browse rows, search rows) reads it through here, so
+ *  setting one picture changes the category everywhere at once; a tile that
+ *  forgot to pass it is how Food's picture once showed only in search. */
+export function getCategoryPicture(categories: readonly CategoryConfig[] | null | undefined, categoryId: string | undefined): string | null {
+  if (!categoryId) return null
+  return (categories ?? []).find((c) => c.id === categoryId)?.iconImageUrl?.trim() || null
+}
+
 /** The palette offered in the category editor's colour picker. Exported so the
  *  admin shows the same twenty the fallback draws from, rather than a second
  *  hand-maintained list that can drift from it. */
