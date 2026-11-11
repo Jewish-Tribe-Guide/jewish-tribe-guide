@@ -1285,6 +1285,23 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
+  // South Philadelphia Shtiebel, Nov 11: read again, the AI dropped
+  // "coffee and learning" from a note it had read before, at the same
+  // times. The queue showed a change the same as the site.
+  it('files nothing when a week read again only rewords its notes', async () => {
+    const said = { ...thisWeek, rows: thisWeek.rows.map((r) => (r.tefillah === 'shacharis' && r.day === '2026-10-22' ? { ...r, notes: 'until 9:00 AM; coffee and learning' } : r)) }
+    byWeek({ '2026-10-22': said, '2026-10-25': nextWeek })
+    await run()
+    const posted = m.submitListingUpdate.mock.calls[0][2].details
+    vi.clearAllMocks()
+    m.getResourceRowById.mockResolvedValue({ ...rodeph, details: posted })
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
+    const reworded = { ...thisWeek, rows: thisWeek.rows.map((r) => (r.tefillah === 'shacharis' && r.day === '2026-10-22' ? { ...r, notes: 'until 9:00 AM' } : r)) }
+    byWeek({ '2026-10-22': reworded, '2026-10-25': nextWeek })
+    expect(await run({ full: true })).toMatchObject({ ok: true, filed: 0 })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
   it('a week of the calendar read again on a later day replaces that week’s days, rather than making a second week', async () => {
     const earlier = { id: 'e', name: 'Times for Oct 18 – Oct 24', from: '2026-10-20', to: '2026-10-24', mode: 'replace', kind: 'week', postedBy: 'website', minyanim: [{ id: 'e1', tefillah: 'shacharis', on: ['2026-10-20'], time: '8:10am' }, { id: 'e2', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:45am' }] }
     m.getResourceRowById.mockResolvedValue({ ...rodeph, details: { minyanim: usual, minyanim_schedules: [earlier] } })

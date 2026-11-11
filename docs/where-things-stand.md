@@ -231,6 +231,22 @@ The user's answers on Nov 10, evening, and what was done with them:
   they landed on Food with nothing to show. They now take the page whose
   places carry the most minyanim (`minyanimPage`), the first holding the
   field only when none has any. The e2e tests pick the page the same way.
+- **Filter tag on Kosher items and Hours** (fixed Nov 11, the user on
+  Grocery's admin page). A field's row said Filter only for a Yes/No or
+  Choice shown as a badge, so Hours ("Open now") and a list of items
+  (Grocery's Kosher items, always the page's "Has" filter) showed none.
+  The row now says Filter the way the site filters (`inFilter`), and
+  removing a list of items warns that the filter loses it. Whether an
+  admin should be able to take a list of items out of "Has" is the user's
+  call; today it is always in.
+- **A shul's week read again with its notes only reworded files nothing**
+  (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
+  a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;
+  coffee and learning" the next, at the same times, so the queue held a
+  change the same as the site. A note that only drops or rewords words
+  the listing's note has now keeps the listing's (`keepListedNotes`); a
+  new word still goes to the queue. The Nov 11 Shtiebel item in the live
+  queue predates this and is the user's to reject.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user

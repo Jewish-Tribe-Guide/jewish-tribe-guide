@@ -39,6 +39,7 @@ import { sendWatchDigest } from '@/lib/email'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { jobPageFor } from '@/lib/watchFindings'
 import { withMinyanLinks } from '@/lib/minyanLinks'
+import { keepListedNotes } from '@/lib/websiteNotes'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -455,7 +456,9 @@ async function readTimesText(
     // A week is compared with the listing's copy of it, so one that now
     // matches the usual times still changes a week that didn't.
     if (!update || (!changesAnything(update) && !(week && update.from && update.to && schedules.some((s) => s.kind === 'week' && s.postedBy === 'website' && s.from <= update.to! && s.to >= update.from!)))) continue
-    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website', ...(week ? { onlyRead: { today } } : {}) })
+    const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', ...(week ? { onlyRead: { today } } : {}) })
+    // A note only reworded (keepListedNotes) stays as the listing has it.
+    const applied = { ...posted, schedules: keepListedNotes(schedules, posted.schedules) }
     if (applied.changes.length === 0) continue
     // Already on the listing as it would be (read again the next day).
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
@@ -684,7 +687,7 @@ async function readCalendarWeeks(
     if (!update || !update.rows.length) continue
     const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: weekName(w), evenIfSame: true, whole, ...(update.kind === 'week' ? { onlyRead: { today: dayIn(Date.now()) } } : {}) })
     // The calendar's join links onto its times (withJoinLinks), by code.
-    const linked = withJoinLinks(posted.schedules, w.joins ?? [])
+    const linked = withJoinLinks(keepListedNotes(schedules, posted.schedules), w.joins ?? [])
     const applied = { ...posted, schedules: linked.schedules, changes: [...posted.changes, ...linked.changes] }
     // Already on the listing as it would be: nothing to file for this week.
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
