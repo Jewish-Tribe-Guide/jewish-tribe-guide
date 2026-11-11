@@ -200,11 +200,11 @@ export default function SubscribeSection({
 
   if (band) {
     return (
-      <div data-testid="home-subscribe" className="flex items-center gap-7 rounded-[18px] bg-[#1e3a8a] px-11 py-10">
+      <div data-testid="home-subscribe" className="flex min-h-[260px] items-center gap-9 rounded-[18px] bg-[#1e3a8a] px-14 py-16">
         <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] font-bold uppercase tracking-[0.12em] text-blue-200">{eyebrow}</p>
-          <h2 className="mt-1.5 text-3xl font-extrabold text-white">{heading}</h2>
-          <p className="mt-1 text-[15px] text-blue-100">
+          <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-blue-200">{eyebrow}</p>
+          <h2 className="mt-2.5 text-[38px] font-extrabold leading-[1.1] text-white">{heading}</h2>
+          <p className="mt-2 text-lg text-blue-100">
             {done ? 'You’re subscribed. Every email has an unsubscribe link.' : 'An email when a place is added or closes.'}
           </p>
           {error && <p className="mt-3 text-sm font-semibold text-red-200">{error}</p>}
@@ -219,12 +219,12 @@ export default function SubscribeSection({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Your email"
               aria-label="Email address"
-              className="h-[50px] w-[280px] rounded-full bg-white px-5 text-[15px] text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="h-14 w-[320px] rounded-full bg-white px-5 text-base text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
             <button
               type="submit"
               disabled={submitting}
-              className="h-[50px] cursor-pointer rounded-full bg-white px-[26px] text-base font-bold text-[#1e3a8a] ring-1 ring-blue-300 transition-colors hover:bg-blue-50 disabled:opacity-60"
+              className="h-14 cursor-pointer rounded-full bg-white px-[30px] text-[17px] font-bold text-[#1e3a8a] ring-1 ring-blue-300 transition-colors hover:bg-blue-50 disabled:opacity-60"
             >
               {submitting ? 'Signing up…' : 'Sign up'}
             </button>

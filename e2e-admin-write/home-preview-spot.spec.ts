@@ -56,7 +56,10 @@ test('the computer preview shows the whole page, and opens full size on a click'
     .toBe(true)
   await page.waitForTimeout(3000)
   expect((await shown.boundingBox())!.height).toBe(last)
-  expect(last).toBeLessThan(800)
+  // A ceiling on top: the whole computer home is about 820px here since
+  // board G5c's roomier sections (Nov 11); a frame stretched by itself would
+  // run far past this.
+  expect(last).toBeLessThan(1000)
 
   const full = page.locator('iframe[title="Site preview"]')
   await shown.click()

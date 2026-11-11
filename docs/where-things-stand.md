@@ -305,6 +305,12 @@ The user's answers on Nov 10, evening, and what was done with them:
     unlike the Google map a visitor lands on; Google's Static Maps is the
     other choice). Dev's map photo was removed to match the no-picture
     board.
+  - **Computer home, more room** (board G5c, the user, Nov 11: "Yes, build
+    G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), the
+    first still 32px under the trust strip. "Know a place we're missing?"
+    is a 240px-tall section with a 38px heading, bigger line and a 56px
+    button; the navy Stay in the Loop box is 260px tall with a 38px
+    heading, a 320px email box and 56px controls. Phone unchanged.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three

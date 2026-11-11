@@ -38,4 +38,11 @@ describe('SuggestListingCard', () => {
 
     expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
   })
+
+  // Board G5c (Nov 11): a stop of its own, not a footnote to the map.
+  it('is a tall section with a big heading', () => {
+    renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    expect(screen.getByTestId('home-suggest')).toHaveClass('min-h-[240px]')
+    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('text-[38px]')
+  })
 })

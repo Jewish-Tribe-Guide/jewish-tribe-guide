@@ -542,7 +542,7 @@ describe('Landing', () => {
     const row = (kind: HomeBlockKind, sortOrder: number, sharesRow = false) => ({ id: kind, kind, title: kind, sortOrder, cardIds: [], sharesRow })
     const subscribeHeading = () => screen.getByTestId('home-subscribe')
     const timesHeading = () => screen.getByTestId('home-shabbos')
-    const spots = (container: HTMLElement) => [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
+    const spots = (container: HTMLElement) => [...container.querySelectorAll('[data-spot^="cards"]')].map((el) => el.getAttribute('data-spot'))
 
     it('three cards in one row, in order', () => {
       const { container } = renderLanding(undefined, {
@@ -644,6 +644,16 @@ describe('Landing', () => {
       expect(screen.queryByTestId('home-suggest')).not.toBeInTheDocument()
     })
 
+    // Board G5c (Nov 11): 72px between the stops; the first 32px under the
+    // trust strip, which bridges into it. (jsdom has no layout, so this
+    // checks the classes; the gaps themselves were measured on dev.)
+    it('puts 72px between the rows, and 32px above the first', () => {
+      const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
+      const rows = [...container.querySelectorAll('[data-spot^="cards"]')]
+      expect(rows[0]).toHaveClass('mt-8', 'mb-[72px]')
+      for (const row of rows.slice(1)) expect(row).toHaveClass('my-[72px]')
+    })
+
     // Board G5b (Nov 11): Categories, the two answer cards side by side,
     // the map, Suggest a listing, Stay in the Loop last.
     it('with no rows saved: the next minyan and this Shabbat share a row, then the map', () => {
@@ -672,7 +682,7 @@ describe('Landing', () => {
 
     it('with nothing configured, the map card comes after the two answer cards (board G5b)', () => {
       const { container } = renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
-      const spots = [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
+      const spots = [...container.querySelectorAll('[data-spot^="cards"]')].map((el) => el.getAttribute('data-spot'))
       expect(spots.slice(0, 3)).toEqual(['cards card-browse', 'cards card-davening card-jewishTimes', 'cards card-map'])
     })
 

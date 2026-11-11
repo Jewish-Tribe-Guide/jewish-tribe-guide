@@ -748,8 +748,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             })
           }
 
-          return rows.map((row) => (
-            <div key={row.key} data-spot={`cards ${row.key.split('-').map((k) => `card-${k}`).join(' ')}`} className="my-8">
+          // Board G5c (Nov 11): 72px between the stops, so each reads as
+          // one thing; the first stays 32px under the trust strip, which
+          // bridges into it. The margins collapse, so a gap is 72px, not 144.
+          return rows.map((row, i) => (
+            <div
+              key={row.key}
+              data-spot={`cards ${row.key.split('-').map((k) => `card-${k}`).join(' ')}`}
+              className={i === 0 ? 'mt-8 mb-[72px]' : 'my-[72px]'}
+            >
               {row.node}
             </div>
           ))
