@@ -253,6 +253,28 @@ The user's answers on Nov 10, evening, and what was done with them:
     Open: the phone's category tiles still mix photos and tinted icons;
     H1 didn't cover them. Networking's and Eruv Information's pictures
     don't work as tiles (generic tech art; a blurry thumbnail).
+  - **"Everything on one map" card** (board G3, the user, Nov 11: "let's
+    build this and let's have it in the admin too with room for
+    adding/changing the photo"): BUILT Nov 11. A wide card, a row of its
+    own like Categories: a photo on the left, "One map / Everything on one
+    map", the community's five biggest categories by name, and "Open the
+    map"; the whole card links to the map. No map is drawn in it (the
+    drawn one in G "looks very fake"). Its photo is set in Site → Home page,
+    under "Cards under the search", while the card is in that list ("Map
+    card photo"); with none it shows the plain map glyph. It is the old
+    'map' card kind come back, offered again in "+ Add", and the default
+    for a community with no cards saved, after Categories. Computer only.
+    Named changes: the map card was retired (it embedded the map); it is
+    back as a link. City Hall moves from the hero to this card, and the
+    hero gets a photo of the community, still to find (the user's call,
+    in the admin). Needs **migration 095** (`site_settings.desktop_map_image`)
+    to save a photo: not run on dev, test or live yet. Without it the card
+    still shows (glyph), every other setting still saves, and choosing a
+    photo says it isn't set up. **On live, Philly already has an old 'map'
+    row** (after Suggest a Listing, before Stay in the Loop), so the card
+    appears there once this deploys; move it in the admin. Fixed on the
+    way (found on dev): the card moved by keyboard could land inside a row
+    of two and be squeezed to a third of the width; it now passes rows.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three
@@ -651,6 +673,11 @@ Still different, each needing the user:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
+0. **Migration 095 (map card photo, Nov 11):** one `add column if not
+   exists`. Run it on live before or with the deploy that ships the map
+   card; the card works without it, only its photo can't be saved. Then
+   the photo is set in the admin (City Hall, by the user's call). Needs a
+   yes.
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site

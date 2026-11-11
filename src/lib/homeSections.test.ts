@@ -26,6 +26,15 @@ describe('cardRows', () => {
   it('keeps Categories alone, before and after', () => {
     expect(kinds(cardRows([c('davening'), c('browse', true), c('listings', true)]))).toEqual([['davening'], ['browse'], ['listings']])
   })
+
+  // Found on dev, Nov 11: moving the map card up through the Davening Times
+  // row by keyboard saved it there, and the page squeezed the card into a
+  // third of a row. It keeps a row of its own, and the cards after it that
+  // say they share make a row of their own.
+  it('keeps the map card alone, even where a saved order put it in a row', () => {
+    expect(kinds(cardRows([c('browse'), c('map'), c('davening', true), c('suggest', true)]))).toEqual([['browse'], ['map'], ['davening', 'suggest']])
+    expect(kinds(cardRows([c('davening'), c('map', true), c('suggest', true)]))).toEqual([['davening'], ['map'], ['suggest']])
+  })
 })
 
 describe('fromCardRows', () => {
@@ -45,5 +54,8 @@ describe('canShareRow', () => {
     expect(canShareRow([c('davening'), c('listings'), c('suggest')], c('subscribe'))).toBe(false)
     expect(canShareRow([c('browse')], c('subscribe'))).toBe(false)
     expect(canShareRow([c('subscribe')], c('browse'))).toBe(false)
+    // The map card too (board G3): photo and words side by side.
+    expect(canShareRow([c('map')], c('davening'))).toBe(false)
+    expect(canShareRow([c('davening')], c('map'))).toBe(false)
   })
 })

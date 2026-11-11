@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { MissingMapPhotoColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -157,7 +157,7 @@ export async function PATCH(request: Request) {
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })
   } catch (err) {
-    if (err instanceof MissingTodayColumnsError) {
+    if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
     }
     console.error('[admin/site-settings] PATCH failed:', err)

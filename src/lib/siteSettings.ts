@@ -67,6 +67,10 @@ export type SiteSettings = {
   /** Desktop only — the hero band's photo. Null shows the CSS gradient
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
+  /** Desktop only — the photo on the home's "Everything on one map" card
+   *  (board G3, Nov 11). Null draws the card's plain map glyph instead.
+   *  Needs migration 095; reads as null without it. */
+  desktopMapImage: { url: string; alt: string } | null
   /** Which home page visitors get: the home as it was ('classic'), or the
    *  one that changes with the day ('today', step 6). Previewed from the Site
    *  tab before it's saved; one save switches back. */
@@ -262,6 +266,7 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,
+  desktopMapImage: null,
   homeStyle: 'classic',
   beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
   todayHidden: [],

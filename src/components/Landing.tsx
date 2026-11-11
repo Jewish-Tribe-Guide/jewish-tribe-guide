@@ -25,6 +25,7 @@ import { trustFacts } from '@/lib/phoneHome'
 import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
+import MapCard from '@/components/home/MapCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
@@ -301,12 +302,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, sharesRow: s.sharesRow }))
-  // With none set: Categories, then Davening Times and Suggest a Listing in
-  // one row, then a row each.
+  // With none set: Categories, the map card (board G3), then Davening Times
+  // and Suggest a Listing in one row, then a row each.
   const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'map', 'davening', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
           sharesRow: kind === 'suggest',
@@ -694,14 +695,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
               )
             )
           }
-          // 'map' — the old embedded map band — is retired (the user's own
-          // call: the map lives at its own full-screen route now, reached via
-          // the hero's "View Map" button/header nav/tab bar, never embedded
-          // on the home screen). Falls through to `return null` below like
-          // any other retired kind (see BUILT_IN_BLOCKS's own doc) — a
-          // community with an old 'map' row in its home_sections just
-          // silently renders nothing for it, same as 'zmanim'/'shabbat'/
-          // 'featured' before it.
+          if (kind === 'map') {
+            // "Everything on one map" (board G3, Nov 11): a photo and a link
+            // to the map, never the map itself. The old embedded map band
+            // this kind used to draw stays gone; a community's old 'map' row
+            // now draws this card where it sits.
+            const names = [...(allCards ?? [])]
+              .sort((a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0))
+              .map((c) => c.title)
+            return (
+              !isMobile && (
+                <MapCard
+                  href={routes.map(communitySlug)}
+                  photo={settings.desktopMapImage}
+                  categoryNames={names}
+                  onOpen={() => track('map_opened', { source: 'home-card' })}
+                />
+              )
+            )
+          }
+          // Retired kinds ('zmanim', 'shabbat', 'featured', 'listings')
+          // fall through and draw nothing for a community's leftover row.
           return null
           }
 

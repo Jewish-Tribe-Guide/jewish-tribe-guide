@@ -50,6 +50,8 @@ type Row = {
   desktop_hero_headline: string | null
   desktop_hero_subhead: string | null
   desktop_hero_image: unknown
+  /** Migration 095; absent from the row before it runs. */
+  desktop_map_image?: unknown
   /** Nothing reads this: the admin's accent colour was never applied to the
    *  site, and the redesign's one look retired it. The column stays rather
    *  than dropping data with a migration. */
@@ -160,6 +162,7 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     // plain gradient, not the bootstrap community's photo from code (which
     // put Philadelphia's City Hall on every other community's home).
     desktopHeroImage: toHeroImage(row.desktop_hero_image),
+    desktopMapImage: toHeroImage(row.desktop_map_image),
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
     todayHidden: toTodayHidden(row.today_hidden),
@@ -210,6 +213,7 @@ async function settingsFrom(row: Row | null, community: string): Promise<SiteSet
     desktopHeroSubhead: heroSplit.subhead,
     // community.config.ts's photo is the bootstrap community's own.
     desktopHeroImage: c.isDefault ? SITE_SETTINGS_DEFAULTS.desktopHeroImage : null,
+    desktopMapImage: null,
   }
 }
 
@@ -239,6 +243,12 @@ export async function updateSiteSettings(
     today.before_candle_items = merged.beforeCandleItems
   }
   if (JSON.stringify(merged.todayHidden) !== JSON.stringify(current.todayHidden)) today.today_hidden = merged.todayHidden
+  // The map card's photo (migration 095) the same way: written only when it
+  // changes, so a database without the column still saves everything else.
+  const mapPhoto: Record<string, unknown> = {}
+  if (JSON.stringify(merged.desktopMapImage) !== JSON.stringify(current.desktopMapImage)) {
+    mapPhoto.desktop_map_image = merged.desktopMapImage
+  }
 
   const { data, error } = await getAdminClient()
     .from('site_settings')
@@ -265,6 +275,7 @@ export async function updateSiteSettings(
         desktop_hero_subhead: merged.desktopHeroSubhead,
         desktop_hero_image: merged.desktopHeroImage,
         ...today,
+        ...mapPhoto,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },
@@ -276,6 +287,9 @@ export async function updateSiteSettings(
     if (Object.keys(today).length > 0 && /home_style|before_candle_items|today_hidden/.test(error.message)) {
       throw new MissingTodayColumnsError()
     }
+    if (Object.keys(mapPhoto).length > 0 && /desktop_map_image/.test(error.message)) {
+      throw new MissingMapPhotoColumnError()
+    }
     throw new Error(`Failed to update site settings: ${error.message}`)
   }
   return toSettings(data as Row)
@@ -286,5 +300,13 @@ export async function updateSiteSettings(
 export class MissingTodayColumnsError extends Error {
   constructor() {
     super('The home page style isn’t set up on this site yet.')
+  }
+}
+
+/** The map card's photo was changed on a database without migration 095
+ *  (supabase/migrations/20240101000095_map_card_photo.sql). */
+export class MissingMapPhotoColumnError extends Error {
+  constructor() {
+    super('The map card’s photo isn’t set up on this site yet.')
   }
 }

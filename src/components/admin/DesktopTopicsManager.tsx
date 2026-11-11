@@ -1,6 +1,6 @@
 'use client'
 
-import { BUILT_IN_BLOCKS, canShareRow, cardRows, fromCardRows, MAX_CARDS_IN_ROW, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
+import { BUILT_IN_BLOCKS, canShareRow, cardRows, fromCardRows, MAX_CARDS_IN_ROW, ROW_OF_ITS_OWN, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
 import DragList, { AddListButton, InnerRow } from './DragList'
 
@@ -29,13 +29,14 @@ import DragList, { AddListButton, InnerRow } from './DragList'
 // reads/reorders the cards, leaving plain category sections and retired
 // kinds in the draft untouched.
 
-type CardKind = Exclude<HomeBlockKind, 'section' | 'map'>
+type CardKind = Exclude<HomeBlockKind, 'section' | 'listings'>
 
-/** The cards offered, in the order "+ Add" lists them. 'map' (the map on the
- *  home screen) and 'listings' (Kept by the Community, now the trust band
- *  under the hero, Nov 11) are retired: Landing.tsx renders nothing for a
- *  leftover row, and this list keeps one aside, untouched, like a section. */
-const CARD_KINDS: CardKind[] = ['browse', 'davening', 'suggest', 'subscribe', 'jewishTimes']
+/** The cards offered, in the order "+ Add" lists them. 'map' is the
+ *  "Everything on one map" card (board G3, Nov 11; its photo is set under
+ *  this list). 'listings' (Kept by the Community, now the trust band under
+ *  the hero, Nov 11) is retired: Landing.tsx renders nothing for a leftover
+ *  row, and this list keeps one aside, untouched, like a section. */
+const CARD_KINDS: CardKind[] = ['browse', 'map', 'davening', 'suggest', 'subscribe', 'jewishTimes']
 const CARD_KIND_SET = new Set<string>(CARD_KINDS)
 
 /** The setting that names a card on the site, where it has one. */
@@ -98,7 +99,8 @@ function turnedDown(refused: readonly Item[], liftedId: string): { ids: Set<stri
   const lifted = run.find((c) => c.id === liftedId)!
   const box = run.filter((c) => c.id !== liftedId)
   if (!box.length) return null
-  const why = lifted.kind === 'browse' || box.some((c) => c.kind === 'browse') ? 'Categories has a row of its own' : `Full: ${MAX_CARDS_IN_ROW} cards at most`
+  const alone = [lifted, ...box].find((c) => ROW_OF_ITS_OWN.has(c.kind))
+  const why = alone ? `${alone.kind === 'map' ? 'Map' : 'Categories'} has a row of its own` : `Full: ${MAX_CARDS_IN_ROW} cards at most`
   return { ids: new Set(box.map((c) => c.id)), why }
 }
 

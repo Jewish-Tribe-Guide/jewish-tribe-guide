@@ -570,6 +570,26 @@ describe('Landing', () => {
       expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
     })
 
+    // Board G3 (Nov 11): a saved 'map' row draws the "Everything on one map"
+    // card, a link to the map with the admin's photo, never the map itself.
+    it('a map card row draws the map card, with the admin’s photo', () => {
+      const photo = { url: 'https://example.com/city-hall.jpg', alt: '' }
+      const { container } = renderLanding(undefined, {
+        content: { categories: cats, homeSections: [row('browse', 100), row('map', 200)], settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapImage: photo } },
+      })
+      expect(spots(container)).toEqual(['cards card-browse', 'cards card-map'])
+      const card = screen.getByTestId('home-map-card')
+      expect(card.getAttribute('href')).toMatch(/\/map$/)
+      expect(card.querySelector('img')?.getAttribute('src')).toContain('city-hall.jpg')
+    })
+
+    it('the map card is not drawn on a phone', () => {
+      mockViewport(true)
+      renderLanding(undefined, { content: { categories: cats, homeSections: [row('map', 100)] } })
+      expect(screen.queryByTestId('home-map-card')).not.toBeInTheDocument()
+      mockViewport(false)
+    })
+
     it('two cards in one row', () => {
       const { container } = renderLanding(undefined, {
         content: { categories: cats, homeSections: [row('subscribe', 100), row('jewishTimes', 200, true)] },
@@ -629,6 +649,7 @@ describe('Landing', () => {
 
       expect(spots(container)).toEqual([
         'cards card-browse',
+        'cards card-map',
         'cards card-davening card-suggest',
         'cards card-subscribe',
         'cards card-jewishTimes',
@@ -645,6 +666,12 @@ describe('Landing', () => {
       const daveningStub = screen.getByTestId('davening-stub')
       const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
       expect(daveningStub.compareDocumentPosition(jewishTimesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('with nothing configured, the map card comes straight after Categories (board G3)', () => {
+      const { container } = renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
+      const spots = [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
+      expect(spots.slice(0, 2)).toEqual(['cards card-browse', 'cards card-map'])
     })
 
     it('follows the admin-configured order — jewishTimes before davening', () => {

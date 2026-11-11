@@ -116,6 +116,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   // here so it survives the field unmounting when Computer or Phone changes.
   const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
   const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
+  const [mapOriginal, setMapOriginal] = useState<File | string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -322,6 +323,25 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
               <div {...spotOn('cards')}>
                 <AdminBox title="Cards under the search">
                   <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
+                  {/* The map card's photo (board G3), here with the card it
+                      belongs to, and only while the card is on the page. */}
+                  {sectionsDraft.some((s) => s.kind === 'map') && (
+                    <div className="border-t border-slate-100 p-4" onMouseEnter={() => setSpot('card-map')}>
+                      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Map card photo</span>
+                      <ImageUploadField
+                        value={draft.desktopMapImage?.url ?? ''}
+                        onChange={(url) => set('desktopMapImage', url ? { url, alt: '' } : null)}
+                        uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+                        token={token}
+                        shape="square"
+                        aspect={26 / 15}
+                        showRepositionHint={false}
+                        collapseUrlInput
+                        originalSource={mapOriginal}
+                        onOriginalSourceChange={setMapOriginal}
+                      />
+                    </div>
+                  )}
                 </AdminBox>
               </div>
             </>

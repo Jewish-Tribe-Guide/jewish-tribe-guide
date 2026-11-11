@@ -164,6 +164,21 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(screen.queryByDisplayValue('City Hall')).toBeNull()
   })
 
+  // Board G3 (Nov 11): the map card's photo is set with the cards, and only
+  // while the map card is on the page.
+  it('the map card’s photo is set with the cards, only while the map card is there', async () => {
+    const mapRow: HomeSection = { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], sharesRow: false }
+    await renderEditor({ ...SITE_SETTINGS_DEFAULTS, desktopMapImage: { url: 'https://example.com/city-hall.jpg', alt: '' } }, [mapRow])
+    const cards = screen.getByRole('region', { name: 'Cards under the search' })
+    expect(within(cards).getByText('Map card photo')).toBeInTheDocument()
+    expect(within(cards).getByRole('button', { name: 'Adjust photo' })).toBeInTheDocument()
+  })
+
+  it('without the map card, there is no map card photo to set', async () => {
+    await renderEditor({ ...SITE_SETTINGS_DEFAULTS }, [])
+    expect(screen.queryByText('Map card photo')).toBeNull()
+  })
+
   // The user, Nov 4: the logo and the photo upload as a listing's photo
   // does: no hint under the buttons, and the address behind "Paste URL"
   // rather than always open.
