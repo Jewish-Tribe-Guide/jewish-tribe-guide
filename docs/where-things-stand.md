@@ -521,7 +521,7 @@ The user's answers on Nov 10, evening, and what was done with them:
   on purpose: the times themselves, and "working again". With nothing
   waiting but something broken, the subject says "1 stopped working".
   Phone, computer and quiet renders checked against N7-N9. **Migration
-  096 isn't run anywhere yet** (see "Waiting for a yes"); until it is,
+  096 is on dev (Nov 12), not live** (see "Waiting for a yes"); until it is,
   Google's changes are emailed at once as before and the nightly email
   just has no Changed on its own. Not seen in a real inbox yet: the
   first one goes out the night after this reaches the live site.
@@ -865,8 +865,8 @@ The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
 0. **Migration 096 (`night_note`, Nov 12):** a new table for the
-   nightly email's Google line. Run it in the SQL editor on dev (the test
-   project) and on live; live needs a yes. The site works without it.
+   nightly email's Google line. On dev since Nov 12; live needs a yes.
+   The site works without it.
 0. **Migration 095 (map card photo, Nov 11):** one `add column if not
    exists`. Run it on live before or with the deploy that ships the map
    card; the card works without it, only its photo can't be saved. Then
