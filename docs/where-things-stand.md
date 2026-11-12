@@ -247,6 +247,18 @@ The user's answers on Nov 10, evening, and what was done with them:
   the listing's note has now keeps the listing's (`keepListedNotes`); a
   new word still goes to the queue. The Nov 11 Shtiebel item in the live
   queue predates this and is the user's to reject.
+- **A line turned down in a shul's week isn't filed again** (fixed Nov 12,
+  prod queue). A read week is filed whole, so a line the admin rejected
+  came back whenever anything else in that week changed: Kol Tzedek's Bar
+  Mitzvah note (rejected 3 times, back as #1347), TBZBI's Sat 9:30 and
+  Zoom links (twice, back as #1352), Rodeph Shalom's Thursday note
+  (twice, back as #1351). Each day's tefillah is now weighed on its own
+  (`leaveOutTurnedDown`): one the page gives exactly as a turned-down
+  suggestion of this watch gave it, with no approval for that week since,
+  stays as the listing has it and leaves the note. The page giving that
+  day something else still files, and so does the rest of the week. The
+  items already waiting in the live queue predate this and are the
+  user's to decide.
 - **A shul's week finding no longer shows other weeks changed back**
   (fixed Nov 11, Mekor Habracha). Mekor's Nov 6 newsletter printed
   "7:00pm" for Friday Nov 13's Mincha (candle lighting 4:28); that was

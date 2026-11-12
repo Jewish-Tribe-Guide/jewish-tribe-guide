@@ -1328,6 +1328,69 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
+  // Prod queue, Nov 12: Kol Tzedek's Bar Mitzvah note turned down three
+  // times, back each time the week's other times changed.
+  describe('a line the admin turned down', () => {
+    const withNote = (week: TimesUpdate, day: string, notes: string) => ({ ...week, rows: week.rows.map((r) => (r.tefillah === 'shacharis' && r.day === day ? { ...r, notes } : r)) })
+    const fridayAt = (time: string) => ({ ...thisWeek, rows: thisWeek.rows.map((r) => (r.tefillah === 'kabbalas_shabbos' ? { ...r, time, status: 'changed' as const, was: '6:00pm' } : r)) })
+    /** The listing as the first read filed it, and the note's suggestion
+     *  filed then turned down. */
+    const turnDown = async (notes: string) => {
+      vi.clearAllMocks()
+      m.earlier = []
+      m.getResourceRowById.mockResolvedValue(rodeph)
+      m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
+      byWeek({ '2026-10-22': thisWeek, '2026-10-25': nextWeek })
+      await run()
+      const listed = m.submitListingUpdate.mock.calls[0][2].details
+      vi.clearAllMocks()
+      m.getResourceRowById.mockResolvedValue({ ...rodeph, details: listed })
+      m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
+      byWeek({ '2026-10-22': withNote(thisWeek, '2026-10-22', notes), '2026-10-25': nextWeek })
+      await run({ full: true })
+      const rejected = m.submitListingUpdate.mock.calls[0][2]
+      expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Bar Mitzvah')
+      vi.clearAllMocks()
+      m.getResourceRowById.mockResolvedValue({ ...rodeph, details: listed })
+      m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
+      m.earlier = [{ payload: rejected, status: 'rejected', reviewed_at: '2026-10-22T15:00:00.000Z' }]
+      return listed
+    }
+    const thursday = () => schedulesFiled().flatMap((w) => w.minyanim).filter((x) => x.on.includes('2026-10-22')) as { notes?: string }[]
+
+    it('isn’t filed again when the week’s other times change, and they still are', async () => {
+      await turnDown('Bar Mitzvah')
+      byWeek({ '2026-10-22': withNote(fridayAt('6:15pm'), '2026-10-22', 'Bar Mitzvah'), '2026-10-25': nextWeek })
+      expect(await run({ full: true })).toMatchObject({ ok: true, filed: 1 })
+      const note = m.submitListingUpdate.mock.calls[0][3] as string
+      expect(note).toContain('kabbalas shabbos · Fri Oct 23 · 6:15pm, was 6:00pm')
+      expect(note).not.toContain('Bar Mitzvah')
+      expect(thursday().map((x) => x.notes)).toEqual([undefined])
+    })
+
+    it('isn’t filed at all when nothing else changed', async () => {
+      await turnDown('Bar Mitzvah')
+      byWeek({ '2026-10-22': withNote(thisWeek, '2026-10-22', 'Bar Mitzvah'), '2026-10-25': nextWeek })
+      expect(await run({ full: true })).toMatchObject({ ok: true, filed: 0 })
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+
+    it('is filed when the page changes that time again, or after an approval of that day since', async () => {
+      await turnDown('Bar Mitzvah')
+      byWeek({ '2026-10-22': withNote(thisWeek, '2026-10-22', 'Bar Mitzvah, kiddush after'), '2026-10-25': nextWeek })
+      expect(await run({ full: true })).toMatchObject({ ok: true, filed: 1 })
+      expect(thursday().map((x) => x.notes)).toEqual(['Bar Mitzvah, kiddush after'])
+
+      // A suggestion for that week approved since: the page's word is news
+      // again.
+      const listed = await turnDown('Bar Mitzvah')
+      m.earlier = [...m.earlier, { payload: { details: listed }, status: 'approved', reviewed_at: '2026-10-22T16:00:00.000Z' }]
+      byWeek({ '2026-10-22': withNote(fridayAt('6:15pm'), '2026-10-22', 'Bar Mitzvah'), '2026-10-25': nextWeek })
+      expect(await run({ full: true })).toMatchObject({ ok: true, filed: 1 })
+      expect(thursday().map((x) => x.notes)).toEqual(['Bar Mitzvah'])
+    })
+  })
+
   it('a week of the calendar read again on a later day replaces that week’s days, rather than making a second week', async () => {
     const earlier = { id: 'e', name: 'Times for Oct 18 – Oct 24', from: '2026-10-20', to: '2026-10-24', mode: 'replace', kind: 'week', postedBy: 'website', minyanim: [{ id: 'e1', tefillah: 'shacharis', on: ['2026-10-20'], time: '8:10am' }, { id: 'e2', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:45am' }] }
     m.getResourceRowById.mockResolvedValue({ ...rodeph, details: { minyanim: usual, minyanim_schedules: [earlier] } })
