@@ -80,11 +80,15 @@ describe('ShabbatTimesCard', () => {
     expect(card()).not.toHaveTextContent('7:27 PM')
   })
 
-  it('names the Hebrew date, the place and Hebcal.com as the source, once ready', () => {
+  // Nov 12, the user: just the place. The Hebrew date and the Hebcal credit
+  // are on the Zmanim page the card opens.
+  it('names only the place under the times, not the Hebrew date or Hebcal', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(detail()).toHaveTextContent('22 Elul 5786 · Philadelphia · from Hebcal.com')
+    expect(detail()).toHaveTextContent(/Philadelphia$/)
+    expect(card()).not.toHaveTextContent('22 Elul 5786')
+    expect(card()).not.toHaveTextContent('Hebcal')
   })
 
   it('shows a loading bar while zmanim are in flight', () => {

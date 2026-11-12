@@ -421,6 +421,12 @@ The user's answers on Nov 10, evening, and what was done with them:
     - Next minyan and This Shabbos: under 448px, the round glyph goes and
       the time drops from 34 to 30px, so it stays on one line.
     - Looks unchanged at full width.
+  - **The computer's This Shabbos card names only the place** under its
+    times (the user, Nov 12: "Yes, just the place"). BUILT Nov 12. The
+    Hebrew date and "from Hebcal.com" are gone from the card; both stay on
+    the Zmanim page it opens, as Next minyan leaves its sources to its
+    page. Change to an earlier decision: the line had been kept for
+    visible trust.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three

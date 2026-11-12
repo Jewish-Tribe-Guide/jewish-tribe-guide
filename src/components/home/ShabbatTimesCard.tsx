@@ -102,11 +102,10 @@ export default function ShabbatTimesCard({
         loading ? undefined : data && view ? (
           <>
             {when}
-            {/* The source, as on the Zmanim page: the same Hebcal times. Plain
-                text, since the whole card is already a link. */}
-            <span className="mt-0.5 block text-xs text-slate-400">
-              {data.hebrewDate} · {locationLabel} · from Hebcal.com
-            </span>
+            {/* Only the place: the times depend on it. The Hebrew date and
+                the Hebcal credit live on the Zmanim page the card opens, as
+                Next minyan leaves its sources to its page (the user, Nov 12). */}
+            <span className="mt-0.5 block text-xs text-slate-400">{locationLabel}</span>
           </>
         ) : (
           'Unavailable right now. Please try again in a moment.'
