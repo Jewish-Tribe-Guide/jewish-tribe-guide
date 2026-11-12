@@ -435,9 +435,8 @@ The user's answers on Nov 10, evening, and what was done with them:
   noticeable"; reminded of that, they still chose plain. Held off for a
   look with real people: next minyan in rows, one map switch, side by side.
   Renamed later on Nov 11 to "Synagogue | Minyan", no "By" (the user:
-  "take out 'by' and replace time with minyan"). Open, the user's call:
-  whether the switch should be the Filters button's height (it is 32px,
-  Filters 40px).
+  "take out 'by' and replace time with minyan"). Then as tall as Filters
+  beside it, 40px (was 34px; the user: "Yes, match it").
 - **Minyanim by time opens on the page whose places have minyanim** (fixed
   Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
   test project's Food was, ahead of Synagogues. The search's "next maariv"

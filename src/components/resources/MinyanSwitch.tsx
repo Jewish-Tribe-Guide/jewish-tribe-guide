@@ -16,6 +16,9 @@
 // Nov 11, later: "Synagogue | Minyan", no "By" (the user: "take out 'by'
 // and replace time with minyan").
 //
+// As tall as Filters and Sort beside it, 40px with its border (the user,
+// Nov 11: "Yes, match it"); it was 34px and looked like the odd one out.
+//
 // The view it turns on keeps its own address (`?davening=1`), so Back,
 // Forward and a reload land where the visitor was.
 
@@ -28,7 +31,7 @@ type Props = {
 
 export default function MinyanSwitch({ singular, byTime, onChange }: Props) {
   const part = (on: boolean) =>
-    `h-8 cursor-pointer whitespace-nowrap px-3.5 text-[13.5px] font-semibold transition-colors ${on ? 'bg-primary text-white' : 'bg-white text-ink hover:bg-slate-50'}`
+    `h-[38px] cursor-pointer whitespace-nowrap px-3.5 text-[14px] font-semibold transition-colors ${on ? 'bg-primary text-white' : 'bg-white text-ink hover:bg-slate-50'}`
   return (
     <div role="group" aria-label="Show" data-testid="minyan-switch" className="inline-flex shrink-0 overflow-hidden rounded-full border border-slate-300">
       <button type="button" aria-pressed={!byTime} onClick={() => byTime && onChange(false)} className={part(!byTime)}>

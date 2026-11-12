@@ -29,6 +29,13 @@ test('the Minyanim view is a step: Back returns to the shuls, Forward and a relo
   const byTime = switchEl.getByRole('button', { name: 'Minyan' })
   const view = page.getByTestId('minyanim-view')
 
+  // As tall as Filters beside it (the user, Nov 11: "Yes, match it").
+  const filters = page.getByTestId('list-heading').filter({ visible: true }).getByRole('button', { name: /^Filters/ })
+  if ((await filters.count()) > 0) {
+    const [a, b] = [await switchEl.filter({ visible: true }).first().boundingBox(), await filters.first().boundingBox()]
+    expect(Math.round(a!.height), 'the switch is as tall as Filters').toBe(Math.round(b!.height))
+  }
+
   await byTime.click()
   await expect(view).toBeVisible()
   await expect(byTime).toHaveAttribute('aria-pressed', 'true')
