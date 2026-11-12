@@ -155,6 +155,7 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
   const sentence = useSourcesSentence(facts, communitySlug, asked)
   return (
     <>
+      <div className="@container">
       <button
         type="button"
         onClick={() => {
@@ -163,9 +164,12 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
         }}
         aria-haspopup="dialog"
         data-testid="desktop-trust-band"
-        className={`flex w-full cursor-pointer items-center gap-6 rounded-2xl bg-white px-6 py-5 text-left ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
+        // Under 900px of its own width, the heading takes a row of its own
+        // and the three points share the one under it, rather than four
+        // columns too narrow to read (the user, Nov 12).
+        className={`flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl bg-white px-6 py-5 text-left @[900px]:flex-nowrap ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
       >
-        <span className="flex shrink-0 items-center gap-3 border-r border-slate-200 pr-6">
+        <span className="flex basis-full items-center gap-3 border-b border-slate-200 pb-4 @[900px]:shrink-0 @[900px]:basis-auto @[900px]:border-r @[900px]:border-b-0 @[900px]:pr-6 @[900px]:pb-0">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
             <ShieldCheck className="h-6 w-6" />
           </span>
@@ -192,6 +196,7 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
         {/* No chevron: it lifts on hover, like the cards below (the user,
             Nov 11). */}
       </button>
+      </div>
       <TrustSheet open={open} facts={facts} region={region} communitySlug={communitySlug} onClose={() => setOpen(false)} desktop />
     </>
   )

@@ -408,6 +408,19 @@ The user's answers on Nov 10, evening, and what was done with them:
     the Eruv page; the rest of the card still opens Zmanim, so on those
     days the card is a box holding two links. Weekdays: no line, one link.
     No line without an Eruv page.
+  - **The computer home fits a narrower window** (the user, Nov 12: it
+    isn't "so great at shrinking", and Suggest a listing beside Stay in
+    the Loop came out badly). BUILT Nov 12. Each section now sizes itself
+    by its own box, not the window, so it also holds up when an admin
+    puts two in one row:
+    - Suggest a listing and Stay in the Loop: words, then the button or
+      email box under them, while the card is under 920px wide; side by
+      side from there, as drawn. Two in a row are the same height.
+    - The trust strip: under 900px, its heading on a row of its own and the
+      three points sharing the row under it.
+    - Next minyan and This Shabbos: under 448px, the round glyph goes and
+      the time drops from 34 to 30px, so it stays on one line.
+    - Looks unchanged at full width.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three

@@ -40,9 +40,14 @@ describe('SuggestListingCard', () => {
   })
 
   // Board G5c (Nov 11): a stop of its own, not a footnote to the map.
-  it('is a tall section with a big heading', () => {
+  // Sized by its own width since Nov 12: tall and side by side once the
+  // card is 920px wide, stacked under that (jsdom has no layout; the widths
+  // themselves are e2e/desktop-home-widths.spec.ts).
+  it('is a tall section with a big heading at full width, stacked in a narrow box', () => {
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
-    expect(screen.getByTestId('home-suggest')).toHaveClass('min-h-[240px]')
-    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('text-[38px]')
+    const box = screen.getByTestId('home-suggest')
+    expect(box).toHaveClass('@[920px]:min-h-[240px]', 'flex-col', '@[920px]:flex-row')
+    expect(box.parentElement).toHaveClass('@container')
+    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('@xl:text-[38px]')
   })
 })

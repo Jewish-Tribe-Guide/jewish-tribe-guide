@@ -15,6 +15,10 @@ import Link from 'next/link'
  *  its own box. It used to show only on hover, in blue. The photo tiles
  *  have none: the picture is their edge. */
 export const HOME_CARD_OUTLINE = 'ring-1 ring-slate-300'
+/** A home section's words and its button or form: stacked while its own
+ *  box is under 920px, side by side from there. Needs an `@container`
+ *  parent; reads the card's width, never the window's. */
+export const NARROW_STACK = 'flex flex-col items-start @[920px]:flex-row @[920px]:items-center'
 
 /** The lift every computer-home card without a chevron shares on hover:
  *  it rises, and its outline turns blue. */
@@ -44,6 +48,9 @@ export default function AnswerCard({
    *  rather than one link, since a link can't sit inside another. */
   footer?: React.ReactNode
 }) {
+  // Sized by the card's own width (the user, Nov 12): under 448px, as two
+  // cards side by side get in a narrow window, the glyph goes and the
+  // answer drops to 30px, so "Shacharis 6:45 AM" stays on one line.
   const body = (
     <Link
       href={href}
@@ -52,10 +59,10 @@ export default function AnswerCard({
       className={
         footer
           ? 'flex flex-1 items-center gap-5 px-7 pt-7 pb-6'
-          : `flex items-center gap-5 rounded-2xl bg-white px-7 py-7 ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`
+          : `flex w-full min-w-0 items-center gap-5 rounded-2xl bg-white px-7 py-7 ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`
       }
     >
-      <span aria-hidden="true" className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <span aria-hidden="true" className="hidden h-[60px] w-[60px] shrink-0 items-center @md:flex justify-center rounded-full bg-primary/10 text-primary">
         {icon}
       </span>
       <span className="min-w-0 flex-1">
@@ -63,17 +70,19 @@ export default function AnswerCard({
         {answer === null ? (
           <span aria-hidden="true" data-testid={`${testId}-loading`} className="mt-2 block h-9 w-1/2 animate-pulse rounded bg-slate-100" />
         ) : (
-          <span data-testid={`${testId}-answer`} className="mt-1 block text-[34px] font-extrabold leading-tight text-ink tabular-nums">{answer}</span>
+          <span data-testid={`${testId}-answer`} className="mt-1 block text-[30px] font-extrabold @md:text-[34px] leading-tight text-ink tabular-nums">{answer}</span>
         )}
         {detail && <span data-testid={`${testId}-detail`} className="mt-1 block text-[15px] text-slate-600">{detail}</span>}
       </span>
     </Link>
   )
-  if (!footer) return body
+  if (!footer) return <div className="@container flex">{body}</div>
   return (
-    <div data-testid={`${testId}-card`} className={`flex flex-col overflow-hidden rounded-2xl bg-white ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}>
+    <div className="@container flex">
+    <div data-testid={`${testId}-card`} className={`flex w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}>
       {body}
       {footer}
+    </div>
     </div>
   )
 }

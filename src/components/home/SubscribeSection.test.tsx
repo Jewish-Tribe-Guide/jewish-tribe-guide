@@ -244,8 +244,9 @@ describe('SubscribeSection', () => {
       renderWithProviders(<SubscribeSection band />, { content: { categories: [grocery, synagogue] } })
 
       const box = screen.getByTestId('home-subscribe')
-      expect(box).toHaveClass('bg-[#1e3a8a]', 'min-h-[260px]')
-      expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toHaveClass('text-[38px]')
+      expect(box).toHaveClass('bg-[#1e3a8a]', '@[920px]:min-h-[260px]', 'flex-col', '@[920px]:flex-row')
+      expect(box.parentElement).toHaveClass('@container')
+      expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toHaveClass('@xl:text-[38px]')
       expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toBeInTheDocument()
       expect(screen.getByText('An email when a place is added or closes.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument()

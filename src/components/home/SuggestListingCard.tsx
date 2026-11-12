@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import ContributePicker from './ContributePicker'
-import { HOME_CARD_OUTLINE } from './AnswerCard'
+import { HOME_CARD_OUTLINE, NARROW_STACK } from './AnswerCard'
 
 // ── Suggest a Listing, on its own after the map (board G5b, Nov 11) ─────────
 // The turn from using the guide to adding to it, so it stands alone rather
@@ -14,10 +14,14 @@ export default function SuggestListingCard() {
   const [open, setOpen] = useState(false)
 
   return (
-    <div data-testid="home-suggest" className={`flex min-h-[240px] items-center gap-9 rounded-[18px] bg-white p-14 ${HOME_CARD_OUTLINE}`}>
-      <div className="min-w-0 flex-1">
+    // Sized by its own width, not the window's (the user, Nov 12): side by
+    // side once the card is 920px wide, stacked below that, so it holds up
+    // in a narrow window or beside another card in a row.
+    <div className="@container h-full">
+    <div data-testid="home-suggest" className={`${NARROW_STACK} h-full gap-6 rounded-[18px] bg-white p-9 @[920px]:min-h-[240px] @[920px]:gap-9 @[920px]:p-14 ${HOME_CARD_OUTLINE}`}>
+      <div className="min-w-0 @[920px]:flex-1">
         <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-slate-500">Kept up by the community</p>
-        <h3 className="mt-2.5 text-[38px] font-extrabold leading-[1.1] text-ink">Know a place we’re missing?</h3>
+        <h3 className="mt-2.5 text-[30px] font-extrabold leading-[1.1] text-ink @xl:text-[38px]">Know a place we’re missing?</h3>
         <p className="mt-2 text-lg text-slate-600">Add it, or fix one that’s out of date. A person checks every change.</p>
       </div>
       <button
@@ -29,6 +33,7 @@ export default function SuggestListingCard() {
       </button>
 
       {open && <ContributePicker onClose={() => setOpen(false)} />}
+    </div>
     </div>
   )
 }
