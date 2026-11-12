@@ -1,7 +1,7 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField } from '@/lib/googlePlaces'
 import { submitGoogleClosure } from '@/lib/submissionStore'
-import { sendSubmissionNotification, type StatusChange } from '@/lib/email'
+import type { StatusChange } from '@/lib/email'
 import { listCategories } from '@/lib/categoryStore'
 import type { CategoryConfig } from '@/lib/categories'
 
@@ -200,10 +200,8 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
   if (sync.businessStatus === 'CLOSED_PERMANENTLY' && !row.details.businessStatusOverride) {
     try {
       const submission = await submitGoogleClosure(row.community_id, row.id)
-      if (submission) {
-        flaggedClosed = true
-        await sendSubmissionNotification(submission).catch(() => {})
-      }
+      // Told of in the nightly email, with the rest of the night's finds.
+      if (submission) flaggedClosed = true
     } catch (err) {
       console.error(`[sync] submitGoogleClosure failed for ${row.id}:`, err)
     }

@@ -5,7 +5,6 @@ const m = vi.hoisted(() => ({
   earlier: [] as { id?: string; status?: string; payload: unknown }[],
   submitListingUpdate: vi.fn(),
   replacePendingSuggestion: vi.fn(),
-  sendWatchDigest: vi.fn(),
   getCategoryById: vi.fn(),
   confirmFromSource: vi.fn(),
 }))
@@ -26,7 +25,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, replacePendingSuggestion: m.replacePendingSuggestion }))
-vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/email', () => ({}))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/sourceConfirm', () => ({ confirmFromSource: m.confirmFromSource }))
 
@@ -49,7 +48,6 @@ beforeEach(() => {
   vi.restoreAllMocks()
   m.submitListingUpdate.mockReset().mockResolvedValue({ id: 's1' })
   m.replacePendingSuggestion.mockReset().mockResolvedValue(true)
-  m.sendWatchDigest.mockReset().mockResolvedValue(undefined)
   m.confirmFromSource.mockReset().mockResolvedValue(1)
   m.getCategoryById.mockReset().mockResolvedValue({ id: 'hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'liaisons', label: 'Liaisons', type: 'contacts' }] })
   m.earlier = []
@@ -90,7 +88,6 @@ describe('runRefuahWatch', () => {
     expect(payload.details.r).toBe(URL_)
     expect(payload.source).toMatchObject({ readBy: 'automatic', from: 'Refuah', named: 'Refuah' })
     expect(note).toContain('phone +1 215-805-8668 → +1 215-805-9000')
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Refuah', [expect.objectContaining({ name: 'Hospital of the University of Pennsylvania' })], { path: `/philly/admin/watches/place/${HOSPITAL}?from=todo`, name: 'Hospitals' })
   })
 
   it('doesn’t file the same suggestion twice, whatever became of the first', async () => {
@@ -151,8 +148,6 @@ describe('runRefuahWatch', () => {
       expect(rides.source.section).toEqual({ section: 'Rides', keys: ['transportation'] })
       expect(rides.details.transportation[0].phones).toEqual(['+1 845-555-0118'])
       expect(rides.details.liaisons[0].phones).toEqual(['+1 215-805-8668'])
-      // One email for the run.
-      expect(m.sendWatchDigest).toHaveBeenCalledTimes(1)
     })
 
     it('remembers what came from Refuah, and takes off only that when Refuah drops it', async () => {

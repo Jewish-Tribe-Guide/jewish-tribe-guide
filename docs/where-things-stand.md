@@ -501,6 +501,30 @@ The user's answers on Nov 10, evening, and what was done with them:
   the listing's note has now keeps the listing's (`keepListedNotes`); a
   new word still goes to the queue. The Nov 11 Shtiebel item in the live
   queue predates this and is the user's to reject.
+- **One nightly email instead of one from every watch** (built Nov 12,
+  as drawn in N7-N9 of canvas S7uB4KuZQtdF6bJywzUZBd). After the last
+  job (`/api/cron/nightly-email`, 9:45 UTC), each community's admins get
+  "Philly Jewish Guide · Nightly watches: 5 to check": the night, a
+  sentence put together by code from the counts, Waiting for you (a row
+  a place, opening it in To do, "Also in To do: N from earlier nights and
+  N from people", Open To do), Stopped working in red (a watch's place in
+  Watches, or the Watches tab for a job), Changed on its own (Google).
+  None on a night with nothing at all. Waiting for you is read from the
+  queue at send time; a watch that broke from its `failingSince`; a job
+  from its runs; Google from `night_note` (migration 096). Gone: the
+  emails each website, newsletter, Keystone-K, Mekor, Refuah and eruv
+  website watch sent, the watch broke / working again emails, the job
+  broke / working again emails, Google's status digest from the nightly
+  sync and its immediate "permanently closed" email (now a row). Kept as
+  they were: a person's submission emails, the eruv-map line alert, and
+  the status email after an admin's own Google refresh. Not in the email,
+  on purpose: the times themselves, and "working again". With nothing
+  waiting but something broken, the subject says "1 stopped working".
+  Phone, computer and quiet renders checked against N7-N9. **Migration
+  096 isn't run anywhere yet** (see "Waiting for a yes"); until it is,
+  Google's changes are emailed at once as before and the nightly email
+  just has no Changed on its own. Not seen in a real inbox yet: the
+  first one goes out the night after this reaches the live site.
 - **A line turned down in a shul's week isn't filed again** (fixed Nov 12,
   prod queue). A read week is filed whole, so a line the admin rejected
   came back whenever anything else in that week changed: Kol Tzedek's Bar
@@ -840,6 +864,9 @@ Still different, each needing the user:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
+0. **Migration 096 (`night_note`, Nov 12):** a new table for the
+   nightly email's Google line. Run it in the SQL editor on dev (the test
+   project) and on live; live needs a yes. The site works without it.
 0. **Migration 095 (map card photo, Nov 11):** one `add column if not
    exists`. Run it on live before or with the deploy that ships the map
    card; the card works without it, only its photo can't be saved. Then

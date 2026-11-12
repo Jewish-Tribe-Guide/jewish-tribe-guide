@@ -17,7 +17,6 @@ const m = vi.hoisted(() => ({
   readShulWeek: vi.fn(),
   readMessage: vi.fn(),
   submitListingUpdate: vi.fn(),
-  sendWatchDigest: vi.fn(),
   upload: vi.fn(),
 }))
 vi.mock('@/lib/watchStore', () => ({ getWatchByUrl: m.getWatchByUrl, addWatch: m.addWatch, updateWatch: m.updateWatch, listWatches: m.listWatches }))
@@ -32,7 +31,7 @@ vi.mock('@/lib/shulWeekReading', () => ({
 }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
-vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/email', () => ({}))
 vi.mock('@/lib/eruvEmailRun', () => ({ eruvSenders: m.eruvSenders }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://kept/${p}` } }) }) } }),
@@ -115,7 +114,6 @@ beforeEach(() => {
   m.readShulWeek.mockResolvedValue({ update: changed, model: 'x' })
   m.readMessage.mockResolvedValue(nothing)
   m.submitListingUpdate.mockResolvedValue({ id: 'sub' })
-  m.sendWatchDigest.mockResolvedValue(undefined)
   m.upload.mockResolvedValue({ error: null })
 })
 
@@ -197,7 +195,6 @@ describe('receiveNewsletter: what it changes', () => {
     expect(payload.source).toMatchObject({ readBy: 'ai', from: 'Mekor Habracha’s newsletter', named: 'Mekor Habracha', original: email.text, note: email.subject })
     expect(note).toContain('From Mekor Habracha’s newsletter: “This Shabbos at Mekor” (Oct 16).')
     expect(note).toContain('9:00am')
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Mekor Habracha’s newsletter', [expect.objectContaining({ name: 'Mekor Habracha' })], { path: `/philly/admin/watches/place/${SHUL}?from=todo`, name: 'Grocery Stores' })
     expect(m.updateWatch).toHaveBeenCalledWith(
       'philly',
       'w1',
@@ -211,7 +208,6 @@ describe('receiveNewsletter: what it changes', () => {
   it('files the times as the part they change, as a website’s reading is', async () => {
     await receiveNewsletter('philly', email, opts)
     expect(m.submitListingUpdate.mock.calls[0][2].source.part).toEqual({ part: 'shabbos', field: 'minyanim' })
-    expect(m.sendWatchDigest.mock.calls[0][2]).toEqual([{ name: 'Mekor Habracha', what: 'Usual Shabbos times: Changed: shacharis · Shabbos · 9:00am, was 9:15am' }])
   })
 
   it('files each part a newsletter changes on its own, each changing only its own times', async () => {
@@ -225,7 +221,6 @@ describe('receiveNewsletter: what it changes', () => {
     expect(filed.map((p) => p.source.part.part)).toEqual(['weekday', 'shabbos'])
     expect(times(filed[0])).toEqual(['mon shacharis 7:00am', 'sat mincha 12:20pm', 'sat shacharis 9:15am'])
     expect(times(filed[1])).toEqual(['sat mincha 12:20pm', 'sat shacharis 9:00am'])
-    expect(m.sendWatchDigest.mock.calls[0][2].map((w: { what: string }) => w.what.split(':')[0])).toEqual(['Usual weekday times', 'Usual Shabbos times'])
   })
 
   // Mekor's newsletter, Oct 23: "2:00pm Mincha at 1818 Market or Mikveh
@@ -264,7 +259,6 @@ describe('receiveNewsletter: what it changes', () => {
     m.readShulWeek.mockResolvedValue({ update: allGone, model: 'x' })
     expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
-    expect(m.sendWatchDigest).not.toHaveBeenCalled()
   })
 
   it('reads the times off its PDF when the words have none, and keeps the PDF for the admin', async () => {

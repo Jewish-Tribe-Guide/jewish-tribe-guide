@@ -13,7 +13,6 @@ const m = vi.hoisted(() => ({
   readMessage: vi.fn(),
   submitListingUpdate: vi.fn(),
   replacePendingSuggestion: vi.fn(),
-  sendWatchDigest: vi.fn(),
   confirmFromSource: vi.fn(),
   pending: [] as unknown[],
   earlier: [] as unknown[],
@@ -35,7 +34,7 @@ vi.mock('@/lib/shulWeekReading', () => ({
 }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, replacePendingSuggestion: m.replacePendingSuggestion }))
-vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/email', () => ({}))
 // A page that agrees dates the listing by name (Oct 23). Mocked so a call
 // is seen, not made.
 vi.mock('@/lib/sourceConfirm', () => ({ confirmFromSource: m.confirmFromSource }))
@@ -134,7 +133,6 @@ beforeEach(() => {
   m.getResourceRowById.mockResolvedValue(shul)
   m.fetchPublic.mockResolvedValue(page)
   m.readShulWeek.mockResolvedValue({ update: moved, model: 'cheap' })
-  m.sendWatchDigest.mockResolvedValue(undefined)
 })
 
 describe('runListingPageWatch: a shul’s page of times', () => {
@@ -151,7 +149,6 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(out).toMatchObject({ ok: true, filed: 1, pageHash: await hashOfPage(), check: { result: 'differs', read: ['Mincha Sun 6:05 PM'] } })
     expect(m.submitListingUpdate.mock.calls[0][3]).toBe(`From their website, read Oct 20: ${URL_}\n\nChanged: mincha · Sun · 6:05pm, was 6:15pm`)
     // It waits on the shul's own screen, and its email says so.
-    expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/place/s1?from=todo', name: 'Grocery Stores' })
     // Its reads spent: left for a later morning, its fingerprint unset.
     m.readShulWeek.mockClear()
     expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0, timesReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, skipped: true })
@@ -660,10 +657,6 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       expect(weekday.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:05pm' })])
       expect(shabbos.source.part).toEqual({ part: 'shabbos', field: 'minyanim' })
       expect(shabbos.details.minyanim).toEqual([minyan, expect.objectContaining({ tefillah: 'shacharis', days: ['sat'], time: '9:00am' })])
-      expect(m.sendWatchDigest.mock.calls[0][2]).toEqual([
-        { name: 'Lower Merion Synagogue', what: 'Usual weekday times: Changed: Mincha · Sun, 6:05 PM, was 6:15 PM' },
-        { name: 'Lower Merion Synagogue', what: 'Usual Shabbos times: New: Shacharis · Sat, 9 AM' },
-      ])
     })
 
     it('a part waiting from another page holds back only that part, unless this page gives more of it', async () => {
@@ -850,7 +843,6 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     expect(payload.details.women_s_hours).toEqual({ sun: { open: '19:30', close: '22:00' } })
     expect(payload.details.e).toBeUndefined()
     expect(note).toContain('Women’s Hours, Sunday: 7:00 PM–10:00 PM → 7:30 PM–10:00 PM')
-    expect(m.sendWatchDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin/watches/place/mk1?from=todo', name: mikvahCategory.pluralLabel })
   })
 
   it('a check says which hours it read', async () => {
@@ -988,7 +980,6 @@ describe('runListingPageWatch: a mikvah’s sections, each filed on its own', ()
     expect(wNote).not.toContain('Men’s')
     expect(mn.source.section).toEqual(SECTION('menTevillah'))
     expect(mn.details).toMatchObject({ women_s_hours: place.details.women_s_hours, men_s_hours: { sun: { open: '05:00', close: '10:00' } } })
-    expect(m.sendWatchDigest.mock.calls[0][2].map((x: { what: string }) => x.what.split(':')[0])).toEqual(['Women’s', 'Men’s'])
   })
 
   it('reads a section’s note: one that says what the listing does is read, not “can’t be read”', async () => {

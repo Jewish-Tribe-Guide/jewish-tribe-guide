@@ -7,14 +7,13 @@ const m = vi.hoisted(() => ({
   earlier: [] as unknown[],
   updates: [] as { payload: unknown; id: unknown }[],
   submitEruvUpdate: vi.fn(),
-  sendWatchDigest: vi.fn(),
   addWatch: vi.fn(),
   removeWatch: vi.fn(),
 }))
 vi.mock('@/lib/eruvStore', () => ({ listEruvimForAdmin: async () => ({ available: true, eruvim: m.eruvim }) }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: async () => ({ available: true, watches: m.watches }), addWatch: m.addWatch, removeWatch: m.removeWatch }))
 vi.mock('@/lib/submissionStore', () => ({ submitEruvUpdate: m.submitEruvUpdate }))
-vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/email', () => ({}))
 vi.mock('@/lib/categoryStore', () => ({ listCategoriesUncached: async () => [{ id: 'eruvin', kind: 'eruv', pluralLabel: 'Eruvin' }] }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -52,7 +51,6 @@ beforeEach(() => {
   m.updates = []
   vi.clearAllMocks()
   m.submitEruvUpdate.mockResolvedValue({})
-  m.sendWatchDigest.mockResolvedValue(undefined)
   m.addWatch.mockResolvedValue({})
 })
 
@@ -66,7 +64,6 @@ describe('reading an eruv’s website', () => {
       'Read from its website, https://lowermerioneruv.org/',
       { name: ERUV_WEBSITE_WATCH_NAME },
     )
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Eruv websites', [{ name: 'Lower Merion Eruv', what: 'Hotline' }], { path: '/philly/admin', name: 'Eruvin' })
   })
 
   it('agrees, and files nothing, when the page has its number', async () => {

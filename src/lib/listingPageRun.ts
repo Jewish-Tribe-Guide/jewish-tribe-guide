@@ -35,9 +35,7 @@ import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionS
 import { TIMES_PART_LABELS, partKey, partLines, partSize, partsGiven, readPartSource, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
 import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
 import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
-import { sendWatchDigest } from '@/lib/email'
 import { confirmFromSource } from '@/lib/sourceConfirm'
-import { jobPageFor } from '@/lib/watchFindings'
 import { withMinyanLinks } from '@/lib/minyanLinks'
 import { keepListedNotes, leaveOutTurnedDown, type Decision } from '@/lib/websiteNotes'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
@@ -1045,11 +1043,6 @@ async function readAndFile(
   if (parts.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
-    if (filed.length) {
-      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-        console.error('[watch-listing-page] digest failed:', err),
-      )
-    }
     return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
   }
   // A mikvah's hours: filed as the sections they change, each on its own.
@@ -1057,11 +1050,6 @@ async function readAndFile(
   if (sections.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileSections(watch, category, listing, sections, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
-    if (filed.length) {
-      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-        console.error('[watch-listing-page] digest failed:', err),
-      )
-    }
     return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
   }
   // Only a check gets here with one waiting: it says so, files nothing, and
@@ -1078,9 +1066,6 @@ async function readAndFile(
     { ...proposal.submission, source: listingPageSource(listing.name, watch.url, on, source.text, seen) } as ResourceSubmission,
     note,
     { name: LISTING_PAGE_WATCH_NAME },
-  )
-  await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }], jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-    console.error('[watch-listing-page] digest failed:', err),
   )
   return { ok: true, filed: 1, pageHash, check: check('filed') }
 }
@@ -1219,11 +1204,6 @@ async function fileContact(
   if (blocked) return { reading, lines, queue: 'waiting', filed: [] }
   const section: HoursSection = { section: CONTACT_SECTION, label: contactBoxName(fields), hours: null, notes: null }
   const { queue, filed } = await fileSections(watch, category, listing, [{ section, details: reading.changes, source: { section: CONTACT_SECTION, keys } }], waiting, text, at)
-  if (filed.length) {
-    await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-      console.error('[watch-listing-page] digest failed:', err),
-    )
-  }
   return { reading, lines, queue, filed }
 }
 
