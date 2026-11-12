@@ -316,3 +316,61 @@ describe('ShabbatTimesCard — the fast block', () => {
     expect(card()).not.toHaveTextContent('Tzom Gedaliah')
   })
 })
+
+// Board L1 (Nov 11): from erev Shabbos (or Yom Tov) to havdalah, the computer
+// card carries the phone's eruv line along its bottom, as a link of its own
+// to the Eruv page; the rest of the card still opens Zmanim. The line's own
+// three looks are FridayEruv's tests; here, only when it is there and where
+// each link goes.
+vi.mock('./FridayEruv', () => ({
+  default: ({ href, look }: { href: string; look?: string }) => (
+    <a data-testid="today-eruv" data-look={look} href={href}>
+      Eruv
+    </a>
+  ),
+}))
+
+describe('ShabbatTimesCard — the eruv line (L1)', () => {
+  const shuls = makeCategory({ id: 'synagogue' })
+  const eruvPage = makeCategory({ id: 'eruv-info', kind: 'eruv' })
+  // Mid-Shabbos: candles were 20 hours ago, havdalah in one. Not tied to the
+  // day the test runs, unlike "candles tonight".
+  const midShabbos: ZmanimData = {
+    ...readyData,
+    isShabbos: true,
+    shabbos: {
+      candleLighting: { label: 'Friday', time: '7:09 PM', iso: isoOffset(-20 * HOUR_MS) },
+      havdalah: { label: 'Saturday', time: '8:07 PM', iso: isoOffset(HOUR_MS) },
+    },
+  }
+
+  it('on Shabbos: the eruv line along the bottom, its own link to the Eruv page', () => {
+    mockUseZmanim.mockReturnValue({ data: midShabbos, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [shuls, eruvPage] } })
+
+    const line = screen.getByTestId('today-eruv')
+    expect(line).toHaveAttribute('data-look', 'light')
+    expect(line).toHaveAttribute('href', '/test-community/eruv')
+    expect(card()).toHaveAttribute('href', '/test-community/zmanim')
+    // Two links side by side in one box, never one inside the other.
+    expect(card()).not.toContainElement(line)
+    expect(screen.getByTestId('home-shabbos-card')).toContainElement(line)
+    expect(screen.getByTestId('home-shabbos-card')).toContainElement(card())
+  })
+
+  it('on a weekday: no eruv line, and the card is one link again', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' }) // no instants: a weekday
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [shuls, eruvPage] } })
+
+    expect(screen.queryByTestId('today-eruv')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-shabbos-card')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toEqual([card()])
+  })
+
+  it('without an Eruv page: no eruv line, even on Shabbos', () => {
+    mockUseZmanim.mockReturnValue({ data: midShabbos, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [shuls] } })
+
+    expect(screen.queryByTestId('today-eruv')).not.toBeInTheDocument()
+  })
+})

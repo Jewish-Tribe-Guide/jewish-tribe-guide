@@ -2,7 +2,11 @@
 
 import AnswerCard from './AnswerCard'
 import { useZmanim } from '@/lib/useZmanim'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
+import { useCategories } from '@/lib/useCategories'
+import { shabbosMoment } from '@/lib/todayHome'
+import { fixedViewSlug } from '@/lib/routes'
+import FridayEruv from './FridayEruv'
 import { useNow } from '@/lib/useNow'
 import { countdown, shabbosCardView, type CardTime } from '@/lib/shabbosCard'
 import { routes } from '@/lib/routes'
@@ -48,6 +52,11 @@ import { CandleIcon } from '@/components/icons'
 // is also live that week; once the grace period passes, the card falls
 // back to the holiday-or-Shabbos block on its own.
 //
+// Board L1 (the user, Nov 11): whenever the phone shows its candles card
+// (Friday or Erev Yom Tov, and through Shabbos), this card carries the same
+// eruv line along its bottom (FridayEruv, in its light look), a link of
+// its own to the Eruv page. The rest of the week it has none.
+//
 // Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
 // it used to sit above the map, in the HomeBreak grid, alongside Davening
 // Times and the community card, then paired with SubscribeSection below the
@@ -70,6 +79,11 @@ export default function ShabbatTimesCard({
   const view = data && now !== null ? shabbosCardView(data, now) : null
   const soon = view?.next && now !== null ? countdown(view.next.iso, now) : null
   const loading = status === 'loading' || (status === 'ready' && now === null)
+  const timezone = useCommunityTimezone()
+  const categories = useCategories()
+  const eruvPage = categories?.find((c) => c.kind === 'eruv')
+  const eruvHref = eruvPage ? routes.slug(communitySlug, fixedViewSlug(eruvPage.kind) ?? eruvPage.id) : null
+  const showEruv = eruvHref !== null && now !== null && shabbosMoment(data ?? null, now, timezone).kind !== 'weekday'
 
   // "This Shabbos", "This Sukkos"; a fast by its own name.
   const eyebrow = view ? (view.kind === 'fast' ? view.name : `This ${view.name}`) : 'Shabbat & holidays'
@@ -80,6 +94,7 @@ export default function ShabbatTimesCard({
     <AnswerCard
       href={routes.slug(communitySlug, 'zmanim')}
       testId="home-shabbos"
+      footer={showEruv ? <FridayEruv communitySlug={communitySlug} href={eruvHref} now={now} look="light" /> : undefined}
       icon={<CandleIcon className="h-7 w-7" />}
       eyebrow={eyebrow}
       answer={answer}

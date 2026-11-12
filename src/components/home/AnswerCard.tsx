@@ -29,6 +29,7 @@ export default function AnswerCard({
   detail,
   testId,
   prefetch,
+  footer,
 }: {
   href: string
   icon: React.ReactNode
@@ -38,13 +39,21 @@ export default function AnswerCard({
   detail?: React.ReactNode
   testId: string
   prefetch?: false
+  /** A strip along the card's bottom with a link of its own (the Shabbos
+   *  card's eruv line, board L1). The card is then a box holding two links
+   *  rather than one link, since a link can't sit inside another. */
+  footer?: React.ReactNode
 }) {
-  return (
+  const body = (
     <Link
       href={href}
       prefetch={prefetch}
       data-testid={testId}
-      className={`flex items-center gap-5 rounded-2xl bg-white px-7 py-7 ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
+      className={
+        footer
+          ? 'flex flex-1 items-center gap-5 px-7 pt-7 pb-6'
+          : `flex items-center gap-5 rounded-2xl bg-white px-7 py-7 ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`
+      }
     >
       <span aria-hidden="true" className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         {icon}
@@ -59,5 +68,12 @@ export default function AnswerCard({
         {detail && <span data-testid={`${testId}-detail`} className="mt-1 block text-[15px] text-slate-600">{detail}</span>}
       </span>
     </Link>
+  )
+  if (!footer) return body
+  return (
+    <div data-testid={`${testId}-card`} className={`flex flex-col overflow-hidden rounded-2xl bg-white ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}>
+      {body}
+      {footer}
+    </div>
   )
 }
