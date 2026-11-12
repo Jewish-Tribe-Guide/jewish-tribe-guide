@@ -31,7 +31,6 @@ type PatchBody = {
   cardImageUrl?: string | null
   cardBandImageUrl?: string | null
   pinColor?: string | null
-  iconImageUrl?: string | null
   /** Map category only (kind === 'map') — see CategoryConfig's own doc. */
   mapZoomRadiusMiles?: number | null
   /** Whether this category shows on the public site — see CategoryConfig's

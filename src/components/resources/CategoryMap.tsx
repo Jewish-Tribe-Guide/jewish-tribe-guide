@@ -143,7 +143,6 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
         phone: item.phone,
         color,
         glyph: category.icon ?? DEFAULT_CATEGORY_ICON,
-        glyphSrc: category.iconImageUrl ?? undefined,
         categoryLabel: category.label,
         filterId: category.id,
         raw: item,
@@ -163,7 +162,6 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
           phone: item.phone,
           color: walkColor,
           glyph: walkCategory.icon ?? DEFAULT_CATEGORY_ICON,
-          glyphSrc: walkCategory.iconImageUrl ?? undefined,
           categoryLabel: walkCategory.label,
           filterId: walkCategory.id,
           raw: item,
@@ -173,7 +171,7 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on which places and pins, not the array's identity
-  }, [itemsKey, walkKey, pinnedKey, color, category.icon, category.iconImageUrl, category.label, category.id, walkCategory])
+  }, [itemsKey, walkKey, pinnedKey, color, category.icon, category.label, category.id, walkCategory])
 
   const button =
     'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[13.5px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'

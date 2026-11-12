@@ -19,13 +19,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-// A category's own picture ("Or use a picture instead" in its admin settings)
-// replaces the glyph on every badge of it. Nov 11: Food had one set and it
-// showed only in the search dropdown, because the home tiles never passed it
-// through. Each home place a category is drawn as its badge is checked here.
+// A category has one picture, its banner (the user, Nov 11: "the picture can
+// just be the banner"). The computer home's tile shows it; a badge (the
+// phone tiles, search rows) is the line icon, never a picture or an emoji.
 
-const PICTURE = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-icon/food-pic.jpeg'
-const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', icon: '🍽️', iconImageUrl: PICTURE })
+const PICTURE = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-band/food-pic.jpeg'
+const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', icon: '🍽️', cardBandImageUrl: PICTURE, cardImageUrl: 'https://images.unsplash.com/photo-older' })
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', icon: '🛒' })
 const card = (id: string, title: string): CardDef => ({ id, title, icon: '🍽️', href: `/philly/${id}`, go: () => {} }) as CardDef
 
@@ -35,12 +34,12 @@ function pictureIn(container: HTMLElement, href: string): string | null {
   return img ? decodeURIComponent(img.getAttribute('src') ?? '') : null
 }
 
-describe('a category’s picture on the home', () => {
-  it('computer home: the Explore by Category tile shows it, and a category without one keeps its glyph', () => {
+describe('a category’s one picture on the home', () => {
+  it('computer home: the Explore by Category tile shows its banner over an older card photo, and a category without one keeps its glyph', () => {
     const { container } = render(
       <CategoryTileRow cards={[card('restaurant', 'Food'), card('grocery', 'Grocery')]} categories={[food, grocery]} expanded onExpand={() => {}} />,
     )
-    expect(pictureIn(container, '/philly/restaurant')).toContain('category-icon/food-pic')
+    expect(pictureIn(container, '/philly/restaurant')).toContain('category-band/food-pic')
     expect(pictureIn(container, '/philly/grocery')).toBeNull()
   })
 
@@ -72,19 +71,21 @@ describe('a category’s picture on the home', () => {
     expect(container.querySelector('a[href="/philly/sukkahs"]')).toHaveAccessibleName('Sukkahs')
   })
 
-  it('search rows (the compact index) show it too', () => {
+  it('search rows (the compact index) draw the line icon, not the picture', () => {
     const { container } = render(<CompactCardGrid cards={[card('restaurant', 'Food'), card('grocery', 'Grocery')]} categories={[food, grocery]} />)
-    expect(pictureIn(container, '/philly/restaurant')).toContain('category-icon/food-pic')
-    expect(pictureIn(container, '/philly/grocery')).toBeNull()
+    expect(pictureIn(container, '/philly/restaurant')).toBeNull()
+    expect(container.querySelector('a[href="/philly/restaurant"] svg')).not.toBeNull()
+    expect(container.textContent).not.toMatch(/🛒|🍽️/u)
   })
 
-  it('phone home: the category tiles show it', () => {
+  it('phone home: the category tiles draw the line icon, not the picture', () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [] }))))
     const { container } = renderWithProviders(
       <CategoryTiles communitySlug="philly" listings={[makeListing({ id: 'a', category: 'restaurant' }), makeListing({ id: 'b', category: 'grocery' })]} />,
       { content: { categories: [food, grocery], homeSections: [] } },
     )
-    expect(pictureIn(container, '/philly/restaurant')).toContain('category-icon/food-pic')
+    expect(pictureIn(container, '/philly/restaurant')).toBeNull()
     expect(pictureIn(container, '/philly/grocery')).toBeNull()
+    expect(container.textContent).not.toMatch(/🛒|🍽️/u)
   })
 })

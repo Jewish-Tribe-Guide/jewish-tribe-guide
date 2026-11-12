@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { categoryColorUsage, categoryTint, getCategoryColor, getCategoryPicture, getCategoryTilePhoto, isValidPinColor, PIN_COLORS, categoryRing } from './categoryColor'
+import { categoryColorUsage, categoryTint, getCategoryColor, getCategoryTilePhoto, isValidPinColor, PIN_COLORS, categoryRing } from './categoryColor'
 import type { CategoryConfig } from './categories'
 
 // The colour is assigned by position rather than stored, so the map pin and the
@@ -302,32 +302,14 @@ describe('categoryRing', () => {
   })
 })
 
-describe('getCategoryPicture', () => {
-  const cats = [
-    { id: 'restaurant', iconImageUrl: ' https://x/food.jpeg ' },
-    { id: 'grocery', iconImageUrl: '' },
-    { id: 'hotel' },
-  ] as unknown as CategoryConfig[]
-  it('the picture set for the category, trimmed', () => {
-    expect(getCategoryPicture(cats, 'restaurant')).toBe('https://x/food.jpeg')
-  })
-  it('null when none is set, the id is unknown or missing, or categories are still loading', () => {
-    expect(getCategoryPicture(cats, 'grocery')).toBeNull()
-    expect(getCategoryPicture(cats, 'hotel')).toBeNull()
-    expect(getCategoryPicture(cats, 'nope')).toBeNull()
-    expect(getCategoryPicture(cats, undefined)).toBeNull()
-    expect(getCategoryPicture(null, 'restaurant')).toBeNull()
-  })
-})
-
 describe('getCategoryTilePhoto', () => {
   const cats = [
-    { id: 'restaurant', iconImageUrl: 'https://x/food.jpeg', cardImageUrl: 'https://x/wide.jpg' },
-    { id: 'grocery', iconImageUrl: ' ', cardImageUrl: ' https://x/grocery.jpg ' },
+    { id: 'restaurant', cardBandImageUrl: 'https://x/food.jpeg', cardImageUrl: 'https://x/wide.jpg' },
+    { id: 'grocery', cardBandImageUrl: ' ', cardImageUrl: ' https://x/grocery.jpg ' },
     { id: 'hotel' },
     { id: 'eruv-information', kind: 'eruv', cardImageUrl: 'https://x/eruv.jpg' },
   ] as unknown as CategoryConfig[]
-  it('its own picture first, else its card photo, else null', () => {
+  it('its banner first, else its older card photo, else null', () => {
     expect(getCategoryTilePhoto(cats, 'restaurant')).toBe('https://x/food.jpeg')
     expect(getCategoryTilePhoto(cats, 'grocery')).toBe('https://x/grocery.jpg')
     expect(getCategoryTilePhoto(cats, 'hotel')).toBeNull()

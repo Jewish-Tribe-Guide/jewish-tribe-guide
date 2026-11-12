@@ -80,7 +80,6 @@ function toConfig(row: CategoryRow): CategoryConfig {
     cardImageUrl: row.card_image_url,
     cardBandImageUrl: row.card_band_image_url,
     pinColor: row.pin_color,
-    iconImageUrl: row.icon_image_url,
     // undefined (column not yet migrated) and null (migrated, never set)
     // both mean "no cap" — normalized to the same null callers already
     // treat that way.
@@ -226,7 +225,6 @@ export async function createCategory(community: string, input: {
   cardImageUrl?: string | null
   cardBandImageUrl?: string | null
   pinColor?: string | null
-  iconImageUrl?: string | null
   active?: boolean
   /** Saved only when given, which the editor does only when it differs from
    *  what the slug implies, so creating a category works on a database
@@ -291,7 +289,6 @@ export async function createCategory(community: string, input: {
     card_image_url: input.cardImageUrl?.trim() || null,
     card_band_image_url: input.cardBandImageUrl?.trim() || null,
     pin_color: input.pinColor?.trim() || null,
-    icon_image_url: input.iconImageUrl?.trim() || null,
     active: input.active ?? true,
     ...(input.placeKind && { place_kind: input.placeKind }),
     ...(input.listingParts && hasListingParts(input.listingParts) && { listing_parts: input.listingParts }),
@@ -332,7 +329,6 @@ export async function updateCategory(
     cardImageUrl?: string | null
     cardBandImageUrl?: string | null
     pinColor?: string | null
-    iconImageUrl?: string | null
     mapZoomRadiusMiles?: number | null
     active?: boolean
     formSections?: CategoryFormSection[] | null
@@ -364,7 +360,6 @@ export async function updateCategory(
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
   if (patch.cardBandImageUrl !== undefined) row.card_band_image_url = patch.cardBandImageUrl?.trim() || null
   if (patch.pinColor !== undefined) row.pin_color = patch.pinColor?.trim() || null
-  if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
   if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
   if (patch.formSections !== undefined) row.form_sections = patch.formSections
   // Only sent when the admin changed it, so every other save keeps working

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { getCategoryColor, getCategoryPicture } from '@/lib/categoryColor'
+import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryIcon from '@/components/CategoryIcon'
 import { BrowseFoot, useBrowseCards } from './BrowseAll'
 import type { CardDef } from './sections'
@@ -51,7 +51,7 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
               prefetch={false}
               className="flex h-full min-h-[88px] flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-1.5 pt-3 pb-2.5 text-center hover:bg-slate-50"
             >
-              <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} iconImageUrl={getCategoryPicture(categories as CategoryConfig[] | null, card.id)} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-10 w-10 text-lg" sizePx={40} />
+              <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-10 w-10 text-lg" sizePx={40} />
               {/* Three lines, not two: "Candle Lighting & Zmanim" lost its
                   last word at an iPhone's width (Oct 20). A row with a
                   three-line name is a little taller, all its tiles alike. */}

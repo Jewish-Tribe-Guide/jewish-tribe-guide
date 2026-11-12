@@ -10,7 +10,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
-import { getCategoryColor, getCategoryPicture } from '@/lib/categoryColor'
+import { getCategoryColor } from '@/lib/categoryColor'
 import { browseLine, shabbosMoment } from '@/lib/todayHome'
 import { routes } from '@/lib/routes'
 import { features } from '@/lib/features'
@@ -128,7 +128,7 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
                   return (
                     <li key={card.id ?? card.title}>
                       <Link href={card.href} prefetch={false} className="flex items-center gap-3 border-t border-slate-100 py-2.5 hover:bg-slate-50">
-                        <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} iconImageUrl={getCategoryPicture(categories as CategoryConfig[] | null, card.id)} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-9 w-9 text-base" sizePx={36} />
+                        <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-9 w-9 text-base" sizePx={36} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[16px] font-bold text-ink">{card.title}</span>
                           {line && <span className="block truncate text-[13.5px] text-slate-600">{line}</span>}

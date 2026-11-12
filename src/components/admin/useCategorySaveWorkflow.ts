@@ -228,7 +228,6 @@ export function useCategorySaveWorkflow({
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         icon: draft.icon,
-        iconImageUrl: draft.iconImageUrl.trim() || null,
         description: draft.description,
         hasAddress: draft.hasAddress,
         hasPhone: draft.hasPhone,

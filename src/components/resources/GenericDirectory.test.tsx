@@ -1790,7 +1790,7 @@ describe('GenericDirectory — the page opens on its home tile\'s picture (board
   })
 
   const PHOTO = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-icon/food.jpg'
-  const withPhoto = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', icon: '🛒', iconImageUrl: PHOTO })
+  const withPhoto = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', icon: '🛒', cardBandImageUrl: PHOTO })
   const items = [makeListing({ id: 'a', name: 'Acme' }), makeListing({ id: 'b', name: 'Bravo' })]
   const render = (category = withPhoto, extra: Record<string, unknown> = {}) =>
     renderWithProviders(<GenericDirectory category={category} items={items} addressPrompt {...handlers} {...extra} />, {

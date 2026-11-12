@@ -1165,13 +1165,13 @@ describe('GenericListingCard — the row', () => {
   })
 
   it('shows initials for a place with no photo of its own, not the category’s icon', () => {
-    const category = makeCategory({ iconImageUrl: 'https://example.com/category.png' })
+    const category = makeCategory({ cardBandImageUrl: 'https://example.com/category.png' })
     renderWithProviders(
       <GenericListingCard item={makeListing({ name: "Shlomo's Fish Market" })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
     expect(screen.getByText('SF')).toBeInTheDocument()
-    // The category's own picture stays off the row (the dialog still has it).
+    // The category's picture stays off the row.
     expect(document.querySelector('img[src*="category.png"]')).toBeNull()
   })
 

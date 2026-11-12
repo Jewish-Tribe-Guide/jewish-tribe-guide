@@ -91,6 +91,13 @@ const CATEGORY_ICON_MARKUP: Record<string, string> = {
   zmanim: '<path d="M12 2.5c1.6 2 2.2 3.6 2.2 5a2.2 2.2 0 1 1-4.4 0c0-1.4.6-3 2.2-5Z"/><path d="M9 21.5h6M12 9v12.5"/>',
 }
 
+/** The plain line icon a category with no icon of its own gets: four
+ *  squares, "a category". Its emoji used to show there instead; the site
+ *  draws no emoji as icons, and the category editor no longer sets one
+ *  (the user, Nov 11). */
+const DEFAULT_ICON_MARKUP =
+  '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>'
+
 /** Whether CategoryGlyph would draw a hand-built icon for `categoryId`
  *  rather than falling back to plain emoji text — for a caller that needs
  *  to style around that difference (e.g. MobileTabBar's active/inactive
@@ -109,16 +116,17 @@ export function useGlyphKey(categoryId: string | undefined): string | undefined 
 type Props = {
   /** The category (or hospitals-filter) id — CategoryConfig.id, or
    *  ResourceMapView's HOSPITALS_FILTER_ID. Undefined (a place with no
-   *  resolved category yet) just falls back to `icon`. */
+   *  resolved category yet) gets the plain default icon. */
   categoryId: string | undefined
-  /** The category's plain emoji — rendered as-is when there's no hand-built
-   *  icon for `categoryId`. */
-  icon: string
+  /** The category's emoji. No longer drawn (no emoji as icons): a category
+   *  with no hand-built icon gets the plain default one. Kept so callers
+   *  needn't change. */
+  icon?: string
   className?: string
 }
 
 /** A category's glyph — the hand-built line icon for `categoryId` when one
- *  exists, its plain emoji otherwise. Stroke/fill is `currentColor`, so the
+ *  exists, a plain four-squares icon otherwise. Stroke/fill is `currentColor`, so the
  *  caller controls color the normal CSS way (a text-* class, or an inline
  *  `color`) exactly like every other icon in components/icons.tsx.
  *
@@ -128,7 +136,7 @@ type Props = {
  *  the same thing regardless of which category it ends up drawing; a plain
  *  text span sized by width/height classes doesn't scale its font to fit
  *  them the way viewBox-relative SVG content does. */
-export function CategoryGlyph({ categoryId: id, icon, className }: Props) {
+export function CategoryGlyph({ categoryId: id, className }: Props) {
   // Drawn by the category's kind (placeKinds.ts), so a community whose
   // shuls aren't at /synagogue still gets the shul icon.
   const categoryId = useGlyphKey(id)
@@ -142,8 +150,7 @@ export function CategoryGlyph({ categoryId: id, icon, className }: Props) {
       </svg>
     )
   }
-  const markup = categoryId ? CATEGORY_ICON_MARKUP[categoryId] : undefined
-  if (!markup) return <>{icon}</>
+  const markup = (categoryId ? CATEGORY_ICON_MARKUP[categoryId] : undefined) ?? DEFAULT_ICON_MARKUP
   return (
     <svg
       viewBox="0 0 24 24"
@@ -166,8 +173,7 @@ export function CategoryGlyph({ categoryId: id, icon, className }: Props) {
  *  background); `glyphColor` on PinElement is ignored once `glyph` is an
  *  Element, so this has to color itself rather than relying on that. */
 export function glyphElementFor(categoryId: string | undefined): SVGElement | undefined {
-  const markup = categoryId ? CATEGORY_ICON_MARKUP[categoryId] : undefined
-  if (!markup) return undefined
+  const markup = (categoryId ? CATEGORY_ICON_MARKUP[categoryId] : undefined) ?? DEFAULT_ICON_MARKUP
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('viewBox', '0 0 24 24')
   svg.setAttribute('width', '18')

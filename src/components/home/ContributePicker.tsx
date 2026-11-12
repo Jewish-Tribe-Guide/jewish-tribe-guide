@@ -83,7 +83,6 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
                 <CategoryIcon
                   icon={c.icon}
                   categoryId={c.id}
-                  iconImageUrl={c.iconImageUrl}
                   color={getCategoryColor(categories, c.id)}
                   className="h-8 w-8 text-base shrink-0"
                   sizePx={32}

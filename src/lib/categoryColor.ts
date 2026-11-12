@@ -1,4 +1,4 @@
-import type { CategoryConfig } from '@/lib/categories'
+import { bandImageFor, type CategoryConfig } from '@/lib/categories'
 
 // A category's colour is stored on the category (CategoryConfig.pinColor,
 // editable in the category editor). Shared by the map (pins, NearbyList) and
@@ -87,15 +87,6 @@ export function getCategoryColor(categories: CategoryConfig[] | null | undefined
   if (index === -1) return FALLBACK_COLOR
   const stored = list[index].pinColor?.trim()
   return stored || PALETTE[index % PALETTE.length]
-}
-
-/** The picture an admin set for this category's icon spot ("Or use a picture
- *  instead"), or null to draw the glyph. Every place a category is drawn as
- *  its badge (home tiles, browse rows, search rows) reads it through here, so
- *  setting one picture changes the category everywhere at once; a tile that
- *  forgot to pass it is how Food's picture once showed only in search. */
-export function getCategoryPicture(categories: readonly CategoryConfig[] | null | undefined, categoryId: string | undefined): string | null {
-  return cardCategory(categories, categoryId)?.iconImageUrl?.trim() || null
 }
 
 /** The category a home card stands for. Cards are keyed by category id,
@@ -204,10 +195,9 @@ export const HOSPITAL_COLOR = '#b6302b'
 export const HOSPITAL_ICON = '🏥'
 
 /** The photo for a category's tile on the computer home's Explore by
- *  Category (board H1, Nov 11): its own icon-spot picture, else the wide
- *  card photo an older setup pasted (at tile size, unlike at badge size, a
- *  wide photo crops fine), else null for the plain glyph on grey. */
+ *  Category, and its page's photo: the category's one picture
+ *  (bandImageFor), or null for the plain glyph on grey. */
 export function getCategoryTilePhoto(categories: readonly CategoryConfig[] | null | undefined, categoryId: string | undefined): string | null {
   const c = cardCategory(categories, categoryId)
-  return c?.iconImageUrl?.trim() || c?.cardImageUrl?.trim() || null
+  return c ? bandImageFor(c) : null
 }

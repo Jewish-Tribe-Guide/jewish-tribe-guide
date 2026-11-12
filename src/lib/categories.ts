@@ -437,12 +437,6 @@ export type CategoryConfig = {
    *  reassigned the colours of others; storing it makes the colour a property
    *  of the category, as it always should have been. */
   pinColor?: string | null
-  /** An uploaded image shown in place of the emoji `icon`, wherever this
-   *  category's circular avatar/pin renders (listing rows, map pins/chips,
-   *  the nearby list) — the icon equivalent of `cardImageUrl`, but this one
-   *  IS an upload (see /api/admin/categories/icon), not just a pasted URL.
-   *  `icon` is kept as the fallback if this is null/unset or fails to load. */
-  iconImageUrl?: string | null
   /** Map category only (kind === 'map'). Caps how far (in miles) a point can
    *  be from the visitor — or the community center, if no location is set —
    *  and still count toward the map's automatic "fit everything" zoom on
@@ -528,10 +522,11 @@ export function isCategorySyncEligible(category: { hasAddress?: boolean }): bool
   return category.hasAddress !== false
 }
 
-/** Which photo a category's desktop directory banner (CategoryBandFrame)
- *  should show: the dedicated, already-cropped-for-this-shape band photo if
- *  one's set, else the home card's photo (better than nothing even
- *  uncropped for the banner), else null — the plain color wash. */
+/** A category's one picture (the user, Nov 11: "the picture can just be
+ *  the banner"): the admin's banner photo if one's set, else the photo an
+ *  older setup pasted, else null for its colour. It is the computer home's
+ *  tile, the category page's photo and a phone's picture under the header.
+ *  The icon spot draws the site's line glyph; there's no picture for it. */
 export function bandImageFor(category: { cardBandImageUrl?: string | null; cardImageUrl?: string | null }): string | null {
   return category.cardBandImageUrl?.trim() || category.cardImageUrl?.trim() || null
 }

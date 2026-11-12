@@ -332,22 +332,31 @@ The user's answers on Nov 10, evening, and what was done with them:
     Phone: the same picture, 120px, edge to edge under the header, no
     second title; the rest as before. Changes to what was there: the round
     category badge and the thin 132px strip are gone (the home tile's photo
-    now grows into the band instead of the badge morphing); the photo is
-    the tile's (own picture, else the wide card photo), not the band photo
-    setting, which these pages no longer read; listing rows are a step
-    bigger on a computer everywhere they're used (18px name, 48px
+    now grows into the band instead of the badge morphing); listing rows
+    are a step bigger on a computer everywhere they're used (18px name, 48px
     picture), phones unchanged; the count shows twice ("71 PLACES" on the
     photo, "71 listings" over the list, which counts what's filtered).
     Not drawn, decided while building: a category with no picture gets its
     colour behind the words; a listing opened on a computer drops back to
     the old 132px band with no words (it keeps the top of the page, as
-    decided Oct). **For the user to look at:** Hospitals, Eruv, Childcare
-    and Schools have small own pictures on dev (612px wide), soft across
-    a 1280px band. Eruv's own page and Zmanim keep the old band.
-    **Waiting on the user:** the admin's category "Banner photo" no longer
-    shows on these pages, and live has one set on Food, Synagogues and
-    Young Professionals (dev the same). Either the banner wins over the
-    tile's picture when set, or the setting goes from the admin.
+    decided Oct). Eruv's own page and Zmanim keep the old band.
+  - **A category has one picture, its banner, and its icon isn't set any
+    more** (the user, Nov 11: "the picture can just be the banner. So maybe
+    we don't need the option to change the icon"; "Yes, build it"). BUILT
+    Nov 11. The admin's Banner photo (else the older pasted card photo) is
+    the computer home's tile, the category page's photo and a phone's
+    picture under the header. The Icon section is gone from the category
+    editor (emoji box, Browse icons, "Or use a picture instead"); Basics
+    still shows the icon beside the name, not tappable. Every category
+    draws its kind's line icon; one with none of its own gets a plain
+    four-squares line icon where its emoji used to show (badges, map pins,
+    the nearby list). `icon_image_url` is no longer read or written (the
+    column stays, no migration) and its upload route is deleted, so the
+    soft 612px icon pictures on dev no longer show anywhere. Forms keep
+    their emoji Icon field. Changes to earlier decisions: home badges
+    (phone tiles, search rows) no longer show a category picture, and
+    Food's page now opens on its banner rather than the picture set as its
+    icon.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three
