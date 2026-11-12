@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState, ViewTransition } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
@@ -90,21 +90,7 @@ function CompactCard({
       prefetch={false}
     >
       {card.icon ? (
-        // Named (desktop only — this component never mounts on mobile, see
-        // its own doc) so React's real <ViewTransition> grows this small
-        // icon badge into the bigger one GenericDirectory shows at the top
-        // of the category page, instead of a flat crossfade — the "shared
-        // element morph" pattern, matched on `name` alone (see that
-        // component's own comment for the other half). Only when `card.id`
-        // exists to key it on: the couple of hand-built cards with no id
-        // just skip the wrap and render plainly.
-        card.id ? (
-          <ViewTransition name={`category-badge-${card.id}`}>
-            <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
-          </ViewTransition>
-        ) : (
-          <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
-        )
+        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
       ) : (
         <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
       )}
@@ -338,9 +324,10 @@ export function CategoryTileRow({
             // this row renders every category at once.
             prefetch={false}
           >
-            {/* Named as CompactCard's badge is, so a <ViewTransition> grows
-                it into the badge at the top of the category page. */}
-            {card.id ? <ViewTransition name={`category-badge-${card.id}`}>{box}</ViewTransition> : box}
+            {/* Not named for a <ViewTransition>: growing the tile into the
+                category page's photo read as the picture flying in (the
+                user, Nov 11). The page just appears, as every other one. */}
+            {box}
             <span className={`${tileName} group-hover:text-primary`}>{card.title}</span>
           </Link>
         )

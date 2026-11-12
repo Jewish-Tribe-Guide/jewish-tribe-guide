@@ -1703,7 +1703,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <CategoryBandFrame
         color={bandColor}
         imageUrl={tilePhoto}
-        transitionName={`category-badge-${category.id}`}
         heroOverlap={heroOverlap}
         heroQuiet={deskListing}
         hero={deskListing ? (

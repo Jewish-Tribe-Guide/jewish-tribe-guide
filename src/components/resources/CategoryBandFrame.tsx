@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { ViewTransition, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { categoryTint, categoryRing } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -22,9 +22,6 @@ type FrameProps = {
    *  the bottom of the photo. Off while nothing would ride up there — a
    *  listing opened on a computer would otherwise start inside the photo. */
   heroOverlap?: boolean
-  /** With `hero`: the name the home's tile for this category carries
-   *  (home/sections.tsx), so the tile's photo grows into this one. */
-  transitionName?: string
   /** With `hero`: a listing is open on a computer and has the top of the
    *  page, so the photo goes back to the short band, with no words on it
    *  (`hero` is then only what a screen reader needs). */
@@ -65,7 +62,7 @@ export const HERO_OVERLAP_PX = 75
  *  directory screen whether or not the widget itself is visible) adds above
  *  it — 48px total — so the frame starts flush under SiteHeader instead of
  *  floating below a gap. */
-export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, transitionName, heroQuiet = false, children }: FrameProps) {
+export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, heroQuiet = false, children }: FrameProps) {
   const isMobile = useIsMobile()
   if (isMobile) return <>{children}</>
 
@@ -84,13 +81,11 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       // computer's photo.
       <div className="relative desktop:-mt-8 mx-[calc(50%-50vw)]" data-testid="category-hero">
         <div className={`relative hidden desktop:block ${heroQuiet ? 'h-[132px]' : 'h-[240px]'}`} style={{ marginBottom: heroOverlap && !heroQuiet ? -HERO_OVERLAP_PX : undefined }}>
-        <MaybeTransition name={transitionName}>
           <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: color }}>
             {bandImage && (
               <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(bandImage)} />
             )}
           </div>
-        </MaybeTransition>
           {heroQuiet ? (
             hero
           ) : (
@@ -141,10 +136,6 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       </div>
     </div>
   )
-}
-
-function MaybeTransition({ name, children }: { name?: string; children: ReactNode }) {
-  return name ? <ViewTransition name={name}>{children}</ViewTransition> : <>{children}</>
 }
 
 type BadgeProps = {
