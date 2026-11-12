@@ -9,8 +9,7 @@
 // files nothing.
 
 import { getAdminClient } from '@/lib/supabase/admin'
-import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
-import { findingPage } from '@/lib/watchFindings'
+import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { askGoogleIfOpen, withPlaceId } from '@/lib/keystoneRun'
@@ -226,7 +225,6 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community)).catch((err) => console.error('[watch-mekor] digest failed:', err))
   // What a kosher list says is the certification: that's what it dates.
   const confirmed = await confirmFromSource(community, agree, MEKOR_NAME, [KOSHER_SECTION])
 

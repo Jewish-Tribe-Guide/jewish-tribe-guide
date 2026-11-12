@@ -9,8 +9,7 @@
 // files nothing.
 
 import { getAdminClient } from '@/lib/supabase/admin'
-import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
-import { findingPage } from '@/lib/watchFindings'
+import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { canAskGoogle, findPlaceStatus, namesOverlap } from '@/lib/googlePlaces'
 import { confirmFromSource } from '@/lib/sourceConfirm'
@@ -234,9 +233,6 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, "Keystone-K's list", items, findingPage(community)).catch((err) =>
-    console.error('[watch-keystone] digest failed:', err),
-  )
   // What a kosher list says is the certification: that's what it dates.
   const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME, [KOSHER_SECTION])
 

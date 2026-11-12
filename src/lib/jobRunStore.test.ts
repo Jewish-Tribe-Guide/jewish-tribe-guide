@@ -53,9 +53,9 @@ vi.mock('./supabase/admin', () => ({
 }))
 
 const sent = vi.hoisted(() => [] as unknown[])
-vi.mock('./email', () => ({ sendJobAlert: async (alert: unknown) => void sent.push(alert) }))
+vi.mock('./email', () => ({ sendJobAlert: async (alert: unknown) => void sent.push(alert), sendNightlyEmail: async (_slug: string, e: unknown) => void sent.push(e) }))
 
-const { recordJobRun, listJobRuns } = await import('./jobRunStore')
+const { recordJobRun, listJobRuns, recentJobRuns } = await import('./jobRunStore')
 
 const START = new Date('2026-10-24T07:47:00.000Z')
 const END = new Date('2026-10-24T07:49:00.000Z')
@@ -134,22 +134,28 @@ describe('recordJobRun', () => {
   })
 
   // The job's last runs as the table holds them after this one's finish.
-  it('emails the admins when this run broke the job', async () => {
+  // Nov 12: one nightly email tells of a job that broke (nightlyEmailRun.ts),
+  // not an email of its own at the end of the run.
+  it('sends no email of its own when the run broke the job', async () => {
     db.rows = [
       { id: 'run-1', job: 'watches', started_at: START.toISOString(), finished_at: END.toISOString(), ok: false, summary: 'Stopped with an error', warning: null, error: 'boom' },
       { id: 'run-0', job: 'watches', started_at: '2026-10-23T07:47:00.000Z', finished_at: '2026-10-23T07:49:00.000Z', ok: true, summary: 'Checked 107 of 107 watches', warning: null, error: null },
     ]
     await expect(recordJobRun('watches', async () => Promise.reject(new Error('boom')), () => ({ ok: true, summary: '' }), clock())).rejects.toThrow('boom')
-    expect(sent).toEqual([{ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 24: boom'] }])
+    expect(sent).toEqual([])
+  })
+})
+
+describe('recentJobRuns', () => {
+  it('each job’s latest runs, for the nightly email', async () => {
+    db.rows = [{ id: 'run-1', job: 'watches', started_at: START.toISOString(), finished_at: END.toISOString(), ok: false, summary: null, warning: null, error: 'boom' }]
+    const runs = await recentJobRuns()
+    expect(runs.get('watches')).toEqual([expect.objectContaining({ id: 'run-1', ok: false, error: 'boom', startedAt: START.toISOString() })])
   })
 
-  it('emails nothing while the job keeps working', async () => {
-    db.rows = [
-      { id: 'run-1', job: 'watches', started_at: START.toISOString(), finished_at: END.toISOString(), ok: true, summary: 'Checked 107', warning: null, error: null },
-      { id: 'run-0', job: 'watches', started_at: '2026-10-23T07:47:00.000Z', finished_at: '2026-10-23T07:49:00.000Z', ok: true, summary: 'Checked 107', warning: null, error: null },
-    ]
-    await recordJobRun('watches', async () => null, () => ({ ok: true, summary: 'Checked 107' }), clock())
-    expect(sent).toEqual([])
+  it('none when migration 086 hasn’t been run', async () => {
+    db.error = { message: 'Could not find the table \'public.job_run\' in the schema cache' }
+    expect((await recentJobRuns()).size).toBe(0)
   })
 })
 

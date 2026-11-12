@@ -13,8 +13,7 @@ import {
 } from './submissionDiff'
 import { MENU_LINK_PROPOSED, SHOWN_WHEN_PROPOSED } from './syncFields'
 import { MENU_LINK_LABEL } from './menuLink'
-import { getCommunityNotifyRecipients, getReviewActionRecipients, listCommunities } from './communityStore'
-import type { JobAlert } from './jobRuns'
+import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -667,107 +666,16 @@ async function sendCommunityStatusChangeDigest(communitySlug: string, changes: S
   })
 }
 
-/** One suggestion a watch put in the queue, for its digest below. */
+/** One suggestion a watch found, as its dry run lists it. */
 export type WatchDigestItem = { name: string; what: string }
 
-/** Where a watch's suggestions wait on the Watches tab (watchFindings.ts),
- *  by its admin path and its name ("Synagogues"); no name, the tab. */
-export type WatchDigestPage = { path: string; name: string }
-
 /**
- * One email per watch run listing the suggestions it filed, instead of one
- * email per suggestion: a first run can file dozens. Sent only when the run
- * filed something, so a quiet day is silent. With `page`, they wait on that
- * job's page (step 6, Oct 21) and the email links there; without one (a
- * watch no job reads), in the moderation queue.
+ * The nightly email (nightlyEmail.ts, Nov 12): one a night per community,
+ * in place of the email every watch and job used to send of its own.
  */
-export async function sendWatchDigest(communitySlug: string, source: string, items: WatchDigestItem[], page?: WatchDigestPage): Promise<void> {
-  if (items.length === 0) return
+export async function sendNightlyEmail(communitySlug: string, email: { subject: string; html: string }): Promise<void> {
   const to = await notificationRecipients(communitySlug)
-  const rows = items
-    .map(
-      (i) => `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${escapeHtml(i.name)}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${escapeHtml(i.what)}</td>
-      </tr>`,
-    )
-    .join('')
-  const admin = adminAppUrl()
-  await sendEmail({
-    to,
-    subject: items.length === 1 ? `${source}: ${items[0].name}` : `${source}: ${items.length} suggestions to check`,
-    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
-      <h2 style="color:#1d4ed8;font-size:18px;">${escapeHtml(source)}</h2>
-      <p style="color:#334155;font-size:14px;">These are waiting ${page ? 'on To do' : 'in the moderation queue'}. Each one quotes what it was read from. Nothing changes until you approve it.</p>
-      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
-      ${admin ? `<p style="font-size:13px;"><a href="${admin}${page ? escapeHtml(page.path) : ''}" style="color:#1d4ed8;">${page ? (page.path.includes('/place/') ? 'Open it' : 'Open To do') : 'Open the moderation queue'}</a></p>` : ''}
-    </div>`,
-  })
-}
-
-/** A watch that just broke, or just started working again. */
-export type WatchHealthAlert = { label: string; url: string; alert: 'broke' | 'recovered'; error?: string | null }
-
-/**
- * Tells the admins a watch stopped working, or works again. Sent on the
- * change only, never daily while it stays broken: the Watches tab carries
- * the state in between. A watch that breaks quietly leaves the guide stale
- * with a calm-looking queue, which is why this exists.
- */
-export async function sendWatchHealthAlert(communitySlug: string, alerts: WatchHealthAlert[]): Promise<void> {
-  if (alerts.length === 0) return
-  const to = await notificationRecipients(communitySlug)
-  const broke = alerts.filter((a) => a.alert === 'broke')
-  const rows = alerts
-    .map(
-      (a) => `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;"><a href="${escapeHtml(a.url)}" style="color:#1d4ed8;">${escapeHtml(a.label)}</a></td>
-        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:${a.alert === 'broke' ? '#b91c1c' : '#15803d'};">${
-          a.alert === 'broke' ? `Stopped working: ${escapeHtml(a.error ?? 'unknown error')}` : 'Working again'
-        }</td>
-      </tr>`,
-    )
-    .join('')
-  const admin = adminAppUrl()
-  await sendEmail({
-    to,
-    subject:
-      broke.length > 0
-        ? `${broke.length === 1 ? broke[0].label : `${broke.length} watches`} stopped working`
-        : `${alerts.length === 1 ? alerts[0].label : `${alerts.length} watches`} working again`,
-    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
-      <h2 style="color:#1d4ed8;font-size:18px;">Watches</h2>
-      <p style="color:#334155;font-size:14px;">The pages the guide reads on its own to stay current. While a watch is broken, the guide isn't hearing from that page. You'll get one email when it works again.</p>
-      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
-      ${admin ? `<p style="font-size:13px;"><a href="${admin}/${encodeURIComponent(communitySlug)}/admin/watches" style="color:#1d4ed8;">Open the Watches tab</a></p>` : ''}
-    </div>`,
-  })
-}
-
-/**
- * A nightly job that stopped working, or works again (jobRuns.ts,
- * jobAlert): once each way, as a watch. The jobs run for the whole site,
- * so it goes once to every community's admins together, with the first
- * community's Watches tab, where every community sees the same runs.
- */
-export async function sendJobAlert(alert: JobAlert): Promise<void> {
-  const communities = await listCommunities()
-  const to = [...new Set((await Promise.all(communities.map((c) => notificationRecipients(c.slug)))).flat())]
-  if (to.length === 0) return
-  const color = alert.broke ? '#b91c1c' : '#15803d'
-  const rows = alert.lines.map((l) => `<li style="margin:4px 0;color:${color};">${escapeHtml(l)}</li>`).join('')
-  const admin = adminAppUrl()
-  const tab = admin && communities[0] ? `${admin}/${encodeURIComponent(communities[0].slug)}/admin/watches` : null
-  await sendEmail({
-    to,
-    subject: alert.broke ? `Nightly job stopped working: ${alert.name}` : `Nightly job working again: ${alert.name}`,
-    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
-      <h2 style="color:#1d4ed8;font-size:18px;">${escapeHtml(alert.name)}</h2>
-      <ul style="font-size:14px;padding-left:18px;">${rows}</ul>
-      ${alert.broke ? '<p style="color:#334155;font-size:14px;">You&rsquo;ll get one email when it works again.</p>' : ''}
-      ${tab ? `<p style="font-size:13px;"><a href="${tab}" style="color:#1d4ed8;">Open the Watches tab</a></p>` : ''}
-    </div>`,
-  })
+  await sendEmail({ to, subject: email.subject, html: email.html })
 }
 
 /**

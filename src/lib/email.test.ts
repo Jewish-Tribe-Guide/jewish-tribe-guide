@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendJobAlert, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification, sendWatchDigest } from './email'
+import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNightlyEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -798,30 +798,17 @@ describe('sendStatusChangeDigest — the body', () => {
   })
 })
 
-// Step 6 (Oct 21): a watch's findings wait on its job's page, not the
-// queue, so its email has to send the admin there.
-describe('sendWatchDigest — where the suggestions wait', () => {
+// One email a night per community (Nov 12, nightlyEmail.ts) goes to that
+// community's admins, as every per-watch email before it did.
+describe('sendNightlyEmail — to the community’s admins', () => {
   const h = harness()
-  beforeEach(() => {
-    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
-    vi.stubEnv('APP_URL', 'https://guide.example')
-  })
+  beforeEach(() => mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com']))
 
-  it('names and links the job page they wait on', async () => {
-    await sendWatchDigest('philly', 'Refuah', [{ name: 'HUP', what: 'Kosher food: a new contact' }], { path: '/philly/admin/watches/place/h1?from=todo', name: 'Hospitals' })
-    const { html } = h.last()
-    expect(html).toContain('waiting on To do')
-    expect(html).toContain('href="https://guide.example/philly/admin/watches/place/h1?from=todo"')
-    expect(html).toContain('Open it')
-    expect(html).not.toContain('moderation queue')
-    // A list's findings span places: To do itself.
-    await sendWatchDigest('philly', 'Keystone', [{ name: 'HUP', what: 'Hechsher' }], { path: '/philly/admin', name: '' })
-    expect(h.last().html).toContain('Open To do')
-  })
-
-  it('without a job page, says the moderation queue', async () => {
-    await sendWatchDigest('philly', 'Somewhere’s website', [{ name: 'Somewhere', what: 'Hours' }])
-    expect(h.last().html).toContain('waiting in the moderation queue')
+  it('sends the subject and body it is given to that community’s admins', async () => {
+    await sendNightlyEmail('philly', { subject: 'Philly Jewish Guide · Nightly watches: 5 to check', html: '<p>hi</p>' })
+    expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('philly')
+    expect(h.last()).toMatchObject({ to: ['admin@example.com'], html: '<p>hi</p>' })
+    expect(h.last().subject).toContain('Nightly watches: 5 to check')
   })
 })
 
@@ -858,35 +845,3 @@ describe('user-supplied text never reaches an inbox as live HTML', () => {
   })
 })
 
-// A nightly job runs for every community at once, so its email goes to every
-// community's admins, and once to someone who admins two.
-describe('sendJobAlert — a nightly job broke or works again', () => {
-  const h = harness()
-  beforeEach(() => {
-    mockListCommunities.mockResolvedValue([{ slug: 'philly' }, { slug: 'ues' }])
-    mockGetCommunityNotifyRecipients.mockImplementation(async (slug: string) =>
-      slug === 'philly' ? ['both@example.com', 'philly@example.com'] : ['both@example.com', 'ues@example.com'],
-    )
-  })
-  afterEach(() => mockGetCommunityNotifyRecipients.mockReset())
-
-  it('one email to every community’s admins, each once', async () => {
-    await sendJobAlert({ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 24: stopped before it finished'] })
-    expect(h.last().to).toEqual(['both@example.com', 'philly@example.com', 'ues@example.com'])
-  })
-
-  it('says it broke, why, and that one more email comes when it works', async () => {
-    await sendJobAlert({ job: 'watches', name: 'Watches', broke: true, lines: ['Oct 24: Google <answered> 403'] })
-    const { subject, html } = h.last()
-    expect(subject).toBe('Nightly job stopped working: Watches')
-    expect(html).toContain('Oct 24: Google &lt;answered&gt; 403')
-    expect(html).toMatch(/one email when it works again/)
-  })
-
-  it('says it works again', async () => {
-    await sendJobAlert({ job: 'walk-routes', name: 'Walks', broke: false, lines: ['Oct 24: working again (Worked out 12 walks)'] })
-    const { subject, html } = h.last()
-    expect(subject).toBe('Nightly job working again: Walks')
-    expect(html).not.toMatch(/when it works again/)
-  })
-})

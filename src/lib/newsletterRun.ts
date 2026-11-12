@@ -6,8 +6,6 @@
 import { createHash } from 'node:crypto'
 import { community as communityConfig } from '@/community.config'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { sendWatchDigest } from '@/lib/email'
-import { findingPage } from '@/lib/watchFindings'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -17,7 +15,7 @@ import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
 import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
 import { applyUpdate, changesAnything, type TimesUpdate } from '@/lib/scheduleUpdate'
-import { TIMES_PART_LABELS, partLines, splitParts, type PartSource } from '@/lib/timesParts'
+import { partLines, splitParts, type PartSource } from '@/lib/timesParts'
 import type { ScheduleSource } from '@/lib/scheduleReader'
 import type { SubmissionSource } from '@/lib/submissionSource'
 import { jobsOff } from '@/lib/jobOff'
@@ -302,16 +300,6 @@ async function readAndFile(
       [heading, f.lines.join('\n')].join('\n\n'),
       { name: NEWSLETTER_WATCH_NAME },
     )
-  }
-  if (filings.length) {
-    await sendWatchDigest(
-      community,
-      from,
-      filings.map((f) => ({ name: f.name, what: `${f.part ? `${TIMES_PART_LABELS[f.part.part]}: ` : ''}${f.lines.join('; ')}` })),
-      // A newsletter is one of its shul's sources: its findings wait on
-      // its shul, with the website's.
-      findingPage(community, shulCategory, shul.id),
-    ).catch((err) => console.error('[newsletter] digest failed:', err))
   }
   return filings.length
 }

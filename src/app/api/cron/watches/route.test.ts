@@ -14,8 +14,9 @@ const mockKeystone = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/keystoneRun', () => ({ runKeystoneWatch: mockKeystone }))
 const mockWebsite = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/websiteWatch', async (real) => ({ ...(await real<typeof import('@/lib/websiteWatch')>()), readWebsite: mockWebsite }))
-const mockAlert = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/email', () => ({ sendWatchHealthAlert: mockAlert }))
+// A watch that breaks is told of in the nightly email (Nov 12), from its
+// failingSince, not in an email of the run's own.
+vi.mock('@/lib/email', () => ({}))
 const mockEruvLines = vi.hoisted(() => vi.fn(async () => []))
 vi.mock('@/lib/eruvLineRun', () => ({ runEruvLines: mockEruvLines }))
 const mockSyncMenus = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
@@ -71,14 +72,13 @@ beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'test')
   delete process.env.CRON_SECRET
   mockUpdate.mockResolvedValue(undefined)
-  mockAlert.mockResolvedValue(undefined)
   mockKeystone.mockResolvedValue({ ok: true, entries: 54, findings: 0, filed: 0, closedOnGoogle: [] })
   mockWebsite.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
 })
 
 afterEach(() => {
   vi.unstubAllEnvs()
-  for (const m of [mockList, mockUpdate, mockKeystone, mockWebsite, mockAlert]) m.mockReset()
+  for (const m of [mockList, mockUpdate, mockKeystone, mockWebsite]) m.mockReset()
   recordedOutcomes.length = 0
   vi.restoreAllMocks()
 })
@@ -172,10 +172,9 @@ describe('/api/cron/watches', () => {
     expect(mockWebsite).toHaveBeenCalledWith('https://bzbi.org/worship/')
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(['k', 'site'])
     expect(mockUpdate.mock.calls.map(([, id]) => id)).toEqual(['k', 'site'])
-    expect(mockAlert).not.toHaveBeenCalled()
   })
 
-  it('keeps going past a watch that throws, records it as broken, and emails once', async () => {
+  it('keeps going past a watch that throws, and records when it broke, for the nightly email', async () => {
     mockList.mockResolvedValue({
       available: true,
       watches: [watch({ id: 'bad', kind: 'keystone_list', label: 'Keystone-K’s list' }), watch({ id: 'good' })],
@@ -185,23 +184,22 @@ describe('/api/cron/watches', () => {
     expect(mockWebsite).toHaveBeenCalled()
     const saved = mockUpdate.mock.calls.find(([, id]) => id === 'bad')![2]
     expect(saved).toMatchObject({ lastError: 'boom', failingSince: expect.any(String) })
-    expect(mockAlert).toHaveBeenCalledTimes(1)
-    expect(mockAlert.mock.calls[0][1]).toEqual([
-      { label: 'Keystone-K’s list', url: 'https://example.org/', alert: 'broke', error: 'boom' },
-    ])
   })
 
-  it('does not email again about a watch that was already broken', async () => {
+  // So it isn't in the next night's email again: that reads failingSince.
+  it('keeps when a watch already broken first broke', async () => {
     mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'bad', failingSince: '2026-10-05T07:00:00.000Z' })] })
     mockWebsite.mockResolvedValue({ ok: false, error: 'The page answered 403' })
     await GET(request())
-    expect(mockAlert).not.toHaveBeenCalled()
+    const saved = mockUpdate.mock.calls.find(([, id]) => id === 'bad')![2]
+    expect(saved).toMatchObject({ failingSince: '2026-10-05T07:00:00.000Z' })
   })
 
-  it('emails when a broken watch works again', async () => {
+  it('a broken watch that works again is no longer broken', async () => {
     mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'mended', failingSince: '2026-10-05T07:00:00.000Z' })] })
     await GET(request())
-    expect(mockAlert.mock.calls[0][1][0]).toMatchObject({ alert: 'recovered' })
+    const saved = mockUpdate.mock.calls.find(([, id]) => id === 'mended')![2]
+    expect(saved).toMatchObject({ failingSince: null })
   })
 
   it('runs Philadelphia’s Keystone-K list as before when migration 070 hasn’t been run', async () => {
