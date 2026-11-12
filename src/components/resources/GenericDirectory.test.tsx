@@ -1773,7 +1773,7 @@ function mockMobile() {
   })) as typeof window.matchMedia
 }
 
-describe('GenericDirectory — desktop category badge (morph target)', () => {
+describe('GenericDirectory — the page opens on its home tile\'s picture (boards H4, H5)', () => {
   afterEach(() => {
     // Restores vitest.setup.ts's own desktop-default stub — see its own
     // comment on why every other test in this file relies on that default.
@@ -1789,27 +1789,65 @@ describe('GenericDirectory — desktop category badge (morph target)', () => {
     })) as typeof window.matchMedia
   })
 
-  it('shows a 64px icon badge above the title on desktop', () => {
-    const category = makeCategory({ id: 'grocery', icon: '🛒' })
-    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
+  const PHOTO = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-icon/food.jpg'
+  const withPhoto = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', icon: '🛒', iconImageUrl: PHOTO })
+  const items = [makeListing({ id: 'a', name: 'Acme' }), makeListing({ id: 'b', name: 'Bravo' })]
+  const render = (category = withPhoto, extra: Record<string, unknown> = {}) =>
+    renderWithProviders(<GenericDirectory category={category} items={items} addressPrompt {...handlers} {...extra} />, {
+      content: { categories: [category] },
+    })
 
-    const badge = document.querySelector('[class*="h-16"][class*="w-16"]')
-    expect(badge).toBeInTheDocument()
+  it('on a computer: the tile\'s photo, the count, the title and where distances are from, with the search riding up onto it', () => {
+    render()
+    const hero = screen.getByTestId('category-hero')
+    // next/image rewrites the address; the picture's own URL is inside it.
+    expect(decodeURIComponent(hero.querySelector('img')!.getAttribute('src')!)).toContain('category-icon/food.jpg')
+    expect(within(hero).getByTestId('category-hero-count')).toHaveTextContent('2 places')
+    // The page's one h1, and it's the photo's.
+    const h1s = screen.getAllByRole('heading', { level: 1 })
+    expect(h1s).toHaveLength(1)
+    expect(hero).toContainElement(h1s[0])
+    expect(h1s[0]).toHaveTextContent('Grocery Stores')
+    expect(h1s[0]).not.toHaveClass('sr-only')
+    expect(within(hero).getByRole('button', { name: 'Use my location' })).toBeInTheDocument()
+    // The photo's box pulls what follows (the search) up onto it.
+    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('-75px')
+    expect(screen.getByTestId('category-ask-box')).toHaveClass('desktop:rounded-full')
+    // The round badge that sat on the old band is gone.
+    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
   })
 
-  it('renders no badge on mobile — that navigation has its own directional slide instead', () => {
+  it('a category with no picture gets its colour behind the words, not an empty photo', () => {
+    render(makeCategory({ id: 'networking', pluralLabel: 'Networking', icon: undefined }))
+    const hero = screen.getByTestId('category-hero')
+    expect(hero.querySelector('img')).toBeNull()
+    expect(within(hero).getByRole('heading', { level: 1, name: 'Networking' })).toBeInTheDocument()
+    expect(screen.queryByTestId('category-phone-picture')).not.toBeInTheDocument()
+  })
+
+  it('a listing opened on a computer has the top of the page: the short band, no words on it, nothing riding up', async () => {
+    const user = userEvent.setup()
+    render()
+    await user.click(screen.getByRole('button', { name: 'Expand Bravo' }))
+    const hero = screen.getByTestId('category-hero')
+    expect(hero.firstElementChild).toHaveClass('h-[132px]')
+    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('')
+    expect(within(hero).queryByTestId('category-hero-count')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Grocery Stores' })).toHaveClass('sr-only')
+  })
+
+  it('on a phone: the same picture, short, under the header, with no second title on it', () => {
     mockMobile()
-    const category = makeCategory({ id: 'grocery', icon: '🛒' })
-    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
-
-    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
-  })
-
-  it('renders no badge for a category with no icon — nothing to morph', () => {
-    const category = makeCategory({ id: 'networking', icon: undefined })
-    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
-
-    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
+    render()
+    expect(screen.queryByTestId('category-hero')).not.toBeInTheDocument()
+    const picture = screen.getByTestId('category-phone-picture')
+    expect(decodeURIComponent(picture.querySelector('img')!.getAttribute('src')!)).toContain('category-icon/food.jpg')
+    expect(picture).toHaveClass('h-[120px]', 'desktop:hidden')
+    expect(within(picture).queryByRole('heading')).toBeNull()
+    // The title is the header's; the page keeps one h1 for a screen reader.
+    const h1s = screen.getAllByRole('heading', { level: 1 })
+    expect(h1s).toHaveLength(1)
+    expect(h1s[0]).toHaveClass('sr-only')
   })
 })
 
@@ -2445,7 +2483,8 @@ describe('GenericDirectory — a listing opened on desktop', () => {
 
     await user.click(screen.getByRole('button', { name: 'Food' }))
     expect(screen.getByRole('searchbox')).toBeVisible()
-    expect(screen.getByRole('heading', { level: 1, name: 'Food' })).toHaveClass('desktop:not-sr-only')
+    // Back on the list, the title is on the photo again (board H4).
+    expect(screen.getByRole('heading', { level: 1, name: 'Food' })).not.toHaveClass('sr-only')
   })
 
   // Oct 6: it has the page, so it's a step the browser's Back undoes. It

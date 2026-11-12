@@ -96,6 +96,22 @@ describe('GenericListingCard — collapsed', () => {
     expect(screen.getByText('Grocery Store · 1 Main St, Philadelphia')).toBeInTheDocument()
   })
 
+  // Board H4 (Nov 11): a step bigger on a computer, to sit with the
+  // home's bigger cards; a phone's rows stay as they were.
+  it('is a step bigger on a computer: an 18px name and a 48px picture', () => {
+    const category = makeCategory()
+    renderWithProviders(
+      <GenericListingCard item={makeListing({ name: 'Acme Grocery' })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      { content: { categories: [category] } },
+    )
+    const name = screen.getByTestId('row-name')
+    expect(name).toHaveClass('desktop:text-[18px]')
+    expect(name).not.toHaveClass('text-[18px]')
+    const picture = document.querySelector('.desktop\\:h-12.desktop\\:w-12')
+    expect(picture).not.toBeNull()
+    expect(picture).toHaveClass('h-10', 'w-10')
+  })
+
   it('starts collapsed (aria-expanded=false) and expands on click', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
