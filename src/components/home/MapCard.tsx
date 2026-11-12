@@ -89,11 +89,10 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
         <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-slate-600">One map</p>
         <h2 className="text-[46px] font-extrabold leading-[1.05] text-ink">Everything on one map</h2>
         <p className="text-lg text-slate-700">{mapCardLine(categoryNames)}</p>
-        <span className="mt-2 inline-flex h-[52px] w-fit items-center gap-2 rounded-full bg-primary px-[26px] text-[17px] font-bold text-white transition-colors">
+        {/* No chevron on the button (the user, Nov 11): the words are the
+            action, and the whole card is the link. */}
+        <span data-testid="map-card-button" className="mt-2 inline-flex h-[52px] w-fit items-center rounded-full bg-primary px-[26px] text-[17px] font-bold text-white transition-colors">
           Open the map
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
         </span>
       </div>
     </Link>

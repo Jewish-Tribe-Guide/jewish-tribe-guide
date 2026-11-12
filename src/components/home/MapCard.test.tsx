@@ -40,6 +40,14 @@ describe('MapCard (board G3)', () => {
     expect(link.querySelectorAll('a, button')).toHaveLength(0)
   })
 
+  // No chevron on "Open the map" (the user, Nov 11): the button is its words.
+  it('“Open the map” is its words alone, no chevron', () => {
+    render(<MapCard href="/philly/map" photo={null} categoryNames={['Food']} />)
+    const button = screen.getByText('Open the map').closest('span')!
+    expect(button).toHaveTextContent(/^Open the map$/)
+    expect(button.querySelector('svg')).toBeNull()
+  })
+
   it('shows the admin’s photo', () => {
     render(<MapCard href="/philly/map" photo={{ url: 'https://example.com/city-hall.jpg', alt: '' }} categoryNames={[]} />)
     const img = screen.getByTestId('home-map-card-picture').querySelector('img')
