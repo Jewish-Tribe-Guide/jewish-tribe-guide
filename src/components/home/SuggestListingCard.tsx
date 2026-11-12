@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import ContributePicker from './ContributePicker'
+import { HOME_CARD_OUTLINE } from './AnswerCard'
 
 // ── Suggest a Listing, on its own after the map (board G5b, Nov 11) ─────────
 // The turn from using the guide to adding to it, so it stands alone rather
@@ -13,7 +14,7 @@ export default function SuggestListingCard() {
   const [open, setOpen] = useState(false)
 
   return (
-    <div data-testid="home-suggest" className="flex min-h-[240px] items-center gap-9 rounded-[18px] bg-white p-14 ring-1 ring-slate-900/5">
+    <div data-testid="home-suggest" className={`flex min-h-[240px] items-center gap-9 rounded-[18px] bg-white p-14 ${HOME_CARD_OUTLINE}`}>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-slate-500">Kept up by the community</p>
         <h3 className="mt-2.5 text-[38px] font-extrabold leading-[1.1] text-ink">Know a place we’re missing?</h3>

@@ -11,6 +11,7 @@ import { nearMiss, type AskResult } from '@/lib/askSearch'
 import type { Answer } from '@/lib/askAnswer'
 import type { SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
+import { HOME_CARD_OUTLINE } from '@/components/home/AnswerCard'
 import { routes } from '@/lib/routes'
 import { learnFrom } from '@/lib/askReader'
 import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
@@ -621,7 +622,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             return (
               <div
                 data-testid="browse-everything-card"
-                className="hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-8 ring-1 ring-slate-900/5"
+                className={`hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-8 ${HOME_CARD_OUTLINE}`}
               >
                   {/* Hardcoded — the user's own reference image titles this
                       "Explore by Category" with no small eyebrow label above

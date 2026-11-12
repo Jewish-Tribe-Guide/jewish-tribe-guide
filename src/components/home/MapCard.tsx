@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import type { MapCardPhoto } from '@/lib/siteSettings'
-import { LIFT_ON_HOVER } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 
 // ── "Everything on one map" — the computer home's map card (boards G3, then
 // G5b, the user, Nov 11). The words and a button on the left over a picture
@@ -54,7 +54,7 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
       href={href}
       onClick={onOpen}
       data-testid="home-map-card"
-      className={`relative flex h-[540px] overflow-hidden rounded-[18px] bg-primary/[0.06] ring-1 ring-slate-900/5 ${LIFT_ON_HOVER}`}
+      className={`relative flex h-[540px] overflow-hidden rounded-[18px] bg-primary/[0.06] ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
     >
       <div data-testid="home-map-card-picture" aria-hidden={photo ? undefined : true} className="absolute inset-0">
         {photo ? (

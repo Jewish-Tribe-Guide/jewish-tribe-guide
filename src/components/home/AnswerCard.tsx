@@ -10,9 +10,16 @@ import Link from 'next/link'
 // and just have hover"). These cards are computer-only; the phone keeps its
 // chevrons, having no hover to show it.
 
-/** The lift every computer-home card without a chevron shares on hover. */
+/** The outline every white card on the computer home carries all the time
+ *  (board J1b, the user, Nov 11): a quiet grey line, so each card reads as
+ *  its own box. It used to show only on hover, in blue. The photo tiles
+ *  have none: the picture is their edge. */
+export const HOME_CARD_OUTLINE = 'ring-1 ring-slate-300'
+
+/** The lift every computer-home card without a chevron shares on hover:
+ *  it rises, and its outline turns blue. */
 export const LIFT_ON_HOVER =
-  'transition-[box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] hover:ring-primary/35'
+  'transition-[box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] hover:ring-[1.5px] hover:ring-primary'
 
 export default function AnswerCard({
   href,
@@ -37,7 +44,7 @@ export default function AnswerCard({
       href={href}
       prefetch={prefetch}
       data-testid={testId}
-      className={`flex items-center gap-5 rounded-2xl bg-white px-7 py-7 ring-1 ring-slate-900/5 ${LIFT_ON_HOVER}`}
+      className={`flex items-center gap-5 rounded-2xl bg-white px-7 py-7 ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
     >
       <span aria-hidden="true" className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         {icon}

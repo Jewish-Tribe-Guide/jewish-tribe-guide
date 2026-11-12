@@ -7,7 +7,7 @@ import MobileSheet from '@/components/resources/MobileSheet'
 import ActionDialog from '@/components/resources/ActionDialog'
 import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
-import { LIFT_ON_HOVER } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 import { routes } from '@/lib/routes'
 import { sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
 import { fetchEruvStatuses, useEruvStatuses } from '@/lib/useEruvStatuses'
@@ -163,7 +163,7 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
         }}
         aria-haspopup="dialog"
         data-testid="desktop-trust-band"
-        className={`flex w-full cursor-pointer items-center gap-6 rounded-2xl bg-white px-6 py-5 text-left ring-1 ring-slate-900/5 ${LIFT_ON_HOVER}`}
+        className={`flex w-full cursor-pointer items-center gap-6 rounded-2xl bg-white px-6 py-5 text-left ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
       >
         <span className="flex shrink-0 items-center gap-3 border-r border-slate-200 pr-6">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">

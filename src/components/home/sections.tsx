@@ -234,8 +234,8 @@ const COLLAPSED_TILE_COUNT = 14
  *  storage thumbnail (falling back to the original if that fails, as
  *  CategoryIcon does); an admin-pasted URL from an unlisted host skips
  *  next/image's optimizer, which would throw on it. */
-function TilePhoto({ src }: { src: string }) {
-  const thumb = storageThumbnailUrl(src, 210)
+export function TilePhoto({ src, px = 210, sizes = '(min-width: 1200px) 210px, 18vw' }: { src: string; px?: number; sizes?: string }) {
+  const thumb = storageThumbnailUrl(src, px)
   const [failedThumb, setFailedThumb] = useState<string | null>(null)
   const useThumb = thumb !== null && failedThumb !== thumb
   return (
@@ -243,7 +243,7 @@ function TilePhoto({ src }: { src: string }) {
       src={useThumb ? thumb : src}
       alt=""
       fill
-      sizes="(min-width: 1200px) 210px, 18vw"
+      sizes={sizes}
       className="object-cover"
       unoptimized={useThumb || !isOptimizableImage(src)}
       onError={useThumb ? () => setFailedThumb(thumb) : undefined}

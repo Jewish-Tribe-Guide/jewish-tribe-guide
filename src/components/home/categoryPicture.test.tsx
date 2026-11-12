@@ -21,7 +21,7 @@ afterEach(() => {
 
 // A category has one picture, its banner (the user, Nov 11: "the picture can
 // just be the banner"). The computer home's tile shows it; a badge (the
-// phone tiles, search rows) is the line icon, never a picture or an emoji.
+// search rows) is the line icon, never a picture or an emoji.
 
 const PICTURE = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-band/food-pic.jpeg'
 const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', icon: '🍽️', cardBandImageUrl: PICTURE, cardImageUrl: 'https://images.unsplash.com/photo-older' })
@@ -78,14 +78,20 @@ describe('a category’s one picture on the home', () => {
     expect(container.textContent).not.toMatch(/🛒|🍽️/u)
   })
 
-  it('phone home: the category tiles draw the line icon, not the picture', () => {
+  // Board J2b (Nov 11): the phone tiles stay three across, each filled by
+  // the category's one picture with its name on it. With no picture, the
+  // tint and the line icon, never the emoji.
+  it('phone home: a tile is the category’s picture with its name on it; no picture keeps the line icon', () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [] }))))
     const { container } = renderWithProviders(
       <CategoryTiles communitySlug="philly" listings={[makeListing({ id: 'a', category: 'restaurant' }), makeListing({ id: 'b', category: 'grocery' })]} />,
       { content: { categories: [food, grocery], homeSections: [] } },
     )
-    expect(pictureIn(container, '/philly/restaurant')).toBeNull()
+    expect(pictureIn(container, '/philly/restaurant')).toContain('category-band/food-pic')
+    expect(container.querySelector('a[href="/philly/restaurant"] [data-testid="tile-name"]')).toHaveTextContent('Food')
+    expect(container.querySelector('a[href="/philly/restaurant"] [data-testid="tile-glyph"]')).toBeNull()
     expect(pictureIn(container, '/philly/grocery')).toBeNull()
+    expect(container.querySelector('a[href="/philly/grocery"] [data-testid="tile-glyph"] svg')).not.toBeNull()
     expect(container.textContent).not.toMatch(/🛒|🍽️/u)
   })
 })

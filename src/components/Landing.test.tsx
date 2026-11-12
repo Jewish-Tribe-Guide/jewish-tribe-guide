@@ -189,14 +189,15 @@ describe('Landing', () => {
     )
 
     const tiles = within(screen.getByTestId('category-tiles'))
-    // Each tile: its icon and its name, nothing after it.
+    // Each tile: its picture and its name, nothing after it.
     const order = ['n', 'm', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
     expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}$`))))
     expect(tiles.getAllByRole('list')).toHaveLength(1)
     expect(tiles.queryAllByRole('heading')).toHaveLength(0)
     expect(screen.queryByText('Also:')).not.toBeInTheDocument()
     expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
-    expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(0)
+    // Board J2b (Nov 11): each tile is the category's picture, one per tile.
+    expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(order.length)
   })
 
   // Search takes you to the page (Oct 13): typing shows where it could go,

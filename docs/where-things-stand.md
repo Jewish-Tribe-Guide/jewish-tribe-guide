@@ -354,7 +354,7 @@ The user's answers on Nov 10, evening, and what was done with them:
     column stays, no migration) and its upload route is deleted, so the
     soft 612px icon pictures on dev no longer show anywhere. Forms keep
     their emoji Icon field. Changes to earlier decisions: home badges
-    (phone tiles, search rows) no longer show a category picture, and
+    (search rows) no longer show a category picture, and
     Food's page now opens on its banner rather than the picture set as its
     icon.
   - **No more flying picture** (the user, Nov 11: "when I click on a
@@ -362,17 +362,20 @@ The user's answers on Nov 10, evening, and what was done with them:
     Nov 11: the home tile and the category page's photo no longer share a
     view-transition name, so the page just appears. Change to H4 as built
     (the tile used to grow into the photo).
-  - **Drawn Nov 11, not built until the user OKs one** (canvas row
-    "Outlined cards on the computer · photo tiles on the phone"):
-    - J1 / J1b: every white card on the computer home carries a lining all
-      the time, soft blue (J1, the hover colour today) or quiet grey (J1b);
-      under the pointer it lifts and the lining goes full blue. The photo
-      tiles stay unlined.
-    - J2 / J2b: the phone home's tiles stay three across, each filled by
-      the category's picture, the name under it (J2) or on it over a dark
-      fade (J2b). Changes the Oct 17 decision ("not the old photo tiles:
-      stock photos, one download each"): every category becomes a picture
-      download, which the home's 600 KB image budget would have to fit.
+  - **Outlined cards on the computer, photo tiles on the phone** (boards
+    J1b and J2b, the user's "J1b and J2b"). BUILT Nov 11:
+    - J1b: every white card on the computer home (Next minyan, Before
+      candles, the map card, the trust band, Suggest a listing, the Explore
+      box) carries a quiet grey outline all the time; under the pointer it
+      lifts and the outline goes blue. One constant, `HOME_CARD_OUTLINE`.
+      The photo tiles stay unoutlined. J1 (soft blue) not built.
+    - J2b: the phone home's tiles stay three across, each filled by the
+      category's one picture (banner, else card photo) with its name on it
+      over a dark fade. A category with no picture keeps its tint and line
+      icon. A long name grows its row rather than being cut. Change to the
+      Oct 17 decision ("not the old photo tiles"): every tile is now a
+      picture download (120px thumbnails from storage), inside the home's
+      600 KB image budget. J2 (name under the picture) not built.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three
