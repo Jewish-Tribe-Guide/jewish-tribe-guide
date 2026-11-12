@@ -302,7 +302,9 @@ The user's answers on Nov 10, evening, and what was done with them:
     with a minyan field, Food on dev, instead of the shuls page the
     schedule reads. The map card's picture came after (below).
   - **Computer home, more room** (board G5c, the user, Nov 11: "Yes, build
-    G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), the
+    G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), now 48px
+    (the user, Nov 11, once the cards were outlined: the gaps read too
+    big; "you can fix the gaps too"), the
     first still 32px under the trust strip. "Know a place we're missing?"
     is a 240px-tall section with a 38px heading, bigger line and a 56px
     button; the navy Stay in the Loop box is 260px tall with a 38px
@@ -397,6 +399,15 @@ The user's answers on Nov 10, evening, and what was done with them:
       mobile"). The computer's footer is a white band (K2).
     - Drawn, not built: K1 (names at the bottom in the box) and K1b (K1c
       with icons and the heading inside the box).
+  - **The eruv line on the computer's Shabbos card** (board L1, the user,
+    Nov 11: "Yes, build L1"). BUILT Nov 11. From erev Shabbos or Yom Tov
+    to havdalah (the same window as the phone's candles card), the This
+    Shabbos card carries the phone's eruv line along its bottom, in a
+    light grey band: the nearest eruv by name with a location, the summary
+    without one, one that's down named first. The line is its own link to
+    the Eruv page; the rest of the card still opens Zmanim, so on those
+    days the card is a box holding two links. Weekdays: no line, one link.
+    No line without an Eruv page.
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three

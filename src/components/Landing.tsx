@@ -749,9 +749,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             })
           }
 
-          // Board G5c (Nov 11): 72px between the stops, so each reads as
-          // one thing; the first stays 32px under the trust strip, which
-          // bridges into it. The margins collapse, so a gap is 72px, not 144.
+          // Board G5c (Nov 11) set 72px between the stops; 48px once the cards
+          // had outlines of their own (J1b, the user Nov 11: the gaps read too
+          // big). The first stays 32px under the trust strip, which bridges
+          // into it. The margins collapse, so a gap is 48px, not 96.
           return rows.map((row, i) => (
             <div
               key={row.key}
@@ -759,7 +760,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
               // desktop: only. The rows draw nothing on a phone, and their
               // margins collapsed through into 72px of empty space above
               // Right now (board K1c, Nov 11, the user: tighten it).
-              className={i === 0 ? 'desktop:mt-8 desktop:mb-[72px]' : 'desktop:my-[72px]'}
+              className={i === 0 ? 'desktop:mt-8 desktop:mb-12' : 'desktop:my-12'}
             >
               {row.node}
             </div>

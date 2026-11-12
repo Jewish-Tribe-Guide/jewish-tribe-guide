@@ -647,16 +647,16 @@ describe('Landing', () => {
       expect(screen.queryByTestId('home-suggest')).not.toBeInTheDocument()
     })
 
-    // Board G5c (Nov 11): 72px between the stops; the first 32px under the
+    // Board G5c (Nov 11), tightened once the cards were outlined: 48px between the stops; the first 32px under the
     // trust strip, which bridges into it. (jsdom has no layout, so this
     // checks the classes; the gaps themselves were measured on dev.) On the
     // computer only: the rows draw nothing on a phone, and their margins
     // collapsed into 72px of empty space above Right now (board K1c).
-    it('puts 72px between the rows, and 32px above the first, on the computer only', () => {
+    it('puts 48px between the rows, and 32px above the first, on the computer only', () => {
       const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
       const rows = [...container.querySelectorAll('[data-spot^="cards"]')]
-      expect(rows[0]).toHaveClass('desktop:mt-8', 'desktop:mb-[72px]')
-      for (const row of rows.slice(1)) expect(row).toHaveClass('desktop:my-[72px]')
+      expect(rows[0]).toHaveClass('desktop:mt-8', 'desktop:mb-12')
+      for (const row of rows.slice(1)) expect(row).toHaveClass('desktop:my-12')
       for (const row of rows) expect(row.className.split(/\s+/).filter((c) => /^(m[tby]?)-/.test(c))).toEqual([])
     })
 
