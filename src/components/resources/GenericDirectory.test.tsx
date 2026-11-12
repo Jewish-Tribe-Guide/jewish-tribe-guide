@@ -233,11 +233,12 @@ async function chooseSort(user: ReturnType<typeof userEvent.setup>, choice: 'Pop
   await user.click(screen.getByRole('menuitemradio', { name: choice }))
 }
 
-// Synagogues' "By synagogue | By time" (MinyanSwitch): its two halves.
+// Synagogues' "Synagogue | Minyan" (MinyanSwitch; "By synagogue | By
+// time" until later on Nov 11): its two halves.
 // Wherever the view is showing, the switch is its heading's, and the
 // list's heading isn't there; one switch on the page either way.
 const minyanSwitch = () => screen.getByTestId('minyan-switch')
-const byTimeButton = () => within(minyanSwitch()).getByRole('button', { name: 'By time' })
+const byTimeButton = () => within(minyanSwitch()).getByRole('button', { name: 'Minyan' })
 const listButton = () => within(minyanSwitch()).getAllByRole('button')[0]
 
 const handlers = {
@@ -976,10 +977,10 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
-    // The switch says "By <place>", in the category's own word, on the
+    // The switch says "<Place>", in the category's own word, on the
     // list's heading; the green card above the search is gone.
     expect(within(screen.getByTestId('list-heading')).getByTestId('minyan-switch')).toBeInTheDocument()
-    expect(listButton()).toHaveTextContent(`By ${shulCategory().label.toLowerCase()}`)
+    expect(listButton()).toHaveTextContent(new RegExp(`^${shulCategory().label}$`))
     expect(listButton()).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
   })
@@ -2227,14 +2228,16 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     // The plain switch (the user, Nov 11): no count on "By time", and the
     // view says nothing of how many are left ("we don't need to say how
     // many minyanim left today").
-    // And "By synagogue", not "3 synagogues" (the user, Nov 11).
-    it('counts nothing: "By <place> | By time", and no count in the view', async () => {
+    // And "By synagogue", not "3 synagogues" (the user, Nov 11); then, the
+    // same day, "Synagogue | Minyan", no "By" ("take out 'by' and replace
+    // time with minyan").
+    it('counts nothing: "<Place> | Minyan", and no count in the view', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      expect(listButton()).toHaveTextContent(new RegExp(`^By ${shulCategory.label.toLowerCase()}$`))
-      expect(byTimeButton()).toHaveTextContent(/^By time$/)
+      expect(listButton()).toHaveTextContent(new RegExp(`^${shulCategory.label}$`))
+      expect(byTimeButton()).toHaveTextContent(/^Minyan$/)
       // Picked is the site's blue, as Sort's and the filters' choices are (Nov 11).
       expect(listButton().className).toMatch(/\bbg-primary\b/)
       await user.click(byTimeButton())
@@ -2636,12 +2639,12 @@ describe('GenericDirectory — the Minyanim tab', () => {
     expect(screen.queryByText('shacharis tomorrow')).not.toBeInTheDocument()
   })
 
-  it('the switch’s “By synagogue” goes back from the Minyanim view to the list of shuls', async () => {
+  it('the switch’s “Synagogue” goes back from the Minyanim view to the list of shuls', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onParamsChange = vi.fn()
     renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
     expect(screen.getByTestId('minyanim-view')).toBeVisible()
-    await user.click(within(minyanSwitch()).getByRole('button', { name: `By ${shulCat.label.toLowerCase()}` }))
+    await user.click(within(minyanSwitch()).getByRole('button', { name: shulCat.label }))
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
     expect(screen.getByText('Aleph Shul')).toBeVisible()
   })

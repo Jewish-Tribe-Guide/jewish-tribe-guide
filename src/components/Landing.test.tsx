@@ -193,7 +193,9 @@ describe('Landing', () => {
     const order = ['n', 'm', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
     expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}$`))))
     expect(tiles.getAllByRole('list')).toHaveLength(1)
-    expect(tiles.queryAllByRole('heading')).toHaveLength(0)
+    // One heading, the small label over the box (board K1c, Nov 11); no
+    // group headings among the tiles.
+    expect(tiles.getAllByRole('heading').map((h) => h.textContent)).toEqual(['Explore by Category'])
     expect(screen.queryByText('Also:')).not.toBeInTheDocument()
     expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
     // Board J2b (Nov 11): each tile is the category's picture, one per tile.
@@ -647,12 +649,15 @@ describe('Landing', () => {
 
     // Board G5c (Nov 11): 72px between the stops; the first 32px under the
     // trust strip, which bridges into it. (jsdom has no layout, so this
-    // checks the classes; the gaps themselves were measured on dev.)
-    it('puts 72px between the rows, and 32px above the first', () => {
+    // checks the classes; the gaps themselves were measured on dev.) On the
+    // computer only: the rows draw nothing on a phone, and their margins
+    // collapsed into 72px of empty space above Right now (board K1c).
+    it('puts 72px between the rows, and 32px above the first, on the computer only', () => {
       const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
       const rows = [...container.querySelectorAll('[data-spot^="cards"]')]
-      expect(rows[0]).toHaveClass('mt-8', 'mb-[72px]')
-      for (const row of rows.slice(1)) expect(row).toHaveClass('my-[72px]')
+      expect(rows[0]).toHaveClass('desktop:mt-8', 'desktop:mb-[72px]')
+      for (const row of rows.slice(1)) expect(row).toHaveClass('desktop:my-[72px]')
+      for (const row of rows) expect(row.className.split(/\s+/).filter((c) => /^(m[tby]?)-/.test(c))).toEqual([])
     })
 
     // Board G5b (Nov 11): Categories, the two answer cards side by side,
@@ -739,7 +744,7 @@ describe('Landing', () => {
       // The card's heading is a hardcoded "Explore by Category" now (the
       // user's own reference image), not settings.desktopBrowseHeading —
       // see Landing.tsx's own comment on why.
-      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       // Both cards render as siblings under the ONE "Browse everything"
       // card — not under their own admin-configured section titles ("Food
       // and Hospitality", etc.), which is what "flat" means here.
@@ -770,9 +775,9 @@ describe('Landing', () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
-      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
-      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
     })
 
     it('tracks category_opened with source "grid" on a card click', async () => {

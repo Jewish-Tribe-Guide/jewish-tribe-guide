@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { CategoryTileRow, CompactCardGrid } from './sections'
 import type { CardDef } from './sections'
-import CategoryTiles from './CategoryTiles'
+import CategoryTiles, { HOME_LABEL, TILE_BOX } from './CategoryTiles'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -79,19 +79,39 @@ describe('a category’s one picture on the home', () => {
   })
 
   // Board J2b (Nov 11): the phone tiles stay three across, each filled by
-  // the category's one picture with its name on it. With no picture, the
-  // tint and the line icon, never the emoji.
-  it('phone home: a tile is the category’s picture with its name on it; no picture keeps the line icon', () => {
+  // the category's one picture with its name on it. Board K1c (later that
+  // day): the name in the middle, and no icon on a tile with no picture,
+  // just its tint and its name ("It feels childish").
+  it('phone home: a tile is the category’s picture with its name in the middle; no picture is its tint and name, no icon', () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [] }))))
     const { container } = renderWithProviders(
       <CategoryTiles communitySlug="philly" listings={[makeListing({ id: 'a', category: 'restaurant' }), makeListing({ id: 'b', category: 'grocery' })]} />,
       { content: { categories: [food, grocery], homeSections: [] } },
     )
+    const foodTile = container.querySelector('a[href="/philly/restaurant"]')!
+    const groceryTile = container.querySelector('a[href="/philly/grocery"]')!
     expect(pictureIn(container, '/philly/restaurant')).toContain('category-band/food-pic')
-    expect(container.querySelector('a[href="/philly/restaurant"] [data-testid="tile-name"]')).toHaveTextContent('Food')
-    expect(container.querySelector('a[href="/philly/restaurant"] [data-testid="tile-glyph"]')).toBeNull()
+    expect(foodTile.querySelector('[data-testid="tile-name"]')).toHaveTextContent('Food')
+    for (const tile of [foodTile, groceryTile]) {
+      expect(tile.className).toMatch(/\bitems-center\b/)
+      expect(tile.className).toMatch(/\bjustify-center\b/)
+      expect(tile.querySelector('svg')).toBeNull()
+    }
     expect(pictureIn(container, '/philly/grocery')).toBeNull()
-    expect(container.querySelector('a[href="/philly/grocery"] [data-testid="tile-glyph"] svg')).not.toBeNull()
+    expect(groceryTile.querySelector('[data-testid="tile-name"]')).toHaveTextContent('Grocery')
     expect(container.textContent).not.toMatch(/🛒|🍽️/u)
+  })
+
+  // K1c: the tiles sit in one white box under a small label, Right now's.
+  it('phone home: the tiles sit in one white box under the small “Explore by Category” label', () => {
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [] }))))
+    renderWithProviders(
+      <CategoryTiles communitySlug="philly" listings={[makeListing({ id: 'a', category: 'restaurant' })]} />,
+      { content: { categories: [food, grocery], homeSections: [] } },
+    )
+    const section = screen.getByTestId('category-tiles')
+    const heading = within(section).getByRole('heading', { name: 'Explore by Category' })
+    expect(heading.className).toBe(HOME_LABEL)
+    expect(within(section).getByRole('list').className).toContain(TILE_BOX)
   })
 })

@@ -5,12 +5,13 @@ import type { DirectoryResource, ZmanimData } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { LatLng } from '@/lib/geo'
-import { getCategoryColor } from '@/lib/categoryColor'
+import { getCategoryTilePhoto } from '@/lib/categoryColor'
 import { fixedViewSlug, routes } from '@/lib/routes'
 import { shabbosMoment } from '@/lib/todayHome'
 import { openNowRows, rightNowDay } from '@/lib/phoneHome'
 import { ChevronRightIcon } from '@/components/icons'
-import CategoryIcon from '@/components/CategoryIcon'
+import { TilePhoto } from './sections'
+import { HOME_LABEL } from './CategoryTiles'
 import { BeforeCandles, CandlesCard } from './TodayBlocks'
 import FridayEruv from './FridayEruv'
 
@@ -68,7 +69,17 @@ export default function RightNow(props: Props) {
         {rows.map((row) => (
           <li key={row.category.id} className="border-t border-slate-100 first:border-t-0">
             <Link href={`${routes.slug(communitySlug, row.category.id)}?openNow=1`} prefetch={false} className="flex items-center gap-3 px-3.5 py-3 hover:bg-slate-50">
-              <CategoryIcon icon={row.category.icon} categoryId={row.category.id} color={getCategoryColor(categories as CategoryConfig[], row.category.id)} className="h-9 w-9 text-base" sizePx={36} />
+              {/* Board K1c (Nov 11): the category's own picture, the same as
+                  its tile below, not an icon ("It feels childish"). None
+                  when it has no picture. */}
+              {(() => {
+                const photo = getCategoryTilePhoto(categories as CategoryConfig[], row.category.id)
+                return photo ? (
+                  <span aria-hidden="true" data-testid="right-now-photo" className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[10px] bg-slate-200">
+                    <TilePhoto src={photo} px={44} sizes="44px" />
+                  </span>
+                ) : null
+              })()}
               <span className="min-w-0 flex-1">
                 <span className="block text-[13px] font-semibold text-slate-500">{row.category.pluralLabel}</span>
                 <span className="block text-[16px] font-extrabold leading-snug text-ink">{row.open} open now</span>
@@ -106,7 +117,7 @@ export default function RightNow(props: Props) {
   const day = rightNowDay(now, timezone)
   return (
     <section data-testid="right-now" data-moment={moment.kind} aria-labelledby="right-now-title">
-      <h2 id="right-now-title" className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">
+      <h2 id="right-now-title" className={HOME_LABEL}>
         Right now
         {day && <span className="font-semibold normal-case tracking-normal"> · {day}</span>}
       </h2>

@@ -4,7 +4,6 @@ import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { categoryTint, getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
-import { CategoryGlyph } from '@/lib/categoryIcons'
 import { BrowseFoot, useBrowseCards } from './BrowseAll'
 import { TilePhoto, type CardDef } from './sections'
 
@@ -34,12 +33,26 @@ export function mostListedFirst(cards: readonly CardDef[], counts: Record<string
 // photo tiles, which Oct 17 had set aside (one download each), so the
 // photos are small copies sized to the tile. A category with no picture is
 // its own tint with its line icon, the name dark under it.
+//
+// Board K1c (the user, Nov 11): the tiles sit in one white box under a
+// small "Explore by Category" label, the same as Right now's label and box
+// above, so the two halves of the home read as a pair. Each name is in the
+// middle of its tile ("I'm fighting my brain/eyes which wants to look
+// center"), over an even darkening rather than a fade at the bottom. No
+// icons on the home ("It feels childish"): a category with no picture is
+// its tint with its name in the middle.
+
+/** The phone home's label over a box (Right now, Explore by Category):
+ *  small, grey, capitals. */
+export const HOME_LABEL = 'mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500'
+/** The phone home's white box, Right now's and the tiles' alike. */
+export const TILE_BOX = 'rounded-2xl border border-slate-200 bg-white p-2.5'
 
 export default function CategoryTiles({ communitySlug, listings }: { communitySlug: string; listings: readonly DirectoryResource[] | null }) {
   const { categories, sections, counts } = useBrowseCards(communitySlug, listings)
   if (sections === null) {
     return (
-      <div aria-hidden="true" className="grid grid-cols-3 gap-2.5">
+      <div aria-hidden="true" className={`${TILE_BOX} grid grid-cols-3 gap-2`}>
         {Array.from({ length: 9 }, (_, i) => (
           <div key={i} className="aspect-square animate-pulse rounded-xl bg-slate-100" />
         ))}
@@ -48,8 +61,9 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
   }
   const cards = mostListedFirst(sections.flatMap((s) => s.cards), counts)
   return (
-    <div data-testid="category-tiles">
-      <ul className="grid grid-cols-3 gap-2.5">
+    <section data-testid="category-tiles" aria-labelledby="category-tiles-title">
+      <h2 id="category-tiles-title" className={HOME_LABEL}>Explore by Category</h2>
+      <ul className={`${TILE_BOX} grid grid-cols-3 gap-2`}>
         {cards.map((card) => {
           const cats = (categories ?? []) as CategoryConfig[]
           const photo = getCategoryTilePhoto(cats, card.id)
@@ -63,25 +77,21 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
               <Link
                 href={card.href}
                 prefetch={false}
-                className="relative flex aspect-square w-full flex-col justify-between rounded-xl p-2"
-                style={photo ? { backgroundColor: '#e2e8f0' } : { backgroundColor: categoryTint(color) }}
+                className="relative flex aspect-square w-full items-center justify-center rounded-xl p-1.5 text-center"
+                style={photo ? { backgroundColor: '#475569' } : { backgroundColor: categoryTint(color) }}
               >
-                {photo ? (
-                  <>
-                    {/* Clipped here, not on the tile: a box that hides its
-                        overflow can't grow past its aspect ratio. */}
-                    <span aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-xl">
-                      <TilePhoto src={photo} px={120} sizes="120px" />
-                      <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0)_35%,rgba(15,23,42,0.78)_100%)]" />
-                    </span>
-                    <span />
-                  </>
-                ) : (
-                  <span aria-hidden="true" className="flex justify-center pt-1" style={{ color: `color-mix(in oklab, ${color} 70%, #000)` }} data-testid="tile-glyph">
-                    <CategoryGlyph categoryId={card.id} className="h-8 w-8" />
+                {photo && (
+                  // Clipped here, not on the tile: a box that hides its
+                  // overflow can't grow past its aspect ratio.
+                  <span aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-xl">
+                    <TilePhoto src={photo} px={120} sizes="120px" />
+                    <span className="absolute inset-0 bg-slate-900/45" />
                   </span>
                 )}
-                <span data-testid="tile-name" className={`relative mt-1 text-[13.5px] font-bold leading-tight ${photo ? 'text-white' : 'text-ink'}`}>
+                <span
+                  data-testid="tile-name"
+                  className={`relative text-[14px] font-extrabold leading-tight ${photo ? 'text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.45)]' : 'text-ink'}`}
+                >
                   {card.title}
                 </span>
               </Link>
@@ -90,6 +100,6 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
         })}
       </ul>
       <BrowseFoot communitySlug={communitySlug} />
-    </div>
+    </section>
   )
 }

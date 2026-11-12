@@ -534,7 +534,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 just removing the one thing putting distance between the box
                 and its own answer. ─────────────────────────────────────── */}
         {!(isMobile && q) && (
-          <div className="mt-8">
+          <div className="mt-8 empty:hidden">
             <CampaignBannerCard />
           </div>
         )}
@@ -756,7 +756,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             <div
               key={row.key}
               data-spot={`cards ${row.key.split('-').map((k) => `card-${k}`).join(' ')}`}
-              className={i === 0 ? 'mt-8 mb-[72px]' : 'my-[72px]'}
+              // desktop: only. The rows draw nothing on a phone, and their
+              // margins collapsed through into 72px of empty space above
+              // Right now (board K1c, Nov 11, the user: tighten it).
+              className={i === 0 ? 'desktop:mt-8 desktop:mb-[72px]' : 'desktop:my-[72px]'}
             >
               {row.node}
             </div>

@@ -376,6 +376,27 @@ The user's answers on Nov 10, evening, and what was done with them:
       Oct 17 decision ("not the old photo tiles"): every tile is now a
       picture download (120px thumbnails from storage), inside the home's
       600 KB image budget. J2 (name under the picture) not built.
+  - **Phone home as board K1c, computer footer as K2** (the user, Nov 11:
+    "I like it" to K1c; K2 "I like the footer for desktop"). BUILT Nov 11:
+    - The tiles sit in one white box under a small "EXPLORE BY CATEGORY"
+      label, the same label and box as Right now's, so the home reads
+      label, box, label, box.
+    - Each name is in the middle of its tile, over an even darkening
+      ("I'm fighting my brain/eyes which wants to look center"). Changes
+      J2b's name at the bottom over a fade. The computer's tiles keep
+      theirs at the bottom.
+    - No icons on the phone home ("It feels childish"): a Right now row
+      shows its category's picture, the same as its tile, and none when it
+      has no picture; a tile with no picture is its tint and its name.
+      Changes this morning's "small badges stay icons" for these two spots.
+      The search lines keep their icons; not asked yet.
+    - The 72px gap above Right now is gone: it was the computer's spacing
+      between card rows (G5c) collapsing through the phone's empty copies.
+      Now 20px.
+    - The phone footer is unchanged (the user: "I'm ok with how it is for
+      mobile"). The computer's footer is a white band (K2).
+    - Drawn, not built: K1 (names at the bottom in the box) and K1b (K1c
+      with icons and the heading inside the box).
   - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
     user's "Let's do F1b for now"). A full-width band below the hero photo,
     not overlapping it: shield, the trust line, and the phone sheet's three
@@ -398,7 +419,7 @@ The user's answers on Nov 10, evening, and what was done with them:
     home-screen photo turns to mush at 32px; this is the separate picture
     chosen for the icon spot. Open: pictures for the other categories
     (Food is the only one so far, so it stands out among icons).
-- **"By synagogue | By time" replaces the green Minyanim card** (BUILT
+- **"Synagogue | Minyan" (first "By synagogue | By time") replaces the green Minyanim card** (BUILT
   Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
   drawn"). The list's heading is a two-part switch on phone and computer;
   By time is the Minyanim view at `?davening=1`, a history step as before.
@@ -413,6 +434,10 @@ The user's answers on Nov 10, evening, and what was done with them:
   dropped a toggle because "if we need a sign the toggle isn't
   noticeable"; reminded of that, they still chose plain. Held off for a
   look with real people: next minyan in rows, one map switch, side by side.
+  Renamed later on Nov 11 to "Synagogue | Minyan", no "By" (the user:
+  "take out 'by' and replace time with minyan"). Open, the user's call:
+  whether the switch should be the Filters button's height (it is 32px,
+  Filters 40px).
 - **Minyanim by time opens on the page whose places have minyanim** (fixed
   Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
   test project's Food was, ahead of Synagogues. The search's "next maariv"

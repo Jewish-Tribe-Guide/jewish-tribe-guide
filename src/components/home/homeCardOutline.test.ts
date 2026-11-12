@@ -29,3 +29,15 @@ describe('computer home card outline', () => {
     expect(src).not.toContain('ring-slate-900/5')
   })
 })
+
+// Board K2 (Nov 11): the computer's footer is a white band, so the page
+// ends; the phone keeps the page's grey (the user: "I'm ok with how it is
+// for mobile").
+describe('the footer', () => {
+  it('is white on the computer only', () => {
+    const src = read('../SiteFooter.tsx')
+    const footer = src.match(/<footer className="([^"]+)"/)![1]!.split(/\s+/)
+    expect(footer).toContain('desktop:bg-white')
+    expect(footer).not.toContain('bg-white')
+  })
+})

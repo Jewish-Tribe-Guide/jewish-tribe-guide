@@ -1,6 +1,6 @@
 'use client'
 
-// ── "By synagogue | By time": the list's two ways to read a page of shuls ───
+// ── "Synagogue | Minyan": the list's two ways to read a page of shuls ───
 // The Synagogues page's way in to every minyan by time (Nov 11, the user's
 // pick from the desk canvas, D1/D2). It replaced the green "Minyanim · 5
 // left today" card, which made the minyanim feel like a different thing on
@@ -12,6 +12,9 @@
 // No number on either half (the user, Nov 11: "By synagogue instead of the
 // number"): two ways to see the same places, worded alike, so it reads as a
 // choice rather than a count.
+//
+// Nov 11, later: "Synagogue | Minyan", no "By" (the user: "take out 'by'
+// and replace time with minyan").
 //
 // The view it turns on keeps its own address (`?davening=1`), so Back,
 // Forward and a reload land where the visitor was.
@@ -29,10 +32,10 @@ export default function MinyanSwitch({ singular, byTime, onChange }: Props) {
   return (
     <div role="group" aria-label="Show" data-testid="minyan-switch" className="inline-flex shrink-0 overflow-hidden rounded-full border border-slate-300">
       <button type="button" aria-pressed={!byTime} onClick={() => byTime && onChange(false)} className={part(!byTime)}>
-        By {singular.toLowerCase()}
+        {singular}
       </button>
       <button type="button" aria-pressed={byTime} onClick={() => !byTime && onChange(true)} className={part(byTime)}>
-        By time
+        Minyan
       </button>
     </div>
   )
