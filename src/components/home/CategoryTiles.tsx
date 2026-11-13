@@ -41,18 +41,23 @@ export function mostListedFirst(cards: readonly CardDef[], counts: Record<string
 // center"), over an even darkening rather than a fade at the bottom. No
 // icons on the home ("It feels childish"): a category with no picture is
 // its tint with its name in the middle.
+//
+// Board M1 (the user, Nov 12: "Build M1"): the white box round the tiles
+// is gone. The photos are cards already, so a card round them read as a
+// box in a box. The tiles sit on the page under their label, as wide as
+// Right now's card; the matching labels are what tie the two together.
 
 /** The phone home's label over a box (Right now, Explore by Category):
  *  small, grey, capitals. */
 export const HOME_LABEL = 'mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500'
-/** The phone home's white box, Right now's and the tiles' alike. */
-export const TILE_BOX = 'rounded-2xl border border-slate-200 bg-white p-2.5'
+/** The phone home's tiles: three across, straight on the page (M1). */
+export const TILE_GRID = 'grid grid-cols-3 gap-2'
 
 export default function CategoryTiles({ communitySlug, listings }: { communitySlug: string; listings: readonly DirectoryResource[] | null }) {
   const { categories, sections, counts } = useBrowseCards(communitySlug, listings)
   if (sections === null) {
     return (
-      <div aria-hidden="true" className={`${TILE_BOX} grid grid-cols-3 gap-2`}>
+      <div aria-hidden="true" className={TILE_GRID}>
         {Array.from({ length: 9 }, (_, i) => (
           <div key={i} className="aspect-square animate-pulse rounded-xl bg-slate-100" />
         ))}
@@ -63,7 +68,7 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
   return (
     <section data-testid="category-tiles" aria-labelledby="category-tiles-title">
       <h2 id="category-tiles-title" className={HOME_LABEL}>Explore by Category</h2>
-      <ul className={`${TILE_BOX} grid grid-cols-3 gap-2`}>
+      <ul className={TILE_GRID}>
         {cards.map((card) => {
           const cats = (categories ?? []) as CategoryConfig[]
           const photo = getCategoryTilePhoto(cats, card.id)

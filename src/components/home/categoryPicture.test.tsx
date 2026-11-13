@@ -6,7 +6,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { CategoryTileRow, CompactCardGrid } from './sections'
 import type { CardDef } from './sections'
-import CategoryTiles, { HOME_LABEL, TILE_BOX } from './CategoryTiles'
+import CategoryTiles, { HOME_LABEL, TILE_GRID } from './CategoryTiles'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -102,8 +102,9 @@ describe('a category’s one picture on the home', () => {
     expect(container.textContent).not.toMatch(/🛒|🍽️/u)
   })
 
-  // K1c: the tiles sit in one white box under a small label, Right now's.
-  it('phone home: the tiles sit in one white box under the small “Explore by Category” label', () => {
+  // K1c: a small label, Right now's. M1: no white box round the tiles,
+  // which are cards themselves (a box in a box).
+  it('phone home: the tiles sit on the page, no box round them, under the small “Explore by Category” label', () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [] }))))
     renderWithProviders(
       <CategoryTiles communitySlug="philly" listings={[makeListing({ id: 'a', category: 'restaurant' })]} />,
@@ -112,6 +113,8 @@ describe('a category’s one picture on the home', () => {
     const section = screen.getByTestId('category-tiles')
     const heading = within(section).getByRole('heading', { name: 'Explore by Category' })
     expect(heading.className).toBe(HOME_LABEL)
-    expect(within(section).getByRole('list').className).toContain(TILE_BOX)
+    const list = within(section).getByRole('list')
+    expect(list.className).toBe(TILE_GRID)
+    expect(list.className).not.toMatch(/\b(bg-white|border|rounded-2xl|p-2\.5)\b/)
   })
 })

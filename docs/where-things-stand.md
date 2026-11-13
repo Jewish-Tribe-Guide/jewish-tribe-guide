@@ -383,6 +383,12 @@ The user's answers on Nov 10, evening, and what was done with them:
     - The tiles sit in one white box under a small "EXPLORE BY CATEGORY"
       label, the same label and box as Right now's, so the home reads
       label, box, label, box.
+      Changed Nov 12 (board M1, the user: "Build M1"): the white box
+      round the tiles is gone. The photo tiles are cards themselves, so
+      it read as a box in a box. The tiles sit on the grey page under
+      their label, as wide as Right now's card, which keeps its box.
+      Drawn, not built: M2 (white page) and M3 (white page, Right now as
+      bare rows).
     - Each name is in the middle of its tile, over an even darkening
       ("I'm fighting my brain/eyes which wants to look center"). Changes
       J2b's name at the bottom over a fade. The computer's tiles keep

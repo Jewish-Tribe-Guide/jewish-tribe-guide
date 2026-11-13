@@ -176,7 +176,7 @@ test.describe('on a phone', () => {
     const tiles = page.getByTestId('category-tiles')
     await expect(tiles.getByRole('listitem').first()).toBeVisible()
     // No group headings (the user, Oct 17), and no "Also:" line. One
-    // heading: the small label over the box (board K1c, Nov 11).
+    // heading: the small label over the tiles (board K1c, Nov 11).
     await expect(tiles.getByRole('heading')).toHaveText(['Explore by Category'])
     await expect(tiles).not.toContainText('Also:')
     // Every category with a page has its tile.
