@@ -231,6 +231,80 @@ The user's answers on Nov 10, evening, and what was done with them:
   they landed on Food with nothing to show. They now take the page whose
   places carry the most minyanim (`minyanimPage`), the first holding the
   field only when none has any. The e2e tests pick the page the same way.
+- **Filter tag on Kosher items and Hours** (fixed Nov 11, the user on
+  Grocery's admin page). A field's row said Filter only for a Yes/No or
+  Choice shown as a badge, so Hours ("Open now") and a list of items
+  (Grocery's Kosher items, always the page's "Has" filter) showed none.
+  The row now says Filter the way the site filters (`inFilter`), and
+  removing a list of items warns that the filter loses it. Whether an
+  admin should be able to take a list of items out of "Has" is the user's
+  call; today it is always in.
+- **A shul's week read again with its notes only reworded files nothing**
+  (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
+  a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;
+  coffee and learning" the next, at the same times, so the queue held a
+  change the same as the site. A note that only drops or rewords words
+  the listing's note has now keeps the listing's (`keepListedNotes`); a
+  new word still goes to the queue. The Nov 11 Shtiebel item in the live
+  queue predates this and is the user's to reject.
+- **One nightly email instead of one from every watch** (built Nov 12,
+  as drawn in N7-N9 of canvas S7uB4KuZQtdF6bJywzUZBd). After the last
+  job (`/api/cron/nightly-email`, 9:45 UTC), each community's admins get
+  "Philly Jewish Guide · Nightly watches: 5 to check": the night, a
+  sentence put together by code from the counts, Waiting for you (a row
+  a place, opening it in To do, "Also in To do: N from earlier nights and
+  N from people", Open To do), Stopped working in red (a watch's place in
+  Watches, or the Watches tab for a job), Changed on its own (Google).
+  None on a night with nothing at all. Waiting for you is read from the
+  queue at send time; a watch that broke from its `failingSince`; a job
+  from its runs; Google from `night_note` (migration 096). Gone: the
+  emails each website, newsletter, Keystone-K, Mekor, Refuah and eruv
+  website watch sent, the watch broke / working again emails, the job
+  broke / working again emails, Google's status digest from the nightly
+  sync and its immediate "permanently closed" email (now a row). Kept as
+  they were: a person's submission emails, the eruv-map line alert, and
+  the status email after an admin's own Google refresh. Not in the email,
+  on purpose: the times themselves, and "working again". With nothing
+  waiting but something broken, the subject says "1 stopped working".
+  Phone, computer and quiet renders checked against N7-N9. **Migration
+  096 isn't run anywhere yet** (see "Waiting for a yes"); until it is,
+  Google's changes are emailed at once as before and the nightly email
+  just has no Changed on its own. Not seen in a real inbox yet: the
+  first one goes out the night after this reaches the live site.
+- **A line turned down in a shul's week isn't filed again** (fixed Nov 12,
+  prod queue). A read week is filed whole, so a line the admin rejected
+  came back whenever anything else in that week changed: Kol Tzedek's Bar
+  Mitzvah note (rejected 3 times, back as #1347), TBZBI's Sat 9:30 and
+  Zoom links (twice, back as #1352), Rodeph Shalom's Thursday note
+  (twice, back as #1351). Each day's tefillah is now weighed on its own
+  (`leaveOutTurnedDown`): one the page gives exactly as a turned-down
+  suggestion of this watch gave it, with no approval for that week since,
+  stays as the listing has it and leaves the note. The page giving that
+  day something else still files, and so does the rest of the week. The
+  items already waiting in the live queue predate this and are the
+  user's to decide.
+- **A shul's week finding no longer shows other weeks changed back**
+  (fixed Nov 11, Mekor Habracha). Mekor's Nov 6 newsletter printed
+  "7:00pm" for Friday Nov 13's Mincha (candle lighting 4:28); that was
+  approved as read, and the listing's copy was later corrected to 4:30.
+  The Nov 10 website read was filed with a copy of the whole schedule
+  from before the correction, so To do showed Friday going back to 7pm.
+  Approving was always safe (`rebasePart` puts on the finding's own week
+  only); the queue list and job pages now show it the same way. The live
+  item's own week (Nov 20-21) is right. A candle-lighting check was
+  proposed and turned down (the user: "We are supposed to be an
+  aggregator. If someone posts a wrong time that's not on us").
+- **A website that changed after the newsletter corrects it** (the user,
+  Nov 11, changing Oct 20's "the newsletter wins": "if they correct it
+  then we should be correcting too"). On a day both give, a website page
+  that changed after the newsletter's week was posted corrects that
+  week's time for each tefillah it gives (`correctOlderWeeks` in
+  listingPageRun.ts): one minyan each side, same tefillah or both evening
+  ones; the week's other times that day stay. A page unchanged since, a
+  week with no posted time, or a page with no change on record leaves
+  the newsletter's week as it was. "Changed" is the whole page's
+  fingerprint, so a page edited for anything else counts as newer too;
+  the admin still approves each change.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
@@ -536,6 +610,9 @@ Still different, each needing the user:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
+0. **Migration 096 (`night_note`, Nov 12):** a new table for the
+   nightly email's Google line. On dev since Nov 12; live needs a yes,
+   before or with the deploy. The site works without it.
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site
@@ -2125,7 +2202,9 @@ Settled with the user so far:
   The website usually gives the usual times; the newsletter gives this
   week's, as a week beside the usual times. For the same days a week from
   the newsletter or a person wins over the website's (the user, Oct 20;
-  `postedBy` in schedules.ts). An agreeing website read confirms and
+  `postedBy` in schedules.ts), unless the website's page changed after
+  that week was posted: then a time it gives corrects the week's
+  (`correctOlderWeeks`, the user, Nov 11). An agreeing website read confirms and
   clears older findings; an approved newsletter change shows "Confirmed
   by <shul>".
 - **Waiting for you, in order**: a place off a certifier's list first
@@ -5268,7 +5347,8 @@ build").
   they disagree"). What the website reads is marked as the website's. The
   website leaves out any day the newsletter (or a person, through Update
   their times) has given a week for, and a newsletter's week takes the
-  website's times off its days.
+  website's times off its days. Changed Nov 11: the newer one wins a day
+  (see "A website that changed after the newsletter corrects it").
 - **Gaps, plainly:** if a website suggestion and a newsletter suggestion
   for one shul are both waiting in the queue, whichever is approved last
   wins (the website watch never files while anything is waiting, so this

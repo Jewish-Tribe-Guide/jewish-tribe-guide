@@ -25,8 +25,7 @@ vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ from: mockFrom
 const mockCreate = vi.hoisted(() => vi.fn())
 const mockUpdate = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/submissionStore', () => ({ submitListingCreate: mockCreate, submitListingUpdate: mockUpdate, submitListingDelete: vi.fn() }))
-const mockDigest = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
+vi.mock('@/lib/email', () => ({}))
 const mockGoogle = vi.hoisted(() => vi.fn())
 const mockCanAsk = vi.hoisted(() => vi.fn(() => true))
 vi.mock('@/lib/googlePlaces', async (actual) => ({ namesOverlap: (await actual<typeof import('@/lib/googlePlaces')>()).namesOverlap, findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
@@ -60,7 +59,6 @@ function setDb(listings: unknown[], pending: unknown[], earlier: unknown[]) {
 const run = (dry = false) => runMekorWatch('philly', LIST, { dry })
 
 beforeEach(() => {
-  mockDigest.mockResolvedValue(undefined)
   mockGoogle.mockResolvedValue({ placeId: 'p', name: null, businessStatus: 'OPERATIONAL' })
   vi.stubGlobal('fetch', vi.fn(async () => new Response(fixture, { status: 200 })))
 })
@@ -70,7 +68,6 @@ afterEach(() => {
   mockFrom.mockReset()
   mockCreate.mockReset()
   mockUpdate.mockReset()
-  mockDigest.mockReset()
   mockGoogle.mockReset()
   mockCanAsk.mockReset().mockReturnValue(true)
 })
@@ -94,9 +91,6 @@ describe('runMekorWatch', () => {
     expect(body.ok && body.listRead).toMatchObject({ updated: '2026-10-12' })
     expect(body.ok ? body.listRead.entries : null).toHaveLength(body.ok ? body.entries : -1)
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
-    expect(mockDigest).toHaveBeenCalledTimes(1)
-    expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
-    expect(mockDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin', name: '' })
   })
 
   it('never files a removal', async () => {
@@ -155,7 +149,6 @@ describe('runMekorWatch', () => {
     expect(filed.length).toBeGreaterThan(3)
     mockUpdate.mockReset()
     mockCreate.mockReset()
-    mockDigest.mockReset().mockResolvedValue(undefined)
 
     setDb([magical, zevis, shtetl], [], filed)
     const body = await run()
@@ -188,7 +181,6 @@ describe('runMekorWatch', () => {
     expect(body.ok && body.wouldFile!.length).toBeGreaterThan(0)
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
-    expect(mockDigest).not.toHaveBeenCalled()
   })
 
   it('files nothing when it reads too few places, rather than flagging every IKC in the guide', async () => {

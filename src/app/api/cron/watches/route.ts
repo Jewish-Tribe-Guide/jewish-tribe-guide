@@ -36,7 +36,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { listAllWatches } from '@/lib/watchStore'
 import { BUILT_IN_WATCHES, runAndRecord, runWatch } from '@/lib/watchRunner'
-import { sendWatchHealthAlert, type WatchHealthAlert } from '@/lib/email'
 import { runEruvLines } from '@/lib/eruvLineRun'
 import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
 import { syncRefuahWatches } from '@/lib/refuahMatchRun'
@@ -102,7 +101,6 @@ async function runAll(started = Date.now()): Promise<Body> {
     return { ok: true, recorded: false, results, eruvLines: await lines, run }
   }
 
-  const alerts = new Map<string, WatchHealthAlert[]>()
   const budget = newMenuReadBudget()
   // Without them, a listing's page goes by its label (watchGroupOf).
   const listings = await loadListings(watches.map((w) => w.communityId)).catch((err) => {
@@ -122,22 +120,12 @@ async function runAll(started = Date.now()): Promise<Body> {
     keysOf: sideBySideKeys,
     mayStart: () => Date.now() - started <= START_NO_WATCH_AFTER_MS,
     run: async (watch) => {
-      const { outcome, alert } = await runAndRecord(watch, undefined, budget)
-      if (alert) {
-        const list = alerts.get(watch.communityId) ?? []
-        list.push({ label: watch.label || watch.url, url: watch.url, alert, error: outcome.ok ? null : outcome.error })
-        alerts.set(watch.communityId, list)
-      }
+      // A watch that breaks is told of in the nightly email (nightlyEmail.ts).
+      const { outcome } = await runAndRecord(watch, undefined, budget)
       return { id: watch.id, url: watch.url, ...outcome }
     },
   })
 
-  // Awaited, not left running: the response must not finish first.
-  await Promise.all(
-    [...alerts].map(([community, list]) =>
-      sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
-    ),
-  )
   // One its reads ran out for wasn't read (the user, Oct 26): not counted
   // as checked, and its kind's line says Not reached.
   const skipped = results.filter((r) => r.ok && r.skipped).length

@@ -28,8 +28,9 @@ const NOT_COLOURS = new Set([
   'balance', 'base', 'center', 'left', 'right', 'lg', 'sm', 'xl', 'xs', 'align',
   'color', 'color-escalation', 'filter', 'glyph', 'shadow', 'string', 'to-border',
   'by-near-zero', 'based', 'linecap', 'linejoin', 'only', 'width', 'do',
-  // Inline CSS properties in the email templates (lib/email.ts).
-  'decoration', 'collapse', 'bottom',
+  // Inline CSS properties in the email templates (lib/email.ts,
+  // lib/nightlyEmail.ts).
+  'decoration', 'collapse', 'bottom', 'top', 'transform',
 ])
 
 const COLOUR_CLASS = /(?<![\w-])(?:[a-z-]+:)*(?:text|bg|border|ring|from|to|via|divide|outline)-([a-z]+(?:-[a-z]+)*)/g

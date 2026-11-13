@@ -105,9 +105,17 @@ export async function listSubmissionsByStatus(
     // A pending edit as approving it would go on the listing now: only its
     // own fields (editedFields.ts), so it never shows another's undone.
     const fields = categories.find((c) => c.id === current?.category)?.detailFields
-    const payload = status === 'pending' && s.operation === 'update' && s.target_type === 'listing' && current && fields
+    const pendingEdit = status === 'pending' && s.operation === 'update' && s.target_type === 'listing' && current
+    const onNow = pendingEdit && current && fields
       ? (onListingNow(s.payload as unknown as ResourceSubmission, current, fields) as unknown as Record<string, unknown>)
       : s.payload
+    // A shul's part, within its field: only its part, the rest of the
+    // times as the listing has them now, as approving it puts them
+    // (rebasePart, below). Else a week the listing corrected since the
+    // read shows as changed back (Nov 11, Mekor Habracha's 7pm Friday).
+    const part = pendingEdit ? statedSource(s.payload)?.part : undefined
+    const details = (onNow as { details?: Record<string, unknown> }).details
+    const payload = part && current && details ? { ...onNow, details: rebasePart(part, current.details ?? {}, details) } : onNow
     return { ...s, payload, current, categoryLabel: categoryLabel(s, current) }
   })
 }

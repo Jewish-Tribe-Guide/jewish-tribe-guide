@@ -168,6 +168,13 @@ test.describe('home screen weight', () => {
       // prefetches at all, and the cards' would have come with it.
       await expect.poll(() => prefetched.length, 'any prefetch at all').toBeGreaterThan(0)
       await page.waitForTimeout(1_500)
+      // From Friday to havdalah the phone's own Right now is the candles
+      // card, whose Minyanim link goes to the same ?davening=1 page and
+      // prefetches rightly, so a computer card's prefetch can't be told
+      // from it: this failed every Friday (Nov 13). Checked the rest of
+      // the week.
+      const ownLink = await page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
+      test.skip(ownLink > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
       expect(fromCards(), 'the "View Times" card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link

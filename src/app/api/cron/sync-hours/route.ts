@@ -25,6 +25,7 @@ import { listAllWatches } from '@/lib/watchStore'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendStatusChangeDigest, type StatusChange } from '@/lib/email'
+import { keepStatusChanges } from '@/lib/nightNoteStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { refreshNight, syncOneListing, type SyncedRow } from '@/lib/syncListing'
 import { cronAuthorized as authorized } from '@/lib/cronAuth'
@@ -115,12 +116,14 @@ async function runSync(): Promise<SyncHoursRun> {
   // hour after the very sync meant to keep it current.
   if (synced > 0) await revalidatePublicContent()
 
-  // One digest for the whole run, closures and reopenings alike. Never fails
-  // the sync: the listings are already updated by this point, and an email
-  // provider hiccup must not turn a successful sync into a failed cron.
-  await sendStatusChangeDigest(statusChanges).catch((err) =>
-    console.error('[sync-hours] status digest failed:', err),
-  )
+  // Closures and reopenings alike, kept for the nightly email
+  // (nightlyEmail.ts); without migration 096, one email now, as before.
+  // Never fails the sync: the listings are already updated by this point.
+  try {
+    if (!(await keepStatusChanges(statusChanges))) await sendStatusChangeDigest(statusChanges)
+  } catch (err) {
+    console.error('[sync-hours] status changes failed:', err)
+  }
 
   await pingHealthcheck(true)
   return {
