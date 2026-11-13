@@ -194,7 +194,9 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   await sheet.getByPlaceholder('Add a dish').fill('Laffa Wraps')
   await sheet.getByRole('button', { name: 'Add', exact: true }).click()
   await sheet.getByRole('button', { name: 'Save to the listing' }).click()
-  await expect(sheet).not.toBeVisible()
+  // The sheet closes once the save is back: over 5s on CI's runner on
+  // Nov 13 (PR 384), as the read after it was on Nov 3.
+  await expect(sheet).not.toBeVisible({ timeout: 15_000 })
   // The save, then To do read again: two round trips, which took over 5s on
   // CI's runner on Nov 3 (PR 373).
   await expect(open.getByTestId('waiting-group')).toHaveCount(0, { timeout: 15_000 })
