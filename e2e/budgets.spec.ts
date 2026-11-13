@@ -158,6 +158,10 @@ test.describe('home screen weight', () => {
     page.on('request', (r) => {
       if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
     })
+    // A Tuesday morning. From Friday to havdalah the phone's own Right now
+    // is the candles card, whose Minyanim link (?davening=1) is the
+    // phone's and prefetches rightly; on those days this failed (Nov 13).
+    await page.clock.setFixedTime(new Date('2026-11-10T14:00:00Z'))
     await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
     await ready(page)
