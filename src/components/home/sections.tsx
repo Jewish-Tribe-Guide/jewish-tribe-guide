@@ -1,7 +1,10 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState, ViewTransition } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
+import { CategoryGlyph, hasCategoryIcon, useGlyphKey } from '@/lib/categoryIcons'
 import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
 import type { NavigateFn } from '@/types'
@@ -11,8 +14,8 @@ import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import CategoryIcon from '@/components/CategoryIcon'
-import { DotsIcon } from '@/components/icons'
-import { getCategoryColor } from '@/lib/categoryColor'
+import { GridIcon } from '@/components/icons'
+import { getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 
 export type CardDef = {
   title: string
@@ -87,21 +90,7 @@ function CompactCard({
       prefetch={false}
     >
       {card.icon ? (
-        // Named (desktop only — this component never mounts on mobile, see
-        // its own doc) so React's real <ViewTransition> grows this small
-        // icon badge into the bigger one GenericDirectory shows at the top
-        // of the category page, instead of a flat crossfade — the "shared
-        // element morph" pattern, matched on `name` alone (see that
-        // component's own comment for the other half). Only when `card.id`
-        // exists to key it on: the couple of hand-built cards with no id
-        // just skip the wrap and render plainly.
-        card.id ? (
-          <ViewTransition name={`category-badge-${card.id}`}>
-            <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
-          </ViewTransition>
-        ) : (
-          <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
-        )
+        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
       ) : (
         <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
       )}
@@ -236,42 +225,63 @@ export function CompactCardGrid({
   )
 }
 
-// How many real cards show before the trailing "More" tile, collapsed —
-// matches the count in the user's own reference image (9 categories + one
-// "More" tile = 10 total). A fixed number, not a measured "however many fit"
-// — this app has one desktop breakpoint, not several to size against, and a
-// fixed count is what makes `flex-1` below reliably lay out as one
-// non-wrapping row instead of needing real layout measurement (the
-// CompactCardGrid approach) just to decide whether to show a tile.
-const COLLAPSED_TILE_COUNT = 9
+// How many cards show before the trailing "All categories" tile, collapsed:
+// three rows of five with that tile last (board G5b, Nov 11: the rows fill
+// the screen and match the map card below).
+const COLLAPSED_TILE_COUNT = 14
 
-/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md), revised
- *  twice after user review — first to a horizontal-scroll row, then to
- *  this: the "Explore by Category" card's tile grid, a bigger, friendlier
- *  icon per category (64px, tinted per getCategoryColor, same as
- *  CompactCard's own smaller version). No border/background on the tile
- *  itself, at rest or on hover — just the icon and label sitting directly
- *  on the card's own white background, the same "navigation, not a boxed
- *  object" reasoning CompactCard's own doc gives for its rows.
+/** A category's photo, cut to its 16:10 tile. Supabase uploads go through the
+ *  storage thumbnail (falling back to the original if that fails, as
+ *  CategoryIcon does); an admin-pasted URL from an unlisted host skips
+ *  next/image's optimizer, which would throw on it. */
+export function TilePhoto({ src, px = 210, sizes = '(min-width: 1200px) 210px, 18vw' }: { src: string; px?: number; sizes?: string }) {
+  const thumb = storageThumbnailUrl(src, px)
+  const [failedThumb, setFailedThumb] = useState<string | null>(null)
+  const useThumb = thumb !== null && failedThumb !== thumb
+  return (
+    <Image
+      src={useThumb ? thumb : src}
+      alt=""
+      fill
+      sizes={sizes}
+      className="object-cover"
+      unoptimized={useThumb || !isOptimizableImage(src)}
+      onError={useThumb ? () => setFailedThumb(thumb) : undefined}
+    />
+  )
+}
+
+/** A tile with no photo: the category's line icon on plain grey, or its
+ *  initial when it has no line icon, never its emoji (the site draws no
+ *  emoji as icons). */
+function TileGlyph({ id, title }: { id: string | undefined; title: string }) {
+  const key = useGlyphKey(id)
+  return (
+    <span className="flex h-full w-full items-center justify-center text-slate-500" data-testid="category-tile-glyph" aria-hidden="true">
+      {hasCategoryIcon(key) ? (
+        <CategoryGlyph categoryId={id} icon="" className="h-9 w-9" />
+      ) : (
+        <span className="text-3xl font-extrabold text-slate-400">{title.trim().charAt(0).toUpperCase()}</span>
+      )}
+    </span>
+  )
+}
+
+const tileBox = 'relative block aspect-[16/10] w-full overflow-hidden rounded-xl bg-slate-100'
+const tileName = 'mt-2.5 block text-base font-bold leading-tight text-ink'
+
+/** The computer home's Explore by Category (board H1, Nov 11, the user:
+ *  "soooo much better"): rectangular photo tiles, five across, the name
+ *  under each and nothing else. It replaced a row of small 64px circles that
+ *  mixed photos with tinted icons and put a listing count under each, which
+ *  read as an icon pack on a wide screen.
  *
- *  Collapsed (`expanded` false) is a single row, no scrolling and no wrap —
- *  the first `COLLAPSED_TILE_COUNT` cards (by whatever order the caller
- *  already sorted `cards` into — Landing sorts by listing count, most to
- *  least, matching the reference image) plus a trailing "More" tile when
- *  there are more. `flex-1` on every tile (not a fixed width) is what
- *  guarantees the row itself never needs to scroll or wrap: exactly
- *  `COLLAPSED_TILE_COUNT` (+1 for "More") tiles share the row's width
- *  evenly, however wide that ends up being, rather than each claiming a
- *  fixed size and overflowing. Expanded is the opposite shape: EVERY card
- *  wrapped into a `grid-cols-4 lg:grid-cols-8` grid, no "More" tile, no cap
- *  — a real "full view". Both states are controlled by the caller
- *  (`expanded`) rather than owned here, because the toggle that drives it
- *  ("View all →") lives in Landing's own header row above this grid, not
- *  beside it — CompactCardGrid can own its own "Show more" because that
- *  button sits directly under its grid; this one can't. CompactCardGrid
- *  itself is untouched and still used for desktop search results (Landing's
- *  own `desktopResultsNode`, rendered below this card's header row once the
- *  hero's search box puts something in `q`). */
+ *  Each tile's photo is getCategoryTilePhoto's: the category's one picture
+ *  (its banner); a category with neither shows its line glyph on
+ *  plain grey, never a tinted circle. Collapsed shows the first
+ *  COLLAPSED_TILE_COUNT cards (in the caller's order, most listings first)
+ *  and an "All categories" tile; expanded shows every card. The caller owns
+ *  `expanded`, since "Show fewer categories" sits in its heading. */
 export function CategoryTileRow({
   cards,
   categories,
@@ -279,86 +289,55 @@ export function CategoryTileRow({
   onCardClick,
   onExpand,
 }: {
-  /** Already in the order this should render — Landing sorts by listing
-   *  count (most to least) before passing this in; this component doesn't
-   *  re-sort. */
+  /** Already in the order this should render. */
   cards: CardDef[]
-  /** Resolves each card's icon-avatar tint — see getCategoryColor. */
   categories: CategoryConfig[] | null
-  /** false: the first COLLAPSED_TILE_COUNT cards plus a trailing "More"
-   *  tile. true: every card, wrapped, no cap. */
   expanded: boolean
   onCardClick?: (card: CardDef) => void
-  /** Fired by the trailing "More" tile — same action as the header row's
-   *  own "View all" toggle (Landing owns the actual `expanded` state). Only
-   *  meaningful (and only rendered) when collapsed and there's a "More"
-   *  tile to click. */
+  /** Fired by the "All categories" tile; only drawn when collapsed and
+   *  there are more cards than fit. */
   onExpand?: () => void
 }) {
   const visible = expanded ? cards : cards.slice(0, COLLAPSED_TILE_COUNT)
   const hasMore = !expanded && cards.length > COLLAPSED_TILE_COUNT
 
-  const tileClassName = 'flex flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-slate-50'
-
   return (
-    <div className={expanded ? 'grid grid-cols-4 gap-6 lg:grid-cols-8' : 'flex gap-6'}>
-      {visible.map((card) => (
-        <Link
-          key={card.id ?? card.title}
-          href={card.href}
-          className={`${tileClassName} ${expanded ? '' : 'min-w-0 flex-1'}`}
-          onClick={onCardClick ? () => onCardClick(card) : undefined}
-          // Same reasoning as Card's own prefetch={false} in this file —
-          // this row renders every category at once, expanded or not.
-          prefetch={false}
-        >
-          {card.icon ? (
-            // Named the same way CompactCard's own badge is (desktop only,
-            // matched on `category-badge-${card.id}`) so a real
-            // <ViewTransition> grows this tile's icon into the bigger one
-            // GenericDirectory shows at the top of the category page —
-            // whichever of the two (this grid or CompactCardGrid's search
-            // results) the visitor actually clicked through.
-            card.id ? (
-              <ViewTransition name={`category-badge-${card.id}`}>
-                <CategoryIcon
-                  icon={card.icon}
-                  categoryId={card.id}
-                  color={getCategoryColor(categories, card.id)}
-                  className="h-16 w-16 text-[28px]"
-                  sizePx={64}
-                />
-              </ViewTransition>
+    <div className="grid grid-cols-5 gap-x-4 gap-y-5">
+      {visible.map((card) => {
+        const photo = getCategoryTilePhoto(categories, card.id)
+        const box = (
+          <span className={tileBox} data-testid="category-tile-photo">
+            {photo ? (
+              <TilePhoto src={photo} />
             ) : (
-              <CategoryIcon
-                icon={card.icon}
-                categoryId={card.id}
-                color={getCategoryColor(categories, card.id ?? '')}
-                className="h-16 w-16 text-[28px]"
-                sizePx={64}
-              />
-            )
-          ) : (
-            <span className="h-16 w-16 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
-          )}
-          {/* No `truncate` — a category name like "Networking" or
-              "Hospitals" shouldn't ever end in an ellipsis on a tile with
-              room to wrap. Two lines (`leading-tight` keeps them close) is
-              the worst case; the count below stays single-line since a
-              number like "72 places" never needs to wrap. */}
-          <span className="mt-3 w-full text-balance text-base font-semibold leading-tight text-ink">{card.title}</span>
-          {card.count != null && (
-            <span className="w-full truncate text-sm text-slate-500">{card.count}</span>
-          )}
-        </Link>
-      ))}
-      {hasMore && (
-        <button type="button" onClick={onExpand} className={`${tileClassName} min-w-0 flex-1 cursor-pointer`}>
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-hidden="true">
-            <DotsIcon className="h-6 w-6" />
+              <TileGlyph id={card.id} title={card.title} />
+            )}
           </span>
-          <span className="mt-3 w-full text-balance text-base font-semibold leading-tight text-ink">More</span>
-          <span className="w-full truncate text-sm text-slate-500">See all</span>
+        )
+        return (
+          <Link
+            key={card.id ?? card.title}
+            href={card.href}
+            className="group block min-w-0 rounded-xl"
+            onClick={onCardClick ? () => onCardClick(card) : undefined}
+            // Same reasoning as Card's own prefetch={false} in this file:
+            // this row renders every category at once.
+            prefetch={false}
+          >
+            {/* Not named for a <ViewTransition>: growing the tile into the
+                category page's photo read as the picture flying in (the
+                user, Nov 11). The page just appears, as every other one. */}
+            {box}
+            <span className={`${tileName} group-hover:text-primary`}>{card.title}</span>
+          </Link>
+        )
+      })}
+      {hasMore && (
+        <button type="button" onClick={onExpand} className="group block min-w-0 cursor-pointer rounded-xl text-left">
+          <span className={`${tileBox} flex items-center justify-center text-slate-500`} aria-hidden="true">
+            <GridIcon className="h-9 w-9" />
+          </span>
+          <span className={`${tileName} group-hover:text-primary`}>All categories</span>
         </button>
       )}
     </div>

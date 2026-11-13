@@ -125,7 +125,6 @@ export function pageToCopy(c: CategoryConfig): CategoryConfig {
     active: true,
     cardImageUrl: null,
     cardBandImageUrl: null,
-    iconImageUrl: null,
     pinColor: null,
     walkList: undefined,
   }

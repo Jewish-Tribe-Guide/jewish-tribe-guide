@@ -428,7 +428,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               glyph={isMinyanOnly(item, category) ? <ClockIcon className="h-full w-full" /> : undefined}
               shape="square"
               color={color}
-              className="h-10 w-10 text-xl"
+              // A step bigger on a computer (board H4, Nov 11), to sit with
+              // the home's bigger cards.
+              className="h-10 w-10 text-xl desktop:h-12 desktop:w-12"
             />
             {pinned && <SavedBadge />}
           </span>
@@ -438,7 +440,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               twice as tall as the rest. */}
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-            <p className="min-w-0 flex-1 truncate font-semibold text-slate-900">
+            <p className="min-w-0 flex-1 truncate font-semibold text-slate-900 desktop:text-[18px]" data-testid="row-name">
               {pageRow ? (
                 <>
                   {item.name}

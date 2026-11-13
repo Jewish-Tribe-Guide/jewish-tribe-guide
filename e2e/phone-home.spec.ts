@@ -95,6 +95,20 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText(/minyan|Mincha/i)
   })
 
+  // Board K1c (Nov 11): Right now sits close under the "Try asking" chips.
+  // The computer's spacing between its card rows used to collapse through
+  // the phone's empty copies of them into 72px of nothing here.
+  test('Right now sits close under the search, with no empty gap', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    const now = page.getByTestId('right-now')
+    await expect(now).toBeVisible()
+    const chips = await page.getByTestId('search-prompts').filter({ visible: true }).first().boundingBox()
+    const top = await now.boundingBox()
+    const gap = (top?.y ?? 0) - ((chips?.y ?? 0) + (chips?.height ?? 0))
+    expect(gap, `the gap between the chips and Right now is ${gap}px`).toBeLessThanOrEqual(32)
+    expect(gap).toBeGreaterThanOrEqual(8)
+  })
+
   test('Friday afternoon: the candles card with the eruvim on it, and nothing “open now”', async ({ page, request }) => {
     const community = await openHome(page, 'friday')
     const now = page.getByTestId('right-now')
@@ -161,8 +175,9 @@ test.describe('on a phone', () => {
     const community = await openHome(page, 'tuesday')
     const tiles = page.getByTestId('category-tiles')
     await expect(tiles.getByRole('listitem').first()).toBeVisible()
-    // No group headings (the user, Oct 17), and no "Also:" line.
-    await expect(tiles.getByRole('heading')).toHaveCount(0)
+    // No group headings (the user, Oct 17), and no "Also:" line. One
+    // heading: the small label over the tiles (board K1c, Nov 11).
+    await expect(tiles.getByRole('heading')).toHaveText(['Explore by Category'])
     await expect(tiles).not.toContainText('Also:')
     // Every category with a page has its tile.
     const hrefs = await tiles.getByRole('listitem').getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href')))

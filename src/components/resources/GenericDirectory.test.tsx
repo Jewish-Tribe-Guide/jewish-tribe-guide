@@ -233,6 +233,14 @@ async function chooseSort(user: ReturnType<typeof userEvent.setup>, choice: 'Pop
   await user.click(screen.getByRole('menuitemradio', { name: choice }))
 }
 
+// Synagogues' "Synagogue | Minyan" (MinyanSwitch; "By synagogue | By
+// time" until later on Nov 11): its two halves.
+// Wherever the view is showing, the switch is its heading's, and the
+// list's heading isn't there; one switch on the page either way.
+const minyanSwitch = () => screen.getByTestId('minyan-switch')
+const byTimeButton = () => within(minyanSwitch()).getByRole('button', { name: 'Minyan' })
+const listButton = () => within(minyanSwitch()).getAllByRole('button')[0]
+
 const handlers = {
   onUp: vi.fn(),
   onAdd: vi.fn(),
@@ -921,14 +929,22 @@ describe('GenericDirectory', () => {
   const shulItem = () =>
     ({ ...makeListing(), minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00 AM' }] }) as unknown as DirectoryResource
 
-  it('opens the Minyanim view from “Minyanim by time”, in place of the list, with its way back', async () => {
+  // Nov 11: "By synagogue | By time", where the list's count was, in
+  // place of the green Minyanim card. The page stays the category's: its
+  // title doesn't change, and the switch is the way back.
+  it('opens the Minyanim view from the switch’s “By time”, in place of the list, and its first half comes back', async () => {
     const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
-    await user.click(screen.getAllByRole('button', { name: /^Minyanim/ })[0])
+    await user.click(byTimeButton())
 
     expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1, name: 'Minyanim by time' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(shulCategory().pluralLabel)
+    expect(byTimeButton()).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(listButton())
+    expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
+    expect(byTimeButton()).toHaveAttribute('aria-pressed', 'false')
   })
 
   // The user's note 10 (Oct 10): Back from a shul opened from the Minyanim
@@ -961,9 +977,12 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
-    // No Synagogues / Minyanim toggle any more (Oct 6): one row is the way in.
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
-    expect(screen.getByTestId('next-minyan')).toHaveAccessibleName(/^Minyanim\b/)
+    // The switch says "<Place>", in the category's own word, on the
+    // list's heading; the green card above the search is gone.
+    expect(within(screen.getByTestId('list-heading')).getByTestId('minyan-switch')).toBeInTheDocument()
+    expect(listButton()).toHaveTextContent(new RegExp(`^${shulCategory().label}$`))
+    expect(listButton()).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
   })
 
   // `?day=` from the home page's link: that day's tab, when it's one of
@@ -993,7 +1012,7 @@ describe('GenericDirectory', () => {
     )
     expect(onParamsChange).not.toHaveBeenCalled()
 
-    await user.click(within(screen.getByTestId('directory-up')).getByRole('button'))
+    await user.click(listButton())
 
     expect(onParamsChange).toHaveBeenCalledWith({ davening: null, day: null }, { replace: true })
   })
@@ -1010,7 +1029,7 @@ describe('GenericDirectory', () => {
       <GenericDirectory category={category} items={[item]} {...handlers} onParamsChange={onParamsChange} />,
     )
 
-    await user.click(screen.getAllByRole('button', { name: /^Minyanim/ })[0])
+    await user.click(byTimeButton())
 
     // A step Back undoes (Oct 6), not a replaced address.
     expect(onParamsChange).toHaveBeenCalledWith({ davening: '1' }, { step: 'minyanim' })
@@ -1755,7 +1774,7 @@ function mockMobile() {
   })) as typeof window.matchMedia
 }
 
-describe('GenericDirectory — desktop category badge (morph target)', () => {
+describe('GenericDirectory — the page opens on its home tile\'s picture (boards H4, H5)', () => {
   afterEach(() => {
     // Restores vitest.setup.ts's own desktop-default stub — see its own
     // comment on why every other test in this file relies on that default.
@@ -1771,27 +1790,65 @@ describe('GenericDirectory — desktop category badge (morph target)', () => {
     })) as typeof window.matchMedia
   })
 
-  it('shows a 64px icon badge above the title on desktop', () => {
-    const category = makeCategory({ id: 'grocery', icon: '🛒' })
-    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
+  const PHOTO = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-icon/food.jpg'
+  const withPhoto = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', icon: '🛒', cardBandImageUrl: PHOTO })
+  const items = [makeListing({ id: 'a', name: 'Acme' }), makeListing({ id: 'b', name: 'Bravo' })]
+  const render = (category = withPhoto, extra: Record<string, unknown> = {}) =>
+    renderWithProviders(<GenericDirectory category={category} items={items} addressPrompt {...handlers} {...extra} />, {
+      content: { categories: [category] },
+    })
 
-    const badge = document.querySelector('[class*="h-16"][class*="w-16"]')
-    expect(badge).toBeInTheDocument()
+  it('on a computer: the tile\'s photo, the count, the title and where distances are from, with the search riding up onto it', () => {
+    render()
+    const hero = screen.getByTestId('category-hero')
+    // next/image rewrites the address; the picture's own URL is inside it.
+    expect(decodeURIComponent(hero.querySelector('img')!.getAttribute('src')!)).toContain('category-icon/food.jpg')
+    expect(within(hero).getByTestId('category-hero-count')).toHaveTextContent('2 places')
+    // The page's one h1, and it's the photo's.
+    const h1s = screen.getAllByRole('heading', { level: 1 })
+    expect(h1s).toHaveLength(1)
+    expect(hero).toContainElement(h1s[0])
+    expect(h1s[0]).toHaveTextContent('Grocery Stores')
+    expect(h1s[0]).not.toHaveClass('sr-only')
+    expect(within(hero).getByRole('button', { name: 'Use my location' })).toBeInTheDocument()
+    // The photo's box pulls what follows (the search) up onto it.
+    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('-75px')
+    expect(screen.getByTestId('category-ask-box')).toHaveClass('desktop:rounded-full')
+    // The round badge that sat on the old band is gone.
+    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
   })
 
-  it('renders no badge on mobile — that navigation has its own directional slide instead', () => {
+  it('a category with no picture gets its colour behind the words, not an empty photo', () => {
+    render(makeCategory({ id: 'networking', pluralLabel: 'Networking', icon: undefined }))
+    const hero = screen.getByTestId('category-hero')
+    expect(hero.querySelector('img')).toBeNull()
+    expect(within(hero).getByRole('heading', { level: 1, name: 'Networking' })).toBeInTheDocument()
+    expect(screen.queryByTestId('category-phone-picture')).not.toBeInTheDocument()
+  })
+
+  it('a listing opened on a computer has the top of the page: the short band, no words on it, nothing riding up', async () => {
+    const user = userEvent.setup()
+    render()
+    await user.click(screen.getByRole('button', { name: 'Expand Bravo' }))
+    const hero = screen.getByTestId('category-hero')
+    expect(hero.firstElementChild).toHaveClass('h-[132px]')
+    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('')
+    expect(within(hero).queryByTestId('category-hero-count')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Grocery Stores' })).toHaveClass('sr-only')
+  })
+
+  it('on a phone: the same picture, short, under the header, with no second title on it', () => {
     mockMobile()
-    const category = makeCategory({ id: 'grocery', icon: '🛒' })
-    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
-
-    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
-  })
-
-  it('renders no badge for a category with no icon — nothing to morph', () => {
-    const category = makeCategory({ id: 'networking', icon: undefined })
-    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
-
-    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
+    render()
+    expect(screen.queryByTestId('category-hero')).not.toBeInTheDocument()
+    const picture = screen.getByTestId('category-phone-picture')
+    expect(decodeURIComponent(picture.querySelector('img')!.getAttribute('src')!)).toContain('category-icon/food.jpg')
+    expect(picture).toHaveClass('h-[120px]', 'desktop:hidden')
+    expect(within(picture).queryByRole('heading')).toBeNull()
+    // The title is the header's; the page keeps one h1 for a screen reader.
+    const h1s = screen.getAllByRole('heading', { level: 1 })
+    expect(h1s).toHaveLength(1)
+    expect(h1s[0]).toHaveClass('sr-only')
   })
 })
 
@@ -2142,7 +2199,6 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     })
 
     expect(screen.getByText('next minyan at Alpha Shul: Mincha 6:05 PM')).toBeInTheDocument()
-    expect(screen.getByTestId('next-minyan')).toHaveTextContent('Minyanim · 2 left today')
   })
 
   it('says a shul with no times at all has none listed', () => {
@@ -2156,7 +2212,9 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     expect(screen.getByText('next minyan at Gamma Shul: No davening times listed')).toBeInTheDocument()
   })
 
-  describe('the Next minyan card', () => {
+  // Nov 11: "By synagogue | By time" replaced the green "Minyanim · 3 left
+  // today" card above the search (the user's pick, D1/D2 on the desk canvas).
+  describe('the switch to By time', () => {
     // A Monday at 5 PM in Philadelphia.
     const fivePm = () => {
       vi.useFakeTimers({ toFake: ['Date'] })
@@ -2167,27 +2225,36 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       { ...shul('near', 'Mekor Habracha', '6:20pm'), milesFromCenter: 0.21 },
       { ...shul('mid', 'Lower Merion Synagogue', '6:25pm'), milesFromCenter: 5.1, confirmedAt: '2026-09-01' },
     ]
-    const row = () => screen.getByTestId('next-minyan')
-
-    // Oct 15 (the user's sketch): one row, "Minyanim · 3 left today", the
-    // same count the view's heading shows. It named the soonest before.
-    it('says how many minyanim are left today', () => {
-      fivePm()
-      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
-
-      expect(row()).toHaveTextContent('Minyanim · 3 left todayEvery minyan by time, any day this week')
-    })
-
-    it('is one button that opens every minyan by time, and the list heading doesn’t repeat it', async () => {
+    // The plain switch (the user, Nov 11): no count on "By time", and the
+    // view says nothing of how many are left ("we don't need to say how
+    // many minyanim left today").
+    // And "By synagogue", not "3 synagogues" (the user, Nov 11); then, the
+    // same day, "Synagogue | Minyan", no "By" ("take out 'by' and replace
+    // time with minyan").
+    it('counts nothing: "<Place> | Minyan", and no count in the view', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /Minyanim by time/ })).not.toBeInTheDocument()
-      await user.click(row())
+      expect(listButton()).toHaveTextContent(new RegExp(`^${shulCategory.label}$`))
+      expect(byTimeButton()).toHaveTextContent(/^Minyan$/)
+      // Picked is the site's blue, as Sort's and the filters' choices are (Nov 11).
+      expect(listButton().className).toMatch(/\bbg-primary\b/)
+      await user.click(byTimeButton())
+      const viewHeading = within(screen.getByTestId('minyanim-view')).getByTestId('list-heading')
+      expect(viewHeading).not.toHaveTextContent(/minyan|left today/)
+    })
+
+    it('is one switch, on the list’s heading and then on the view’s, opening every minyan by time', async () => {
+      fivePm()
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
+
+      expect(screen.getAllByTestId('minyan-switch')).toHaveLength(1)
+      await user.click(byTimeButton())
       expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()
-      // The row goes: the view's own answer says what's next.
-      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
+      expect(screen.getAllByTestId('minyan-switch')).toHaveLength(1)
+      expect(within(screen.getByTestId('minyanim-view')).getByTestId('minyan-switch')).toBeInTheDocument()
       expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)).toEqual([
         // None sent this week's times: each says its usual one, and when
         // it was last checked (a listing with no date, just that).
@@ -2197,54 +2264,18 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       ])
     })
 
-    // The user, Nov 2: above the search, like Watches on Places and the home
-    // screen's row. It stays while typing, so the box doesn't jump up.
-    it('sits above the search and stays there while typing', async () => {
+    // Under the search now, where the list's count was: nothing above the
+    // box any more, so it's the first thing on the page (search box first).
+    it('sits under the search, where the list’s count was', () => {
       fivePm()
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
       const box = screen.getByRole('searchbox')
-      expect(row().compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-      await user.type(box, 'no shul has this')
-      expect(row().compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-      await user.clear(box)
-      await user.type(box, 'mincha')
-      expect(row()).toBeInTheDocument()
-      expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /Minyanim by time/ })).not.toBeInTheDocument()
+      expect(box.compareDocumentPosition(minyanSwitch()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(within(screen.getByTestId('list-heading')).queryByRole('heading')).not.toBeInTheDocument()
     })
 
-    it('follows the list’s filters', () => {
-      fivePm()
-      const withEruv = makeCategory({
-        id: 'synagogue',
-        detailFields: [
-          { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
-          { key: 'eruv', label: 'In the eruv', type: 'boolean', filterable: true },
-        ],
-      })
-      const items = shuls().map((s) => ({ ...s, eruv: s.id === 'mid' }))
-      renderWithProviders(<GenericDirectory category={withEruv} items={items} initialFilters={{ f_eruv: '1' }} {...handlers} />, {
-        content: { categories: [withEruv] },
-      })
-
-      expect(row()).toHaveTextContent('Minyanim · 1 left today')
-    })
-
-    it('counts only what’s still ahead today, and says when none is', () => {
-      fivePm()
-      const items = [
-        { ...shul('early', 'Early Shul', '1:30pm'), milesFromCenter: 1 },
-        { ...shul('late', 'Late Shul', '6:40pm'), milesFromCenter: 1 },
-      ]
-      renderWithProviders(<GenericDirectory category={shulCategory} items={items} {...handlers} />, { content: { categories: [shulCategory] } })
-      expect(row()).toHaveTextContent('Minyanim · 1 left today')
-      cleanup()
-      renderWithProviders(<GenericDirectory category={shulCategory} items={[items[0]]} {...handlers} />, { content: { categories: [shulCategory] } })
-      expect(row()).toHaveTextContent('Minyanim · none left today')
-    })
-
-    it('goes when no shul the filters leave keeps times, and “Minyanim by time” goes to the list heading', () => {
+    it('stays when no shul the filters leave keeps times', () => {
       fivePm()
       const withEruv = makeCategory({
         id: 'synagogue',
@@ -2258,8 +2289,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         content: { categories: [withEruv] },
       })
 
-      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
-      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /Minyanim by time/ })).toBeInTheDocument()
+      expect(byTimeButton()).toBeInTheDocument()
     })
 
     // Oct 15 (the user's sketch): the view says how many it shows, with
@@ -2292,11 +2322,10 @@ describe('GenericDirectory — each shul’s next minyan', () => {
           .getAllByRole('link')
           .map((a) => a.textContent!.replace(a.querySelector('[data-testid="minyan-whose"]')?.textContent ?? '', ''))
 
-      it('says how many are left today, and each minyan its shul’s denomination', async () => {
+      it('gives each minyan its shul’s denomination', async () => {
         fivePm()
         open()
         expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
-        expect(heading()).toHaveTextContent('3 minyanim left today')
         expect(rows()).toEqual([
           '6:20 PMMekor HabrachaMincha · Orthodox · 0.2 mi',
           '6:30 PMSociety Hill SynagogueMincha · Conservative · 0.7 mi',
@@ -2316,7 +2345,6 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         await user.click(within(sheet()).getByRole('button', { name: 'Orthodox' }))
         expect(within(sheet()).getByRole('button', { name: 'Show 1 minyan' })).toBeInTheDocument()
         await user.click(within(sheet()).getByRole('button', { name: 'Show 1 minyan' }))
-        expect(heading()).toHaveTextContent('1 minyan left today')
         expect(rows()).toEqual(['6:20 PMMekor HabrachaMincha · Orthodox · 0.2 mi'])
         expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
 
@@ -2338,7 +2366,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
         open()
         await user.type(screen.getByRole('searchbox'), 'mincha')
-        expect(heading()).toHaveTextContent('2 minyanim left today')
+        expect(rows()).toHaveLength(2)
         expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
         await user.click(within(heading()).getByRole('button', { name: /^Filters/ }))
         expect(within(sheet()).getByRole('button', { name: 'Mincha' })).toHaveAttribute('aria-pressed', 'true')
@@ -2361,7 +2389,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
         open()
         await user.type(screen.getByRole('searchbox'), 'orthodox mincha')
-        expect(heading()).toHaveTextContent('1 minyan left today')
+        expect(rows()).toHaveLength(1)
         expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
         await user.click(within(heading()).getByRole('button', { name: /^Filters/ }))
         expect(within(sheet()).getByRole('button', { name: 'Orthodox' })).toHaveAttribute('aria-pressed', 'true')
@@ -2391,7 +2419,8 @@ describe('GenericDirectory — each shul’s next minyan', () => {
 
     it('isn’t on a page without minyanim', () => {
       renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing({ name: 'Acme' })]} {...handlers} />)
-      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('minyan-switch')).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('list-heading')).getByRole('heading')).toHaveTextContent('1 listing')
     })
   })
 
@@ -2457,7 +2486,8 @@ describe('GenericDirectory — a listing opened on desktop', () => {
 
     await user.click(screen.getByRole('button', { name: 'Food' }))
     expect(screen.getByRole('searchbox')).toBeVisible()
-    expect(screen.getByRole('heading', { level: 1, name: 'Food' })).toHaveClass('desktop:not-sr-only')
+    // Back on the list, the title is on the photo again (board H4).
+    expect(screen.getByRole('heading', { level: 1, name: 'Food' })).not.toHaveClass('sr-only')
   })
 
   // Oct 6: it has the page, so it's a step the browser's Back undoes. It
@@ -2609,25 +2639,24 @@ describe('GenericDirectory — the Minyanim tab', () => {
     expect(screen.queryByText('shacharis tomorrow')).not.toBeInTheDocument()
   })
 
-  it('“‹ Synagogues” goes back from the Minyanim view to the list of shuls', async () => {
+  it('the switch’s “Synagogue” goes back from the Minyanim view to the list of shuls', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onParamsChange = vi.fn()
     renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
     expect(screen.getByTestId('minyanim-view')).toBeVisible()
-    await user.click(within(screen.getByTestId('directory-up')).getByRole('button', { name: 'Synagogues' }))
+    await user.click(within(minyanSwitch()).getByRole('button', { name: shulCat.label }))
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
     expect(screen.getByText('Aleph Shul')).toBeVisible()
   })
 
-  // Oct 6: the view said "Synagogues" three times on a computer (the page
-  // title, "‹ Synagogues", then a bigger "Minyanim by time"), and on a phone
-  // had a second back under the header's.
-  it('on a computer, Synagogues once: a small “‹ Synagogues” over the title, which is the view’s', () => {
+  // Nov 11: By time is a way of reading the page, not a page of its own:
+  // the title stays the category's, with no "‹ Synagogues" over it (Oct 6's
+  // way back), since the switch beside the list is the way back.
+  it('on a computer, the title stays Synagogues, with no back over it', () => {
     renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} />, { content: { categories: [shulCat] } })
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Minyanim by time')
-    expect(within(screen.getByTestId('directory-up')).getByRole('button')).toHaveTextContent('Synagogues')
-    expect(screen.getAllByRole('button', { name: /Synagogues/ })).toHaveLength(1)
-    expect(screen.queryAllByRole('heading', { name: 'Minyanim by time' })).toHaveLength(1)
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Synagogues')
+    expect(screen.queryByTestId('directory-up')).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('heading', { name: 'Minyanim by time' })).toHaveLength(0)
   })
 
   function HeaderProbe() {
@@ -2635,7 +2664,7 @@ describe('GenericDirectory — the Minyanim tab', () => {
     return header && <button data-testid="header-back" onClick={header.onBack}>‹ {header.title}</button>
   }
 
-  it('on a phone, the header names it and its ‹ goes to Synagogues; no second back under it', async () => {
+  it('on a phone, the header stays Synagogues and its ‹ closes By time; no second back under it', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     renderWithProviders(
       <ScreenHeaderProvider>
@@ -2647,9 +2676,9 @@ describe('GenericDirectory — the Minyanim tab', () => {
       { content: { categories: [shulCat] } },
     )
     expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Synagogues')
-    await user.click(screen.getByTestId('next-minyan'))
-    expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Minyanim by time')
-    expect(screen.queryByRole('button', { name: /Synagogues/ })).not.toBeInTheDocument()
+    await user.click(byTimeButton())
+    expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Synagogues')
+    expect(screen.queryByTestId('directory-up')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('header-back'))
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
@@ -2663,7 +2692,7 @@ describe('GenericDirectory — the Minyanim tab', () => {
     const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
     try {
       renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
-      await user.click(screen.getByTestId('next-minyan'))
+      await user.click(byTimeButton())
       expect(onParamsChange).toHaveBeenLastCalledWith({ davening: '1' }, { step: 'minyanim' })
 
       // The browser's Back: the address no longer has ?davening.
@@ -2674,9 +2703,9 @@ describe('GenericDirectory — the Minyanim tab', () => {
       expect(screen.getByText('Aleph Shul')).toBeVisible()
 
       // Its own back, when the step is there to take, takes it.
-      await user.click(screen.getByTestId('next-minyan'))
+      await user.click(byTimeButton())
       window.history.replaceState({ step: 'minyanim' }, '')
-      await user.click(within(screen.getByTestId('directory-up')).getByRole('button'))
+      await user.click(listButton())
       expect(back).toHaveBeenCalledTimes(1)
     } finally {
       back.mockRestore()

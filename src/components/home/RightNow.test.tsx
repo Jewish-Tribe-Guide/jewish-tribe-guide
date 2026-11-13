@@ -37,7 +37,8 @@ const kosherType: CategoryField = {
 }
 const items: CategoryField = { key: 'm', label: 'Items', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' }
 const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours, meatDairy] })
+const FOOD_PICTURE = 'https://example.supabase.co/storage/v1/object/public/site-assets/category-band/food-pic.jpeg'
+const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', icon: '🍽️', cardBandImageUrl: FOOD_PICTURE, detailFields: [hours, meatDairy] })
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [hours, kosherType, items] })
 const zmanimPage = makeCategory({ id: 'prayer-shabbat-times', kind: 'zmanim', label: 'Zmanim', pluralLabel: 'Zmanim' })
 const eruvPage = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruv Information' })
@@ -122,6 +123,22 @@ describe('Right now', () => {
       ['Grocery2 open now3 kosher items tracked', '/test-community/grocery?openNow=1'],
     ])
     expect(section).not.toHaveTextContent(/minyan|Mincha|Candles/i)
+  })
+
+  // Board K1c (Nov 11): each row shows its category's picture, the same as
+  // its tile below, not an icon ("It feels childish"); none when it has no
+  // picture.
+  it('a weekday row shows its category’s picture, never an icon or emoji', () => {
+    at('2026-10-13T12:30:00-04:00')
+    show('2026-10-13T12:30:00-04:00', week)
+    const [foodRow, groceryRow] = within(screen.getByTestId('right-now')).getAllByRole('link')
+    const img = foodRow!.querySelector('[data-testid="right-now-photo"] img')
+    expect(decodeURIComponent(img?.getAttribute('src') ?? '')).toContain('category-band/food-pic')
+    expect(groceryRow!.querySelector('[data-testid="right-now-photo"]')).toBeNull()
+    // The chevron is the only drawing left in either row.
+    expect(foodRow!.querySelectorAll('svg')).toHaveLength(1)
+    expect(groceryRow!.querySelectorAll('svg')).toHaveLength(1)
+    expect(screen.getByTestId('right-now')).not.toHaveTextContent(/🍽️|🛒/u)
   })
 
   it('late at night, with nothing open: nothing at all', () => {

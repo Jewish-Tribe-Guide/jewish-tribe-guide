@@ -60,7 +60,7 @@ describe('desktop hero photo', () => {
     expect(preloadSpy).toHaveBeenCalledTimes(1)
     const [href, opts] = preloadSpy.mock.calls[0]!
     expect(href).toContain('/_next/image')
-    expect(opts).toMatchObject({ as: 'image', fetchPriority: 'high', imageSizes: '58vw' })
+    expect(opts).toMatchObject({ as: 'image', fetchPriority: 'high', imageSizes: '100vw' })
     // Without a media condition this is exactly the bug: every phone preloads
     // the photo it then hides. Must match the `desktop:` variant in globals.css.
     expect(opts.media).toBe('(min-width: 640px) and (min-height: 640px)')

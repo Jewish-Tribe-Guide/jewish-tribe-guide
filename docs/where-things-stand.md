@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 10, 2026.
+Last updated: Nov 11, 2026.
 
 ## The branch
 
@@ -224,6 +224,255 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
+- **Computer home: the hero centred** (BUILT Nov 11, the user's yes to
+  board C on the desk canvas: "much calmer and more directs my attention").
+  The headline, the big search and what to try are centred over the photo,
+  now full width and dimmed; white type. Named changes: Browse Categories
+  and View Map are gone from the hero (the header has Categories and Map),
+  and the header no longer goes see-through over the hero (dark header
+  text can't sit on a dimmed photo; the board draws it white). No line
+  under the headline (the user, Nov 11), and the admin's "Line under it"
+  field is gone (the stored value is left, unused). Everything below the hero is unchanged, and the
+  phone home is untouched. Held off for a look with real people: the
+  showcase sections, search in the header.
+- **Open from Nov 11's home review** (the user's notes on the built hero):
+  - The switch and day pills are blue (the site's colour for a picked
+    thing), BUILT.
+  - Explore by Category showing every category instead of "More": held,
+    to ask visitors.
+  - Explore by Category as photo tiles (board H1 on the desk canvas, the
+    user: "soooo much better. let's do it"): BUILT Nov 11. Five across, the
+    name under each photo, no counts; the first nine and an "All
+    categories" tile (was "More"), which expands to every tile. A tile's
+    photo is the category's own picture, else its wide card photo, else its
+    line icon on grey, else its initial (never its emoji). Changes to
+    earlier decisions: the 64px circles with listing counts are gone on the
+    computer. Fixed with it: the eruv card never found Philly's eruv
+    category's picture (its id is `eruv-information`; the card is always
+    `eruv`), and the trust band's point text ignored its two-line clamp.
+    Open: the phone's category tiles still mix photos and tinted icons;
+    H1 didn't cover them. Networking's and Eruv Information's pictures
+    don't work as tiles (generic tech art; a blurry thumbnail).
+  - **"Everything on one map" card** (board G3, the user, Nov 11: "let's
+    build this and let's have it in the admin too with room for
+    adding/changing the photo"): BUILT Nov 11. A wide card, a row of its
+    own like Categories: a photo on the left, "One map / Everything on one
+    map", the community's five biggest categories by name, and "Open the
+    map"; the whole card links to the map. No map is drawn in it (the
+    drawn one in G "looks very fake"). Its photo is set in Site → Home page,
+    under "Cards under the search", while the card is in that list ("Map
+    card photo"); with none it shows the plain map glyph. It is the old
+    'map' card kind come back, offered again in "+ Add", and the default
+    for a community with no cards saved, after Categories. Computer only.
+    Named changes: the map card was retired (it embedded the map); it is
+    back as a link. City Hall moves from the hero to this card, and the
+    hero gets a photo of the community, still to find (the user's call,
+    in the admin). Needs **migration 095** (`site_settings.desktop_map_image`)
+    to save a photo: not run on dev, test or live yet. Without it the card
+    still shows (glyph), every other setting still saves, and choosing a
+    photo says it isn't set up. **On live, Philly already has an old 'map'
+    row** (after Suggest a Listing, before Stay in the Loop), so the card
+    appears there once this deploys; move it in the admin. Fixed on the
+    way (found on dev): the card moved by keyboard could land inside a row
+    of two and be squeezed to a third of the width; it now passes rows.
+  - **Computer home, one thing at a time** (board G5b on the desk canvas,
+    the user, Nov 11: "Let's first build out the drawing with no
+    picture"): BUILT Nov 11. Top to bottom: the photo, the trust strip
+    (no chevron, lifts on hover), Explore by Category in three rows of
+    five (14 tiles and "All categories"), two white answer cards side by
+    side ("Next minyan / Maariv 7 PM / the shul · distance" and "This
+    Shabbos / Candles 4:28 PM / Friday · Havdalah Saturday 5:28 PM", each
+    one link, no chevron, lifting on hover), the map card 540px tall, a
+    plain "Know a place we're missing?" card with "Suggest a listing", and
+    a navy "Stay in the Loop" box (email and Sign up only: every category,
+    new places and closures). Named changes: the minyan and Shabbat cards
+    lose their photos, headings and buttons ("View Times", Minyanim / All
+    zmanim / Eruv); the Shabbat card is white, not night ink; Suggest
+    loses its photo; Stay in the Loop loses its category picker and
+    switches on the home page (they stay on the manage page every email
+    links to); the "Jewish Times card heading" setting is removed (no
+    migration; the column is no longer read). The default order for a
+    community with no cards saved is the G5b order; **Philly's live order
+    is the admin's** (Categories, Davening + Suggest, Map, Shabbat, Stay in
+    the Loop), so it needs moving in the live admin to match (dev is
+    moved). Differs from the board: "This Shabbos" (the site's word) not
+    "This Shabbat"; a small source line under the Shabbat time (Hebrew
+    date, place, Hebcal.com), kept for visible trust. Fixed on the way:
+    the minyan card linked to (and drew the glyph of) the first category
+    with a minyan field, Food on dev, instead of the shuls page the
+    schedule reads. The map card's picture came after (below).
+  - **Computer home, more room** (board G5c, the user, Nov 11: "Yes, build
+    G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), now 48px
+    (the user, Nov 11, once the cards were outlined: the gaps read too
+    big; "you can fix the gaps too"), the
+    first still 32px under the trust strip. "Know a place we're missing?"
+    is a 240px-tall section with a 38px heading, bigger line and a 56px
+    button; the navy Stay in the Loop box is 260px tall with a 38px
+    heading, a 320px email box and 56px controls. Phone unchanged.
+  - **Map card picture: an OpenStreetMap street map** (the user, Nov 11:
+    "OSM, farther out", picked over a close-in Center City view and over
+    Google's Static Maps). BUILT Nov 11. `scripts/map-card-picture.mjs
+    <slug>` makes one saved picture from the community's map centre,
+    framed about as wide as the map page opens, centre 70% across (right
+    of the words), and sets it as the card's photo with the credit
+    OpenStreetMap asks for; the card shows "© OpenStreetMap contributors"
+    small in the corner. An admin's own photo replaces both. It differs
+    from the Google map page in colour (pink and orange main roads, more
+    green), not framing; the user accepted that. The picture fades to the
+    card's ground under the words (180 KB on the home before, over the
+    150 KB image budget; 110 KB after), and waits until the screen
+    measures as a computer: fixed on the way, phones were downloading
+    the card's picture, any picture, though the card is computer-only
+    (since G3; unseen until a picture was set). **Dev has it. Live needs
+    migration 095 first, then the script with `--prod --apply`: both need
+    the user's go-ahead.**
+  - **Category pages open on the home tile's picture** (boards H4 computer,
+    H5 phone; the user, Nov 11: "let's do H4 and the phone"). BUILT Nov 11.
+    Computer: the band is a 240px photo under a dark gradient carrying "N
+    PLACES", the title at 44px (now the page's h1) and the distances line
+    in white; the search is a white pill on the photo's bottom, 688px wide.
+    Phone: the same picture, 120px, edge to edge under the header, no
+    second title; the rest as before. Changes to what was there: the round
+    category badge and the thin 132px strip are gone (the home tile's photo
+    now grows into the band instead of the badge morphing); listing rows
+    are a step bigger on a computer everywhere they're used (18px name, 48px
+    picture), phones unchanged; the count shows twice ("71 PLACES" on the
+    photo, "71 listings" over the list, which counts what's filtered).
+    Not drawn, decided while building: a category with no picture gets its
+    colour behind the words; a listing opened on a computer drops back to
+    the old 132px band with no words (it keeps the top of the page, as
+    decided Oct). Eruv's own page and Zmanim keep the old band.
+  - **A category has one picture, its banner, and its icon isn't set any
+    more** (the user, Nov 11: "the picture can just be the banner. So maybe
+    we don't need the option to change the icon"; "Yes, build it"). BUILT
+    Nov 11. The admin's Banner photo (else the older pasted card photo) is
+    the computer home's tile, the category page's photo and a phone's
+    picture under the header. The Icon section is gone from the category
+    editor (emoji box, Browse icons, "Or use a picture instead"); Basics
+    still shows the icon beside the name, not tappable. Every category
+    draws its kind's line icon; one with none of its own gets a plain
+    four-squares line icon where its emoji used to show (badges, map pins,
+    the nearby list). `icon_image_url` is no longer read or written (the
+    column stays, no migration) and its upload route is deleted, so the
+    soft 612px icon pictures on dev no longer show anywhere. Forms keep
+    their emoji Icon field. Changes to earlier decisions: home badges
+    (search rows) no longer show a category picture, and
+    Food's page now opens on its banner rather than the picture set as its
+    icon.
+  - **No more flying picture** (the user, Nov 11: "when I click on a
+    category card I see the background picture come flying in"). BUILT
+    Nov 11: the home tile and the category page's photo no longer share a
+    view-transition name, so the page just appears. Change to H4 as built
+    (the tile used to grow into the photo).
+  - **Outlined cards on the computer, photo tiles on the phone** (boards
+    J1b and J2b, the user's "J1b and J2b"). BUILT Nov 11:
+    - J1b: every white card on the computer home (Next minyan, Before
+      candles, the map card, the trust band, Suggest a listing, the Explore
+      box) carries a quiet grey outline all the time; under the pointer it
+      lifts and the outline goes blue. One constant, `HOME_CARD_OUTLINE`.
+      The photo tiles stay unoutlined. J1 (soft blue) not built.
+    - J2b: the phone home's tiles stay three across, each filled by the
+      category's one picture (banner, else card photo) with its name on it
+      over a dark fade. A category with no picture keeps its tint and line
+      icon. A long name grows its row rather than being cut. Change to the
+      Oct 17 decision ("not the old photo tiles"): every tile is now a
+      picture download (120px thumbnails from storage), inside the home's
+      600 KB image budget. J2 (name under the picture) not built.
+  - **Phone home as board K1c, computer footer as K2** (the user, Nov 11:
+    "I like it" to K1c; K2 "I like the footer for desktop"). BUILT Nov 11:
+    - The tiles sit in one white box under a small "EXPLORE BY CATEGORY"
+      label, the same label and box as Right now's, so the home reads
+      label, box, label, box.
+      Changed Nov 12 (board M1, the user: "Build M1"): the white box
+      round the tiles is gone. The photo tiles are cards themselves, so
+      it read as a box in a box. The tiles sit on the grey page under
+      their label, as wide as Right now's card, which keeps its box.
+      Drawn, not built: M2 (white page) and M3 (white page, Right now as
+      bare rows).
+    - Each name is in the middle of its tile, over an even darkening
+      ("I'm fighting my brain/eyes which wants to look center"). Changes
+      J2b's name at the bottom over a fade. The computer's tiles keep
+      theirs at the bottom.
+    - No icons on the phone home ("It feels childish"): a Right now row
+      shows its category's picture, the same as its tile, and none when it
+      has no picture; a tile with no picture is its tint and its name.
+      Changes this morning's "small badges stay icons" for these two spots.
+      The search lines keep their icons; not asked yet.
+    - The 72px gap above Right now is gone: it was the computer's spacing
+      between card rows (G5c) collapsing through the phone's empty copies.
+      Now 20px.
+    - The phone footer is unchanged (the user: "I'm ok with how it is for
+      mobile"). The computer's footer is a white band (K2).
+    - Drawn, not built: K1 (names at the bottom in the box) and K1b (K1c
+      with icons and the heading inside the box).
+  - **The eruv line on the computer's Shabbos card** (board L1, the user,
+    Nov 11: "Yes, build L1"). BUILT Nov 11. From erev Shabbos or Yom Tov
+    to havdalah (the same window as the phone's candles card), the This
+    Shabbos card carries the phone's eruv line along its bottom, in a
+    light grey band: the nearest eruv by name with a location, the summary
+    without one, one that's down named first. The line is its own link to
+    the Eruv page; the rest of the card still opens Zmanim, so on those
+    days the card is a box holding two links. Weekdays: no line, one link.
+    No line without an Eruv page.
+  - **The computer home fits a narrower window** (the user, Nov 12: it
+    isn't "so great at shrinking", and Suggest a listing beside Stay in
+    the Loop came out badly). BUILT Nov 12. Each section now sizes itself
+    by its own box, not the window, so it also holds up when an admin
+    puts two in one row:
+    - Suggest a listing and Stay in the Loop: words, then the button or
+      email box under them, while the card is under 920px wide; side by
+      side from there, as drawn. Two in a row are the same height.
+    - The trust strip: under 900px, its heading on a row of its own and the
+      three points sharing the row under it.
+    - Next minyan and This Shabbos: under 448px, the round glyph goes and
+      the time drops from 34 to 30px, so it stays on one line.
+    - Looks unchanged at full width.
+  - **The computer's This Shabbos card names only the place** under its
+    times (the user, Nov 12: "Yes, just the place"). BUILT Nov 12. The
+    Hebrew date and "from Hebcal.com" are gone from the card; both stay on
+    the Zmanim page it opens, as Next minyan leaves its sources to its
+    page. Change to an earlier decision: the line had been kept for
+    visible trust.
+  - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
+    user's "Let's do F1b for now"). A full-width band below the hero photo,
+    not overlapping it: shield, the trust line, and the phone sheet's three
+    points, the whole band opening the same sheet as a centred dialog. The
+    phone is unchanged. The "Kept by the Community" card is gone with it:
+    a saved row of it draws nothing, the admin's card list no longer offers
+    it, and its eyebrow and heading settings are removed (no migration; the
+    two columns just stop being read).
+  - The big map: G2 on the canvas, a card in words only (map glyph, "ONE
+    MAP", "Everything on one map", one line, "Open the map"), the whole
+    card tappable, under the categories. The user didn't want a drawn
+    map. Not built: waiting on the user's go-ahead.
+  - The headline is 48px (was 40), in an 880px column so it stays on one
+    line about as wide as the 688px search box under it. BUILT.
+  - A category's own picture ("Or use a picture instead") now shows on
+    every home badge of it: computer tiles, search rows, phone tiles,
+    Browse, Right now, the Add picker. It used to show only in the search
+    dropdown, so Food's new picture never appeared. BUILT. Change to an
+    earlier decision: the search rows had dropped photos because the wide
+    home-screen photo turns to mush at 32px; this is the separate picture
+    chosen for the icon spot. Open: pictures for the other categories
+    (Food is the only one so far, so it stands out among icons).
+- **"Synagogue | Minyan" (first "By synagogue | By time") replaces the green Minyanim card** (BUILT
+  Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
+  drawn"). The list's heading is a two-part switch on phone and computer;
+  By time is the Minyanim view at `?davening=1`, a history step as before.
+  The page title stays the category's name in both (it used to turn into
+  "Minyanim by time"). No count beside it in the view (the user, Nov 11:
+  "we don't need to say how many minyanim left today"). The days are small
+  pills across the top of the white box, as board D1 drew them (the user,
+  Nov 11); a Yom Tov keeps its name on the pill, a plain date is only its
+  hover title (changes the two-line day + date tabs). No number in the
+  switch either (the user's yes, Nov 11: "By synagogue instead of the
+  number"), so the list no longer says how many places it holds. Named change: on Oct 6 the user
+  dropped a toggle because "if we need a sign the toggle isn't
+  noticeable"; reminded of that, they still chose plain. Held off for a
+  look with real people: next minyan in rows, one map switch, side by side.
+  Renamed later on Nov 11 to "Synagogue | Minyan", no "By" (the user:
+  "take out 'by' and replace time with minyan"). Then as tall as Filters
+  beside it, 40px (was 34px; the user: "Yes, match it").
 - **Minyanim by time opens on the page whose places have minyanim** (fixed
   Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
   test project's Food was, ahead of Synagogues. The search's "next maariv"
@@ -231,6 +480,91 @@ The user's answers on Nov 10, evening, and what was done with them:
   they landed on Food with nothing to show. They now take the page whose
   places carry the most minyanim (`minyanimPage`), the first holding the
   field only when none has any. The e2e tests pick the page the same way.
+- **Filter tag on Kosher items and Hours** (fixed Nov 11, the user on
+  Grocery's admin page). A field's row said Filter only for a Yes/No or
+  Choice shown as a badge, so Hours ("Open now") and a list of items
+  (Grocery's Kosher items, always the page's "Has" filter) showed none.
+  The row now says Filter the way the site filters (`inFilter`), and
+  removing a list of items warns that the filter loses it. A list of items
+  has the "In the filter" switch like any filter now (the user: "I don't
+  want any hidden rules"), saved as `itemFilter: false` when off, since
+  saving had forced `filterable` off on every list; off, it leaves Filters
+  and a search for an item no longer ticks it.
+- **To do's week box marks only what changed** (Nov 11, the user on the
+  Shtiebel item). A week read again comes with every minyan under a new id,
+  and the box matched the site's by id, so all of them said "New". It now
+  pairs by id, else by day, tefillah and time (`pairWithListing`, also in
+  the change count): an unchanged minyan has no mark, and a note-only
+  change says Changed with the old note crossed out under the new one, the
+  way a changed time shows what it was. Two admin-write flakes seen while
+  running it, each green alone: todo-scroll's resize line and
+  category-open's no-request check.
+- **A shul's week read again with its notes only reworded files nothing**
+  (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
+  a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;
+  coffee and learning" the next, at the same times, so the queue held a
+  change the same as the site. A note that only drops or rewords words
+  the listing's note has now keeps the listing's (`keepListedNotes`); a
+  new word still goes to the queue. The Nov 11 Shtiebel item in the live
+  queue predates this and is the user's to reject.
+- **One nightly email instead of one from every watch** (built Nov 12,
+  as drawn in N7-N9 of canvas S7uB4KuZQtdF6bJywzUZBd). After the last
+  job (`/api/cron/nightly-email`, 9:45 UTC), each community's admins get
+  "Philly Jewish Guide · Nightly watches: 5 to check": the night, a
+  sentence put together by code from the counts, Waiting for you (a row
+  a place, opening it in To do, "Also in To do: N from earlier nights and
+  N from people", Open To do), Stopped working in red (a watch's place in
+  Watches, or the Watches tab for a job), Changed on its own (Google).
+  None on a night with nothing at all. Waiting for you is read from the
+  queue at send time; a watch that broke from its `failingSince`; a job
+  from its runs; Google from `night_note` (migration 096). Gone: the
+  emails each website, newsletter, Keystone-K, Mekor, Refuah and eruv
+  website watch sent, the watch broke / working again emails, the job
+  broke / working again emails, Google's status digest from the nightly
+  sync and its immediate "permanently closed" email (now a row). Kept as
+  they were: a person's submission emails, the eruv-map line alert, and
+  the status email after an admin's own Google refresh. Not in the email,
+  on purpose: the times themselves, and "working again". With nothing
+  waiting but something broken, the subject says "1 stopped working".
+  Phone, computer and quiet renders checked against N7-N9. **Migration
+  096 is on dev (Nov 12), not live** (see "Waiting for a yes"); until it is,
+  Google's changes are emailed at once as before and the nightly email
+  just has no Changed on its own. Not seen in a real inbox yet: the
+  first one goes out the night after this reaches the live site.
+- **A line turned down in a shul's week isn't filed again** (fixed Nov 12,
+  prod queue). A read week is filed whole, so a line the admin rejected
+  came back whenever anything else in that week changed: Kol Tzedek's Bar
+  Mitzvah note (rejected 3 times, back as #1347), TBZBI's Sat 9:30 and
+  Zoom links (twice, back as #1352), Rodeph Shalom's Thursday note
+  (twice, back as #1351). Each day's tefillah is now weighed on its own
+  (`leaveOutTurnedDown`): one the page gives exactly as a turned-down
+  suggestion of this watch gave it, with no approval for that week since,
+  stays as the listing has it and leaves the note. The page giving that
+  day something else still files, and so does the rest of the week. The
+  items already waiting in the live queue predate this and are the
+  user's to decide.
+- **A shul's week finding no longer shows other weeks changed back**
+  (fixed Nov 11, Mekor Habracha). Mekor's Nov 6 newsletter printed
+  "7:00pm" for Friday Nov 13's Mincha (candle lighting 4:28); that was
+  approved as read, and the listing's copy was later corrected to 4:30.
+  The Nov 10 website read was filed with a copy of the whole schedule
+  from before the correction, so To do showed Friday going back to 7pm.
+  Approving was always safe (`rebasePart` puts on the finding's own week
+  only); the queue list and job pages now show it the same way. The live
+  item's own week (Nov 20-21) is right. A candle-lighting check was
+  proposed and turned down (the user: "We are supposed to be an
+  aggregator. If someone posts a wrong time that's not on us").
+- **A website that changed after the newsletter corrects it** (the user,
+  Nov 11, changing Oct 20's "the newsletter wins": "if they correct it
+  then we should be correcting too"). On a day both give, a website page
+  that changed after the newsletter's week was posted corrects that
+  week's time for each tefillah it gives (`correctOlderWeeks` in
+  listingPageRun.ts): one minyan each side, same tefillah or both evening
+  ones; the week's other times that day stay. A page unchanged since, a
+  week with no posted time, or a page with no change on record leaves
+  the newsletter's week as it was. "Changed" is the whole page's
+  fingerprint, so a page edited for anything else counts as newer too;
+  the admin still approves each change.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
@@ -536,6 +870,14 @@ Still different, each needing the user:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
+0. **Migration 096 (`night_note`, Nov 12):** a new table for the
+   nightly email's Google line. On dev since Nov 12; live needs a yes.
+   The site works without it.
+0. **Migration 095 (map card photo, Nov 11):** one `add column if not
+   exists`. Run it on live before or with the deploy that ships the map
+   card; the card works without it, only its photo can't be saved. Then
+   the photo is set in the admin (City Hall, by the user's call). Needs a
+   yes.
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site
@@ -2125,7 +2467,9 @@ Settled with the user so far:
   The website usually gives the usual times; the newsletter gives this
   week's, as a week beside the usual times. For the same days a week from
   the newsletter or a person wins over the website's (the user, Oct 20;
-  `postedBy` in schedules.ts). An agreeing website read confirms and
+  `postedBy` in schedules.ts), unless the website's page changed after
+  that week was posted: then a time it gives corrects the week's
+  (`correctOlderWeeks`, the user, Nov 11). An agreeing website read confirms and
   clears older findings; an approved newsletter change shows "Confirmed
   by <shul>".
 - **Waiting for you, in order**: a place off a certifier's list first
@@ -5268,7 +5612,8 @@ build").
   they disagree"). What the website reads is marked as the website's. The
   website leaves out any day the newsletter (or a person, through Update
   their times) has given a week for, and a newsletter's week takes the
-  website's times off its days.
+  website's times off its days. Changed Nov 11: the newer one wins a day
+  (see "A website that changed after the newsletter corrects it").
 - **Gaps, plainly:** if a website suggestion and a newsletter suggestion
   for one shul are both waiting in the queue, whichever is approved last
   wins (the website watch never files while anything is waiting, so this

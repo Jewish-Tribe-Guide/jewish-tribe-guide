@@ -321,8 +321,8 @@ export function SkylineIcon({ className }: IconProps) {
   )
 }
 
-// People — UpdateListingsCard's header icon (Phase 6, desktop mockup
-// rework). Two overlapping figures, not one — "kept by the community" is
+// People — the trust sheet and band's "People fill in the rest" (once
+// UpdateListingsCard's). Two overlapping figures, not one — "kept by the community" is
 // about the group, not an individual.
 export function PeopleIcon({ className }: IconProps) {
   return (

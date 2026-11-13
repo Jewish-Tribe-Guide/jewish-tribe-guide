@@ -26,7 +26,7 @@ import {
   type CalendarEntry,
   type CalendarWeek,
 } from '@/lib/calendarFeed'
-import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, seasonOf, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
+import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, readWeekLines, sameTime, seasonOf, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
 import { dateText, readSchedules, regularMinyanim, schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
@@ -35,10 +35,9 @@ import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionS
 import { TIMES_PART_LABELS, partKey, partLines, partSize, partsGiven, readPartSource, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
 import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
 import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
-import { sendWatchDigest } from '@/lib/email'
 import { confirmFromSource } from '@/lib/sourceConfirm'
-import { jobPageFor } from '@/lib/watchFindings'
 import { withMinyanLinks } from '@/lib/minyanLinks'
+import { keepListedNotes, leaveOutTurnedDown, type Decision } from '@/lib/websiteNotes'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -312,7 +311,9 @@ export function dropListed(update: TimesUpdate, current: readonly Minyan[], sche
 
 /** What the website gives for days the shul's newsletter (or a person)
  *  has already given a week for, taken out: the newsletter wins on any day
- *  both give (the user, Oct 20). A website is usually the one behind. A
+ *  both give (the user, Oct 20). A website is usually the one behind; one
+ *  that changed since corrects the newsletter's week first
+ *  (correctOlderWeeks), so what's taken out here then agrees. A
  *  week of the website's keeps its other days. Null when no day is left. */
 export function yieldToNewsletter(update: TimesUpdate, schedules: readonly SpecialSchedule[]): TimesUpdate | null {
   const held = datesHeldOverWebsite(schedules)
@@ -320,6 +321,52 @@ export function yieldToNewsletter(update: TimesUpdate, schedules: readonly Speci
   if (update.kind !== 'week' || !update.from || !update.to) return { ...update, rows }
   const left = datesBetween(update.from, update.to).filter((d) => !held.has(d))
   return left.length ? { ...update, from: left[0], to: left.at(-1)!, rows } : null
+}
+
+/** The newsletter's (or a person's) weeks, corrected by a website that
+ *  changed after they were posted: the newer one wins a day (the user,
+ *  Nov 11, changing Oct 20's "the newsletter wins"). Mekor Habracha's
+ *  newsletter gave Friday's Mincha at 7:00pm, a typo; its website, changed
+ *  since, said 4:30, and was held off. "If they correct it then we should
+ *  be correcting too." Only a time the website gives is corrected: a
+ *  minyan the week has that date, that tefillah (or both an evening one),
+ *  when each side has exactly one; the week's other times stay. A page
+ *  with no change on record (`pageChangedAt` null) corrects nothing. */
+export function correctOlderWeeks(
+  schedules: readonly SpecialSchedule[],
+  update: TimesUpdate,
+  pageChangedAt: string | null | undefined,
+): { schedules: SpecialSchedule[]; changes: string[] } {
+  if (!pageChangedAt || update.kind !== 'week') return { schedules: [...schedules], changes: [] }
+  const given = update.rows.filter((r) => DATE.test(r.day) && (r.status === 'same' || r.status === 'changed' || r.status === 'new'))
+  const changes: string[] = []
+  const out = schedules.map((s) => {
+    if (s.kind !== 'week' || s.postedBy === 'website' || !s.postedAt || s.postedAt >= pageChangedAt) return s
+    let minyanim = s.minyanim
+    for (const d of datesBetween(s.from, s.to)) {
+      const rows = given.filter((r) => r.day === d)
+      for (const r of rows) {
+        const group = (t: Tefillah) => (EVENING.includes(r.tefillah) && EVENING.includes(t)) || t === r.tefillah
+        const exact = minyanim.filter((m) => m.on.includes(d) && m.tefillah === r.tefillah)
+        const theirs = exact.length ? exact : minyanim.filter((m) => m.on.includes(d) && group(m.tefillah))
+        const ours = rows.filter((o) => (exact.length ? o.tefillah === r.tefillah : group(o.tefillah)))
+        if (theirs.length !== 1 || ours.length !== 1) continue
+        const m = theirs[0]
+        if (sameTime(m, r)) continue
+        // The time as the page gives it, rule and bounds too; the rest (its
+        // notes, its join link) as the week has it.
+        const time = { time: r.time, anchor: r.anchor, offsetMinutes: r.offsetMinutes, notBefore: r.notBefore, notAfter: r.notAfter }
+        const fixed = Object.fromEntries(Object.entries({ ...m, ...time, on: [d] }).filter(([, v]) => v !== undefined)) as typeof m
+        const others = m.on.filter((x) => x !== d)
+        minyanim = minyanim.flatMap((x) => (x === m ? [...(others.length ? [{ ...m, on: others }] : []), others.length ? { ...fixed, id: crypto.randomUUID() } : fixed] : [x]))
+      }
+    }
+    if (minyanim === s.minyanim) return s
+    const after = { ...s, minyanim }
+    changes.push(...readWeekLines(s, after))
+    return after
+  })
+  return { schedules: out, changes }
 }
 
 /** A time a page gives on a date: a calendar's week, on the listing, in
@@ -406,6 +453,34 @@ export function upcoming(u: { from?: string | null; to?: string | null }, today:
 /** A result's lines that change the listing. */
 const changing = (u: TimesUpdate | null) => (u ? u.rows.filter((r) => r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && !r.keep)).length : 0)
 
+/** A read with the days the admin already turned down put back as the
+ *  listing has them (leaveOutTurnedDown), and those weeks' lines said
+ *  again. */
+function leaveOut<T extends { schedules: SpecialSchedule[]; changes: string[] }>(listed: readonly SpecialSchedule[], applied: T, decisions: readonly Decision[]): T {
+  const schedules = leaveOutTurnedDown(listed, applied.schedules, decisions)
+  if (schedules === applied.schedules) return applied
+  const touched = applied.schedules.filter((s) => !schedules.includes(s))
+  const changes = [
+    ...applied.changes.filter((l) => !touched.some((s) => l.startsWith(`${s.name}: `))),
+    ...touched.flatMap((s) => readWeekLines(listed.find((x) => x.id === s.id), schedules.find((x) => x.id === s.id))),
+  ]
+  return { ...applied, schedules, changes }
+}
+
+/** What the admin decided of this watch's suggestions for a shul's times:
+ *  a week's part, or one filed whole, with the website weeks it gave. */
+export function decisionsFrom(earlier: readonly Earlier[], key: string): Decision[] {
+  const sk = schedulesKey(key)
+  return earlier.flatMap((s) => {
+    if ((s.status !== 'approved' && s.status !== 'rejected') || !s.reviewed_at) return []
+    const part = partOf(s)
+    if (part && (part.part !== 'week' || part.field !== key)) return []
+    const ids = part ? new Set(part.schedules) : null
+    const weeks = readSchedules(detailsOf(s)[sk]).filter((w) => w.kind === 'week' && w.postedBy === 'website' && (!ids || ids.has(w.id)))
+    return weeks.length ? [{ turnedDown: s.status === 'rejected', at: s.reviewed_at, weeks }] : []
+  })
+}
+
 /** A page's words read for the shul's times (readPageFor), usual and
  *  dated, against the listing as it is now. */
 async function readTimesText(
@@ -414,7 +489,14 @@ async function readTimesText(
   key: string,
   source: PageSource,
   text: string | null,
-  { apiKey, now, dated, others }: { apiKey: string; now: number; dated: readonly DatedTime[]; others?: () => Promise<readonly DirectoryResource[]> },
+  {
+    apiKey,
+    now,
+    dated,
+    others,
+    pageChangedAt,
+    decisions = [],
+  }: { apiKey: string; now: number; dated: readonly DatedTime[]; others?: () => Promise<readonly DirectoryResource[]>; pageChangedAt?: string | null; decisions?: readonly Decision[] },
 ): Promise<PageReading> {
   // The shul's times (scheduleUpdate.ts): its usual ones, and since Oct 20
   // the dated ones too, a week's, filed as that week's times. What the
@@ -450,12 +532,21 @@ async function readTimesText(
     const listed = week ? keepUncovered(u) : dropListed(keepUncovered(u), minyanim, schedules)
     const own = yieldToDated(listed, onDates, today)
     if (changing(own) < changing(listed)) heldByDate = true
+    // A newsletter week older than the page: the page's times correct it.
+    const corrected = correctOlderWeeks(schedules, own, pageChangedAt)
+    if (corrected.changes.length) {
+      schedules = corrected.schedules
+      changes.push(...corrected.changes)
+    }
     const update = yieldToNewsletter(own, schedules)
-    if (changing(update) < changing(own)) held = true
+    if (changing(update) < changing(own) && !corrected.changes.length) held = true
     // A week is compared with the listing's copy of it, so one that now
     // matches the usual times still changes a week that didn't.
     if (!update || (!changesAnything(update) && !(week && update.from && update.to && schedules.some((s) => s.kind === 'week' && s.postedBy === 'website' && s.from <= update.to! && s.to >= update.from!)))) continue
-    const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website', ...(week ? { onlyRead: { today } } : {}) })
+    const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', ...(week ? { onlyRead: { today } } : {}) })
+    // A note only reworded (keepListedNotes), or a line already turned
+    // down (leaveOutTurnedDown), stays as the listing has it.
+    const applied = leaveOut(schedules, { ...posted, schedules: keepListedNotes(schedules, posted.schedules) }, decisions)
     if (applied.changes.length === 0) continue
     // Already on the listing as it would be (read again the next day).
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
@@ -491,6 +582,8 @@ export async function readPageFor(
     now = Date.now(),
     dated = [],
     others,
+    pageChangedAt = null,
+    decisions = [],
   }: {
     apiKey: string
     communityName: string
@@ -502,6 +595,12 @@ export async function readPageFor(
     /** The guide's listings, for a minyan the page says is at another
      *  shul (heldElsewhere.ts). */
     others?: () => Promise<readonly DirectoryResource[]>
+    /** When the page last changed: a newsletter week posted before it is
+     *  corrected by what it gives (correctOlderWeeks). */
+    pageChangedAt?: string | null
+    /** What the admin approved and turned down of this watch's: a line
+     *  turned down isn't filed again (leaveOutTurnedDown). */
+    decisions?: readonly Decision[]
   },
 ): Promise<PageReading> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
@@ -510,18 +609,18 @@ export async function readPageFor(
     const got = await Promise.all(source.pictures.map((u) => fetchPublic(u, { fetchImpl, headers: WATCH_FETCH_HEADERS, pictures: true }).catch(() => null)))
     const images = got.flatMap((g) => (g?.type === 'picture' ? [{ mime: g.mime, b64: g.body }] : []))
     if (!images.length) return { read: [], proposal: null, note: 'Their calendar’s pictures couldn’t be opened.' }
-    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, () => ({ images }), others)
+    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, () => ({ images }), others, false, pageChangedAt, decisions)
   }
   // A calendar that is the shul's whole schedule: its weeks as whole weeks,
   // and one with no services is no minyan (noMinyanWeeks).
   const whole = reads.kind === 'times' && !!source.calendar && calendarIsWhole(source.calendar.services, regularMinyanim(listing[reads.key]))
   if (reads.kind === 'times' && source.weeks) {
     const words = (w: CalendarWeek) => (w.lines.length ? { text: [CALENDAR_HEADING, ...w.lines].join('\n') } : null)
-    const got = await readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, words, others, whole)
+    const got = await readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, words, others, whole, pageChangedAt, decisions)
     return whole ? noMinyanWeeks(got, listing, category, reads.key, source.calendar!) : got
   }
   if (reads.kind === 'times') {
-    const got = await readTimesText(listing, category, reads.key, source, text, { apiKey, now, dated, others })
+    const got = await readTimesText(listing, category, reads.key, source, text, { apiKey, now, dated, others, pageChangedAt, decisions })
     if (whole) return noMinyanWeeks(got, listing, category, reads.key, source.calendar!)
     // Its words list every service by date: the weeks between have none.
     const listed = listedServices(text, got.services ?? [], regularMinyanim(listing[reads.key]), dayIn(now))
@@ -657,6 +756,8 @@ async function readCalendarWeeks(
   sourceFor: (w: CalendarWeek) => ScheduleSource | null,
   others?: () => Promise<readonly DirectoryResource[]>,
   whole = false,
+  pageChangedAt: string | null = null,
+  decisions: readonly Decision[] = [],
 ): Promise<PageReading> {
   const sk = schedulesKey(key)
   let minyanim = regularMinyanim(listing[key])
@@ -679,13 +780,18 @@ async function readCalendarWeeks(
     const own = eventsOnly ? dropListed({ ...week, kind: 'schedule', from: null, to: null, rows: week.rows.filter((r) => r.status === 'new') }, minyanim, schedules) : week
     if (eventsOnly && got.update.rows.some((r) => r.status === 'new'))
       notes.push(`Their calendar for ${weekText(w)} has none of their usual minyanim, so only its other services go on, each on its own date, and their usual times stay.`)
+    const corrected = correctOlderWeeks(schedules, own, pageChangedAt)
+    if (corrected.changes.length) {
+      schedules = corrected.schedules
+      lines.push(...corrected.changes)
+    }
     const update = yieldToNewsletter(own, schedules)
-    if (changing(update) < changing(own) || (!update && own.rows.length)) notes.push(NEWSLETTER_HELD)
+    if ((changing(update) < changing(own) || (!update && own.rows.length)) && !corrected.changes.length) notes.push(NEWSLETTER_HELD)
     if (!update || !update.rows.length) continue
     const posted = applyUpdate(minyanim, schedules, update, { postedBy: 'website', name: weekName(w), evenIfSame: true, whole, ...(update.kind === 'week' ? { onlyRead: { today: dayIn(Date.now()) } } : {}) })
     // The calendar's join links onto its times (withJoinLinks), by code.
-    const linked = withJoinLinks(posted.schedules, w.joins ?? [])
-    const applied = { ...posted, schedules: linked.schedules, changes: [...posted.changes, ...linked.changes] }
+    const linked = withJoinLinks(keepListedNotes(schedules, posted.schedules), w.joins ?? [])
+    const applied = leaveOut(schedules, { ...posted, schedules: linked.schedules, changes: [...posted.changes, ...linked.changes] }, decisions)
     // Already on the listing as it would be: nothing to file for this week.
     if (suggestionKey({ [key]: applied.minyanim, [sk]: applied.schedules }, [key, sk]) === suggestionKey({ [key]: minyanim, [sk]: schedules }, [key, sk])) continue
     minyanim = applied.minyanim
@@ -715,6 +821,8 @@ export async function hasPendingSuggestion(community: string, listingId: string)
 }
 
 type Filed = { id: string; payload: unknown }
+/** A suggestion this watch filed, and what became of it. */
+type Earlier = { payload: unknown; status?: string; reviewed_at?: string | null }
 
 /** The listing's suggestions waiting in the queue, from anyone. */
 async function pendingSuggestions(community: string, listingId: string): Promise<Filed[]> {
@@ -733,15 +841,15 @@ const valuesOf = (s: { payload: unknown }) => ({ ...detailsOf(s), phone: (s.payl
 const sectionOf = (s: { payload: unknown }): SectionSource | null => readSectionSource((s.payload as { source?: { section?: unknown } } | null)?.source?.section)
 
 /** Everything this watch has filed for the listing, whatever became of it. */
-export async function earlierSuggestions(community: string, listingId: string): Promise<{ payload: unknown }[]> {
+export async function earlierSuggestions(community: string, listingId: string): Promise<Earlier[]> {
   const { data, error } = await getAdminClient()
     .from('submission')
-    .select('payload')
+    .select('payload, status, reviewed_at')
     .eq('community_id', community)
     .eq('target_id', listingId)
     .eq('submitted_by->>name', LISTING_PAGE_WATCH_NAME)
   if (error) throw new Error(`Couldn’t read earlier suggestions: ${error.message}`)
-  return (data ?? []) as { payload: unknown }[]
+  return (data ?? []) as Earlier[]
 }
 
 /** The listing's own times or hours, as a fingerprint: what a page's read
@@ -762,7 +870,7 @@ export function listedAs(listing: DirectoryResource, reads: PageReads): string {
  *  read and whether that agrees with the listing. The daily run reads with
  *  the AI only a page that changed: it costs. */
 export async function runListingPageWatch(
-  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'> & Partial<Pick<Watch, 'createdBy' | 'lastCheck'>>,
+  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'> & Partial<Pick<Watch, 'createdBy' | 'lastCheck' | 'pageChangedAt'>>,
   budget?: MenuReadBudget,
   opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; now?: number; full?: boolean } = {},
 ): Promise<WatchOutcome> {
@@ -890,7 +998,7 @@ export async function runListingPageWatch(
  *  a shul's times a part at a time, a mikvah's hours a section at a time,
  *  anything else whole. */
 async function readAndFile(
-  watch: Pick<Watch, 'communityId' | 'url' | 'pageHash'>,
+  watch: Pick<Watch, 'communityId' | 'url' | 'pageHash'> & Partial<Pick<Watch, 'pageChangedAt'>>,
   listing: DirectoryResource,
   category: CategoryConfig,
   reads: PageReads,
@@ -912,7 +1020,12 @@ async function readAndFile(
       return datedTimes(readSchedules(detailsOf(s)[schedulesKey(part.field)]).filter((x) => ids.has(x.id)))
     })
     const others = () => listApprovedResources(watch.communityId)
-    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl, now: opts.now, dated, others })
+    // When the page last changed: now, if it just did (watches.ts records it
+    // after this run).
+    const pageChangedAt = changed ? new Date(opts.now ?? Date.now()).toISOString() : (watch.pageChangedAt ?? null)
+    // What the admin turned down isn't filed again (leaveOutTurnedDown).
+    const decisions = reads.kind === 'times' ? decisionsFrom(await earlierSuggestions(watch.communityId, listing.id), reads.key) : []
+    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl, now: opts.now, dated, others, pageChangedAt, decisions })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The page changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
@@ -930,11 +1043,6 @@ async function readAndFile(
   if (parts.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
-    if (filed.length) {
-      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-        console.error('[watch-listing-page] digest failed:', err),
-      )
-    }
     return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
   }
   // A mikvah's hours: filed as the sections they change, each on its own.
@@ -942,11 +1050,6 @@ async function readAndFile(
   if (sections.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileSections(watch, category, listing, sections, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
-    if (filed.length) {
-      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-        console.error('[watch-listing-page] digest failed:', err),
-      )
-    }
     return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
   }
   // Only a check gets here with one waiting: it says so, files nothing, and
@@ -963,9 +1066,6 @@ async function readAndFile(
     { ...proposal.submission, source: listingPageSource(listing.name, watch.url, on, source.text, seen) } as ResourceSubmission,
     note,
     { name: LISTING_PAGE_WATCH_NAME },
-  )
-  await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }], jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-    console.error('[watch-listing-page] digest failed:', err),
   )
   return { ok: true, filed: 1, pageHash, check: check('filed') }
 }
@@ -1104,11 +1204,6 @@ async function fileContact(
   if (blocked) return { reading, lines, queue: 'waiting', filed: [] }
   const section: HoursSection = { section: CONTACT_SECTION, label: contactBoxName(fields), hours: null, notes: null }
   const { queue, filed } = await fileSections(watch, category, listing, [{ section, details: reading.changes, source: { section: CONTACT_SECTION, keys } }], waiting, text, at)
-  if (filed.length) {
-    await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category, listing.id)).catch((err) =>
-      console.error('[watch-listing-page] digest failed:', err),
-    )
-  }
   return { reading, lines, queue, filed }
 }
 

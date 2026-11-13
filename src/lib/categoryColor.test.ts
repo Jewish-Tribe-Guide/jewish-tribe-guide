@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { categoryColorUsage, categoryTint, getCategoryColor, isValidPinColor, PIN_COLORS, categoryRing } from './categoryColor'
+import { categoryColorUsage, categoryTint, getCategoryColor, getCategoryTilePhoto, isValidPinColor, PIN_COLORS, categoryRing } from './categoryColor'
 import type { CategoryConfig } from './categories'
 
 // The colour is assigned by position rather than stored, so the map pin and the
@@ -299,5 +299,23 @@ describe('categoryRing', () => {
     // exactly the white-logo rows it was added for.
     const alpha = (s: string) => parseInt(s.slice(-2), 16)
     expect(alpha(categoryRing('#b63167').trim())).toBeGreaterThan(alpha(categoryTint('#b63167')))
+  })
+})
+
+describe('getCategoryTilePhoto', () => {
+  const cats = [
+    { id: 'restaurant', cardBandImageUrl: 'https://x/food.jpeg', cardImageUrl: 'https://x/wide.jpg' },
+    { id: 'grocery', cardBandImageUrl: ' ', cardImageUrl: ' https://x/grocery.jpg ' },
+    { id: 'hotel' },
+    { id: 'eruv-information', kind: 'eruv', cardImageUrl: 'https://x/eruv.jpg' },
+  ] as unknown as CategoryConfig[]
+  it('its banner first, else its older card photo, else null', () => {
+    expect(getCategoryTilePhoto(cats, 'restaurant')).toBe('https://x/food.jpeg')
+    expect(getCategoryTilePhoto(cats, 'grocery')).toBe('https://x/grocery.jpg')
+    expect(getCategoryTilePhoto(cats, 'hotel')).toBeNull()
+    expect(getCategoryTilePhoto(cats, undefined)).toBeNull()
+  })
+  it('the eruv card (always "eruv") is the eruv-kind category', () => {
+    expect(getCategoryTilePhoto(cats, 'eruv')).toBe('https://x/eruv.jpg')
   })
 })

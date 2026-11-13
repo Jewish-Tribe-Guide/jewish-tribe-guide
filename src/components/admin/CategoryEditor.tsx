@@ -19,7 +19,7 @@ import CardBox, { ShowOnLine, type CardLine } from './CardBox'
 import { cardPatch, reorderLine, type CardPage } from '@/lib/cardLines'
 import CategoryPreview, { type PreviewView } from './CategoryPreview'
 import { sampleName } from '@/lib/fieldLooks'
-import { CardBandImageField, IconField } from './CategoryFormFields'
+import { CardBandImageField } from './CategoryFormFields'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import FieldLooks from './FieldLooks'
@@ -363,7 +363,7 @@ function CategoryEditorScreen({
     const still = screenFromSearch(window.location.search)
     if (!still.remove || still.field !== ref) return
     if (!count) return void screens.replace({ ...still, remove: false })
-    const next: Removing = { target, label: f ? f.label || 'New field' : open === 'address' ? 'Address' : 'Phone', count, filter: !!f && !!normalizeField(f).filterable }
+    const next: Removing = { target, label: f ? f.label || 'New field' : open === 'address' ? 'Address' : 'Phone', count, filter: !!f && (f.type === 'tags' ? f.itemFilter !== false : !!normalizeField(f).filterable) }
     lastRemoving.current = next
     setRemoving(next)
   }
@@ -390,7 +390,6 @@ function CategoryEditorScreen({
     pluralLabel: draft.pluralLabel || draft.label || 'Preview',
     ...(draft.placeKind && { placeKind: draft.placeKind }),
     icon: draft.icon.trim() || DEFAULT_CATEGORY_ICON,
-    iconImageUrl: draft.iconImageUrl.trim() || null,
     description: draft.description,
     detailFields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
     kind: initial?.kind ?? 'listing',
@@ -686,13 +685,11 @@ function CategoryEditorScreen({
               <CategoryIcon
                 icon={draft.icon || DEFAULT_CATEGORY_ICON}
                 categoryId={initial?.id}
-                iconImageUrl={draft.iconImageUrl.trim() || undefined}
                 color={pinColor}
                 className="h-11 w-11 text-2xl"
                 sizePx={44}
               />
             }
-            iconFields={<IconField icon={draft.icon} onChange={(v) => set('icon', v)} iconImageUrl={draft.iconImageUrl} onIconImageUrl={(v) => set('iconImageUrl', v)} token={token} />}
             banner={bandImageFor(previewCategory)}
             bannerFields={
               <CardBandImageField
@@ -805,7 +802,7 @@ function CategoryEditorScreen({
               if (!f) return
               // A field not named yet has nothing anyone has answered.
               if (!f.key) return removeField(i)
-              void askRemove({ field: f.key }, f.label || 'New field', !!normalizeField(f).filterable)
+              void askRemove({ field: f.key }, f.label || 'New field', f.type === 'tags' ? f.itemFilter !== false : !!normalizeField(f).filterable)
             }}
           />
 
@@ -933,34 +930,31 @@ export function fieldsSummary(labels: string[]): string {
   return `${named.slice(0, 3).join(', ')} and ${named.length - 3} more`
 }
 
-/** A page's Basics (board 4): its icon beside its name, each opening its
- *  settings in place, then the banner photo as a row. */
+/** A page's Basics (board 4): its icon beside its name, then the banner
+ *  photo as a row. The icon is shown, not set: the site draws each kind's
+ *  line icon, and the banner is the page's one picture (the user, Nov 11:
+ *  "maybe we don't need the option to change the icon"). */
 function Basics({
   name,
   onName,
   icon,
-  iconFields,
   banner,
   bannerFields,
 }: {
   name: string
   onName: (name: string) => void
   icon: React.ReactNode
-  iconFields: React.ReactNode
   banner: string | null
   bannerFields: React.ReactNode
 }) {
-  const [open, setOpen] = useState<'icon' | 'banner' | null>(null)
-  const flip = (which: 'icon' | 'banner') => setOpen((o) => (o === which ? null : which))
+  const [open, setOpen] = useState(false)
   return (
     <>
       <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
         <div className="flex items-end gap-3">
           <span className="flex flex-col gap-1.5">
             <span className="text-[13px] font-semibold text-slate-700">Icon</span>
-            <button type="button" aria-expanded={open === 'icon'} aria-label="Change the icon" onClick={() => flip('icon')} className="rounded-[10px] cursor-pointer">
-              {icon}
-            </button>
+            <span data-testid="category-icon-preview">{icon}</span>
           </span>
           <span className="flex-1 min-w-0">
             <AdminField label="Name">
@@ -968,21 +962,20 @@ function Basics({
             </AdminField>
           </span>
         </div>
-        {open === 'icon' && <div className="flex flex-col gap-3">{iconFields}</div>}
       </div>
       <button
         type="button"
-        aria-expanded={open === 'banner'}
-        onClick={() => flip('banner')}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[60px] text-left cursor-pointer hover:bg-slate-50"
       >
         <span className="flex-1 text-[15px] font-semibold text-slate-900">Banner photo</span>
         <BannerThumb url={banner} />
-        <span className={open === 'banner' ? 'rotate-90' : ''}>
+        <span className={open ? 'rotate-90' : ''}>
           <Chevron />
         </span>
       </button>
-      {open === 'banner' && <div className="flex flex-col gap-3 px-4 pb-4">{bannerFields}</div>}
+      {open && <div className="flex flex-col gap-3 px-4 pb-4">{bannerFields}</div>}
     </>
   )
 }

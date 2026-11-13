@@ -1,5 +1,6 @@
 import type { WalkRouteRun } from './walkRouteJob'
 import type { LookAgainRun } from './lookAgain'
+import type { NightlyEmailRun } from './nightlyEmailRun'
 
 // ── The nightly jobs and how each run went (Oct 24) ─────────────────────────
 // Five jobs run on their own every night, and the link check once a week
@@ -10,7 +11,7 @@ import type { LookAgainRun } from './lookAgain'
 // kept anything, on each watch: the run that stopped after 29 of 107 of
 // them on Oct 24 looked like a quiet morning. Pure: the tab reads it too.
 
-export type JobId = 'sync-hours' | 'watches' | 'read-menus' | 'walk-routes' | 'check-links' | 'look-again'
+export type JobId = 'sync-hours' | 'watches' | 'read-menus' | 'walk-routes' | 'check-links' | 'look-again' | 'nightly-email'
 
 export type NightlyJob = {
   id: JobId
@@ -70,6 +71,13 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
     about: 'Tries again what a job couldn’t find, a month after the last try, a few a night: an eruv’s status page, a menu, a place on Google.',
     limitSeconds: 300,
     cron: '0 9 * * *',
+  },
+  {
+    id: 'nightly-email',
+    name: 'Nightly email',
+    about: 'Emails each community’s admins what the night found, after the last job. None on a night with nothing.',
+    limitSeconds: 60,
+    cron: '45 9 * * *',
   },
 ]
 
@@ -219,12 +227,19 @@ export function lookAgainOutcome(run: LookAgainRun): JobOutcome {
   return { ok: true, summary: parts.join(' · '), warning: failed ? `${plural(failed, 'try', 'tries')} stopped with an error` : null }
 }
 
+export function nightlyEmailOutcome(run: NightlyEmailRun): JobOutcome {
+  const sent = run.communities.filter((c) => c.sent).length
+  const failed = run.communities.filter((c) => c.error)
+  const summary = sent ? `Sent to ${plural(sent, 'community', 'communities')}` : 'Nothing to send'
+  return { ok: true, summary, warning: failed.length ? `${failed.map((c) => c.slug).join(', ')}: couldn’t send` : null }
+}
+
 // ── Telling the admins (Oct 24) ─────────────────────────────────────────────
-// As a broken watch is: one email when a job stops working, one when it
-// works again, nothing on the nights between. Worked out at the end of
-// each run from the job's last three. A run cut off can't send anything,
-// so the next run tells of it. A job that stops running altogether sends
-// nothing: only the tab shows that.
+// A job that stops working is in the next nightly email (Nov 12,
+// nightlyEmailRun.ts); before it, one email when a job stopped working
+// and one when it worked again. Worked out from the job's last three
+// runs. A run cut off is told of by the run after it. A job that stops
+// running altogether is in no email: only the tab shows that.
 
 /** What was wrong with a run, or null. The latest run has just finished,
  *  so only an older one can be cut off. */

@@ -78,8 +78,16 @@ describe('runWatch: a listing’s own page', () => {
     page.run.mockResolvedValue({ ok: true, filed: 1, pageHash: 'h2' })
     const budget = { aiReads: 3 }
     expect(await runWatch(shulPage, budget)).toEqual({ ok: true, filed: 1, pageHash: 'h2' })
-    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h', createdBy: 'listing pages', lastCheck: null }, budget, { full: false })
+    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h', pageChangedAt: null, createdBy: 'listing pages', lastCheck: null }, budget, { full: false })
     expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  // Nov 11: a page that changed after the newsletter's week corrects it
+  // (correctOlderWeeks), so the reader needs to know when it last changed.
+  it('is read knowing when the page last changed', async () => {
+    page.run.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    await runWatch({ ...shulPage, pageChangedAt: '2026-11-08T07:47:46.879Z' })
+    expect(page.run).toHaveBeenCalledWith(expect.objectContaining({ pageChangedAt: '2026-11-08T07:47:46.879Z' }), undefined, { full: false })
   })
 
   // The user, Oct 20: "Check now" has the AI read it, changed or not.

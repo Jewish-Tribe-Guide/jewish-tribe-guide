@@ -40,6 +40,8 @@ vi.mock('@/lib/email', () => ({
   sendSubmissionNotification: vi.fn(),
   sendStatusChangeDigest: mockDigest,
 }))
+const mockKeep = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/nightNoteStore', () => ({ keepStatusChanges: mockKeep }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: vi.fn() }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: vi.fn().mockResolvedValue([]) }))
 // The run's own record is jobRunStore.test.ts's.
@@ -61,6 +63,7 @@ beforeEach(() => {
   // promise — a bare vi.fn() returns undefined and blows up before the
   // assertion the test is actually about.
   mockDigest.mockResolvedValue(undefined)
+  mockKeep.mockResolvedValue(true)
   mockSubmitClosure.mockResolvedValue(null)
 })
 
@@ -70,6 +73,7 @@ afterEach(() => {
   mockFrom.mockReset()
   mockFetchPlaceSync.mockReset()
   mockDigest.mockReset()
+  mockKeep.mockReset()
   mockSubmitClosure.mockReset()
 })
 
@@ -199,9 +203,22 @@ describe('GET /api/cron/sync-hours', () => {
         }),
       }),
     )
-    expect(mockDigest).toHaveBeenCalledWith([
+    // Kept for the nightly email, not emailed now (Nov 12).
+    expect(mockKeep).toHaveBeenCalledWith([
       { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
     ])
+    expect(mockDigest).not.toHaveBeenCalled()
+  })
+
+  // Without migration 096 there's nowhere to keep them: one email now, as before.
+  it('emails them straight away when they can’t be kept', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...OPERATIONAL, businessStatus: 'CLOSED_TEMPORARILY' })
+    stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'OPERATIONAL' } }])
+    mockKeep.mockResolvedValue(false)
+
+    await runGet()
+
+    expect(mockDigest).toHaveBeenCalledWith([expect.objectContaining({ name: 'Kosher Bite', to: 'CLOSED_TEMPORARILY' })])
   })
 
   // Reopenings matter as much as closures — that's the direction nobody would
@@ -212,7 +229,7 @@ describe('GET /api/cron/sync-hours', () => {
 
     await runGet()
 
-    expect(mockDigest).toHaveBeenCalledWith([
+    expect(mockKeep).toHaveBeenCalledWith([
       expect.objectContaining({ from: 'CLOSED_TEMPORARILY', to: 'OPERATIONAL' }),
     ])
   })
@@ -224,9 +241,9 @@ describe('GET /api/cron/sync-hours', () => {
     const body = await (await runGet()).json()
 
     expect(body).toMatchObject({ statusChanged: 0 })
-    // Called with an empty list, which sendStatusChangeDigest itself no-ops on
-    // — a quiet week must not produce a "0 listings changed" email.
-    expect(mockDigest).toHaveBeenCalledWith([])
+    // Nothing kept and nothing emailed: a quiet night adds nothing.
+    expect(mockKeep).toHaveBeenCalledWith([])
+    expect(mockDigest).not.toHaveBeenCalled()
     // And no stale transition marker is written onto an unchanged listing.
     // chainable() is loosely typed (Record<string, unknown>), so the mock needs
     // naming before its calls can be read.
@@ -237,10 +254,10 @@ describe('GET /api/cron/sync-hours', () => {
 
   // A dead email provider must not turn a successful sync into a failed cron:
   // the listings are already updated by the time the digest is attempted.
-  it('still reports success when the digest fails to send', async () => {
+  it('still reports success when the changes can’t be kept', async () => {
     mockFetchPlaceSync.mockResolvedValue({ ...OPERATIONAL, businessStatus: 'CLOSED_TEMPORARILY' })
     stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'OPERATIONAL' } }])
-    mockDigest.mockRejectedValue(new Error('provider down'))
+    mockKeep.mockRejectedValue(new Error('database down'))
 
     const res = await runGet()
 

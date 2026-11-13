@@ -68,8 +68,8 @@ describe('readyMadePages', () => {
   })
 
   it('copies a page without its community’s photos or nearby lists', () => {
-    const copy = pageToCopy(makeCategory({ cardImageUrl: 'x', cardBandImageUrl: 'y', iconImageUrl: 'z', active: false, walkList: [] as never }))
-    expect(copy).toMatchObject({ cardImageUrl: null, cardBandImageUrl: null, iconImageUrl: null, active: true, walkList: undefined })
+    const copy = pageToCopy(makeCategory({ cardImageUrl: 'x', cardBandImageUrl: 'y', active: false, walkList: [] as never }))
+    expect(copy).toMatchObject({ cardImageUrl: null, cardBandImageUrl: null, active: true, walkList: undefined })
   })
 })
 

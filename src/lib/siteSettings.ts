@@ -15,6 +15,12 @@ import { community } from '@/community.config'
 // an async, per-request lookup; out of scope for now.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The map card's picture. `credit` is the line its licence asks to be shown
+ *  on it ("© OpenStreetMap contributors" for the street map that
+ *  scripts/map-card-picture.mjs makes); an admin's own photo has none, and
+ *  replacing the picture drops it. */
+export type MapCardPhoto = { url: string; alt: string; credit?: string }
+
 export type SiteSettings = {
   /** Site name — the header title, footer name, and copyright line. */
   name: string
@@ -50,19 +56,10 @@ export type SiteSettings = {
    *  More, by default), in order. Empty falls back to
    *  DEFAULT_DESKTOP_NAV_ITEMS. Mobile has no top nav and ignores this. */
   desktopNavItems: DesktopNavItem[]
-  /** Desktop only — the Update Listings card's eyebrow/heading (the
-   *  Add/Edit/Report card, "Kept by the Community" by default). */
-  desktopListingsEyebrow: string
-  desktopListingsHeading: string
   /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
    *  heading. */
   desktopSubscribeEyebrow: string
   desktopSubscribeHeading: string
-  /** Desktop only — the Jewish Times (ShabbatTimesCard) card's heading. No
-   *  matching eyebrow field: that card's own eyebrow is the computed
-   *  Hebrew date + location, not static text there's anything useful to
-   *  override. */
-  desktopJewishTimesHeading: string
   /** Desktop only — the warm hero band's bold headline. */
   desktopHeroHeadline: string
   /** Desktop only — the smaller supporting line under the headline. Empty
@@ -71,6 +68,10 @@ export type SiteSettings = {
   /** Desktop only — the hero band's photo. Null shows the CSS gradient
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
+  /** Desktop only — the photo on the home's "Everything on one map" card
+   *  (board G3, Nov 11). Null draws the card's plain map glyph instead.
+   *  Needs migration 095; reads as null without it. */
+  desktopMapImage: MapCardPhoto | null
   /** Which home page visitors get: the home as it was ('classic'), or the
    *  one that changes with the day ('today', step 6). Previewed from the Site
    *  tab before it's saved; one save switches back. */
@@ -219,11 +220,8 @@ export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, m
 // strings, so nothing changes on screen until an admin edits one. See
 // DesktopTopicsManager's CARD_META for the admin labels ("Davening Times
 // Card", etc.) these fields' inputs are grouped under.
-export const DEFAULT_DESKTOP_LISTINGS_EYEBROW = 'Community run'
-export const DEFAULT_DESKTOP_LISTINGS_HEADING = 'Kept by the Community'
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
-export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
 
 // Same split HeroHeading.tsx's own splitMission() does, duplicated rather
 // than imported: that's a 'use client' component and this defaults object is
@@ -262,14 +260,12 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   mobileTabs: DEFAULT_MOBILE_TABS,
   searchPlaceholder: DEFAULT_SEARCH_PLACEHOLDER,
   desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
-  desktopListingsEyebrow: DEFAULT_DESKTOP_LISTINGS_EYEBROW,
-  desktopListingsHeading: DEFAULT_DESKTOP_LISTINGS_HEADING,
   desktopSubscribeEyebrow: DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW,
   desktopSubscribeHeading: DEFAULT_DESKTOP_SUBSCRIBE_HEADING,
-  desktopJewishTimesHeading: DEFAULT_DESKTOP_JEWISH_TIMES_HEADING,
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,
+  desktopMapImage: null,
   homeStyle: 'classic',
   beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
   todayHidden: [],

@@ -114,11 +114,7 @@ function renderLanding(
   listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
-    // HeaderCollapseProvider: Landing now calls useHeaderOverlay (Phase 2 —
-    // transparent desktop header over the hero), which needs the same
-    // provider SiteChrome always wraps it in for real. Not asserted on
-    // directly here — see SiteHeader.test.tsx for the overlay behavior
-    // itself — just required for Landing to render at all.
+    // HeaderCollapseProvider: what SiteChrome always wraps Landing in.
     <HeaderCollapseProvider>
       <LocationProvider>
         <ListingsProvider listings={listings}>
@@ -193,14 +189,17 @@ describe('Landing', () => {
     )
 
     const tiles = within(screen.getByTestId('category-tiles'))
-    // Each tile: its icon and its name, nothing after it.
+    // Each tile: its picture and its name, nothing after it.
     const order = ['n', 'm', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
     expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}$`))))
     expect(tiles.getAllByRole('list')).toHaveLength(1)
-    expect(tiles.queryAllByRole('heading')).toHaveLength(0)
+    // One heading, the small label over the box (board K1c, Nov 11); no
+    // group headings among the tiles.
+    expect(tiles.getAllByRole('heading').map((h) => h.textContent)).toEqual(['Explore by Category'])
     expect(screen.queryByText('Also:')).not.toBeInTheDocument()
     expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
-    expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(0)
+    // Board J2b (Nov 11): each tile is the category's picture, one per tile.
+    expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(order.length)
   })
 
   // Search takes you to the page (Oct 13): typing shows where it could go,
@@ -471,21 +470,6 @@ describe('Landing', () => {
     }
   })
 
-  // The map is retired as a home-screen card (the user's own call — it only
-  // ever lives at its own full-screen route now), so the hero's "View Map"
-  // button has one job unconditionally: navigate there. No more "scroll to
-  // an embedded band, falling back to navigation only once the admin's
-  // removed it" branching.
-  it('the hero\'s "View Map" button navigates to the full map page', async () => {
-    const user = userEvent.setup()
-    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    renderLanding(undefined, { content: { categories: [withMap] } })
-
-    await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
-
-    expect(handlers.onNavigate).toHaveBeenCalledWith(null, 'map')
-  })
-
   // Jewish Times (ShabbatTimesCard, not mocked) is the one remaining card
   // still gated on a real Zmanim pseudo-category — it needs candle-lighting
   // data that has nowhere to come from otherwise. Davening Times/Update
@@ -495,20 +479,57 @@ describe('Landing', () => {
   it('renders the Jewish Times card only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
     const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
-    expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
+    expect(screen.getByTestId('home-shabbos')).toBeInTheDocument()
     unmount()
 
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
   })
 
-  it('renders Update Listings and (once a minyanim category exists) Davening Times with no zmanim category at all', () => {
-    // Regression: both used to share a component with the Jewish
-    // Times/Shabbat pair and were needlessly gated on zmanimCategory even
-    // though neither reads zmanim data — see homeSections.ts's own doc.
+  it('renders Davening Times with no zmanim category at all', () => {
+    // Regression: it used to share a component with the Jewish
+    // Times/Shabbat pair and was needlessly gated on zmanimCategory even
+    // though it reads no zmanim data — see homeSections.ts's own doc.
     renderLanding(undefined, { content: { categories: [makeCategory()] } }) // grocery only, no zmanim category
-    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).toBeInTheDocument()
     expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
+  })
+
+  // Nov 11 (board F1b): the computer home says how it stays right in a band
+  // under the photo, the phone's trust line grown to the width, and the
+  // "Kept by the Community" card it replaces is gone.
+  describe('the computer trust band', () => {
+    const groc = makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' })
+    const place = makeListing({ id: 'g1', name: 'Test Grocery', category: 'grocery' })
+
+    it('shows under the hero on a computer, with its three points, and opens the sheet', async () => {
+      vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [], checks: [] }))))
+      mockViewport(false)
+      renderLanding(undefined, { content: { categories: [groc], homeSections: [] } }, [place])
+
+      const band = screen.getByTestId('desktop-trust-band')
+      expect(band).toHaveTextContent('Kept up by the community')
+      expect(band).toHaveTextContent('People fill in the rest')
+      expect(band).toHaveTextContent('Every listing is dated')
+      // Each point's line stops at two lines. `block` beside line-clamp-2
+      // undid the clamp (it needs display: -webkit-box), and the first
+      // point ran to three, pushing the categories below a laptop's fold.
+      const subs = band.querySelectorAll('.line-clamp-2')
+      expect(subs.length).toBeGreaterThan(0)
+      for (const el of subs) expect(el).not.toHaveClass('block')
+      expect(screen.getByTestId('desktop-hero').compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
+
+      await userEvent.setup().click(band)
+      expect(await screen.findByRole('dialog')).toHaveTextContent('How this guide stays right')
+      vi.unstubAllGlobals()
+    })
+
+    it('is not drawn on a phone, which keeps its own trust line', () => {
+      mockViewport(true)
+      renderLanding(undefined, { content: { categories: [groc], homeSections: [] } }, [place])
+      expect(screen.queryByTestId('desktop-trust-band')).not.toBeInTheDocument()
+      mockViewport(false)
+    })
   })
 
   // The admin sets the cards in rows (the user, Nov 4; artifact
@@ -522,24 +543,54 @@ describe('Landing', () => {
       makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
     ]
     const row = (kind: HomeBlockKind, sortOrder: number, sharesRow = false) => ({ id: kind, kind, title: kind, sortOrder, cardIds: [], sharesRow })
-    const subscribeHeading = () => screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
-    const timesHeading = () => screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
-    const spots = (container: HTMLElement) => [...container.querySelectorAll('.my-8')].map((el) => el.getAttribute('data-spot'))
+    const subscribeHeading = () => screen.getByTestId('home-subscribe')
+    const timesHeading = () => screen.getByTestId('home-shabbos')
+    const spots = (container: HTMLElement) => [...container.querySelectorAll('[data-spot^="cards"]')].map((el) => el.getAttribute('data-spot'))
 
     it('three cards in one row, in order', () => {
       const { container } = renderLanding(undefined, {
-        content: { categories: cats, homeSections: [row('davening', 100), row('listings', 200, true), row('suggest', 300, true)] },
+        content: { categories: cats, homeSections: [row('davening', 100), row('suggest', 200, true), row('subscribe', 300, true)] },
       })
 
       const grid = screen.getByTestId('davening-stub').closest('.grid')!
       expect(grid).toHaveClass('min-[900px]:grid-cols-3')
-      expect(grid).toContainElement(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading }))
-      expect(grid).toContainElement(screen.getByRole('heading', { name: 'Suggest a Listing' }))
-      expect(spots(container)).toEqual(['cards card-davening card-listings card-suggest'])
+      expect(grid).toContainElement(screen.getByTestId('home-suggest'))
+      expect(grid).toContainElement(subscribeHeading())
+      expect(spots(container)).toEqual(['cards card-davening card-suggest card-subscribe'])
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading))
-      expect(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)).toBeLessThan(html.indexOf('Suggest a Listing'))
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('data-testid="home-suggest"'))
+      expect(html.indexOf('data-testid="home-suggest"')).toBeLessThan(html.indexOf('data-testid="home-subscribe"'))
+    })
+
+    // Retired Nov 11 for the trust band: a community that saved it keeps the
+    // row, and the row draws nothing.
+    it('a saved Kept by the Community card draws nothing', () => {
+      const { container } = renderLanding(undefined, {
+        content: { categories: cats, homeSections: [row('davening', 100), row('listings', 200, true)] },
+      })
+      expect(spots(container)).toEqual(['cards card-davening'])
+      expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
+    })
+
+    // Board G3 (Nov 11): a saved 'map' row draws the "Everything on one map"
+    // card, a link to the map with the admin's photo, never the map itself.
+    it('a map card row draws the map card, with the admin’s photo', () => {
+      const photo = { url: 'https://example.com/city-hall.jpg', alt: '' }
+      const { container } = renderLanding(undefined, {
+        content: { categories: cats, homeSections: [row('browse', 100), row('map', 200)], settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapImage: photo } },
+      })
+      expect(spots(container)).toEqual(['cards card-browse', 'cards card-map'])
+      const card = screen.getByTestId('home-map-card')
+      expect(card.getAttribute('href')).toMatch(/\/map$/)
+      expect(card.querySelector('img')?.getAttribute('src')).toContain('city-hall.jpg')
+    })
+
+    it('the map card is not drawn on a phone', () => {
+      mockViewport(true)
+      renderLanding(undefined, { content: { categories: cats, homeSections: [row('map', 100)] } })
+      expect(screen.queryByTestId('home-map-card')).not.toBeInTheDocument()
+      mockViewport(false)
     })
 
     it('two cards in one row', () => {
@@ -570,40 +621,56 @@ describe('Landing', () => {
       })
 
       expect(subscribeHeading().closest('.grid')).toBeNull()
-      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
     })
 
     it('Categories stays alone, and no row holds a fourth card, whatever was saved', () => {
       const { container } = renderLanding(undefined, {
         content: {
           categories: cats,
-          homeSections: [row('browse', 100), row('davening', 200, true), row('listings', 300, true), row('suggest', 400, true), row('subscribe', 500, true)],
+          homeSections: [row('browse', 100), row('davening', 200, true), row('suggest', 300, true), row('subscribe', 400, true), row('jewishTimes', 500, true)],
         },
       })
 
       expect(spots(container)).toEqual([
         'cards card-browse',
-        'cards card-davening card-listings card-suggest',
-        'cards card-subscribe',
+        'cards card-davening card-suggest card-subscribe',
+        'cards card-jewishTimes',
       ])
     })
 
     // A card of its own now, so the admin can take it off.
     it('Suggest a Listing shows only where it has a row', () => {
-      renderLanding(undefined, { content: { categories: cats, homeSections: [row('listings', 100)] } })
+      renderLanding(undefined, { content: { categories: cats, homeSections: [row('subscribe', 100)] } })
 
-      expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading }).closest('.grid')).toBeNull()
-      expect(screen.queryByRole('heading', { name: 'Suggest a Listing' })).not.toBeInTheDocument()
+      expect(subscribeHeading().closest('.grid')).toBeNull()
+      expect(screen.queryByTestId('home-suggest')).not.toBeInTheDocument()
     })
 
-    it('with no rows saved, the home is as it was: Davening Times, Kept by the Community and Suggest a Listing share a row', () => {
+    // Board G5c (Nov 11), tightened once the cards were outlined: 48px between the stops; the first 32px under the
+    // trust strip, which bridges into it. (jsdom has no layout, so this
+    // checks the classes; the gaps themselves were measured on dev.) On the
+    // computer only: the rows draw nothing on a phone, and their margins
+    // collapsed into 72px of empty space above Right now (board K1c).
+    it('puts 48px between the rows, and 32px above the first, on the computer only', () => {
+      const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
+      const rows = [...container.querySelectorAll('[data-spot^="cards"]')]
+      expect(rows[0]).toHaveClass('desktop:mt-8', 'desktop:mb-12')
+      for (const row of rows.slice(1)) expect(row).toHaveClass('desktop:my-12')
+      for (const row of rows) expect(row.className.split(/\s+/).filter((c) => /^(m[tby]?)-/.test(c))).toEqual([])
+    })
+
+    // Board G5b (Nov 11): Categories, the two answer cards side by side,
+    // the map, Suggest a listing, Stay in the Loop last.
+    it('with no rows saved: the next minyan and this Shabbat share a row, then the map', () => {
       const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
 
       expect(spots(container)).toEqual([
         'cards card-browse',
-        'cards card-davening card-listings card-suggest',
+        'cards card-davening card-jewishTimes',
+        'cards card-map',
+        'cards card-suggest',
         'cards card-subscribe',
-        'cards card-jewishTimes',
       ])
     })
   })
@@ -615,8 +682,14 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
 
       const daveningStub = screen.getByTestId('davening-stub')
-      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      const jewishTimesHeading = screen.getByTestId('home-shabbos')
       expect(daveningStub.compareDocumentPosition(jewishTimesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('with nothing configured, the map card comes after the two answer cards (board G5b)', () => {
+      const { container } = renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
+      const spots = [...container.querySelectorAll('[data-spot^="cards"]')].map((el) => el.getAttribute('data-spot'))
+      expect(spots.slice(0, 3)).toEqual(['cards card-browse', 'cards card-davening card-jewishTimes', 'cards card-map'])
     })
 
     it('follows the admin-configured order — jewishTimes before davening', () => {
@@ -631,7 +704,7 @@ describe('Landing', () => {
       })
 
       const daveningStub = screen.getByTestId('davening-stub')
-      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      const jewishTimesHeading = screen.getByTestId('home-shabbos')
       expect(jewishTimesHeading.compareDocumentPosition(daveningStub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
@@ -652,7 +725,7 @@ describe('Landing', () => {
       expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
       // Jewish Times has no row of its own here, so it doesn't render at
       // all — configuring one kind doesn't implicitly configure the rest.
-      expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
     })
   })
 
@@ -671,7 +744,7 @@ describe('Landing', () => {
       // The card's heading is a hardcoded "Explore by Category" now (the
       // user's own reference image), not settings.desktopBrowseHeading —
       // see Landing.tsx's own comment on why.
-      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       // Both cards render as siblings under the ONE "Browse everything"
       // card — not under their own admin-configured section titles ("Food
       // and Hospitality", etc.), which is what "flat" means here.
@@ -685,14 +758,14 @@ describe('Landing', () => {
     // against the user's own reference image, which shows plain icon+label
     // with no box, closer to CompactCard's own borderless-at-rest treatment
     // than a card grid.
-    it('tiles have no border, at rest or on hover — just the icon and label', () => {
+    it('tiles have no border, at rest or on hover — just the photo and name', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
       const card = screen.getByTestId('browse-everything-card')
       const tile = within(card).getByText('Grocery Stores').closest('a')!
       expect(tile.className).not.toMatch(/\bborder\b/)
-      expect(tile.className).toMatch(/hover:bg-slate-50/)
+      expect(within(card).getByText('Grocery Stores')).toHaveClass('group-hover:text-primary')
     })
 
     // "Explore by Category" titles the whole merged card — unlike the flat
@@ -702,9 +775,9 @@ describe('Landing', () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
-      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
-      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
     })
 
     it('tracks category_opened with source "grid" on a card click', async () => {
@@ -721,114 +794,94 @@ describe('Landing', () => {
 
   // Phase 5 of the desktop mockup rework, revised twice after user review:
   // the flat grid is a single non-scrolling, non-wrapping row by default —
-  // the first COLLAPSED_TILE_COUNT (9) cards, sorted by listing count (most
+  // the first COLLAPSED_TILE_COUNT (14) cards, sorted by listing count (most
   // to least places), plus a trailing "More" tile when there are more than
   // that. The header row's own "View all" link is gone (the "More" tile
   // does that job now); "Show fewer categories" there is the only way back
   // once expanded, since there's no "More" tile to click in that state.
-  describe('the capped row + "More" tile vs. full grid', () => {
+  describe('the capped tiles + "All categories" tile vs. every tile', () => {
     // Listing counts, not creation order, decide the order — deliberately
     // NOT already-sorted category ids, so a test that accidentally read
     // insertion order instead of the real sort would still pass by
-    // accident. cat9 (the 10th, over COLLAPSED_TILE_COUNT) gets the fewest
+    // accident. cat14 (the 15th, over COLLAPSED_TILE_COUNT) gets the fewest
     // listings, so it's the one pushed behind "More".
-    function tenCategoriesWithCounts() {
-      const categories = Array.from({ length: 10 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      // Descending counts: cat0 has the most listings, cat9 the fewest.
+    function fifteenCategoriesWithCounts() {
+      const categories = Array.from({ length: 15 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      // Descending counts: cat0 has the most listings, cat14 the fewest.
       const listings = categories.flatMap((c, i) =>
-        Array.from({ length: 10 - i }, (_, j) => makeListing({ id: `${c.id}-l${j}`, category: c.id! })),
+        Array.from({ length: 15 - i }, (_, j) => makeListing({ id: `${c.id}-l${j}`, category: c.id! })),
       )
       return { categories, listings }
     }
 
-    it('sorts by listing count (most to least), caps at 9, and shows a trailing "More" tile', () => {
-      const { categories, listings } = tenCategoriesWithCounts()
+    it('sorts by listing count (most to least), caps at 14, and shows a trailing "All categories" tile', () => {
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
       const tileLinks = within(card).getAllByRole('link', { name: /Category \d/ })
-      // Exactly the first 9, in descending-count order — cat9 (fewest
+      // Exactly the first 14, in descending-count order — cat14 (fewest
       // listings) is the one left out, behind "More".
       expect(tileLinks.map((l) => l.textContent)).toEqual(
-        Array.from({ length: 9 }, (_, i) => expect.stringContaining(`Category ${i}`)),
+        Array.from({ length: 14 }, (_, i) => expect.stringContaining(`Category ${i}`)),
       )
-      expect(within(card).queryByText('Category 9')).not.toBeInTheDocument()
+      expect(within(card).queryByText('Category 14')).not.toBeInTheDocument()
 
-      const moreButton = within(card).getByRole('button', { name: /More/ })
+      const moreButton = within(card).getByRole('button', { name: 'All categories' })
       expect(moreButton).toBeInTheDocument()
-      // Single row: no scroll container, no wrap — a plain flex row.
+      // Boards H1 and G5b (Nov 11): photo tiles five across, three rows with the
+      // "All categories" tile last, and nothing under a name.
       const row = tileLinks[0]!.parentElement!
-      expect(row).toHaveClass('flex')
-      expect(row).not.toHaveClass('overflow-x-auto')
-      expect(row).not.toHaveClass('flex-wrap')
+      expect(row).toHaveClass('grid', 'grid-cols-5')
+      expect(row.lastElementChild).toBe(moreButton)
+      expect(card).not.toHaveTextContent(/listings?\b|places\b|See all/)
     })
 
-    it('the trailing "More" tile expands the grid to every card, no cap', async () => {
+    it('the "All categories" tile expands the grid to every card, no cap', async () => {
       const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByRole('button', { name: 'All categories' }))
 
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
-      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(15)
+      expect(within(card).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
     })
 
-    it('collapses back to the capped row + "More" tile on "Show fewer categories"', async () => {
+    it('collapses back to the capped tiles + "All categories" on "Show fewer categories"', async () => {
       const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByRole('button', { name: 'All categories' }))
       await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
 
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
-      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(14)
+      expect(within(card).getByRole('button', { name: 'All categories' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
     })
 
-    it('shows no "More" tile and no "Show fewer" control with 9 or fewer cards', () => {
-      const nine = Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      renderLanding(undefined, { content: { categories: nine } })
+    it('shows no "More" tile and no "Show fewer" control with 14 or fewer cards', () => {
+      const fourteen = Array.from({ length: 14 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: fourteen } })
 
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('browse-everything-card')).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
     })
 
     it('tile clicks still track category_opened with source "grid" once expanded', async () => {
       const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
+      const { categories, listings } = fifteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByRole('button', { name: /More/ }))
-      await user.click(within(card).getByText('Category 9'))
+      await user.click(within(card).getByRole('button', { name: 'All categories' }))
+      await user.click(within(card).getByText('Category 14'))
 
-      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
-    })
-
-    // The hero's own "Browse Categories" button used to only scroll to this
-    // card, landing a visitor on the same capped 9+"More" row they'd have
-    // scrolled to on their own — defeating a button whose whole promise is
-    // "show me everything." It now expands the grid too, same as clicking
-    // "More" directly.
-    it('the hero\'s "Browse Categories" button expands the grid, not just scrolls to it', async () => {
-      // jsdom doesn't implement scrollIntoView at all (not even a no-op).
-      Element.prototype.scrollIntoView = vi.fn()
-      const user = userEvent.setup()
-      const { categories, listings } = tenCategoriesWithCounts()
-      renderLanding(undefined, { content: { categories } }, listings)
-
-      const card = screen.getByTestId('browse-everything-card')
-      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
-
-      await user.click(screen.getByRole('button', { name: 'Browse Categories' }))
-
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
-      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat14', source: 'grid' })
     })
   })
 

@@ -72,7 +72,7 @@ export async function runWatch(
     // read with its own fingerprint (sharedPageWatch.ts).
     if (isListingPageWatch({ createdBy: watch.createdBy ?? null })) {
       const hashes = splitPageHash(watch.pageHash)
-      const page = await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: hashes.page, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
+      const page = await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: hashes.page, pageChangedAt: watch.pageChangedAt ?? null, createdBy: watch.createdBy ?? null, lastCheck: watch.lastCheck ?? null }, budget, { full })
       const menuOf = page.ok ? await menuOnPage({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null }) : null
       if (!menuOf) return page
       const menu = await runMenuWatch({ communityId: watch.communityId, url: watch.url, resourceId: menuOf, pageHash: hashes.menu }, budget, { full })

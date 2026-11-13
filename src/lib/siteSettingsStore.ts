@@ -15,6 +15,7 @@ import {
   type DesktopNavItem,
   type TodayBlockId,
   type MobileTabConfig,
+  type MapCardPhoto,
   type SiteSettings,
 } from './siteSettings'
 
@@ -42,16 +43,18 @@ type Row = {
   desktop_browse_heading: string | null
   desktop_davening_eyebrow: string | null
   desktop_davening_heading: string | null
-  desktop_listings_eyebrow: string | null
-  desktop_listings_heading: string | null
   desktop_map_eyebrow: string | null
   desktop_map_heading: string | null
   desktop_subscribe_eyebrow: string | null
   desktop_subscribe_heading: string | null
-  desktop_jewish_times_heading: string | null
+  /** Unread since board G5b (Nov 11): the Shabbat card lost its heading.
+   *  The column stays; nothing writes it. */
+  desktop_jewish_times_heading?: string | null
   desktop_hero_headline: string | null
   desktop_hero_subhead: string | null
   desktop_hero_image: unknown
+  /** Migration 095; absent from the row before it runs. */
+  desktop_map_image?: unknown
   /** Nothing reads this: the admin's accent colour was never applied to the
    *  site, and the redesign's one look retired it. The column stays rather
    *  than dropping data with a migration. */
@@ -109,6 +112,14 @@ function toHeroImage(raw: unknown): { url: string; alt: string } | null {
   return { url, alt: typeof alt === 'string' ? alt : '' }
 }
 
+/** The map card's picture, keeping the credit its licence asks for. */
+export function toMapCardPhoto(raw: unknown): MapCardPhoto | null {
+  const photo = toHeroImage(raw)
+  if (!photo) return null
+  const { credit } = raw as Record<string, unknown>
+  return typeof credit === 'string' && credit.trim() ? { ...photo, credit: credit.trim() } : photo
+}
+
 /** The admin's item names: trimmed, no blanks or repeats, at most
  *  MAX_BEFORE_CANDLE_ITEMS. Null (never set, or 067 not applied) is the
  *  starting list; an empty list is the admin's own "none". */
@@ -149,11 +160,8 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     mobileTabs: toMobileTabs(row.mobile_tabs),
     searchPlaceholder: row.search_placeholder || fallback.searchPlaceholder,
     desktopNavItems: toDesktopNavItems(row.desktop_nav_items),
-    desktopListingsEyebrow: row.desktop_listings_eyebrow || fallback.desktopListingsEyebrow,
-    desktopListingsHeading: row.desktop_listings_heading || fallback.desktopListingsHeading,
     desktopSubscribeEyebrow: row.desktop_subscribe_eyebrow || fallback.desktopSubscribeEyebrow,
     desktopSubscribeHeading: row.desktop_subscribe_heading || fallback.desktopSubscribeHeading,
-    desktopJewishTimesHeading: row.desktop_jewish_times_heading || fallback.desktopJewishTimesHeading,
     // Pre-migration/pre-first-save rows have no desktop hero fields of their
     // own yet — fall back to splitting this row's real mission, same as the
     // defaults object does at seed time, so an existing community's hero
@@ -164,6 +172,7 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     // plain gradient, not the bootstrap community's photo from code (which
     // put Philadelphia's City Hall on every other community's home).
     desktopHeroImage: toHeroImage(row.desktop_hero_image),
+    desktopMapImage: toMapCardPhoto(row.desktop_map_image),
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
     todayHidden: toTodayHidden(row.today_hidden),
@@ -214,6 +223,7 @@ async function settingsFrom(row: Row | null, community: string): Promise<SiteSet
     desktopHeroSubhead: heroSplit.subhead,
     // community.config.ts's photo is the bootstrap community's own.
     desktopHeroImage: c.isDefault ? SITE_SETTINGS_DEFAULTS.desktopHeroImage : null,
+    desktopMapImage: null,
   }
 }
 
@@ -243,6 +253,12 @@ export async function updateSiteSettings(
     today.before_candle_items = merged.beforeCandleItems
   }
   if (JSON.stringify(merged.todayHidden) !== JSON.stringify(current.todayHidden)) today.today_hidden = merged.todayHidden
+  // The map card's photo (migration 095) the same way: written only when it
+  // changes, so a database without the column still saves everything else.
+  const mapPhoto: Record<string, unknown> = {}
+  if (JSON.stringify(merged.desktopMapImage) !== JSON.stringify(current.desktopMapImage)) {
+    mapPhoto.desktop_map_image = merged.desktopMapImage
+  }
 
   const { data, error } = await getAdminClient()
     .from('site_settings')
@@ -262,15 +278,13 @@ export async function updateSiteSettings(
         mobile_tabs: merged.mobileTabs,
         search_placeholder: merged.searchPlaceholder,
         desktop_nav_items: merged.desktopNavItems,
-        desktop_listings_eyebrow: merged.desktopListingsEyebrow,
-        desktop_listings_heading: merged.desktopListingsHeading,
         desktop_subscribe_eyebrow: merged.desktopSubscribeEyebrow,
         desktop_subscribe_heading: merged.desktopSubscribeHeading,
-        desktop_jewish_times_heading: merged.desktopJewishTimesHeading,
         desktop_hero_headline: merged.desktopHeroHeadline,
         desktop_hero_subhead: merged.desktopHeroSubhead,
         desktop_hero_image: merged.desktopHeroImage,
         ...today,
+        ...mapPhoto,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },
@@ -282,6 +296,9 @@ export async function updateSiteSettings(
     if (Object.keys(today).length > 0 && /home_style|before_candle_items|today_hidden/.test(error.message)) {
       throw new MissingTodayColumnsError()
     }
+    if (Object.keys(mapPhoto).length > 0 && /desktop_map_image/.test(error.message)) {
+      throw new MissingMapPhotoColumnError()
+    }
     throw new Error(`Failed to update site settings: ${error.message}`)
   }
   return toSettings(data as Row)
@@ -292,5 +309,13 @@ export async function updateSiteSettings(
 export class MissingTodayColumnsError extends Error {
   constructor() {
     super('The home page style isn’t set up on this site yet.')
+  }
+}
+
+/** The map card's photo was changed on a database without migration 095
+ *  (supabase/migrations/20240101000095_map_card_photo.sql). */
+export class MissingMapPhotoColumnError extends Error {
+  constructor() {
+    super('The map card’s photo isn’t set up on this site yet.')
   }
 }

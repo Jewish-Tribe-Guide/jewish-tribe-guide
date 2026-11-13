@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { MissingMapPhotoColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -110,11 +110,8 @@ export async function PATCH(request: Request) {
   // The desktop card texts have nowhere sensible to fall back to if saved
   // blank, so they're required.
   const REQUIRED_CARD_TEXT_FIELDS: { key: keyof SiteSettings; label: string }[] = [
-    { key: 'desktopListingsEyebrow', label: 'The Update Listings card’s eyebrow' },
-    { key: 'desktopListingsHeading', label: 'The Update Listings card’s heading' },
     { key: 'desktopSubscribeEyebrow', label: 'The Email Signup card’s eyebrow' },
     { key: 'desktopSubscribeHeading', label: 'The Email Signup card’s heading' },
-    { key: 'desktopJewishTimesHeading', label: 'The Jewish Times card’s heading' },
   ]
   for (const { key, label } of REQUIRED_CARD_TEXT_FIELDS) {
     const value = body[key]
@@ -159,7 +156,7 @@ export async function PATCH(request: Request) {
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })
   } catch (err) {
-    if (err instanceof MissingTodayColumnsError) {
+    if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
     }
     console.error('[admin/site-settings] PATCH failed:', err)

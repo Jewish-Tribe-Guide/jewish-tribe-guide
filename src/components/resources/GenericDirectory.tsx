@@ -1,8 +1,8 @@
 'use client'
 
-import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
+import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
+import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { isMinyanim } from '@/lib/davening'
@@ -10,8 +10,10 @@ import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
 import { TellAboutContext } from './tellAbout'
 import DistanceNote from './DistanceNote'
+import Image from 'next/image'
+import { isOptimizableImage } from '@/lib/imageHosts'
 import { NextMinyans } from './nextMinyans'
-import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
+import { CategoryBandFrame } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
 import { TEFILLAH_CHOICES, WITHIN_CHOICES, milesChosen, tefillosChosen, typedTefillahChoices } from '@/lib/minyanimFilters'
 import { kindText } from '@/lib/listingView'
@@ -23,7 +25,7 @@ import { usePersistedState } from '@/lib/usePersistedState'
 import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import MinyanimView from './MinyanimView'
-import { PlusIcon } from '@/components/icons'
+import { PinIcon, PlusIcon } from '@/components/icons'
 import { AddButton } from '@/components/AddButton'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
@@ -42,7 +44,7 @@ import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityCon
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
-import NextMinyanCard from './NextMinyanCard'
+import MinyanSwitch from './MinyanSwitch'
 import CategoryMap, { createHighlight, useWide } from './CategoryMap'
 import { WalkOnMapContext, type WalkShown } from './walkOnMap'
 import RowLookSwitch, { useRowLook } from './RowLookSwitch'
@@ -58,8 +60,7 @@ import { categoryHref } from '@/lib/searchLands'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useCategories } from '@/lib/useCategories'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
-import { getCategoryColor } from '@/lib/categoryColor'
-import { CategoryGlyph } from '@/lib/categoryIcons'
+import { getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
 import { tellUsPlaceholder } from '@/lib/tellUs'
@@ -542,8 +543,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Opened from the page, the view is a step Back undoes (Oct 6): the
   // browser's, and on a phone a swipe. It used to replace the address, so
   // Back left Synagogues altogether. Its own ways back (the header's ‹ on a
-  // phone, "‹ Synagogues" on a computer) take that same step when there is
-  // one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
+  // phone, the switch's first half anywhere) take that same step when there
+  // is one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
   // none, and they just close it.
   const showMinyanimView = () => {
     openedHere.current = true
@@ -554,9 +555,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     else setMinyanimViewOn(false)
   }
   const isMobile = useIsMobile()
-  // For getCategoryColor below — same call CompactCard makes for this same
-  // category's home-screen badge, so the morph target's color matches
-  // exactly (see categoryBadge's own doc).
+  // For getCategoryColor and the tile's picture below, as the home reads them.
   const categories = useCategories()
   // Whether the sticky controls bar below is actually capable of being stuck
   // right now — matches its own `lg:sticky` breakpoint (1024px), not
@@ -1250,14 +1249,17 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (see listingRowNote).
   const flagUnconfirmed = !!now && items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
 
-  // Synagogues' Next minyan card, while some shul the list holds keeps times.
-  // It's above the search (Nov 2) and stays while typing, so the box never
-  // jumps up under a finger; it answers for every shul, not what's typed.
-  // Wherever it isn't, All davening times is back in the list heading, so
-  // it's never gone.
-  const minyanCardItems = typed ? items : filtered
-  const showMinyanCard =
-    hasMinyanim && !minyanimViewOn && minyanCardItems.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+  // Synagogues' "By synagogue | By time" (Nov 11): where the list's count
+  // was, in both views, so the way between them is never gone. It replaced
+  // the green Next minyan card above the search (see MinyanSwitch).
+  const minyanSwitch = (byTime: boolean) =>
+    hasMinyanim ? (
+      <MinyanSwitch
+        singular={category.label}
+        byTime={byTime}
+        onChange={(on) => (on ? showMinyanimView() : closeMinyanimView())}
+      />
+    ) : undefined
   // The Minyanim view in place of the list, typing included: its search
   // narrows the minyanim (the user's note 4, agreed Oct 2). It used to drop
   // back to the list of shuls.
@@ -1432,42 +1434,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     sheetItems.reduce((n, f) => n + f.chosen.length, 0) +
     (sheetOpenNow ? 1 : 0)
 
-  // Desktop-only shared-element morph target for the same icon badge
-  // CompactCard shows next to this category on the home screen — that's
-  // the actual home-screen representation on desktop (a small colored
-  // circle, not a photo tile; CardGrid's full photo tiles are mobile-only,
-  // see home/sections.tsx's own doc on why). The matching `name` below is
-  // what lets React's real <ViewTransition> grow that small badge into this
-  // bigger one instead of a flat crossfade — it must exactly match the name
-  // CompactCard gives its own copy (`category-badge-${category.id}`, both
-  // keyed on the same CategoryConfig id) or no pair forms and this just
-  // plays its own plain enter animation. `getCategoryColor` is called the
-  // same way CompactCard calls it (same categories array, same id) so both
-  // ends render the identical color — a mismatch here would make the morph
-  // visibly change hue mid-flight instead of just growing.
-  //
-  // Not rendered at all (not just hidden) when there's no icon to morph —
-  // a badge paired with nothing is pointless — or on mobile, where the
-  // home->category move already has its own directional slide (see
-  // navTransitions.ts) communicating the same "one level deeper" hierarchy;
-  // morphing a badge AND sliding the whole screen at once would compete for
-  // attention rather than reinforcing each other.
+  // The page's colour: the band's when the category has no picture, and
+  // the listings' initials. Called as the home calls it, so the two match.
   const bandColor = getCategoryColor(categories, category.id)
-  const bandImage = bandImageFor(category)
 
-  // Not rendered at all (not just hidden) when there's no icon to morph — a
-  // badge paired with nothing is pointless — or on mobile, where the
-  // home->category move already has its own directional slide (see
-  // navTransitions.ts) communicating the same "one level deeper" hierarchy;
-  // morphing a badge AND sliding the whole screen at once would compete for
-  // attention rather than reinforcing each other.
-  const categoryBadge = !isMobile && category.icon ? (
-    <ViewTransition name={`category-badge-${category.id}`}>
-      <CategoryBandBadge color={bandColor}>
-        <CategoryGlyph categoryId={category.id} icon={category.icon} className="h-[55%] w-[55%]" />
-      </CategoryBandBadge>
-    </ViewTransition>
-  ) : null
+  // Board H4/H5 (Nov 11): the page opens on the same picture as its tile
+  // on the home, so the two read as one place. Null for a category with no
+  // picture of its own: the computer's band is then its colour, and a
+  // phone shows none.
+  const tilePhoto = getCategoryTilePhoto(categories, category.id)
 
   // What the list is drawn as: one section per group, each with what goes
   // above its rows (a closed group's line, a later open group's heading)
@@ -1636,7 +1611,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const minyanimTitle = 'Minyanim by time'
   useSetScreenHeader(
     true,
-    minyanimView && !phonePage ? minyanimTitle : category.pluralLabel,
+    category.pluralLabel,
     phonePage && columnItem ? () => closeColumn(columnItem.id) : minyanimView ? closeMinyanimView : onUp,
     { named: phonePage },
   )
@@ -1693,14 +1668,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         total={filtered.length}
         filters={hasActualFilters ? { active: sheetFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
         sort={upvotes ? { byPopular, onSelect: selectSort } : undefined}
-        // Only while the Next minyan card, which carries it, is gone.
-        onDaveningTimes={hasMinyanim && !showMinyanCard ? showMinyanimView : undefined}
+        lead={minyanSwitch(false)}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
       />
   )
   // The categories with no map keep the list's heading under the search,
   // as the toolbar's last line.
   const headingInToolbar = !hasMapColumn && !columnItem && !minyanimView && listHeading !== null
+  // The search rides up onto the computer's photo (board H4), which leaves
+  // the photo's last 22px under it: the list starts 28px below that, as
+  // drawn. Where the list's heading is in the sticky bar, that space is
+  // inside the bar until it docks, then under it, so the list doesn't jump.
+  const heroOverlap = showSearch && !deskListing && !phonePage
+  const heroGap = heroOverlap ? (headingInToolbar ? '' : 'desktop:mb-[34px]') : ''
 
   return (
     <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
@@ -1711,8 +1691,41 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           the visitor hasn't set a location, with the way to set one. At the
           top, above the category band, as the old banner was; desktop has
           the same line under the title (DirectoryHeader). */}
+      {/* A phone's picture (board H5): the tile's photo, short and edge to
+          edge, in the gap under the header (32px on a phone: -mt-8). Its
+          title is the header's. */}
+      {tilePhoto && !phonePage && (
+        <div className="relative -mt-8 mb-3 mx-[calc(50%-50vw)] h-[120px] overflow-hidden desktop:hidden" data-testid="category-phone-picture">
+          <Image src={tilePhoto} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(tilePhoto)} />
+        </div>
+      )}
       {addressPrompt && !anchorLabel && !phonePage && <DistanceNote className="desktop:hidden pb-3" />}
-      <CategoryBandFrame color={bandColor} imageUrl={bandImage}>
+      <CategoryBandFrame
+        color={bandColor}
+        imageUrl={tilePhoto}
+        heroOverlap={heroOverlap}
+        heroQuiet={deskListing}
+        hero={deskListing ? (
+          <h1 className="sr-only">{category.pluralLabel}</h1>
+        ) : (
+          <>
+            <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
+              {items.length} {items.length === 1 ? 'place' : 'places'}
+            </p>
+            {/* The page's h1 on a computer. A phone's is DirectoryHeader's
+                (hidden here), whose title the site header shows. */}
+            <h1 className="mt-1.5 text-[44px] font-extrabold leading-[1.05]">{category.pluralLabel}</h1>
+            {anchorLabel ? (
+              <p className="mt-2 flex items-center gap-1.5 text-[15px] text-white/90">
+                <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {anchorLabel}
+              </p>
+            ) : addressPrompt ? (
+              <DistanceNote onPhoto className="mt-2" />
+            ) : null}
+          </>
+        )}
+      >
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
               desktop:hidden). It's gone now that useSetScreenHeader (above)
               puts the same "‹ {title}" control directly in SiteHeader on
@@ -1721,19 +1734,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               since-removed Breadcrumb lived inside DirectoryHeader, not
               here) and still doesn't. */}
 
+          {/* A phone's title (sr-only: the site header shows it). A
+              computer's is the photo's (the band's `hero` above), so this
+              isn't drawn there at all: one h1 either way. */}
+          {isMobile && (
           <div hidden={phonePage}>
           <DirectoryHeader
-            title={minyanimView ? minyanimTitle : category.pluralLabel}
+            title={category.pluralLabel}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
             titleInHeader
-            banner={categoryBadge}
-            // A computer's way back from the Minyanim view: small, over the
-            // title it replaced. A phone's is the header's ‹.
-            up={minyanimView && !columnItem && !isMobile ? { label: category.pluralLabel, onClick: closeMinyanimView } : undefined}
             titleOnly={deskListing}
           />
           </div>
+          )}
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
           on a long list instead of scrolling away above the fold. `top-14`
@@ -1811,7 +1825,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // categories with no map): the heading's own padding is the space
         // above the list, as it is where the heading tops the list column.
         // A margin as well left a gap there and nowhere else (Oct 20).
-        className={`${headingInToolbar ? '' : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
+        className={`${headingInToolbar ? (heroOverlap && controlsStuck ? 'lg:mb-[26px]' : '') : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
           hasMapColumn
             ? ''
             : controlsStuck
@@ -1819,21 +1833,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             : 'lg:translate-y-0'
         }`}
       >
-        {/* Synagogues' "Minyanim by time" row, then the page's one search box,
-            limited to this category, with example searches under it and,
+        {/* The page's one search box, limited to this category, with example searches under it and,
             once something is typed, the sentence answering it (see
             CategoryAsk). */}
-        <div className={showMinyanCard ? 'space-y-3' : undefined}>
-          {/* "Minyanim by time", with the next minyan under it: the way in
-              to every minyan, on every screen size (Oct 6). */}
-          {showMinyanCard && (
-            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
-              <NextMinyanCard items={minyanCardItems} onDaveningTimes={showMinyanimView} />
-            </div>
-          )}
+        <div>
           {showSearch && (
-            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
+            <div className={`desktop:max-w-[688px] ${heroGap}`}>
               <CategoryAsk
+                onPhoto
                 category={category}
                 search={search}
                 onSearch={setSearch}
@@ -1849,7 +1856,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           )}
         </div>
-        {headingInToolbar && listHeading}
+        {headingInToolbar && (heroOverlap ? <div className={`desktop:pt-[26px] ${controlsStuck ? 'lg:pt-0' : ''}`}>{listHeading}</div> : listHeading)}
       </div>
 
       <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
@@ -1912,6 +1919,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           filters={{ active: sheetFilterCount + minyanFilterCount, onOpen: () => setFiltersOpen(true) }}
           onShowing={setMinyanimShowing}
           kindOf={(item) => kindText(item, category)}
+          heading={minyanSwitch(true)}
         />
       ) : searchFoundNothing ? (
         // The search found nothing: the box under the search says so, with

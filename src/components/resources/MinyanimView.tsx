@@ -1,5 +1,7 @@
 'use client'
 
+import type { ReactNode } from 'react'
+
 import { useEffect, useRef, useState } from 'react'
 import type { Tefillah } from '@/lib/davening'
 import Link from 'next/link'
@@ -55,9 +57,12 @@ function howFar(item: DirectoryResource | undefined): string | null {
  *  are on its own page. */
 const DAYS_SHOWN = 7
 
-function tabLabel(d: DateFacts, i: number): [string, string] {
+/** A day's pill: its name ("Today", "Fri", "Shabbos"), and a Yom Tov's or
+ *  Chol HaMoed's name when it has one. A plain date is only the pill's
+ *  hover title: within one week the day says which (board D1, Nov 11). */
+function tabLabel(d: DateFacts, i: number): { day: string; name: string | null; date: string } {
   const day = i === 0 ? 'Today' : d.weekday === 'sat' ? 'Shabbos' : dayLabel(d.weekday).slice(0, 3)
-  return [day, d.name ?? dateText(d.date)]
+  return { day, name: d.name ?? null, date: dateText(d.date) }
 }
 
 export default function MinyanimView({
@@ -75,6 +80,7 @@ export default function MinyanimView({
   filters,
   onShowing,
   kindOf = () => '',
+  heading,
 }: {
   items: readonly DirectoryResource[]
   categoryId: string
@@ -113,6 +119,9 @@ export default function MinyanimView({
   /** A shul's denomination, said on each of its minyanim (Oct 15: the
    *  list no longer groups shuls by it). */
   kindOf?: (item: DirectoryResource) => string
+  /** Synagogues' switch back to the list (MinyanSwitch): it heads the
+   *  view, over the days, in place of the count of minyanim. */
+  heading?: ReactNode
 }) {
   const schedule = useMinyanSchedule(null, items)
   const { community } = useActiveCommunity()
@@ -187,7 +196,7 @@ export default function MinyanimView({
   // "Mincha on Friday"; "Minyanim Shabbos morning" when a part of the day
   // was typed, which says it better than "Shacharis & Shabbos Mussaf".
   const partOfDay = sought && !sought.named && sought.when?.tefillos ? sought.when.label : null
-  const dayWord = partOfDay ?? (isToday ? 'today' : `on ${tabLabel(day, index)[0] === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`)
+  const dayWord = partOfDay ?? (isToday ? 'today' : `on ${tabLabel(day, index).day === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`)
   const label = sought?.named ? tefillosLabel(asked) : 'Minyanim'
   const lead = partOfDay && !sought?.named ? partOfDay[0].toUpperCase() + partOfDay.slice(1) : `${label} ${dayWord}`
   // A minyan that only runs when enough sign up says so where it's named.
@@ -212,9 +221,9 @@ export default function MinyanimView({
             : `No ${label === 'Minyanim' ? 'minyanim' : label} listed ${dayWord}.`
   // The one shul the search named, for adding a minyan to it.
   const oneShul = named?.length === 1 ? named[0].id : undefined
-  const addLabel = `Add ${sought?.named ? `a ${label}` : 'a minyan'} on ${tabLabel(day, index)[0] === 'Today' ? dayLabel(day.weekday).slice(0, 3) : tabLabel(day, index)[0]}${day.name ? ` · ${day.name}` : ''}`
+  const addLabel = `Add ${sought?.named ? `a ${label}` : 'a minyan'} on ${tabLabel(day, index).day === 'Today' ? dayLabel(day.weekday).slice(0, 3) : tabLabel(day, index).day}${day.name ? ` · ${day.name}` : ''}`
   const answer = searchedAnswer ?? (next
-    ? `${isToday ? 'Next' : `First on ${tabLabel(day, index)[0] === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`}: ${TEFILLAH_LABELS[next.tefillah]} ${clockTime(next.minutes)} at ${next.shulName}${howFar(byId.get(next.shulId ?? '')) ? `, ${howFar(byId.get(next.shulId ?? ''))}` : ''}${whose(postingOf(next.shulId), true)}.`
+    ? `${isToday ? 'Next' : `First on ${tabLabel(day, index).day === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`}: ${TEFILLAH_LABELS[next.tefillah]} ${clockTime(next.minutes)} at ${next.shulName}${howFar(byId.get(next.shulId ?? '')) ? `, ${howFar(byId.get(next.shulId ?? ''))}` : ''}${whose(postingOf(next.shulId), true)}.`
     : notPostedShuls.length
       ? `No shul has posted ${day.name ?? festival} times yet. The regular times of ${notPostedShuls.length} ${notPostedShuls.length === 1 ? 'shul are' : 'shuls are'} below, and may not apply.`
       : isToday && past.length
@@ -223,17 +232,13 @@ export default function MinyanimView({
 
   return (
     <div data-testid="minyanim-view">
-      <DayTabs
-        days={days}
-        index={index}
-        onPick={(i) => {
-          setPicked({ index: i, search })
-          onDayChange?.(i === 0 ? null : days[i].weekday)
-        }}
-      />
+      {/* The switch heads the view, and nothing beside it: no count of
+          what's left (the user, Nov 11: "we don't need to say how many
+          minyanim left today"). The rows say it. */}
+      {heading && <ListHeading count={upcoming.length} total={upcoming.length} lead={heading} filters={filters} />}
       {/* How many the list shows, with Filters beside it (Oct 15): today,
           what's still ahead; Earlier today is folded away and not counted. */}
-      <div className="mt-2">
+      {!heading && <div className="mt-2">
         <ListHeading
           count={upcoming.length}
           total={upcoming.length}
@@ -243,45 +248,55 @@ export default function MinyanimView({
           suffix={isToday ? 'left today' : undefined}
           filters={filters}
         />
-      </div>
+      </div>}
       {onShowing && <Showing count={upcoming.length} onShowing={onShowing} />}
 
-      {(upcoming.length === 0 || named?.length === 0) && (
-        <div className="mt-3 rounded-xl bg-primary/[0.07] px-3.5 py-3" data-testid="minyanim-answer">
-          <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{answer}</p>
-        </div>
-      )}
-      {festival && (
-        <p className="mt-2.5 text-[13.5px] leading-snug text-slate-600">
-          {day.name ?? festival}. <b>{postedCount} of {shulCount} shuls</b> have posted {festival} times
-          {day.yomTov ? '.' : '; the rest show their regular times, marked.'}
-        </p>
-      )}
-
       {/* One white box, a timetable, as a place's times are (the user, Oct
-          16): straight on the grey page it looked plainer than the
-          Synagogues rows beside it. */}
-      {(upcoming.length > 0 || canAdd) && (
-      <ul className={`mt-2 ${BOX}`} data-testid="minyanim-rows">
-        {upcoming.map((s, i) => (
-          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} checkedAt={checkedOf(s)} href={hrefOf(s)} onHover={onHoverShul} inset />
-        ))}
-        {/* Adding a minyan where the minyanim are, as the list's last row
-            (the user's note 2): on the day being looked at. */}
-        {canAdd && (
-          <li>
-            <button type="button" onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50" data-testid="add-minyan">
-              <span className="flex w-[4.5rem] shrink-0 text-primary" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-[18px] w-[18px]">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </span>
-              <span className="text-[15px] font-bold text-primary">{addLabel}</span>
-            </button>
-          </li>
+          16), with the days as small pills across its top (board D1, the
+          user, Nov 11: "the small pills and how it's part of the box"). */}
+      <div className={`mt-2 ${BOX}`} data-testid="minyanim-box">
+        <DayTabs
+          days={days}
+          index={index}
+          onPick={(i) => {
+            setPicked({ index: i, search })
+            onDayChange?.(i === 0 ? null : days[i].weekday)
+          }}
+        />
+        {(upcoming.length === 0 || named?.length === 0) && (
+          <div className="border-t border-slate-100 bg-primary/[0.07] px-4 py-3" data-testid="minyanim-answer">
+            <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{answer}</p>
+          </div>
         )}
-      </ul>
-      )}
+        {festival && (
+          <p className="border-t border-slate-100 px-4 py-2.5 text-[13.5px] leading-snug text-slate-600">
+            {day.name ?? festival}. <b>{postedCount} of {shulCount} shuls</b> have posted {festival} times
+            {day.yomTov ? '.' : '; the rest show their regular times, marked.'}
+          </p>
+        )}
+
+        {(upcoming.length > 0 || canAdd) && (
+        <ul className="divide-y divide-slate-100 border-t border-slate-100" data-testid="minyanim-rows">
+          {upcoming.map((s, i) => (
+            <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} checkedAt={checkedOf(s)} href={hrefOf(s)} onHover={onHoverShul} inset />
+          ))}
+          {/* Adding a minyan where the minyanim are, as the list's last row
+              (the user's note 2): on the day being looked at. */}
+          {canAdd && (
+            <li>
+              <button type="button" onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50" data-testid="add-minyan">
+                <span className="flex w-[4.5rem] shrink-0 text-primary" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-[18px] w-[18px]">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </span>
+                <span className="text-[15px] font-bold text-primary">{addLabel}</span>
+              </button>
+            </li>
+          )}
+        </ul>
+        )}
+      </div>
       {canAdd && adding && (
         <AddMinyanSheet
           isOpen
@@ -300,7 +315,7 @@ export default function MinyanimView({
             <ChevronRightIcon className={`h-4 w-4 transition-transform ${earlier ? '-rotate-90' : 'rotate-90'}`} />
           </button>
           {earlier && (
-            <ul className={`${BOX} opacity-60`}>
+            <ul className={`divide-y divide-slate-100 ${BOX} opacity-60`}>
               {past.map((s, i) => (
                 <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} checkedAt={checkedOf(s)} href={hrefOf(s)} onHover={onHoverShul} inset />
               ))}
@@ -396,8 +411,8 @@ function Showing({ count, onShowing }: { count: number; onShowing: (count: numbe
   return null
 }
 
-/** Minyanim by time's rows: one white box, thin lines between. */
-const BOX = 'divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5'
+/** Minyanim by time's box: the days, then the rows. */
+const BOX = 'overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5'
 
 /** One minyan: its time, its shul, the tefillah and how far. Also a
  *  hotel's minyanim within a walk (WalkList). */
@@ -486,12 +501,12 @@ function DayTabs({ days, index, onPick }: { days: readonly DateFacts[]; index: n
     return () => window.removeEventListener('resize', measure)
   }, [])
   const step = (dir: 1 | -1) => row.current?.scrollBy?.({ left: dir * 220, behavior: 'smooth' })
-  const arrow = 'absolute top-0 bottom-1 hidden w-10 cursor-pointer items-center text-primary desktop:flex'
+  const arrow = 'absolute inset-y-0 hidden w-10 px-1.5 cursor-pointer items-center text-primary desktop:flex'
   return (
     <div className="relative">
-      <div ref={row} onScroll={measure} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 desktop:mx-0 desktop:px-0" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Day">
+      <div ref={row} onScroll={measure} className="flex gap-1.5 overflow-x-auto px-3 py-2.5" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Day">
         {days.map((d, i) => {
-          const [a, b] = tabLabel(d, i)
+          const { day, name, date } = tabLabel(d, i)
           const on = i === index
           return (
             <button
@@ -499,11 +514,12 @@ function DayTabs({ days, index, onPick }: { days: readonly DateFacts[]; index: n
               type="button"
               role="tab"
               aria-selected={on}
+              title={date}
               onClick={() => onPick(i)}
-              className={`shrink-0 cursor-pointer rounded-xl border-[1.5px] px-3 py-1.5 text-left ${on ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-semibold ${on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-ink hover:bg-slate-50'}`}
             >
-              <span className={`block text-[14px] font-bold ${on ? 'text-primary' : 'text-slate-900'}`}>{a}</span>
-              <span className={`block whitespace-nowrap text-[12px] ${on ? 'text-primary' : 'text-muted'}`}>{b}</span>
+              {day}
+              {name && <span className={`font-medium ${on ? 'text-white/80' : 'text-slate-500'}`}> · {name}</span>}
             </button>
           )
         })}

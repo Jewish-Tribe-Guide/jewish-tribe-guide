@@ -43,7 +43,7 @@ function card(kind: HomeBlockKind, sharesRow = false): DraftHomeSection {
   return { id: kind, kind, title: TITLES[kind] ?? kind, cardIds: [], sharesRow }
 }
 
-const LISTINGS = SITE_SETTINGS_DEFAULTS.desktopListingsHeading
+const TIMES = 'Shabbat & Holiday Times'
 const SUBSCRIBE = SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading
 
 /** Each row's cards by name, as the list draws them: a box per shared row. */
@@ -73,35 +73,38 @@ describe('DesktopTopicsManager', () => {
   // homeSections.ts's own doc), so a row with a retired kind ('zmanim',
   // 'map') can still be sitting in real data. That once crashed the whole
   // tab: BUILT_IN_BLOCKS has no entry for a retired kind.
-  it('does not crash on a row whose kind is retired (the old "zmanim", or "map"), and lists none', () => {
+  // 'listings' (Kept by the Community) joined them Nov 11, for the trust
+  // band under the hero.
+  it('does not crash on a row whose kind is retired (the old "zmanim" or "listings"), and lists none', () => {
     const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], sharesRow: false }
-    expect(() => renderManager([legacyZmanim, card('map'), card('davening')])).not.toThrow()
+    expect(() => renderManager([legacyZmanim, card('listings'), card('davening')])).not.toThrow()
     expect(drawnRows()).toEqual([['Davening Times']])
     expect(screen.queryByText('Zmanim & Shabbos')).not.toBeInTheDocument()
+    expect(screen.queryByText('Kept by the Community')).not.toBeInTheDocument()
   })
 
   it('leaves retired-kind rows untouched when adding a card', async () => {
     const user = userEvent.setup()
     const legacyZmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], sharesRow: false }
-    const { onChange } = renderManager([legacyZmanim, card('map')])
+    const { onChange } = renderManager([legacyZmanim, card('listings')])
 
     await user.click(screen.getByRole('button', { name: 'Add Davening Times' }))
 
-    expect(onChange).toHaveBeenCalledWith([legacyZmanim, card('map'), card('davening')])
+    expect(onChange).toHaveBeenCalledWith([legacyZmanim, card('listings'), card('davening')])
   })
 
   // The drawing (artifact 8HpeQANzsQyGbyHVPsXrc5): a card alone fills its
   // row; cards that share one sit in one box.
   it('draws cards that share a row in one box, and a card alone on its own', () => {
-    renderManager([card('browse'), card('davening'), card('listings', true), card('suggest', true), card('subscribe')])
-    expect(drawnRows()).toEqual([['Categories'], ['Davening Times', LISTINGS, 'Suggest a Listing'], [SUBSCRIBE]])
+    renderManager([card('browse'), card('davening'), card('suggest', true), card('subscribe', true), card('jewishTimes')])
+    expect(drawnRows()).toEqual([['Categories'], ['Davening Times', 'Suggest a Listing', SUBSCRIBE], [TIMES]])
   })
 
   // The same rules as the home page (cardRows): a saved row can't put
   // Categories beside anything, or a fourth card in a row.
   it('keeps Categories alone and a row to three, whatever was saved', () => {
-    renderManager([card('browse'), card('davening', true), card('listings', true), card('suggest', true), card('subscribe', true)])
-    expect(drawnRows()).toEqual([['Categories'], ['Davening Times', LISTINGS, 'Suggest a Listing'], [SUBSCRIBE]])
+    renderManager([card('browse'), card('davening', true), card('suggest', true), card('subscribe', true), card('jewishTimes', true)])
+    expect(drawnRows()).toEqual([['Categories'], ['Davening Times', 'Suggest a Listing', SUBSCRIBE], [TIMES]])
   })
 
   // Nothing opens: each card is a handle, its name and an ×.
@@ -119,28 +122,34 @@ describe('DesktopTopicsManager', () => {
 
   it('taking off the first card of a row leaves the rest of that row together', async () => {
     const user = userEvent.setup()
-    const { onChange } = renderManager([card('davening'), card('listings', true), card('suggest', true)])
+    const { onChange } = renderManager([card('davening'), card('suggest', true), card('subscribe', true)])
 
     await user.click(screen.getByRole('button', { name: 'Take Davening Times off' }))
 
-    expect(onChange).toHaveBeenCalledWith([card('listings'), card('suggest', true)])
+    expect(onChange).toHaveBeenCalledWith([card('suggest'), card('subscribe', true)])
   })
 
   // 'map' is retired, so there's no "+ Add" for it under any circumstance.
-  it('offers "+ Add" for each card not in the list, Suggest a Listing included, never the map', () => {
+  it('offers "+ Add" for each card not in the list, the map card and Suggest a Listing included, never Kept by the Community', () => {
     renderManager([card('davening')])
     const adds = screen.getAllByRole('button', { name: /^Add / }).map((b) => b.textContent)
     for (const b of screen.getAllByRole('button', { name: /^Add / })) expect(b).toHaveClass('border-dashed', 'w-full')
-    expect(adds).toEqual(['Add Categories', `Add ${LISTINGS}`, 'Add Suggest a Listing', `Add ${SUBSCRIBE}`, `Add ${SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading}`])
+    expect(adds).toEqual(['Add Categories', 'Add Map', 'Add Suggest a Listing', `Add ${SUBSCRIBE}`, `Add ${TIMES}`])
+  })
+
+  // Board G3 (Nov 11): a community's old 'map' row is the map card now.
+  it('lists a saved map card row as the Map card', () => {
+    renderManager([card('browse'), card('map'), card('davening')])
+    expect(drawnRows()).toEqual([['Categories'], ['Map'], ['Davening Times']])
   })
 
   it('"+ Add" puts the card back at the bottom, in a row of its own', async () => {
     const user = userEvent.setup()
-    const { onChange } = renderManager([card('davening'), card('listings', true)])
+    const { onChange } = renderManager([card('davening'), card('subscribe', true)])
 
     await user.click(screen.getByRole('button', { name: 'Add Suggest a Listing' }))
 
-    expect(onChange).toHaveBeenCalledWith([card('davening'), card('listings', true), card('suggest')])
+    expect(onChange).toHaveBeenCalledWith([card('davening'), card('subscribe', true), card('suggest')])
   })
 
   // Dragging needs layout, so it is in e2e-admin-write; here, the handle's
@@ -155,6 +164,19 @@ describe('DesktopTopicsManager', () => {
     expect(onChange).not.toHaveBeenCalled()
     await user.keyboard('{ArrowDown}')
     expect(onChange).toHaveBeenCalledWith([card('davening'), card('browse')])
+  })
+
+  // Found on dev, Nov 11: the map card moved up by keyboard through a row of
+  // two landed inside it. Like Categories, it passes rows, never joins one.
+  it('moves the map card past a row of two without joining it', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<ManagerHarness initialSections={[card('browse'), card('davening'), card('suggest', true), card('map')]} onChange={onChange} />)
+
+    screen.getByRole('button', { name: 'Move Map' }).focus()
+    await user.keyboard('{ArrowUp}')
+    expect(drawnRows()).toEqual([['Categories'], ['Map'], ['Davening Times', 'Suggest a Listing']])
+    expect(onChange).toHaveBeenLastCalledWith([card('browse'), card('map'), card('davening'), card('suggest', true)])
   })
 
   it('each arrow press changes the rows: into the next row, along it, then a row of its own', async () => {
@@ -180,12 +202,12 @@ describe('DesktopTopicsManager', () => {
 
   it('a full row of three takes no fourth: the card moving up goes over it', async () => {
     const user = userEvent.setup()
-    const { onChange } = renderManager([card('davening'), card('listings', true), card('suggest', true), card('subscribe')])
+    const { onChange } = renderManager([card('davening'), card('suggest', true), card('subscribe', true), card('jewishTimes')])
 
-    screen.getByRole('button', { name: `Move ${SUBSCRIBE}` }).focus()
+    screen.getByRole('button', { name: `Move ${TIMES}` }).focus()
     await user.keyboard('{ArrowUp}')
 
-    expect(onChange).toHaveBeenCalledWith([card('subscribe'), card('davening'), card('listings', true), card('suggest', true)])
+    expect(onChange).toHaveBeenCalledWith([card('jewishTimes'), card('davening'), card('suggest', true), card('subscribe', true)])
   })
 
   // Nothing opens, so the preview lights a card while the mouse is on it.

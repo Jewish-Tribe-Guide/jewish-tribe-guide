@@ -27,7 +27,7 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     desktopHeroImage: null,
   }
 
-  it('desktop: renders desktopHeroHeadline as a bold <h1> and desktopHeroSubhead as a smaller paragraph; the site name and mission are not repeated here at all', () => {
+  it('desktop: renders desktopHeroHeadline as the <h1> and nothing under it (the user, Nov 11); the site name and mission are not repeated here at all', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
 
     // Both layouts render at once (CSS-only mobile/desktop split — see the
@@ -36,7 +36,7 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     // heroTitle (a different <h1> — see the mobile assertion below).
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s.some((h) => h.textContent === settings.desktopHeroHeadline)).toBe(true)
-    expect(screen.getByText(settings.desktopHeroSubhead).tagName).toBe('P')
+    expect(screen.queryByText(settings.desktopHeroSubhead)).not.toBeInTheDocument()
 
     // The site name doesn't render anywhere in this component any more —
     // SiteHeader is where it lives now, once and only once.
@@ -46,19 +46,6 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     // any more, since search (and the label heading it) moved out to its own
     // section entirely rather than staying folded into the hero band.
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
-  })
-
-  it('desktop: renders the headline alone when desktopHeroSubhead is empty', () => {
-    render(
-      <HeroHeading
-        settings={{ ...settings, desktopHeroSubhead: '' }}
-        query=""
-        onQueryChange={vi.fn()}
-      />,
-    )
-    expect(screen.getAllByRole('heading', { level: 1 }).some((h) => h.textContent === settings.desktopHeroHeadline)).toBe(
-      true,
-    )
   })
 
   // The phone home (the user, Oct 17): no headline and no mission on show.
@@ -82,9 +69,7 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
 // trimmed: the mockup's own "People · Places · Community" tagline and its
 // short quote naming the community's region were both cut after review —
 // the user's own call — so this now asserts they're gone rather than
-// present. Every desktop home-screen button (including View Map) later
-// lost its icon too, the user's own call — see the plain-text assertion
-// below.
+// present.
 describe('HeroHeading — Phase 3 desktop details', () => {
   const settings = {
     name: 'Philly Jewish Guide',
@@ -106,30 +91,25 @@ describe('HeroHeading — Phase 3 desktop details', () => {
     expect(screen.queryByText(/stronger Jewish/)).not.toBeInTheDocument()
   })
 
-  it('the desktop View Map button renders plain text — no icon, and not the raw admin-set emoji string, next to the label', () => {
-    const { container } = render(
-      <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap onViewMap={vi.fn()} />,
-    )
-
-    // Scoped to the `desktop:block` section rather than asserting on every
-    // button in the document — mobile has no "View Map" button of its own
-    // any more (see the next describe block).
-    const desktopSection = container.querySelector('.desktop\\:block')
-    expect(desktopSection).not.toBeNull()
-    const desktopViewMap = Array.from(desktopSection!.querySelectorAll('button')).find((b) => b.textContent?.includes('View Map'))
-    expect(desktopViewMap).toBeTruthy()
-    expect(desktopViewMap!.textContent).not.toContain('🗺️')
-    expect(desktopViewMap!.querySelector('svg')).toBeNull()
-  })
-
-  // Mobile used to render its own "View Map" button below the search box —
-  // removed since mobile already reaches the map through its own tab
-  // (MobileTabBar), making the hero's copy redundant.
-  it('renders no "View Map" button on mobile, even when a Map category is configured', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap onViewMap={vi.fn()} />)
-
-    const buttons = screen.getAllByRole('button', { name: /View Map/ })
-    expect(buttons).toHaveLength(1)
+  // Nov 11, board C: the headline, the search and what to try, centred
+  // over the dimmed photo; Browse Categories and View Map gone (the header
+  // has Categories and Map).
+  it('desktop: centred over the dimmed photo, white type, no Browse or Map buttons', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} searchPrompts={['Challah']} onPickPrompt={vi.fn()} />)
+    const hero = screen.getByTestId('desktop-hero')
+    const column = hero.querySelector('h1')!.parentElement!
+    expect(column.className).toMatch(/\bitems-center\b/)
+    expect(column.className).toMatch(/\btext-center\b/)
+    expect(hero.querySelector('h1')!.className).toMatch(/\btext-white\b/)
+    // 48px, so the line spans about the search box's 720px under it rather
+    // than sitting narrower than the box (Nov 11).
+    expect(hero.querySelector('h1')!.className).toMatch(/\btext-\[48px\]/)
+    expect(column.className).toMatch(/\bmax-w-\[880px\]/)
+    expect(hero.querySelector('h1')!.nextElementSibling!.className).toMatch(/\bmax-w-\[688px\]/)
+    expect(hero.querySelector('[class*="rgba(15,23,42,0.55)"]')).not.toBeNull()
+    expect(within(hero).queryByRole('button', { name: /Browse Categories|View Map/ })).not.toBeInTheDocument()
+    // The chips read on the dark photo.
+    expect(within(hero).getByRole('button', { name: 'Challah' }).className).toMatch(/\btext-white\b/)
   })
 })
 
@@ -163,15 +143,15 @@ describe('HeroHeading — the photo panel', () => {
     expect(screen.queryByAltText('A test skyline')).toBeNull()
   })
 
-  it('falls back to the aria-hidden placeholder when no photo is configured', () => {
+  it('falls back to a plain aria-hidden gradient when no photo is configured', () => {
     const { container } = render(
       <HeroHeading settings={{ ...settings, desktopHeroImage: null }} query="" onQueryChange={vi.fn()} />,
     )
 
-    // No <img> at all — the placeholder is a CSS gradient + inline SVG, not
-    // an <img> with an empty/missing alt (which would be its own violation).
+    // No <img> at all: the placeholder is a CSS gradient, not an <img>
+    // with an empty or missing alt (which would be its own violation).
     expect(container.querySelector('img')).toBeNull()
-    expect(container.querySelector('[aria-hidden="true"] svg')).toBeTruthy()
+    expect(container.querySelector('[data-testid="desktop-hero"] [aria-hidden="true"][class*="bg-gradient"]')).toBeTruthy()
   })
 })
 
@@ -435,7 +415,7 @@ describe('HeroHeading — the Today home', () => {
   const dayLine = 'Tuesday, Oct 6 · 25 Tishrei · sunset 6:35 PM'
 
   it('puts the day over the title on both devices, and drops the mission, the subhead and the Browse and Map buttons', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap today={{ dayLine }} />)
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} today={{ dayLine }} />)
     expect(screen.getAllByText(dayLine)).toHaveLength(2)
     expect(screen.getByTestId('today-hero')).toHaveTextContent(`${dayLine}${settings.heroTitle}`)
     expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
@@ -445,9 +425,10 @@ describe('HeroHeading — the Today home', () => {
   })
 
   it('the classic home is unchanged', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} showMap />)
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
     expect(screen.queryByTestId('today-hero')).not.toBeInTheDocument()
     expect(screen.getByTestId('phone-hero')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Browse Categories' })).toBeInTheDocument()
+    // No line under the computer's headline (the user, Nov 11).
+    expect(screen.queryByText(settings.desktopHeroSubhead)).not.toBeInTheDocument()
   })
 })

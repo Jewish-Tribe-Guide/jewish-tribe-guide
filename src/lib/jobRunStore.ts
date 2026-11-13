@@ -1,13 +1,12 @@
 import { getAdminClient } from './supabase/admin'
-import { NIGHTLY_JOBS, jobAlert, type JobId, type JobOutcome, type JobRun, type RunKinds } from './jobRuns'
-import { sendJobAlert } from './email'
+import { NIGHTLY_JOBS, type JobId, type JobOutcome, type JobRun, type RunKinds } from './jobRuns'
 
 // The job_run table (migration 086): each nightly job's runs (jobRuns.ts).
 // Uncached: the jobs themselves and the admin Watches tab. Saving a run
 // never fails the job it records: a job that worked is not made to look
 // broken by its own record. Without the table, jobs run as before and
-// nothing is saved. After each run, the admins are emailed if the job
-// just broke or works again (jobAlert). What a run read of each kind of
+// nothing is saved. A job that just broke is told of in the next
+// nightly email (nightlyEmailRun.ts, jobAlert). What a run read of each kind of
 // source is saved too (`kinds`, migration 087); without that column, the
 // rest still is.
 
@@ -59,14 +58,6 @@ async function startRun(job: JobId, now: Date): Promise<string | null> {
 
 const COLUMNS = 'id, job, started_at, finished_at, ok, summary, warning, error'
 
-/** Emails the admins when this run broke the job or mended it. */
-async function tellIfChanged(job: JobId): Promise<void> {
-  const { data, error } = await getAdminClient().from('job_run').select(COLUMNS).eq('job', job).order('started_at', { ascending: false }).limit(3)
-  if (error) throw new Error(error.message)
-  const alert = jobAlert(NIGHTLY_JOBS.find((j) => j.id === job)!, ((data ?? []) as Row[]).map(fromRow))
-  if (alert) await sendJobAlert(alert)
-}
-
 async function finishRun(id: string, outcome: JobOutcome, now: Date): Promise<void> {
   const row = { finished_at: now.toISOString(), ok: outcome.ok, summary: outcome.summary, warning: outcome.warning ?? null, error: outcome.error ?? null }
   const save = (r: Record<string, unknown>) => getAdminClient().from('job_run').update(r).eq('id', id)
@@ -75,13 +66,13 @@ async function finishRun(id: string, outcome: JobOutcome, now: Date): Promise<vo
   if (error) throw new Error(error.message)
 }
 
-/** Saves the finish and tells the admins of a change; never throws. */
+/** Saves the finish; never throws. A job that broke is told of in the
+ *  nightly email (nightlyEmailRun.ts, from these runs). */
 async function finish(job: JobId, id: string, outcome: JobOutcome, now: Date): Promise<void> {
   try {
     await finishRun(id, outcome, now)
-    await tellIfChanged(job)
   } catch (err) {
-    quietly(`couldn’t save ${job}’s finish or tell of it`)(err)
+    quietly(`couldn’t save ${job}’s finish`)(err)
   }
 }
 
@@ -118,4 +109,19 @@ export async function listJobRuns(): Promise<{ available: boolean; runs: Record<
     runs[NIGHTLY_JOBS[i].id] = ((data ?? []) as unknown as Row[]).map(fromRow)
   }
   return { available: true, runs }
+}
+
+/** Each job's last three runs, newest first, for the nightly email to
+ *  tell which broke (jobAlert). None without migration 086. */
+export async function recentJobRuns(): Promise<Map<JobId, JobRun[]>> {
+  const out = new Map<JobId, JobRun[]>()
+  const results = await Promise.all(NIGHTLY_JOBS.map((j) => getAdminClient().from('job_run').select(COLUMNS).eq('job', j.id).order('started_at', { ascending: false }).limit(3)))
+  for (const [i, { data, error }] of results.entries()) {
+    if (error) {
+      if (runTableMissing(error.message)) return new Map()
+      throw new Error(`Failed to load the job runs: ${error.message}`)
+    }
+    out.set(NIGHTLY_JOBS[i].id, ((data ?? []) as unknown as Row[]).map(fromRow))
+  }
+  return out
 }

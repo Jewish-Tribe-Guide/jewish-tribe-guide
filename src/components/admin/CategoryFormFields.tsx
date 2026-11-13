@@ -65,33 +65,19 @@ const ICON_CHOICES: { group: string; options: { emoji: string; label: string }[]
   },
 ]
 
-// The emoji field + curated browse panel, plus (when the caller wires up
-// upload support) an image alternative — shared by the full category editor
-// and SingletonEditor (Map/Zmanim/Eruv), which has nothing else to edit.
+// The emoji field + curated browse panel — a form's icon (FormEditor). A
+// category's icon isn't set any more: the site draws its kind's line icon
+// (the user, Nov 11).
 export function IconField({
   icon,
   onChange,
-  iconImageUrl,
-  onIconImageUrl,
-  token,
 }: {
   icon: string
   onChange: (value: string) => void
-  /** When both this and `onIconImageUrl`/`token` are provided, an "or upload
-   *  a picture" option renders below the emoji picker — omitted by any
-   *  caller that hasn't wired up image storage for its icon (there are
-   *  none today, but this keeps the emoji-only path available without a
-   *  required prop every call site has to pass). */
-  iconImageUrl?: string
-  onIconImageUrl?: (url: string) => void
-  token?: string
 }) {
   const [open, setOpen] = useState(false)
   return (
-    // A <div>, not <label> — an image URL text input renders inside this
-    // (see the ImageUploadField block below) with its own <label>, and
-    // labels can't nest. The emoji <input> below carries its own
-    // aria-label="Icon" instead of relying on an ancestor <label> for that.
+    // The emoji <input> below carries its own aria-label="Icon".
     <div className="block">
       <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
       <div className="flex gap-2">
@@ -148,22 +134,10 @@ export function IconField({
         </div>
       )}
       <span className="block text-[11px] text-muted mt-1">
-        Browse a curated list, or type/paste any emoji directly into the box. Used as the map
-        marker, and as the card icon if no background photo is set.
+        Browse a curated list, or type/paste any emoji directly into the box. Shown beside the
+        form’s name.
       </span>
 
-      {onIconImageUrl && token !== undefined && (
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Or use a picture instead</span>
-          <ImageUploadField
-            value={iconImageUrl ?? ''}
-            onChange={onIconImageUrl}
-            uploadUrl="/api/admin/categories/icon"
-            token={token}
-            helpText="Replaces the emoji above everywhere this category's icon shows — listing rows, map pins, the nearby list. Clear it to go back to the emoji."
-          />
-        </div>
-      )}
     </div>
   )
 }
@@ -225,7 +199,6 @@ export function PinColorField({
   fallback,
   icon,
   categoryId,
-  iconImageUrl,
   siblings,
 }: {
   value: string
@@ -234,7 +207,6 @@ export function PinColorField({
   fallback: string
   icon: string
   categoryId?: string
-  iconImageUrl?: string
   /** Every category, so each swatch can say who already has it. Null while
    *  they're still loading — the row then just renders plain, as before. */
   siblings?: CategoryConfig[] | null
@@ -251,7 +223,6 @@ export function PinColorField({
         <CategoryIcon
           icon={icon || '📍'}
           categoryId={categoryId}
-          iconImageUrl={iconImageUrl?.trim() || undefined}
           color={active}
           className="h-11 w-11 text-2xl"
           sizePx={44}

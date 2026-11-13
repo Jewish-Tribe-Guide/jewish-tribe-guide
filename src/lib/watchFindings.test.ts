@@ -123,6 +123,19 @@ describe('findingFrom: a shul’s times', () => {
     expect(f.times).toMatchObject({ current: was, proposed: now })
   })
 
+  // Nov 11: Mekor Habracha's week from its website, filed with a copy of
+  // the newsletter's week as the listing had it then (a 7pm typo). The
+  // listing's copy was corrected to 4:30 since; the finding showed it
+  // changed back to 7pm, though approving puts on its own week only.
+  it('a week’s finding shows its own week, every other week as the listing has it now', () => {
+    const fri = (time: string) => ({ id: 'n', name: 'Times for Nov 8 – Nov 13', from: '2026-11-08', to: '2026-11-13', mode: 'replace', kind: 'week', minyanim: [{ id: 'm', on: ['2026-11-13'], tefillah: 'mincha_maariv', time }] })
+    const next = { id: 'w', name: 'Times for Nov 20 – Nov 21', from: '2026-11-20', to: '2026-11-21', mode: 'replace', kind: 'week', minyanim: [{ id: 'k', on: ['2026-11-20'], tefillah: 'mincha_maariv', time: '4:25pm' }] }
+    const s = read({ minyanim: was, minyanim_schedules: [fri('7:00 PM'), next] })
+    ;(s.payload as Record<string, unknown>).source = { readBy: 'ai', from: 'its website', part: { part: 'week', field: 'minyanim', schedules: ['w'] } }
+    const f = findingFrom(s, { ...shul, details: { minyanim: was, minyanim_schedules: [fri('4:30pm')] } }, TIMES)
+    expect(f.times?.proposedSchedules).toEqual([fri('4:30pm'), next])
+  })
+
   it('none when it would change something else too, so it’s shown line by line', () => {
     const f = findingFrom(read({ minyanim: was, rabbi: 'Rabbi Cohen' }), shul, [...TIMES, { key: 'rabbi', label: 'Rabbi', type: 'text' }])
     expect(f.lines.map((l) => l.key)).toEqual(['rabbi'])

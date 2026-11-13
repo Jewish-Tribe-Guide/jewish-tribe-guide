@@ -11,7 +11,7 @@ import { MEKOR_WATCH_NAME } from './mekorWatch'
 import { submissionSource } from './submissionSource'
 import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
 import type { Minyan } from './davening'
-import type { TimesPart } from './timesParts'
+import { rebasePart, type TimesPart } from './timesParts'
 import { hoursSections, sectionKeys, sectionOfKeys, type SectionSource } from './hoursSections'
 import { CONTACT_SECTION } from './contactRead'
 import { itemsField } from './listingView'
@@ -157,8 +157,15 @@ export function pageOf(note: string | null | undefined): string | undefined {
 
 /** A pending suggestion a watch filed, as the job page shows it. */
 export function findingFrom(s: SubmissionRow, current: ResourceRow | null, fields: readonly CategoryField[]): Finding {
-  const payload = s.payload as unknown as ResourceSubmission
+  const sent = s.payload as unknown as ResourceSubmission
   const source = submissionSource(s)
+  // ...and within its field, only its part: the rest of the times are the
+  // listing's as they are now, as approval puts them (rebasePart). Filed
+  // with a copy of the whole schedule, a week the listing has corrected
+  // since showed as changed back (the user, Nov 11: Mekor Habracha's
+  // newsletter week, its 7pm typo fixed to 4:30, back to 7pm in To do).
+  const payload =
+    source.part && s.operation === 'update' && current && sent?.details ? { ...sent, details: rebasePart(source.part, current.details ?? {}, sent.details) } : sent
   const editable = editableKeys(fields)
   // A shul's times read a part at a time change only that part when
   // approved (submissionStore.ts), so they show only it: whatever else

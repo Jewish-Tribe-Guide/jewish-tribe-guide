@@ -148,9 +148,8 @@ describe('SiteSettingsEditor — Home page', () => {
       searchPlaceholder: 'Ask: challah',
     })
     expect(screen.getByLabelText('Big line')).toHaveValue('Your guide')
-    // Wraps, so a long line shows whole (the user, Nov 4).
-    expect(screen.getByLabelText('Line under it')).toHaveValue('Kept current by you')
-    expect(screen.getByLabelText('Line under it').tagName).toBe('TEXTAREA')
+    // No line under the big line any more (the user, Nov 11).
+    expect(screen.queryByLabelText('Line under it')).toBeNull()
     expect(screen.getByLabelText('Words in the search box')).toHaveValue('Ask: challah')
   })
 
@@ -163,6 +162,21 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(within(screen.getByRole('region', { name: 'Top of the page' })).getByRole('button', { name: 'Adjust photo' })).toBeInTheDocument()
     expect(screen.queryByLabelText(/description/i)).toBeNull()
     expect(screen.queryByDisplayValue('City Hall')).toBeNull()
+  })
+
+  // Board G3 (Nov 11): the map card's photo is set with the cards, and only
+  // while the map card is on the page.
+  it('the map card’s photo is set with the cards, only while the map card is there', async () => {
+    const mapRow: HomeSection = { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], sharesRow: false }
+    await renderEditor({ ...SITE_SETTINGS_DEFAULTS, desktopMapImage: { url: 'https://example.com/city-hall.jpg', alt: '' } }, [mapRow])
+    const cards = screen.getByRole('region', { name: 'Cards under the search' })
+    expect(within(cards).getByText('Map card photo')).toBeInTheDocument()
+    expect(within(cards).getByRole('button', { name: 'Adjust photo' })).toBeInTheDocument()
+  })
+
+  it('without the map card, there is no map card photo to set', async () => {
+    await renderEditor({ ...SITE_SETTINGS_DEFAULTS }, [])
+    expect(screen.queryByText('Map card photo')).toBeNull()
   })
 
   // The user, Nov 4: the logo and the photo upload as a listing's photo

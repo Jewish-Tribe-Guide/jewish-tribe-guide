@@ -109,9 +109,9 @@ describe('getSiteSettingsUncached', () => {
   })
 
   it('maps a full row, falling back to defaults for any per-card copy column not yet set', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_listings_eyebrow: null }, error: null }))
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_subscribe_eyebrow: null }, error: null }))
     const settings = await getSiteSettingsUncached('philly')
-    expect(settings.desktopListingsEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopListingsEyebrow)
+    expect(settings.desktopSubscribeEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopSubscribeEyebrow)
     expect(settings.name).toBe('My Community')
     expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
   })
@@ -307,5 +307,54 @@ describe('the Today home settings', () => {
     await expect(updateSiteSettings('philly', { homeStyle: 'today' })).rejects.toThrow('isn’t set up on this site yet')
     saveWith(rawRow, { data: null, error: { message: 'column "today_hidden" of relation "site_settings" does not exist' } })
     await expect(updateSiteSettings('philly', { todayHidden: ['pinned'] })).rejects.toThrow('isn’t set up on this site yet')
+  })
+})
+
+describe('the map card photo (migration 095)', () => {
+  function saveWith(row: Record<string, unknown>, writeResult: unknown = { data: row, error: null }) {
+    const readBuilder = chainable({ data: row, error: null })
+    const writeBuilder = chainable(writeResult)
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? readBuilder : writeBuilder
+    })
+    return writeBuilder
+  }
+  const photo = { url: 'https://example.com/city-hall.jpg', alt: '' }
+
+  it('reads as none on a row from before 095, and reads a saved one', async () => {
+    mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopMapImage).toBeNull()
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_map_image: photo }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopMapImage).toEqual(photo)
+  })
+
+  it('keeps a saved picture’s credit, and ignores a blank one', async () => {
+    const osm = { url: 'https://example.com/osm.jpg', alt: 'Street map', credit: '© OpenStreetMap contributors' }
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_map_image: osm }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopMapImage).toEqual(osm)
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_map_image: { ...photo, credit: '  ' } }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).desktopMapImage).toEqual(photo)
+  })
+
+  it('a save that doesn’t change it leaves the column out, so a database without 095 still saves', async () => {
+    const write = saveWith(rawRow)
+    await updateSiteSettings('philly', { heroTitle: 'New Hero', desktopMapImage: null })
+    expect((write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty('desktop_map_image')
+  })
+
+  it('a save that changes it writes it, and clearing it writes the clear', async () => {
+    let write = saveWith(rawRow)
+    await updateSiteSettings('philly', { desktopMapImage: photo })
+    expect(write.upsert).toHaveBeenCalledWith(expect.objectContaining({ desktop_map_image: photo }), { onConflict: 'community_id' })
+    write = saveWith({ ...rawRow, desktop_map_image: photo })
+    await updateSiteSettings('philly', { desktopMapImage: null })
+    expect(write.upsert).toHaveBeenCalledWith(expect.objectContaining({ desktop_map_image: null }), { onConflict: 'community_id' })
+  })
+
+  it('choosing one before 095 says what’s missing', async () => {
+    saveWith(rawRow, { data: null, error: { message: 'column "desktop_map_image" of relation "site_settings" does not exist' } })
+    await expect(updateSiteSettings('philly', { desktopMapImage: photo })).rejects.toThrow('map card’s photo isn’t set up on this site yet')
   })
 })

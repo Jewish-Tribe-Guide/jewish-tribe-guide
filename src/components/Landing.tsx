@@ -11,22 +11,22 @@ import { nearMiss, type AskResult } from '@/lib/askSearch'
 import type { Answer } from '@/lib/askAnswer'
 import type { SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
+import { HOME_CARD_OUTLINE } from '@/components/home/AnswerCard'
 import { routes } from '@/lib/routes'
 import { learnFrom } from '@/lib/askReader'
 import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
-import { linksToMap } from '@/lib/navTabs'
 import TodayBlocks from '@/components/home/TodayBlocks'
 import CategoryTiles from '@/components/home/CategoryTiles'
 import RightNow from '@/components/home/RightNow'
-import TrustBand from '@/components/home/TrustBand'
+import TrustBand, { DesktopTrustBand } from '@/components/home/TrustBand'
 import { trustFacts } from '@/lib/phoneHome'
 import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
-import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
+import MapCard from '@/components/home/MapCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
@@ -45,14 +45,12 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useLocation } from '@/lib/locationContext'
-import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
 import { useActiveCommunity, useCommunitySlug } from '@/lib/communityContext'
 import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-import { ui } from '@/lib/uiConfig'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import { dayLine } from '@/lib/todayHome'
 
@@ -76,11 +74,11 @@ export type LandingProps = {
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
-//   Desktop — a two-column warm hero (headline + subhead + search beside a
-//   photo, see HeroHeading) → five independent, admin-orderable cards (see
-//   builtInOrder): Categories & Search (a flat "Browse everything" grid,
-//   full weight — every card, always visible, no hover needed), Davening
-//   Times, Update Listings ("kept by the community"), Email Signup (Stay in
+//   Desktop — the hero (headline + search over a dimmed photo, see
+//   HeroHeading) → the trust band (DesktopTrustBand, Nov 11) → the
+//   admin-orderable cards (see builtInOrder): Categories & Search (a flat
+//   "Browse everything" grid, full weight — every card, always visible, no
+//   hover needed), Davening Times, Suggest a Listing, Email Signup (Stay in
 //   the Loop), and Jewish Times (Shabbat & Holiday Times) — → footer. The map
 //   itself lives at its own full-screen route (the hero's "View Map" button,
 //   header nav, or the mobile tab bar), never embedded here — that used to be
@@ -124,23 +122,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // tile), so the state has to be shared rather than owned by the grid
   // alone.
   const [browseExpanded, setBrowseExpanded] = useState(false)
-  // The hero's "Browse Categories" button scrolls here.
-  const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
   // The Today home (step 6), when the admin has switched it on — and it
   // isn't held back from the site (see features.ts).
   const today = features.todayHome && settings.homeStyle === 'today'
   const timezone = useCommunityTimezone()
-  // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
-  // transparent over this screen's photo hero until scrolled past it.
-  useHeaderOverlay(true)
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
   const navTransition = useNavTransitionProps()
   const { anchor } = useLocation()
-  // The hero's "View Map" shows wherever the header or a tab links to the
-  // Map, the same rule as those links.
-  const showMap = linksToMap(settings)
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
   // Same as the real Zmanim & Shabbos category page (FindResources' own
   // locationLabel) — the visitor's typed address, or the community's region,
@@ -313,15 +303,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, sharesRow: s.sharesRow }))
-  // With none set: Categories, then Davening Times, Kept by the Community
-  // and Suggest a Listing in one row, then a row each.
+  // With none set (board G5b, Nov 11): Categories, the next minyan and this
+  // Shabbat side by side, the map card, Suggest a listing, Stay in the Loop
+  // last.
   const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'listings', 'suggest', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'davening', 'jewishTimes', 'map', 'suggest', 'subscribe'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
-          sharesRow: kind === 'listings' || kind === 'suggest',
+          sharesRow: kind === 'jewishTimes',
         }))
   // On the Today home its own blocks answer what Browse, Davening Times and
   // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
@@ -503,17 +494,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           query={query}
           onQueryChange={changeQuery}
           onSearchSubmit={submit}
-          showMap={showMap}
-          onViewMap={() => onNavigate(null, 'map')}
-          onBrowseCategories={() => {
-            // Also expands the row (the same thing the "More" tile's own
-            // click does), not just a scroll — "Browse Categories" reads as
-            // "show me everything," so landing on the same capped 9+More
-            // row a visitor would've scrolled to on their own defeats the
-            // button's own promise.
-            setBrowseExpanded(true)
-            browseCardRef.current?.scrollIntoView({ block: 'start' })
-          }}
           searchPanel={linesNode || nothingNode || null}
           searchDismissed={searchDismissed}
           onSearchDismissedChange={setSearchDismissed}
@@ -523,6 +503,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           trust={!today && trust ? <TrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} /> : null}
         />
 
+        {/* ── How it stays right, on a computer (F1b, Nov 11): its own
+                band under the photo, before the cards. It took over from
+                the "Kept by the Community" card ('listings' below). */}
+        {!today && !isMobile && trust && (
+          <div className="mt-10 hidden desktop:block">
+            <DesktopTrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} />
+          </div>
+        )}
+
         {/* ── Seasonal campaign banner ─────────────────────────────────────────
                 Renders nothing outside its own admin-set date range (see the
                 component's own doc). Common to both layouts — sits above the
@@ -531,7 +520,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 banner "near the top" on both. Not part of builtInOrder/
                 cardKindContent: it isn't admin-orderable among those cards,
                 just a plain "is one active" check, same shape as
-                showMap/zmanimCategory above.
+                zmanimCategory above.
 
                 Hidden on mobile while actively searching (`isMobile && q`):
                 mobile has no HeroSearchDropdown of its own — typing re-filters
@@ -545,7 +534,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 just removing the one thing putting distance between the box
                 and its own answer. ─────────────────────────────────────── */}
         {!(isMobile && q) && (
-          <div className="mt-8">
+          <div className="mt-8 empty:hidden">
             <CampaignBannerCard />
           </div>
         )}
@@ -625,20 +614,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             // listing count (most to least places) rather than the source
             // order resourceCards/entryCards happens to build — matching
             // the user's own reference image. Collapsed shows the first
-            // COLLAPSED_TILE_COUNT plus a trailing "More" tile (no
-            // scrolling, no wrap — see CategoryTileRow's own doc); "View
-            // all" (here or the "More" tile itself) expands it into a full
-            // wrapped grid instead.
+            // nine as photo tiles and an "All categories" tile (board H1,
+            // see CategoryTileRow's own doc), which expands it.
             const browseCards = [...(loading ? entryCards : (allCards ?? []))].sort(
               (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
             )
             return (
-              // scroll-mt-24 clears the sticky site header when this card is
-              // scrolled into view (the "Browse Categories" hero button).
               <div
-                ref={browseCardRef}
                 data-testid="browse-everything-card"
-                className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
+                className={`hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-8 ${HOME_CARD_OUTLINE}`}
               >
                   {/* Hardcoded — the user's own reference image titles this
                       "Explore by Category" with no small eyebrow label above
@@ -661,7 +645,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                     )}
                   </div>
                   {!isMobile && (
-                    <div className={ui.search.landing ? 'mt-3' : ''}>
+                    <div className="mt-4">
                       <CategoryTileRow
                         cards={browseCards}
                         categories={categories}
@@ -675,9 +659,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             )
           }
           if (kind === 'davening') return !today && !isMobile && <DaveningTimesCard coords={coords} />
-          if (kind === 'listings') {
-            return !isMobile && <UpdateListingsCard eyebrow={settings.desktopListingsEyebrow} heading={settings.desktopListingsHeading} />
-          }
+          // 'listings' (the "Kept by the Community" card) is retired: the
+          // trust band under the hero says it, with its evidence (Nov 11).
+          // A community's leftover row draws nothing, as 'map' below.
           if (kind === 'suggest') return !isMobile && <SuggestListingCard />
           if (kind === 'subscribe') {
             // Also unconditional — SubscribeSection doesn't read zmanim
@@ -685,13 +669,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             // ShabbatTimesCard, not depend on it.
             return (
               !isMobile && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                  <SubscribeSection
-                    bare
-                    eyebrow={settings.desktopSubscribeEyebrow}
-                    heading={settings.desktopSubscribeHeading}
-                  />
-                </div>
+                <SubscribeSection
+                  band
+                  eyebrow={settings.desktopSubscribeEyebrow}
+                  heading={settings.desktopSubscribeHeading}
+                />
               )
             )
           }
@@ -708,19 +690,31 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 <ShabbatTimesCard
                   coords={coords ?? community.mapCenter}
                   locationLabel={zmanimLocationLabel}
-                  heading={settings.desktopJewishTimesHeading}
                 />
               )
             )
           }
-          // 'map' — the old embedded map band — is retired (the user's own
-          // call: the map lives at its own full-screen route now, reached via
-          // the hero's "View Map" button/header nav/tab bar, never embedded
-          // on the home screen). Falls through to `return null` below like
-          // any other retired kind (see BUILT_IN_BLOCKS's own doc) — a
-          // community with an old 'map' row in its home_sections just
-          // silently renders nothing for it, same as 'zmanim'/'shabbat'/
-          // 'featured' before it.
+          if (kind === 'map') {
+            // "Everything on one map" (board G3, Nov 11): a photo and a link
+            // to the map, never the map itself. The old embedded map band
+            // this kind used to draw stays gone; a community's old 'map' row
+            // now draws this card where it sits.
+            const names = [...(allCards ?? [])]
+              .sort((a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0))
+              .map((c) => c.title)
+            return (
+              !isMobile && (
+                <MapCard
+                  href={routes.map(communitySlug)}
+                  photo={settings.desktopMapImage}
+                  categoryNames={names}
+                  onOpen={() => track('map_opened', { source: 'home-card' })}
+                />
+              )
+            )
+          }
+          // Retired kinds ('zmanim', 'shabbat', 'featured', 'listings')
+          // fall through and draw nothing for a community's leftover row.
           return null
           }
 
@@ -755,8 +749,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             })
           }
 
-          return rows.map((row) => (
-            <div key={row.key} data-spot={`cards ${row.key.split('-').map((k) => `card-${k}`).join(' ')}`} className="my-8">
+          // Board G5c (Nov 11) set 72px between the stops; 48px once the cards
+          // had outlines of their own (J1b, the user Nov 11: the gaps read too
+          // big). The first stays 32px under the trust strip, which bridges
+          // into it. The margins collapse, so a gap is 48px, not 96.
+          return rows.map((row, i) => (
+            <div
+              key={row.key}
+              data-spot={`cards ${row.key.split('-').map((k) => `card-${k}`).join(' ')}`}
+              // desktop: only. The rows draw nothing on a phone, and their
+              // margins collapsed through into 72px of empty space above
+              // Right now (board K1c, Nov 11, the user: tighten it).
+              className={i === 0 ? 'desktop:mt-8 desktop:mb-12' : 'desktop:my-12'}
+            >
               {row.node}
             </div>
           ))

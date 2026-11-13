@@ -18,6 +18,7 @@ vi.mock('@/lib/siteSettingsStore', async (importOriginal) => ({
 }))
 
 const { PATCH } = await import('./route')
+const { MissingMapPhotoColumnError } = await import('@/lib/siteSettingsStore')
 const patch = (body: unknown) =>
   PATCH(new Request('http://x/api/admin/site-settings?community=philly', { method: 'PATCH', body: JSON.stringify(body) }))
 
@@ -30,7 +31,7 @@ beforeEach(() => {
 
 describe('PATCH /api/admin/site-settings', () => {
   // Regression: these card texts show nowhere on the site (the cards hard-code
-  // their own headings, and there is no Map card), yet blanking one refused
+  // their own headings, the map card's words included), yet blanking one refused
   // the whole save, and the editor sends every field on every save.
   it.each(['desktopBrowseEyebrow', 'desktopBrowseHeading', 'desktopDaveningEyebrow', 'desktopDaveningHeading', 'desktopMapEyebrow', 'desktopMapHeading'])(
     'a blank %s, which the site never shows, does not block the save',
@@ -41,7 +42,14 @@ describe('PATCH /api/admin/site-settings', () => {
     },
   )
 
-  it.each(['desktopListingsHeading', 'desktopSubscribeHeading', 'desktopJewishTimesHeading'])(
+  it('choosing a map card photo before migration 095 says what’s missing, not a bare failure', async () => {
+    m.updateSiteSettings.mockRejectedValue(new MissingMapPhotoColumnError())
+    const res = await patch({ desktopMapImage: { url: 'https://example.com/a.jpg', alt: '' } })
+    expect(res.status).toBe(409)
+    expect((await res.json()).errors).toEqual(['The map card’s photo isn’t set up on this site yet.'])
+  })
+
+  it.each(['desktopSubscribeEyebrow', 'desktopSubscribeHeading'])(
     'a blank %s, which the site shows, is still refused',
     async (key) => {
       const res = await patch({ ...SITE_SETTINGS_DEFAULTS, [key]: '' })

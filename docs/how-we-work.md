@@ -53,8 +53,10 @@ work is in `docs/where-things-stand.md`.
   down." An explaining sentence means the screen needs fixing. This holds on
   admin screens too: a card is its heading, the facts, and its buttons.
 - **No clutter links.** No buttons or links under cards. The card itself is
-  tappable (chevron). A row is the name, the answer, and when it was checked.
-  Details live in the listing.
+  tappable: a chevron on a phone; on the computer home the cards lift on
+  hover instead (board G5b, Nov 11: "those two + kept up by the community
+  can lose the chevrons and just have hover"). A row is the name, the
+  answer, and when it was checked. Details live in the listing.
 - **Whole-text links.** A link is one action phrase ("Fill it in yourself"),
   not a question with a clickable tail.
 - **No emoji as icons.** They read as "childish, cheap, and more AI obvious".

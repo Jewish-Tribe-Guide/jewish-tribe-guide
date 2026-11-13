@@ -6,7 +6,6 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'rea
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { isOptimizableImage } from '@/lib/imageHosts'
-import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 import SearchPrompts from './SearchPrompts'
 
@@ -28,19 +27,6 @@ type Props = {
   /** Admin-preview only: renders the search box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
-  /** Shows the "View Map" button beside Browse Categories (desktop only;
-   *  mobile reaches the map through its own tab instead, see MobileTabBar):
-   *  whenever the header or a tab links to the Map (navTabs.ts linksToMap). */
-  showMap?: boolean
-  /** Preview mode has nothing to navigate to, so it's left undefined there —
-   *  the button still renders (for visual fidelity) but doesn't do anything. */
-  onViewMap?: () => void
-  /** Desktop only — scrolls to the "Browse everything" card below. Always
-   *  rendered (unlike the Map button, which is conditional on a Map category
-   *  existing): every community has categories to browse. Preview mode
-   *  leaves this undefined the same way it leaves onViewMap undefined — the
-   *  button still renders, it just doesn't do anything. */
-  onBrowseCategories?: () => void
   /** Where the search could go (SearchLines), or that nothing was found:
    *  under the box while something is typed, over the page on desktop,
    *  in the page's flow on a phone. Built by Landing. */
@@ -89,53 +75,24 @@ type Props = {
 // same site — `settings.name` still isn't dead, it's the header, the
 // footer, and the browser tab, just never repeated here.
 //
-// Search sits inside the band, overlaid on the photo alongside Browse
-// Categories/View Map — this is now the ONLY search box on desktop.
-// It used to have a second copy in SearchSection, a standalone headed card
-// below the hero, on the reasoning that search deserved billing as a peer
-// of the category grid rather than a hero accessory; SearchSection is gone
-// (the user's own call, reviewing the built page — a second input for the
-// same `query` state read as redundant once both were on screen at once).
-// The "Browse everything" card (Landing.tsx) still reads/writes the same
-// `query` state this band does, so typing here still narrows/surfaces its
-// results — it just doesn't have an input of its own any more.
-//
-// Typing also opens HeroSearchDropdown, a capped live-results preview right
-// under the box — the user's own reported pain point: a search box whose
-// answer shows up in a card near the bottom of the page reads as
-// disconnected from the box itself, since nothing changes where you're
-// actually looking. "See all" expands that same panel in place instead of
-// scrolling anywhere — see that component's own doc for why a scroll-to-a-
-// section answer was explicitly rejected in favor of the panel just
-// growing and spilling out over whatever's beneath it.
+// Desktop centres the headline, the search and what to try over the photo,
+// dimmed (Nov 11, board C). Search is the only box on desktop; typing opens
+// its results right under it, over the page (the user's own pain point: an
+// answer in a card far below reads as disconnected from the box).
 //
 // Expressed as two parallel layouts behind `desktop:`/`hidden` classes
 // rather than an isMobile branch: isMobile starts false on every render
 // (SSR-safe), so branching here would flash the desktop layout on a phone
-// for one frame — the same reasoning as Landing's own inlineGridClass.
+// for one frame (the same reasoning as Landing's own inlineGridClass).
 //
-// The photo shows settings.desktopHeroImage when the admin has set one
-// (Desktop tab's Hero card), and falls back to the original CSS gradient +
-// watermark star otherwise, so a fresh community with no photo yet never
-// renders broken.
-//
-// Desktop mockup match (docs/desktop-mockup-plan.md, Phase 3): serif
-// headline and a faint skyline silhouette low in the band. The mockup's own
-// "People · Places · Community" tagline and the short quote over the
-// photo's right side (naming the community by its own `community.config`
-// region) were both cut after review — the user's own call, not a mockup
-// deviation. Browse Categories and View Map render as plain text buttons —
-// the user's own call, removing the icons that used to sit next to every
-// label across the desktop home screen.
+// The photo is settings.desktopHeroImage when the admin has set one
+// (Desktop tab's Hero card), a plain gradient otherwise.
 export default function HeroHeading({
   settings,
   query,
   onQueryChange,
   onSearchSubmit,
   interactive = true,
-  showMap = false,
-  onViewMap,
-  onBrowseCategories,
   searchPanel = null,
   searchDismissed,
   onSearchDismissedChange,
@@ -144,7 +101,7 @@ export default function HeroHeading({
   today,
   trust = null,
 }: Props) {
-  const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
+  const { desktopHeroHeadline: headline, desktopHeroImage: heroImage } = settings
 
   // Start fetching the hero photo from <head> — but only where it will be
   // shown. The <img> below is deliberately lazy (a lazy image in a display:none
@@ -159,7 +116,7 @@ export default function HeroHeading({
       src: heroImage.url,
       alt: '',
       fill: true,
-      sizes: '58vw',
+      sizes: '100vw',
       unoptimized: !isOptimizableImage(heroImage.url),
     })
     preload(props.src, {
@@ -277,149 +234,53 @@ export default function HeroHeading({
       </section>
       )}
 
-      {/* Desktop — a full-bleed band, edge to edge under the header rather
-          than a rounded card inside the page's usual max-w-6xl column.
-          `w-screen` + `left-1/2` + `-translate-x-1/2` is the same full-
-          bleed-inside-a-centered-container technique ResourceMapView
-          already uses for the mobile map band (see that component's own
-          doc, and the backstop rule in globals.css that this pattern is
-          the one sanctioned exception to) — it breaks the section out of
-          `<main>`'s `max-w-6xl mx-auto px-4 sm:px-6`, which nothing else on
-          this page needs to do. The inner content wrapper below re-applies
-          that same max-w-6xl/px-4 so the headline/search/buttons still line
-          up with the header logo and every section beneath this one.
-          desktopHeroHeadline/Subhead are the headline, not the site name —
-          see the component doc for why (the header beside it already names
-          the site).
-          The photo itself is NOT full-bleed any more — it's confined to a
-          `w-[58%]` box anchored to the right edge, matching a reference
-          image the user supplied: solid `bg-surface` (the section's own
-          background) on the left where the headline/search/buttons sit,
-          photo only on the right. A full-bleed photo washed to fake a
-          plain left side (the previous design) computed object-cover's
-          crop against the ENTIRE band's width — a very short/wide shape —
-          and cropped away most of a normal photo's height regardless of
-          where the wash made it look plain; see the photo box's own
-          comment below for why confining the box itself is what actually
-          fixes that, not just where the fade happens. */}
-      {/* No overflow property here at all — not even overflow-x-hidden,
-          which was tried first and turned out to be the same bug this
-          section's own w-screen/-translate-x-1/2 trick has already been
-          burned by once (see globals.css's own overflow-x doc on <html>):
-          per CSS Overflow 3, an axis left `visible` alongside a sibling
-          axis that's anything else computes to `auto`, so `overflow-x:
-          hidden` alone silently turned `overflow-y` into `auto` and clipped
-          (with a visible scrollbar, confirmed live) HeroSearchDropdown
-          whenever it grew taller than the section's own rendered height —
-          exactly the "scroll on the hero" the user reported, not the fix
-          the earlier commit claimed. This section was never the thing
-          keeping the page from scrolling sideways in the first place: the
-          w-screen band is exactly 100vw and centered, so it never actually
-          extends past the viewport edge, and the global `html {
-          overflow-x: hidden }` backstop (already in place for exactly this
-          full-bleed pattern) covers it regardless. Nothing here needed
-          clipping at all — the photo box has its own overflow-hidden
-          wrapper below and was never relying on this section's.
+      {/* Desktop: the headline, the big search and what to try, centred
+          over the photo, dimmed (board C on the desk canvas, the user, Nov
+          11: "much calmer and more directs my attention"). Under the header,
+          not behind it: the header stays white, as the board drew it.
+          Browse Categories and View Map went with it: the header has
+          Categories and Map, and the grid is just below.
 
-          `z-30`: without an explicit z-index of its own, this section (and
-          everything inside its own `isolate` stacking context, dropdown
-          included) painted at the SAME implicit stacking level as every
-          sibling after it in the DOM — CampaignBannerCard among them —
-          which then won on DOM order alone and painted over the dropdown
-          instead of the dropdown painting over it. `isolate` only walls off
-          z-index COMPARISONS from happening inside vs. outside this
-          section; it does nothing for the section's own position in ITS
-          parent's stacking order, which is what actually decided this.
-          z-30 (not something arbitrarily high) stays under SiteHeader's own
-          sticky z-40, so the dropdown still tucks correctly behind the
-          header on scroll instead of painting over it too. */}
-      <section data-spot="top" className="hidden desktop:block relative z-30 left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 bg-surface desktop:-mt-[60px]">
-        {/* The photo lives in its OWN right-anchored box — NOT the full
-            w-screen band (that was the earlier design: one full-bleed photo
-            with a wash faked over the left side to look plain). The user
-            flagged that version as "zoomed in": object-cover was computing
-            its crop against the full band's width, an extremely short/wide
-            shape (easily 3.5:1), so almost all of a normal-aspect photo's
-            height got cropped away no matter where the wash made it LOOK
-            plain. A photo confined to `w-[58%]` computes its crop against a
-            far less extreme shape (~1.9:1 at typical desktop widths), so
-            object-cover keeps far more of the original scene — the "whole
-            picture" look the reference image has. The left ~42% is now a
-            genuinely flat `bg-surface` (the section's own background, set
-            above) with no photo pixels under it at all, matching that
-            reference exactly instead of approximating it with a gradient. */}
-        <div className="absolute inset-y-0 right-0 -z-10 w-[58%]">
+          A full-bleed band: `w-screen left-1/2 -translate-x-1/2` breaks out
+          of <main>'s column (the pattern ResourceMapView uses; globals.css
+          backstops it). No overflow property: `overflow-x: hidden` alone
+          turns `overflow-y` into `auto` and clips the search's results as
+          they spill over the page (it has, once). The photo has its own
+          clipping box. `z-30` puts the results over the page's next
+          sections and keeps them under the sticky header's z-40. */}
+      <section data-spot="top" data-testid="desktop-hero" className="hidden desktop:block relative z-30 left-1/2 isolate w-screen -translate-x-1/2 bg-slate-800">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
           {heroImage ? (
-            // Decoration: the big line beside it says what the page is, so
+            // Decoration: the big line over it says what the page is, so
             // the photo has an empty alt and a screen reader passes it by.
-            // (The admin's "Photo description" went, the user, Nov 4.)
             <Image
               src={heroImage.url}
               alt=""
               fill
-              sizes="58vw"
-              // object-top, not object-cover's default (center): even
-              // confined to this narrower box, the shape is still wider
-              // than a typical photo's own aspect ratio, so SOME cropping
-              // still happens — object-top keeps sky/rooftops in frame
-              // (what a street photo's "whole scene" reads as) instead of a
-              // center crop landing mid-building/street level.
-              className="object-cover object-top"
-              // Above the fold on every desktop load, so it should win the
-              // bandwidth race — but NOT `priority`/`preload`. This section is
-              // `hidden` below the desktop breakpoint, and a preload has no
-              // media condition: it made every phone download the desktop hero
-              // and then never show it. Left at the default lazy loading, the
-              // browser skips an image inside a display:none box entirely;
-              // `fetchPriority` alone is what Next's own docs prescribe for an
-              // image that's only visible at some breakpoints.
+              sizes="100vw"
+              className="object-cover"
+              // Above the fold, so it should win the bandwidth race, but not
+              // `priority`: a preload has no media condition, and this band
+              // is `hidden` on a phone (the <head> preload above carries
+              // one). Lazy by default, so a phone never fetches it.
               fetchPriority="high"
               unoptimized={!isOptimizableImage(heroImage.url)}
             />
           ) : (
-            // A CSS pattern stand-in, not a real photo. aria-hidden, not
-            // role="img": there's no real image content here to describe —
-            // role="img" with no name is exactly the axe violation
-            // ("role=img elements must have alternative text") that shipped
-            // here once already.
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 bg-gradient-to-br from-slate-200/70 via-primary/15 to-primary/35"
-            >
-              <div className="absolute inset-0 flex items-center justify-center opacity-15">
-                <svg width="130" height="130" viewBox="0 0 100 100" fill="none" stroke="white" strokeWidth="2.5">
-                  <polygon points="50,6 61,35 92,35 67,54 77,84 50,65 23,84 33,54 8,35 39,35" />
-                </svg>
-              </div>
-            </div>
+            // No photo set yet: a plain gradient, so a new community never
+            // renders broken.
+            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-slate-500 to-primary-dark" />
           )}
-          {/* A short soft fade at the photo box's OWN left edge, not a wash
-              spanning most of the band any more — the flat bg-surface to its
-              left already does the "plain on the left" job, so this only
-              needs to soften the seam between the two rather than fake an
-              entire plain region out of a still-visible photo. */}
-          <div
-            aria-hidden="true"
-            className="absolute inset-y-0 left-0 w-1/3 bg-[linear-gradient(to_right,var(--color-surface)_0%,transparent_100%)]"
-          />
+          {/* Dims the photo so white type reads anywhere on it. */}
+          <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.7))]" />
         </div>
-        {/* Faint skyline, low and behind the text column — purely
-            decorative (aria-hidden), `-z-10` inside this section's own
-            `isolate` so it never competes with the wash/photo layers
-            above. */}
-        <SkylineIcon className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[360px] text-slate-400 opacity-15" />
-        <div className="mx-auto flex min-h-[435px] max-w-6xl desktop:max-w-7xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
-          {today && <p className="mb-2 min-h-6 text-[16px] font-semibold text-slate-600">{today.dayLine}</p>}
-          <h1 className="max-w-2xl text-[60px] font-extrabold leading-[1.02] tracking-tight text-ink text-balance">
-            {headline}
-          </h1>
-          {subhead && !today && (
-            <p className="mt-3 max-w-[46ch] text-lg text-slate-600">
-              {subhead}
-            </p>
-          )}
+        {/* Wider than the search (880 against 688) so the 48px headline sits on
+            one line, about the box's width, instead of wrapping (Nov 11). */}
+        <div className="mx-auto flex min-h-[360px] max-w-[880px] flex-col items-center px-4 pt-[72px] pb-14 text-center">
+          {today && <p className="mb-2 min-h-6 text-[16px] font-semibold text-white/80">{today.dayLine}</p>}
+          <h1 className="text-[48px] font-extrabold leading-tight tracking-tight text-white text-balance">{headline}</h1>
           {ui.search.landing && (
-            <div ref={searchShellRef} className="relative mt-8 max-w-[585px]">
+            <div ref={searchShellRef} className="relative mt-6 w-full max-w-[688px] text-left">
               <SearchBox
                 query={query}
                 onQueryChange={handleQueryChange}
@@ -427,31 +288,12 @@ export default function HeroHeading({
                 interactive={interactive}
                 placeholder={settings.searchPlaceholder}
                 onFocus={reopen}
-                className="pl-6 pr-2.5 py-3"
+                className="pl-6 pr-2.5 py-3.5 shadow-[0_10px_30px_rgba(15,23,42,0.3)]"
               />
               {/* Over the page, right under the box (canvas board 8b). */}
               {dropdownOpen && <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20">{searchPanel}</div>}
-              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3" />
+              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-4 justify-center" onDark />
             </div>
-          )}
-          {/* Today has Browse beside its answers, and Map in the header. */}
-          {!today && (
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button
-              onClick={onBrowseCategories}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark cursor-pointer"
-            >
-              Browse Categories
-            </button>
-            {showMap && (
-              <button
-                onClick={onViewMap}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-[15px] font-medium text-ink shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
-              >
-                View Map
-              </button>
-            )}
-          </div>
           )}
         </div>
       </section>

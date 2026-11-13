@@ -235,4 +235,50 @@ describe('SubscribeSection', () => {
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
     expect(screen.queryByText(/You're subscribed/)).not.toBeInTheDocument()
   })
+
+  // Board G5b (Nov 11): the computer home's last stop, a navy box with just
+  // the email and Sign up. No picker and no switches: every category, new
+  // places and closures both.
+  describe('as the home page’s navy box', () => {
+    it('shows only the email box and Sign up, no picker or switches', () => {
+      renderWithProviders(<SubscribeSection band />, { content: { categories: [grocery, synagogue] } })
+
+      const box = screen.getByTestId('home-subscribe')
+      expect(box).toHaveClass('bg-[#1e3a8a]', '@[920px]:min-h-[260px]', 'flex-col', '@[920px]:flex-row')
+      expect(box.parentElement).toHaveClass('@container')
+      expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toHaveClass('@xl:text-[38px]')
+      expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toBeInTheDocument()
+      expect(screen.getByText('An email when a place is added or closes.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument()
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /All categories/ })).not.toBeInTheDocument()
+    })
+
+    it('signs up for every category, new places and closures both', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubFetch({ ok: true })
+      renderWithProviders(<SubscribeSection band />, { content: { categories: [grocery] } })
+
+      await user.type(screen.getByLabelText('Email address'), 'person@example.com')
+      await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(body).toMatchObject({ email: 'person@example.com', categories: null, notifyAdd: true, notifyClosure: true })
+      expect(await screen.findByText(/You’re subscribed/)).toBeInTheDocument()
+      expect(screen.queryByLabelText('Email address')).not.toBeInTheDocument()
+    })
+
+    it('shows the server’s error and keeps the form', async () => {
+      const user = userEvent.setup()
+      stubFetch({ ok: false, errors: ['Something went wrong. Please try again.'] }, false)
+      renderWithProviders(<SubscribeSection band />, { content: { categories: [grocery] } })
+
+      await user.type(screen.getByLabelText('Email address'), 'person@example.com')
+      await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+      expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Email address')).toBeInTheDocument()
+    })
+  })
 })

@@ -30,8 +30,7 @@ vi.mock('@/lib/submissionStore', () => ({
   submitListingUpdate: mockUpdate,
   submitListingDelete: mockDelete,
 }))
-const mockDigest = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
+vi.mock('@/lib/email', () => ({}))
 const mockGoogle = vi.hoisted(() => vi.fn())
 const mockCanAsk = vi.hoisted(() => vi.fn(() => true))
 vi.mock('@/lib/googlePlaces', async (actual) => ({ namesOverlap: (await actual<typeof import('@/lib/googlePlaces')>()).namesOverlap, findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
@@ -70,7 +69,6 @@ const run = (dry = false) => runKeystoneWatch('philly', LIST, { dry })
 beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'test')
   delete process.env.CRON_SECRET
-  mockDigest.mockResolvedValue(undefined)
   mockGoogle.mockResolvedValue({ placeId: 'p', name: null, businessStatus: 'OPERATIONAL' })
   vi.stubGlobal('fetch', vi.fn(async () => new Response(fullPage(), { status: 200 })))
 })
@@ -82,7 +80,6 @@ afterEach(() => {
   mockCreate.mockReset()
   mockUpdate.mockReset()
   mockDelete.mockReset()
-  mockDigest.mockReset()
   mockGoogle.mockReset()
   mockCanAsk.mockReset().mockReturnValue(true)
 })
@@ -99,9 +96,6 @@ describe('runKeystoneWatch', () => {
     expect(note).toContain('Certification: "Dairy – Cholov Stam, Pareve – Pas Yisroel"')
     expect(by).toEqual({ name: 'Keystone-K list (automated)' })
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
-    expect(mockDigest).toHaveBeenCalledTimes(1)
-    expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
-    expect(mockDigest.mock.calls[0][3]).toEqual({ path: '/philly/admin', name: '' })
   })
 
   // The user, Oct 20: the Watches tab says what a run compared, not only
@@ -140,8 +134,6 @@ describe('runKeystoneWatch', () => {
     expect(mockDelete).toHaveBeenCalledTimes(1)
     mockUpdate.mockReset()
     mockCreate.mockReset()
-    mockDigest.mockReset()
-    mockDigest.mockResolvedValue(undefined)
 
     mockDelete.mockReset()
     setDb([bagel, shtetl], filed)
@@ -209,7 +201,6 @@ describe('runKeystoneWatch', () => {
     expect(body.ok && body.wouldFile!.length).toBeGreaterThan(0)
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
-    expect(mockDigest).not.toHaveBeenCalled()
   })
 
   it('files nothing when it reads too few places, rather than calling every hechsher lost', async () => {

@@ -21,9 +21,6 @@ export type MapPoint = {
   phone?: string
   /** Emoji/glyph shown inside the pin (e.g. a category icon). */
   glyph?: string
-  /** An uploaded picture shown inside the pin instead of `glyph` — see
-   *  CategoryConfig.iconImageUrl. */
-  glyphSrc?: string
   /** Pin background color (hex). */
   color: string
   /** Subtitle shown in the info window (e.g. the category label). */
@@ -317,20 +314,14 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     document.head.appendChild(style)
   }
 
-  // Precedence: an uploaded category picture (glyphSrc) first — a category
-  // with an image set still carries its emoji as the CategoryIcon fallback
-  // everywhere else, but on the map itself there's room for only one. Then
-  // a hand-built glyph (see lib/categoryIcons.tsx) — a plain "H" string for
-  // hospitals, an SVG line icon Element for everything else covered there —
-  // which is what most real categories actually get, noticeably cleaner at
-  // pin scale than the plain emoji it replaces. Only a category with none of
-  // the above (a custom admin-created one with no icon set here yet) falls
-  // back to the plain emoji glyph.
-  const glyphIcon = p.glyphSrc ? undefined : glyphTextFor(p.filterId) ?? glyphElementFor(p.filterId)
+  // A hand-built glyph (see lib/categoryIcons.tsx): a plain "H" string for
+  // hospitals, an SVG line icon Element for everything else, the plain
+  // four-squares one for a category with none of its own. Never the emoji.
+  const glyphIcon = glyphTextFor(p.filterId) ?? glyphElementFor(p.filterId)
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    ...(p.glyphSrc ? { glyphSrc: p.glyphSrc } : glyphIcon ? { glyph: glyphIcon } : { glyph: p.glyph ?? null }),
+    glyph: glyphIcon ?? null,
     // Ignored once `glyph` is an SVG Element (glyphElementFor's icons color
     // themselves white directly) — still applies to a plain-string glyph
     // (the "H" text, or the plain-emoji fallback), where PinElement really
@@ -732,7 +723,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         const b = points[i]
         if (
           a.id !== b.id || a.lat !== b.lat || a.lng !== b.lng || a.color !== b.color ||
-          a.glyph !== b.glyph || a.glyphSrc !== b.glyphSrc || a.name !== b.name
+          a.glyph !== b.glyph || a.name !== b.name
         ) {
           onlyPinnedChanged = false
           break

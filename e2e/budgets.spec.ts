@@ -158,6 +158,10 @@ test.describe('home screen weight', () => {
     page.on('request', (r) => {
       if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
     })
+    // A Tuesday morning. From Friday to havdalah the phone's own Right now
+    // is the candles card, whose Minyanim link (?davening=1) is the
+    // phone's and prefetches rightly; on those days this failed (Nov 13).
+    await page.clock.setFixedTime(new Date('2026-11-10T14:00:00Z'))
     await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
     await ready(page)
@@ -168,12 +172,12 @@ test.describe('home screen weight', () => {
       // prefetches at all, and the cards' would have come with it.
       await expect.poll(() => prefetched.length, 'any prefetch at all').toBeGreaterThan(0)
       await page.waitForTimeout(1_500)
-      expect(fromCards(), 'the "View Times" card’s link, on a phone').toEqual([])
+      expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link
       // prefetches once it's on screen.
-      await page.getByRole('link', { name: 'View Times' }).scrollIntoViewIfNeeded()
-      await expect.poll(() => fromCards().length, 'the "View Times" card’s link, on a computer').toBeGreaterThan(0)
+      await page.getByTestId('home-next-minyan').scrollIntoViewIfNeeded()
+      await expect.poll(() => fromCards().length, 'the Next minyan card’s link, on a computer').toBeGreaterThan(0)
     }
   })
 
