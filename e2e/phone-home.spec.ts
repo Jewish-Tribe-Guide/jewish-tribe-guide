@@ -95,18 +95,29 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText(/minyan|Mincha/i)
   })
 
-  // Board K1c (Nov 11): Right now sits close under the "Try asking" chips.
-  // The computer's spacing between its card rows used to collapse through
-  // the phone's empty copies of them into 72px of nothing here.
+  // Board K1c (Nov 11): Right now sits close under the search. The
+  // computer's spacing between its card rows used to collapse through the
+  // phone's empty copies of them into 72px of nothing here. Board Q1
+  // (Nov 14): Try asking waits for a tap into the box, so at rest Right now
+  // sits under the box itself.
   test('Right now sits close under the search, with no empty gap', async ({ page }) => {
     await openHome(page, 'tuesday')
     const now = page.getByTestId('right-now')
     await expect(now).toBeVisible()
-    const chips = await page.getByTestId('search-prompts').filter({ visible: true }).first().boundingBox()
+    await expect(page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button')).toHaveCount(0)
+    const box = await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().boundingBox()
     const top = await now.boundingBox()
-    const gap = (top?.y ?? 0) - ((chips?.y ?? 0) + (chips?.height ?? 0))
-    expect(gap, `the gap between the chips and Right now is ${gap}px`).toBeLessThanOrEqual(32)
+    const gap = (top?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0))
+    expect(gap, `the gap between the search box and Right now is ${gap}px`).toBeLessThanOrEqual(40)
     expect(gap).toBeGreaterThanOrEqual(8)
+  })
+
+  test('Try asking shows once the box is tapped, and a chip keeps it open', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    const chips = page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button')
+    await expect(chips).toHaveCount(0)
+    await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().click()
+    await expect(chips.first()).toBeVisible()
   })
 
   test('Friday afternoon: the candles card with the eruvim on it, and nothing “open now”', async ({ page, request }) => {

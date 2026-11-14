@@ -135,10 +135,23 @@ describe('Right now', () => {
     const img = foodRow!.querySelector('[data-testid="right-now-photo"] img')
     expect(decodeURIComponent(img?.getAttribute('src') ?? '')).toContain('category-band/food-pic')
     expect(groceryRow!.querySelector('[data-testid="right-now-photo"]')).toBeNull()
-    // The chevron is the only drawing left in either row.
-    expect(foodRow!.querySelectorAll('svg')).toHaveLength(1)
-    expect(groceryRow!.querySelectorAll('svg')).toHaveLength(1)
+    // No drawing at all in either row: no icon, and no chevron (Nov 14:
+    // the photo row is the button).
+    expect(foodRow!.querySelectorAll('svg')).toHaveLength(0)
+    expect(groceryRow!.querySelectorAll('svg')).toHaveLength(0)
     expect(screen.getByTestId('right-now')).not.toHaveTextContent(/🍽️|🛒/u)
+  })
+
+  // Board Q1 (Nov 14): a row is its picture, full width, the words white
+  // over a dark fade; no picture, plain slate under the same white words.
+  it('a weekday row is a photo row: the picture fills it, the words white on it', () => {
+    at('2026-10-13T12:30:00-04:00')
+    show('2026-10-13T12:30:00-04:00', week)
+    const [foodRow, groceryRow] = within(screen.getByTestId('right-now')).getAllByRole('link')
+    for (const row of [foodRow!, groceryRow!]) {
+      expect(row).toHaveClass('h-[84px]', 'rounded-2xl', 'text-white', 'bg-slate-700')
+    }
+    expect(foodRow!.querySelector('[data-testid="right-now-photo"]')).toHaveClass('absolute', 'inset-0')
   })
 
   it('late at night, with nothing open: nothing at all', () => {

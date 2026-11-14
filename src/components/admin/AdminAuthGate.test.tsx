@@ -164,7 +164,9 @@ describe('AdminAuthGate — tab-visibility token-refresh noise', () => {
       </AdminAuthGate>,
     )
     await screen.findByText('children')
-    expect(mounts).toBe(1)
+    // The text can be in the page a moment before the screen's effect has
+    // run (CI, under coverage, Nov 14: 0 here), so wait for the first mount.
+    await waitFor(() => expect(mounts).toBe(1))
 
     fireAuthStateChange('TOKEN_REFRESHED', { ...session, access_token: 'tok-2' })
     await new Promise((r) => setTimeout(r, 0))

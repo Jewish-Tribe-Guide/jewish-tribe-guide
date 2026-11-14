@@ -385,9 +385,34 @@ describe('HeroHeading — example questions', () => {
     expect(onQueryChange).not.toHaveBeenCalled()
   })
 
-  it('shows them on the phone layout and the desktop one', () => {
+  it('shows them on the computer at once, and on the phone only once its box is tapped', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} searchPrompts={['Next Mincha']} />)
-    expect(screen.getAllByTestId('search-prompts')).toHaveLength(2)
+    const phone = screen.getByTestId('phone-hero')
+    expect(screen.getAllByTestId('search-prompts')).toHaveLength(1)
+    expect(within(phone).queryByTestId('search-prompts')).not.toBeInTheDocument()
+  })
+
+  // Board Q1 (Nov 14): at rest the phone has no Try asking row; tapping
+  // into the box brings it, a tap on one keeps the box's focus so it
+  // lands, and leaving the box takes the row away again.
+  it('on the phone: tapping the box brings them, a chip keeps the focus, leaving takes them away', async () => {
+    const user = userEvent.setup()
+    const onPickPrompt = vi.fn()
+    render(
+      <>
+        <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} searchPrompts={['Next Mincha']} onPickPrompt={onPickPrompt} />
+        <button type="button">elsewhere</button>
+      </>,
+    )
+    const phone = screen.getByTestId('phone-hero')
+    const box = within(phone).getByRole('textbox')
+    await user.click(box)
+    const chip = within(within(phone).getByTestId('search-prompts')).getByRole('button', { name: 'Next Mincha' })
+    await user.click(chip)
+    expect(onPickPrompt).toHaveBeenCalledWith('Next Mincha')
+    expect(box).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'elsewhere' }))
+    expect(within(phone).queryByTestId('search-prompts')).not.toBeInTheDocument()
   })
 
   it('hides them once something is typed: the answer is the point then', () => {

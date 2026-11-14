@@ -193,6 +193,19 @@ export default function HeroHeading({
   // On a phone, right under the box, in the page's flow.
   const phonePanel = dropdownOpen ? <div className="mt-2 text-left">{searchPanel}</div> : null
   const reopen = () => setDismissed(false)
+  // Board Q1 (Nov 14): on a phone, Try asking shows only while the box is
+  // being used, so at rest Right now sits straight under the search. The
+  // placeholder already gives two examples. Focus moving anywhere inside
+  // the box's own area (a chip, the results) keeps them; a tap on a chip
+  // doesn't take focus from the box at all (SearchPrompts).
+  const [phoneAsking, setPhoneAsking] = useState(false)
+  const phonePrompts = phoneAsking ? prompts : []
+  const phoneFocus = {
+    onFocus: () => setPhoneAsking(true),
+    onBlur: (e: React.FocusEvent<HTMLDivElement>) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPhoneAsking(false)
+    },
+  }
 
   return (
     <>
@@ -205,10 +218,10 @@ export default function HeroHeading({
           <p className="min-h-5 text-[13.5px] font-semibold text-slate-500">{today.dayLine}</p>
           <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight tracking-tight text-ink">{settings.heroTitle}</h1>
           {ui.search.landing && (
-            <div ref={phoneShellRef} className="mt-3">
+            <div ref={phoneShellRef} className="mt-3" {...phoneFocus}>
               <SearchBox query={query} onQueryChange={handleQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} onFocus={reopen} />
               {phonePanel}
-              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
+              <SearchPrompts prompts={phonePrompts} onPick={pickPrompt} className="mt-2.5" oneLine />
             </div>
           )}
         </section>
@@ -225,10 +238,10 @@ export default function HeroHeading({
         <h1 className="sr-only">{headline || settings.heroTitle}</h1>
         {trust}
         {ui.search.landing && (
-          <div ref={phoneShellRef} className={trust ? 'mt-3' : undefined}>
+          <div ref={phoneShellRef} className={trust ? 'mt-3' : undefined} {...phoneFocus}>
             <SearchBox query={query} onQueryChange={handleQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} onFocus={reopen} look="box" />
             {phonePanel}
-            <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
+            <SearchPrompts prompts={phonePrompts} onPick={pickPrompt} className="mt-2.5" oneLine />
           </div>
         )}
       </section>

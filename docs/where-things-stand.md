@@ -45,6 +45,13 @@ with no icons. The computer home's Suggest a listing card lifts on hover
 like the other cards, and a click anywhere on it opens the picker.
 (The picker has no Escape-to-close; small, not done.)
 
+Board Q1 (Nov 14, built): on the phone home, Right now's rows are photo
+rows, the category's picture filling the row with the words white over a
+dark fade, and no chevron (the user, Nov 14). The phone's Try asking row
+shows only while the search box has focus; tapping a chip keeps the box
+focused. The computer keeps Try asking under its box as before. Still
+drawn only: N1, N3, O1–O3, P1/P1b.
+
 ## Open from the boxes and fields work (Nov 10)
 
 The user's answers on Nov 10, evening, and what was done with them:

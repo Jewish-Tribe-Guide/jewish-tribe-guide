@@ -9,7 +9,6 @@ import { getCategoryTilePhoto } from '@/lib/categoryColor'
 import { fixedViewSlug, routes } from '@/lib/routes'
 import { shabbosMoment } from '@/lib/todayHome'
 import { openNowRows, rightNowDay } from '@/lib/phoneHome'
-import { ChevronRightIcon } from '@/components/icons'
 import { TilePhoto } from './sections'
 import { HOME_LABEL } from './CategoryTiles'
 import { BeforeCandles, CandlesCard } from './TodayBlocks'
@@ -49,7 +48,7 @@ export default function RightNow(props: Props) {
   // Held open until the clock is known, so the tiles under it don't jump
   // down once it arrives.
   if (!schedule || !listings) {
-    return <div aria-hidden="true" className="h-[124px] animate-pulse rounded-2xl bg-slate-100" />
+    return <div aria-hidden="true" className="h-[176px] animate-pulse rounded-2xl bg-slate-100" />
   }
   const now = schedule.now
   const moment = shabbosMoment(zmanim, now, timezone)
@@ -65,30 +64,36 @@ export default function RightNow(props: Props) {
     const rows = openNowRows(listings, categories, new Date(now))
     if (rows.length === 0) return null
     body = (
-      <ul className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {rows.map((row) => (
-          <li key={row.category.id} className="border-t border-slate-100 first:border-t-0">
-            <Link href={`${routes.slug(communitySlug, row.category.id)}?openNow=1`} prefetch={false} className="flex items-center gap-3 px-3.5 py-3 hover:bg-slate-50">
-              {/* Board K1c (Nov 11): the category's own picture, the same as
-                  its tile below, not an icon ("It feels childish"). None
-                  when it has no picture. */}
-              {(() => {
-                const photo = getCategoryTilePhoto(categories as CategoryConfig[], row.category.id)
-                return photo ? (
-                  <span aria-hidden="true" data-testid="right-now-photo" className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[10px] bg-slate-200">
-                    <TilePhoto src={photo} px={44} sizes="44px" />
+      // Board Q1 (Nov 14): each row its category's picture, full width,
+      // the words in white over a dark fade, so the top of the phone home
+      // carries the same colour as the tiles under it. A category with no
+      // picture: the same row on plain slate.
+      <ul className="space-y-2">
+        {rows.map((row) => {
+          const photo = getCategoryTilePhoto(categories as CategoryConfig[], row.category.id)
+          return (
+            <li key={row.category.id}>
+              <Link
+                href={`${routes.slug(communitySlug, row.category.id)}?openNow=1`}
+                prefetch={false}
+                data-testid="right-now-row"
+                className="relative flex h-[84px] items-center gap-3 overflow-hidden rounded-2xl bg-slate-700 px-4 text-white"
+              >
+                {photo && (
+                  <span aria-hidden="true" data-testid="right-now-photo" className="absolute inset-0">
+                    <TilePhoto src={photo} px={400} sizes="100vw" />
                   </span>
-                ) : null
-              })()}
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-semibold text-slate-500">{row.category.pluralLabel}</span>
-                <span className="block text-[16px] font-extrabold leading-snug text-ink">{row.open} open now</span>
-                {row.parts.length > 0 && <span className="block truncate text-[13.5px] text-slate-600">{row.parts.join(' · ')}</span>}
-              </span>
-              <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
-            </Link>
-          </li>
-        ))}
+                )}
+                <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-slate-900/85 via-slate-900/65 to-slate-900/25" />
+                <span className="relative min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-white/90">{row.category.pluralLabel}</span>
+                  <span className="block text-[19px] font-extrabold leading-tight">{row.open} open now</span>
+                  {row.parts.length > 0 && <span className="block truncate text-[12.5px] text-white/85">{row.parts.join(' · ')}</span>}
+                </span>
+              </Link>
+            </li>
+          )
+        })}
       </ul>
     )
   } else {

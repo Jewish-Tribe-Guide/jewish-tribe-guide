@@ -139,6 +139,9 @@ test('Back to home, then a search to another page: that page has the search', as
   await page.waitForURL((url) => url.pathname === `/${community}`)
   // Straight from Back: a "Try asking" tapped (nothing typed first), or
   // the item typed and Enter at once.
+  // On a phone, Try asking shows only once the box has focus (board Q1).
+  const box = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first()
+  if (!(await page.getByTestId('search-prompts').filter({ visible: true }).count()) && (await box.count())) await box.click()
   const prompt = page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button').first()
   if (await prompt.count()) {
     await prompt.click()

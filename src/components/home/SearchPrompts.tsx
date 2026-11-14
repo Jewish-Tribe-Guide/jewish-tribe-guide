@@ -62,7 +62,9 @@ function SwipedPrompts({ prompts, onPick, className }: { prompts: string[]; onPi
     >
       <Label />
       {prompts.map((p) => (
-        <button key={p} type="button" data-prompt onClick={() => onPick(p)} className={chip}>
+        // A tap keeps the focus in the search box: the phone shows these only
+        // while the box has it (HeroHeading), and they'd go before the tap landed.
+        <button key={p} type="button" data-prompt onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(p)} className={chip}>
           {p}
         </button>
       ))}
