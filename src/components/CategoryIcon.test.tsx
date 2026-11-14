@@ -52,3 +52,14 @@ describe('CategoryIcon with an uploaded photo', () => {
     expect(container.querySelector('img')).toBeNull()
   })
 })
+
+// No emoji as icons (the user, Nov 14: emoji still showed in the Add
+// picker and the Categories menu on the live site): a category with no
+// line icon of its own draws a plain line icon, never its stored emoji.
+describe('a category with no line icon of its own', () => {
+  it('draws a plain line icon, not its emoji', () => {
+    const { container } = render(<CategoryIcon icon="🛒" categoryId="made-up-category" color="#123456" />)
+    expect(container.textContent).not.toContain('🛒')
+    expect(container.querySelector('svg rect')).not.toBeNull()
+  })
+})
