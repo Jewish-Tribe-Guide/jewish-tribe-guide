@@ -91,6 +91,9 @@ const CATEGORY_ICON_MARKUP: Record<string, string> = {
   zmanim: '<path d="M12 2.5c1.6 2 2.2 3.6 2.2 5a2.2 2.2 0 1 1-4.4 0c0-1.4.6-3 2.2-5Z"/><path d="M9 21.5h6M12 9v12.5"/>',
 }
 
+const DEFAULT_ICON_MARKUP =
+  '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>'
+
 /** Whether CategoryGlyph would draw a hand-built icon for `categoryId`
  *  rather than falling back to plain emoji text — for a caller that needs
  *  to style around that difference (e.g. MobileTabBar's active/inactive
@@ -128,7 +131,7 @@ type Props = {
  *  the same thing regardless of which category it ends up drawing; a plain
  *  text span sized by width/height classes doesn't scale its font to fit
  *  them the way viewBox-relative SVG content does. */
-export function CategoryGlyph({ categoryId: id, icon, className }: Props) {
+export function CategoryGlyph({ categoryId: id, className }: Props) {
   // Drawn by the category's kind (placeKinds.ts), so a community whose
   // shuls aren't at /synagogue still gets the shul icon.
   const categoryId = useGlyphKey(id)
@@ -143,7 +146,9 @@ export function CategoryGlyph({ categoryId: id, icon, className }: Props) {
     )
   }
   const markup = categoryId ? CATEGORY_ICON_MARKUP[categoryId] : undefined
-  if (!markup) return <>{icon}</>
+  // No emoji as icons (the user: "childish, cheap"): a category with no
+  // line icon of its own gets a plain four-squares one.
+  if (!markup) return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true" dangerouslySetInnerHTML={{ __html: DEFAULT_ICON_MARKUP }} />
   return (
     <svg
       viewBox="0 0 24 24"
