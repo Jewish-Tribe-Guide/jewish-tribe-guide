@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { resourceCards, groupCardsIntoSections, useEntryCards } from '@/components/home/sections'
 import dynamic from 'next/dynamic'
-import { CategoryGlyph } from '@/lib/categoryIcons'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
@@ -245,11 +244,8 @@ export default function HeaderNav() {
                                   setOpen(null)
                                   track('category_opened', { category: card.id ?? card.title, source: 'header-nav' })
                                 }}
-                                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
+                                className="flex items-center rounded-lg px-2 py-1.5 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
                               >
-                                {card.icon && (
-                                  <CategoryGlyph categoryId={card.id} icon={card.icon} className="h-4 w-4 shrink-0" />
-                                )}
                                 <span className="min-w-0 truncate">{card.title}</span>
                               </Link>
                             </li>

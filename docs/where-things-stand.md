@@ -39,6 +39,10 @@ Small open items from Nov 9:
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
 
+**Nov 14, on this branch (appearance, held for its own PR):** the header
+Categories menu and the Add a listing picker list categories by name only,
+with no icons.
+
 ## Open from the boxes and fields work (Nov 10)
 
 The user's answers on Nov 10, evening, and what was done with them:

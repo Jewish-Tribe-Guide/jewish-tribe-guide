@@ -50,6 +50,17 @@ describe('HeaderNav — Categories', () => {
     expect(screen.getByRole('link', { name: /Synagogues/ })).toHaveAttribute('href', '/test-community/synagogue')
   })
 
+  it('lists the categories by name only, no icons (Nov 14)', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery, synagogue], homeSections: [foodSection, institutionsSection] },
+    })
+    await user.click(screen.getByRole('button', { name: /Categories/ }))
+    const link = screen.getByRole('link', { name: /Grocery Stores/ })
+    expect(link.querySelector('svg, img')).toBeNull()
+    expect(link.textContent).toBe('Grocery Stores')
+  })
+
   it('tracks category_opened with source "header-nav" when a menu item is clicked', async () => {
     const user = userEvent.setup()
     renderWithProviders(<HeaderNav />, {

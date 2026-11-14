@@ -39,6 +39,14 @@ describe('ContributePicker', () => {
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
   })
 
+  it('lists the categories by name only, no icons (Nov 14)', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderWithProviders(<ContributePicker onClose={vi.fn()} />, { content: { categories: [grocery] } })
+    const link = screen.getByRole('link', { name: /Grocery Stores/ })
+    expect(link.querySelector('svg, img')).toBeNull()
+    expect(link.textContent).toBe('Grocery Stores')
+  })
+
   it('filters the category list live as you type', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
