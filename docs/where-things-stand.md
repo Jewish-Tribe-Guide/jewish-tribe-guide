@@ -41,7 +41,9 @@ Small open items from Nov 9:
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
-with no icons.
+with no icons. The computer home's Suggest a listing card lifts on hover
+like the other cards, and a click anywhere on it opens the picker.
+(The picker has no Escape-to-close; small, not done.)
 
 ## Open from the boxes and fields work (Nov 10)
 

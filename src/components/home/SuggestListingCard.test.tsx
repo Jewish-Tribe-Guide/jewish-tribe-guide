@@ -6,6 +6,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import SuggestListingCard from './SuggestListingCard'
+import { LIFT_ON_HOVER } from './AnswerCard'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -37,6 +38,21 @@ describe('SuggestListingCard', () => {
     await user.click(screen.getByRole('button', { name: 'Suggest a listing' }))
 
     expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+  })
+
+  // Nov 14: the whole card lifts like the other computer-home cards and
+  // opens the picker from anywhere on it; the picker can still close.
+  it('lifts on hover and opens the picker from anywhere on the card', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    const box = screen.getByTestId('home-suggest')
+    expect(box).toHaveClass(...LIFT_ON_HOVER.split(' '))
+
+    await user.click(screen.getByRole('heading', { name: 'Know a place we’re missing?' }))
+    expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   // Board G5c (Nov 11): a stop of its own, not a footnote to the map.
