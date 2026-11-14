@@ -878,7 +878,8 @@ for that exact change, in the same conversation. Show the dry run first.
 
 0. **Migration 096 (`night_note`, Nov 12):** a new table for the
    nightly email's Google line. On dev since Nov 12; live needs a yes.
-   The site works without it.
+   The email itself is live (PR 384), so until 096 runs there, Google's
+   changes go out at once as before. The site works without it.
 0. **Migration 095 (map card photo, Nov 11):** one `add column if not
    exists`. Run it on live before or with the deploy that ships the map
    card; the card works without it, only its photo can't be saved. Then
