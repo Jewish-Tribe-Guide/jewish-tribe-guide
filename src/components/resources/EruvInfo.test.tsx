@@ -180,6 +180,9 @@ describe('EruvInfo', () => {
     const user = userEvent.setup()
     show()
     const [row] = await screen.findAllByTestId('eruv-row')
+    // The map loads lazily, after the rows: on a slow CI runner it is still
+    // the grey placeholder here (main, Nov 14), so wait for it.
+    await screen.findByTestId('eruv-map')
     fireEvent.mouseMove(row, { movementX: 2, movementY: 1 })
     expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-highlight', 'center-city')
     fireEvent.mouseLeave(row)

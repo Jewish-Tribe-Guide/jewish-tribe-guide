@@ -63,14 +63,16 @@ describe('the Minyanim view (step 4)', () => {
     view()
     // A week, so next Shabbos is always there (it was four days, Oct 1).
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
-      'TodayChol HaMoed',
-      'FriHoshana Rabbah',
-      'ShabbosShemini Atzeres',
-      'SunSimchas Torah',
-      'MonOct 5',
-      'TueOct 6',
-      'WedOct 7',
+      'Today · Chol HaMoed',
+      'Fri · Hoshana Rabbah',
+      'Shabbos · Shemini Atzeres',
+      'Sun · Simchas Torah',
+      'Mon',
+      'Tue',
+      'Wed',
     ])
+    // A plain date is the pill's hover title.
+    expect(screen.getAllByRole('tab').map((t) => t.title).slice(-3)).toEqual(['Oct 5', 'Oct 6', 'Oct 7'])
   })
 
   // The week was built 24 hours at a time. Nov 1, 2026 has 25 (the clocks
@@ -79,10 +81,10 @@ describe('the Minyanim view (step 4)', () => {
   it('shows seven different days in the week the clocks go back', () => {
     vi.setSystemTime(new Date('2026-10-27T00:13:00-04:00')) // Tue, just after midnight
     view()
-    const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
+    const tabs = screen.getAllByRole('tab').map((t) => t.title)
     expect(tabs).toHaveLength(7)
     expect(new Set(tabs).size).toBe(7)
-    expect(tabs.slice(-2)).toEqual(['SunNov 1', 'MonNov 2'])
+    expect(tabs.slice(-2)).toEqual(['Nov 1', 'Nov 2'])
   })
 
   it('a minyan hovered lights its shul on the map, as a shul’s own row does', () => {
@@ -142,12 +144,20 @@ describe('the Minyanim view (step 4)', () => {
   // Oct 16: the rows in one white box, a timetable, padded in from its
   // sides; straight on the grey page they looked plainer than the
   // Synagogues rows beside them.
-  it('lists the minyanim in one white box', () => {
+  // The days as small pills across the box's top, the rows under them
+  // (board D1, the user, Nov 11: "how it's part of the box").
+  it('lists the minyanim in one white box, the days across its top', () => {
     view()
-    const box = screen.getByTestId('minyanim-rows')
+    const box = screen.getByTestId('minyanim-box')
     expect(box.className).toMatch(/\bbg-white\b/)
     expect(box.className).toMatch(/\brounded-2xl\b/)
-    expect(within(box).getAllByRole('link')[0].className).toMatch(/\bpx-4\b/)
+    expect(within(box).getByRole('tablist', { name: 'Day' })).toBeInTheDocument()
+    expect(box.firstElementChild!.contains(screen.getByRole('tablist'))).toBe(true)
+    expect(within(box).getByTestId('minyanim-rows')).toBeInTheDocument()
+    expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')[0].className).toMatch(/\bpx-4\b/)
+    // Small round pills, the day picked filled in.
+    for (const tab of screen.getAllByRole('tab')) expect(tab.className).toMatch(/\brounded-full\b/)
+    expect(screen.getByRole('tab', { selected: true }).className).toMatch(/\bbg-primary\b/)
   })
 
   it('the days on one line: swiped on a phone, arrows on desktop, never wrapped', () => {
