@@ -174,7 +174,9 @@ With no choice made it's the first two categories with hours, as before
     13 in two rows), the map at 540px (W7i) and at 420px (W7j, my pick,
     so the two bands weigh about the same). The user's worry: a shorter
     map leaves Suggest and Stay in the Loop under it too close to its
-    size. Not decided.
+    size. W7k (drawn): W7j with those two quieter, about 135px instead
+    of ~260 (21px headings, a small button, Stay in the Loop white
+    instead of solid blue, the same words). Not decided.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only
