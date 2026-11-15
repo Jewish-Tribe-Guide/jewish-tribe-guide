@@ -187,9 +187,14 @@ With no choice made it's the first two categories with hours, as before
     In the full admin-write run `category-open.spec.ts` failed once (it
     fetched `cat:cache-roundtrip-seed`, a category another test makes);
     it passed twice alone. Watch for it again.
-  - **Asked Nov 15, not decided:** the notification emails' sender name
-    (`RESEND_FROM` is a bare address on live; each email could carry its
-    community's name).
+  - **Done Nov 15 (the user's yes): emails arrive in the community's
+    name**, "Philly Jewish Guide" <notifications@…> instead of the bare
+    address. `sendEmail` takes the community the email is about and puts
+    its name (`community.name`) on the sender; the two sign-in links have
+    none and get the default community's. Nothing to change on live:
+    `RESEND_FROM` stays the bare address (one set as `Name <address>`
+    is left as it is). `email.test.ts` also fails if a new send doesn't
+    name its community. Shows on live once the branch merges.
   - **Done Nov 15 (the user's yes): a listing opened on a computer has
     no category photo above it.** It was a 132px strip of the category's
     picture with nothing on it, pushing the listing and the map down; now

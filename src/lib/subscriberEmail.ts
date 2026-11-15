@@ -41,6 +41,7 @@ export async function sendNewListingNotification(
     subscribers.map((sub) =>
       sendEmail({
         to: sub.email,
+        community: sub.communityId,
         subject: `New in ${categoryLabel}: ${listing.name}`,
         html: `<div style="${BODY_STYLE}">
           <h2 style="${HEADING_STYLE}">${escapeHtml(listing.name)}</h2>
@@ -74,6 +75,7 @@ export async function sendSubscribeConfirmation(subscriber: Subscriber): Promise
 
   await sendEmail({
     to: subscriber.email,
+    community: subscriber.communityId,
     subject: "You're subscribed",
     html: `<div style="${BODY_STYLE}">
       <h2 style="${HEADING_STYLE}">You're on the list.</h2>
@@ -94,6 +96,7 @@ export async function sendClosureNotification(
     subscribers.map((sub) =>
       sendEmail({
         to: sub.email,
+        community: sub.communityId,
         subject: `${listing.name} has closed`,
         html: `<div style="${BODY_STYLE}">
           <h2 style="${HEADING_STYLE}">${escapeHtml(listing.name)}</h2>

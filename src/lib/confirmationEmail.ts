@@ -127,7 +127,7 @@ export async function sendRequestConfirmation(
 
   const { subject, html } = buildRequestConfirmation(payload, requestId)
   const { replyTo, bcc } = await communityContact(communitySlug)
-  await sendEmail({ to, subject, html, replyTo, bcc })
+  await sendEmail({ to, subject, html, replyTo, bcc, community: communitySlug })
 }
 
 // ── Resource directory submission confirmations ───────────────────────────────
@@ -328,7 +328,7 @@ export async function sendDecisionEmail(
 
   const { subject, html } = result
   const { replyTo, bcc } = await communityContact(submission.community_id)
-  await sendEmail({ to, subject, html, replyTo, bcc })
+  await sendEmail({ to, subject, html, replyTo, bcc, community: submission.community_id })
 }
 
 // ── Resource directory submission confirmations ───────────────────────────────
@@ -351,5 +351,5 @@ export async function sendSubmissionConfirmation(submission: SubmissionRow): Pro
 
   const { subject, html } = result
   const { replyTo, bcc } = await communityContact(submission.community_id)
-  await sendEmail({ to, subject, html, replyTo, bcc })
+  await sendEmail({ to, subject, html, replyTo, bcc, community: submission.community_id })
 }
