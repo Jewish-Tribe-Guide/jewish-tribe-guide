@@ -105,11 +105,39 @@ test.describe('on a phone', () => {
     const now = page.getByTestId('right-now')
     await expect(now).toBeVisible()
     await expect(page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button')).toHaveCount(0)
-    const box = await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().boundingBox()
+    const box = await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().locator('xpath=..').boundingBox()
     const top = await now.boundingBox()
     const gap = (top?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0))
-    expect(gap, `the gap between the search box and Right now is ${gap}px`).toBeLessThanOrEqual(40)
+    expect(gap, `the gap between the search box and Right now is ${gap}px`).toBeLessThanOrEqual(32)
     expect(gap).toBeGreaterThanOrEqual(8)
+  })
+
+  // The user, Nov 14: in Safari a gap under Feedback · About · Privacy,
+  // none in the app added to the home screen. The page left a flat 96px
+  // for a 58px tab bar, which only the home-screen app's 34px safe area
+  // filled. Chromium, like Safari, has no safe area here, so this is
+  // Safari's case: the footer ends just above the bar.
+  test('the footer ends just above the tab bar, no empty band', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    const privacy = page.getByRole('link', { name: 'Privacy', exact: true }).filter({ visible: true }).last()
+    await expect(privacy).toBeVisible()
+    await expect(async () => {
+      const link = await privacy.boundingBox()
+      const bar = await page.getByRole('navigation', { name: 'Primary' }).boundingBox()
+      const gap = (bar?.y ?? 0) - ((link?.y ?? 0) + (link?.height ?? 0))
+      expect(gap, `the footer's last link ends ${gap}px above the tab bar`).toBeLessThanOrEqual(28)
+      expect(gap).toBeGreaterThanOrEqual(0)
+    }).toPass({ timeout: 5_000 })
+  })
+
+  // One line, as tall as the search box (the user, Nov 14).
+  test('Kept up is as tall as the search box', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    const band = await page.getByTestId('trust-band').boundingBox()
+    // The box the input sits in; the input itself is one line of text.
+    const box = await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().locator('xpath=..').boundingBox()
+    expect(Math.abs(Math.round(band?.height ?? 0) - Math.round(box?.height ?? 0)), `Kept up ${band?.height}px, the search box ${box?.height}px`).toBeLessThanOrEqual(2)
   })
 
   test('Try asking shows once the box is tapped, and a chip keeps it open', async ({ page }) => {

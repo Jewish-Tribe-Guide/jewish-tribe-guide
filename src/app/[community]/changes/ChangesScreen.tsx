@@ -8,6 +8,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useNow } from '@/lib/useNow'
 import { routes } from '@/lib/routes'
 import { CHANGES_PAGE_DAYS, THIS_WEEK_DAYS, changeDay, changeTime, changesWithin, whatChanged, type Change } from '@/lib/whatChanged'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 
 /** The What changed page's client half: the changes by day, in the
  *  community's time, against the visitor's clock (so the days are right
@@ -29,7 +30,7 @@ export default function ChangesScreen({ failed }: { failed: boolean }) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-5 sm:px-6 desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]">
+    <main className={`mx-auto w-full max-w-3xl flex-1 px-4 ${TAB_BAR_CLEARANCE} pt-5 sm:px-6 desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]`}>
       <div data-testid="changes-page">
         <Link href={routes.home(community.slug)} className="text-[15px] font-bold text-primary hover:underline">
           ‹ Today

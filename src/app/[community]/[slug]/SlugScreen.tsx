@@ -12,6 +12,7 @@ import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { isIOSWebKit, useNavTransitionProps } from '@/lib/navTransitions'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 
 // The client half of the [slug] route. The server has already decided whether
 // this slug is a category or a form (and 404'd if it was neither), so this only
@@ -97,7 +98,7 @@ export default function SlugScreen({
           between "different pages" here forces a remount (and re-fade) on
           every switch, the same way visiting a genuinely different route
           already does elsewhere. */}
-      <main key={slug} className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8 animate-[fadeIn_180ms_ease-out]">
+      <main key={slug} className={`flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 ${TAB_BAR_CLEARANCE} sm:pt-8 sm:pb-8 animate-[fadeIn_180ms_ease-out]`}>
         {/* The fallback IS FindResources — a full, real render of this category
             with no query-string state, which is exactly what a plain
             /community/slug visit (no ?item=/?q=/etc.) looks like. That's what

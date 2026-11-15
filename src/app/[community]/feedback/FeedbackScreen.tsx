@@ -7,6 +7,7 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { PAGE_COLUMN } from '@/lib/pageColumn'
 import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 
 // Feedback is a page at every width, in the same column as About and Privacy
 // (PAGE_COLUMN): a card holding the form. On a desktop it's normally opened as
@@ -35,9 +36,9 @@ export default function FeedbackScreen() {
   const drillDown = isMobile && !isTab
   useSetScreenHeader(drillDown, 'Feedback', goHome)
 
-  // pb-24 clears the phone's tab bar; on a desktop the padding is the pages'.
+  // TAB_BAR_CLEARANCE clears the phone's tab bar; on a desktop the padding is the pages'.
   return (
-    <main className={`${PAGE_COLUMN} flex flex-1 flex-col pt-4 pb-24 desktop:py-16 animate-[fadeIn_180ms_ease-out]`}>
+    <main className={`${PAGE_COLUMN} flex flex-1 flex-col pt-4 ${TAB_BAR_CLEARANCE} desktop:py-16 animate-[fadeIn_180ms_ease-out]`}>
       <FeedbackForm
         variant="inline"
         heading={settings.feedbackHeading}

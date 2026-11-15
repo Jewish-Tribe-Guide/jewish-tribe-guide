@@ -80,12 +80,16 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
         }}
         aria-haspopup="dialog"
         data-testid="trust-band"
-        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:bg-slate-50"
+        // One line, as tall as the search box under it (the user, Nov 14):
+        // two lines made it 59px to the box's 48, the bigger white box on
+        // the page, so it drew the eye before the search did. Still a card
+        // with its chevron: it's how people find out they can trust the
+        // guide.
+        className="flex h-12 w-full cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 text-left hover:bg-slate-50"
       >
-        <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-700" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[14.5px] font-extrabold leading-snug text-ink">Kept up by the community</span>
-          <span className="block text-[12.5px] leading-snug text-slate-500">{trustLine(facts)}</span>
+        <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" />
+        <span className="min-w-0 flex-1 truncate text-[14px] leading-none text-slate-500">
+          <span className="font-extrabold text-ink">Kept up by the community</span> · {trustLine(facts)}
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
       </button>

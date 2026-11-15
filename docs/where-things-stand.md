@@ -59,6 +59,20 @@ Kept up card stays a card above the search, chevron and all (decided Nov
 14: it's how people find out they can trust the site, and opening it shows
 how everything is checked).
 
+Nov 14, later, the user's yes to both:
+- **The Kept up card is one line**, as tall as the search box (48px; it
+  was 59px on two lines, the bigger box on the page): "Kept up by the
+  community · 149 places", still a card with its chevron. A longer trust
+  line ("· every listing dated") is cut off with "…" on a narrow phone;
+  the sheet it opens says it all.
+- **Fixed: a gap under the footer in Safari** (none in the app added to
+  the home screen). Every phone screen over the tab bar left a flat 96px
+  for a 58px bar, which only the home-screen app's 34px safe area filled.
+  It is now the bar plus the safe area (`TAB_BAR_CLEARANCE`), on the home,
+  category pages, Browse, What changed, Feedback and You. The Add button
+  sits beside Feedback · About · Privacy at the bottom now, in Safari as
+  it already did in the home-screen app.
+
 ## Open from the boxes and fields work (Nov 10)
 
 The user's answers on Nov 10, evening, and what was done with them:

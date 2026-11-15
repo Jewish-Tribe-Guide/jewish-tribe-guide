@@ -150,7 +150,7 @@ describe('Landing', () => {
       [makeListing({ id: 'g1', category: 'grocery' }), makeListing({ id: 'g2', category: 'grocery' })],
     )
     const hero = screen.getByTestId('phone-hero')
-    expect(within(hero).getByTestId('trust-band')).toHaveTextContent('Kept up by the community2 places')
+    expect(within(hero).getByTestId('trust-band')).toHaveTextContent('Kept up by the community · 2 places')
     // The page's heading is the big line, as on a computer (heroTitle is no
     // longer edited in the admin, Nov 4); hidden, for screen readers.
     expect(within(hero).getByRole('heading', { level: 1, name: 'Welcome to the directory' })).toHaveClass('sr-only')

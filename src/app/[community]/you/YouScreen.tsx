@@ -23,6 +23,7 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { listingRowFacts } from '@/lib/listingRow'
 import { milesText, type LatLng } from '@/lib/geo'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
@@ -84,7 +85,7 @@ export default function YouScreen() {
   return (
     <main
       data-testid="you-page"
-      className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-5 sm:px-6 desktop:max-w-5xl desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]"
+      className={`mx-auto w-full max-w-6xl flex-1 px-4 ${TAB_BAR_CLEARANCE} pt-5 sm:px-6 desktop:max-w-5xl desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]`}
     >
       <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:text-[36px]">You</h1>
 

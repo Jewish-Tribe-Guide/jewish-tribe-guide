@@ -53,6 +53,7 @@ import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import { dayLine } from '@/lib/todayHome'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 
 // Only after a search finds nothing; it carries the anti-spam check, which
 // the home shouldn't load for everyone (see GenericListingCard).
@@ -457,7 +458,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
 
   return (
     <>
-      {/* pb-24 clears mobile's fixed bottom tab bar so the last card isn't
+      {/* TAB_BAR_CLEARANCE clears mobile's fixed bottom tab bar so the last card isn't
           hidden behind it — desktop has no such bar, so that padding just
           stacked on top of the footer's own mt-16/border-t below, leaving a
           much bigger gap after the last section than the footer intended. */}
@@ -486,7 +487,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
         // element on its own, same mechanism that made the plain fadeIn
         // replay before any of this existed — the className never has to
         // change for that part to keep working.
-        className={`max-w-6xl desktop:max-w-7xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
+        className={`max-w-6xl desktop:max-w-7xl mx-auto px-4 sm:px-6 ${TAB_BAR_CLEARANCE} desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
       >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading
