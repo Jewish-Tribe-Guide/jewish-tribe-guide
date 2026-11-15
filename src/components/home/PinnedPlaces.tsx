@@ -69,12 +69,12 @@ export const eruvPlaceView = (p: Extract<PinnedPlace, { kind: 'eruv' }>, now: nu
 
 /** A saved place's picture: a listing's photo or its category's icon; an
  *  eruv's initials, as on its listing. */
-export function PlaceIcon({ place, color }: { place: PinnedPlace; color: string }) {
+export function PlaceIcon({ place, color, className = 'h-11 w-11 text-lg', sizePx = 44 }: { place: PinnedPlace; color: string; className?: string; sizePx?: number }) {
   const { category } = place
   return place.kind === 'eruv' ? (
-    <CategoryIcon icon="" initials={initialsOf(place.eruv.name)} shape="square" color={color} className="h-11 w-11 text-lg" sizePx={44} />
+    <CategoryIcon icon="" initials={initialsOf(place.eruv.name)} shape="square" color={color} className={className} sizePx={sizePx} />
   ) : (
-    <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={photoOf(place.item)} initials={initialsOf(place.item.name)} shape="square" color={color} className="h-11 w-11 text-lg" sizePx={44} />
+    <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={photoOf(place.item)} initials={initialsOf(place.item.name)} shape="square" color={color} className={className} sizePx={sizePx} />
   )
 }
 

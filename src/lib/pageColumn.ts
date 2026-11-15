@@ -5,7 +5,8 @@
 // small tablet, where the three sat side by side in the same back-stack.
 export const PAGE_COLUMN = 'mx-auto w-full max-w-2xl px-4 sm:px-6'
 
-// The page title on a desktop, where it sits inside the card: PageDocument's
-// h1 and Feedback's, so the three pages' titles match there too.
+// Feedback's title on a desktop, inside its card. About and Privacy had it
+// too until their titles moved onto the photo header (board W11, Nov 15);
+// Feedback stays plain (the user's call).
 export const PAGE_TITLE_DESKTOP =
   'desktop:text-[34px] desktop:font-bold desktop:leading-tight desktop:tracking-tight desktop:text-slate-900'

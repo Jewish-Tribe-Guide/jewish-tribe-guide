@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import PageDocument from './PageDocument'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -38,10 +38,15 @@ describe('PageDocument — About and Privacy', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/test-community', expect.anything())
   })
 
-  it('keeps the h1, hidden on a phone (the header says it) and shown on desktop', () => {
-    renderPage()
-    const h1 = screen.getByRole('heading', { level: 1, name: 'Privacy Policy' })
-    expect(h1).toHaveClass('sr-only', 'desktop:not-sr-only')
+  // Board W11 (the user, Nov 15): a computer's title is on the category
+  // pages' photo; a phone's h1 stays, for screen readers only.
+  it('puts the title on the photo on a computer, with a hidden h1 for a phone', () => {
+    const { container } = renderPage()
+    const hero = screen.getByTestId('category-hero')
+    expect(within(hero).getAllByRole('heading', { level: 1 })[0]).toHaveTextContent('Privacy Policy')
+    const phone = within(screen.getByTestId('page-document')).getByRole('heading', { level: 1, name: 'Privacy Policy' })
+    expect(phone).toHaveClass('sr-only', 'desktop:hidden')
+    expect(container.querySelector('[data-testid=page-document]')).toHaveClass('desktop:max-w-[760px]')
   })
 
   it('gives each section its own box, split at the headings', () => {

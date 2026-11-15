@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import FeedbackScreen from './FeedbackScreen'
 import PageDocument from '@/components/PageDocument'
+import { PAGE_TITLE_DESKTOP } from '@/lib/pageColumn'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
@@ -102,18 +103,19 @@ describe('FeedbackScreen — on a desktop it is a page', () => {
     expect(within(main).getByLabelText('Your feedback')).toBeInTheDocument()
   })
 
-  it('in the same column as About and Privacy, with their title style', () => {
+  // About and Privacy's titles are on the photo on a computer now (board
+  // W11); Feedback stays plain, with its title in its card.
+  it('in the same column as About and Privacy, with the pages’ desktop title style', () => {
     const { container } = renderScreen(false)
     const feedbackMain = container.querySelector('main')!
-    const feedbackTitle = [...screen.getByRole('heading', { level: 1 }).classList].filter((c) => c.startsWith('desktop:text-'))
+    const feedbackTitle = screen.getByRole('heading', { level: 1 })
     cleanup()
     const page = renderWithProviders(<ScreenHeaderProvider><PageDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
     const pageMain = page.container.querySelector('main')!
-    const pageTitle = [...screen.getByRole('heading', { level: 1 }).classList].filter((c) => c.startsWith('desktop:text-'))
 
     expect(widthClasses(feedbackMain)).toEqual(widthClasses(pageMain))
     expect(feedbackMain.querySelector('[class*="max-w-"]')).toBeNull()
-    expect(feedbackTitle).toEqual(pageTitle)
-    expect(feedbackTitle.length).toBeGreaterThan(0)
+    expect(feedbackTitle).toHaveClass(...PAGE_TITLE_DESKTOP.split(' '))
   })
+
 })

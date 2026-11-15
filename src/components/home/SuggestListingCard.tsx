@@ -12,7 +12,9 @@ import { HOME_CARD_OUTLINE, LIFT_ON_HOVER, SIGN_OFF_BUTTON, SIGN_OFF_CARD, SIGN_
 // button, so a visitor chooses what to add before any form. The whole card
 // lifts on hover and opens it, like the other computer-home cards (Nov 14);
 // the button stays for the keyboard.
-export default function SuggestListingCard() {
+/** `line={false}`: the eyebrow, heading and button alone (What changed's
+ *  side card, board W11). */
+export default function SuggestListingCard({ line = true }: { line?: boolean } = {}) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -29,7 +31,7 @@ export default function SuggestListingCard() {
       <div className="min-w-0 @[540px]:flex-1">
         <p className={SIGN_OFF_EYEBROW}>Kept up by the community</p>
         <h3 className={SIGN_OFF_HEADING}>Know a place we’re missing?</h3>
-        <p className={SIGN_OFF_LINE}>Add it, or fix one that’s out of date. A person checks every change.</p>
+        {line && <p className={SIGN_OFF_LINE}>Add it, or fix one that’s out of date. A person checks every change.</p>}
       </div>
       <button
         type="button"

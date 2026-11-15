@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import PageScreenHeader from '@/components/PageScreenHeader'
 import { pageBodyToHtml, splitPageSections } from '@/lib/richText'
-import { PAGE_COLUMN, PAGE_TITLE_DESKTOP } from '@/lib/pageColumn'
+import PhotoHeader from '@/components/PhotoHeader'
+import { PAGE_COLUMN } from '@/lib/pageColumn'
 
 type Props = {
   title: string
@@ -20,11 +21,10 @@ type Props = {
  *  box around a long document read as one grey-edged slab on a small screen;
  *  per-section boxes give the page the same rhythm as the listing cards.
  *
- *  Desktop: one card holding the whole document, title included, as before.
- *  The h1 sits inside the card rather than above it because the heading-above-
- *  cards pattern comes from the category screens, where one heading introduces
- *  many cards. Padding grows rather than the column — 16px prose at this width
- *  is already ~80 characters a line. The sections are still separate elements
+ *  Desktop (board W11, the user, Nov 15): the category pages' photo with
+ *  the title on it (PhotoHeader), and the document in one white card under
+ *  it, left-aligned with the title and no wider than 760px, about 80
+ *  characters of 16px prose a line. The sections are still separate elements
  *  there but carry no box (see `.rich-text-section` in globals.css), so the
  *  text renders exactly as the unsplit body did. */
 export default function PageDocument({ title, subtitle, body }: Props) {
@@ -33,19 +33,21 @@ export default function PageDocument({ title, subtitle, body }: Props) {
   const sections = splitPageSections(pageBodyToHtml(body))
 
   return (
-    <main className={`${PAGE_COLUMN} pt-4 pb-12 desktop:py-16`}>
+    <main className={`${PAGE_COLUMN} pt-4 pb-12 desktop:pt-8`}>
       <PageScreenHeader title={title} />
-      <div className="desktop:rounded-lg desktop:border desktop:border-slate-200 desktop:bg-white desktop:p-10 desktop:shadow-sm">
-        <h1 className={`sr-only desktop:not-sr-only desktop:block ${PAGE_TITLE_DESKTOP}`}>
-          {title}
-        </h1>
-        {subtitle && <p className="mx-0.5 text-sm text-muted desktop:mx-0 desktop:mt-1.5">{subtitle}</p>}
-        <div className="rich-text mt-3 text-[16px] leading-[1.75] text-slate-700 desktop:mt-7">
-          {sections.map((html, i) => (
-            <div key={i} className="rich-text-section" dangerouslySetInnerHTML={{ __html: html }} />
-          ))}
+      <PhotoHeader title={title}>
+        <div data-testid="page-document" className="desktop:max-w-[760px] desktop:rounded-lg desktop:border desktop:border-slate-200 desktop:bg-white desktop:p-10 desktop:shadow-sm">
+          {/* A phone's, for screen readers: the header says it. A computer's
+              is on the photo. */}
+          <h1 className="sr-only desktop:hidden">{title}</h1>
+          {subtitle && <p className="mx-0.5 text-sm text-muted desktop:mx-0 desktop:mb-5">{subtitle}</p>}
+          <div className="rich-text mt-3 text-[16px] leading-[1.75] text-slate-700 desktop:mt-0">
+            {sections.map((html, i) => (
+              <div key={i} className="rich-text-section" dangerouslySetInnerHTML={{ __html: html }} />
+            ))}
+          </div>
         </div>
-      </div>
+      </PhotoHeader>
     </main>
   )
 }

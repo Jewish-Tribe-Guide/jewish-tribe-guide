@@ -252,21 +252,29 @@ With no choice made it's the first two categories with hours, as before
     title on it ("5 eruvim" above Eruv Information; the location under
     Candle Lighting & Zmanim). An opened eruv keeps it, as a listing does,
     and its way back reads "‹ All 5 eruvim". Phones unchanged.
-  - **W11 drawn Nov 15, waiting on the user** (the user: should What
-    changed and You "look a little less boring"; canvas v86, row "What
-    changed and You"). Computer: both get the category pages' photo
-    header (the community's home photo) with a count on it; What changed
-    is one box with the days inside and "Know a place we're missing?"
-    beside it; You's saved places and searches are cards, three across;
-    an empty You shows dashed outlines where saved places go, the first
-    saying "Save a place or a search to keep it here". Phone: only the
-    words change (one line, "5 changes in the last 7 days"; "Save", not
-    "Tap"). Not built. Added the same day (v90): What changed on the
-    phone in white, as one box or a box per day; About with the photo
-    header (Privacy and Feedback stay plain). The page lists 30 days; the
-    line under its title counts only the last 7, so the redraws count
-    what's on the page. Live has 419 change rows in the last 30 days
-    (9 in the last 7); none older.
+  - **W11 BUILT Nov 15** (the user: What changed and You should "look a
+    little less boring"; canvas v90, row "What changed and You"; "leave
+    out search and filter and if we need it we can add it"). On a
+    computer, What changed, You, About and Privacy have the category
+    pages' photo header (`PhotoHeader`, the community's home photo) with
+    the title on it.
+    - **What changed:** the photo's count is the 30 days the page lists
+      ("68 changes in the last 30 days"), and the explaining paragraph is
+      gone. On a computer the days sit in one white box, with "Know a
+      place we're missing? / Suggest a listing" beside it. On a phone the
+      count is the line under the title, and each day's changes are in a
+      white box under its heading on the grey.
+    - **You:** the photo says "5 places · 1 search". Saved places and
+      searches are cards, three across, with 56px pictures. An empty You
+      on a computer shows three dashed outlines. On both phone and
+      computer the empty state says "Save a place or a search to keep it
+      here."
+    - **About and Privacy:** on a computer the text is in one white card
+      (at most 760px) under the photo, lined up with the title.
+      Privacy's "Last updated" is the card's first line. Phones are
+      unchanged, and Feedback stays plain.
+    - **Not drawn, not built:** a "Recent changes" box on each listing
+      (raised Nov 15, undecided).
   - **Fixed Nov 15: a saved restaurant on You said "No davening times
     listed"**. Food has a minyanim field (for restaurants that host one),
     and You treated every place in such a category as a shul. It now asks

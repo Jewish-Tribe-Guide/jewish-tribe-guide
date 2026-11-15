@@ -78,10 +78,14 @@ afterEach(() => {
 })
 
 describe('You', () => {
-  it('nothing saved: says how to save', () => {
+  // Board W11 (the user, Nov 15): the same words on a phone and a computer,
+  // and on a computer three dashed outlines where the cards will go.
+  it('nothing saved: says how to save, and a computer draws where the cards will go', () => {
     show()
     expect(screen.getByTestId('you-empty')).toHaveTextContent('Nothing saved yet')
-    expect(screen.getByTestId('you-empty')).toHaveTextContent('Tap Save on a place or a search.')
+    expect(screen.getByTestId('you-empty')).toHaveTextContent('Save a place or a search to keep it here.')
+    expect(screen.getByTestId('you-empty-cards').children).toHaveLength(3)
+    expect(screen.getByTestId('category-hero-count')).toBeEmptyDOMElement()
   })
 
   it('saved places, newest first, and saved searches with what they find now, in the home line’s words', async () => {
@@ -95,6 +99,8 @@ describe('You', () => {
     expect(within(searches).getByRole('link')).toHaveAttribute('href', '/test-community/grocery?q=challah')
     expect(await within(searches).findByText('Grocery · 2 with Challah')).toBeInTheDocument()
     expect(screen.getByText('Saved on this phone')).toBeInTheDocument()
+    // Board W11: what's kept here, on the computer's photo.
+    expect(screen.getByTestId('category-hero-count')).toHaveTextContent('2 places · 1 search')
   })
 
   it('removing a place says so, with Undo, which puts it back where it was', async () => {
