@@ -116,7 +116,8 @@ test.describe('on a phone', () => {
   // none in the app added to the home screen. The page left a flat 96px
   // for a 58px tab bar, which only the home-screen app's 34px safe area
   // filled. Chromium, like Safari, has no safe area here, so this is
-  // Safari's case: the footer ends just above the bar.
+  // Safari's case: the footer ends just above the bar, as close as the
+  // home-screen app had it (4px of air past the bar; 14px read as high).
   test('the footer ends just above the tab bar, no empty band', async ({ page }) => {
     await openHome(page, 'tuesday')
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
@@ -126,7 +127,7 @@ test.describe('on a phone', () => {
       const link = await privacy.boundingBox()
       const bar = await page.getByRole('navigation', { name: 'Primary' }).boundingBox()
       const gap = (bar?.y ?? 0) - ((link?.y ?? 0) + (link?.height ?? 0))
-      expect(gap, `the footer's last link ends ${gap}px above the tab bar`).toBeLessThanOrEqual(28)
+      expect(gap, `the footer's last link ends ${gap}px above the tab bar`).toBeLessThanOrEqual(16)
       expect(gap).toBeGreaterThanOrEqual(0)
     }).toPass({ timeout: 5_000 })
   })
