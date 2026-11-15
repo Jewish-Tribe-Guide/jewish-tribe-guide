@@ -50,7 +50,7 @@ export async function listChangeLogUncached(community: string): Promise<ChangeLo
 
   const listings = new Map<string, Listing>()
   for (let from = 0; ; from += 1000) {
-    const { data: found, error: listingError } = await supabase.from('resource').select('id, name, category, status').eq('community_id', community).order('id').range(from, from + 999)
+    const { data: found, error: listingError } = await supabase.from('resource').select('id, name, category, status, photo:details->>photo').eq('community_id', community).order('id').range(from, from + 999)
     if (listingError) throw new Error(`Could not read the changed listings: ${listingError.message}`)
     for (const l of (found ?? []) as Listing[]) listings.set(l.id, l)
     if ((found ?? []).length < 1000) break

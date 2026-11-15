@@ -14,7 +14,7 @@ type FrameProps = {
    *  Omit (or null) for the plain wash — most categories, and every caller
    *  with nowhere to store a photo (Hospitals has no CategoryConfig row). */
   imageUrl?: string | null
-  /** Board H4 (Nov 11): the band grows to a 240px photo under a dark
+  /** Board H4 (Nov 11): the band grows to a photo (240px, 262 since Nov 15) under a dark
    *  gradient, carrying this (the count, the title, where distances are
    *  measured from) in white. The home's own tile picture is the photo. */
   hero?: ReactNode
@@ -30,9 +30,16 @@ type FrameProps = {
   children: ReactNode
 }
 
+/** The photo under the search: as much as above the count (pt-11), so the
+ *  search sits in the photo rather than on its bottom edge (the user, Nov
+ *  15: "a little more space underneath the search bar"; it was 22px). */
+export const HERO_PHOTO_UNDER_SEARCH_PX = 44
 /** How far the search rides up onto the hero photo: its 52px box plus the
- *  22px of photo under it (board H4). */
-export const HERO_OVERLAP_PX = 75
+ *  photo under it (board H4). */
+export const HERO_OVERLAP_PX = 52 + HERO_PHOTO_UNDER_SEARCH_PX + 1
+/** The photo's height: where the search starts (165px down, under the
+ *  count, title and distance line), then the search and the photo under it. */
+export const HERO_PHOTO_PX = 165 + HERO_OVERLAP_PX
 
 /** The full-bleed photo/color band, plus the thin frame that continues
  *  around everything the caller wraps in it (header, filters, listing
@@ -91,7 +98,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       // has its own short picture, GenericDirectory) rather than flash a
       // computer's photo.
       <div className="relative desktop:-mt-8 mx-[calc(50%-50vw)]" data-testid="category-hero">
-        <div className="relative hidden desktop:block h-[240px]" style={{ marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
+        <div className="relative hidden desktop:block" style={{ height: HERO_PHOTO_PX, marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
           <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: color }}>
             {bandImage && (
               <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(bandImage)} />

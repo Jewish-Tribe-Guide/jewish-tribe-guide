@@ -229,8 +229,17 @@ With no choice made it's the first two categories with hours, as before
     filled all 400, so the page was always empty there. It now reads only
     rows on listings the community has. Dev has the 16-row seed
     (`scripts/seed-dev-activity.mjs --apply`, dated from today; `--remove`
-    takes it off), so the preview's What changed shows something. One of
-    dev's listings is called "Charlie was a sinner." and shows as new.
+    takes it off), so the preview's What changed shows something. Dev
+    still has a leftover write-suite listing, "E2E Admin Write 6eabdb10-…",
+    which shows there as new.
+  - **W9 BUILT Nov 15**: What changed shows each place's own picture,
+    whole on a small white tile (most are logos; filling a square cut wide
+    ones), and the category's icon where a place has none (118 of dev's
+    151 places have one). Board on the canvas, row "What changed".
+  - **Computer category pages (Nov 15)**: 44px of photo under the search
+    box, as above the count; it was 22 and the box sat on the photo's
+    edge. The photo is 262px (was 240); the list and map stay where they
+    were under it.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only

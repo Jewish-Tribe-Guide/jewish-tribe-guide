@@ -80,6 +80,13 @@ describe('reading the log for What changed', () => {
     ])
   })
 
+  it('reads each place’s own picture, for its row (board W9)', async () => {
+    m.answer = (table) => (table === 'activity' ? { data: [logRow], error: null } : { data: [{ ...bj, photo: 'https://x/bj.jpeg' }], error: null })
+    const [row] = await listChangeLogUncached('philly')
+    expect(m.selects.find(([t]) => t === 'resource')?.[1]).toContain('photo:details->>photo')
+    expect(row!.listing).toMatchObject({ photo: 'https://x/bj.jpeg' })
+  })
+
   it('any other failure says so', async () => {
     m.answer = (table) => (table === 'resource' ? { data: [bj], error: null } : { data: null, error: { message: 'permission denied' } })
     await expect(listChangeLogUncached('philly')).rejects.toThrow(/Could not read the activity log: permission denied/)

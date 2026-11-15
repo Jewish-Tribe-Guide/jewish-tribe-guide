@@ -53,6 +53,24 @@ afterEach(() => {
 })
 
 describe('the What changed page', () => {
+  // Board W9 C (the user, Nov 15): each row is about one place, so its own
+  // picture, whole on a white tile (most are logos, which filling a square
+  // cuts). A place with no picture keeps its category's icon.
+  it('each place’s own picture, whole on a white tile; the category’s icon where it has none', () => {
+    show([
+      row('2026-10-01T22:00:00Z', { listing: { id: '22222222-bbbb', name: 'Ben & Jerry’s', category: 'restaurant', status: 'approved', photo: 'https://example.supabase.co/storage/v1/object/public/site-assets/listing-photo/bj.jpeg' } }),
+      row('2026-10-01T16:00:00Z'),
+    ])
+    const [withPhoto, without] = screen.getAllByTestId('change')
+    const tile = withPhoto!.querySelector('[data-whole-picture]')
+    expect(tile).not.toBeNull()
+    expect(tile).toHaveClass('rounded-xl')
+    expect(decodeURIComponent(tile!.querySelector('img')!.getAttribute('src')!)).toContain('listing-photo/bj')
+    expect(tile!.querySelector('img')).toHaveClass('object-contain')
+    expect(without!.querySelector('[data-whole-picture]')).toBeNull()
+    expect(without!.querySelector('img')).toBeNull()
+  })
+
   it('by day in the community’s time, newest first, each line opening its listing', () => {
     show([
       row('2026-10-01T22:00:00Z', { listing: { id: '22222222-bbbb', name: 'Ben & Jerry’s', category: 'restaurant', status: 'approved' } }),

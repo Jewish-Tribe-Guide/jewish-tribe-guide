@@ -1676,11 +1676,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // as the toolbar's last line.
   const headingInToolbar = !hasMapColumn && !columnItem && !minyanimView && listHeading !== null
   // The search rides up onto the computer's photo (board H4), which leaves
-  // the photo's last 22px under it: the list starts 28px below that, as
+  // the photo's last 44px under it (HERO_PHOTO_UNDER_SEARCH_PX): the list starts 28px below that, as
   // drawn. Where the list's heading is in the sticky bar, that space is
   // inside the bar until it docks, then under it, so the list doesn't jump.
   const heroOverlap = showSearch && !deskListing && !phonePage
-  const heroGap = heroOverlap ? (headingInToolbar ? '' : 'desktop:mb-[34px]') : ''
+  // Each 22px more since Nov 15, when the photo under the search grew from
+  // 22px to 44: the list keeps its distance from the photo's edge.
+  const heroGap = heroOverlap ? (headingInToolbar ? '' : 'desktop:mb-[56px]') : ''
 
   return (
     <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
@@ -1825,7 +1827,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // categories with no map): the heading's own padding is the space
         // above the list, as it is where the heading tops the list column.
         // A margin as well left a gap there and nowhere else (Oct 20).
-        className={`${headingInToolbar ? (heroOverlap && controlsStuck ? 'lg:mb-[26px]' : '') : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
+        className={`${headingInToolbar ? (heroOverlap && controlsStuck ? 'lg:mb-[48px]' : '') : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
           hasMapColumn
             ? ''
             : controlsStuck
@@ -1856,7 +1858,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           )}
         </div>
-        {headingInToolbar && (heroOverlap ? <div className={`desktop:pt-[26px] ${controlsStuck ? 'lg:pt-0' : ''}`}>{listHeading}</div> : listHeading)}
+        {headingInToolbar && (heroOverlap ? <div className={`desktop:pt-[48px] ${controlsStuck ? 'lg:pt-0' : ''}`}>{listHeading}</div> : listHeading)}
       </div>
 
       <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>

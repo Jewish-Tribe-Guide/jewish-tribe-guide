@@ -1812,7 +1812,10 @@ describe('GenericDirectory — the page opens on its home tile\'s picture (board
     expect(h1s[0]).not.toHaveClass('sr-only')
     expect(within(hero).getByRole('button', { name: 'Use my location' })).toBeInTheDocument()
     // The photo's box pulls what follows (the search) up onto it.
-    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('-75px')
+    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('-97px')
+    // As much photo under the search (44px) as above the count (pt-11):
+    // it was 22, and the search sat on the photo's bottom edge (Nov 15).
+    expect((hero.firstElementChild as HTMLElement).style.height).toBe('262px')
     expect(screen.getByTestId('category-ask-box')).toHaveClass('desktop:rounded-full')
     // The round badge that sat on the old band is gone.
     expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
