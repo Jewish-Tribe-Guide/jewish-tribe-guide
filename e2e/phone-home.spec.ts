@@ -259,10 +259,13 @@ test.describe('on a phone', () => {
   })
 })
 
-test('on a computer, none of it: the photo band home as before', async ({ page, isMobile }) => {
+// The computer has a Right now of its own since board U1 (Nov 14), wide,
+// under Explore; the phone's stays hidden.
+test('on a computer, none of the phone’s: the photo band home, Right now its own wide one', async ({ page, isMobile }) => {
   test.skip(!!isMobile, 'the computer’s home')
   await openHome(page, 'tuesday')
   await expect(page.getByTestId('trust-band')).toBeHidden()
   await expect(page.getByTestId('category-tiles')).toBeHidden()
-  await expect(page.getByTestId('right-now')).toBeHidden()
+  await expect(page.locator('[data-testid="right-now"]:not([data-wide])')).toBeHidden()
+  await expect(page.locator('[data-testid="right-now"][data-wide]')).toBeVisible()
 })

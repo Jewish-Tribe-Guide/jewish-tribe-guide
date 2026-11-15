@@ -11,7 +11,6 @@ import { nearMiss, type AskResult } from '@/lib/askSearch'
 import type { Answer } from '@/lib/askAnswer'
 import type { SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
-import { HOME_CARD_OUTLINE } from '@/components/home/AnswerCard'
 import { routes } from '@/lib/routes'
 import { learnFrom } from '@/lib/askReader'
 import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
@@ -573,12 +572,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 own `source: 'hero-search'`, so keeping all three isn't a
                 permanent guess.
 
-                The ring-1/rounded-2xl wrapper matches the map's own
-                container below — the two are meant to read as equal "main
-                things". Every card between them (Davening Times, Update
-                Listings, Email Signup, Jewish Times) uses the same card
-                language (border, rounded-2xl) as this section, so the whole
-                stack reads as one family. */}
+                It has no box of its own (board W2, Nov 15): the tiles are
+                pictures already, and a box round them was a box in a box,
+                as on the phone (M1). The cards after it keep theirs. */}
         {/* ── The desktop gateway's cards — Categories, Davening Times, Kept
                 by the Community, Suggest a Listing, Email Signup, Jewish
                 Times — in the admin's order and rows (builtInOrder above;
@@ -624,7 +620,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             return (
               <div
                 data-testid="browse-everything-card"
-                className={`hidden desktop:block rounded-2xl bg-white px-8 pt-6 pb-8 ${HOME_CARD_OUTLINE}`}
+                // Board W2 (the user, Nov 15): no white box; the tiles stand
+                // on the page under their heading, as the phone's do (M1).
+                // The other cards keep theirs.
+                className="hidden desktop:block"
               >
                   {/* Hardcoded — the user's own reference image titles this
                       "Explore by Category" with no small eyebrow label above

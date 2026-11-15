@@ -319,6 +319,15 @@ describe('Landing', () => {
   // change out from under a search read as two different things reacting to
   // one keystroke — the user's own call, reviewing the built feature. So
   // this now stays the plain, full category index regardless of `query`.
+  // Board W2 (the user, Nov 15): the tiles stand on the page, no white box
+  // round them, as the phone's do.
+  it('desktop: Explore by Category has no box of its own', () => {
+    renderLanding()
+    const card = screen.getByTestId('browse-everything-card')
+    expect(card.className).not.toMatch(/\b(bg-white|ring-1|border|rounded-2xl)\b/)
+    expect(within(card).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
+  })
+
   it("desktop: the category index doesn't narrow when typing — only the hero's own search dropdown does", async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })

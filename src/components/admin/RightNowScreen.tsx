@@ -12,8 +12,12 @@ import { adminInputClass } from './AdminUI'
 // The card list is names only; Right now's choices live here, behind its
 // row's chevron, so the list doesn't fill up with them ("I'm worried about
 // that admin cage getting cluttered"). Two things: which categories it
-// answers on a weekday, two at most, from the ones that can say something
-// about now (rightNowPicks); and what Shabbos shopping looks for on Friday.
+// answers from Saturday night to Thursday, two at most, from the ones that
+// can say something about now (rightNowPicks); and what Shabbos shopping
+// looks for on Friday. Board W1 (Nov 15) spells out each part of the week,
+// so it's plain the picks are for the weekdays only: Friday until candles
+// is the candles card and Shabbos shopping, candles to havdalah the card
+// alone (shabbosMoment in todayHome.ts; Erev Yom Tov and Yom Tov the same).
 
 const ANSWER_WORDS: Record<RightNowAnswer, string> = { open: 'Open now', minyan: 'Next minyan', eruv: 'Up or down' }
 
@@ -115,7 +119,7 @@ export default function RightNowScreen({
     <section data-testid="right-now-screen" aria-label="Right Now" className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <ScreenHeader title="Right Now" onBack={onBack} onRemove={onRemove} />
       <div className="px-5 pt-4 pb-2">
-        <h3 className="m-0 text-[15px] font-bold text-slate-900">On a weekday</h3>
+        <h3 className="m-0 text-[15px] font-bold text-slate-900">Saturday night to Thursday</h3>
         <p className="m-0 mb-1.5 text-[13.5px] text-muted">Two at most</p>
         {!data ? (
           <div aria-hidden="true" className="my-2 h-40 animate-pulse rounded-lg bg-slate-100" />
@@ -142,9 +146,14 @@ export default function RightNowScreen({
           </ul>
         )}
       </div>
-      <div className="border-t border-slate-100 px-5 pt-4 pb-5">
-        <h3 className="m-0 mb-2.5 text-[15px] font-bold text-slate-900">Shabbos shopping looks for</h3>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="border-t border-slate-200 px-5 pt-4 pb-5">
+        <h3 className="m-0 text-[15px] font-bold text-slate-900">Friday, until candles</h3>
+        <p className="m-0 mb-1.5 text-[13.5px] text-muted">Erev Yom Tov the same</p>
+        <Shows>Candle lighting, with the eruv</Shows>
+        {/* The one part of Friday with something to set: a blue dot, its
+            items under it (board W1). */}
+        <Shows dot="bg-primary">Shabbos shopping, which looks for</Shows>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-4">
           {items.map((item) => (
             <span key={item} className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-[14.5px] font-semibold text-slate-900">
               {item}
@@ -180,6 +189,22 @@ export default function RightNowScreen({
           )}
         </div>
       </div>
+      <div className="border-t border-slate-200 bg-slate-50 px-5 pt-4 pb-5">
+        <h3 className="m-0 text-[15px] font-bold text-slate-900">Candles to havdalah</h3>
+        <p className="m-0 mb-1.5 text-[13.5px] text-muted">Yom Tov the same</p>
+        <Shows>Candle lighting, with the eruv</Shows>
+        <Shows quiet>Nothing open, nothing to buy</Shows>
+      </div>
     </section>
+  )
+}
+
+/** One thing the site shows then, which has nothing to set. */
+function Shows({ children, quiet = false, dot = 'bg-slate-400' }: { children: React.ReactNode; quiet?: boolean; dot?: string }) {
+  return (
+    <p className={`m-0 flex items-center gap-2.5 py-1.5 text-[15px] ${quiet ? 'text-muted' : 'text-slate-900'}`}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+      {children}
+    </p>
   )
 }

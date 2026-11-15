@@ -22,7 +22,8 @@ describe('computer home card outline', () => {
     ['MapCard.tsx'],
     ['TrustBand.tsx'],
     ['SuggestListingCard.tsx'],
-    ['../Landing.tsx'],
+    // Not Landing.tsx: its one white card, Explore by Category, has no box
+    // since board W2 (Nov 15); Landing.test checks that.
   ])('%s uses the shared outline, not the old faint ring', (f) => {
     const src = read(f)
     expect(src).toContain('HOME_CARD_OUTLINE')

@@ -144,7 +144,7 @@ export default function RightNow(props: Props) {
   // No label on the computer home (the user, Nov 15: "let's actually take
   // off the right now label"); a screen reader still hears it.
   return (
-    <section data-testid="right-now" data-moment={moment.kind} aria-labelledby="right-now-title">
+    <section data-testid="right-now" data-moment={moment.kind} data-wide={wide || undefined} aria-labelledby="right-now-title">
       <h2 id="right-now-title" className={wide ? 'sr-only' : HOME_LABEL}>
         Right now
         {day && <span className="font-semibold normal-case tracking-normal"> · {day}</span>}

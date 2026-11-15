@@ -267,7 +267,9 @@ function TileGlyph({ id, title }: { id: string | undefined; title: string }) {
   )
 }
 
-const tileBox = 'relative block aspect-[16/10] w-full overflow-hidden rounded-xl bg-slate-100'
+// White, not grey: the tiles stand on the grey page (board W2, Nov 15), where
+// a grey tile with no picture read as a hole.
+const tileBox = 'relative block aspect-[16/10] w-full overflow-hidden rounded-xl bg-white'
 const tileName = 'mt-2.5 block text-base font-bold leading-tight text-ink'
 
 /** The computer home's Explore by Category (board H1, Nov 11, the user:

@@ -178,8 +178,11 @@ test.describe('home screen weight', () => {
       expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link
-      // prefetches once it's on screen.
-      await page.getByTestId('home-next-minyan').scrollIntoViewIfNeeded()
+      // prefetches once it's on screen. A community whose computer home has
+      // Right now in the card's place (board U1, Nov 14) has no such card.
+      const card = page.getByTestId('home-next-minyan')
+      test.skip((await card.count()) === 0, 'no Next minyan card on this computer home (Right now took its place)')
+      await card.scrollIntoViewIfNeeded()
       await expect.poll(() => fromCards().length, 'the Next minyan card’s link, on a computer').toBeGreaterThan(0)
     }
   })

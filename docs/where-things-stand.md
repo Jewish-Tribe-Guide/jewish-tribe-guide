@@ -109,6 +109,25 @@ With no choice made it's the first two categories with hours, as before
   - Left off the board: the grips on the chosen categories (V4b) for
     reordering them. The chosen are listed first, in the order they were
     ticked; untick and tick again to swap.
+  - **W1 and W2, built Nov 15 (the user: "fix 1, you can fix 2").**
+    W1: Right Now's screen spells out each part of the week. "Saturday
+    night to Thursday" (was "On a weekday") with the picks; "Friday, until
+    candles" (Erev Yom Tov the same): candle lighting with the eruv, and
+    Shabbos shopping's items; "Candles to havdalah" (Yom Tov the same):
+    candle lighting with the eruv, nothing open, nothing to buy, nothing to
+    set. The preview beside it still shows the site as of now, so Friday
+    can't be seen on a Tuesday (the user asked Nov 15; not built). W2:
+    the computer's Explore by Category has no white box; its tiles stand
+    on the grey page under the heading, as the phone's do (M1). A tile
+    with no picture is white rather than grey, which read as a hole on
+    the grey. The other cards keep their boxes. W3a/W3b (the phone two
+    per row) were drawn only; the user: leave them.
+  - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
+    hadn't run e2e on this branch since the last PR): budgets' computer
+    check waited for the Next minyan card (skips now where Right now took
+    its place), phone-home said a computer has no Right now (it has its
+    own, `data-wide`), mobile held the footer words 45-75px over the tab
+    bar (16-40 now; they sit ~25px over it).
 
 Nov 14, later, the user's yes to both:
 - **The Kept up card is one line**, as tall as the search box (48px; it

@@ -545,6 +545,29 @@ describe('SiteSettingsEditor — Right now’s own screen', () => {
     expect(await screen.findByRole('region', { name: 'Cards under the search' })).toBeInTheDocument()
   })
 
+  // Board W1 (Nov 15): each part of the week spelled out, so the picks read
+  // as the weekdays' only, and Shabbos shopping sits under Friday.
+  it('says when each part shows: Saturday night to Thursday, Friday until candles, candles to havdalah', async () => {
+    const user = userEvent.setup()
+    await renderWithData()
+    await user.click(await screen.findByRole('button', { name: /^Right Now/ }))
+    const rn = screen.getByTestId('right-now-screen')
+    expect(within(rn).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Saturday night to Thursday',
+      'Friday, until candles',
+      'Candles to havdalah',
+    ])
+    // Shabbos shopping's items are Friday's, and the last part has nothing to set.
+    const friday = within(rn).getByRole('heading', { name: 'Friday, until candles' }).parentElement!
+    expect(within(friday).getByRole('button', { name: 'Take Wine off' })).toBeInTheDocument()
+    expect(friday).toHaveTextContent('Erev Yom Tov the same')
+    const shabbos = within(rn).getByRole('heading', { name: 'Candles to havdalah' }).parentElement!
+    expect(shabbos).toHaveTextContent('Yom Tov the same')
+    expect(shabbos).toHaveTextContent('Nothing open, nothing to buy')
+    expect(within(shabbos).queryByRole('button')).toBeNull()
+    expect(within(shabbos).queryByRole('checkbox')).toBeNull()
+  })
+
   it('Shabbos shopping’s items: taken off with ×, added with + Add', async () => {
     const user = userEvent.setup()
     await renderWithData()
