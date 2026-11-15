@@ -176,7 +176,16 @@ With no choice made it's the first two categories with hours, as before
     map leaves Suggest and Stay in the Loop under it too close to its
     size. W7k (drawn): W7j with those two quieter, about 135px instead
     of ~260 (21px headings, a small button, Stay in the Loop white
-    instead of solid blue, the same words). Not decided.
+    instead of solid blue, the same words). The user: not seven across,
+    five across with the All categories tile, so W7l (drawn) is W7k with
+    two rows of five, the first nine and All categories last (the built
+    tiles show 14 and the tile, in three rows). W7m (drawn): W7l for
+    someone with saved places, three white cards across the top with
+    what each is doing now and You's blue dot on one that changed;
+    nothing saved, W7l. The user, Nov 15: the phone isn't much of a
+    landing page and its tabs are what people use, so the phone home
+    stays and its You tab gets the dot (PhoneYouDot). Nothing from W7i
+    to W7m built; waiting on the user's OK.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only
