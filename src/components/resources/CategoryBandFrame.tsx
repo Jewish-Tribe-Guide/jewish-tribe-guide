@@ -19,14 +19,9 @@ type FrameProps = {
    *  measured from) in white. The home's own tile picture is the photo. */
   hero?: ReactNode
   /** With `hero`: the first thing in `children` (the search) rides up onto
-   *  the bottom of the photo. Off while nothing would ride up there — a
-   *  listing opened on a computer would otherwise start inside the photo. */
+   *  the bottom of the photo. Off while nothing would ride up there (no
+   *  search, or a phone), or what follows would start inside the photo. */
   heroOverlap?: boolean
-  /** With `hero`: a listing is open on a computer and has the top of the
-   *  page, so there's no photo at all (the user, Nov 15: a strip of the
-   *  category's picture with nothing on it only pushed the listing and the
-   *  map down). `hero` is then only what a screen reader needs. */
-  heroQuiet?: boolean
   children: ReactNode
 }
 
@@ -40,6 +35,27 @@ export const HERO_OVERLAP_PX = 52 + HERO_PHOTO_UNDER_SEARCH_PX + 1
 /** The photo's height: where the search starts (165px down, under the
  *  count, title and distance line), then the search and the photo under it. */
 export const HERO_PHOTO_PX = 165 + HERO_OVERLAP_PX
+/** With nothing riding up onto it (the Eruv and Zmanim pages have no
+ *  search): the title and the line under it, then as much photo again as
+ *  under a search, not an empty strip where the search would be. */
+export const HERO_TITLE_PHOTO_PX = 165 + HERO_PHOTO_UNDER_SEARCH_PX
+
+/** The words on the photo (board H4): a small count over the title, and
+ *  one line under it. The category pages draw their own (GenericDirectory,
+ *  whose line has a button); the Eruv and Zmanim pages use this, so they
+ *  look like the category pages around them (the user, Nov 15). */
+export function HeroTitle({ eyebrow, title, line }: { eyebrow?: string | null; title: string; line?: ReactNode }) {
+  return (
+    <>
+      {/* Held open while it loads, so the title doesn't move down. */}
+      <p className="min-h-[19.5px] text-[13px] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
+        {eyebrow}
+      </p>
+      <h1 className="mt-1.5 text-[44px] font-extrabold leading-[1.05]">{title}</h1>
+      {line && <p className="mt-2 flex items-center gap-1.5 text-[15px] text-white/90">{line}</p>}
+    </>
+  )
+}
 
 /** The full-bleed photo/color band, plus the thin frame that continues
  *  around everything the caller wraps in it (header, filters, listing
@@ -70,21 +86,11 @@ export const HERO_PHOTO_PX = 165 + HERO_OVERLAP_PX
  *  directory screen whether or not the widget itself is visible) adds above
  *  it — 48px total — so the frame starts flush under SiteHeader instead of
  *  floating below a gap. */
-export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, heroQuiet = false, children }: FrameProps) {
+export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, children }: FrameProps) {
   const isMobile = useIsMobile()
   if (isMobile) return <>{children}</>
 
   const bandImage = imageUrl?.trim() || null
-
-  if (hero && heroQuiet) {
-    // No -mt-8: with no photo, <main>'s own 32px under the header stays.
-    return (
-      <div className="relative" data-testid="category-hero" data-quiet="">
-        {hero}
-        <div className="mx-auto max-w-6xl px-4">{children}</div>
-      </div>
-    )
-  }
 
   if (hero) {
     return (
@@ -98,7 +104,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       // has its own short picture, GenericDirectory) rather than flash a
       // computer's photo.
       <div className="relative desktop:-mt-8 mx-[calc(50%-50vw)]" data-testid="category-hero">
-        <div className="relative hidden desktop:block" style={{ height: HERO_PHOTO_PX, marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
+        <div className="relative hidden desktop:block" style={{ height: heroOverlap ? HERO_PHOTO_PX : HERO_TITLE_PHOTO_PX, marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
           <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: color }}>
             {bandImage && (
               <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(bandImage)} />

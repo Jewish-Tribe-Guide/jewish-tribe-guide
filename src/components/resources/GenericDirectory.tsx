@@ -1615,10 +1615,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     phonePage && columnItem ? () => closeColumn(columnItem.id) : minyanimView ? closeMinyanimView : onUp,
     { named: phonePage },
   )
-  // A computer's opened listing has the top of the page (Oct 6, B): the
-  // search, its examples and the "Minyanim by time" row are the list's, and
-  // come back with it; above the listing only "‹ Synagogues", as a phone's
-  // opened listing has only the header's ‹. They pushed it halfway down.
+  // A computer's opened listing. It had the top of the page (Oct 6, B), and
+  // from Nov 15 no photo either; now (board W10 A, the user, Nov 15: "without
+  // the photo it also feels a bit weird") the photo, the title and the search
+  // stay as the list has them, and only the column under them changes, so
+  // nothing above it moves on the click. Clicking into the search goes back
+  // to the list: a search over a listing would narrow a list no one can see.
   const deskListing = !!columnItem && !phonePage
 
   // An opened listing's last part: the places near it in the list as it's
@@ -1679,7 +1681,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the photo's last 44px under it (HERO_PHOTO_UNDER_SEARCH_PX): the list starts 28px below that, as
   // drawn. Where the list's heading is in the sticky bar, that space is
   // inside the bar until it docks, then under it, so the list doesn't jump.
-  const heroOverlap = showSearch && !deskListing && !phonePage
+  const heroOverlap = showSearch && !phonePage
   // Each 22px more since Nov 15, when the photo under the search grew from
   // 22px to 44: the list keeps its distance from the photo's edge.
   const heroGap = heroOverlap ? (headingInToolbar ? '' : 'desktop:mb-[56px]') : ''
@@ -1706,10 +1708,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         color={bandColor}
         imageUrl={tilePhoto}
         heroOverlap={heroOverlap}
-        heroQuiet={deskListing}
-        hero={deskListing ? (
-          <h1 className="sr-only">{category.pluralLabel}</h1>
-        ) : (
+        hero={
           <>
             <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
               {items.length} {items.length === 1 ? 'place' : 'places'}
@@ -1726,7 +1725,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               <DistanceNote onPhoto className="mt-2" />
             ) : null}
           </>
-        )}
+        }
       >
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
               desktop:hidden). It's gone now that useSetScreenHeader (above)
@@ -1781,7 +1780,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <div ref={controlsSentinelRef} aria-hidden className="h-px" />
       <div
         ref={controlsRef}
-        hidden={phonePage || deskListing}
+        hidden={phonePage}
         // The "docked" look (white background, the padding it needs, the
         // negative margin that pulls it flush against the header above, the
         // shadow, and the hide-on-scroll transform) only ever applies once
@@ -1838,7 +1837,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {/* The page's one search box, limited to this category, with example searches under it and,
             once something is typed, the sentence answering it (see
             CategoryAsk). */}
-        <div>
+        <div onFocusCapture={deskListing ? () => closeColumn(columnItem.id) : undefined}>
           {showSearch && (
             <div className={`desktop:max-w-[688px] ${heroGap}`}>
               <CategoryAsk
@@ -1892,7 +1891,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onOpen: (other) => switchListing(columnItem.id, other.id),
               seeAll: { label: onwardSource.allLabel, onClick: () => closeColumn(columnItem.id) },
             }}
-            backLabel={minyanimView ? minyanimTitle : category.pluralLabel}
+            // "‹ All 71 places", across from "2 of 71": the title is on the
+            // photo right above it, so "‹ Food" said it twice (Nov 15).
+            backLabel={minyanimView ? minyanimTitle : `All ${shownItems.length} ${shownItems.length === 1 ? 'place' : 'places'}`}
             onBack={() => closeColumn(columnItem.id)}
             position={{ index: Math.max(0, shownIndex.get(columnItem.id) ?? 0), total: shownItems.length }}
             onStep={(direction) => navigateFromCard(columnItem.id, direction)}

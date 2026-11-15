@@ -234,23 +234,29 @@ describe('EruvInfo', () => {
       expect(within(screen.getByTestId('eruv-column')).getByText('Lower Merion Eruv')).toBeInTheDocument()
       expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', 'lower-merion')
       expect(onParamsChange).toHaveBeenLastCalledWith({ item: 'lower-merion' }, { replace: true })
-      await user.click(screen.getByRole('button', { name: 'Eruvim' }))
+      await user.click(screen.getByRole('button', { name: /^All \d+ eruvim$/ }))
       expect(screen.queryByTestId('eruv-column')).not.toBeInTheDocument()
       expect(screen.getByTestId('eruv-list')).toBeVisible()
       expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', '')
     })
 
-    // Oct 15: "Eruvim" twice, the title over ‹ Eruvim. An opened listing on a
-    // computer has the top of the page, as a category's has (GenericDirectory):
-    // only its way back, the title kept for a screen reader.
-    it('on desktop, an open eruv has the top of the page: ‹ Eruvim, not the title over it too; the title returns with the list', async () => {
+    // Oct 15: "Eruvim" twice, the title over ‹ Eruvim. Nov 15: the page has
+    // the category pages' photo with its title on it (board H4), and keeps
+    // it while an eruv is open (board W10 A), so the way back says where it
+    // goes instead of the title again.
+    it('on desktop: the title on the photo, kept while an eruv is open; the way back is All N eruvim', async () => {
       const user = userEvent.setup()
       show()
+      const hero = screen.getByTestId('category-hero')
+      expect(await within(hero).findByTestId('category-hero-count')).toHaveTextContent(/^\d+ eruvim$/)
+      const count = within(hero).getByTestId('category-hero-count').textContent!.split(' ')[0]
+      expect(within(hero).getByRole('heading', { level: 1, name: 'Eruvim' })).not.toHaveClass('sr-only')
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
       await user.click((await screen.findAllByTestId('eruv-row'))[0])
-      expect(screen.getByRole('heading', { level: 1, name: 'Eruvim' })).toHaveAttribute('class', 'sr-only')
-      expect(within(screen.getByTestId('listing-column-bar')).getByRole('button', { name: 'Eruvim' })).toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: 'Eruvim' }))
-      expect(screen.getByRole('heading', { level: 1, name: 'Eruvim' })).toHaveClass('desktop:not-sr-only')
+      expect(within(hero).getByRole('heading', { level: 1, name: 'Eruvim' })).not.toHaveClass('sr-only')
+      const back = within(screen.getByTestId('listing-column-bar')).getByRole('button', { name: `All ${count} eruvim` })
+      await user.click(back)
+      expect(screen.queryByTestId('eruv-column')).not.toBeInTheDocument()
     })
 
     it('a link to an eruv (?item=) opens it', async () => {

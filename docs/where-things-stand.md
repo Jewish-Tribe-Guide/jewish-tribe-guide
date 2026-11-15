@@ -240,13 +240,24 @@ With no choice made it's the first two categories with hours, as before
     box, as above the count; it was 22 and the box sat on the photo's
     edge. The photo is 262px (was 240); the list and map stay where they
     were under it.
-  - **Drawn Nov 15, waiting on the user (W10)**: a listing opened on a
-    computer category page has no photo today, and the user isn't sure
-    about that any more ("without the photo it also feels a bit weird").
-    Board W10 on the canvas: A keeps the whole top as the list has it,
-    so only the left column changes (listing 335px down); B a 120px band
-    with the title only (206px down, "Food" said twice). Recommended A.
-    Not built until the user picks.
+  - **W10 A BUILT Nov 15**: a listing opened on a computer category page
+    keeps the photo, the title and the search where the list has them;
+    only the column under them changes, so nothing moves on the click (the
+    user: without the photo it "feels a bit weird"). Clicking into the
+    search goes back to the list. The way back reads "‹ All 71 places",
+    across from "2 of 71", since the title is right above it.
+  - **Eruv and Candle Lighting on the photo header (Nov 15)** (the user:
+    they "still have the old layout on desktop"): both had the coloured
+    banner with an icon; they now have the category pages' photo, with the
+    title on it ("5 eruvim" above Eruv Information; the location under
+    Candle Lighting & Zmanim). An opened eruv keeps it, as a listing does,
+    and its way back reads "‹ All 5 eruvim". Phones unchanged.
+  - **Fixed Nov 15: a saved restaurant on You said "No davening times
+    listed"**. Food has a minyanim field (for restaurants that host one),
+    and You treated every place in such a category as a shul. It now asks
+    whether the place itself lists minyanim, as the category page does,
+    and otherwise says whether it's open. Same on the held-back Today's
+    Pinned block.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only

@@ -3,8 +3,8 @@
 import ZmanimBody from '@/components/ZmanimBody'
 import type { TimesAsk } from '@/lib/ask'
 import DirectoryHeader from '@/components/resources/DirectoryHeader'
-import { CategoryBandFrame, CategoryBandBadge } from '@/components/resources/CategoryBandFrame'
-import { CategoryGlyph } from '@/lib/categoryIcons'
+import { CategoryBandFrame, HeroTitle } from '@/components/resources/CategoryBandFrame'
+import { PinIcon } from '@/components/icons'
 import { useZmanim } from '@/lib/useZmanim'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -30,7 +30,7 @@ type Props = {
   picked?: TimesAsk | null
 }
 
-export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos', icon, color = '#64748b', bandImageUrl, picked = null }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos', color = '#64748b', bandImageUrl, picked = null }: Props) {
   const { data, status } = useZmanim(coords)
   const now = useNow()
 
@@ -40,18 +40,28 @@ export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmani
   useSetScreenHeader(true, title, onUp)
   const isMobile = useIsMobile()
 
-  const banner = !isMobile && icon ? (
-    <CategoryBandBadge color={color}>
-      <CategoryGlyph categoryId={undefined} icon={icon} className="h-[55%] w-[55%]" />
-    </CategoryBandBadge>
-  ) : null
-
+  // A computer's top is the category pages' photo with the title on it
+  // (board H4; the user, Nov 15: this page still had the old band). A
+  // phone's is the site header's ‹ {title} (useSetScreenHeader).
   return (
-    <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
-      {/* Mobile used to have its own "‹ {upLabel}" row here — see
-          GenericDirectory's identical comment on why it doesn't need one now
-          that useSetScreenHeader puts the same "‹ {title}" in SiteHeader. */}
-      <DirectoryHeader title={title} anchorLabel={locationLabel} titleInHeader banner={banner} />
+    <CategoryBandFrame
+      color={color}
+      imageUrl={bandImageUrl}
+      hero={
+        <HeroTitle
+          title={title}
+          line={
+            <>
+              <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {locationLabel}
+            </>
+          }
+        />
+      }
+    >
+      {isMobile && <DirectoryHeader title={title} anchorLabel={locationLabel} titleInHeader />}
+      {/* The photo's 44px, then the times, as a category's list sits under it. */}
+      <div aria-hidden="true" className="hidden h-8 desktop:block" />
 
       <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
         {/* ZmanimBody's sub-headings are h3s, written to sit under a caller's own
