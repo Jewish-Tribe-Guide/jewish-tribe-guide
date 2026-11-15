@@ -169,6 +169,29 @@ With no choice made it's the first two categories with hours, as before
     not as sections (my view; nothing decided). Earlier boards in the
     row (W2b, W4-W4c, W5a/b, W6a/b, W7, W7b) are older options; the
     W7c-W7h boards use today's pictures and map from the dev site.
+    Later Nov 15: someone the user showed it to liked Explore in two
+    rows, so W7i/W7j redraw W7d with the tiles seven across (Philly's
+    13 in two rows), the map at 540px (W7i) and at 420px (W7j, my pick,
+    so the two bands weigh about the same). The user's worry: a shorter
+    map leaves Suggest and Stay in the Loop under it too close to its
+    size. Not decided.
+  - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
+    (the user: "don't seem to appear great on mobile"). The campaign's
+    Ends date ran ~4px off its card, and the banner preview lived only
+    in the computer's side column, so a phone saw a thumbnail and the
+    word "Photo"; it now shows the banner as it will look under the
+    dates. A category's banner photo (280px wide) kept Upload, Paste and
+    URL beside it, off the card's edge, and the page moved sideways; the
+    row now wraps them under the picture when there's no room.
+    `e2e-admin-write/phone-photos.spec.ts`, 2 of 2 red on the old code.
+    In the full admin-write run `category-open.spec.ts` failed once (it
+    fetched `cat:cache-roundtrip-seed`, a category another test makes);
+    it passed twice alone. Watch for it again.
+  - **Asked Nov 15, not decided:** the notification emails' sender name
+    (`RESEND_FROM` is a bare address on live; each email could carry its
+    community's name), and whether a listing opened on a computer should
+    lose the 132px category photo strip above it (`heroQuiet` in
+    `CategoryBandFrame`).
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took
