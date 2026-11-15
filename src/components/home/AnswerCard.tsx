@@ -24,6 +24,12 @@ export const NARROW_STACK = 'flex flex-col items-start @[920px]:flex-row @[920px
  *  it rises, and its outline turns blue. */
 export const LIFT_ON_HOVER =
   'transition-[box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] hover:ring-[1.5px] hover:ring-primary'
+/** The same, for a picture inside a link that also holds its name (the
+ *  computer's Explore tiles, board W2c, Nov 15): the pointer anywhere on
+ *  the tile lifts the picture. Spelled out so Tailwind sees the classes;
+ *  homeCardOutline.test keeps it LIFT_ON_HOVER's twin. */
+export const LIFT_ON_GROUP_HOVER =
+  'transition-[box-shadow,transform] duration-150 group-hover:-translate-y-0.5 group-hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] group-hover:ring-[1.5px] group-hover:ring-primary'
 
 export default function AnswerCard({
   href,

@@ -18,6 +18,7 @@ import { markHomeReveal } from '@/lib/homeRevealSignal'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import Landing from './Landing'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { HOME_CARD_OUTLINE, LIFT_ON_GROUP_HOVER } from './home/AnswerCard'
 
 // Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
 // which is what makes cmd/ctrl-click "open in new tab" work — that pulled
@@ -892,6 +893,21 @@ describe('Landing', () => {
       const card = screen.getByTestId('browse-everything-card')
       expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(15)
       expect(within(card).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
+    })
+
+    // Board W2c (Nov 15): each picture has the home cards' thin outline, and
+    // the pointer anywhere on its tile lifts it with the blue ring.
+    it('each picture, All categories too, has the thin outline and lifts when its tile is hovered', () => {
+      const { categories, listings } = sixteenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+      const card = screen.getByTestId('browse-everything-card')
+      const tiles = [...within(card).getAllByRole('link', { name: /Category \d/ }), within(card).getByRole('button', { name: 'All categories' })]
+      expect(tiles.length).toBe(15)
+      for (const tile of tiles) {
+        expect(tile).toHaveClass('group')
+        const picture = tile.firstElementChild!
+        for (const c of [...HOME_CARD_OUTLINE.split(' '), ...LIFT_ON_GROUP_HOVER.split(' ')]) expect(picture).toHaveClass(c)
+      }
     })
 
     it('shows no "More" tile and no "Show fewer" control with 14 or fewer cards', () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_GROUP_HOVER, LIFT_ON_HOVER } from './AnswerCard'
 
 // Board J1b (Nov 11): every white card on the computer home carries a quiet
 // grey outline all the time; under the pointer it lifts and the outline
@@ -17,13 +17,18 @@ describe('computer home card outline', () => {
     expect(LIFT_ON_HOVER).toMatch(/hover:-translate-y/)
   })
 
+  it('the group-hover lift is the same lift, for a picture inside a tile', () => {
+    expect(LIFT_ON_GROUP_HOVER).toBe(LIFT_ON_HOVER.replaceAll('hover:', 'group-hover:'))
+  })
+
   it.each([
     ['AnswerCard.tsx'],
     ['MapCard.tsx'],
     ['TrustBand.tsx'],
     ['SuggestListingCard.tsx'],
     // Not Landing.tsx: its one white card, Explore by Category, has no box
-    // since board W2 (Nov 15); Landing.test checks that.
+    // since board W2 (Nov 15); Landing.test checks that. Its pictures have
+    // the outline each (W2c, sections.tsx); Landing.test checks that too.
   ])('%s uses the shared outline, not the old faint ring', (f) => {
     const src = read(f)
     expect(src).toContain('HOME_CARD_OUTLINE')

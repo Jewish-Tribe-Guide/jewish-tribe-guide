@@ -136,9 +136,12 @@ With no choice made it's the first two categories with hours, as before
     candles, Shabbos 3 hours before havdalah, a weekday 3 days before
     candles), so the candles card and Shabbos shopping are right, but a
     weekday's Next minyan row still reads today's schedule.
-  - **Drawn only, Nov 15: a thin outline on Explore (W2b, W2c).** One
-    around the whole section, or one around each picture. Not built
-    until the user picks.
+  - **W2c, built Nov 15: a thin outline round each Explore picture.**
+    The home cards' grey line round each picture (All categories too),
+    the name outside it; the pointer anywhere on the tile turns it blue
+    and lifts the picture, as the other cards do (the user: "the same
+    light up blue and pop out"). W2b (one outline round the whole
+    section) was drawn only and not picked.
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took

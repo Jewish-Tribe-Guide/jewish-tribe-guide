@@ -15,6 +15,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import CategoryIcon from '@/components/CategoryIcon'
 import { GridIcon } from '@/components/icons'
+import { HOME_CARD_OUTLINE, LIFT_ON_GROUP_HOVER } from './AnswerCard'
 import { getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 
 export type CardDef = {
@@ -270,6 +271,11 @@ function TileGlyph({ id, title }: { id: string | undefined; title: string }) {
 // White, not grey: the tiles stand on the grey page (board W2, Nov 15), where
 // a grey tile with no picture read as a hole.
 const tileBox = 'relative block aspect-[16/10] w-full overflow-hidden rounded-xl bg-white'
+// The computer's Explore pictures (board W2c, Nov 15): the home cards'
+// thin outline round each picture, the name outside it, and their hover:
+// the outline turns blue and the picture lifts (the user: "the same light
+// up blue and pop out that we have for the other cards").
+const tileEdge = `${HOME_CARD_OUTLINE} ${LIFT_ON_GROUP_HOVER}`
 const tileName = 'mt-2.5 block text-base font-bold leading-tight text-ink'
 
 /** The computer home's Explore by Category (board H1, Nov 11, the user:
@@ -311,7 +317,7 @@ export function CategoryTileRow({
       {visible.map((card) => {
         const photo = getCategoryTilePhoto(categories, card.id)
         const box = (
-          <span className={tileBox} data-testid="category-tile-photo">
+          <span className={`${tileBox} ${tileEdge}`} data-testid="category-tile-photo">
             {photo ? (
               <TilePhoto src={photo} />
             ) : (
@@ -339,7 +345,7 @@ export function CategoryTileRow({
       })}
       {hasMore && (
         <button type="button" onClick={onExpand} className="group block min-w-0 cursor-pointer rounded-xl text-left">
-          <span className={`${tileBox} flex items-center justify-center text-slate-500`} aria-hidden="true">
+          <span className={`${tileBox} ${tileEdge} flex items-center justify-center text-slate-500`} aria-hidden="true">
             <GridIcon className="h-9 w-9" />
           </span>
           <span className={`${tileName} group-hover:text-primary`}>All categories</span>
