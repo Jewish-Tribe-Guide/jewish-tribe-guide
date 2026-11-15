@@ -16,6 +16,10 @@ import { useNearestEruv } from './YourEruv'
 import { TilePhoto } from './sections'
 import { HOME_LABEL } from './CategoryTiles'
 import { CandlesCard } from './TodayBlocks'
+import { LIFT_ON_HOVER } from './AnswerCard'
+import { usePreviewDay } from '@/lib/contentContext'
+import { previewNow } from '@/lib/previewDay'
+import { dayAndMinutesInTimezone } from '@/lib/hours'
 import ShabbosShopping from './ShabbosShopping'
 import FridayEruv from './FridayEruv'
 
@@ -57,12 +61,15 @@ type Props = {
 
 export default function RightNow(props: Props) {
   const { listings, categories, communitySlug, timezone, schedule, zmanim, wide = false } = props
+  // In the admin's preview, the day asked for (previewDay.ts); null elsewhere.
+  const previewDay = usePreviewDay()
   // Held open until the clock is known, so the tiles under it don't jump
   // down once it arrives.
   if (!schedule || !listings) {
     return <div aria-hidden="true" className="h-[176px] animate-pulse rounded-2xl bg-slate-100" />
   }
-  const now = schedule.now
+  const now = previewNow(previewDay, zmanim, schedule.now, timezone)
+  const nowMinutes = now === schedule.now ? schedule.nowMinutes : dayAndMinutesInTimezone(now, timezone).minutes
   const moment = shabbosMoment(zmanim, now, timezone)
   const kindLink = (kind: string) => {
     const c = categories.find((x) => x.kind === kind)
@@ -125,7 +132,7 @@ export default function RightNow(props: Props) {
         <CandlesCard
           moment={moment}
           now={now}
-          nowMinutes={schedule.nowMinutes}
+          nowMinutes={nowMinutes}
           links={[
             ['Minyanim', shulsHref],
             ['Zmanim', kindLink('zmanim')],
@@ -164,7 +171,9 @@ function PhotoRow({ category, categories, href, big, small, wide }: { category: 
         href={href}
         prefetch={false}
         data-testid="right-now-row"
-        className={`relative flex items-center gap-3 overflow-hidden rounded-2xl bg-slate-700 text-white ${wide ? 'h-[132px] px-7' : 'h-[84px] px-4'}`}
+        // On the computer it lifts under the pointer as the home's other
+        // cards do (the user, Nov 15); no grey outline, it's a photo.
+        className={`relative flex items-center gap-3 overflow-hidden rounded-2xl bg-slate-700 text-white ${wide ? `h-[132px] px-7 ${LIFT_ON_HOVER}` : 'h-[84px] px-4'}`}
       >
         {photo && (
           <span aria-hidden="true" data-testid="right-now-photo" className="absolute inset-0">

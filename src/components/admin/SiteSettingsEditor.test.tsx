@@ -568,6 +568,31 @@ describe('SiteSettingsEditor — Right now’s own screen', () => {
     expect(within(shabbos).queryByRole('checkbox')).toBeNull()
   })
 
+  // The user, Nov 15: "is there a way to see on admin what right now would
+  // show on other days?" A click in a part of the week shows that day beside,
+  // and it stays after going back to the list, until × goes back to now.
+  it('a click in a part of the week shows that day in the preview, kept until “Back to now”', async () => {
+    const user = userEvent.setup()
+    await renderWithData()
+    await user.click(await screen.findByRole('button', { name: /^Right Now/ }))
+    const rn = screen.getByTestId('right-now-screen')
+    expect(screen.queryByText(/^Showing/)).toBeNull()
+    await user.click(within(rn).getByRole('heading', { name: 'Friday, until candles' }))
+    expect(rn.querySelector('[data-day="erev"]')).toHaveAttribute('aria-current', 'true')
+    const preview = screen.getByRole('complementary', { name: 'Preview' })
+    expect(within(preview).getByText(/Showing Friday/)).toBeInTheDocument()
+    await waitFor(() => expect(vi.mocked(writePreviewDraft)).toHaveBeenLastCalledWith(expect.objectContaining({ day: 'erev' })))
+    // Anything in a part picks it: ticking a category is the weekday's.
+    await user.click(within(rn).getByRole('checkbox', { name: /Grocery/ }))
+    expect(within(preview).getByText(/Showing a weekday/)).toBeInTheDocument()
+    await user.click(within(rn).getByRole('heading', { name: 'Candles to havdalah' }))
+    await user.click(within(rn).getByRole('button', { name: 'Back to the cards' }))
+    expect(within(preview).getByText(/Showing Shabbos/)).toBeInTheDocument()
+    await user.click(within(preview).getByRole('button', { name: 'Back to now' }))
+    expect(screen.queryByText(/^Showing/)).toBeNull()
+    await waitFor(() => expect(vi.mocked(writePreviewDraft)).toHaveBeenLastCalledWith(expect.objectContaining({ day: null })))
+  })
+
   it('Shabbos shopping’s items: taken off with ×, added with + Add', async () => {
     const user = userEvent.setup()
     await renderWithData()

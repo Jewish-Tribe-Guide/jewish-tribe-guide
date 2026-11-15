@@ -2,6 +2,7 @@
 
 import type { SiteSettings } from './siteSettings'
 import type { DraftHomeSection, HomeSection } from './homeSections'
+import type { PreviewDay } from './previewDay'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin preview handoff.
@@ -32,6 +33,9 @@ export type PreviewDraft = {
    *  be client-only. `readPreviewSections` restores the `sortOrder` the app's
    *  hook expects. */
   sections: DraftHomeSection[]
+  /** The day the admin asked to see Right now on (previewDay.ts); none for
+   *  now. */
+  day?: PreviewDay | null
 }
 
 /** The URL the admin's preview iframe points at, for the community being

@@ -7,6 +7,7 @@ import { rightNowChosen, rightNowPicks, type RightNowAnswer, type RightNowPick }
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_RIGHT_NOW } from '@/lib/siteSettings'
 import { withCommunity } from '@/lib/useCommunityData'
 import { adminInputClass } from './AdminUI'
+import type { PreviewDay } from '@/lib/previewDay'
 
 // ── Right now, its own screen (boards V4/V4b, the user, Nov 15) ─────────────
 // The card list is names only; Right now's choices live here, behind its
@@ -91,6 +92,8 @@ export default function RightNowScreen({
   onItems,
   onBack,
   onRemove,
+  day = null,
+  onDay,
 }: {
   data: RightNowData | null
   chosen: string[] | null
@@ -101,7 +104,20 @@ export default function RightNowScreen({
   /** Taking the card off the computer home; none on the phone's, which
    *  always has Right now. */
   onRemove?: () => void
+  /** The day the preview beside shows (previewDay.ts): clicking a part of
+   *  the week, or anything in it, shows that day there (the user, Nov 15). */
+  day?: PreviewDay | null
+  onDay?: (day: PreviewDay) => void
 }) {
+  // One part of the week: a click anywhere in it, or the keyboard reaching
+  // it, shows its day beside; the one shown has a blue edge.
+  const part = (d: PreviewDay, extra = '') => ({
+    'data-day': d,
+    'aria-current': day === d ? ('true' as const) : undefined,
+    onClick: () => onDay?.(d),
+    onFocus: () => onDay?.(d),
+    className: `border-l-4 ${day === d ? 'border-l-primary' : 'border-l-transparent'} ${onDay ? 'cursor-pointer' : ''} ${extra}`,
+  })
   const [adding, setAdding] = useState<string | null>(null)
   const shown = data ? rightNowShown(data, chosen).map((p) => p.category.id) : []
   const picks = data ? rightNowPicks(data.categories, data.listings) : []
@@ -118,7 +134,7 @@ export default function RightNowScreen({
   return (
     <section data-testid="right-now-screen" aria-label="Right Now" className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <ScreenHeader title="Right Now" onBack={onBack} onRemove={onRemove} />
-      <div className="px-5 pt-4 pb-2">
+      <div {...part('weekday', 'px-5 pt-4 pb-2')}>
         <h3 className="m-0 text-[15px] font-bold text-slate-900">Saturday night to Thursday</h3>
         <p className="m-0 mb-1.5 text-[13.5px] text-muted">Two at most</p>
         {!data ? (
@@ -146,7 +162,7 @@ export default function RightNowScreen({
           </ul>
         )}
       </div>
-      <div className="border-t border-slate-200 px-5 pt-4 pb-5">
+      <div {...part('erev', 'border-t border-t-slate-200 px-5 pt-4 pb-5')}>
         <h3 className="m-0 text-[15px] font-bold text-slate-900">Friday, until candles</h3>
         <p className="m-0 mb-1.5 text-[13.5px] text-muted">Erev Yom Tov the same</p>
         <Shows>Candle lighting, with the eruv</Shows>
@@ -189,7 +205,8 @@ export default function RightNowScreen({
           )}
         </div>
       </div>
-      <div className="border-t border-slate-200 bg-slate-50 px-5 pt-4 pb-5">
+      {/* Nothing in it can take focus, so it takes it itself. */}
+      <div {...part('shabbos', 'border-t border-t-slate-200 bg-slate-50 px-5 pt-4 pb-5')} tabIndex={onDay ? 0 : undefined}>
         <h3 className="m-0 text-[15px] font-bold text-slate-900">Candles to havdalah</h3>
         <p className="m-0 mb-1.5 text-[13.5px] text-muted">Yom Tov the same</p>
         <Shows>Candle lighting, with the eruv</Shows>

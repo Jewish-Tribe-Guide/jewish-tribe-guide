@@ -9,6 +9,12 @@ import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { ZmanimData } from '@/types'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import RightNow from './RightNow'
+import { LIFT_ON_HOVER } from './AnswerCard'
+
+// The admin preview's day (previewDay.ts), set per test; null like any
+// visitor's page.
+const preview = vi.hoisted(() => ({ day: null as null | 'weekday' | 'erev' | 'shabbos' }))
+vi.mock('@/lib/contentContext', async (actual) => ({ ...(await actual<typeof import('@/lib/contentContext')>()), usePreviewDay: () => preview.day }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -100,6 +106,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, available: true, timezone: NY, candles: null, eruvim }))))
 })
 afterEach(() => {
+  preview.day = null
   cleanup()
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -294,6 +301,12 @@ describe('Right now', () => {
     const list = within(screen.getByTestId('right-now')).getByRole('list')
     expect(list).toHaveClass('grid', 'grid-cols-2')
     for (const row of within(list).getAllByRole('link')) expect(row).toHaveClass('h-[132px]')
+    // The user, Nov 15: they lift under the pointer as the home's other
+    // cards do, with no grey outline (they're photos).
+    for (const row of within(list).getAllByRole('link')) {
+      expect(row.className).toContain(LIFT_ON_HOVER)
+      expect(row.className).not.toMatch(/\bring-slate-300\b/)
+    }
     cleanup()
     at('2026-10-16T13:30:00-04:00')
     renderWithProviders(
@@ -310,5 +323,32 @@ describe('Right now', () => {
     const { container } = show(null, null)
     expect(screen.queryByTestId('right-now')).not.toBeInTheDocument()
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
+  })
+})
+
+// The user, Nov 15: the admin can see Right now on another day; the preview
+// asks for one, and on a Tuesday it shows Friday's or Shabbos's.
+describe('Right now in the admin’s preview, on another day', () => {
+  const at = (nyIso: string) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(nyIso))
+  }
+  it('a Tuesday asked for Friday shows Friday’s candles card; for Shabbos, Shabbos’s', () => {
+    at('2026-10-13T12:30:00-04:00')
+    preview.day = 'erev'
+    show('2026-10-13T12:30:00-04:00', week)
+    expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'erev')
+    expect(screen.getByTestId('right-now')).toHaveTextContent('Candles 6:01 PM')
+    cleanup()
+    preview.day = 'shabbos'
+    show('2026-10-13T12:30:00-04:00', week)
+    expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'shabbos')
+  })
+
+  it('a Friday asked for a weekday shows the weekday rows', () => {
+    at('2026-10-16T13:30:00-04:00')
+    preview.day = 'weekday'
+    show('2026-10-16T13:30:00-04:00', { ...week, dayOfWeek: 5, isFriday: true } as ZmanimData)
+    expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'weekday')
   })
 })

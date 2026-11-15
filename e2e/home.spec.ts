@@ -3,7 +3,7 @@ import { defaultCommunity, dismissLocationPrompt, previewSettings, ready } from 
 
 // "Explore by Category" (CategoryTileRow, desktop only): photo tiles, five
 // across (boards H1 and G5b, Nov 11) — the first 14 cards and an "All categories" tile
-// that expands to every card; "Show fewer categories" (shown only once
+// that expands to every card (only from 16 cards: with 15 all show, Nov 15); "Show fewer categories" (shown only once
 // expanded) goes back. Whether there's an "All categories" tile at all is
 // read from the page rather than hardcoded: admins add and remove
 // categories.
@@ -23,13 +23,13 @@ test.describe('home — Browse everything grid', () => {
     const tiles = card.locator('a')
     const more = card.getByRole('button', { name: 'All categories' })
 
-    // 14 tiles or fewer hides "All categories" (Landing.tsx). Counted from
+    // 15 tiles or fewer hides "All categories" (CategoryTileRow). Counted from
     // the tiles, not the category list, which also holds the Map, the
     // Zmanim page and hidden categories: Philly had 14 tiles (Zmanim among
     // them) on Nov 15, no button, and the old count-based skip failed.
     if ((await more.count()) === 0) {
-      expect(await tiles.count()).toBeLessThanOrEqual(14)
-      test.skip(true, '14 tiles or fewer, so there is no "All categories" tile to test')
+      expect(await tiles.count()).toBeLessThanOrEqual(15)
+      test.skip(true, '15 tiles or fewer, so there is no "All categories" tile to test')
     }
 
     expect(await tiles.count()).toBe(14)

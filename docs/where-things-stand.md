@@ -115,13 +115,30 @@ With no choice made it's the first two categories with hours, as before
     candles" (Erev Yom Tov the same): candle lighting with the eruv, and
     Shabbos shopping's items; "Candles to havdalah" (Yom Tov the same):
     candle lighting with the eruv, nothing open, nothing to buy, nothing to
-    set. The preview beside it still shows the site as of now, so Friday
-    can't be seen on a Tuesday (the user asked Nov 15; not built). W2:
+    set. W2:
     the computer's Explore by Category has no white box; its tiles stand
     on the grey page under the heading, as the phone's do (M1). A tile
     with no picture is white rather than grey, which read as a hole on
     the grey. The other cards keep their boxes. W3a/W3b (the phone two
     per row) were drawn only; the user: leave them.
+  - **Three follow-ups, built Nov 15.** Explore's "All categories" tile
+    appears only from 16 cards, so 15 all show (it used to hide one card
+    behind a button in its own spot). The computer's Right now cards lift
+    on hover like the home's other cards, no grey outline (they're
+    photos). And the preview shows another day: clicking (or tabbing to)
+    a part of the week on Right Now's screen shows that day in the
+    preview beside it, with a blue edge on the part and a "Showing
+    Friday ×" chip above the preview; the day stays while the admin is
+    on Home page, back on the card list included, until × ("Back to
+    now"). No switch on the preview (the user: clicking a section is
+    enough). It's viewing only, never saved or in the address. How:
+    the preview's clock moves (previewDay.ts: Friday 3 hours before
+    candles, Shabbos 3 hours before havdalah, a weekday 3 days before
+    candles), so the candles card and Shabbos shopping are right, but a
+    weekday's Next minyan row still reads today's schedule.
+  - **Drawn only, Nov 15: a thin outline on Explore (W2b, W2c).** One
+    around the whole section, or one around each picture. Not built
+    until the user picks.
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took

@@ -300,8 +300,11 @@ export function CategoryTileRow({
    *  there are more cards than fit. */
   onExpand?: () => void
 }) {
-  const visible = expanded ? cards : cards.slice(0, COLLAPSED_TILE_COUNT)
-  const hasMore = !expanded && cards.length > COLLAPSED_TILE_COUNT
+  // The "All categories" tile only when it hides two or more: with one
+  // over, it would stand in the 15th spot and open to the 15th category in
+  // that same spot (the user, Nov 15). Fifteen show as three full rows.
+  const hasMore = !expanded && cards.length > COLLAPSED_TILE_COUNT + 1
+  const visible = expanded || !hasMore ? cards : cards.slice(0, COLLAPSED_TILE_COUNT)
 
   return (
     <div className="grid grid-cols-5 gap-x-4 gap-y-5">

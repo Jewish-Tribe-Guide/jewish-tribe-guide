@@ -17,6 +17,7 @@ import MobileTabsEditor from './MobileTabsEditor'
 import SitePreview, { type PreviewDevice } from './SitePreview'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
+import { PREVIEW_DAY_WORDS, type PreviewDay } from '@/lib/previewDay'
 import SaveBar, { useLeaveGuard } from './SaveBar'
 import { AdminBox, AdminField, AdminPreviewButton, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
@@ -84,6 +85,9 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const { community } = useActiveCommunity()
   // Which version of the page the boxes and the preview are of.
   const [device, setDevice] = useState<PreviewDevice>('computer')
+  // The day the preview shows Right now on, picked on Right Now's screen
+  // (previewDay.ts); null for now. Kept while on Home page, never saved.
+  const [previewDay, setPreviewDay] = useState<PreviewDay | null>(null)
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
   const [sections, setSections] = useState<HomeSection[] | null>(null)
@@ -217,7 +221,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   }
 
   const openPreview = () => {
-    writePreviewDraft({ settings: draft, sections: sectionsDraft })
+    writePreviewDraft({ settings: draft, sections: sectionsDraft, day: previewDay })
     setPreviewing(true)
     history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
@@ -280,6 +284,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         onItems={(items) => set('beforeCandleItems', items)}
         onBack={() => setCardScreen(null)}
         onRemove={computer && cardOn('rightNow') ? () => takeOff('rightNow') : undefined}
+        day={previewDay}
+        onDay={setPreviewDay}
       />
     </div>
   )
@@ -474,7 +480,18 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          {roomy && <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} />}
+          {roomy && previewDay && (
+            // Which day it shows, when it isn't now, and the way back to now.
+            <p className="m-0 mb-2 flex items-center gap-1 text-sm font-semibold text-slate-900">
+              <span className="rounded-full bg-primary/10 py-1 pl-3 pr-1 text-primary">
+                Showing {PREVIEW_DAY_WORDS[previewDay].replace(/^A /, 'a ')}
+                <button type="button" aria-label="Back to now" onClick={() => setPreviewDay(null)} className="ml-1 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full hover:bg-primary/15">
+                  ×
+                </button>
+              </span>
+            </p>
+          )}
+          {roomy && <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} day={previewDay} />}
         </aside>
       </div>
 
