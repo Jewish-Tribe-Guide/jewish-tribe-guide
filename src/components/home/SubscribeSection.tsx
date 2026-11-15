@@ -7,7 +7,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
-import { NARROW_STACK } from './AnswerCard'
+import { HOME_CARD_OUTLINE, SIGN_OFF_BUTTON, SIGN_OFF_CARD, SIGN_OFF_EYEBROW, SIGN_OFF_HEADING, SIGN_OFF_LINE } from './AnswerCard'
 
 // ── "Stay in the loop" signup — desktop only, right after the map ──────────
 // The home screen ends at the map with nothing after it but the footer; this
@@ -201,20 +201,21 @@ export default function SubscribeSection({
 
   if (band) {
     return (
-      // Sized by its own width, like Suggest a listing: the email box goes
-      // under the words below 920px.
+      // Board W7l (Nov 15): white and quiet beside Suggest a listing, the
+      // page's sign-off under the map; it was solid blue and as tall as the
+      // map's words. The email box goes under the words below 540px.
       <div className="@container h-full">
-      <div data-testid="home-subscribe" className={`${NARROW_STACK} h-full gap-6 rounded-[18px] bg-[#1e3a8a] p-9 @[920px]:min-h-[260px] @[920px]:gap-9 @[920px]:px-14 @[920px]:py-16`}>
-        <div className="min-w-0 @[920px]:flex-1">
-          <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-blue-200">{eyebrow}</p>
-          <h2 className="mt-2.5 text-[30px] font-extrabold leading-[1.1] text-white @xl:text-[38px]">{heading}</h2>
-          <p className="mt-2 text-lg text-blue-100">
+      <div data-testid="home-subscribe" className={`${SIGN_OFF_CARD} ${HOME_CARD_OUTLINE}`}>
+        <div className="min-w-0 @[540px]:flex-1">
+          <p className={SIGN_OFF_EYEBROW}>{eyebrow}</p>
+          <h2 className={SIGN_OFF_HEADING}>{heading}</h2>
+          <p className={SIGN_OFF_LINE}>
             {done ? 'You’re subscribed. Every email has an unsubscribe link.' : 'An email when a place is added or closes.'}
           </p>
-          {error && <p className="mt-3 text-sm font-semibold text-red-200">{error}</p>}
+          {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
         </div>
         {!done && (
-          <form onSubmit={handleSubmit} className="flex w-full gap-2.5 @[920px]:w-auto @[920px]:shrink-0">
+          <form onSubmit={handleSubmit} className="flex w-full gap-2 @[540px]:w-auto @[540px]:shrink-0">
             <Honeypot value={honeypot} onChange={setHoneypot} />
             <input
               type="email"
@@ -223,13 +224,9 @@ export default function SubscribeSection({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Your email"
               aria-label="Email address"
-              className="h-14 min-w-0 flex-1 rounded-full bg-white @[920px]:w-[320px] @[920px]:flex-none px-5 text-base text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="h-10 min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 text-[14.5px] text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary @[540px]:w-[200px] @[540px]:flex-none"
             />
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-14 shrink-0 cursor-pointer rounded-full bg-white px-[30px] text-[17px] font-bold text-[#1e3a8a] ring-1 ring-blue-300 transition-colors hover:bg-blue-50 disabled:opacity-60"
-            >
+            <button type="submit" disabled={submitting} className={SIGN_OFF_BUTTON}>
               {submitting ? 'Signing up…' : 'Sign up'}
             </button>
           </form>

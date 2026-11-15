@@ -63,15 +63,19 @@ test.describe('computer home at a narrow window', () => {
   test('at 1280px they are side by side, as drawn', async ({ page }) => {
     await open(page, 1280)
 
-    // Side by side once the card itself is 920px wide, whatever the window:
-    // an admin can put Suggest in a row with another card, and then it
+    // Side by side once the card itself is 540px wide (board W7l), whatever
+    // the window: an admin can put Suggest in a row of three, and then it
     // stacks even here (the test project's rows did, Nov 12 CI).
-    const card = page.getByTestId('home-suggest')
-    await card.scrollIntoViewIfNeeded()
-    const heading = await box(card.getByRole('heading'))
-    const button = await box(card.getByRole('button', { name: 'Suggest a listing' }))
-    if ((await box(card)).width >= 920) expect(button.x).toBeGreaterThan(heading.x + heading.width)
-    else expect(button.y).toBeGreaterThan(heading.y + heading.height)
+    for (const [id, name] of [['home-suggest', 'Suggest a listing'], ['home-subscribe', 'Sign up']] as const) {
+      const card = page.getByTestId(id)
+      await card.scrollIntoViewIfNeeded()
+      const heading = await box(card.getByRole('heading'))
+      const button = await box(card.getByRole('button', { name }))
+      if ((await box(card)).width >= 540) expect(button.x, `${id}: its control beside the words`).toBeGreaterThan(heading.x + heading.width)
+      else expect(button.y, `${id}: its control under the words`).toBeGreaterThan(heading.y + heading.height)
+      // Quiet (board W7l): no taller than the words and one small control need.
+      if ((await box(card)).width >= 540) expect((await box(card)).height, `${id}: a short card`).toBeLessThan(170)
+    }
 
     const band = page.getByTestId('desktop-trust-band')
     const title = await box(band.getByText('Kept up by the community', { exact: true }))

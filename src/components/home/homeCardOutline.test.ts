@@ -23,12 +23,12 @@ describe('computer home card outline', () => {
 
   it.each([
     ['AnswerCard.tsx'],
-    ['MapCard.tsx'],
     ['TrustBand.tsx'],
     ['SuggestListingCard.tsx'],
-    // Not Landing.tsx: its one white card, Explore by Category, has no box
-    // since board W2 (Nov 15); Landing.test checks that. Its pictures have
-    // the outline each (W2c, sections.tsx); Landing.test checks that too.
+    // Not Landing.tsx or MapCard.tsx: Explore and the map are bands from
+    // edge to edge since board W7l (Nov 15), with a line above and below
+    // instead; Landing.test and MapCard.test check that. Explore's pictures
+    // have the outline each (W2c, sections.tsx); Landing.test checks that.
   ])('%s uses the shared outline, not the old faint ring', (f) => {
     const src = read(f)
     expect(src).toContain('HOME_CARD_OUTLINE')

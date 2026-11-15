@@ -184,8 +184,21 @@ With no choice made it's the first two categories with hours, as before
     what each is doing now and You's blue dot on one that changed;
     nothing saved, W7l. The user, Nov 15: the phone isn't much of a
     landing page and its tabs are what people use, so the phone home
-    stays and its You tab gets the dot (PhoneYouDot). Nothing from W7i
-    to W7m built; waiting on the user's OK.
+    stays and its You tab gets the dot (PhoneYouDot). The user dropped
+    W7m's Saved row ("if it's going to be this small... we don't need
+    it at all"). **W7l and the You dot BUILT Nov 15**: Explore two rows
+    of five with All categories on a white band edge to edge, Open now
+    under it as it was (asked; left), the map a 420px band edge to edge,
+    Suggest and Stay in the Loop small and white; a blue dot on the
+    phone's You tab and the header's You link when a saved place changed
+    since You was last opened (`/api/changes`, `useYouDot`). Dev's home
+    rows were swapped so Explore comes before Open now. **Live needs
+    the user's OK when it ships**: production's home rows are still the
+    old order (browse, davening, listings, ... no Right now), so they
+    want setting to browse, rightNow, map, suggest, subscribe. Dev's
+    change log is all test-suite churn (its newest 400 rows are on test
+    listings), so the dot never lights on the preview without a real
+    edit to a saved place; production's log is real.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only

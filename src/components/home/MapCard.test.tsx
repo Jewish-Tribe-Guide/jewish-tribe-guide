@@ -68,4 +68,14 @@ describe('MapCard (board G3)', () => {
     expect(picture.querySelector('img')).toBeNull()
     expect(picture.querySelectorAll('svg')).toHaveLength(1)
   })
+
+  // Board W7l (Nov 15): a band from edge to edge, 420px tall (it was a 540px
+  // outlined card), its words in the page's column, no lift.
+  it('is a 420px band from edge to edge, not an outlined card', () => {
+    render(<MapCard href="/philly/map" photo={null} categoryNames={['Food']} />)
+    const link = screen.getByTestId('home-map-card')
+    expect(link).toHaveClass('w-screen', 'h-[420px]', 'border-y')
+    expect(link.className).not.toMatch(/\b(ring-1|rounded-\[18px\]|hover:-translate-y)/)
+    expect(screen.getByText('Everything on one map').closest('.max-w-7xl')).not.toBeNull()
+  })
 })

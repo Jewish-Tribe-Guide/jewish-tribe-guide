@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import ContributePicker from './ContributePicker'
-import { HOME_CARD_OUTLINE, LIFT_ON_HOVER, NARROW_STACK } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_HOVER, SIGN_OFF_BUTTON, SIGN_OFF_CARD, SIGN_OFF_EYEBROW, SIGN_OFF_HEADING, SIGN_OFF_LINE } from './AnswerCard'
 
 // ── Suggest a Listing, on its own after the map (board G5b, Nov 11) ─────────
 // The turn from using the guide to adding to it, so it stands alone rather
@@ -16,23 +16,25 @@ export default function SuggestListingCard() {
   const [open, setOpen] = useState(false)
 
   return (
-    // Sized by its own width, not the window's (the user, Nov 12): side by
-    // side once the card is 920px wide, stacked below that, so it holds up
-    // in a narrow window or beside another card in a row.
+    // Board W7l (the user, Nov 15): quieter than it was, so the map above
+    // stays the bigger thing and this reads as the page's sign-off: a small
+    // heading and a small button, beside the words once the card is 540px
+    // wide, under them below that (sized by its own width, not the
+    // window's, Nov 12).
     <div className="@container h-full">
     <div
       data-testid="home-suggest"
       onClick={() => setOpen(true)}
-      className={`${NARROW_STACK} ${LIFT_ON_HOVER} h-full cursor-pointer gap-6 rounded-[18px] bg-white p-9 @[920px]:min-h-[240px] @[920px]:gap-9 @[920px]:p-14 ${HOME_CARD_OUTLINE}`}>
-      <div className="min-w-0 @[920px]:flex-1">
-        <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-slate-500">Kept up by the community</p>
-        <h3 className="mt-2.5 text-[30px] font-extrabold leading-[1.1] text-ink @xl:text-[38px]">Know a place we’re missing?</h3>
-        <p className="mt-2 text-lg text-slate-600">Add it, or fix one that’s out of date. A person checks every change.</p>
+      className={`${SIGN_OFF_CARD} ${LIFT_ON_HOVER} cursor-pointer ${HOME_CARD_OUTLINE}`}>
+      <div className="min-w-0 @[540px]:flex-1">
+        <p className={SIGN_OFF_EYEBROW}>Kept up by the community</p>
+        <h3 className={SIGN_OFF_HEADING}>Know a place we’re missing?</h3>
+        <p className={SIGN_OFF_LINE}>Add it, or fix one that’s out of date. A person checks every change.</p>
       </div>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-14 shrink-0 cursor-pointer items-center rounded-full bg-primary px-[30px] text-[17px] font-bold text-white transition-colors hover:bg-primary-dark"
+        className={SIGN_OFF_BUTTON}
       >
         Suggest a listing
       </button>

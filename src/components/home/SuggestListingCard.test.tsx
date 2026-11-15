@@ -55,15 +55,17 @@ describe('SuggestListingCard', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  // Board G5c (Nov 11): a stop of its own, not a footnote to the map.
-  // Sized by its own width since Nov 12: tall and side by side once the
-  // card is 920px wide, stacked under that (jsdom has no layout; the widths
-  // themselves are e2e/desktop-home-widths.spec.ts).
-  it('is a tall section with a big heading at full width, stacked in a narrow box', () => {
+  // Board W7l (Nov 15): the page's quiet sign-off, so the map above stays
+  // the bigger thing: a small heading and a small button, beside the words
+  // once the card is 540px wide, stacked under that (jsdom has no layout;
+  // the widths themselves are e2e/desktop-home-widths.spec.ts).
+  it('is a quiet card: a small heading, side by side from 540px, stacked in a narrow box', () => {
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
     const box = screen.getByTestId('home-suggest')
-    expect(box).toHaveClass('@[920px]:min-h-[240px]', 'flex-col', '@[920px]:flex-row')
+    expect(box).toHaveClass('flex-col', '@[540px]:flex-row')
+    expect(box).not.toHaveClass('@[920px]:min-h-[240px]')
     expect(box.parentElement).toHaveClass('@container')
-    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('@xl:text-[38px]')
+    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('text-[21px]')
+    expect(screen.getByRole('button', { name: 'Suggest a listing' })).toHaveClass('h-10')
   })
 })

@@ -227,9 +227,10 @@ export function CompactCardGrid({
 }
 
 // How many cards show before the trailing "All categories" tile, collapsed:
-// three rows of five with that tile last (board G5b, Nov 11: the rows fill
-// the screen and match the map card below).
-const COLLAPSED_TILE_COUNT = 14
+// two rows of five with that tile last (board W7l, the user, Nov 15: "I want
+// 5 across with the all categories card", in two rows; it was three rows
+// of five from board G5b).
+export const COLLAPSED_TILE_COUNT = 9
 
 /** A category's photo, cut to its 16:10 tile. Supabase uploads go through the
  *  storage thumbnail (falling back to the original if that fails, as
@@ -307,8 +308,8 @@ export function CategoryTileRow({
   onExpand?: () => void
 }) {
   // The "All categories" tile only when it hides two or more: with one
-  // over, it would stand in the 15th spot and open to the 15th category in
-  // that same spot (the user, Nov 15). Fifteen show as three full rows.
+  // over, it would stand in the 10th spot and open to the 10th category in
+  // that same spot (the user, Nov 15). Ten show as two full rows.
   const hasMore = !expanded && cards.length > COLLAPSED_TILE_COUNT + 1
   const visible = expanded || !hasMore ? cards : cards.slice(0, COLLAPSED_TILE_COUNT)
 

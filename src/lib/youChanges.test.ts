@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changeWords, changedSince } from './youChanges'
+import { changeWords, changedSince, latestChangeByListing, youHasNews } from './youChanges'
 import type { Change } from './whatChanged'
 
 const change = (over: Partial<Change> & { id: string; listingId: string; at: string }): Change => ({
@@ -41,5 +41,25 @@ describe('which saved places get a dot', () => {
   it('none the first time You is opened, and none without the log', () => {
     expect(changedSince(changes, new Set(['tj']), null).size).toBe(0)
     expect(changedSince(null, new Set(['tj']), since).size).toBe(0)
+  })
+})
+
+describe('the dot on the You tab and link', () => {
+  it('each listing’s newest change, a removal left out', () => {
+    const latest = latestChangeByListing([
+      change({ id: 'b', listingId: 'tj', at: '2026-11-12T00:00:00Z' }),
+      change({ id: 'a', listingId: 'tj', at: '2026-11-01T00:00:00Z' }),
+      change({ id: 'c', listingId: 'gone', at: '2026-11-12T00:00:00Z', kind: 'removed' }),
+    ])
+    expect(latest).toEqual({ tj: '2026-11-12T00:00:00Z' })
+  })
+  it('only a saved place changed after You was opened; never before it was', () => {
+    const latest = { tj: '2026-11-12T00:00:00Z', other: '2026-11-12T00:00:00Z' }
+    const since = Date.parse('2026-11-10T00:00:00Z')
+    expect(youHasNews(latest, ['tj'], since)).toBe(true)
+    expect(youHasNews(latest, ['nope'], since)).toBe(false)
+    expect(youHasNews(latest, ['tj'], Date.parse('2026-11-13T00:00:00Z'))).toBe(false)
+    expect(youHasNews(latest, ['tj'], null)).toBe(false)
+    expect(youHasNews(null, ['tj'], since)).toBe(false)
   })
 })

@@ -322,10 +322,14 @@ describe('Landing', () => {
   // this now stays the plain, full category index regardless of `query`.
   // Board W2 (the user, Nov 15): the tiles stand on the page, no white box
   // round them, as the phone's do.
-  it('desktop: Explore by Category has no box of its own', () => {
+  // Board W7l (Nov 15): a white band from edge to edge, not a box (no
+  // outline or round corners), the tiles in the page's column inside it.
+  it('desktop: Explore by Category is a white band from edge to edge, not a box', () => {
     renderLanding()
     const card = screen.getByTestId('browse-everything-card')
-    expect(card.className).not.toMatch(/\b(bg-white|ring-1|border|rounded-2xl)\b/)
+    expect(card).toHaveClass('w-screen', 'bg-white', 'border-y')
+    expect(card.className).not.toMatch(/\b(ring-1|rounded-2xl)\b/)
+    expect(card.firstElementChild).toHaveClass('max-w-7xl', 'mx-auto')
     expect(within(card).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
   })
 
@@ -814,7 +818,7 @@ describe('Landing', () => {
 
   // Phase 5 of the desktop mockup rework, revised twice after user review:
   // the flat grid is a single non-scrolling, non-wrapping row by default —
-  // the first COLLAPSED_TILE_COUNT (14) cards, sorted by listing count (most
+  // the first COLLAPSED_TILE_COUNT (9) cards, sorted by listing count (most
   // to least places), plus a trailing "More" tile when there are more than
   // that. The header row's own "View all" link is gone (the "More" tile
   // does that job now); "Show fewer categories" there is the only way back
@@ -823,9 +827,8 @@ describe('Landing', () => {
     // Listing counts, not creation order, decide the order — deliberately
     // NOT already-sorted category ids, so a test that accidentally read
     // insertion order instead of the real sort would still pass by
-    // accident. cat14 and cat15 (over COLLAPSED_TILE_COUNT) get the fewest
-    // listings, so they're the ones behind "All categories". Two, because
-    // the tile only shows when it hides two or more.
+    // accident. cat9 to cat15 (over COLLAPSED_TILE_COUNT) get the fewest
+    // listings, so they're the ones behind "All categories".
     function sixteenCategoriesWithCounts() {
       const categories = Array.from({ length: 16 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
       // Descending counts: cat0 has the most listings, cat15 the fewest.
@@ -835,22 +838,22 @@ describe('Landing', () => {
       return { categories, listings }
     }
 
-    it('sorts by listing count (most to least), caps at 14, and shows a trailing "All categories" tile', () => {
+    it('sorts by listing count (most to least), caps at 9, and shows a trailing "All categories" tile', () => {
       const { categories, listings } = sixteenCategoriesWithCounts()
       renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
       const tileLinks = within(card).getAllByRole('link', { name: /Category \d/ })
-      // Exactly the first 14, in descending-count order — cat14 (fewest
-      // listings) and cat15 are left out, behind "All categories".
+      // Exactly the first 9, in descending-count order; cat9 to cat15 (the
+      // fewest listings) are left out, behind "All categories".
       expect(tileLinks.map((l) => l.textContent)).toEqual(
-        Array.from({ length: 14 }, (_, i) => expect.stringContaining(`Category ${i}`)),
+        Array.from({ length: 9 }, (_, i) => expect.stringContaining(`Category ${i}`)),
       )
-      expect(within(card).queryByText('Category 14')).not.toBeInTheDocument()
+      expect(within(card).queryByText('Category 9')).not.toBeInTheDocument()
 
       const moreButton = within(card).getByRole('button', { name: 'All categories' })
       expect(moreButton).toBeInTheDocument()
-      // Boards H1 and G5b (Nov 11): photo tiles five across, three rows with the
+      // Board W7l (Nov 15): photo tiles five across, two rows with the
       // "All categories" tile last, and nothing under a name.
       const row = tileLinks[0]!.parentElement!
       expect(row).toHaveClass('grid', 'grid-cols-5')
@@ -880,18 +883,18 @@ describe('Landing', () => {
       await user.click(within(card).getByRole('button', { name: 'All categories' }))
       await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
 
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(14)
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
       expect(within(card).getByRole('button', { name: 'All categories' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
     })
 
-    // The user, Nov 15: with 15, "All categories" took the 15th spot and
-    // opened to the 15th category in that same spot.
-    it('with exactly 15 cards, all 15 show and there is no "All categories" tile', () => {
-      const fifteen = Array.from({ length: 15 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      renderLanding(undefined, { content: { categories: fifteen } })
+    // The user, Nov 15: with one over, "All categories" took the last spot
+    // and opened to that category in that same spot. Ten fill two rows.
+    it('with exactly 10 cards, all 10 show and there is no "All categories" tile', () => {
+      const ten = Array.from({ length: 10 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: ten } })
       const card = screen.getByTestId('browse-everything-card')
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(15)
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
       expect(within(card).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()
     })
 
@@ -902,7 +905,7 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories } }, listings)
       const card = screen.getByTestId('browse-everything-card')
       const tiles = [...within(card).getAllByRole('link', { name: /Category \d/ }), within(card).getByRole('button', { name: 'All categories' })]
-      expect(tiles.length).toBe(15)
+      expect(tiles.length).toBe(10)
       for (const tile of tiles) {
         expect(tile).toHaveClass('group')
         const picture = tile.firstElementChild!
@@ -910,9 +913,9 @@ describe('Landing', () => {
       }
     })
 
-    it('shows no "More" tile and no "Show fewer" control with 14 or fewer cards', () => {
-      const fourteen = Array.from({ length: 14 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      renderLanding(undefined, { content: { categories: fourteen } })
+    it('shows no "More" tile and no "Show fewer" control with 9 or fewer cards', () => {
+      const nine = Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: nine } })
 
       expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
       expect(within(screen.getByTestId('browse-everything-card')).queryByRole('button', { name: 'All categories' })).not.toBeInTheDocument()

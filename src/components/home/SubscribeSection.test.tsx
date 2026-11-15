@@ -236,17 +236,19 @@ describe('SubscribeSection', () => {
     expect(screen.queryByText(/You're subscribed/)).not.toBeInTheDocument()
   })
 
-  // Board G5b (Nov 11): the computer home's last stop, a navy box with just
-  // the email and Sign up. No picker and no switches: every category, new
-  // places and closures both.
-  describe('as the home page’s navy box', () => {
+  // Board G5b (Nov 11): the computer home's last stop, with just the email
+  // and Sign up. No picker and no switches: every category, new places and
+  // closures both. Board W7l (Nov 15): white and quiet beside Suggest a
+  // listing, no longer navy, so the map above stays the bigger thing.
+  describe('as the home page’s sign-off box', () => {
     it('shows only the email box and Sign up, no picker or switches', () => {
       renderWithProviders(<SubscribeSection band />, { content: { categories: [grocery, synagogue] } })
 
       const box = screen.getByTestId('home-subscribe')
-      expect(box).toHaveClass('bg-[#1e3a8a]', '@[920px]:min-h-[260px]', 'flex-col', '@[920px]:flex-row')
+      expect(box).toHaveClass('bg-white', 'ring-1', 'ring-slate-300', 'flex-col', '@[540px]:flex-row')
+      expect(box).not.toHaveClass('bg-[#1e3a8a]')
       expect(box.parentElement).toHaveClass('@container')
-      expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toHaveClass('@xl:text-[38px]')
+      expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toHaveClass('text-[21px]')
       expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toBeInTheDocument()
       expect(screen.getByText('An email when a place is added or closes.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument()

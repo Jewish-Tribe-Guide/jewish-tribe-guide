@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import type { MapCardPhoto } from '@/lib/siteSettings'
-import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 
 // ── "Everything on one map" — the computer home's map card (boards G3, then
 // G5b, the user, Nov 11). The words and a button on the left over a picture
@@ -41,9 +40,12 @@ export function mapCardLine(names: readonly string[]): string {
 }
 
 export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
-  // Board G5b (Nov 11): the map is the page's one big stop, so the card is
-  // tall (540px) and the picture fills it, fading to white under the words
-  // on the left. With no picture, plain tinted ground and the map glyph.
+  // Board W7l (the user, Nov 15): a band from edge to edge, 420px tall, the
+  // picture filling it and fading to white under the words, which sit in
+  // the page's column. It was a 540px card (G5b); with Explore a band above
+  // it, the two now weigh about the same. With no picture, plain tinted
+  // ground and the map glyph. No lift: a band doesn't rise off the page;
+  // the button darkens instead.
   //
   // The picture waits until the screen is measured as a computer's: a
   // phone's first render is the computer layout, and the card in it was
@@ -54,7 +56,8 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
       href={href}
       onClick={onOpen}
       data-testid="home-map-card"
-      className={`relative flex h-[540px] overflow-hidden rounded-[18px] bg-primary/[0.06] ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
+      // Full width as the hero is (HeroHeading).
+      className="group relative left-1/2 block h-[420px] w-screen -translate-x-1/2 overflow-hidden border-y border-slate-200 bg-primary/[0.06]"
     >
       <div data-testid="home-map-card-picture" aria-hidden={photo ? undefined : true} className="absolute inset-0">
         {photo ? (
@@ -64,7 +67,7 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
               src={photo.url}
               alt={photo.alt}
               fill
-              sizes="(min-width: 1200px) 1120px, 100vw"
+              sizes="100vw"
               className="object-cover"
               unoptimized={!isOptimizableImage(photo.url)}
             />
@@ -85,15 +88,17 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
           </span>
         )}
       </div>
-      <div className="relative flex w-[440px] flex-col justify-center gap-3.5 pl-14">
+      <div className="relative mx-auto flex h-full max-w-7xl px-4 sm:px-6">
+      <div className="flex w-[440px] flex-col justify-center gap-3.5">
         <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-slate-600">One map</p>
         <h2 className="text-[46px] font-extrabold leading-[1.05] text-ink">Everything on one map</h2>
         <p className="text-lg text-slate-700">{mapCardLine(categoryNames)}</p>
         {/* No chevron on the button (the user, Nov 11): the words are the
             action, and the whole card is the link. */}
-        <span data-testid="map-card-button" className="mt-2 inline-flex h-[52px] w-fit items-center rounded-full bg-primary px-[26px] text-[17px] font-bold text-white transition-colors">
+        <span data-testid="map-card-button" className="mt-2 inline-flex h-[52px] w-fit items-center rounded-full bg-primary px-[26px] text-[17px] font-bold text-white transition-colors group-hover:bg-primary-dark">
           Open the map
         </span>
+      </div>
       </div>
     </Link>
   )

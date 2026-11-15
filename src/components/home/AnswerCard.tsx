@@ -15,10 +15,6 @@ import Link from 'next/link'
  *  its own box. It used to show only on hover, in blue. The photo tiles
  *  have none: the picture is their edge. */
 export const HOME_CARD_OUTLINE = 'ring-1 ring-slate-300'
-/** A home section's words and its button or form: stacked while its own
- *  box is under 920px, side by side from there. Needs an `@container`
- *  parent; reads the card's width, never the window's. */
-export const NARROW_STACK = 'flex flex-col items-start @[920px]:flex-row @[920px]:items-center'
 
 /** The lift every computer-home card without a chevron shares on hover:
  *  it rises, and its outline turns blue. */
@@ -92,3 +88,14 @@ export default function AnswerCard({
     </div>
   )
 }
+
+/** The page's sign-off cards, Suggest a listing and Stay in the Loop (board
+ *  W7l): white, outlined, words and their one control side by side once
+ *  the card is 540px wide, stacked under that. Needs an `@container`
+ *  parent; reads the card's width, never the window's. */
+export const SIGN_OFF_CARD = 'flex h-full flex-col items-start gap-4 rounded-2xl bg-white px-7 py-6 @[540px]:flex-row @[540px]:items-center @[540px]:gap-5'
+export const SIGN_OFF_EYEBROW = 'text-[11.5px] font-extrabold uppercase tracking-[0.08em] text-slate-500'
+export const SIGN_OFF_HEADING = 'mt-1.5 text-[21px] font-extrabold leading-tight text-ink'
+export const SIGN_OFF_LINE = 'mt-1 text-[14.5px] text-slate-600'
+export const SIGN_OFF_BUTTON =
+  'inline-flex h-10 shrink-0 cursor-pointer items-center rounded-full bg-primary px-[18px] text-[14.5px] font-bold text-white transition-colors hover:bg-primary-dark disabled:opacity-60'

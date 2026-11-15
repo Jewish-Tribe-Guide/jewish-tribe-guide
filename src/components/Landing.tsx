@@ -620,11 +620,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             return (
               <div
                 data-testid="browse-everything-card"
-                // Board W2 (the user, Nov 15): no white box; the tiles stand
-                // on the page under their heading, as the phone's do (M1).
-                // The other cards keep theirs.
-                className="hidden desktop:block"
+                // Board W7l (the user, Nov 15): a white band from edge to
+                // edge, one anchor like the hero and the map, its tiles in
+                // the page's column. Full width as the hero is (HeroHeading).
+                className="hidden desktop:block relative left-1/2 w-screen -translate-x-1/2 border-y border-slate-200 bg-white"
               >
+                <div className="mx-auto max-w-7xl px-4 pt-10 pb-11 sm:px-6">
                   {/* Hardcoded — the user's own reference image titles this
                       "Explore by Category" with no small eyebrow label above
                       it, unlike every other card on this page, so it has no
@@ -656,6 +657,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                       />
                     </div>
                   )}
+                </div>
               </div>
             )
           }

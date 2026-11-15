@@ -5,6 +5,8 @@ import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
 import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
 import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
+import { useYouDot } from '@/lib/useYouDot'
+import { YouDot } from './YouDot'
 import { useCategoriesIfAny } from '@/lib/contentContext'
 import { kindKeyById } from '@/lib/placeKinds'
 
@@ -64,6 +66,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
   // With a Browse tab, the grid is Browse's, and the home tab is a house.
   const categories = useCategoriesIfAny()
   const hasBrowse = tabs.some((t) => t.target === 'browse')
+  const youDot = useYouDot()
   // The tab whose screen the visitor was last on. A category page belongs to
   // no tab of its own, so the one it was reached from stays lit, as Spotify
   // does (the user, Nov 4): before, nothing was lit there. A first load onto
@@ -106,7 +109,12 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
               active ? 'text-primary' : 'text-slate-600'
             }`}
           >
-            {Icon ? (
+            {Icon && tab.target === 'you' ? (
+              <span className="relative">
+                <Icon className="h-6 w-6" />
+                {youDot && <YouDot className="-right-1 -top-0.5" />}
+              </span>
+            ) : Icon ? (
               <Icon className="h-6 w-6" />
             ) : hasLineIcon ? (
               <CategoryGlyph categoryId={tab.target} icon={emoji ?? ''} className="h-6 w-6" />

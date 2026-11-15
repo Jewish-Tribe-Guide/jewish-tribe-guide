@@ -74,3 +74,8 @@ export function usePinned(): PinnedContextValue {
   if (!ctx) throw new Error('usePinned must be used inside a PinnedProvider')
   return ctx
 }
+
+/** The same, or null outside a PinnedProvider (the admin's previews). */
+export function useOptionalPinned(): PinnedContextValue | null {
+  return useContext(PinnedContext)
+}

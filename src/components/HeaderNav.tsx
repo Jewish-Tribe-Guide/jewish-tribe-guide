@@ -11,6 +11,8 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { routes } from '@/lib/routes'
+import { useYouDot } from '@/lib/useYouDot'
+import { YouDot } from './YouDot'
 import { DEFAULT_DESKTOP_NAV_ITEMS, type DesktopNavItem } from '@/lib/siteSettings'
 import { tabHolds, tabItems } from '@/lib/navTabs'
 
@@ -69,6 +71,7 @@ export default function HeaderNav() {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const communitySlug = useCommunitySlug()
+  const youDot = useYouDot()
   const settings = useSiteSettings()
   const { navigate, openFlow } = useSiteNavigation()
   const entryCards = useEntryCards(openFlow)
@@ -292,9 +295,10 @@ export default function HeaderNav() {
               // Nor You, which carries the home's search to ask saved
               // searches again.
               prefetch={target === 'map' || target === 'you' ? false : undefined}
-              className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
+              className="relative whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
             >
               {item.label}
+              {target === 'you' && youDot && <YouDot className="-right-2.5 -top-1" />}
             </Link>
           )
         }

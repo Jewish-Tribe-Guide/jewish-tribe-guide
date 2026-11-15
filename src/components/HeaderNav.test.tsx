@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -8,6 +8,7 @@ import { makeCategory } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { SITE_SETTINGS_DEFAULTS, type DesktopNavItem } from '@/lib/siteSettings'
 import HeaderNav from './HeaderNav'
+import { resetYouDotForTests } from '@/lib/useYouDot'
 
 // Replaces SectionTabs — see this component's own doc for why. The mega-menu
 // behavior (hover/click/focus opens, Escape and focus-out close, a click
@@ -139,6 +140,21 @@ describe('HeaderNav — You', () => {
     expect(screen.getByRole('link', { name: 'You' })).toHaveAttribute('href', '/test-community/you')
     const links = screen.getAllByRole('link').map((a) => a.textContent)
     expect(links.indexOf('You')).toBe(links.indexOf('Map') + 1)
+  })
+
+  // Board PhoneYouDot (Nov 15): the same blue dot as the phone's You tab.
+  it('carries the blue dot when a saved place changed since You was opened', async () => {
+    resetYouDotForTests()
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }]))
+    localStorage.setItem('jpc:you-seen-at', String(Date.parse('2026-11-10T00:00:00Z')))
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, latest: { tj: '2026-11-12T00:00:00Z' } }))))
+    try {
+      renderWithProviders(<HeaderNav />, { content: { categories: [grocery, mapCategory] } })
+      await waitFor(() => expect(screen.getByRole('link', { name: /^You/ }).querySelector('[data-testid="you-dot"]')).not.toBeNull())
+    } finally {
+      vi.unstubAllGlobals()
+      localStorage.clear()
+    }
   })
 })
 
