@@ -80,9 +80,10 @@ describe('a category’s one picture on the home', () => {
 
   // Board J2b (Nov 11): the phone tiles stay three across, each filled by
   // the category's one picture with its name on it. Board K1c (later that
-  // day): the name in the middle, and no icon on a tile with no picture,
-  // just its tint and its name ("It feels childish").
-  it('phone home: a tile is the category’s picture with its name in the middle; no picture is its tint and name, no icon', () => {
+  // day): no icon on a tile with no picture, just its tint and its name
+  // ("It feels childish"). Board R3 (Nov 14): the name under the picture
+  // rather than in the middle of it (CategoryTile.test.tsx has the look).
+  it('phone home: a tile is the category’s picture with its name under it; no picture is its tint and name, no icon', () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: true, eruvim: [] }))))
     const { container } = renderWithProviders(
       <CategoryTiles communitySlug="philly" listings={[makeListing({ id: 'a', category: 'restaurant' }), makeListing({ id: 'b', category: 'grocery' })]} />,
@@ -93,8 +94,7 @@ describe('a category’s one picture on the home', () => {
     expect(pictureIn(container, '/philly/restaurant')).toContain('category-band/food-pic')
     expect(foodTile.querySelector('[data-testid="tile-name"]')).toHaveTextContent('Food')
     for (const tile of [foodTile, groceryTile]) {
-      expect(tile.className).toMatch(/\bitems-center\b/)
-      expect(tile.className).toMatch(/\bjustify-center\b/)
+      expect(tile.querySelector('[data-testid="tile-picture"] [data-testid="tile-name"]')).toBeNull()
       expect(tile.querySelector('svg')).toBeNull()
     }
     expect(pictureIn(container, '/philly/grocery')).toBeNull()

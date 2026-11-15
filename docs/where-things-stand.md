@@ -52,6 +52,13 @@ shows only while the search box has focus; tapping a chip keeps the box
 focused. The computer keeps Try asking under its box as before. Still
 drawn only: N1, N3, O1–O3, P1/P1b.
 
+Board R3 (Nov 14, built): the phone's category tiles are the picture with
+the name under it in dark text (as J2), no longer white words on a
+darkened photo, so they don't read as more of Right now's photo rows. The
+Kept up card stays a card above the search, chevron and all (decided Nov
+14: it's how people find out they can trust the site, and opening it shows
+how everything is checked).
+
 ## Open from the boxes and fields work (Nov 10)
 
 The user's answers on Nov 10, evening, and what was done with them:

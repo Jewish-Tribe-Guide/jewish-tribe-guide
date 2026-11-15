@@ -46,12 +46,18 @@ export function mostListedFirst(cards: readonly CardDef[], counts: Record<string
 // is gone. The photos are cards already, so a card round them read as a
 // box in a box. The tiles sit on the page under their label, as wide as
 // Right now's card; the matching labels are what tie the two together.
+//
+// Board R3 (the user, Nov 14: "let's do it"): the name moves under the
+// picture, in dark text. Right now's rows became photos with white words
+// on them (Q1), and tiles the same made the page one run of pictures; a
+// picture with its name under it reads as a menu, apart from the answer
+// above it. A category with no picture keeps its tint as the picture.
 
 /** The phone home's label over a box (Right now, Explore by Category):
  *  small, grey, capitals. */
 export const HOME_LABEL = 'mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500'
 /** The phone home's tiles: three across, straight on the page (M1). */
-export const TILE_GRID = 'grid grid-cols-3 gap-2'
+export const TILE_GRID = 'grid grid-cols-3 gap-x-2.5 gap-y-3.5'
 
 export default function CategoryTiles({ communitySlug, listings }: { communitySlug: string; listings: readonly DirectoryResource[] | null }) {
   const { categories, sections, counts } = useBrowseCards(communitySlug, listings)
@@ -59,7 +65,7 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
     return (
       <div aria-hidden="true" className={TILE_GRID}>
         {Array.from({ length: 9 }, (_, i) => (
-          <div key={i} className="aspect-square animate-pulse rounded-xl bg-slate-100" />
+          <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-slate-100" />
         ))}
       </div>
     )
@@ -74,37 +80,35 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
           const photo = getCategoryTilePhoto(cats, card.id)
           const color = getCategoryColor(cats, card.id ?? '')
           return (
-            <li key={card.id ?? card.title} className="flex min-w-0">
-              {/* aspect-square with the name in flow: a name longer than
-                  the square has room for makes its tile (and row) taller
-                  rather than cut off (Oct 20: "Candle Lighting & Zmanim"
-                  lost its last word). */}
-              <Link
-                href={card.href}
-                prefetch={false}
-                className="relative flex aspect-square w-full items-center justify-center rounded-xl p-1.5 text-center"
-                style={photo ? { backgroundColor: '#475569' } : { backgroundColor: categoryTint(color) }}
-              >
-                {photo && (
-                  // Clipped here, not on the tile: a box that hides its
-                  // overflow can't grow past its aspect ratio.
-                  <span aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-xl">
-                    <TilePhoto src={photo} px={120} sizes="120px" />
-                    <span className="absolute inset-0 bg-slate-900/45" />
-                  </span>
-                )}
-                <span
-                  data-testid="tile-name"
-                  className={`relative text-[14px] font-extrabold leading-tight ${photo ? 'text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.45)]' : 'text-ink'}`}
-                >
-                  {card.title}
-                </span>
-              </Link>
+            <li key={card.id ?? card.title} className="min-w-0">
+              <CategoryTile card={card} photo={photo} color={color} />
             </li>
           )
         })}
       </ul>
       <BrowseFoot communitySlug={communitySlug} />
     </section>
+  )
+}
+
+/** One tile (board R3): the category's picture, or its tint when it has
+ *  none, and its name under it in dark text. */
+export function CategoryTile({ card, photo, color }: { card: CardDef; photo: string | null | undefined; color: string }) {
+  return (
+    <Link href={card.href} prefetch={false} className="block min-w-0">
+      <span
+        aria-hidden="true"
+        data-testid="tile-picture"
+        className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl"
+        style={{ backgroundColor: photo ? '#e2e8f0' : categoryTint(color) }}
+      >
+        {photo && <TilePhoto src={photo} px={160} sizes="120px" />}
+      </span>
+      {/* In flow under the picture: a long name ("Candle Lighting &
+          Zmanim") takes a second line rather than being cut off. */}
+      <span data-testid="tile-name" className="mt-1.5 block text-[13.5px] font-bold leading-tight text-ink">
+        {card.title}
+      </span>
+    </Link>
   )
 }
