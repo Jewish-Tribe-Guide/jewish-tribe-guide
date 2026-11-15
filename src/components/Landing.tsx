@@ -304,16 +304,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, sharesRow: s.sharesRow }))
-  // With none set (board G5b, Nov 11): Categories, the next minyan and this
-  // Shabbat side by side, the map card, Suggest a listing, Stay in the Loop
-  // last.
+  // With none set: Categories, Right now under them (board U1, Nov 14; it
+  // took the place of the next minyan and this Shabbat, which stay cards an
+  // admin can add), the map card, Suggest a listing, Stay in the Loop last.
   const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'jewishTimes', 'map', 'suggest', 'subscribe'] as const).map((kind) => ({
+      : (['browse', 'rightNow', 'map', 'suggest', 'subscribe'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
-          sharesRow: kind === 'jewishTimes',
+          sharesRow: kind === 'subscribe',
         }))
   // On the Today home its own blocks answer what Browse, Davening Times and
   // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
@@ -660,6 +660,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             )
           }
           if (kind === 'davening') return !today && !isMobile && <DaveningTimesCard coords={coords} />
+          // The phone's Right now, side by side (board U1, Nov 14). On the
+          // held-back Today home its own blocks answer this.
+          if (kind === 'rightNow') {
+            return (
+              !today &&
+              !isMobile && (
+                <RightNow
+                  wide
+                  listings={listings}
+                  categories={orderedCategories}
+                  communitySlug={communitySlug}
+                  timezone={timezone}
+                  schedule={schedule}
+                  zmanim={zmanim.data}
+                  from={coords ?? community.mapCenter}
+                  items={settings.beforeCandleItems}
+                  onOpenListing={openListing}
+                />
+              )
+            )
+          }
           // 'listings' (the "Kept by the Community" card) is retired: the
           // trust band under the hero says it, with its evidence (Nov 11).
           // A community's leftover row draws nothing, as 'map' below.

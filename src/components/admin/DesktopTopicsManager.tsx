@@ -36,7 +36,7 @@ type CardKind = Exclude<HomeBlockKind, 'section' | 'listings'>
  *  this list). 'listings' (Kept by the Community, now the trust band under
  *  the hero, Nov 11) is retired: Landing.tsx renders nothing for a leftover
  *  row, and this list keeps one aside, untouched, like a section. */
-const CARD_KINDS: CardKind[] = ['browse', 'map', 'davening', 'suggest', 'subscribe', 'jewishTimes']
+const CARD_KINDS: CardKind[] = ['browse', 'rightNow', 'map', 'davening', 'suggest', 'subscribe', 'jewishTimes']
 const CARD_KIND_SET = new Set<string>(CARD_KINDS)
 
 /** The setting that names a card on the site, where it has one. */

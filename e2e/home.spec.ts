@@ -1,19 +1,17 @@
 import { expect, test } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, previewSettings, ready } from './helpers'
+import { defaultCommunity, dismissLocationPrompt, previewSettings, ready } from './helpers'
 
 // "Explore by Category" (CategoryTileRow, desktop only): photo tiles, five
 // across (boards H1 and G5b, Nov 11) — the first 14 cards and an "All categories" tile
 // that expands to every card; "Show fewer categories" (shown only once
-// expanded) goes back. Deriving the expected count from the real,
-// admin-configured category list (via `categories()` below) rather than
-// hardcoding a number: this app hosts more than one community's worth of
-// fixture data.
+// expanded) goes back. Whether there's an "All categories" tile at all is
+// read from the page rather than hardcoded: admins add and remove
+// categories.
 test.describe('home — Browse everything grid', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop-only feature (hidden below the desktop breakpoint)')
 
-  test('caps at 14 photo tiles, five across, with "All categories" last; it expands to every tile', async ({ page, request }) => {
+  test('caps at 14 photo tiles, five across, with "All categories" last; it expands to every tile', async ({ page }) => {
     const community = await defaultCommunity(page)
-    const cats = await categories(request, community)
     // The classic home's grid, whichever home the admin has chosen.
     await previewSettings(page, community, { homeStyle: 'classic' })
     await page.goto(`/${community}?preview=1`)
@@ -25,13 +23,13 @@ test.describe('home — Browse everything grid', () => {
     const tiles = card.locator('a')
     const more = card.getByRole('button', { name: 'All categories' })
 
-    // This community's own category (+ built-in entry card) count decides
-    // whether there's an "All categories" tile to test at all (14 or fewer hides it
-    // entirely — see Landing.tsx's own doc) — skip rather than fail if
-    // there isn't, since the point is the mechanism, not this fixture data
-    // forcing it.
+    // 14 tiles or fewer hides "All categories" (Landing.tsx). Counted from
+    // the tiles, not the category list, which also holds the Map, the
+    // Zmanim page and hidden categories: Philly had 14 tiles (Zmanim among
+    // them) on Nov 15, no button, and the old count-based skip failed.
     if ((await more.count()) === 0) {
-      test.skip(cats.length < 14, "this community doesn't have enough categories for the \"All categories\" tile to show")
+      expect(await tiles.count()).toBeLessThanOrEqual(14)
+      test.skip(true, '14 tiles or fewer, so there is no "All categories" tile to test')
     }
 
     expect(await tiles.count()).toBe(14)

@@ -147,15 +147,21 @@ describe('the label over Right now', () => {
   // No Hebrew date (the user, Oct 18: the phone home read as too Jewish for
   // everyone it serves).
   it('just the weekday', () => {
-    expect(rightNowDay(Date.parse('2026-10-13T16:30:00Z'), NY)).toBe('Tuesday')
+    expect(rightNowDay(Date.parse('2026-10-13T16:30:00Z'), NY, false)).toBe('Tuesday')
   })
 
-  it('Saturday is Shabbos', () => {
-    expect(rightNowDay(Date.parse('2026-10-17T15:00:00Z'), NY)).toBe('Shabbos')
+  it('Saturday is Shabbos while it is Shabbos', () => {
+    expect(rightNowDay(Date.parse('2026-10-17T15:00:00Z'), NY, true)).toBe('Shabbos')
+  })
+
+  // The user, Nov 14: after havdalah Right now shows what's open, under
+  // "Shabbos". It's Saturday night.
+  it('Saturday after havdalah is Saturday', () => {
+    expect(rightNowDay(Date.parse('2026-10-18T00:30:00Z'), NY, false)).toBe('Saturday')
   })
 
   it('nothing before there’s a clock', () => {
-    expect(rightNowDay(null, NY)).toBeNull()
+    expect(rightNowDay(null, NY, false)).toBeNull()
   })
 })
 

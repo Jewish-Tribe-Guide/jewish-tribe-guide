@@ -134,7 +134,7 @@ describe('DesktopTopicsManager', () => {
     renderManager([card('davening')])
     const adds = screen.getAllByRole('button', { name: /^Add / }).map((b) => b.textContent)
     for (const b of screen.getAllByRole('button', { name: /^Add / })) expect(b).toHaveClass('border-dashed', 'w-full')
-    expect(adds).toEqual(['Add Categories', 'Add Map', 'Add Suggest a Listing', `Add ${SUBSCRIBE}`, `Add ${TIMES}`])
+    expect(adds).toEqual(['Add Categories', 'Add Right Now', 'Add Map', 'Add Suggest a Listing', `Add ${SUBSCRIBE}`, `Add ${TIMES}`])
   })
 
   // Board G3 (Nov 11): a community's old 'map' row is the map card now.

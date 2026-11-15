@@ -59,6 +59,27 @@ Kept up card stays a card above the search, chevron and all (decided Nov
 14: it's how people find out they can trust the site, and opening it shows
 how everything is checked).
 
+Boards U1 + U3f/U3g (Nov 14, canvas
+https://claude.ai/artifact/1L9Ep2cBxk84xQ2BePNbzL, built Nov 15): the
+computer home has Right now under Explore by Category, the same answers as
+the phone, two photo rows side by side on a weekday; on Friday the candles
+card and **Shabbos shopping** side by side (stacked on the phone). Shabbos
+shopping replaces Before candles: the grocery picture, how many stores open
+now have any of the admin's items, the closest, and a button per item
+(Challah, Wine, Chicken) opening Grocery with Has and Open now on. Left off
+the board: "· until candles" (a store can close before candles). No "Right
+now" label on the computer (the user, Nov 15: "let's actually take off the
+right now label"; may come back, they'll see); the phone keeps it and says
+"Saturday" after havdalah instead of "Shabbos".
+  - Right now is a card kind (`rightNow`) in Home page › cards. Next
+    minyan and Jewish Times stay as cards an admin can add (the user: other
+    communities may want them). A community with no card rows gets Right
+    now by default instead of those two.
+  - Migration 097 (allows `rightNow`): run on dev Nov 15, **not on prod**.
+  - **Waiting on the user:** add Right now to Philly's cards and take off
+    Next minyan / Jewish Times, on dev in the admin; on prod after 097,
+    each with a yes.
+
 Nov 14, later, the user's yes to both:
 - **The Kept up card is one line**, as tall as the search box (48px; it
   was 59px on two lines, the bigger box on the page): "Kept up by the
@@ -2189,8 +2210,8 @@ real prod numbers (Friday Oct 30, 1 PM; candles 5:44 PM).
   answers every row, the one whose open places carry the most of the items
   (Grocery): Food's main dishes are an item list too, and on the test
   project they answered "Challah" and "Chicken" with restaurants until this.
-- The computer home (boards 4 and 5) is drawn, not built: waiting on the
-  user.
+- The computer home (boards 4 and 5) was overtaken by board U1 (built
+  Nov 15; see the top of this file).
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 

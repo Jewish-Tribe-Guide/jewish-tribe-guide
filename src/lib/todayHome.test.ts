@@ -143,6 +143,22 @@ describe('before candles', () => {
     expect(missing).toEqual([])
   })
 
+  // Shabbos shopping (board U3f, Nov 14): one number for the card, stores
+  // open now with any of the items, each store once however many it has.
+  it('Shabbos shopping: how many stores open now have any of them, and the nearest', () => {
+    const closed = Object.fromEntries(['fri'].map((d) => [d, { open: '15:00', close: '21:00' }]))
+    const got = beforeCandles(
+      [store('Far', 0.02, ['Challah', 'Wine', 'Chicken']), store('Near', 0.003, ['Wine']), store('Shut', 0.0005, ['Challah'], closed), store('None', 0.0001, ['Milk'])],
+      [grocery],
+      ['Challah', 'Wine', 'Chicken'],
+      friday,
+      from,
+    )
+    expect(got.stores).toBe(2)
+    expect(got.closest).toBeCloseTo(0.207, 2)
+    expect(beforeCandles([], [grocery], ['Challah'], friday, from)).toMatchObject({ stores: 0, closest: null })
+  })
+
   it('an item no store open now lists is said; "Chicken soup" isn’t Chicken', () => {
     const { rows, missing } = beforeCandles(
       [store('A', 0.001, ['Challah', 'Wine']), store('B', 0.002, ['Wine']), store('C', 0.003, ['Chicken soup'])],

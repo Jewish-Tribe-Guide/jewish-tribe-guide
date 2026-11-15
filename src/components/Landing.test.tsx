@@ -476,13 +476,19 @@ describe('Landing', () => {
   // Listings/Email Signup dropped that gate entirely when the old paired
   // blocks split into independent cards (see homeSections.ts's own doc) —
   // each now has only the gating it actually needs on its own merits.
+  // Both are cards an admin adds now (board U1, Nov 14: Right now took
+  // their place in the defaults), so each test lists them.
+  const answerCards = [
+    { id: 'davening', kind: 'davening' as const, title: 'Davening Times Card', sortOrder: 100, cardIds: [], sharesRow: false },
+    { id: 'jewishTimes', kind: 'jewishTimes' as const, title: 'Jewish Times Card', sortOrder: 200, cardIds: [], sharesRow: true },
+  ]
   it('renders the Jewish Times card only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
-    const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
+    const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim], homeSections: answerCards } })
     expect(screen.getByTestId('home-shabbos')).toBeInTheDocument()
     unmount()
 
-    renderLanding(undefined, { content: { categories: [makeCategory()] } })
+    renderLanding(undefined, { content: { categories: [makeCategory()], homeSections: answerCards } })
     expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
   })
 
@@ -490,7 +496,7 @@ describe('Landing', () => {
     // Regression: it used to share a component with the Jewish
     // Times/Shabbat pair and was needlessly gated on zmanimCategory even
     // though it reads no zmanim data — see homeSections.ts's own doc.
-    renderLanding(undefined, { content: { categories: [makeCategory()] } }) // grocery only, no zmanim category
+    renderLanding(undefined, { content: { categories: [makeCategory()], homeSections: answerCards } }) // grocery only, no zmanim category
     expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
   })
 
@@ -660,36 +666,40 @@ describe('Landing', () => {
       for (const row of rows) expect(row.className.split(/\s+/).filter((c) => /^(m[tby]?)-/.test(c))).toEqual([])
     })
 
-    // Board G5b (Nov 11): Categories, the two answer cards side by side,
-    // the map, Suggest a listing, Stay in the Loop last.
-    it('with no rows saved: the next minyan and this Shabbat share a row, then the map', () => {
+    // Board U1 (Nov 14): Categories, Right now under them in place of the
+    // next minyan and this Shabbat, the map, Suggest a listing beside Stay
+    // in the Loop.
+    it('with no rows saved: Categories, Right now, the map, then Suggest beside Stay in the Loop', () => {
       const { container } = renderLanding(undefined, { content: { categories: cats, homeSections: [] } })
 
-      expect(spots(container)).toEqual([
-        'cards card-browse',
-        'cards card-davening card-jewishTimes',
-        'cards card-map',
-        'cards card-suggest',
-        'cards card-subscribe',
-      ])
+      expect(spots(container)).toEqual(['cards card-browse', 'cards card-rightNow', 'cards card-map', 'cards card-suggest card-subscribe'])
+      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
     })
   })
 
   describe('the built-in cards\' admin-configured order', () => {
     const withZmanim = [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })]
 
-    it('defaults to davening before jewishTimes when nothing is configured (no built-in rows at all)', () => {
+    // The user, Nov 14: keep the next minyan "as a card option for admins.
+    // I think other communities may want that option".
+    it('with nothing configured, neither answer card shows; an admin adds them', () => {
       renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
-
-      const daveningStub = screen.getByTestId('davening-stub')
-      const jewishTimesHeading = screen.getByTestId('home-shabbos')
-      expect(daveningStub.compareDocumentPosition(jewishTimesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('home-shabbos')).not.toBeInTheDocument()
     })
 
-    it('with nothing configured, the map card comes after the two answer cards (board G5b)', () => {
-      const { container } = renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
+    it('Right now is a card like any other: where the admin puts it, in a row of its own', () => {
+      const { container } = renderLanding(undefined, {
+        content: {
+          categories: withZmanim,
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], sharesRow: false },
+            { id: 'rightNow', kind: 'rightNow', title: 'Right Now Card', sortOrder: 200, cardIds: [], sharesRow: true },
+          ],
+        },
+      })
       const spots = [...container.querySelectorAll('[data-spot^="cards"]')].map((el) => el.getAttribute('data-spot'))
-      expect(spots.slice(0, 3)).toEqual(['cards card-browse', 'cards card-davening card-jewishTimes', 'cards card-map'])
+      expect(spots).toEqual(['cards card-davening', 'cards card-rightNow'])
     })
 
     it('follows the admin-configured order — jewishTimes before davening', () => {

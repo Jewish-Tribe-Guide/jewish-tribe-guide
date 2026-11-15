@@ -168,31 +168,34 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText('open now')
   })
 
-  // The user, Oct 28: a row per item, not the one store that has them all.
-  // Each opens its stores with Has and Open now on, and the list it opens is
-  // as long as the row says.
-  test('Friday afternoon: Before candles is a row per item, opening the stores open now that have it', async ({ page }) => {
+  // The user, Oct 28: an answer per item, not the one store that has them
+  // all. Board U3f (Nov 14): Shabbos shopping, a button per item, each
+  // opening its stores with Has and Open now on; the card's number is how
+  // many stores open now have any of them, so no item's list is longer.
+  test('Friday afternoon: Shabbos shopping, a button per item opening the stores open now that have it', async ({ page }) => {
     const community = await openHome(page, 'friday')
     await expect(page.getByTestId('today-candles')).toBeVisible()
-    const rows = page.getByTestId('today-before-candles').getByRole('link')
-    test.skip((await rows.count()) === 0, 'no store in the test project lists a Before candles item')
-    for (const link of await rows.all()) {
+    const card = page.getByTestId('shabbos-shopping')
+    const buttons = card.getByRole('link')
+    test.skip((await buttons.count()) === 0, 'no store in the test project lists a Shabbos shopping item')
+    for (const link of await buttons.all()) {
       await expect(link).toHaveAttribute('href', new RegExp(`^/${community}/[^/?]+\\?openNow=1&has_[^=&]+=[^&]+$`))
-      await expect(link).toContainText(/\d+ stores? open/)
     }
-    const first = rows.first()
+    const stores = Number((await card.textContent())!.match(/(\d+) stores? open/)![1])
+    const first = buttons.first()
     const href = (await first.getAttribute('href'))!
-    const stores = Number((await first.textContent())!.match(/(\d+) stores? open/)![1])
     await first.click()
     await expect(page).toHaveURL(href)
-    await expect(page.getByTestId('directory-row').filter({ visible: true })).toHaveCount(stores)
+    const rows = page.getByTestId('directory-row').filter({ visible: true })
+    await expect(rows.first()).toBeVisible()
+    expect(await rows.count()).toBeLessThanOrEqual(stores)
   })
 
   test('Shabbos: the card says when it ends; nothing to buy and nothing open', async ({ page }) => {
     await openHome(page, 'shabbos')
     await expect(page.getByTestId('right-now')).toHaveAttribute('data-moment', 'shabbos')
     await expect(page.getByTestId('today-candles')).toContainText('Havdalah 6:59 PM')
-    await expect(page.getByTestId('today-before-candles')).toHaveCount(0)
+    await expect(page.getByTestId('shabbos-shopping')).toHaveCount(0)
     await expect(page.getByTestId('right-now')).not.toContainText('open now')
   })
 

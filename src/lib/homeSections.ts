@@ -28,7 +28,9 @@
 // load; Landing.tsx's ordered walk just no longer has a branch for it, so it
 // silently renders nothing until reseeded (see seed-home-blocks.mjs) or
 // removed by hand.
-export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'suggest' | 'map' | 'subscribe' | 'jewishTimes'
+// 'rightNow' (board U1, Nov 14) is the phone home's Right now, as a card
+// on the computer: what's open, or the candles card and Shabbos shopping.
+export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'suggest' | 'map' | 'subscribe' | 'jewishTimes' | 'rightNow'
 
 /** The built-ins' fixed identity — id doubles as `kind` (there can only ever
  *  be one of each). `title` is only ever used as this row's fallback label
@@ -46,6 +48,7 @@ export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: st
   map: { id: 'map', title: 'Map Card' },
   subscribe: { id: 'subscribe', title: 'Email Signup Card' },
   jewishTimes: { id: 'jewishTimes', title: 'Shabbat & Holiday Times Card' },
+  rightNow: { id: 'rightNow', title: 'Right Now Card' },
 }
 
 export type HomeSection = {
@@ -89,9 +92,10 @@ export function newDraftSectionId(): string {
 
 export const MAX_CARDS_IN_ROW = 3
 
-/** The cards that always fill a row: Categories, and the map card, whose
- *  photo and words sit side by side (board G3). */
-export const ROW_OF_ITS_OWN: ReadonlySet<string> = new Set(['browse', 'map'])
+/** The cards that always fill a row: Categories, the map card, whose photo
+ *  and words sit side by side (board G3), and Right now, whose two answers
+ *  do (board U1). */
+export const ROW_OF_ITS_OWN: ReadonlySet<string> = new Set(['browse', 'map', 'rightNow'])
 
 type RowCard = { kind: string; sharesRow: boolean }
 

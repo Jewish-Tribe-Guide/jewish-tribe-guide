@@ -160,7 +160,7 @@ describe('Right now', () => {
     expect(screen.queryByTestId('right-now')).not.toBeInTheDocument()
   })
 
-  it('Friday afternoon: the candles card with the eruvim on it, and Before candles; nothing “open now”', async () => {
+  it('Friday afternoon: the candles card with the eruvim on it, and Shabbos shopping; nothing “open now”', async () => {
     at('2026-10-16T13:30:00-04:00')
     show('2026-10-16T13:30:00-04:00', { ...week, hebrewDate: '5 Cheshvan 5787', dayOfWeek: 5, isFriday: true } as ZmanimData)
     const section = screen.getByTestId('right-now')
@@ -172,7 +172,16 @@ describe('Right now', () => {
     expect(eruv).toHaveTextContent('Eruvim1 up1 by phone')
     expect(eruv).toHaveAttribute('href', '/test-community/eruv')
     expect(within(card).getAllByRole('link').map((a) => a.textContent)).toEqual([eruv.textContent, 'Minyanim', 'Zmanim'])
-    expect(screen.getByTestId('today-before-candles')).toHaveTextContent('Challah2 stores open · closest 0.2 mi')
+    // Board U3f (Nov 14): Before candles is Shabbos shopping, a button per
+    // item to the stores open now that have it.
+    const shopping = screen.getByTestId('shabbos-shopping')
+    expect(shopping).toHaveTextContent(/^Shabbos shopping2 stores openClosest 0\.2 mi/)
+    expect(within(shopping).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Challah', '/test-community/grocery?openNow=1&has_m=Challah'],
+      ['Wine', '/test-community/grocery?openNow=1&has_m=Wine'],
+      ['Chicken', '/test-community/grocery?openNow=1&has_m=Chicken'],
+    ])
+    expect(screen.queryByTestId('today-before-candles')).not.toBeInTheDocument()
     expect(section).not.toHaveTextContent('open now')
   })
 
@@ -182,9 +191,75 @@ describe('Right now', () => {
     expect(await screen.findByTestId('today-eruv')).toHaveTextContent('Eruvim1 up1 by phone')
     expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'shabbos')
     expect(screen.getByTestId('today-candles')).toHaveTextContent('Havdalah 6:59 PM')
-    expect(screen.queryByTestId('today-before-candles')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('shabbos-shopping')).not.toBeInTheDocument()
     expect(screen.getByTestId('right-now')).not.toHaveTextContent('open now')
     expect(screen.getByRole('heading', { name: /Right now/ })).toHaveTextContent(/^Right now · Shabbos$/)
+  })
+
+  // The user, Nov 14: after havdalah it said "Shabbos" over what's open.
+  it('Saturday night, after havdalah: what’s open, under “Saturday”', () => {
+    at('2026-10-17T20:00:00-04:00')
+    show('2026-10-17T20:00:00-04:00', { ...week, hebrewDate: '6 Cheshvan 5787', dayOfWeek: 6, isShabbos: true } as ZmanimData)
+    expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'weekday')
+    expect(screen.getByRole('heading', { name: /Right now/ })).toHaveTextContent(/^Right now · Saturday$/)
+  })
+
+  // Friday, an item no store open now lists: no button for it; none at
+  // all, no card.
+  it('Shabbos shopping leaves out an item no store has, and goes when none has any', () => {
+    at('2026-10-16T13:30:00-04:00')
+    const friday = { ...week, hebrewDate: '5 Cheshvan 5787', dayOfWeek: 5, isFriday: true } as ZmanimData
+    renderWithProviders(
+      <RightNow listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-16T13:30:00-04:00')} zmanim={friday} from={{ lat: 39.9526, lng: -75.1652 }} items={['Challah', 'Fish']} onOpenListing={vi.fn()} />,
+      { content: { categories } },
+    )
+    expect(within(screen.getByTestId('shabbos-shopping')).getAllByRole('link').map((a) => a.textContent)).toEqual(['Challah'])
+    cleanup()
+    renderWithProviders(
+      <RightNow listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-16T13:30:00-04:00')} zmanim={friday} from={{ lat: 39.9526, lng: -75.1652 }} items={['Fish']} onOpenListing={vi.fn()} />,
+      { content: { categories } },
+    )
+    expect(screen.queryByTestId('shabbos-shopping')).not.toBeInTheDocument()
+    expect(screen.getByTestId('today-candles')).toBeInTheDocument()
+  })
+
+  // Board U1 (Nov 14): on the computer, the same answers side by side.
+  // The user, Nov 15: no Right now label on the computer home. Still the
+  // section's name for a screen reader, so only hidden from sight.
+  it('wide: no label to see, still named for a screen reader', () => {
+    renderWithProviders(
+      <RightNow wide listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-13T12:30:00-04:00')} zmanim={week} from={{ lat: 39.9526, lng: -75.1652 }} items={['Challah']} onOpenListing={vi.fn()} />,
+    )
+    const heading = screen.getByRole('heading', { name: /Right now/ })
+    expect(heading).toHaveClass('sr-only')
+    expect(screen.getByRole('region', { name: /Right now/ })).toBe(screen.getByTestId('right-now'))
+  })
+
+  it('on the phone the label shows', () => {
+    renderWithProviders(
+      <RightNow listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-13T12:30:00-04:00')} zmanim={week} from={{ lat: 39.9526, lng: -75.1652 }} items={['Challah']} onOpenListing={vi.fn()} />,
+    )
+    expect(screen.getByRole('heading', { name: /Right now/ })).not.toHaveClass('sr-only')
+  })
+
+  it('wide (the computer home): the two rows side by side, taller; Friday’s two cards side by side', () => {
+    at('2026-10-13T12:30:00-04:00')
+    renderWithProviders(
+      <RightNow wide listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-13T12:30:00-04:00')} zmanim={week} from={{ lat: 39.9526, lng: -75.1652 }} items={['Challah']} onOpenListing={vi.fn()} />,
+      { content: { categories } },
+    )
+    const list = within(screen.getByTestId('right-now')).getByRole('list')
+    expect(list).toHaveClass('grid', 'grid-cols-2')
+    for (const row of within(list).getAllByRole('link')) expect(row).toHaveClass('h-[132px]')
+    cleanup()
+    at('2026-10-16T13:30:00-04:00')
+    renderWithProviders(
+      <RightNow wide listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-16T13:30:00-04:00')} zmanim={{ ...week, dayOfWeek: 5, isFriday: true } as ZmanimData} from={{ lat: 39.9526, lng: -75.1652 }} items={['Challah']} onOpenListing={vi.fn()} />,
+      { content: { categories } },
+    )
+    const pair = screen.getByTestId('today-candles').parentElement!
+    expect(pair).toHaveClass('grid', 'grid-cols-2')
+    expect(pair).toContainElement(screen.getByTestId('shabbos-shopping'))
   })
 
   // The tiles under it shouldn't jump down when the clock arrives.

@@ -57,5 +57,8 @@ describe('canShareRow', () => {
     // The map card too (board G3): photo and words side by side.
     expect(canShareRow([c('map')], c('davening'))).toBe(false)
     expect(canShareRow([c('davening')], c('map'))).toBe(false)
+    // And Right now (board U1, Nov 14): its two answers sit side by side.
+    expect(canShareRow([c('rightNow')], c('davening'))).toBe(false)
+    expect(canShareRow([c('davening')], c('rightNow'))).toBe(false)
   })
 })

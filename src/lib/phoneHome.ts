@@ -221,13 +221,15 @@ function openParts(category: CategoryConfig, open: readonly DirectoryResource[])
 
 // ── The label over Right now ────────────────────────────────────────────────
 
-/** "Tuesday"; Saturday is "Shabbos". No Hebrew date (the user, Oct 18: the
+/** "Tuesday"; Saturday is "Shabbos" while it is Shabbos, and "Saturday"
+ *  once havdalah has passed (the user, Nov 14: "Shabbos" over what's open
+ *  on Saturday night was wrong). No Hebrew date (the user, Oct 18: the
  *  phone home read as too Jewish for everyone it serves). Null before
  *  there's a clock. */
-export function rightNowDay(now: number | null, timezone: string): string | null {
+export function rightNowDay(now: number | null, timezone: string, inShabbos: boolean): string | null {
   if (now === null) return null
   const weekday = new Date(now).toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone })
-  return weekday === 'Saturday' ? 'Shabbos' : weekday
+  return weekday === 'Saturday' && inShabbos ? 'Shabbos' : weekday
 }
 
 // ── The eruvim, on the Friday card ──────────────────────────────────────────
