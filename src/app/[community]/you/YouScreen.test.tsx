@@ -185,6 +185,40 @@ describe('You', () => {
 
   // Oct 15: an eruv couldn't be saved; now it's saved from its listing as
   // the Eruv page's, and You says whether it's up.
+  it('a saved restaurant in a category that can list minyanim says whether it’s open, not “No davening times”', () => {
+    // Food has a minyanim field for the few restaurants that host one; a
+    // place without any is a restaurant, and its row is its hours (Nov 15).
+    const food = makeCategory({
+      id: 'food',
+      label: 'Food',
+      pluralLabel: 'Food',
+      detailFields: [
+        { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' },
+        { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+      ],
+    })
+    const allDay = { open: '00:00', close: '23:59' }
+    const hours = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, allDay]))
+    const cafe = makeListing({ id: 'cafe', name: 'HipCityVeg', category: 'food', hours })
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'cafe', categoryId: 'food' }]))
+    clock.at = new Date(2026, 9, 7, 14, 0).getTime()
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <LocationProvider>
+          <ListingsProvider listings={[cafe]}>
+            <ChangesProvider rows={null}>
+              <YouScreen />
+            </ChangesProvider>
+          </ListingsProvider>
+        </LocationProvider>
+      </ForcedViewport>,
+      { content: { categories: [food] } },
+    )
+    const row = screen.getByText('HipCityVeg').closest('.group') as HTMLElement
+    expect(within(row).getByText(/^Open/)).toBeTruthy()
+    expect(within(row).queryByText(/davening/i)).toBeNull()
+  })
+
   it('a saved eruv: whether it’s up and when the guide checked, opening it on the Eruv page; removing it says so', async () => {
     const user = userEvent.setup()
     clock.at = Date.parse('2026-10-09T19:00:00Z') // Fri 3 PM in Philadelphia

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
 import SaveButton from '@/components/SaveButton'
 import { BookmarkIcon } from '@/components/icons'
-import { PlaceIcon, TONE, WithMinyans, eruvPlaceView, hasMinyanim, milesFrom, placeHref, placeName, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
+import { PlaceIcon, TONE, WithMinyans, eruvPlaceView, davensHere, milesFrom, placeHref, placeName, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
 import { TONE_WORDS } from '@/lib/eruvTone'
 import { useNextMinyan } from '@/components/resources/nextMinyans'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
@@ -191,7 +191,7 @@ function PlaceRow({
       ? eruv
         ? [{ text: eruv.label, className: `font-semibold ${TONE_WORDS[eruv.tone]}` }, ...(eruv.checked ? [{ text: eruv.checked.split(' · ')[0], className: '' }] : [])]
         : []
-      : hasMinyanim(category)
+      : davensHere(category, place.item)
         ? shul
           ? [{ text: shul.text, className: TONE[shul.tone] }]
           : []
