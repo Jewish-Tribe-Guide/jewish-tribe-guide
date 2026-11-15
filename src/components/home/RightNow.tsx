@@ -13,10 +13,10 @@ import { nextMinyan, nextMinyanHref } from '@/lib/nextMinyan'
 import { clockTime } from '@/lib/upcomingDavening'
 import { eruvView } from '@/lib/eruv'
 import { useNearestEruv } from './YourEruv'
-import { TilePhoto } from './sections'
+import { TileGlyph, TilePhoto } from './sections'
 import { HOME_LABEL } from './CategoryTiles'
 import { CandlesCard } from './TodayBlocks'
-import { LIFT_ON_HOVER } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 import { usePreviewDay } from '@/lib/contentContext'
 import { previewNow } from '@/lib/previewDay'
 import { dayAndMinutesInTimezone } from '@/lib/hours'
@@ -162,18 +162,49 @@ export default function RightNow(props: Props) {
 }
 
 /** One row: the category's picture under a dark fade, its name, the answer
- *  big, a line under it. A category with no picture: plain slate. */
+ *  big, a line under it. A category with no picture: plain slate. On the
+ *  computer, a white card instead (board W4d, the user, Nov 15): under the
+ *  photo tiles, two more photos read as more tiles ("too much pictures
+ *  right next to each other"), so the picture is a band down its left side
+ *  and the answer sits on white beside it, with the home cards' outline
+ *  and hover. A category with no picture: its line glyph in the band, as
+ *  its tile has. */
 function PhotoRow({ category, categories, href, big, small, wide }: { category: CategoryConfig; categories: readonly CategoryConfig[]; href: string; big: string; small: string; wide: boolean }) {
   const photo = getCategoryTilePhoto(categories as CategoryConfig[], category.id)
+  if (wide) {
+    return (
+      <li>
+        <Link
+          href={href}
+          prefetch={false}
+          data-testid="right-now-row"
+          className={`flex h-[132px] items-center gap-6 overflow-hidden rounded-2xl bg-white ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
+        >
+          <span aria-hidden="true" data-testid="right-now-band" className="relative h-full w-[28%] shrink-0 bg-slate-100">
+            {photo ? (
+              <span data-testid="right-now-photo" className="absolute inset-0">
+                <TilePhoto src={photo} px={400} sizes="300px" />
+              </span>
+            ) : (
+              <TileGlyph id={category.id} title={category.pluralLabel} />
+            )}
+          </span>
+          <span className="min-w-0 flex-1 pr-6">
+            <span className="block text-[15px] font-semibold text-slate-600">{category.pluralLabel}</span>
+            <span className="block text-[30px] font-extrabold leading-tight text-ink">{big}</span>
+            {small && <span className="block truncate text-[14px] text-muted">{small}</span>}
+          </span>
+        </Link>
+      </li>
+    )
+  }
   return (
     <li>
       <Link
         href={href}
         prefetch={false}
         data-testid="right-now-row"
-        // On the computer it lifts under the pointer as the home's other
-        // cards do (the user, Nov 15); no grey outline, it's a photo.
-        className={`relative flex items-center gap-3 overflow-hidden rounded-2xl bg-slate-700 text-white ${wide ? `h-[132px] px-7 ${LIFT_ON_HOVER}` : 'h-[84px] px-4'}`}
+        className="relative flex h-[84px] items-center gap-3 overflow-hidden rounded-2xl bg-slate-700 px-4 text-white"
       >
         {photo && (
           <span aria-hidden="true" data-testid="right-now-photo" className="absolute inset-0">
@@ -182,9 +213,9 @@ function PhotoRow({ category, categories, href, big, small, wide }: { category: 
         )}
         <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-slate-900/85 via-slate-900/65 to-slate-900/25" />
         <span className="relative min-w-0 flex-1">
-          <span className={`block font-semibold text-white/90 ${wide ? 'text-[15px]' : 'text-[13px]'}`}>{category.pluralLabel}</span>
-          <span className={`block font-extrabold leading-tight ${wide ? 'text-[30px]' : 'text-[19px]'}`}>{big}</span>
-          {small && <span className={`block truncate text-white/85 ${wide ? 'text-[14px]' : 'text-[12.5px]'}`}>{small}</span>}
+          <span className="block text-[13px] font-semibold text-white/90">{category.pluralLabel}</span>
+          <span className="block text-[19px] font-extrabold leading-tight">{big}</span>
+          {small && <span className="block truncate text-[12.5px] text-white/85">{small}</span>}
         </span>
       </Link>
     </li>

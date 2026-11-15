@@ -255,7 +255,7 @@ export function TilePhoto({ src, px = 210, sizes = '(min-width: 1200px) 210px, 1
 /** A tile with no photo: the category's line icon on plain grey, or its
  *  initial when it has no line icon, never its emoji (the site draws no
  *  emoji as icons). */
-function TileGlyph({ id, title }: { id: string | undefined; title: string }) {
+export function TileGlyph({ id, title }: { id: string | undefined; title: string }) {
   const key = useGlyphKey(id)
   return (
     <span className="flex h-full w-full items-center justify-center text-slate-500" data-testid="category-tile-glyph" aria-hidden="true">

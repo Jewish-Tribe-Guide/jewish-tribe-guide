@@ -142,6 +142,17 @@ With no choice made it's the first two categories with hours, as before
     and lifts the picture, as the other cards do (the user: "the same
     light up blue and pop out"). W2b (one outline round the whole
     section) was drawn only and not picked.
+  - **W4d, built Nov 15: the computer's Right now cards are white.** Under
+    the outlined photo tiles, two more photo cards read as more tiles
+    (the user: "too much pictures right next to each other"). Each card
+    is now white with the home cards' outline and hover, its category's
+    picture a band down the left quarter, the answer dark on the white
+    beside it; a category with no picture shows its line glyph in the
+    band, as its tile does. The phone keeps its photo rows (no hero photo
+    there, so they're the colour at the top). Drawn and not picked: W4
+    and W4b (the line icon in a blue square), W4c (a photo square). The
+    user asked (Nov 15) whether the phone should match; my view: keep
+    it, offered to draw it to compare.
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took

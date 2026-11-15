@@ -9,7 +9,7 @@ import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { ZmanimData } from '@/types'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import RightNow from './RightNow'
-import { LIFT_ON_HOVER } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 
 // The admin preview's day (previewDay.ts), set per test; null like any
 // visitor's page.
@@ -301,12 +301,20 @@ describe('Right now', () => {
     const list = within(screen.getByTestId('right-now')).getByRole('list')
     expect(list).toHaveClass('grid', 'grid-cols-2')
     for (const row of within(list).getAllByRole('link')) expect(row).toHaveClass('h-[132px]')
-    // The user, Nov 15: they lift under the pointer as the home's other
-    // cards do, with no grey outline (they're photos).
-    for (const row of within(list).getAllByRole('link')) {
+    // Board W4d (Nov 15): a white card with the home cards' outline and
+    // hover; the picture a band down its left side, the words dark on the
+    // white beside it. No picture (Grocery here): its line glyph in the band.
+    const [foodRow, groceryRow] = within(list).getAllByRole('link')
+    for (const row of [foodRow!, groceryRow!]) {
+      expect(row).toHaveClass('bg-white', ...HOME_CARD_OUTLINE.split(' '))
       expect(row.className).toContain(LIFT_ON_HOVER)
-      expect(row.className).not.toMatch(/\bring-slate-300\b/)
+      expect(row).not.toHaveClass('text-white')
+      expect(row.firstElementChild).toHaveAttribute('data-testid', 'right-now-band')
+      expect(row.querySelector('.bg-gradient-to-r')).toBeNull()
     }
+    expect(decodeURIComponent(foodRow!.querySelector('[data-testid="right-now-band"] [data-testid="right-now-photo"] img')?.getAttribute('src') ?? '')).toContain('category-band/food-pic')
+    expect(groceryRow!.querySelector('[data-testid="right-now-photo"]')).toBeNull()
+    expect(groceryRow!.querySelector('[data-testid="right-now-band"] [data-testid="category-tile-glyph"]')).not.toBeNull()
     cleanup()
     at('2026-10-16T13:30:00-04:00')
     renderWithProviders(
