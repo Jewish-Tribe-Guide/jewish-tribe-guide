@@ -300,21 +300,20 @@ describe('Right now', () => {
     )
     const list = within(screen.getByTestId('right-now')).getByRole('list')
     expect(list).toHaveClass('grid', 'grid-cols-2')
-    for (const row of within(list).getAllByRole('link')) expect(row).toHaveClass('h-[132px]')
-    // Board W4d (Nov 15): a white card with the home cards' outline and
-    // hover; the picture a band down its left side, the words dark on the
-    // white beside it. No picture (Grocery here): its line glyph in the band.
+    // Board W8 (Nov 15): drawn like the sign-off cards at the bottom, no
+    // photo (the tiles just above already show them): a white card with the
+    // home cards' outline and hover, the category a small grey label, the
+    // answer, one line, and a blue button.
     const [foodRow, groceryRow] = within(list).getAllByRole('link')
     for (const row of [foodRow!, groceryRow!]) {
       expect(row).toHaveClass('bg-white', ...HOME_CARD_OUTLINE.split(' '))
       expect(row.className).toContain(LIFT_ON_HOVER)
-      expect(row).not.toHaveClass('text-white')
-      expect(row.firstElementChild).toHaveAttribute('data-testid', 'right-now-band')
-      expect(row.querySelector('.bg-gradient-to-r')).toBeNull()
+      expect(row.querySelector('img')).toBeNull()
+      expect(row.querySelector('[data-testid="category-tile-glyph"]')).toBeNull()
+      expect(within(row).getByTestId('right-now-button')).toHaveTextContent('See what’s open')
+      expect(within(row).getByTestId('right-now-button')).toHaveClass('bg-primary')
     }
-    expect(decodeURIComponent(foodRow!.querySelector('[data-testid="right-now-band"] [data-testid="right-now-photo"] img')?.getAttribute('src') ?? '')).toContain('category-band/food-pic')
-    expect(groceryRow!.querySelector('[data-testid="right-now-photo"]')).toBeNull()
-    expect(groceryRow!.querySelector('[data-testid="right-now-band"] [data-testid="category-tile-glyph"]')).not.toBeNull()
+    expect(foodRow).toHaveTextContent(/^Food\d+ open now/)
     cleanup()
     at('2026-10-16T13:30:00-04:00')
     renderWithProviders(

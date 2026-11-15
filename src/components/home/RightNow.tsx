@@ -13,10 +13,10 @@ import { nextMinyan, nextMinyanHref } from '@/lib/nextMinyan'
 import { clockTime } from '@/lib/upcomingDavening'
 import { eruvView } from '@/lib/eruv'
 import { useNearestEruv } from './YourEruv'
-import { TileGlyph, TilePhoto } from './sections'
+import { TilePhoto } from './sections'
 import { HOME_LABEL } from './CategoryTiles'
 import { CandlesCard } from './TodayBlocks'
-import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
+import { HOME_CARD_OUTLINE, LIFT_ON_HOVER, SIGN_OFF_BUTTON, SIGN_OFF_EYEBROW, SIGN_OFF_HEADING, SIGN_OFF_LINE } from './AnswerCard'
 import { usePreviewDay } from '@/lib/contentContext'
 import { previewNow } from '@/lib/previewDay'
 import { dayAndMinutesInTimezone } from '@/lib/hours'
@@ -100,6 +100,7 @@ export default function RightNow(props: Props) {
             href={nextMinyanHref(communitySlug, category.id, next, schedule, timezone)}
             big={next ? `${next.label} ${clockTime(next.minutes)}` : 'Minyan times'}
             small={small}
+            button="See all times"
             wide={wide}
           />,
         ]
@@ -115,6 +116,7 @@ export default function RightNow(props: Props) {
           href={row.opens ? routes.slug(communitySlug, category.id) : `${routes.slug(communitySlug, category.id)}?openNow=1`}
           big={row.opens ? `Opens ${row.opens.at}` : `${row.open} open now`}
           small={row.opens ? `Nothing open now · first: ${row.opens.first}` : row.parts.join(' · ')}
+          button={row.opens ? `See ${category.pluralLabel}` : 'See what’s open'}
           wide={wide}
         />,
       ]
@@ -163,14 +165,13 @@ export default function RightNow(props: Props) {
 
 /** One row: the category's picture under a dark fade, its name, the answer
  *  big, a line under it. A category with no picture: plain slate. On the
- *  computer, a white card instead (board W4d, the user, Nov 15): under the
- *  photo tiles, two more photos read as more tiles ("too much pictures
- *  right next to each other"), so the picture is a band down its left side
- *  and the answer sits on white beside it, with the home cards' outline
- *  and hover. A category with no picture: its line glyph in the band, as
- *  its tile has. */
-function PhotoRow({ category, categories, href, big, small, wide }: { category: CategoryConfig; categories: readonly CategoryConfig[]; href: string; big: string; small: string; wide: boolean }) {
-  const photo = getCategoryTilePhoto(categories as CategoryConfig[], category.id)
+ *  computer, a plain white card instead, drawn like the sign-off cards at
+ *  the bottom of the page (board W8, the user, Nov 15: the photo band
+ *  repeated "more of the same pictures when we just passed a row or two of
+ *  pictures"): the category as a small grey label, the answer big, one
+ *  line, and a blue button. The whole card opens it; the button is drawn,
+ *  not a second control inside the link. */
+function PhotoRow({ category, categories, href, big, small, button, wide }: { category: CategoryConfig; categories: readonly CategoryConfig[]; href: string; big: string; small: string; button: string; wide: boolean }) {
   if (wide) {
     return (
       <li>
@@ -178,26 +179,21 @@ function PhotoRow({ category, categories, href, big, small, wide }: { category: 
           href={href}
           prefetch={false}
           data-testid="right-now-row"
-          className={`flex h-[132px] items-center gap-6 overflow-hidden rounded-2xl bg-white ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
+          className={`group flex h-full items-center gap-5 rounded-2xl bg-white px-7 py-6 ${HOME_CARD_OUTLINE} ${LIFT_ON_HOVER}`}
         >
-          <span aria-hidden="true" data-testid="right-now-band" className="relative h-full w-[28%] shrink-0 bg-slate-100">
-            {photo ? (
-              <span data-testid="right-now-photo" className="absolute inset-0">
-                <TilePhoto src={photo} px={400} sizes="300px" />
-              </span>
-            ) : (
-              <TileGlyph id={category.id} title={category.pluralLabel} />
-            )}
+          <span className="min-w-0 flex-1">
+            <span className={`block ${SIGN_OFF_EYEBROW}`}>{category.pluralLabel}</span>
+            <span className={`block ${SIGN_OFF_HEADING}`}>{big}</span>
+            {small && <span className={`block truncate ${SIGN_OFF_LINE}`}>{small}</span>}
           </span>
-          <span className="min-w-0 flex-1 pr-6">
-            <span className="block text-[15px] font-semibold text-slate-600">{category.pluralLabel}</span>
-            <span className="block text-[30px] font-extrabold leading-tight text-ink">{big}</span>
-            {small && <span className="block truncate text-[14px] text-muted">{small}</span>}
+          <span aria-hidden="true" data-testid="right-now-button" className={`${SIGN_OFF_BUTTON} group-hover:bg-primary-dark`}>
+            {button}
           </span>
         </Link>
       </li>
     )
   }
+  const photo = getCategoryTilePhoto(categories as CategoryConfig[], category.id)
   return (
     <li>
       <Link
@@ -248,5 +244,5 @@ function EruvRow({ category, categories, communitySlug, now, wide }: { category:
       small = texts.slice(1).join(' · ')
     }
   }
-  return <PhotoRow category={category} categories={categories} href={to} big={big} small={small} wide={wide} />
+  return <PhotoRow category={category} categories={categories} href={to} big={big} small={small} button="See the eruv" wide={wide} />
 }

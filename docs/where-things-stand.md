@@ -217,12 +217,20 @@ With no choice made it's the first two categories with hours, as before
     after it still gets the old copy (here, the 404) while a new one is
     made; a reload showed it. The save now expires `/<community>/changes`
     at once, so the next load is the page (`route.test.ts`, red without).
-  - **W8 (drawn only, Nov 15)**: Open now on the computer drawn like the
-    cards at the bottom (the user: "more of the same pictures when we just
-    passed a row or two of pictures"): white, no photo, the category as a
-    small grey label, the answer big, a blue "See what's open" button.
-    Changes W4d's photo band. The phone keeps its photo rows. Not built
-    until the user OKs it.
+  - **W8 BUILT Nov 15**: Open now on the computer drawn like the cards at
+    the bottom (the user: "more of the same pictures when we just passed a
+    row or two of pictures"): white, no photo, the category as a small grey
+    label, the answer big, a blue button ("See what's open"; "See all
+    times" for a minyan, "See the eruv"). Replaces W4d's photo band. The
+    phone keeps its photo rows.
+  - **What changed reads past deleted listings (Nov 15).** The log read
+    took the newest 400 rows and the page then dropped any whose listing
+    was gone; on dev the write suites' fixtures (4,307 rows in two weeks)
+    filled all 400, so the page was always empty there. It now reads only
+    rows on listings the community has. Dev has the 16-row seed
+    (`scripts/seed-dev-activity.mjs --apply`, dated from today; `--remove`
+    takes it off), so the preview's What changed shows something. One of
+    dev's listings is called "Charlie was a sinner." and shows as new.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only

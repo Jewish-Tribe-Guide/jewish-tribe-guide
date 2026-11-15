@@ -33,31 +33,52 @@ function missingLater(error: { message: string } | null, columns: readonly strin
   return error ? LATER_COLUMNS.find((c) => columns.includes(c) && error.message.includes(c)) : undefined
 }
 
-/** The newest change rows, each with its listing (any status). */
+/** Listing ids per log read: each is a query-string entry. */
+const IDS_PER_READ = 100
+
+type Listing = NonNullable<ChangeLogRow['listing']>
+
+/** The newest change rows, each with its listing (any status).
+ *
+ *  Only rows on a listing this community still has: What changed drops the
+ *  rest anyway (whatChanged), and reading them first let them crowd out the
+ *  real ones. On dev, which shares its project with the write suites, the
+ *  test fixtures' rows (4,307 in two weeks, Nov 15, every one on a listing
+ *  deleted again) filled all 400 and the page said nothing had changed. */
 export async function listChangeLogUncached(community: string): Promise<ChangeLogRow[]> {
   const supabase = getAdminClient()
-  const read = (columns: readonly string[]) =>
-    supabase.from('activity').select(columns.join(', ')).eq('community_id', community).in('kind', CHANGE_KINDS).order('created_at', { ascending: false }).limit(ROW_LIMIT)
-  let columns: string[] = ['id', 'created_at', 'kind', 'source', 'item', 'field_key', 'submission_id', 'resource_id', ...LATER_COLUMNS]
-  let { data, error } = await read(columns)
-  // One missing column is reported at a time, in whatever order: drop each
-  // as it's named, until the read works or fails for another reason.
-  for (let later = missingLater(error, columns); later; later = missingLater(error, columns)) {
-    columns = columns.filter((c) => c !== later)
-    ;({ data, error } = await read(columns))
-  }
-  if (error) throw new Error(`Could not read the activity log: ${error.message}`)
-  const rows = (data ?? []) as unknown as Row[]
 
-  const ids = [...new Set(rows.map((r) => r.resource_id).filter((id): id is string => !!id))]
-  const listings = new Map<string, NonNullable<ChangeLogRow['listing']>>()
-  for (let i = 0; i < ids.length; i += 200) {
-    const { data: found, error: listingError } = await supabase.from('resource').select('id, name, category, status').in('id', ids.slice(i, i + 200))
+  const listings = new Map<string, Listing>()
+  for (let from = 0; ; from += 1000) {
+    const { data: found, error: listingError } = await supabase.from('resource').select('id, name, category, status').eq('community_id', community).order('id').range(from, from + 999)
     if (listingError) throw new Error(`Could not read the changed listings: ${listingError.message}`)
-    for (const l of (found ?? []) as NonNullable<ChangeLogRow['listing']>[]) listings.set(l.id, l)
+    for (const l of (found ?? []) as Listing[]) listings.set(l.id, l)
+    if ((found ?? []).length < 1000) break
   }
+  const ids = [...listings.keys()]
+  if (ids.length === 0) return []
 
-  return rows.map((r) => ({
+  // Columns added later are dropped as they're reported missing, once, and
+  // the narrower list kept for the rest of the reads.
+  let columns: string[] = ['id', 'created_at', 'kind', 'source', 'item', 'field_key', 'submission_id', 'resource_id', ...LATER_COLUMNS]
+  const read = async (chunk: string[]): Promise<Row[]> => {
+    const query = () =>
+      supabase.from('activity').select(columns.join(', ')).eq('community_id', community).in('kind', CHANGE_KINDS).in('resource_id', chunk).order('created_at', { ascending: false }).limit(ROW_LIMIT)
+    let { data, error } = await query()
+    // One missing column is reported at a time, in whatever order: drop each
+    // as it's named, until the read works or fails for another reason.
+    for (let later = missingLater(error, columns); later; later = missingLater(error, columns)) {
+      columns = columns.filter((c) => c !== later)
+      ;({ data, error } = await query())
+    }
+    if (error) throw new Error(`Could not read the activity log: ${error.message}`)
+    return (data ?? []) as unknown as Row[]
+  }
+  const rows: Row[] = []
+  for (let i = 0; i < ids.length; i += IDS_PER_READ) rows.push(...(await read(ids.slice(i, i + IDS_PER_READ))))
+  rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id)
+
+  return rows.slice(0, ROW_LIMIT).map((r) => ({
     id: r.id,
     createdAt: r.created_at,
     kind: r.kind,
