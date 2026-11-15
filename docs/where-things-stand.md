@@ -153,6 +153,22 @@ With no choice made it's the first two categories with hours, as before
     and W4b (the line icon in a blue square), W4c (a photo square). The
     phone with the same card was drawn (W4e) beside today's; the user
     chose to keep today's photo rows (decided Nov 15).
+  - **Computer home: anchors, drawn only, paused Nov 15 (the user's
+    call to come back to it).** The problem: "too many fragmented pieces
+    and not enough anchors". Liked but not yet approved to build: Explore
+    on a white band from edge to edge, and the map as a band edge to edge
+    too (W7c/W7d on the desk canvas 1L9Ep2cBxk84xQ2BePNbzL; the user: "we
+    really nailed the category and map going full screen"), with Right
+    now back under Explore, today's order, so no section-order write
+    on live. Not settled: the middle piece between the bands, Right now.
+    Drawn: W7e (one bar split in two), W7f (one box cut in four, pictures
+    on a diagonal), W7g/W7h (a faint blue tray with a lead like the trust
+    band's and raised white cells, two or three). The user picked
+    neither ("not sure we've hit the middle pieces"). Also raised: You and
+    What changed as extra cells only when they have something to say,
+    not as sections (my view; nothing decided). Earlier boards in the
+    row (W2b, W4-W4c, W5a/b, W6a/b, W7, W7b) are older options; the
+    W7c-W7h boards use today's pictures and map from the dev site.
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took
