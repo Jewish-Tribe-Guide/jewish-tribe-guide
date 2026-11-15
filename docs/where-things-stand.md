@@ -151,8 +151,8 @@ With no choice made it's the first two categories with hours, as before
     band, as its tile does. The phone keeps its photo rows (no hero photo
     there, so they're the colour at the top). Drawn and not picked: W4
     and W4b (the line icon in a blue square), W4c (a photo square). The
-    user asked (Nov 15) whether the phone should match; my view: keep
-    it, offered to draw it to compare.
+    phone with the same card was drawn (W4e) beside today's; the user
+    chose to keep today's photo rows (decided Nov 15).
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took
