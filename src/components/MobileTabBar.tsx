@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
-import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
+import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon, PulseIcon } from './icons'
 import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
 import { useYouDot } from '@/lib/useYouDot'
 import { YouDot } from './YouDot'
@@ -19,6 +19,7 @@ const BUILT_IN_MODES: Record<string, AppMode[]> = {
   feedback: ['feedback'],
   browse: ['browse'],
   you: ['you'],
+  changes: ['changes'],
 }
 
 const BUILT_IN_ICONS: Record<string, typeof GridIcon> = {
@@ -28,6 +29,7 @@ const BUILT_IN_ICONS: Record<string, typeof GridIcon> = {
   browse: GridIcon,
   // The Save mark itself, as Google Maps does: You is what's been saved.
   you: BookmarkIcon,
+  changes: PulseIcon,
 }
 
 /** A built-in tab's line icon; with a Browse tab, the home tab is a house.

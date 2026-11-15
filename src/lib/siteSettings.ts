@@ -151,7 +151,7 @@ export type DesktopNavItem = {
  *  pseudo-category, same gating the mobile tab bar and the old hardcoded nav
  *  already applied. 'feedback' opens the feedback modal instead of
  *  navigating. */
-export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback'] as const
+export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback', 'changes'] as const
 export type BuiltInDesktopLinkTarget = (typeof BUILT_IN_DESKTOP_LINK_TARGETS)[number]
 
 export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDesktopLinkTarget {
@@ -195,7 +195,7 @@ export type MobileTabConfig = {
 /** The built-in targets, which behave differently from card targets: they're
  *  whole app screens rather than one category, and two of them are gated on
  *  site config (a Map category existing, feedback being enabled). */
-export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse', 'you'] as const
+export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse', 'you', 'changes'] as const
 export type BuiltInTabTarget = (typeof BUILT_IN_TAB_TARGETS)[number]
 
 export function isBuiltInTabTarget(target: string): target is BuiltInTabTarget {
@@ -316,4 +316,13 @@ export function iconVersion(logoUrl: string | null | undefined): string {
     hash = (hash * 31 + value.charCodeAt(i)) | 0
   }
   return `${Math.abs(hash).toString(36)}-${ICON_RENDER_VERSION}`
+}
+
+/** What changed (step 7a) is held back from the site (features.ts), but an
+ *  admin can put it on a phone tab or a header link to see it, and take it
+ *  off again (the user, Nov 15). Its page answers while either has it. */
+export function changesLinked(settings: Pick<SiteSettings, 'mobileTabs' | 'desktopNavItems'>): boolean {
+  const inNav = (items: readonly DesktopNavItem[] | undefined): boolean =>
+    (items ?? []).some((i) => (i.kind === 'link' && i.target === 'changes') || inNav(i.items))
+  return settings.mobileTabs.some((t) => t.target === 'changes') || inNav(settings.desktopNavItems)
 }

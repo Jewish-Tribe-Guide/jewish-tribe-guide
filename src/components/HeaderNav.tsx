@@ -37,6 +37,7 @@ type OpenPanel = string | null
 function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string): string | null {
   if (target === 'map') return routes.map(communitySlug)
   if (target === 'you') return routes.you(communitySlug)
+  if (target === 'changes') return routes.changes(communitySlug)
   if (target === 'about') return routes.about(communitySlug)
   if (target === 'privacy') return routes.privacy(communitySlug)
   if (target === 'feedback') return null

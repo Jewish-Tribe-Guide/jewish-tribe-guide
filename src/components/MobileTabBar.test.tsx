@@ -119,3 +119,18 @@ describe('on a page reached from a tab', () => {
     expect(lit()).toEqual(['Shuls'])
   })
 })
+
+// What changed as a tab an admin can add while it's held back (Nov 15).
+describe('a What changed tab', () => {
+  const tabs: MobileTabConfig[] = [
+    { id: 'categories', label: 'Home', target: 'categories' },
+    { id: 'changes', label: 'What changed', target: 'changes' },
+  ]
+  it('has its own line icon and is lit on its page', () => {
+    render(<MobileTabBar mode="changes" tabs={tabs} onSelect={vi.fn()} />)
+    const tab = screen.getByRole('button', { name: 'What changed' })
+    expect(tab).toHaveAttribute('aria-current', 'page')
+    expect(tab.querySelector('svg')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+})

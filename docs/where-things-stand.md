@@ -199,6 +199,19 @@ With no choice made it's the first two categories with hours, as before
     change log is all test-suite churn (its newest 400 rows are on test
     listings), so the dot never lights on the preview without a real
     edit to a saved place; production's log is real.
+  - **What changed can be a tab while it's held back** (the user, Nov 15:
+    "add it to the tabs to see it and then take it off the tab in admin
+    with the ability to add it back"). Site › Home page › Phone › Tabs ›
+    Add a tab › What changed, or a header link on the Computer side; its
+    page (`/<community>/changes`) answers only while a tab or link has
+    it, and is a 404 again once it's taken off (`changesLinked`). The
+    switch in `features.ts` stays off; the admin's own What changed tab
+    (hiding a change) is still held back with it. Dev's page is empty
+    (its log is test churn); live's would show the real log, once this
+    ships and the user adds the tab there themselves. The user's view
+    (Nov 15): an activity feed is the first thing after testers' feedback;
+    my view was to lead with new places, closures, hechsher and minyan
+    changes and fold small edits into one line. Nothing decided.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only

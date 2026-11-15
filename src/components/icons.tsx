@@ -149,6 +149,15 @@ export function MessageIcon({ className }: IconProps) {
   )
 }
 
+// A pulse line — the What changed tab (the guide's activity).
+export function PulseIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 12h4l3-7 4 14 3-7h4" />
+    </svg>
+  )
+}
+
 // Left chevron — the phone map sheet's "Back to list", and the desktop
 // map sidebar's edge tab (collapse).
 export function ChevronLeftIcon({ className }: IconProps) {
