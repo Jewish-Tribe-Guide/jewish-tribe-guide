@@ -23,8 +23,9 @@ type FrameProps = {
    *  listing opened on a computer would otherwise start inside the photo. */
   heroOverlap?: boolean
   /** With `hero`: a listing is open on a computer and has the top of the
-   *  page, so the photo goes back to the short band, with no words on it
-   *  (`hero` is then only what a screen reader needs). */
+   *  page, so there's no photo at all (the user, Nov 15: a strip of the
+   *  category's picture with nothing on it only pushed the listing and the
+   *  map down). `hero` is then only what a screen reader needs. */
   heroQuiet?: boolean
   children: ReactNode
 }
@@ -68,6 +69,16 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
 
   const bandImage = imageUrl?.trim() || null
 
+  if (hero && heroQuiet) {
+    // No -mt-8: with no photo, <main>'s own 32px under the header stays.
+    return (
+      <div className="relative" data-testid="category-hero" data-quiet="">
+        {hero}
+        <div className="mx-auto max-w-6xl px-4">{children}</div>
+      </div>
+    )
+  }
+
   if (hero) {
     return (
       // -mt-8, not the -mt-12 below: measured, the gap under the header on
@@ -80,20 +91,14 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       // has its own short picture, GenericDirectory) rather than flash a
       // computer's photo.
       <div className="relative desktop:-mt-8 mx-[calc(50%-50vw)]" data-testid="category-hero">
-        <div className={`relative hidden desktop:block ${heroQuiet ? 'h-[132px]' : 'h-[240px]'}`} style={{ marginBottom: heroOverlap && !heroQuiet ? -HERO_OVERLAP_PX : undefined }}>
+        <div className="relative hidden desktop:block h-[240px]" style={{ marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
           <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: color }}>
             {bandImage && (
               <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(bandImage)} />
             )}
           </div>
-          {heroQuiet ? (
-            hero
-          ) : (
-            <>
-              <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.78)_0%,rgba(15,23,42,0.55)_45%,rgba(15,23,42,0.15)_80%)]" />
-              <div className="relative mx-auto max-w-6xl px-4 pt-11 text-white">{hero}</div>
-            </>
-          )}
+          <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.78)_0%,rgba(15,23,42,0.55)_45%,rgba(15,23,42,0.15)_80%)]" />
+          <div className="relative mx-auto max-w-6xl px-4 pt-11 text-white">{hero}</div>
         </div>
         {/* relative: painted after the photo, so the search riding up onto
             it sits on top. No z-index, which would make a stacking context

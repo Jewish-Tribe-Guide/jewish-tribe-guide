@@ -189,9 +189,13 @@ With no choice made it's the first two categories with hours, as before
     it passed twice alone. Watch for it again.
   - **Asked Nov 15, not decided:** the notification emails' sender name
     (`RESEND_FROM` is a bare address on live; each email could carry its
-    community's name), and whether a listing opened on a computer should
-    lose the 132px category photo strip above it (`heroQuiet` in
-    `CategoryBandFrame`).
+    community's name).
+  - **Done Nov 15 (the user's yes): a listing opened on a computer has
+    no category photo above it.** It was a 132px strip of the category's
+    picture with nothing on it, pushing the listing and the map down; now
+    they start under the header, as on any other page. The category page
+    itself keeps its 240px photo. `GenericDirectory.test.tsx`, red on the
+    old band.
   - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
     hadn't run e2e on this branch since the last PR): budgets' computer
     check waited for the Next minyan card (skips now where Right now took

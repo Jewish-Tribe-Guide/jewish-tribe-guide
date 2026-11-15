@@ -1826,13 +1826,13 @@ describe('GenericDirectory — the page opens on its home tile\'s picture (board
     expect(screen.queryByTestId('category-phone-picture')).not.toBeInTheDocument()
   })
 
-  it('a listing opened on a computer has the top of the page: the short band, no words on it, nothing riding up', async () => {
+  it('a listing opened on a computer has the top of the page: no photo at all (the user, Nov 15), nothing riding up', async () => {
     const user = userEvent.setup()
     render()
     await user.click(screen.getByRole('button', { name: 'Expand Bravo' }))
     const hero = screen.getByTestId('category-hero')
-    expect(hero.firstElementChild).toHaveClass('h-[132px]')
-    expect((hero.firstElementChild as HTMLElement).style.marginBottom).toBe('')
+    expect(hero.querySelector('img')).toBeNull()
+    expect(hero).not.toHaveClass('desktop:-mt-8')
     expect(within(hero).queryByTestId('category-hero-count')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Grocery Stores' })).toHaveClass('sr-only')
   })
