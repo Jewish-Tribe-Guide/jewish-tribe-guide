@@ -212,6 +212,17 @@ With no choice made it's the first two categories with hours, as before
     (Nov 15): an activity feed is the first thing after testers' feedback;
     my view was to lead with new places, closures, hechsher and minyan
     changes and fold small edits into one line. Nothing decided.
+    **Fixed Nov 15:** the user added the tab on the preview and got "Page
+    not found". A settings save marks pages stale, and the first load
+    after it still gets the old copy (here, the 404) while a new one is
+    made; a reload showed it. The save now expires `/<community>/changes`
+    at once, so the next load is the page (`route.test.ts`, red without).
+  - **W8 (drawn only, Nov 15)**: Open now on the computer drawn like the
+    cards at the bottom (the user: "more of the same pictures when we just
+    passed a row or two of pictures"): white, no photo, the category as a
+    small grey label, the answer big, a blue "See what's open" button.
+    Changes W4d's photo band. The phone keeps its photo rows. Not built
+    until the user OKs it.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only

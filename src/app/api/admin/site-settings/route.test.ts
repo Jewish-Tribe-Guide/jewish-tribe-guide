@@ -5,12 +5,14 @@ const m = vi.hoisted(() => ({
   getAdminUserForCommunity: vi.fn(),
   resolveCommunity: vi.fn(),
   updateSiteSettings: vi.fn(),
+  revalidatePath: vi.fn(),
 }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
   resolveCommunity: m.resolveCommunity,
 }))
+vi.mock('next/cache', () => ({ revalidatePath: m.revalidatePath }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: vi.fn() }))
 vi.mock('@/lib/siteSettingsStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/siteSettingsStore')>()),
@@ -94,6 +96,17 @@ describe('PATCH /api/admin/site-settings', () => {
   })
   // A phone tab emptied by its × (Nov 4) saves, like an empty tab on a computer.
   const phone = (target: string, id = target || 'blank') => ({ id, label: id, target })
+  // What changed answers only while a tab or link has it (changesLinked), so
+  // a save can flip its page between the page and a 404. The shared tags are
+  // stale-while-revalidate: without its own path expired, the admin's next
+  // load after adding the tab was the old 404 (the user, Nov 15).
+  it("expires What changed's page at once, so a new tab to it works on the next load", async () => {
+    m.revalidatePath.mockClear()
+    const res = await patch({ mobileTabs: [{ id: 't1', label: 'Home', target: 'home' }, { id: 't2', label: 'Activity', target: 'changes' }] })
+    expect(res.status).toBe(200)
+    expect(m.revalidatePath).toHaveBeenCalledWith('/philly/changes')
+  })
+
   it('saves a phone tab with nothing in it yet', async () => {
     expect((await patch({ mobileTabs: [phone('map'), phone('')] })).status).toBe(200)
   })

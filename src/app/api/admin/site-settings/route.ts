@@ -1,4 +1,6 @@
+import { revalidatePath } from 'next/cache'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { routes } from '@/lib/routes'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { MissingMapPhotoColumnError, MissingRightNowColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, toRightNowCategories, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_RIGHT_NOW, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
@@ -164,6 +166,13 @@ export async function PATCH(request: Request) {
     const settings = await updateSiteSettings(community.slug, body)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
+    // What changed answers only while a tab or link has it (changesLinked),
+    // so adding or taking off that tab flips its page between the page and
+    // a 404. The tags above are stale-while-revalidate, which served the
+    // admin the old 404 once after adding it (the user, Nov 15: "I don't see
+    // what changed working when I added it as a tab"). Expire it now, so
+    // the next load is the new answer, as /about's save does (route.test.ts).
+    revalidatePath(routes.changes(community.slug))
     return Response.json({ ok: true, settings })
   } catch (err) {
     if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError || err instanceof MissingRightNowColumnError) {
