@@ -358,3 +358,42 @@ describe('the map card photo (migration 095)', () => {
     await expect(updateSiteSettings('philly', { desktopMapImage: photo })).rejects.toThrow('map card’s photo isn’t set up on this site yet')
   })
 })
+
+// Board V1 (Nov 15): which categories Right now answers. Its own column
+// (098), written only when it changes, so a site without the column still
+// saves everything else.
+describe('what Right now shows (migration 098)', () => {
+  function saveWith(row: Record<string, unknown>, writeResult: unknown = { data: row, error: null }) {
+    const readBuilder = chainable({ data: row, error: null })
+    const writeBuilder = chainable(writeResult)
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? readBuilder : writeBuilder
+    })
+    return writeBuilder
+  }
+
+  it('no choice (null) on a row from before 098; a saved one tidied: ids only, once each, at most two', async () => {
+    mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
+    expect((await getSiteSettingsUncached('philly')).rightNowCategories).toBeNull()
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, right_now_categories: ['shuls', 7, '', 'shuls', 'eruv', 'food'] }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).rightNowCategories).toEqual(['shuls', 'eruv'])
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, right_now_categories: [] }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).rightNowCategories).toEqual([])
+  })
+
+  it('a save that doesn’t change it leaves the column out; one that does writes it', async () => {
+    let write = saveWith(rawRow)
+    await updateSiteSettings('philly', { heroTitle: 'New Hero' })
+    expect((write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty('right_now_categories')
+    write = saveWith(rawRow)
+    await updateSiteSettings('philly', { rightNowCategories: ['shuls'] })
+    expect(write.upsert).toHaveBeenCalledWith(expect.objectContaining({ right_now_categories: ['shuls'] }), { onConflict: 'community_id' })
+  })
+
+  it('choosing before 098 says what’s missing', async () => {
+    saveWith(rawRow, { data: null, error: { message: 'column "right_now_categories" of relation "site_settings" does not exist' } })
+    await expect(updateSiteSettings('philly', { rightNowCategories: ['shuls'] })).rejects.toThrow('isn’t set up on this site yet')
+  })
+})

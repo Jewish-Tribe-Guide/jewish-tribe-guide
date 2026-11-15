@@ -18,7 +18,8 @@ vi.mock('next/navigation', () => ({
 
 // The phone home's Right now (the user, Oct 17), for each kind of day, with
 // the clock fixed: what's open on a weekday, the candles card and Before
-// candles on Friday, the card alone on Shabbos, and never the next minyan.
+// candles on Friday, the card alone on Shabbos; the next minyan or the eruv
+// only when the admin chose them (board V1, Nov 15).
 const NY = 'America/New_York'
 const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', filterable: true }
 const meatDairy: CategoryField = {
@@ -71,18 +72,19 @@ function scheduleAt(nyIso: string): MinyanSchedule {
   return { now: Date.parse(nyIso), nowMinutes: h * 60 + m, linkCategoryId: 'synagogue', shuls: [] } as unknown as MinyanSchedule
 }
 
-function show(nyIso: string | null, zmanim: ZmanimData | null) {
+function show(nyIso: string | null, zmanim: ZmanimData | null, choice: readonly string[] | null = null, schedule?: Partial<MinyanSchedule>) {
   return renderWithProviders(
     <RightNow
       listings={listings}
       categories={categories}
       communitySlug="test-community"
       timezone={NY}
-      schedule={nyIso ? scheduleAt(nyIso) : null}
+      schedule={nyIso ? { ...scheduleAt(nyIso), ...schedule } : null}
       zmanim={zmanim}
       from={{ lat: 39.9526, lng: -75.1652 }}
       items={['Challah', 'Wine', 'Chicken']}
       onOpenListing={vi.fn()}
+      choice={choice}
     />,
     { content: { categories } },
   )
@@ -154,9 +156,50 @@ describe('Right now', () => {
     expect(foodRow!.querySelector('[data-testid="right-now-photo"]')).toHaveClass('absolute', 'inset-0')
   })
 
-  it('late at night, with nothing open: nothing at all', () => {
+  // Board V3 (the user, Nov 15): the card used to go overnight. Each row
+  // says when its first place opens, and opens the category itself, since
+  // Open now would be an empty list.
+  it('late at night, with nothing open: each row says when the first place opens', () => {
     at('2026-10-13T23:30:00-04:00')
     show('2026-10-13T23:30:00-04:00', week)
+    const rows = within(screen.getByTestId('right-now')).getAllByRole('link')
+    expect(rows.map((r) => [r.textContent, r.getAttribute('href')])).toEqual([
+      [expect.stringMatching(/^FoodOpens Wed \d+(:\d\d)? [AP]MNothing open now · first: HipCityVeg$/), '/test-community/restaurant'],
+      [expect.stringMatching(/^GroceryOpens Wed \d+(:\d\d)? [AP]MNothing open now · first: House of Kosher$/), '/test-community/grocery'],
+    ])
+  })
+
+  // Board V1/V2 (the user, Nov 15): an admin can choose what Right now
+  // answers, say the next minyan and the eruv for a community where those
+  // are what matter on a weekday.
+  it('the admin’s choice: the next minyan, to that day’s davening times, and the eruv', async () => {
+    at('2026-10-13T12:30:00-04:00')
+    const minyanim = { shuls: [{ id: 'mekor', name: 'Mekor Habracha', minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '1:45pm' }] }], todayDayKeys: ['tue'], tomorrowDayKeys: ['wed'], tomorrowKey: 'wed', anchors: {}, season: null } as Partial<MinyanSchedule>
+    show('2026-10-13T12:30:00-04:00', week, ['synagogue', 'eruv-information'], minyanim)
+    const section = screen.getByTestId('right-now')
+    await within(section).findByText('1 up')
+    expect(within(section).getAllByTestId('right-now-row').map((r) => [r.textContent, r.getAttribute('href')])).toEqual([
+      ['SynagoguesMincha 1:45 PMMekor Habracha', '/test-community/synagogue?davening=1'],
+      ['Eruv Information1 up1 by phone', '/test-community/eruv'],
+    ])
+    expect(section).not.toHaveTextContent('open now')
+  })
+
+  it('the next minyan is tomorrow’s first: it says so, and opens tomorrow', () => {
+    at('2026-10-13T22:30:00-04:00')
+    const minyanim = { shuls: [{ id: 'mekor', name: 'Mekor Habracha', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['wed'], time: '7:00am' }] }], todayDayKeys: ['tue'], tomorrowDayKeys: ['wed'], tomorrowKey: 'wed', anchors: {}, season: null } as Partial<MinyanSchedule>
+    show('2026-10-13T22:30:00-04:00', week, ['synagogue'], minyanim)
+    const [row] = within(screen.getByTestId('right-now')).getAllByTestId('right-now-row')
+    expect(row).toHaveTextContent(/Shacharis 7 AMMekor Habracha · tomorrow$/)
+    expect(row).toHaveAttribute('href', '/test-community/synagogue?davening=1&day=wed')
+  })
+
+  it('an admin who chose nothing gets nothing; a choice that’s gone is left out', () => {
+    at('2026-10-13T12:30:00-04:00')
+    show('2026-10-13T12:30:00-04:00', week, ['deleted', 'grocery'])
+    expect(within(screen.getByTestId('right-now')).getAllByTestId('right-now-row').map((r) => r.textContent)).toEqual(['Grocery2 open now3 kosher items tracked'])
+    cleanup()
+    show('2026-10-13T12:30:00-04:00', week, [])
     expect(screen.queryByTestId('right-now')).not.toBeInTheDocument()
   })
 

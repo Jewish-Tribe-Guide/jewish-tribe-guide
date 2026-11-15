@@ -8,6 +8,7 @@ import {
   MAX_MOBILE_TABS,
   SITE_SETTINGS_DEFAULTS,
   DEFAULT_BEFORE_CANDLE_ITEMS,
+  MAX_RIGHT_NOW,
   MAX_BEFORE_CANDLE_ITEMS,
   defaultHeroSplit,
   isHomeStyle,
@@ -55,6 +56,8 @@ type Row = {
   desktop_hero_image: unknown
   /** Migration 095; absent from the row before it runs. */
   desktop_map_image?: unknown
+  /** Migration 098. Absent on a row read before it's applied. */
+  right_now_categories?: unknown
   /** Nothing reads this: the admin's accent colour was never applied to the
    *  site, and the redesign's one look retired it. The column stays rather
    *  than dropping data with a migration. */
@@ -130,6 +133,13 @@ export function toTodayHidden(raw: unknown): TodayBlockId[] {
   return [...new Set(raw.filter(isTodayBlockId))]
 }
 
+/** Right now's chosen categories: ids, each once, at most MAX_RIGHT_NOW.
+ *  Null (the ready-made choice) for anything else, including no column. */
+export function toRightNowCategories(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null
+  return [...new Set(raw.filter((id): id is string => typeof id === 'string' && id.trim() !== ''))].slice(0, MAX_RIGHT_NOW)
+}
+
 export function toBeforeCandleItems(raw: unknown): string[] {
   if (!Array.isArray(raw)) return DEFAULT_BEFORE_CANDLE_ITEMS
   const seen = new Set<string>()
@@ -175,6 +185,7 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     desktopMapImage: toMapCardPhoto(row.desktop_map_image),
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
+    rightNowCategories: toRightNowCategories(row.right_now_categories),
     todayHidden: toTodayHidden(row.today_hidden),
   }
 }
@@ -259,6 +270,11 @@ export async function updateSiteSettings(
   if (JSON.stringify(merged.desktopMapImage) !== JSON.stringify(current.desktopMapImage)) {
     mapPhoto.desktop_map_image = merged.desktopMapImage
   }
+  // Right now's choice (migration 098), the same way.
+  const rightNow: Record<string, unknown> = {}
+  if (JSON.stringify(merged.rightNowCategories) !== JSON.stringify(current.rightNowCategories)) {
+    rightNow.right_now_categories = merged.rightNowCategories
+  }
 
   const { data, error } = await getAdminClient()
     .from('site_settings')
@@ -285,6 +301,7 @@ export async function updateSiteSettings(
         desktop_hero_image: merged.desktopHeroImage,
         ...today,
         ...mapPhoto,
+        ...rightNow,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },
@@ -298,6 +315,9 @@ export async function updateSiteSettings(
     }
     if (Object.keys(mapPhoto).length > 0 && /desktop_map_image/.test(error.message)) {
       throw new MissingMapPhotoColumnError()
+    }
+    if (Object.keys(rightNow).length > 0 && /right_now_categories/.test(error.message)) {
+      throw new MissingRightNowColumnError()
     }
     throw new Error(`Failed to update site settings: ${error.message}`)
   }
@@ -314,6 +334,12 @@ export class MissingTodayColumnsError extends Error {
 
 /** The map card's photo was changed on a database without migration 095
  *  (supabase/migrations/20240101000095_map_card_photo.sql). */
+export class MissingRightNowColumnError extends Error {
+  constructor() {
+    super('Choosing what Right now shows isn’t set up on this site yet.')
+  }
+}
+
 export class MissingMapPhotoColumnError extends Error {
   constructor() {
     super('The map card’s photo isn’t set up on this site yet.')

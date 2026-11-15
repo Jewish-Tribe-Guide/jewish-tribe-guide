@@ -80,6 +80,11 @@ export type SiteSettings = {
    *  it looks for, in order. The guide can't tell which items are for
    *  Shabbos, so an admin names them. */
   beforeCandleItems: string[]
+  /** What Right now answers on a weekday (board V1, Nov 15): category ids,
+   *  in order, at most MAX_RIGHT_NOW. Null is the ready-made choice: the
+   *  first two categories whose places say their hours. Needs migration
+   *  098; reads as null without it. */
+  rightNowCategories: string[] | null
   /** The Today home's blocks an admin has turned off. Each shows on the
    *  days it's for unless it's here; their order follows the day. */
   todayHidden: TodayBlockId[]
@@ -91,6 +96,9 @@ export type HomeStyle = (typeof HOME_STYLES)[number]
 export function isHomeStyle(value: unknown): value is HomeStyle {
   return (HOME_STYLES as readonly unknown[]).includes(value)
 }
+
+/** How many answers Right now shows on a weekday. */
+export const MAX_RIGHT_NOW = 2
 
 /** Where Before candles starts until an admin changes it. */
 export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
@@ -268,6 +276,7 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopMapImage: null,
   homeStyle: 'classic',
   beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
+  rightNowCategories: null,
   todayHidden: [],
 }
 

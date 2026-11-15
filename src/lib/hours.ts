@@ -162,22 +162,32 @@ export function hoursClosing(
  * the row says "No hours listed" for it, the same as for no hours at all.
  */
 export function hoursNextOpening(v: unknown, now: Date = new Date()): string | null {
+  return hoursNextOpeningAt(v, now)?.label ?? null
+}
+
+/** hoursNextOpening, with how many minutes away it is, so the soonest of
+ *  several places can be picked (Right now overnight, board V3). */
+export function hoursNextOpeningAt(v: unknown, now: Date = new Date()): { minutes: number; label: string } | null {
   if (!isStructuredHours(v)) return null
   const hours = v as Record<string, DayHours>
   const nowMins = now.getHours() * 60 + now.getMinutes()
+  const short = (open: string) => fmt12(open).replace(/:00(?= [AP]M$)/, '')
   for (let ahead = 0; ahead < 7; ahead++) {
     const key = DAY_KEYS[(now.getDay() + ahead) % 7]
     const day = hours[key]
     if (!day || !day.open || !day.close) continue
     const [oh, om] = day.open.split(':').map(Number)
     if (ahead === 0 && oh * 60 + om <= nowMins) continue
-    const time = fmt12(day.open).replace(/:00(?= [AP]M$)/, '')
-    return ahead === 0 ? time : `${DAY_SHORT[key]} ${time}`
+    const time = short(day.open)
+    return { minutes: ahead * 1440 + oh * 60 + om - nowMins, label: ahead === 0 ? time : `${DAY_SHORT[key]} ${time}` }
   }
   // Today's opening already passed and nothing else all week: it opens
   // again a week from now, the same time.
   const today = hours[DAY_KEYS[now.getDay()]]
-  if (today?.open && today.close) return `${DAY_SHORT[DAY_KEYS[now.getDay()]]} ${fmt12(today.open).replace(/:00(?= [AP]M$)/, '')}`
+  if (today?.open && today.close) {
+    const [oh, om] = today.open.split(':').map(Number)
+    return { minutes: 7 * 1440 + oh * 60 + om - nowMins, label: `${DAY_SHORT[DAY_KEYS[now.getDay()]]} ${short(today.open)}` }
+  }
   return null
 }
 

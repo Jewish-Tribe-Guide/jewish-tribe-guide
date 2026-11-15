@@ -1,7 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { MissingMapPhotoColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
-import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
+import { MissingMapPhotoColumnError, MissingRightNowColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, toRightNowCategories, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { MAX_BEFORE_CANDLE_ITEMS, MAX_RIGHT_NOW, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Recursive shape check — a 'link' item needs a target, a tab ('more-menu')
@@ -142,6 +142,16 @@ export async function PATCH(request: Request) {
     }
     body.beforeCandleItems = toBeforeCandleItems(items)
   }
+  if (body.rightNowCategories !== undefined && body.rightNowCategories !== null) {
+    const ids = body.rightNowCategories
+    if (!Array.isArray(ids) || ids.some((i) => typeof i !== 'string')) {
+      return Response.json({ ok: false, errors: ['Right now’s choices have to be a list of categories.'] }, { status: 400 })
+    }
+    if (new Set(ids).size > MAX_RIGHT_NOW) {
+      return Response.json({ ok: false, errors: [`Right now shows at most ${MAX_RIGHT_NOW}.`] }, { status: 400 })
+    }
+    body.rightNowCategories = toRightNowCategories(ids)
+  }
   if (body.todayHidden !== undefined) {
     const ids = body.todayHidden
     if (!Array.isArray(ids) || !ids.every(isTodayBlockId)) {
@@ -156,7 +166,7 @@ export async function PATCH(request: Request) {
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })
   } catch (err) {
-    if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError) {
+    if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError || err instanceof MissingRightNowColumnError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
     }
     console.error('[admin/site-settings] PATCH failed:', err)

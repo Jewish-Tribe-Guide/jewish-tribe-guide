@@ -18,7 +18,7 @@ vi.mock('@/lib/siteSettingsStore', async (importOriginal) => ({
 }))
 
 const { PATCH } = await import('./route')
-const { MissingMapPhotoColumnError } = await import('@/lib/siteSettingsStore')
+const { MissingMapPhotoColumnError, MissingRightNowColumnError } = await import('@/lib/siteSettingsStore')
 const patch = (body: unknown) =>
   PATCH(new Request('http://x/api/admin/site-settings?community=philly', { method: 'PATCH', body: JSON.stringify(body) }))
 
@@ -47,6 +47,18 @@ describe('PATCH /api/admin/site-settings', () => {
     const res = await patch({ desktopMapImage: { url: 'https://example.com/a.jpg', alt: '' } })
     expect(res.status).toBe(409)
     expect((await res.json()).errors).toEqual(['The map card’s photo isn’t set up on this site yet.'])
+  })
+
+  it('Right now’s choice: a list of categories, at most two, tidied; anything else refused', async () => {
+    expect((await patch({ rightNowCategories: ['shuls', 'shuls', 'eruv'] })).status).toBe(200)
+    expect(m.updateSiteSettings).toHaveBeenLastCalledWith('philly', expect.objectContaining({ rightNowCategories: ['shuls', 'eruv'] }))
+    expect((await patch({ rightNowCategories: ['a', 'b', 'c'] })).status).toBe(400)
+    expect((await patch({ rightNowCategories: 'shuls' })).status).toBe(400)
+    expect((await patch({ rightNowCategories: null })).status).toBe(200)
+    m.updateSiteSettings.mockRejectedValue(new MissingRightNowColumnError())
+    const res = await patch({ rightNowCategories: ['shuls'] })
+    expect(res.status).toBe(409)
+    expect((await res.json()).errors).toEqual(['Choosing what Right now shows isn’t set up on this site yet.'])
   })
 
   it.each(['desktopSubscribeEyebrow', 'desktopSubscribeHeading'])(

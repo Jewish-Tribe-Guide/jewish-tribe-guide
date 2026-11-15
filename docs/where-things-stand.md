@@ -80,6 +80,28 @@ right now label"; may come back, they'll see); the phone keeps it and says
     Next minyan / Jewish Times, on dev in the admin; on prod after 097,
     each with a yes.
 
+Boards V1/V2/V3 (Nov 15, same canvas; the user: "yes, but I'm worried
+about that admin cage getting cluttered"): an admin chooses what Right now
+answers on a weekday, two at most, from the categories that can say
+something about now: places with hours ("25 open now"), the minyan page
+(the next minyan, to that day's davening times), the eruv (up or down).
+With no choice made it's the first two categories with hours, as before
+(Food and Grocery on Philly's). Built on the site Nov 15:
+  - **Overnight (V3):** a row says "Opens Wed 6 AM · Nothing open now ·
+    first: HipCityVeg" and opens the category, instead of the card going.
+  - **The choice** is `site_settings.right_now_categories` (migration
+    **098, not run anywhere**). Before 098 a save that changes it says
+    it isn't set up; every other save still works.
+  - The next-minyan row shows no distance (Right now measures from the
+    map's centre when the visitor hasn't said where they are).
+  - **Not built, waiting on the user:** where the admin chooses. Boards
+    V4/V4b propose the cards list as names only, with Right now and the
+    Map each opening a screen of its own (its own address) for its
+    choices: the categories and the Shabbos shopping items for Right now,
+    the photo for the Map. That changes the Nov 4 decision "each card is
+    a handle, its name and an ×: nothing opens". The Shabbos shopping
+    items today are editable only in the held-back Today home's box.
+
 Nov 14, later, the user's yes to both:
 - **The Kept up card is one line**, as tall as the search box (48px; it
   was 59px on two lines, the bigger box on the page): "Kept up by the
@@ -5918,7 +5940,8 @@ build").
 - **Right now:** on a weekday, what's open in Food and Grocery (Grocery says
   how many kosher items are tracked); on Friday, the candles card with the
   eruvim's status on it and Before candles; on Shabbos, the card with the
-  eruvim. Never weekday minyanim.
+  eruvim. Never weekday minyanim on Philly's (Nov 15: an admin can choose
+  the next minyan or the eruv instead, boards V1/V2).
 - **Trust sheet ("How this guide stays right"):** the idea in three lines,
   naming only the checks that ran that week, by what they check, never by
   source (Oct 23). No reading

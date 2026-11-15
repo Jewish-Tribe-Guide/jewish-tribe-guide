@@ -348,6 +348,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           from={coords ?? community.mapCenter}
           items={settings.beforeCandleItems}
           onOpenListing={openListing}
+          choice={settings.rightNowCategories}
         />
       )}
       <div data-testid="home-browse-list" className={searching ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
@@ -677,6 +678,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                   from={coords ?? community.mapCenter}
                   items={settings.beforeCandleItems}
                   onOpenListing={openListing}
+                  choice={settings.rightNowCategories}
                 />
               )
             )

@@ -5,14 +5,13 @@ import AnswerCard from './AnswerCard'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { haversineMiles, milesText } from '@/lib/geo'
 import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
-import { clockTime, nextUpcomingDavening } from '@/lib/upcomingDavening'
-import { secularHolidayTomorrow } from '@/lib/secularHolidays'
+import { clockTime } from '@/lib/upcomingDavening'
+import { nextMinyan, nextMinyanHref } from '@/lib/nextMinyan'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import { minyanimPage } from '@/lib/davening'
 import type { LatLng } from '@/lib/geo'
-import { routes } from '@/lib/routes'
 
 // ── The home screen's davening-times card — one line, deliberately. ────────
 //
@@ -54,39 +53,15 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   const linkCategory = minyanimPage(categories ?? [], allListings)
   const linkCategoryId = linkCategory?.id
 
-  const result = schedule
-    ? nextUpcomingDavening(schedule.shuls, {
-        today: schedule.todayDayKeys,
-        tomorrow: schedule.tomorrowDayKeys,
-        nowMinutes: schedule.nowMinutes,
-        season: schedule.season,
-        anchors: schedule.anchors,
-      })
-    : null
+  const result = schedule ? nextMinyan(schedule) : null
 
   // No category configured with a minyanim field at all — not a loading
   // state, a real "this community hasn't set this up" — so the card
   // doesn't appear rather than showing a permanently-empty shell.
   if (!linkCategoryId) return null
 
-  // `?davening=1` opens "All davening times" as soon as the category page
-  // mounts (see GenericDirectory's own `openMinyanimView` doc) — without it
-  // this landed on a bare category page and made the visitor find the same
-  // button a second time to reach the thing this link's own label promised.
-  // `&day=` additionally does the same for WHICH day it opens to: when this
-  // card is showing tomorrow's earliest minyan (result.isTomorrow), the
-  // Minyanim view opening on Today would land the visitor on a
-  // day with nothing left to see and no visible reason why — see
-  // GenericDirectory's own `initialDaveningDay` doc.
-  //
-  // Comma-separated, not just the weekday: if tomorrow is also a secular
-  // holiday, a shul's holiday-specific minyan (days: ['holiday']) needs
-  // that pseudo-day in the filter too, or it's invisible on a view that's
-  // otherwise correctly showing tomorrow. Rosh Chodesh isn't included here
-  // for the same reason — see secularHolidayTomorrow's own doc.
-  const tomorrowHoliday = result?.isTomorrow && schedule ? secularHolidayTomorrow(schedule.now, timezone) : null
-  const tomorrowDayParam = [schedule?.tomorrowKey, ...(tomorrowHoliday ? ['holiday'] : [])].join(',')
-  const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowDayParam}` : ''}`
+  // All davening times, on the day the answer is for (nextMinyanHref).
+  const seeAllHref = nextMinyanHref(communitySlug, linkCategoryId, result, schedule, timezone)
 
   // Where the visitor is, the nearest of the shuls the time is shared by.
   const nearest =
