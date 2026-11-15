@@ -261,7 +261,12 @@ With no choice made it's the first two categories with hours, as before
     an empty You shows dashed outlines where saved places go, the first
     saying "Save a place or a search to keep it here". Phone: only the
     words change (one line, "5 changes in the last 7 days"; "Save", not
-    "Tap"). Not built.
+    "Tap"). Not built. Added the same day (v90): What changed on the
+    phone in white, as one box or a box per day; About with the photo
+    header (Privacy and Feedback stay plain). The page lists 30 days; the
+    line under its title counts only the last 7, so the redraws count
+    what's on the page. Live has 419 change rows in the last 30 days
+    (9 in the last 7); none older.
   - **Fixed Nov 15: a saved restaurant on You said "No davening times
     listed"**. Food has a minyanim field (for restaurants that host one),
     and You treated every place in such a category as a shul. It now asks
