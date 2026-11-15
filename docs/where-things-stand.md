@@ -252,6 +252,16 @@ With no choice made it's the first two categories with hours, as before
     title on it ("5 eruvim" above Eruv Information; the location under
     Candle Lighting & Zmanim). An opened eruv keeps it, as a listing does,
     and its way back reads "‹ All 5 eruvim". Phones unchanged.
+  - **W11 drawn Nov 15, waiting on the user** (the user: should What
+    changed and You "look a little less boring"; canvas v86, row "What
+    changed and You"). Computer: both get the category pages' photo
+    header (the community's home photo) with a count on it; What changed
+    is one box with the days inside and "Know a place we're missing?"
+    beside it; You's saved places and searches are cards, three across;
+    an empty You shows dashed outlines where saved places go, the first
+    saying "Save a place or a search to keep it here". Phone: only the
+    words change (one line, "5 changes in the last 7 days"; "Save", not
+    "Tap"). Not built.
   - **Fixed Nov 15: a saved restaurant on You said "No davening times
     listed"**. Food has a minyanim field (for restaurants that host one),
     and You treated every place in such a category as a shul. It now asks
