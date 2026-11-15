@@ -94,13 +94,21 @@ With no choice made it's the first two categories with hours, as before
     it isn't set up; every other save still works.
   - The next-minyan row shows no distance (Right now measures from the
     map's centre when the visitor hasn't said where they are).
-  - **Not built, waiting on the user:** where the admin chooses. Boards
-    V4/V4b propose the cards list as names only, with Right now and the
-    Map each opening a screen of its own (its own address) for its
-    choices: the categories and the Shabbos shopping items for Right now,
-    the photo for the Map. That changes the Nov 4 decision "each card is
-    a handle, its name and an ×: nothing opens". The Shabbos shopping
-    items today are editable only in the held-back Today home's box.
+  - **Where the admin chooses: boards V4/V4b, approved and built Nov 15.**
+    Home page › Cards under the search is names only. Right Now and Map
+    end in what they're set to ("Food, Grocery", "Photo") and a chevron,
+    and open a screen of their own (`?card=rightNow`, `?card=map`) with
+    Back, and "Take off the page" in place of the ×. Right Now's screen:
+    the categories that can answer (two at most) and Shabbos shopping's
+    items (× and + Add; before this they could only be changed in the
+    held-back Today home's box). Map's screen: its photo, moved off the
+    list. On Phone, a box "Under the search" opens the same Right Now
+    screen (the phone home always has Right now), with nothing to take
+    off. **Changed from Nov 4:** "each card is a handle, its name and an
+    ×: nothing opens" now holds for every card but these two.
+  - Left off the board: the grips on the chosen categories (V4b) for
+    reordering them. The chosen are listed first, in the order they were
+    ticked; untick and tick again to swap.
 
 Nov 14, later, the user's yes to both:
 - **The Kept up card is one line**, as tall as the search box (48px; it

@@ -9,7 +9,9 @@ import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { adminBase } from '@/lib/adminNav'
-import DesktopTopicsManager from './DesktopTopicsManager'
+import DesktopTopicsManager, { withoutCard } from './DesktopTopicsManager'
+import RightNowScreen, { ScreenHeader, inHomeOrder, rightNowSummary, useRightNowData } from './RightNowScreen'
+import { useStepsInAddress } from './useStepsInAddress'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SitePreview, { type PreviewDevice } from './SitePreview'
@@ -76,6 +78,8 @@ function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange
   )
 }
 
+type CardScreen = 'rightNow' | 'map'
+
 export default function SiteSettingsEditor({ token }: { token: string }) {
   const { community } = useActiveCommunity()
   // Which version of the page the boxes and the preview are of.
@@ -117,6 +121,12 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
   const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
   const [mapOriginal, setMapOriginal] = useState<File | string | null>(null)
+  // A card's own screen (boards V4/V4b, Nov 15), in the address as
+  // ?card=rightNow, so Back returns to the list and a reload stays on it.
+  const [cardScreen, setCardScreen] = useState<CardScreen | null>(null)
+  useStepsInAddress('card', cardScreen ? [cardScreen] : [], ([to]) => setCardScreen(to === 'rightNow' || to === 'map' ? to : null))
+  const rightNowLoaded = useRightNowData(community.slug)
+  const rightNowData = rightNowLoaded && sectionsDraft ? inHomeOrder(rightNowLoaded, sectionsDraft) : null
 
   const load = useCallback(async () => {
     setError(null)
@@ -254,6 +264,53 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     </div>
   )
 
+  const cardOn = (kind: string) => sectionsDraft.find((x) => x.kind === kind)
+  const takeOff = (kind: string) => {
+    const card = cardOn(kind)
+    if (card) setHomeSections(withoutCard(sectionsDraft, card.id))
+    setCardScreen(null)
+  }
+  const rightNowScreen = (
+    <div {...spotOn('card-rightNow')}>
+      <RightNowScreen
+        data={rightNowData}
+        chosen={draft.rightNowCategories}
+        onChoose={(ids) => set('rightNowCategories', ids)}
+        items={draft.beforeCandleItems}
+        onItems={(items) => set('beforeCandleItems', items)}
+        onBack={() => setCardScreen(null)}
+        onRemove={computer && cardOn('rightNow') ? () => takeOff('rightNow') : undefined}
+      />
+    </div>
+  )
+  const mapScreen = (
+    <section data-testid="map-card-screen" aria-label="Map" className="overflow-hidden rounded-2xl border border-slate-200 bg-white" {...spotOn('card-map')}>
+      <ScreenHeader title="Map" onBack={() => setCardScreen(null)} onRemove={cardOn('map') ? () => takeOff('map') : undefined} />
+      <div className="p-5">
+        {/* The map card's photo (board G3), on the card's own screen (V4). */}
+        <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
+        <ImageUploadField
+          value={draft.desktopMapImage?.url ?? ''}
+          onChange={(url) => set('desktopMapImage', url ? { url, alt: '' } : null)}
+          uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+          token={token}
+          shape="square"
+          aspect={26 / 15}
+          showRepositionHint={false}
+          collapseUrlInput
+          originalSource={mapOriginal}
+          onOriginalSourceChange={setMapOriginal}
+        />
+      </div>
+    </section>
+  )
+  const cardOpens = {
+    rightNow: { summary: rightNowSummary(rightNowData, draft.rightNowCategories), onOpen: () => setCardScreen('rightNow') },
+    map: { summary: draft.desktopMapImage ? 'Photo' : 'No photo', onOpen: () => setCardScreen('map') },
+  }
+  // The Map card is the computer's only; Right now is on both homes.
+  const openScreen = cardScreen === 'rightNow' ? rightNowScreen : cardScreen === 'map' && computer ? mapScreen : null
+
   return (
     <div className="flex flex-col gap-4">
       {/* Full width on a phone, like the Preview button under it (the user,
@@ -276,6 +333,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           <div className="lg:hidden">
             <AdminPreviewButton onClick={openPreview} />
           </div>
+          {openScreen ?? (
+          <>
           {nameAndLogo}
           {computer ? (
             <>
@@ -322,32 +381,38 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
 
               <div {...spotOn('cards')}>
                 <AdminBox title="Cards under the search">
-                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
-                  {/* The map card's photo (board G3), here with the card it
-                      belongs to, and only while the card is on the page. */}
-                  {sectionsDraft.some((s) => s.kind === 'map') && (
-                    <div className="border-t border-slate-100 p-4" onMouseEnter={() => setSpot('card-map')}>
-                      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Map card photo</span>
-                      <ImageUploadField
-                        value={draft.desktopMapImage?.url ?? ''}
-                        onChange={(url) => set('desktopMapImage', url ? { url, alt: '' } : null)}
-                        uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
-                        token={token}
-                        shape="square"
-                        aspect={26 / 15}
-                        showRepositionHint={false}
-                        collapseUrlInput
-                        originalSource={mapOriginal}
-                        onOriginalSourceChange={setMapOriginal}
-                      />
-                    </div>
-                  )}
+                  <DesktopTopicsManager
+                    sections={sectionsDraft}
+                    onChange={setHomeSections}
+                    settings={draft}
+                    onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')}
+                    opens={cardOpens}
+                  />
                 </AdminBox>
               </div>
             </>
           ) : (
             <>
               {searchBox}
+
+              {/* The phone home always has Right now, under the search. */}
+              <div {...spotOn('card-rightNow')}>
+                <AdminBox title="Under the search">
+                  <div className="p-3">
+                    <button
+                      type="button"
+                      onClick={cardOpens.rightNow.onOpen}
+                      className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-left hover:border-primary"
+                    >
+                      <span className="flex-1 text-[15px] font-medium text-slate-900">Right Now</span>
+                      {cardOpens.rightNow.summary && <span className="truncate text-[14px] text-muted">{cardOpens.rightNow.summary}</span>}
+                      <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-slate-400">
+                        <path d="M1.5 1.5l6 6-6 6" />
+                      </svg>
+                    </button>
+                  </div>
+                </AdminBox>
+              </div>
 
               {/* Held back from the site for now (see features.ts). */}
               {features.todayHome && (
@@ -403,6 +468,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                 </AdminBox>
               </div>
             </>
+          )}
+          </>
           )}
         </div>
 

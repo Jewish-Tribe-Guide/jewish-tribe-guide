@@ -73,6 +73,11 @@ async function saveWith(user: ReturnType<typeof userEvent.setup>, settings: type
 
 beforeEach(() => {
   vi.mocked(fetchJson).mockResolvedValue({ ok: true })
+  // The address moves as Next's router would move it, so a card's screen
+  // (?card=…) is in it and Back from it lands.
+  window.history.replaceState({}, '', '/philly/admin/home')
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
 })
 
 afterEach(() => {
@@ -91,13 +96,13 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(within(screen.getByRole('group', { name: 'Show the page on' })).getByRole('button', { name: 'Computer' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('on a phone: the name and logo, the search box and the tabs', async () => {
+  it('on a phone: the name and logo, the search box, Right now under it, and the tabs', async () => {
     const user = userEvent.setup()
     features.todayHome = false
     try {
       await renderEditor()
       await show(user, 'Phone')
-      expect(boxes()).toEqual(['Name and logo', 'Search box', 'Tabs'])
+      expect(boxes()).toEqual(['Name and logo', 'Search box', 'Under the search', 'Tabs'])
     } finally {
       features.todayHome = true
     }
@@ -166,17 +171,29 @@ describe('SiteSettingsEditor — Home page', () => {
 
   // Board G3 (Nov 11): the map card's photo is set with the cards, and only
   // while the map card is on the page.
-  it('the map card’s photo is set with the cards, only while the map card is there', async () => {
+  // Board V4 (Nov 15): the list is names only; the Map card ends in what it's
+  // set to and a chevron, and its photo is on its own screen.
+  it('the map card’s photo is on the Map card’s own screen, not under the list', async () => {
+    const user = userEvent.setup()
     const mapRow: HomeSection = { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], sharesRow: false }
     await renderEditor({ ...SITE_SETTINGS_DEFAULTS, desktopMapImage: { url: 'https://example.com/city-hall.jpg', alt: '' } }, [mapRow])
     const cards = screen.getByRole('region', { name: 'Cards under the search' })
-    expect(within(cards).getByText('Map card photo')).toBeInTheDocument()
-    expect(within(cards).getByRole('button', { name: 'Adjust photo' })).toBeInTheDocument()
+    expect(within(cards).queryByRole('button', { name: 'Adjust photo' })).toBeNull()
+    expect(within(cards).queryByRole('button', { name: 'Take Map off' })).toBeNull()
+    await user.click(within(cards).getByRole('button', { name: 'Map: Photo' }))
+    const map = screen.getByTestId('map-card-screen')
+    expect(within(map).getByRole('button', { name: 'Adjust photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Cards under the search' })).toBeNull()
+    await waitFor(() => expect(window.location.search).toBe('?card=map'))
+    await user.click(within(map).getByRole('button', { name: 'Back to the cards' }))
+    expect(screen.getByRole('region', { name: 'Cards under the search' })).toBeInTheDocument()
+    await waitFor(() => expect(window.location.search).toBe(''))
   })
 
   it('without the map card, there is no map card photo to set', async () => {
     await renderEditor({ ...SITE_SETTINGS_DEFAULTS }, [])
-    expect(screen.queryByText('Map card photo')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Map:/ })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Cards under the search' })).queryByRole('button', { name: 'Adjust photo' })).toBeNull()
   })
 
   // The user, Nov 4: the logo and the photo upload as a listing's photo
@@ -333,7 +350,7 @@ describe('SiteSettingsEditor — Home page', () => {
     await renderEditor()
     expect(screen.queryByTestId('home-style')).toBeNull()
     await show(user, 'Phone')
-    expect(boxes()).toEqual(['Name and logo', 'Search box', 'Today home', 'Tabs'])
+    expect(boxes()).toEqual(['Name and logo', 'Search box', 'Under the search', 'Today home', 'Tabs'])
   })
 
   // Held back (features.ts): nothing to choose, so the box isn't there.
@@ -446,5 +463,116 @@ describe('countChanges', () => {
     expect(countChanges(SITE_SETTINGS_DEFAULTS, SITE_SETTINGS_DEFAULTS, sections, sections)).toBe(0)
     expect(countChanges(SITE_SETTINGS_DEFAULTS, { ...SITE_SETTINGS_DEFAULTS, name: 'x', mission: 'y' }, sections, sections)).toBe(2)
     expect(countChanges(SITE_SETTINGS_DEFAULTS, SITE_SETTINGS_DEFAULTS, sections, [{ ...sections[0], title: 'B' }])).toBe(1)
+  })
+})
+
+// Boards V4/V4b (the user, Nov 15): Right now's choices on a screen of its
+// own, opened from its row in the card list (or, on a phone, from the box
+// under the search), so the list stays names.
+describe('SiteSettingsEditor — Right now’s own screen', () => {
+  const hours = { key: 'hours', label: 'Hours', type: 'hours' as const }
+  const cats = [
+    makeCategory({ id: 'restaurant', pluralLabel: 'Food', detailFields: [hours] }),
+    makeCategory({ id: 'grocery', pluralLabel: 'Grocery', detailFields: [hours] }),
+    makeCategory({ id: 'mikvah', pluralLabel: 'Mikvah', detailFields: [hours] }),
+    makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' as const }] }),
+    makeCategory({ id: 'school', pluralLabel: 'Schools', detailFields: [] }),
+    makeCategory({ id: 'eruv', kind: 'eruv', pluralLabel: 'Eruv Information', detailFields: [] }),
+  ]
+  const open = { mon: { open: '09:00', close: '17:00' } }
+  const listings = [
+    { id: 'a', category: 'restaurant', hours: open },
+    { id: 'b', category: 'grocery', hours: open },
+    { id: 'c', category: 'mikvah', hours: open },
+    { id: 'd', category: 'synagogue' },
+  ]
+  const rightNowRow: HomeSection = { id: 'right-now', kind: 'rightNow', title: 'Right Now Card', sortOrder: 100, cardIds: [], sharesRow: false }
+
+  /** The editor, with the public categories and places it reads to say
+   *  what can answer now. */
+  async function renderWithData(settings = SITE_SETTINGS_DEFAULTS, sections: HomeSection[] = [rightNowRow]) {
+    mockLoad(settings, sections)
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      const u = String(url)
+      const body = u.startsWith('/api/categories') ? { categories: cats } : u.startsWith('/api/resources') ? { resources: listings } : {}
+      return { ok: true, status: 200, json: async () => body } as Response
+    })
+    renderWithProviders(<SiteSettingsEditor token="tok" />, { content: { categories: cats }, community: makeCommunity({ slug: 'philly' }) })
+    await screen.findByRole('complementary', { name: 'Preview' })
+  }
+
+  // The site's ready-made two are the first with hours in the home's order
+  // (its sections), not the categories' own: on dev it said "Childcare,
+  // Food" while the site showed Food and Grocery.
+  it('the ready-made two in the home’s order, as the site reads them', async () => {
+    const section: HomeSection = { id: 's1', kind: 'section', title: 'Everyday', sortOrder: 1, cardIds: ['grocery', 'mikvah'], sharesRow: false }
+    await renderWithData(SITE_SETTINGS_DEFAULTS, [section, rightNowRow])
+    expect(await screen.findByRole('button', { name: 'Right Now: Grocery, Mikvah' })).toBeInTheDocument()
+  })
+
+  it('the row says what it shows and opens the screen, in the address; the list keeps no settings', async () => {
+    const user = userEvent.setup()
+    await renderWithData()
+    const cards = screen.getByRole('region', { name: 'Cards under the search' })
+    const row = await within(cards).findByRole('button', { name: 'Right Now: Food, Grocery' })
+    expect(within(cards).queryByRole('button', { name: 'Take Right Now off' })).toBeNull()
+    await user.click(row)
+    const rn = screen.getByTestId('right-now-screen')
+    await waitFor(() => expect(window.location.search).toBe('?card=rightNow'))
+    // Only what can answer, the chosen first; ready-made: Food and Grocery.
+    const boxes = within(rn).getAllByRole('checkbox')
+    expect(boxes.map((b) => [b.closest('label')!.textContent, (b as HTMLInputElement).checked, (b as HTMLInputElement).disabled])).toEqual([
+      ['FoodOpen now', true, false],
+      ['GroceryOpen now', true, false],
+      ['MikvahOpen now', false, true],
+      ['SynagoguesNext minyan', false, true],
+      ['Eruv InformationUp or down', false, true],
+    ])
+    // Two at most: one off, then another on.
+    await user.click(within(rn).getByRole('checkbox', { name: /Grocery/ }))
+    await user.click(within(rn).getByRole('checkbox', { name: /Synagogues/ }))
+    expect(within(rn).getAllByRole('checkbox').filter((b) => (b as HTMLInputElement).checked).map((b) => b.closest('label')!.textContent)).toEqual(['FoodOpen now', 'SynagoguesNext minyan'])
+    await saveWith(user, { ...SITE_SETTINGS_DEFAULTS, rightNowCategories: ['restaurant', 'synagogue'] })
+    expect(sentBody().rightNowCategories).toEqual(['restaurant', 'synagogue'])
+  })
+
+  it('a reload on its address opens it again, and Back closes it', async () => {
+    window.history.replaceState({}, '', '/philly/admin/home?card=rightNow')
+    await renderWithData()
+    expect(await screen.findByTestId('right-now-screen')).toBeInTheDocument()
+    window.history.replaceState({}, '', '/philly/admin/home')
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')))
+    expect(await screen.findByRole('region', { name: 'Cards under the search' })).toBeInTheDocument()
+  })
+
+  it('Shabbos shopping’s items: taken off with ×, added with + Add', async () => {
+    const user = userEvent.setup()
+    await renderWithData()
+    await user.click(await screen.findByRole('button', { name: /^Right Now/ }))
+    const rn = screen.getByTestId('right-now-screen')
+    await user.click(within(rn).getByRole('button', { name: 'Take Wine off' }))
+    await user.click(within(rn).getByRole('button', { name: '+ Add' }))
+    await user.type(within(rn).getByRole('textbox', { name: 'Add an item' }), 'Grape juice{Enter}')
+    await saveWith(user, SITE_SETTINGS_DEFAULTS)
+    expect(sentBody().beforeCandleItems).toEqual(['Challah', 'Chicken', 'Grape juice'])
+  })
+
+  it('Take off the page takes the card off and goes back to the list', async () => {
+    const user = userEvent.setup()
+    await renderWithData()
+    await user.click(await screen.findByRole('button', { name: /^Right Now/ }))
+    await user.click(screen.getByRole('button', { name: 'Take off the page' }))
+    const cards = screen.getByRole('region', { name: 'Cards under the search' })
+    expect(within(cards).queryByRole('button', { name: /^Right Now/ })).toBeNull()
+    expect(within(cards).getByRole('button', { name: 'Add Right Now' })).toBeInTheDocument()
+  })
+
+  it('on a phone, the box under the search opens it, with nothing to take off', async () => {
+    const user = userEvent.setup()
+    await renderWithData(SITE_SETTINGS_DEFAULTS, [])
+    await show(user, 'Phone')
+    await user.click(within(screen.getByRole('region', { name: 'Under the search' })).getByRole('button', { name: /Right Now/ }))
+    expect(screen.getByTestId('right-now-screen')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take off the page' })).toBeNull()
   })
 })
