@@ -342,8 +342,8 @@ With no choice made it's the first two categories with hours, as before
       search has linked to Feedback since Oct 10 (3fe02e6d left "Ask in a
       WhatsApp group" as the nothing-found card's only action). Feedback's
       leftover `?about=` prefill is removed. Bringing a + Add button back
-      to the nothing-found card would undo the Oct 10 decision, so it
-      waits for the user to say so.
+      to the nothing-found card would undo the Oct 10 decision; **decided
+      Nov 16: leave it** ("Ask in a WhatsApp group" stays the only action).
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's
