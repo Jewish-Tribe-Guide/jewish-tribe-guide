@@ -3,7 +3,7 @@ import type { PointGlyph } from '@/lib/pageSections'
 // Line icons for About's and Privacy's named points (pageSections.ts's
 // pointGlyph picks one from the point's words). Stroke-only, 24-unit, like
 // the category glyphs; never emoji.
-const PATHS: Record<PointGlyph | 'plus' | 'map' | 'chevron' | 'chevronDown', string> = {
+const PATHS: Record<PointGlyph | 'plus' | 'map' | 'chevron' | 'chevronDown' | 'send' | 'mail' | 'tick', string> = {
   home: 'M3 11 12 4l9 7M5 10v10h14V10',
   bag: 'M5 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2',
   hospital: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zM12 8v8M8 12h8',
@@ -19,6 +19,9 @@ const PATHS: Record<PointGlyph | 'plus' | 'map' | 'chevron' | 'chevronDown', str
   plus: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 8v8M8 12h8',
   map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14',
   chevron: 'm9 6 6 6-6 6',
+  send: 'M4 12 20 4l-6 16-3-7zM11 13l9-9',
+  mail: 'M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM4 7l8 6 8-6',
+  tick: 'm5 12 5 5 9-10',
   chevronDown: 'm6 9 6 6 6-6',
 }
 

@@ -1,6 +1,6 @@
 import PageScreenHeader from '@/components/PageScreenHeader'
 import PhotoHeader from '@/components/PhotoHeader'
-import { PAGE_COLUMN } from '@/lib/pageColumn'
+import { PAGE_BOX, PAGE_COLUMN } from '@/lib/pageColumn'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import { pageBodyToHtml } from '@/lib/richText'
 import { aboutBlocks, firstMailto, pageDocumentParts, pointGlyph, type PageSection } from '@/lib/pageSections'
@@ -16,7 +16,7 @@ type Props = {
   body: string | null | undefined
 }
 
-export const BOX = 'rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.05)]'
+const BOX = PAGE_BOX
 const H2 = 'text-[20px] font-extrabold tracking-tight text-slate-900 desktop:text-[24px]'
 // Fixed strings, so Tailwind sees every one.
 const CARD_COLUMNS: Record<number, string> = {

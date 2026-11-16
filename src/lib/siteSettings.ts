@@ -219,8 +219,8 @@ export const DEFAULT_MOBILE_TABS: MobileTabConfig[] = [
 export const DEFAULT_HERO_TITLE = 'What are you looking for?'
 
 export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the site? Send a note'
-export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
-export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
+export const DEFAULT_FEEDBACK_HEADING = 'Feedback'
+export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We read every note. If you left an email, we’ll write back.'
 
 export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, mikvah…'
 

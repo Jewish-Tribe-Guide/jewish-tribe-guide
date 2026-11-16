@@ -312,6 +312,34 @@ With no choice made it's the first two categories with hours, as before
     - **Open question for the user:** is one contact email right for
       every community (the page rows are shared by all communities, and
       the email is Philly's)?
+  - **Feedback, redrawn (Nov 15)**, from the same review page (v7, board
+    Feedback; the user: "Yes, build it"). BUILT.
+    - "Know something we don't?" first, About's card word for word, which
+      opens the + Add box. On a phone it sits above the form; on a computer
+      to its right, under "About a place". In the footer's dialog the
+      dialog steps aside while the box is up, and closing the box closes
+      Feedback (`src/components/pages/TellUsCard.tsx`).
+    - The form: "Your note" and "Email, for a reply", no "(optional …)"
+      and no star; 16px fields; a tall Send with an icon, pale until
+      there's a note; "Read by the people who run the guide. Privacy".
+      After sending, a check, "Thanks, it's sent", the admin's thank-you
+      words and Send another (Close in the dialog).
+    - **A change to an earlier decision:** Feedback kept plain on a
+      computer (Nov 15). It now has the photo header, like About.
+    - The computer page's "Rather email?" card gives the address About's
+      text gives (one shared row, so Philly's for every community), and
+      is left out when there is none. No per-community contact setting
+      was added; same open question as above.
+    - The heading and thank-you words stay admin-editable; the drawn words
+      ("Feedback", "We read every note. If you left an email, we'll write
+      back.") are the new defaults. Migration 099 changes the column
+      defaults and any row still holding the old words. **Dev rows
+      updated (Nov 16); 099's column defaults not run on dev; nothing run
+      on live — live still says "Send feedback" until 099 runs there,
+      which needs the user's go-ahead.**
+    - **Still the user's call:** "Add it to the guide" (a search that
+      found nothing) still opens Feedback with the search written in; the
+      board asked whether it should open the + Add box instead.
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's

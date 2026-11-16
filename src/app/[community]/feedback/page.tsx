@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import FeedbackScreen from './FeedbackScreen'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
+import { getPage } from '@/lib/pagesStore'
+import { pageBodyToHtml } from '@/lib/richText'
+import { firstMailto } from '@/lib/pageSections'
 
 // Self-referencing canonical — see [community]/page.tsx's comment. This file
 // is a thin server wrapper specifically so it can export generateMetadata;
@@ -12,6 +15,10 @@ export async function generateMetadata(props: PageProps<'/[community]/feedback'>
   return { alternates: { canonical: `${siteUrl()}${routes.feedback(community)}` } }
 }
 
-export default function FeedbackPage() {
-  return <FeedbackScreen />
+// The computer page's "Rather email?" card gives the address the About page's
+// own text gives (one shared row, so one address for every community), and
+// is left out when it gives none. There is no per-community contact address.
+export default async function FeedbackPage() {
+  const about = await getPage('about').catch(() => null)
+  return <FeedbackScreen email={firstMailto(pageBodyToHtml(about?.body))} />
 }

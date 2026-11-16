@@ -1,6 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import FeedbackForm from '@/components/FeedbackForm'
+import PhotoHeader from '@/components/PhotoHeader'
+import TellUsCard, { HELP_CARD } from '@/components/pages/TellUsCard'
+import { GlyphDot } from '@/components/pages/PageGlyph'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
@@ -8,22 +12,28 @@ import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { PAGE_COLUMN } from '@/lib/pageColumn'
 import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
+import { ui } from '@/lib/uiConfig'
 
-// Feedback is a page at every width, in the same column as About and Privacy
-// (PAGE_COLUMN): a card holding the form. On a desktop it's normally opened as
-// a dialog from the footer or the header's More menu, over the page someone is
-// reading — which is what feedback is usually about — so this URL is reached
-// there only by a typed or shared link. It used to answer that with the same
-// dialog over an empty <main>, closing to the home screen: a dialog over
-// nothing (Oct 15).
+const EYEBROW = 'mx-0.5 text-[13px] font-bold uppercase tracking-[0.06em] text-slate-500'
+
+// Feedback as a page (board Feedback, Nov 15): About and Privacy's look. On a
+// phone, "Know something we don't?" first, so a fix to a place goes into the
+// + Add box where an admin can approve it, then the note. On a computer, the
+// photo header, the note on the left, and on the right that card and the
+// email address the About page gives.
 //
-// Split out of page.tsx (which is now a thin server wrapper exporting
-// generateMetadata — a 'use client' file can't export that) so the page can
-// have its own canonical tag, same as every other screen under [community].
-export default function FeedbackScreen() {
+// On a desktop it's normally opened as a dialog from the footer or the
+// header's More menu, over the page someone is reading — which is what
+// feedback is usually about — so this URL is reached there only by a typed
+// or shared link.
+//
+// Split out of page.tsx (a thin server wrapper exporting generateMetadata,
+// which a 'use client' file can't) so the page can have its own canonical tag.
+export default function FeedbackScreen({ email = null }: { email?: string | null }) {
   const settings = useSiteSettings()
   const isMobile = useIsMobile()
   const { goHome } = useSiteNavigation()
+  const [sent, setSent] = useState(false)
 
   // On a phone this is normally reached from the links at the foot of the
   // home screen's category list, alongside About and Privacy, so it's a
@@ -36,15 +46,47 @@ export default function FeedbackScreen() {
   const drillDown = isMobile && !isTab
   useSetScreenHeader(drillDown, 'Feedback', goHome)
 
-  // TAB_BAR_CLEARANCE clears the phone's tab bar; on a desktop the padding is the pages'.
+  const tellUs = ui.contributions.add
+  const heading = settings.feedbackHeading
+
   return (
-    <main className={`${PAGE_COLUMN} flex flex-1 flex-col pt-4 ${TAB_BAR_CLEARANCE} desktop:py-16 animate-[fadeIn_180ms_ease-out]`}>
-      <FeedbackForm
-        variant="inline"
-        heading={settings.feedbackHeading}
-        successMessage={settings.feedbackSuccessMessage}
-        headingHidden={drillDown}
-      />
+    <main className={`${PAGE_COLUMN} pt-4 ${TAB_BAR_CLEARANCE} desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]`}>
+      <PhotoHeader title={heading}>
+        <div
+          data-testid="page-document"
+          className="mb-4 flex flex-col gap-3 desktop:mb-0 desktop:grid desktop:grid-cols-[minmax(0,1fr)_420px] desktop:items-start desktop:gap-8 desktop:pt-3"
+        >
+          <h1 className={drillDown ? 'sr-only' : 'mx-1 text-[24px] font-extrabold tracking-tight text-slate-900 desktop:hidden'}>{heading}</h1>
+          {/* The side column: on a phone only its Tell us card shows, above
+              the form; on a computer it sits to the right. */}
+          <div className={`${sent ? 'hidden desktop:flex' : 'contents desktop:flex'} desktop:col-start-2 desktop:row-start-1 desktop:flex-col desktop:gap-4`}>
+            {tellUs && (
+              <>
+                <p className={`${EYEBROW} hidden desktop:mt-1.5 desktop:block`}>About a place</p>
+                <TellUsCard />
+              </>
+            )}
+            {email && (
+              <>
+                <p className={`${EYEBROW} hidden desktop:block ${tellUs ? 'desktop:mt-3.5' : 'desktop:mt-1.5'}`}>Rather email?</p>
+                <a className={`${HELP_CARD} hidden desktop:flex`} href={`mailto:${email}?subject=${encodeURIComponent('Feedback')}`}>
+                  <GlyphDot name="mail" large />
+                  <span className="min-w-0 flex-1 break-words text-[16px] font-bold text-blue-700">{email}</span>
+                </a>
+              </>
+            )}
+          </div>
+          <div className="min-w-0 desktop:col-start-1 desktop:row-start-1">
+            <FeedbackForm
+              variant="inline"
+              heading={heading}
+              successMessage={settings.feedbackSuccessMessage}
+              afterTellUs={tellUs}
+              onSentChange={setSent}
+            />
+          </div>
+        </div>
+      </PhotoHeader>
     </main>
   )
 }

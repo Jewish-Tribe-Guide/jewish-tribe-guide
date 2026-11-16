@@ -49,11 +49,12 @@ describe('FeedbackForm — modal variant semantics', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('the inline variant is the page itself: an h1, and not a dialog', () => {
+  it('the inline variant is the form box alone: not a dialog, and no h1 (the page has it)', () => {
     renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" />)
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1, name: 'Send feedback' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'What’s on your mind?' })).toBeInTheDocument()
   })
 })
 
@@ -63,20 +64,20 @@ describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
     const user = userEvent.setup()
     renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" />)
 
-    await user.type(screen.getByLabelText('Your feedback'), 'First note')
-    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
+    await user.type(screen.getByLabelText('Your note'), 'First note')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(await screen.findByText('Thanks for your note!')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Thanks, it’s sent' })).toBeInTheDocument()
     // The bug this guards: the inline variant (no onClose to fall back on,
     // unlike the modal) used to leave the visitor stranded on the success
     // screen with no way back to a blank form for a second message.
-    const again = screen.getByRole('button', { name: 'Send another message' })
+    const again = screen.getByRole('button', { name: 'Send another' })
 
     await user.click(again)
 
-    const input = screen.getByLabelText('Your feedback') as HTMLTextAreaElement
+    const input = screen.getByLabelText('Your note') as HTMLTextAreaElement
     expect(input.value).toBe('')
-    expect(screen.getByRole('button', { name: 'Send feedback' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
   })
 
   it('does not offer "Send another message" in the modal variant, which closes instead', async () => {
@@ -84,12 +85,12 @@ describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
     const user = userEvent.setup()
     renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
 
-    await user.type(screen.getByLabelText('Your feedback'), 'A note')
-    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
+    await user.type(screen.getByLabelText('Your note'), 'A note')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(await screen.findByText('Thanks for your note!')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Send another message' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Thanks, it’s sent' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Send another' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(2) // the × and the thank-you's own
   })
 
   // The form (message + email + Turnstile + submit + privacy note) can be
@@ -103,7 +104,7 @@ describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
   it('scrolls the backdrop itself instead of overflowing the viewport', () => {
     renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
 
-    const backdrop = screen.getByRole('heading', { name: 'Feedback' }).closest('.fixed.inset-0')
+    const backdrop = screen.getByRole('dialog', { name: 'Feedback' }).closest('.fixed.inset-0')
     expect(backdrop).toHaveClass('overflow-y-auto')
   })
 
@@ -126,7 +127,7 @@ describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
       </div>,
     )
 
-    const backdrop = screen.getByRole('heading', { name: 'Feedback' }).closest('.fixed.inset-0')
+    const backdrop = screen.getByRole('dialog', { name: 'Feedback' }).closest('.fixed.inset-0')
     expect(backdrop?.parentElement).toBe(document.body)
     expect(container.contains(backdrop)).toBe(false)
   })
@@ -145,31 +146,87 @@ describe('FeedbackForm — arriving from a search that found nothing', () => {
   it('starts empty otherwise', async () => {
     window.history.replaceState(null, '', '/philly/feedback')
     renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
-    expect(await screen.findByRole('textbox', { name: /feedback/i })).toHaveValue('')
+    expect(await screen.findByRole('textbox', { name: 'Your note' })).toHaveValue('')
     window.history.replaceState(null, '', '/')
   })
 })
 
-describe('FeedbackForm — inline heading when the header already names the page', () => {
-  it('keeps the heading for screen readers but does not show it', () => {
-    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" headingHidden />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Send feedback' })).toHaveClass('sr-only')
+// Board Feedback (Nov 15): the form looked old and bland, and said
+// "(optional, if you'd like a reply)" where a mark would do.
+describe('FeedbackForm — the board’s form', () => {
+  it('names its two fields plainly, with no “(optional …)” and no star', () => {
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" />)
+    expect(screen.getByLabelText('Your note')).toHaveAttribute('placeholder', 'An idea, something that didn’t work, or what you’d like to see.')
+    expect(screen.getByLabelText('Email, for a reply')).toHaveAttribute('type', 'email')
+    expect(screen.queryByText(/optional/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('*')).not.toBeInTheDocument()
   })
 
-  it('still shows the thank-you heading after sending — that one is the message', async () => {
-    vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
+  // 16px or more, or an iPhone zooms the page in when a field is tapped.
+  it('draws its fields at 16px', () => {
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" />)
+    for (const label of ['Your note', 'Email, for a reply']) expect(screen.getByLabelText(label)).toHaveClass('text-[16px]')
+  })
+
+  it('keeps Send pale until there is a note', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" headingHidden />)
-    await user.type(screen.getByLabelText('Your feedback'), 'A note')
-    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
-    expect(await screen.findByRole('heading', { name: 'Thanks for your note!' })).not.toHaveClass('sr-only')
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" />)
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Your note'), 'x')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+  })
+
+  it('titles the form “Anything else?” on a phone when the Tell us card is above it', () => {
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" afterTellUs />)
+    const title = screen.getByRole('heading', { level: 2 })
+    expect(within(title).getByText('Anything else?')).toHaveClass('desktop:hidden')
+    expect(within(title).getByText('What’s on your mind?')).toHaveClass('hidden', 'desktop:inline')
+  })
+
+  it('after sending: a check, the admin’s thank-you words, and the page told', async () => {
+    vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
+    const onSentChange = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="We read every note." variant="inline" onSentChange={onSentChange} />)
+    await user.type(screen.getByLabelText('Your note'), 'A note')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByRole('heading', { name: 'Thanks, it’s sent' })).toBeInTheDocument()
+    expect(screen.getByText('We read every note.')).toBeInTheDocument()
+    expect(onSentChange).toHaveBeenLastCalledWith(true)
+    await user.click(screen.getByRole('button', { name: 'Send another' }))
+    expect(onSentChange).toHaveBeenLastCalledWith(false)
+  })
+})
+
+describe('FeedbackForm — the dialog leads with Tell us', () => {
+  it('shows “Know something we don’t?” before the form', () => {
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    const dialog = screen.getByRole('dialog', { name: 'Feedback' })
+    const card = within(dialog).getByRole('button', { name: /Know something we don’t\?/ })
+    const form = within(dialog).getByRole('region', { name: 'Anything else?' })
+    expect(card.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  // The box is fixed, and the dialog has a transform (its opening
+  // animation), so the box has to leave the dialog: portaled to <body>, with
+  // the dialog hidden while it's up and Escape left to the box.
+  it('steps aside for the box, and leaves Escape to it', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={onClose} />)
+    await user.click(screen.getByRole('button', { name: /Know something we don’t\?/ }))
+    expect(screen.getByRole('dialog', { hidden: true, name: 'Feedback' }).closest('.fixed.inset-0')).toHaveClass('hidden')
+    await user.keyboard('{Escape}')
+    // The box's own Escape may close it, which closes Feedback once; this
+    // dialog's listener must not add a second.
+    expect(onClose.mock.calls.length).toBeLessThanOrEqual(1)
   })
 })
 
 describe('FeedbackForm — the privacy line under the button', () => {
   it('is the one-liner, with a "Privacy" link that opens the policy in a new tab', () => {
     renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" />)
-    expect(screen.getByText(/We only use this to reply\./)).toBeInTheDocument()
+    expect(screen.getByText(/Read by the people who run the guide\./)).toBeInTheDocument()
     expect(screen.queryByText(/never for marketing/)).not.toBeInTheDocument()
     const link = screen.getByRole('link', { name: 'Privacy' })
     expect(link).toHaveAttribute('href', '/test-community/privacy')

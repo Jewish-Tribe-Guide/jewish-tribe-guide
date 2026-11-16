@@ -5,8 +5,6 @@
 // small tablet, where the three sat side by side in the same back-stack.
 export const PAGE_COLUMN = 'mx-auto w-full max-w-2xl px-4 sm:px-6'
 
-// Feedback's title on a desktop, inside its card. About and Privacy had it
-// too until their titles moved onto the photo header (board W11, Nov 15);
-// Feedback stays plain (the user's call).
-export const PAGE_TITLE_DESKTOP =
-  'desktop:text-[34px] desktop:font-bold desktop:leading-tight desktop:tracking-tight desktop:text-slate-900'
+// The white box About, Privacy and Feedback are built of (boards About v2,
+// Privacy and terms, Feedback; Nov 15).
+export const PAGE_BOX = 'rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.05)]'

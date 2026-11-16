@@ -1,13 +1,12 @@
 import PageScreenHeader from '@/components/PageScreenHeader'
 import PhotoHeader from '@/components/PhotoHeader'
-import { PAGE_COLUMN } from '@/lib/pageColumn'
+import { PAGE_BOX as BOX, PAGE_COLUMN } from '@/lib/pageColumn'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import { pageBodyToHtml } from '@/lib/richText'
 import { pageDocumentParts, pointGlyph, type PageSection } from '@/lib/pageSections'
 import { GlyphDot } from './PageGlyph'
 import PageContents from './PageContents'
 import PrivacyDetails, { SectionBody } from './PrivacyDetails'
-import { BOX } from './AboutDocument'
 
 type Props = {
   title: string

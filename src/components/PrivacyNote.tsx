@@ -26,17 +26,18 @@ export default function PrivacyNote({ className = '', short = false }: { classNa
   const communitySlug = useCommunitySlug()
   // Feedback asks for an optional email and nothing else, so the full
   // sentence was longer than the form it sat under. The forms that take a
-  // name or a phone number keep it.
+  // name or a phone number keep it. Its words are the Feedback board's
+  // (Nov 15): who reads a note matters more there than what the email is for.
   if (short) {
     return (
-      <p className={`text-xs leading-relaxed text-muted ${className}`}>
-        We only use this to reply.{' '}
+      <p className={`text-center text-sm leading-relaxed text-slate-500 ${className}`}>
+        Read by the people who run the guide.{' '}
         {/* New tab for the same reason as the link below. */}
         <Link
           href={routes.privacy(communitySlug)}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-medium text-blue-700 hover:underline"
+          className="font-semibold text-blue-700 hover:underline"
         >
           Privacy
         </Link>

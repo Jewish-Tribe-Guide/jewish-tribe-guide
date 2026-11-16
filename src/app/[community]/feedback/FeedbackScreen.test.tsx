@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import FeedbackScreen from './FeedbackScreen'
 import AboutDocument from '@/components/pages/AboutDocument'
-import { PAGE_TITLE_DESKTOP } from '@/lib/pageColumn'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
@@ -26,11 +25,11 @@ function HeaderProbe() {
 
 const noFeedbackTab = SITE_SETTINGS_DEFAULTS.mobileTabs!.filter((t) => t.target !== 'feedback')
 
-function renderScreen(isMobile: boolean, mobileTabs = noFeedbackTab) {
+function renderScreen(isMobile: boolean, mobileTabs = noFeedbackTab, email: string | null = null) {
   return renderWithProviders(
     <ScreenHeaderProvider>
       <ForcedViewport isMobile={isMobile}>
-        <FeedbackScreen />
+        <FeedbackScreen email={email} />
       </ForcedViewport>
       <HeaderProbe />
     </ScreenHeaderProvider>,
@@ -84,38 +83,54 @@ describe('FeedbackScreen — the same box as About and Privacy', () => {
   it('has no line telling people to use the listing buttons instead', () => {
     renderScreen(true)
     expect(screen.queryByText(/handled fastest/)).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Your feedback')).toBeInTheDocument()
+    expect(screen.getByLabelText('Your note')).toBeInTheDocument()
   })
 })
 
 // Oct 15: on a desktop, /feedback is reached by a typed or shared link (the
 // footer and the More menu open a dialog over the page being read). It used to
 // answer with that dialog over an empty <main>; now it's a page, like About
-// and Privacy.
+// and Privacy — since Nov 15 (board Feedback) with their photo header too.
 describe('FeedbackScreen — on a desktop it is a page', () => {
-  it('is the form in a card, not a dialog, with its title showing', () => {
+  it('is the form, not a dialog, with its title on the photo', () => {
     renderScreen(false)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
-    const main = screen.getByRole('main')
-    const h1 = within(main).getByRole('heading', { level: 1, name: SITE_SETTINGS_DEFAULTS.feedbackHeading })
-    expect(h1).not.toHaveClass('sr-only')
-    expect(within(main).getByLabelText('Your feedback')).toBeInTheDocument()
+    expect(within(screen.getByTestId('category-hero')).getAllByRole('heading', { level: 1 })[0]).toHaveTextContent(SITE_SETTINGS_DEFAULTS.feedbackHeading)
+    expect(within(screen.getByRole('main')).getByLabelText('Your note')).toBeInTheDocument()
   })
 
-  // About and Privacy's titles are on the photo on a computer now (board
-  // W11); Feedback stays plain, with its title in its card.
-  it('in the same column as About and Privacy, with the pages’ desktop title style', () => {
+  it('in the same column as About and Privacy', () => {
     const { container } = renderScreen(false)
     const feedbackMain = container.querySelector('main')!
-    const feedbackTitle = screen.getByRole('heading', { level: 1 })
     cleanup()
     const page = renderWithProviders(<ScreenHeaderProvider><AboutDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
-    const pageMain = page.container.querySelector('main')!
+    expect(widthClasses(feedbackMain)).toEqual(widthClasses(page.container.querySelector('main')!))
+  })
+})
 
-    expect(widthClasses(feedbackMain)).toEqual(widthClasses(pageMain))
-    expect(feedbackMain.querySelector('[class*="max-w-"]')).toBeNull()
-    expect(feedbackTitle).toHaveClass(...PAGE_TITLE_DESKTOP.split(' '))
+// Board Feedback (Nov 15): "Know something we don't?" first, so a fix to a
+// place goes into the + Add box where an admin can approve it.
+describe('FeedbackScreen — Tell us first, then the note', () => {
+  it('puts the Tell us card before the form', () => {
+    renderScreen(true)
+    const card = screen.getByRole('button', { name: /Know something we don’t\?/ })
+    const form = screen.getByLabelText('Your note')
+    expect(card.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('on a computer, puts the card to the right of the form, under “About a place”', () => {
+    renderScreen(false)
+    const side = screen.getByRole('button', { name: /Know something we don’t\?/ }).parentElement!
+    expect(side).toHaveClass('desktop:col-start-2')
+    expect(within(side).getByText('About a place')).toHaveClass('hidden', 'desktop:block')
+  })
+
+  it('gives the address About gives, on a computer, and nothing when there is none', () => {
+    renderScreen(false, noFeedbackTab, 'hi@guide.org')
+    expect(screen.getByRole('link', { name: /hi@guide\.org/ })).toHaveAttribute('href', 'mailto:hi@guide.org?subject=Feedback')
+    expect(screen.getByRole('link', { name: /hi@guide\.org/ })).toHaveClass('hidden', 'desktop:flex')
+    cleanup()
+    renderScreen(false)
+    expect(screen.queryByText('Rather email?')).not.toBeInTheDocument()
+  })
 })
