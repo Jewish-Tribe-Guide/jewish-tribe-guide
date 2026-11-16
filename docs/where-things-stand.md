@@ -357,6 +357,11 @@ With no choice made it's the first two categories with hours, as before
     place we're missing?" card at the bottom had it as its eyebrow too. The
     card leaves it off on the home and keeps it on What changed's side
     card, where there's no band.
+  - **Fixed Nov 16: Escape didn't close the Add a listing picker** (from
+    "Suggest a listing" on the computer home). Found while looking at it.
+  - **Open (the user, Nov 16): photos in that picker?** Names only since
+    Nov 14. Every Philly listing category but Food has a card photo on
+    dev (Food's home tile gets its picture another way).
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's

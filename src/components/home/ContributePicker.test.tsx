@@ -24,6 +24,17 @@ afterEach(() => cleanup())
 // the real Add form that already exists.
 
 describe('ContributePicker', () => {
+  // Found Nov 16: Escape left it open, unlike every other dialog here.
+  it('closes on Escape', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<ContributePicker onClose={onClose} />, {
+      content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] },
+    })
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('only lists categories where Add is actually enabled', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const noAdd = makeCategory({

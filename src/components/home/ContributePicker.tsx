@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import { resolveCapabilities } from '@/lib/categories'
@@ -28,6 +28,13 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
   const categories = useCategories()
   const community = useCommunitySlug()
   const [query, setQuery] = useState('')
+
+  // Escape closes it, as it does every other dialog in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const eligible = (categories ?? []).filter((c: CategoryConfig) => {
     if (c.kind !== 'listing') return false
