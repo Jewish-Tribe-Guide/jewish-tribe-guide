@@ -121,6 +121,14 @@ are unbalanced; about 6–7 min looks reachable.
   "Rejecting…" at expect's 5s default on a slow runner (4.1 min vs 2.7).
   The approve test got 15s for the same thing on Nov 3; the reject,
   edited-approve and History waits never did. All four have 15s now.
+- Fixed Nov 16 (PR 389's CI, then 4 of 10 locally, on main too): in the
+  admin, a category page's editor started over whenever its list arrived
+  with ANY page changed, so a screen just opened (Add a field) closed
+  itself while another admin, or another test, changed some other page.
+  Now only a change to the open page starts it over. editor-screens went
+  from 8 failures in 20 to 1 in 34. That 1 is still open, as a lead:
+  "See the whole page" showed the preview but the address stayed at
+  `?field=hours` (no trace; it didn't come back in 25 more runs).
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them
