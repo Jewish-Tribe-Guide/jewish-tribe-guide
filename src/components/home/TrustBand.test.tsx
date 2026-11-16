@@ -63,10 +63,11 @@ describe('the trust line', () => {
     expect(band.querySelectorAll('svg')).toHaveLength(2)
   })
 
-  // The user, Oct 23: Google checks more than hours, and not every night.
-  it('says who keeps it, how many places, and that they’re checked with Google', () => {
+  // "· checked with Google" (the user, Oct 23) was cut off after the count
+  // on a phone like "every listing dated" (Nov 16); the sheet names Google.
+  it('says who keeps it and how many places, nothing fetched yet', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
-    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community · 155 places · checked with Google')
+    expect(screen.getByTestId('trust-band')).toHaveTextContent(/^Kept up by the community · 155 places$/)
     // Nothing fetched while the home itself is loading.
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -126,9 +127,14 @@ describe('the trust line', () => {
     expect((await rows())[0]).toBe('We check it every dayMenus. Places on Google Maps are checked against Google.')
   })
 
-  it('every place dated: the band says “every listing dated”', () => {
+  // One line on a phone, so the band is the heading and the count only:
+  // "· every listing dated" after them was cut off with "…" on a 375px
+  // phone (the user, Nov 16). The sheet it opens says the rest.
+  it('the band is the heading and the count, nothing after them to cut off', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 155 })
-    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community · 155 places · every listing dated')
+    expect(screen.getByTestId('trust-band')).toHaveTextContent(/^Kept up by the community · 155 places$/)
+    show({ places: 1, googleChecked: 1, checkedThisWeek: 1, dated: 0 })
+    expect(screen.getAllByTestId('trust-band').at(-1)).toHaveTextContent(/^Kept up by the community · 1 place$/)
   })
 
   // A check that's set up but hasn't dated anything this week, and no eruv

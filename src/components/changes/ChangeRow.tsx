@@ -107,7 +107,10 @@ export default function ChangeRow({
             <CategoryIcon icon={category?.icon ?? ''} categoryId={change.listing.category} color={getCategoryColor([...categories], change.listing.category)} className="h-9 w-9 text-base" sizePx={36} />
           )}
         </span>
-        <span className={`min-w-0 flex-1 ${change.hidden ? 'opacity-45' : ''}`}>
+        {/* break-words: a join link or a long minyan line has nowhere to
+            wrap, and pushed the Activity page wider than a phone, so it
+            slid sideways (the user, Nov 16). */}
+        <span className={`min-w-0 flex-1 break-words ${change.hidden ? 'opacity-45' : ''}`}>
           <span className="block text-[15px] leading-snug text-slate-700">
             {linked ? (
               // The whole row is the link (its ::after covers it), so "and 2

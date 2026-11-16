@@ -79,6 +79,12 @@ describe('FeedbackForm — the board’s form', () => {
     }
   })
 
+  // The user, Nov 16: "No emoji for send in feedback" (a paper plane).
+  it('Send is the word alone, with no picture beside it', () => {
+    renderWithProviders(<FeedbackForm successMessage="Thanks!" />)
+    expect(screen.getByRole('button', { name: 'Send' }).querySelector('svg, img')).toBeNull()
+  })
+
   it('keeps Send pale until there is a note', async () => {
     const user = userEvent.setup()
     renderWithProviders(<FeedbackForm successMessage="Thanks!" />)

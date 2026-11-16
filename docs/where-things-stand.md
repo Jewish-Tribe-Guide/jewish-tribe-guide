@@ -48,6 +48,28 @@ checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
 (~12 min now). The e2e shards wait for cache-roundtrip and admin-write and
 are unbalanced; about 6–7 min looks reachable.
 
+**Nov 16, the user's notes after the release:**
+
+- Fixed: the Activity page slid sideways on a phone (a join link or long
+  minyan line had nowhere to wrap; 421px on a 375px phone, live). Rows wrap.
+- Fixed: the phone's "Kept up by the community" card was cut off with "…".
+  It says the count only now ("· 158 places"); "every listing dated" and
+  "checked with Google" are in the sheet it opens.
+- Fixed: Feedback's Send has no paper-plane icon ("No emoji for send").
+- The computer home's map photo: production lacked migration 095; the user
+  ran it and set the photo, then it was copied to production's own storage
+  (it pointed at dev's). The live home shows the copy once its cache
+  refreshes (any Site tab save does it).
+- Open: About and Privacy's new text is on dev only; the layout is live.
+  Copying the text to live needs the user's go-ahead.
+- Open: Activity says "Mei Shalva updated" for a visitor's edit to its
+  Keilim notes, which reads as "updated by Mei Shalva". Wording is the
+  user's call.
+- Open: coming back to the app after switching tabs still feels stuck at
+  times (fixed once Oct 18 for the refresh; something else now). Not
+  investigated yet.
+- Open question, not a decision: should a visitor order their You page?
+
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
 with no icons. The computer home's Suggest a listing card lifts on hover
