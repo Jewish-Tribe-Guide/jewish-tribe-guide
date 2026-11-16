@@ -298,6 +298,10 @@ With no choice made it's the first two categories with hours, as before
       text, which renders as a lead with no sections (readable, plain).
       **Writing the new text to live needs the user's go-ahead, after this
       deploys.**
+    - **Fixed Nov 15: the bottom of both pages ran under the phone's tab
+      bar** (the user: "getting cut off at the bottom"). They had a flat
+      48px under them, as the old pages did; now the bar's clearance plus
+      a small gap, like Feedback and the other tab screens.
     - **PostHog replays are mentioned** (the user, Nov 15, after asking
       whether sites usually say so): "and recordings of some visits, with
       anything typed hidden". The code records whenever Session Replay is

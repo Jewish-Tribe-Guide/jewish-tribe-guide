@@ -15,6 +15,9 @@ const SCREENS = [
   'src/app/[community]/changes/ChangesScreen.tsx',
   'src/app/[community]/feedback/FeedbackScreen.tsx',
   'src/app/[community]/you/YouScreen.tsx',
+  // About and Privacy ran under the bar until Nov 15 (the user: "getting cut off at the bottom").
+  'src/components/pages/AboutDocument.tsx',
+  'src/components/pages/PrivacyDocument.tsx',
 ]
 
 describe('room for the tab bar', () => {

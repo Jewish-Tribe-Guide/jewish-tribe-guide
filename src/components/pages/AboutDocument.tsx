@@ -1,6 +1,7 @@
 import PageScreenHeader from '@/components/PageScreenHeader'
 import PhotoHeader from '@/components/PhotoHeader'
 import { PAGE_COLUMN } from '@/lib/pageColumn'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import { pageBodyToHtml } from '@/lib/richText'
 import { aboutBlocks, firstMailto, pageDocumentParts, pointGlyph, type PageSection } from '@/lib/pageSections'
 import { GlyphDot } from './PageGlyph'
@@ -83,10 +84,10 @@ export default function AboutDocument({ title, eyebrow, body }: Props) {
   const rows = beside ? blocks.slice(0, -1) : blocks
 
   return (
-    <main className={`${PAGE_COLUMN} pt-4 pb-12 desktop:pt-8`}>
+    <main className={`${PAGE_COLUMN} pt-4 ${TAB_BAR_CLEARANCE} desktop:pb-12 desktop:pt-8`}>
       <PageScreenHeader title={title} />
       <PhotoHeader eyebrow={eyebrow} title={title}>
-        <div data-testid="page-document" className="flex flex-col gap-3.5 desktop:gap-12 desktop:pt-3">
+        <div data-testid="page-document" className="mb-4 flex flex-col gap-3.5 desktop:mb-0 desktop:gap-12 desktop:pt-3">
           <h1 className="sr-only desktop:hidden">{title}</h1>
           {eyebrow && <p className="mx-0.5 text-sm font-semibold text-slate-500 desktop:hidden">{eyebrow}</p>}
           {/* Text with no headings at all (live's About until its new text

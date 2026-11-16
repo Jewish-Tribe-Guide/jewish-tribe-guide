@@ -1,6 +1,7 @@
 import PageScreenHeader from '@/components/PageScreenHeader'
 import PhotoHeader from '@/components/PhotoHeader'
 import { PAGE_COLUMN } from '@/lib/pageColumn'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import { pageBodyToHtml } from '@/lib/richText'
 import { pageDocumentParts, pointGlyph, type PageSection } from '@/lib/pageSections'
 import { GlyphDot } from './PageGlyph'
@@ -50,10 +51,10 @@ export default function PrivacyDocument({ title, updated, body }: Props) {
   const [first, ...rest] = sections
 
   return (
-    <main className={`${PAGE_COLUMN} pt-4 pb-12 desktop:pt-8`}>
+    <main className={`${PAGE_COLUMN} pt-4 ${TAB_BAR_CLEARANCE} desktop:pb-12 desktop:pt-8`}>
       <PageScreenHeader title={title} />
       <PhotoHeader eyebrow={updated} title={title}>
-        <div data-testid="page-document" className="desktop:grid desktop:grid-cols-[240px_minmax(0,760px)] desktop:items-start desktop:gap-10 desktop:pt-3">
+        <div data-testid="page-document" className="mb-4 desktop:mb-0 desktop:grid desktop:grid-cols-[240px_minmax(0,760px)] desktop:items-start desktop:gap-10 desktop:pt-3">
           {sections.length > 1 ? <PageContents items={sections.map((s) => ({ id: s.id, heading: s.heading }))} /> : <div aria-hidden="true" />}
           <div className="flex flex-col gap-3 desktop:gap-4">
             <h1 className="sr-only desktop:hidden">{title}</h1>
