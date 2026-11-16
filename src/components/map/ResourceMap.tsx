@@ -298,6 +298,18 @@ export function resolveSelectionZoom(hasLocation: boolean, isFar: boolean, curre
   return null
 }
 
+// The two looping rings, the selected pin's halo and the visitor's own dot's
+// pulse, are invisible unless their animation is running: `opacity:0` as
+// the base, the keyframes fading them in. With Reduce Motion on, globals.css
+// cuts every animation to one 0.01ms pass, and a ring whose base style was
+// a solid disc stayed one, a 30px blot under the selected pin (a visitor's
+// phone, Nov 15). Without the animation, the selected pin is still bigger.
+export function pinHaloStyle(color: string): string {
+  return `position:absolute;bottom:6px;width:30px;height:30px;border-radius:9999px;background:${color};opacity:0;animation:jpcPinHalo 1.4s ease-out infinite`
+}
+export const USER_PULSE_STYLE =
+  'position:absolute;inset:0;border-radius:9999px;background:#2563eb;opacity:0;animation:jpcPulse 1.8s ease-out infinite'
+
 // A category pin — noticeably bigger AND wrapped in a pulsing color halo plus
 // a one-time drop-bounce when it's the place currently shown in the mobile
 // sheet. Scale alone (the old behavior) read as "a little bigger", easy to
@@ -337,7 +349,7 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     (isSelected ? ';animation:jpcPinDrop 0.35s ease-out' : '')
   if (isSelected) {
     const halo = document.createElement('div')
-    halo.style.cssText = `position:absolute;bottom:6px;width:30px;height:30px;border-radius:9999px;background:${p.color};animation:jpcPinHalo 1.4s ease-out infinite`
+    halo.style.cssText = pinHaloStyle(p.color)
     wrap.append(halo)
   }
   wrap.append(pin.element)
@@ -460,8 +472,7 @@ function buildUserDot(): HTMLElement {
   const wrap = document.createElement('div')
   wrap.style.cssText = 'position:relative;width:22px;height:22px'
   const pulse = document.createElement('div')
-  pulse.style.cssText =
-    'position:absolute;inset:0;border-radius:9999px;background:#2563eb;animation:jpcPulse 1.8s ease-out infinite'
+  pulse.style.cssText = USER_PULSE_STYLE
   const dot = document.createElement('div')
   dot.style.cssText =
     'position:absolute;inset:5px;border-radius:9999px;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)'

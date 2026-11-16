@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { haversineMiles } from '@/lib/geo'
-import { markerZIndex, pointsWithinZoomRadius, resolveSelectionZoom, SELECTED_Z_BOOST, type MapPoint } from './ResourceMap'
+import { markerZIndex, pinHaloStyle, pointsWithinZoomRadius, resolveSelectionZoom, SELECTED_Z_BOOST, USER_PULSE_STYLE, type MapPoint } from './ResourceMap'
 
 function point(overrides: Partial<MapPoint> = {}): MapPoint {
   return { id: 'p1', lat: 40, lng: -75, name: 'Test Place', color: '#000', ...overrides }
@@ -109,5 +109,22 @@ describe('resolveSelectionZoom', () => {
 
   it('leaves the zoom alone for a nearby pick with a location set', () => {
     expect(resolveSelectionZoom(true, false, 11)).toBeNull()
+  })
+})
+
+describe('the looping rings without their animation', () => {
+  // Reduce Motion (globals.css) runs each animation once for 0.01ms, then the
+  // element is drawn in its base style. That base must be nothing at all.
+  const base = (css: string) => {
+    const decls = Object.fromEntries(css.split(';').map((d) => d.split(':').map((x) => x.trim()) as [string, string]))
+    return decls.opacity
+  }
+
+  it('the selected pin’s halo is invisible', () => {
+    expect(base(pinHaloStyle('#be185d'))).toBe('0')
+  })
+
+  it('the visitor’s own dot’s pulse is invisible', () => {
+    expect(base(USER_PULSE_STYLE)).toBe('0')
   })
 })

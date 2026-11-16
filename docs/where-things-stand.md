@@ -287,6 +287,12 @@ With no choice made it's the first two categories with hours, as before
       "The Guide is built to stay current…" and "A community effort"
       before "The goal is simple…", are new words, so they go in through
       the Pages tab (the user's, or mine on a yes). Not written.
+  - **Fixed Nov 15: a solid circle under the selected map pin** (a
+    visitor's phone, sent by the user). It was the pin's pulsing halo with
+    Reduce Motion on: the site cuts animations short there, and the halo's
+    resting look was a solid disc. Both looping rings (the halo, and the
+    pulse around your own dot) now rest invisible. Phones without Reduce
+    Motion look the same as before.
   - **Fixed Nov 15: the "flaky" offline test was a test bug.**
     `e2e/offline.spec.ts`'s wait for the service worker never waited
     (an async `waitForFunction` predicate, which Playwright doesn't
