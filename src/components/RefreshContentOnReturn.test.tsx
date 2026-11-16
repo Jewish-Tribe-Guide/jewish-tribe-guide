@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import RefreshContentOnReturn, { MIN_REFRESH_INTERVAL_MS } from './RefreshContentOnReturn'
+import RefreshContentOnReturn, { MIN_REFRESH_INTERVAL_MS, QUIET_MS } from './RefreshContentOnReturn'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
 
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter }))
@@ -35,8 +35,15 @@ function letThrottleExpire() {
 let serverVersion = 'v1'
 const fetchMock = vi.fn(async (_url: string) => Response.json({ ok: true, version: serverVersion }))
 
-/** Lets the ask and its answer land: the component awaits both. */
+/** Lets the ask and its answer land (the component awaits both), then the
+ *  quiet wait before a refresh pass, with nobody tapping. */
 async function settle() {
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+  vi.advanceTimersByTime(QUIET_MS)
+}
+
+/** The ask and its answer only, with the quiet wait still to run. */
+async function answered() {
   for (let i = 0; i < 10; i++) await Promise.resolve()
 }
 
@@ -113,6 +120,49 @@ describe('RefreshContentOnReturn', () => {
     await settle()
 
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  // Nov 16: live, the server's answer flipped between two fingerprints and
+  // a page cached hours earlier carried a third; refreshing it brought the
+  // same old one back, so every return refreshed and held the next tap.
+  it('refreshes once for a fingerprint, even when the page it brings back still carries an old one', async () => {
+    show()
+    for (const answer of ['v2', 'v3', 'v2', 'v3', 'v1']) {
+      serverVersion = answer
+      letThrottleExpire()
+      window.dispatchEvent(new Event('focus'))
+      await settle()
+    }
+    // v2 and v3, once each; v1 is what the tab loaded with.
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(2)
+  })
+
+  // The tap someone came back to make is never the one held behind it.
+  it('waits for the visitor to be still before refreshing', async () => {
+    show()
+    letThrottleExpire()
+    window.dispatchEvent(new Event('focus'))
+    await answered()
+    expect(mockRouter.refresh).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(QUIET_MS - 100)
+    window.dispatchEvent(new Event('pointerdown'))
+    vi.advanceTimersByTime(QUIET_MS - 100)
+    expect(mockRouter.refresh).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(100)
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops a waiting refresh once unmounted', async () => {
+    const { unmount } = show()
+    letThrottleExpire()
+    window.dispatchEvent(new Event('focus'))
+    await answered()
+    unmount()
+    vi.advanceTimersByTime(QUIET_MS * 2)
+    expect(mockRouter.refresh).not.toHaveBeenCalled()
   })
 
   it('asks when the tab becomes visible again', async () => {

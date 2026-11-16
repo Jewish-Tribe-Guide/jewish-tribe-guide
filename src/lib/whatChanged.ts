@@ -1,4 +1,4 @@
-import type { ActivityKind, ActivitySource } from './activity'
+import type { ActivityKind, ActivitySource, EditedBy } from './activity'
 import type { ChangePart } from './changeParts'
 
 // ── What changed (step 7a) ───────────────────────────────────────────────────
@@ -30,6 +30,8 @@ export type ChangeLogRow = {
   /** The item's field, on an item_added row. */
   fieldKey?: string | null
   submissionId: string | null
+  /** Who sent it, for an approved submission (activity.ts editedBy). */
+  by?: EditedBy | null
   hidden: boolean
   /** What it changed, as visitors read it (migration 069; null before). */
   changes?: ChangePart[] | null
@@ -51,6 +53,8 @@ export type Change = {
   /** What it changed: "Hours" · "Sunday 11 AM – 10 PM", or a new place's
    *  facts. Empty for an edit from before migration 069 ("updated"). */
   parts: ChangePart[]
+  /** Who sent it, when that's known. */
+  by?: EditedBy | null
   hidden: boolean
 }
 
@@ -93,6 +97,7 @@ export function whatChanged(rows: readonly ChangeLogRow[], timezone: string, opt
       listing: { id, name, category, ...(photo ? { photo } : {}) },
       items,
       parts,
+      ...(newest.by ? { by: newest.by } : {}),
       hidden: group.every((r) => r.hidden),
     }
   })
@@ -173,7 +178,9 @@ export function changeSentence(change: Change): { before: string; name: string; 
     case 'google':
       return { before: '', name, after: ' updated from Google' }
     default:
-      return { before: '', name, after: ' updated' }
+      // A visitor's edit says so: "Mei Shalva updated" read as the place's
+      // own doing (the user, Nov 16).
+      return change.by === 'visitor' ? { before: 'A visitor updated ', name, after: '' } : { before: '', name, after: ' updated' }
   }
 }
 

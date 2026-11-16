@@ -63,12 +63,22 @@ are unbalanced; about 6–7 min looks reachable.
 - Done: About and Privacy's new text copied from dev to live (the user's
   yes, Nov 16), refreshed by a Pages tab save; the live home shows the map
   photo from production's storage since the same save.
-- Open: Activity says "Mei Shalva updated" for a visitor's edit to its
-  Keilim notes, which reads as "updated by Mei Shalva". Wording is the
-  user's call.
-- Open: coming back to the app after switching tabs still feels stuck at
-  times (fixed once Oct 18 for the refresh; something else now). Not
-  investigated yet.
+- Fixed: Activity says "A visitor updated Mei Shalva" for a visitor's edit
+  (the user: "we can say visitor updated"). An admin's own edit and the
+  checks' ("… (automated)") still say "Mei Shalva updated" (activity.ts
+  `editedBy`, read from each edit's submission).
+- Fixed: coming back to the app re-rendered the whole page on nearly every
+  return, and a tap made then waited for it. Live, the server's content
+  fingerprint flipped between two values (instances with different cached
+  copies) and pages cached hours earlier carried a third, so it never
+  matched. Now a tab refreshes once per new fingerprint, and only after the
+  visitor has been still 1.5s (RefreshContentOnReturn). Not covered: a
+  phone that throws the page away in the background reloads it, and taps
+  do nothing until it has loaded; not measured.
+- Food's band photo and Mike's Chicken's photo pointed at dev's storage on
+  live; copied to production's (the user's yes, Nov 16). Live has no eruv
+  photo pointing at dev. Dev alone has photos for Eruv, Hospitals,
+  Childcare and Schools (iStock links) and Hotels; not copied.
 - Open question, not a decision: should a visitor order their You page?
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header

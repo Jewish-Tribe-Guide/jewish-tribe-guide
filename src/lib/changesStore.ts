@@ -2,7 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { CHANGE_KINDS, type ChangeLogRow } from './whatChanged'
-import type { ActivityKind, ActivitySource } from './activity'
+import { editedBy, type ActivityKind, type ActivitySource, type EditedBy } from './activity'
 import type { ChangePart } from './changeParts'
 
 // Reads the activity log for What changed (step 7a), and hides a change.
@@ -78,7 +78,18 @@ export async function listChangeLogUncached(community: string): Promise<ChangeLo
   for (let i = 0; i < ids.length; i += IDS_PER_READ) rows.push(...(await read(ids.slice(i, i + IDS_PER_READ))))
   rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id)
 
-  return rows.slice(0, ROW_LIMIT).map((r) => ({
+  // Who sent each approved edit (a visitor, an admin, one of the checks),
+  // from its submission. A failed read leaves it unsaid, never wrong.
+  const kept = rows.slice(0, ROW_LIMIT)
+  const by = new Map<string, EditedBy>()
+  const submissionIds = [...new Set(kept.map((r) => r.submission_id).filter((id): id is string => !!id))]
+  for (let i = 0; i < submissionIds.length; i += IDS_PER_READ) {
+    const { data, error } = await supabase.from('submission').select('id, submitted_by').in('id', submissionIds.slice(i, i + IDS_PER_READ))
+    if (error) break
+    for (const s of (data ?? []) as { id: string; submitted_by: { name?: string; email?: string } | null }[]) by.set(s.id, editedBy(s.submitted_by))
+  }
+
+  return kept.map((r) => ({
     id: r.id,
     createdAt: r.created_at,
     kind: r.kind,
@@ -86,6 +97,7 @@ export async function listChangeLogUncached(community: string): Promise<ChangeLo
     item: r.item,
     fieldKey: r.field_key,
     submissionId: r.submission_id,
+    by: r.submission_id ? (by.get(r.submission_id) ?? null) : null,
     hidden: !!r.hidden_at,
     changes: Array.isArray(r.changes) ? r.changes : null,
     listing: r.resource_id ? (listings.get(r.resource_id) ?? null) : null,

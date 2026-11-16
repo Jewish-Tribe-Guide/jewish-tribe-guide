@@ -91,6 +91,24 @@ describe('what each change changed', () => {
     expect(changeSentence(without)).toEqual({ before: '', name: 'Old Edit', after: ' updated' })
   })
 
+  // The user, Nov 16: a visitor's edit to Mei Shalva's Keilim notes read
+  // "Mei Shalva updated", as if the mikvah had made it.
+  it('a visitor’s edit says a visitor made it; an admin’s or a check’s says only that the place was updated', () => {
+    const [visitor, admin, check, unknown] = whatChanged(
+      [
+        row({ hoursAgo: 1, listing: place('Mei Shalva'), by: 'visitor' }),
+        row({ hoursAgo: 2, listing: place('ALDI'), by: 'admin' }),
+        row({ hoursAgo: 3, listing: place('Bala Shul'), by: 'check' }),
+        row({ hoursAgo: 4, listing: place('Old Edit') }),
+      ],
+      NY,
+    )
+    expect(changeSentence(visitor)).toEqual({ before: 'A visitor updated ', name: 'Mei Shalva', after: '' })
+    expect(changeSentence(admin)).toEqual({ before: '', name: 'ALDI', after: ' updated' })
+    expect(changeSentence(check)).toEqual({ before: '', name: 'Bala Shul', after: ' updated' })
+    expect(changeSentence(unknown)).toEqual({ before: '', name: 'Old Edit', after: ' updated' })
+  })
+
   it('items an edit added head the line, so their list isn’t said again; the rest of the edit is', () => {
     const items = { key: 'm', label: 'Kosher items', value: 'added Challah' }
     const [change] = whatChanged(
