@@ -298,11 +298,13 @@ With no choice made it's the first two categories with hours, as before
       text, which renders as a lead with no sections (readable, plain).
       **Writing the new text to live needs the user's go-ahead, after this
       deploys.**
-    - **PostHog replays: the text no longer mentions them** (the user,
-      Nov 15: no replays). The code still records them whenever Session
-      Replay is on in PostHog's project settings
-      (`src/instrumentation-client.ts`), so that setting has to be off,
-      or the code switched off, for the text to be true. Not checked.
+    - **PostHog replays are mentioned** (the user, Nov 15, after asking
+      whether sites usually say so): "and recordings of some visits, with
+      anything typed hidden". The code records whenever Session Replay is
+      on in PostHog's project settings (`src/instrumentation-client.ts`)
+      and leaves PostHog's default of hiding typed input
+      (`src/lib/deferredPostHog.ts`); the project settings themselves
+      were not checked.
     - **Open question for the user:** is one contact email right for
       every community (the page rows are shared by all communities, and
       the email is Philly's)?
