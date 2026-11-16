@@ -8,6 +8,8 @@ import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { ui } from '@/lib/uiConfig'
+import { categoryTint, getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
+import { TilePhoto } from './sections'
 
 /** The Add flow's category picker — opened by SuggestListingCard's "Submit a
  *  Listing" button (UpdateListingsCard used to open this too, before the
@@ -20,7 +22,9 @@ import { ui } from '@/lib/uiConfig'
  *  listing to search for,
  *  so "which category" is the real first question. A search field instead
  *  of a plain grid: filtering scales better than a grid that just gets
- *  taller as more categories are added. Names only, no icons (Nov 14).
+ *  taller as more categories are added. No icons (Nov 14); each name has
+ *  its home tile's photo beside it (the user, Nov 16), or the tile's plain
+ *  tint where there's none.
  *  Picking a category deep-links straight into that category's Add form
  *  (`?form=create` — see FindResources' own doc on why that resolves with
  *  no listing needed). */
@@ -82,8 +86,9 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
                 key={c.id}
                 href={`${routes.slug(community, c.id)}?form=create`}
                 onClick={onClose}
-                className="flex items-center rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-50"
+                className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-slate-50"
               >
+                <PickerPhoto category={c} categories={categories} />
                 <span className="min-w-0 truncate text-sm font-medium text-slate-800">{c.pluralLabel}</span>
               </Link>
             ))}
@@ -91,5 +96,20 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </div>
+  )
+}
+
+/** The home tile's picture, small: the same photo, or the same plain tint. */
+function PickerPhoto({ category, categories }: { category: CategoryConfig; categories: CategoryConfig[] | null | undefined }) {
+  const photo = getCategoryTilePhoto(categories, category.id)
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="picker-photo"
+      className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg"
+      style={{ backgroundColor: photo ? '#e2e8f0' : categoryTint(getCategoryColor(categories ?? [], category.id)) }}
+    >
+      {photo && <TilePhoto src={photo} px={80} sizes="40px" />}
+    </span>
   )
 }

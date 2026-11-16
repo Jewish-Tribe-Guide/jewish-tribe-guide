@@ -359,9 +359,11 @@ With no choice made it's the first two categories with hours, as before
     card, where there's no band.
   - **Fixed Nov 16: Escape didn't close the Add a listing picker** (from
     "Suggest a listing" on the computer home). Found while looking at it.
-  - **Open (the user, Nov 16): photos in that picker?** Names only since
-    Nov 14. Every Philly listing category but Food has a card photo on
-    dev (Food's home tile gets its picture another way).
+  - **Photos in the Add a listing picker (the user, Nov 16: "Add photos
+    first").** A change to the Nov 14 decision (names only): each name has
+    its home tile's photo beside it, 40px, the same picture the tile uses
+    (so Food's banner picture too), or the tile's plain tint where a
+    category has none. Still no icons or emoji.
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's
