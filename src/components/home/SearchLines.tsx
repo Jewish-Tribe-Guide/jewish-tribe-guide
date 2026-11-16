@@ -129,7 +129,7 @@ function LineIcon({ line, categories }: { line: SearchLine; categories: readonly
   if (line.kind === 'listing' && line.listing) {
     return <CategoryIcon icon={category?.icon ?? ''} categoryId={category?.id} initials={initialsOf(line.listing.name)} shape="square" color={color} className="h-9 w-9 text-lg" sizePx={36} />
   }
-  if (category) return <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={category.iconImageUrl} color={color} className="h-9 w-9 text-lg" sizePx={36} />
+  if (category) return <CategoryIcon icon={category.icon} categoryId={category.id} color={color} className="h-9 w-9 text-lg" sizePx={36} />
   return (
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
       {line.kind === 'add' ? (

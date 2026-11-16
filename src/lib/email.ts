@@ -13,7 +13,7 @@ import {
 } from './submissionDiff'
 import { MENU_LINK_PROPOSED, SHOWN_WHEN_PROPOSED } from './syncFields'
 import { MENU_LINK_LABEL } from './menuLink'
-import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
+import { getCommunityNotifyRecipients, getReviewActionRecipients, resolveCommunity } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -170,22 +170,46 @@ function taggedSubject(subject: string): string {
   return process.env.NODE_ENV === 'production' ? subject : `[DEV] ${subject}`
 }
 
+/** "Philly Jewish Guide" <notifications@…>: the inbox shows the
+ *  community's name instead of the bare address (the user, Nov 15). An
+ *  address that already carries a name (RESEND_FROM set as
+ *  `Name <address>`) is left as it is, and so is a bare one with no name. */
+export function namedSender(address: string, name: string | null | undefined): string {
+  const clean = (name ?? '').replace(/["<>\\\r\n]/g, '').trim()
+  if (!clean || address.includes('<')) return address
+  return `"${clean}" <${address}>`
+}
+
+/** The community's own name ("Philly Jewish Guide"), or the default
+ *  community's when an email isn't about one (the sign-in links). Never
+ *  fails a send: with no name, the bare address. */
+async function senderName(community: string | null | undefined): Promise<string | null> {
+  try {
+    return (await resolveCommunity(community)).name
+  } catch {
+    return null
+  }
+}
+
 export async function sendEmail({
   to,
   subject,
   html,
   replyTo,
   bcc,
+  community,
 }: {
   to: string | string[]
   subject: string
   html: string
   replyTo?: string
   bcc?: string[]
+  /** The community the email is about (its slug): its name is the sender's. */
+  community?: string | null
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('Missing required environment variable: RESEND_API_KEY')
-  const from = process.env.RESEND_FROM || 'onboarding@resend.dev'
+  const from = namedSender(process.env.RESEND_FROM || 'onboarding@resend.dev', await senderName(community))
   const resend = new Resend(apiKey)
   const { error } = await resend.emails.send({
     from,
@@ -333,6 +357,7 @@ export async function sendNotification(
     : buildHtml(payload, requestId, timestamp, communitySlug)
   await sendEmail({
     to,
+    community: communitySlug,
     subject: buildRequestSubject(payload),
     html,
     ...(payload.requestType === 'Feedback' && payload.contact.email?.trim()
@@ -522,7 +547,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     ${adminLink}
   </div>`
 
-  await sendEmail({ to, subject, html })
+  await sendEmail({ to, subject, html, community: submission.community_id })
 }
 
 /** "New category — Kosher Butchers" / "New listing — Goldi's" — the same
@@ -571,6 +596,7 @@ export async function sendReviewActionNotification(
   // matters once you've opened the email, not before.
   await sendEmail({
     to,
+    community: submission.community_id,
     subject: subjectLine(submissionRef(submission.case_number), `${Verb} — ${submissionDisplayName(submission)}`),
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
       <h2 style="color:#1d4ed8;margin-bottom:4px;">${Verb}</h2>
@@ -653,6 +679,7 @@ async function sendCommunityStatusChangeDigest(communitySlug: string, changes: S
   const admin = adminAppUrl()
   await sendEmail({
     to,
+    community: communitySlug,
     subject:
       changes.length === 1
         ? `${changes[0].name} is now ${statusWord(changes[0].to)}`
@@ -675,7 +702,7 @@ export type WatchDigestItem = { name: string; what: string }
  */
 export async function sendNightlyEmail(communitySlug: string, email: { subject: string; html: string }): Promise<void> {
   const to = await notificationRecipients(communitySlug)
-  await sendEmail({ to, subject: email.subject, html: email.html })
+  await sendEmail({ to, subject: email.subject, html: email.html, community: communitySlug })
 }
 
 /**
@@ -697,6 +724,7 @@ export async function sendEruvLineAlert(communitySlug: string, eruvim: { name: s
   const admin = adminAppUrl()
   await sendEmail({
     to,
+    community: communitySlug,
     subject: eruvim.length === 1 ? `${eruvim[0].name}: its map has changed` : `${eruvim.length} eruv maps have changed`,
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
       <h2 style="color:#1d4ed8;font-size:18px;">Eruv maps</h2>

@@ -1,6 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig } from '@/lib/categories'
-import { getOpenStatus, hasAnyHours } from '@/lib/hours'
+import { businessClosure, getOpenStatus, hasAnyHours, hoursNextOpeningAt } from '@/lib/hours'
+import { minyanimPage } from '@/lib/davening'
 import { eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
 import { hasAnyDate, KOSHER_SECTION } from '@/lib/boxDates'
 import type { CheckRan } from '@/lib/checksRun'
@@ -161,29 +162,97 @@ export type OpenNowRow = {
    *  can filter by, in the admin's order, at most three. Empty when it has
    *  neither. */
   parts: string[]
+  /** With nothing open (board V3, Nov 15): when the first place opens and
+   *  which, so overnight the row says "Opens 7 AM" instead of going. */
+  opens?: { at: string; first: string }
 }
 
 /** What's open now, in the first `limit` categories (the admin's order)
  *  whose places say their hours: on Philly's home, Food and Grocery. A
- *  category with nothing open says nothing: late at night there may be no
- *  rows at all. Not on Shabbos or Yom Tov (the caller's to know). */
+ *  category with nothing open says when its first place opens (board V3,
+ *  the user, Nov 15: overnight the card used to go). Not on Shabbos or Yom
+ *  Tov (the caller's to know). */
 export function openNowRows(listings: readonly DirectoryResource[], categories: readonly CategoryConfig[], now: Date, limit = 2): OpenNowRow[] {
-  const rows: OpenNowRow[] = []
-  let taken = 0
-  for (const category of categories) {
-    if (taken >= limit) break
-    if (category.kind !== 'listing') continue
-    const hoursKeys = category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
-    if (hoursKeys.length === 0) continue
-    const places = listings.filter((l) => l.category === category.id)
-    if (!places.some((p) => hoursKeys.some((k) => hasAnyHours(p[k])))) continue
-    taken++
-    const open = places.filter((p) => getOpenStatus(p as Record<string, unknown>, hoursKeys, now).isOpen)
-    if (open.length === 0) continue
-    const tracked = itemsTracked(category, places)
-    rows.push({ category, open: open.length, parts: tracked ? [tracked] : openParts(category, open) })
+  return readyMadeRightNow(categories, listings, limit).flatMap((category) => openNowRow(category, listings, now) ?? [])
+}
+
+/** One category's row: how many places are open, or, with none, when the
+ *  first opens. Null when nothing in it says its hours. */
+export function openNowRow(category: CategoryConfig, listings: readonly DirectoryResource[], now: Date): OpenNowRow | null {
+  const hoursKeys = hoursKeysOf(category)
+  const places = listings.filter((l) => l.category === category.id)
+  const open = places.filter((p) => getOpenStatus(p as Record<string, unknown>, hoursKeys, now).isOpen)
+  if (open.length === 0) {
+    const opens = firstToOpen(places, hoursKeys, now)
+    return opens ? { category, open: 0, parts: [], opens } : null
   }
-  return rows
+  const tracked = itemsTracked(category, places)
+  return { category, open: open.length, parts: tracked ? [tracked] : openParts(category, open) }
+}
+
+const hoursKeysOf = (category: CategoryConfig) => category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
+
+// ── What Right now answers (board V1, the user, Nov 15) ─────────────────────
+// An admin picks which categories Right now answers on a weekday, from the
+// ones that can say something about now. What each says comes from its
+// kind and fields, never from which category it is:
+//   open    places with hours: "25 open now", overnight "Opens 7 AM".
+//   minyan  the community's minyan page (minyanimPage): the next minyan.
+//   eruv    the eruv page: whether it's up.
+
+export type RightNowAnswer = 'open' | 'minyan' | 'eruv'
+export type RightNowPick = { category: CategoryConfig; answer: RightNowAnswer }
+
+/** What a category can answer in Right now, or null when it can't. */
+export function rightNowAnswer(category: CategoryConfig, categories: readonly CategoryConfig[], listings: readonly DirectoryResource[]): RightNowAnswer | null {
+  if (category.kind === 'eruv') return 'eruv'
+  if (category.kind !== 'listing') return null
+  if (minyanimPage(categories, listings)?.id === category.id) return 'minyan'
+  const hoursKeys = hoursKeysOf(category)
+  if (hoursKeys.length === 0) return null
+  return listings.some((l) => l.category === category.id && hoursKeys.some((k) => hasAnyHours(l[k]))) ? 'open' : null
+}
+
+/** Every category that can answer, in the admin's order: the admin's list. */
+export function rightNowPicks(categories: readonly CategoryConfig[], listings: readonly DirectoryResource[]): RightNowPick[] {
+  return categories.flatMap((category) => {
+    const answer = rightNowAnswer(category, categories, listings)
+    return answer ? [{ category, answer }] : []
+  })
+}
+
+/** What Right now shows: the admin's choice, in their order, leaving out
+ *  any category that's gone or can't answer any more; with no choice (null),
+ *  the ready-made one, the first two categories whose places say their
+ *  hours. */
+export function rightNowChosen(categories: readonly CategoryConfig[], listings: readonly DirectoryResource[], chosen: readonly string[] | null): RightNowPick[] {
+  if (chosen === null) return readyMadeRightNow(categories, listings, 2).map((category) => ({ category, answer: 'open' }))
+  return chosen.flatMap((id) => {
+    const category = categories.find((c) => c.id === id)
+    const answer = category && rightNowAnswer(category, categories, listings)
+    return category && answer ? [{ category, answer }] : []
+  })
+}
+
+/** The first `limit` listing categories whose places say their hours. */
+function readyMadeRightNow(categories: readonly CategoryConfig[], listings: readonly DirectoryResource[], limit: number): CategoryConfig[] {
+  return categories
+    .filter((c) => c.kind === 'listing' && hoursKeysOf(c).length > 0 && listings.some((l) => l.category === c.id && hoursKeysOf(c).some((k) => hasAnyHours(l[k]))))
+    .slice(0, limit)
+}
+
+/** The place that opens soonest, and when: "7 AM", or "Mon 7 AM" on
+ *  another day. A place Google says is closed doesn't count. */
+function firstToOpen(places: readonly DirectoryResource[], hoursKeys: string[], now: Date): { at: string; first: string } | null {
+  let best: { minutes: number; label: string; name: string } | null = null
+  for (const p of places) {
+    if (businessClosure(p as Record<string, unknown>)) continue
+    for (const k of hoursKeys) {
+      const next = hoursNextOpeningAt(p[k], now)
+      if (next && (!best || next.minutes < best.minutes)) best = { ...next, name: p.name }
+    }
+  }
+  return best && { at: best.label, first: best.name }
 }
 
 /** "44 kosher items tracked": how many different things the category's
@@ -221,13 +290,15 @@ function openParts(category: CategoryConfig, open: readonly DirectoryResource[])
 
 // ── The label over Right now ────────────────────────────────────────────────
 
-/** "Tuesday"; Saturday is "Shabbos". No Hebrew date (the user, Oct 18: the
+/** "Tuesday"; Saturday is "Shabbos" while it is Shabbos, and "Saturday"
+ *  once havdalah has passed (the user, Nov 14: "Shabbos" over what's open
+ *  on Saturday night was wrong). No Hebrew date (the user, Oct 18: the
  *  phone home read as too Jewish for everyone it serves). Null before
  *  there's a clock. */
-export function rightNowDay(now: number | null, timezone: string): string | null {
+export function rightNowDay(now: number | null, timezone: string, inShabbos: boolean): string | null {
   if (now === null) return null
   const weekday = new Date(now).toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone })
-  return weekday === 'Saturday' ? 'Shabbos' : weekday
+  return weekday === 'Saturday' && inShabbos ? 'Shabbos' : weekday
 }
 
 // ── The eruvim, on the Friday card ──────────────────────────────────────────

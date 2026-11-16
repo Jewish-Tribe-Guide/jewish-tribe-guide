@@ -31,6 +31,7 @@ const BUILT_IN_LABELS: Record<string, string> = {
   feedback: 'Feedback form',
   browse: 'Browse (every category, grouped)',
   you: 'You (saved places and searches)',
+  changes: 'What changed (held back from the site)',
 }
 
 /** What a row says its tab opens, as the bar's own screens are called. */
@@ -40,6 +41,7 @@ const OPENS: Record<string, string> = {
   feedback: 'the Feedback form',
   browse: 'the Browse page',
   you: 'You',
+  changes: 'What changed',
 }
 
 /** What a tab opens, as one link inside it, named as the site calls it. */
@@ -49,6 +51,7 @@ const PLACE_NAMES: Record<string, string> = {
   feedback: 'Feedback',
   browse: 'Browse',
   you: 'You',
+  changes: 'What changed',
 }
 
 /** Ids must survive renames, so they're minted once and never derived from the
@@ -97,7 +100,7 @@ export default function MobileTabsEditor({
     // wanted, and still editable once the row is open. Where it goes changes
     // by taking its link out (×) and adding another.
     const id = newTabId()
-    onChange([...tabs, { id, label: targetLabel(target), target }])
+    onChange([...tabs, { id, label: PLACE_NAMES[target] ?? targetLabel(target), target }])
     setOpenId(id)
   }
 

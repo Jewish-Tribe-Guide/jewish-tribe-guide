@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import { resolveCapabilities } from '@/lib/categories'
-import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { ui } from '@/lib/uiConfig'
-import CategoryIcon from '@/components/CategoryIcon'
+import { categoryTint, getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
+import { TilePhoto } from './sections'
 
 /** The Add flow's category picker — opened by SuggestListingCard's "Submit a
  *  Listing" button (UpdateListingsCard used to open this too, before the
@@ -22,8 +22,9 @@ import CategoryIcon from '@/components/CategoryIcon'
  *  listing to search for,
  *  so "which category" is the real first question. A search field instead
  *  of a plain grid: filtering scales better than a grid that just gets
- *  taller as more categories are added, while keeping each result's icon
- *  for fast recognition rather than falling back to a plain text list.
+ *  taller as more categories are added. No icons (Nov 14); each name has
+ *  its home tile's photo beside it (the user, Nov 16), or the tile's plain
+ *  tint where there's none.
  *  Picking a category deep-links straight into that category's Add form
  *  (`?form=create` — see FindResources' own doc on why that resolves with
  *  no listing needed). */
@@ -31,6 +32,13 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
   const categories = useCategories()
   const community = useCommunitySlug()
   const [query, setQuery] = useState('')
+
+  // Escape closes it, as it does every other dialog in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const eligible = (categories ?? []).filter((c: CategoryConfig) => {
     if (c.kind !== 'listing') return false
@@ -78,15 +86,9 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
                 key={c.id}
                 href={`${routes.slug(community, c.id)}?form=create`}
                 onClick={onClose}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-50"
+                className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-slate-50"
               >
-                <CategoryIcon
-                  icon={c.icon}
-                  categoryId={c.id}
-                  color={getCategoryColor(categories, c.id)}
-                  className="h-8 w-8 text-base shrink-0"
-                  sizePx={32}
-                />
+                <PickerPhoto category={c} categories={categories} />
                 <span className="min-w-0 truncate text-sm font-medium text-slate-800">{c.pluralLabel}</span>
               </Link>
             ))}
@@ -94,5 +96,20 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </div>
+  )
+}
+
+/** The home tile's picture, small: the same photo, or the same plain tint. */
+function PickerPhoto({ category, categories }: { category: CategoryConfig; categories: CategoryConfig[] | null | undefined }) {
+  const photo = getCategoryTilePhoto(categories, category.id)
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="picker-photo"
+      className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg"
+      style={{ backgroundColor: photo ? '#e2e8f0' : categoryTint(getCategoryColor(categories ?? [], category.id)) }}
+    >
+      {photo && <TilePhoto src={photo} px={80} sizes="40px" />}
+    </span>
   )
 }

@@ -175,12 +175,15 @@ test.describe('home screen weight', () => {
       // the week.
       const ownLink = await page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
       test.skip(ownLink > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
-      expect(fromCards(), 'the "View Times" card’s link, on a phone').toEqual([])
+      expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link
-      // prefetches once it's on screen.
-      await page.getByRole('link', { name: 'View Times' }).scrollIntoViewIfNeeded()
-      await expect.poll(() => fromCards().length, 'the "View Times" card’s link, on a computer').toBeGreaterThan(0)
+      // prefetches once it's on screen. A community whose computer home has
+      // Right now in the card's place (board U1, Nov 14) has no such card.
+      const card = page.getByTestId('home-next-minyan')
+      test.skip((await card.count()) === 0, 'no Next minyan card on this computer home (Right now took its place)')
+      await card.scrollIntoViewIfNeeded()
+      await expect.poll(() => fromCards().length, 'the Next minyan card’s link, on a computer').toBeGreaterThan(0)
     }
   })
 

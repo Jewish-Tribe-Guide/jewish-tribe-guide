@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -8,6 +8,7 @@ import { makeCategory } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { SITE_SETTINGS_DEFAULTS, type DesktopNavItem } from '@/lib/siteSettings'
 import HeaderNav from './HeaderNav'
+import { resetYouDotForTests } from '@/lib/useYouDot'
 
 // Replaces SectionTabs — see this component's own doc for why. The mega-menu
 // behavior (hover/click/focus opens, Escape and focus-out close, a click
@@ -48,6 +49,17 @@ describe('HeaderNav — Categories', () => {
     expect(screen.getByRole('link', { name: /Grocery Stores/ })).toHaveAttribute('href', '/test-community/grocery')
     expect(screen.getByText('Jewish Institutions')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Synagogues/ })).toHaveAttribute('href', '/test-community/synagogue')
+  })
+
+  it('lists the categories by name only, no icons (Nov 14)', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery, synagogue], homeSections: [foodSection, institutionsSection] },
+    })
+    await user.click(screen.getByRole('button', { name: /Categories/ }))
+    const link = screen.getByRole('link', { name: /Grocery Stores/ })
+    expect(link.querySelector('svg, img')).toBeNull()
+    expect(link.textContent).toBe('Grocery Stores')
   })
 
   it('tracks category_opened with source "header-nav" when a menu item is clicked', async () => {
@@ -129,6 +141,21 @@ describe('HeaderNav — You', () => {
     const links = screen.getAllByRole('link').map((a) => a.textContent)
     expect(links.indexOf('You')).toBe(links.indexOf('Map') + 1)
   })
+
+  // Board PhoneYouDot (Nov 15): the same blue dot as the phone's You tab.
+  it('carries the blue dot when a saved place changed since You was opened', async () => {
+    resetYouDotForTests()
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }]))
+    localStorage.setItem('jpc:you-seen-at', String(Date.parse('2026-11-10T00:00:00Z')))
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, latest: { tj: '2026-11-12T00:00:00Z' } }))))
+    try {
+      renderWithProviders(<HeaderNav />, { content: { categories: [grocery, mapCategory] } })
+      await waitFor(() => expect(screen.getByRole('link', { name: /^You/ }).querySelector('[data-testid="you-dot"]')).not.toBeNull())
+    } finally {
+      vi.unstubAllGlobals()
+      localStorage.clear()
+    }
+  })
 })
 
 describe('HeaderNav — More', () => {
@@ -149,7 +176,7 @@ describe('HeaderNav — More', () => {
     expect(panel).not.toHaveClass('right-0')
   })
 
-  it('offers About and Privacy as real links, and opens feedback as an in-place modal', async () => {
+  it('offers About, Privacy and Feedback as real links', async () => {
     const user = userEvent.setup()
     renderWithProviders(<HeaderNav />, {
       content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true } },
@@ -159,17 +186,28 @@ describe('HeaderNav — More', () => {
 
     expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/test-community/about')
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/test-community/privacy')
-
-    // Opens the same in-place FeedbackForm modal the footer's own
-    // FeedbackButton does — not a page navigation, so this component (and
-    // everything else on the page) stays mounted underneath it.
+    // Feedback is a page on a computer too since Nov 16 (the user: "let's do
+    // full page"); it opened a dialog over the page until then.
     //
     // This menu item is a fixed "Feedback", not settings.feedbackButtonLabel
-    // — that's a full sentence meant for SiteFooter's wider button, not this
+    // — that's a full sentence meant for SiteFooter's wider link, not this
     // compact dropdown (see HeaderNav's own comment on it).
-    expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Feedback' }))
-    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Feedback' })).toHaveAttribute('href', '/test-community/feedback')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('makes a top-level Feedback item a link to the page', () => {
+    renderWithProviders(<HeaderNav />, {
+      content: {
+        categories: [grocery],
+        settings: {
+          ...SITE_SETTINGS_DEFAULTS,
+          feedbackEnabled: true,
+          desktopNavItems: [{ id: 'fb', label: 'Tell us', kind: 'link', target: 'feedback' }],
+        },
+      },
+    })
+    expect(screen.getByRole('link', { name: 'Tell us' })).toHaveAttribute('href', '/test-community/feedback')
   })
 
   it('renders an admin-configured nav — a renamed top-level link, and a custom label on a More sub-item', async () => {

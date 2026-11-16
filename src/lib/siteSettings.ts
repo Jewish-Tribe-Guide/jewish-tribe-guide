@@ -15,6 +15,12 @@ import { community } from '@/community.config'
 // an async, per-request lookup; out of scope for now.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The map card's picture. `credit` is the line its licence asks to be shown
+ *  on it ("© OpenStreetMap contributors" for the street map that
+ *  scripts/map-card-picture.mjs makes); an admin's own photo has none, and
+ *  replacing the picture drops it. */
+export type MapCardPhoto = { url: string; alt: string; credit?: string }
+
 export type SiteSettings = {
   /** Site name — the header title, footer name, and copyright line. */
   name: string
@@ -50,19 +56,10 @@ export type SiteSettings = {
    *  More, by default), in order. Empty falls back to
    *  DEFAULT_DESKTOP_NAV_ITEMS. Mobile has no top nav and ignores this. */
   desktopNavItems: DesktopNavItem[]
-  /** Desktop only — the Update Listings card's eyebrow/heading (the
-   *  Add/Edit/Report card, "Kept by the Community" by default). */
-  desktopListingsEyebrow: string
-  desktopListingsHeading: string
   /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
    *  heading. */
   desktopSubscribeEyebrow: string
   desktopSubscribeHeading: string
-  /** Desktop only — the Jewish Times (ShabbatTimesCard) card's heading. No
-   *  matching eyebrow field: that card's own eyebrow is the computed
-   *  Hebrew date + location, not static text there's anything useful to
-   *  override. */
-  desktopJewishTimesHeading: string
   /** Desktop only — the warm hero band's bold headline. */
   desktopHeroHeadline: string
   /** Desktop only — the smaller supporting line under the headline. Empty
@@ -71,6 +68,10 @@ export type SiteSettings = {
   /** Desktop only — the hero band's photo. Null shows the CSS gradient
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
+  /** Desktop only — the photo on the home's "Everything on one map" card
+   *  (board G3, Nov 11). Null draws the card's plain map glyph instead.
+   *  Needs migration 095; reads as null without it. */
+  desktopMapImage: MapCardPhoto | null
   /** Which home page visitors get: the home as it was ('classic'), or the
    *  one that changes with the day ('today', step 6). Previewed from the Site
    *  tab before it's saved; one save switches back. */
@@ -79,6 +80,11 @@ export type SiteSettings = {
    *  it looks for, in order. The guide can't tell which items are for
    *  Shabbos, so an admin names them. */
   beforeCandleItems: string[]
+  /** What Right now answers on a weekday (board V1, Nov 15): category ids,
+   *  in order, at most MAX_RIGHT_NOW. Null is the ready-made choice: the
+   *  first two categories whose places say their hours. Needs migration
+   *  098; reads as null without it. */
+  rightNowCategories: string[] | null
   /** The Today home's blocks an admin has turned off. Each shows on the
    *  days it's for unless it's here; their order follows the day. */
   todayHidden: TodayBlockId[]
@@ -90,6 +96,9 @@ export type HomeStyle = (typeof HOME_STYLES)[number]
 export function isHomeStyle(value: unknown): value is HomeStyle {
   return (HOME_STYLES as readonly unknown[]).includes(value)
 }
+
+/** How many answers Right now shows on a weekday. */
+export const MAX_RIGHT_NOW = 2
 
 /** Where Before candles starts until an admin changes it. */
 export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
@@ -142,7 +151,7 @@ export type DesktopNavItem = {
  *  pseudo-category, same gating the mobile tab bar and the old hardcoded nav
  *  already applied. 'feedback' opens the feedback modal instead of
  *  navigating. */
-export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback'] as const
+export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback', 'changes'] as const
 export type BuiltInDesktopLinkTarget = (typeof BUILT_IN_DESKTOP_LINK_TARGETS)[number]
 
 export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDesktopLinkTarget {
@@ -186,7 +195,7 @@ export type MobileTabConfig = {
 /** The built-in targets, which behave differently from card targets: they're
  *  whole app screens rather than one category, and two of them are gated on
  *  site config (a Map category existing, feedback being enabled). */
-export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse', 'you'] as const
+export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse', 'you', 'changes'] as const
 export type BuiltInTabTarget = (typeof BUILT_IN_TAB_TARGETS)[number]
 
 export function isBuiltInTabTarget(target: string): target is BuiltInTabTarget {
@@ -210,8 +219,8 @@ export const DEFAULT_MOBILE_TABS: MobileTabConfig[] = [
 export const DEFAULT_HERO_TITLE = 'What are you looking for?'
 
 export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the site? Send a note'
-export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
-export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
+export const DEFAULT_FEEDBACK_HEADING = 'Feedback'
+export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We read every note. If you left an email, we’ll write back.'
 
 export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, mikvah…'
 
@@ -219,11 +228,8 @@ export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, m
 // strings, so nothing changes on screen until an admin edits one. See
 // DesktopTopicsManager's CARD_META for the admin labels ("Davening Times
 // Card", etc.) these fields' inputs are grouped under.
-export const DEFAULT_DESKTOP_LISTINGS_EYEBROW = 'Community run'
-export const DEFAULT_DESKTOP_LISTINGS_HEADING = 'Kept by the Community'
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
-export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
 
 // Same split HeroHeading.tsx's own splitMission() does, duplicated rather
 // than imported: that's a 'use client' component and this defaults object is
@@ -262,16 +268,15 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   mobileTabs: DEFAULT_MOBILE_TABS,
   searchPlaceholder: DEFAULT_SEARCH_PLACEHOLDER,
   desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
-  desktopListingsEyebrow: DEFAULT_DESKTOP_LISTINGS_EYEBROW,
-  desktopListingsHeading: DEFAULT_DESKTOP_LISTINGS_HEADING,
   desktopSubscribeEyebrow: DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW,
   desktopSubscribeHeading: DEFAULT_DESKTOP_SUBSCRIBE_HEADING,
-  desktopJewishTimesHeading: DEFAULT_DESKTOP_JEWISH_TIMES_HEADING,
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,
+  desktopMapImage: null,
   homeStyle: 'classic',
   beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
+  rightNowCategories: null,
   todayHidden: [],
 }
 
@@ -311,4 +316,13 @@ export function iconVersion(logoUrl: string | null | undefined): string {
     hash = (hash * 31 + value.charCodeAt(i)) | 0
   }
   return `${Math.abs(hash).toString(36)}-${ICON_RENDER_VERSION}`
+}
+
+/** What changed (step 7a) is held back from the site (features.ts), but an
+ *  admin can put it on a phone tab or a header link to see it, and take it
+ *  off again (the user, Nov 15). Its page answers while either has it. */
+export function changesLinked(settings: Pick<SiteSettings, 'mobileTabs' | 'desktopNavItems'>): boolean {
+  const inNav = (items: readonly DesktopNavItem[] | undefined): boolean =>
+    (items ?? []).some((i) => (i.kind === 'link' && i.target === 'changes') || inNav(i.items))
+  return settings.mobileTabs.some((t) => t.target === 'changes') || inNav(settings.desktopNavItems)
 }

@@ -48,6 +48,9 @@ type Props = {
   /** The bookmark that saves this search (SaveButton), beside the ✕ while
    *  something is typed. */
   save?: ReactNode
+  /** On a computer it sits on the category page's photo (board H4): a
+   *  white pill with a shadow, no blue edge. A phone keeps the edged box. */
+  onPhoto?: boolean
 }
 
 /** The search box's words on a category page (also How it looks' phone,
@@ -61,7 +64,7 @@ export function askPlaceholder(category: CategoryConfig): string {
       : `Ask anything about ${plural}`
 }
 
-export default function CategoryAsk({ category, search, onSearch, scope, onSubmit, foundNothing = false, save }: Props) {
+export default function CategoryAsk({ category, search, onSearch, scope, onSubmit, foundNothing = false, save, onPhoto = false }: Props) {
   const communitySlug = useOptionalCommunitySlug()
   const categories = useCategories() ?? [category]
   const q = search.trim()
@@ -78,15 +81,20 @@ export default function CategoryAsk({ category, search, onSearch, scope, onSubmi
 
   return (
     <div className="space-y-3">
-      <label className="flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-5 w-5 shrink-0 text-primary">
+      <label
+        data-testid="category-ask-box"
+        className={`flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30 ${
+          onPhoto ? 'desktop:h-[52px] desktop:rounded-full desktop:border-0 desktop:pl-[18px] desktop:pr-2 desktop:shadow-[0_6px_20px_rgba(15,23,42,0.25)] desktop:focus-within:ring-white/60' : ''
+        }`}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className={`h-5 w-5 shrink-0 text-primary ${onPhoto ? 'desktop:text-slate-600' : ''}`}>
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.3-4.3" />
         </svg>
         {/* The search is this category's, and says so where there's
             room. Its ✕ asks the whole guide instead, with whatever has
             been typed. */}
-        <span className="hidden h-7 shrink-0 items-center gap-1 rounded-lg bg-primary/10 pl-2.5 pr-1 text-[13px] font-semibold text-primary sm:flex">
+        <span className={`hidden h-7 shrink-0 items-center gap-1 ${onPhoto ? 'rounded-full' : 'rounded-lg'} bg-primary/10 pl-2.5 pr-1 text-[13px] font-semibold text-primary sm:flex`}>
           in {scopeLabel}
           <Link
             href={q && communitySlug ? routes.ask(communitySlug, q) : routes.home(communitySlug ?? '')}

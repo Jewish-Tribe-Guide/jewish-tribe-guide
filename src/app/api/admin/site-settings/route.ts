@@ -1,7 +1,9 @@
+import { revalidatePath } from 'next/cache'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { routes } from '@/lib/routes'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
-import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
+import { MissingMapPhotoColumnError, MissingRightNowColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, toRightNowCategories, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { MAX_BEFORE_CANDLE_ITEMS, MAX_RIGHT_NOW, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Recursive shape check — a 'link' item needs a target, a tab ('more-menu')
@@ -110,11 +112,8 @@ export async function PATCH(request: Request) {
   // The desktop card texts have nowhere sensible to fall back to if saved
   // blank, so they're required.
   const REQUIRED_CARD_TEXT_FIELDS: { key: keyof SiteSettings; label: string }[] = [
-    { key: 'desktopListingsEyebrow', label: 'The Update Listings card’s eyebrow' },
-    { key: 'desktopListingsHeading', label: 'The Update Listings card’s heading' },
     { key: 'desktopSubscribeEyebrow', label: 'The Email Signup card’s eyebrow' },
     { key: 'desktopSubscribeHeading', label: 'The Email Signup card’s heading' },
-    { key: 'desktopJewishTimesHeading', label: 'The Jewish Times card’s heading' },
   ]
   for (const { key, label } of REQUIRED_CARD_TEXT_FIELDS) {
     const value = body[key]
@@ -145,6 +144,16 @@ export async function PATCH(request: Request) {
     }
     body.beforeCandleItems = toBeforeCandleItems(items)
   }
+  if (body.rightNowCategories !== undefined && body.rightNowCategories !== null) {
+    const ids = body.rightNowCategories
+    if (!Array.isArray(ids) || ids.some((i) => typeof i !== 'string')) {
+      return Response.json({ ok: false, errors: ['Right now’s choices have to be a list of categories.'] }, { status: 400 })
+    }
+    if (new Set(ids).size > MAX_RIGHT_NOW) {
+      return Response.json({ ok: false, errors: [`Right now shows at most ${MAX_RIGHT_NOW}.`] }, { status: 400 })
+    }
+    body.rightNowCategories = toRightNowCategories(ids)
+  }
   if (body.todayHidden !== undefined) {
     const ids = body.todayHidden
     if (!Array.isArray(ids) || !ids.every(isTodayBlockId)) {
@@ -157,9 +166,16 @@ export async function PATCH(request: Request) {
     const settings = await updateSiteSettings(community.slug, body)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
+    // What changed answers only while a tab or link has it (changesLinked),
+    // so adding or taking off that tab flips its page between the page and
+    // a 404. The tags above are stale-while-revalidate, which served the
+    // admin the old 404 once after adding it (the user, Nov 15: "I don't see
+    // what changed working when I added it as a tab"). Expire it now, so
+    // the next load is the new answer, as /about's save does (route.test.ts).
+    revalidatePath(routes.changes(community.slug))
     return Response.json({ ok: true, settings })
   } catch (err) {
-    if (err instanceof MissingTodayColumnsError) {
+    if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError || err instanceof MissingRightNowColumnError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
     }
     console.error('[admin/site-settings] PATCH failed:', err)

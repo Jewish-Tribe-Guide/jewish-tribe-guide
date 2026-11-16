@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { prefetchCategoryListings } from '@/lib/categoryListings'
@@ -50,6 +50,9 @@ let savedHandOff: string | null = null
 // what comes back replaces it.
 let kept: { community: string; categories: CategoryConfig[]; placeCounts: Record<string, number> } | null = null
 
+/** The list kept for this community, read when asked rather than once. */
+const keptNow = (community: string) => (kept?.community === community ? kept : null)
+
 /** Tests: no list kept from the one before. */
 export function forgetCategoryList(): void {
   kept = null
@@ -96,6 +99,26 @@ export default function CategoryManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId])
 
+  // Next keeps a screen left behind mounted, hidden, and brings it back when
+  // its address is opened again: a page's screen came back showing the list
+  // it first opened with, from before a save made since. Before it draws,
+  // it takes the list kept since then. Without this, the reload below found
+  // the difference only once it arrived and started the page over, which
+  // threw away a Delete this page already asked (CI on PR 387, Nov 16).
+  // Layout effects run again each time a hidden screen is shown.
+  const shownRef = useRef(categories)
+  useLayoutEffect(() => {
+    shownRef.current = categories
+  }, [categories])
+  useLayoutEffect(() => {
+    if (!keptNow(community) || !shownRef.current || keptNow(community)!.categories === shownRef.current) return
+    const latest = keptNow(community)!
+    setCategories(latest.categories)
+    setPlaceCounts(latest.placeCounts)
+    setListRound((r) => r + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const load = useCallback(async () => {
     setError(null)
     try {
@@ -103,15 +126,15 @@ export default function CategoryManager({
       const catBody = await parseOkJson<{ categories: CategoryConfig[]; placeCounts?: Record<string, number> }>(catRes, 'Failed to load categories.')
       // A kept list that turns out stale (changed in another tab) starts
       // the open page again from what's saved, before anything's typed.
-      if (keptHere && JSON.stringify(keptHere.categories) !== JSON.stringify(catBody.categories)) setListRound((r) => r + 1)
+      // Against what this screen shows now, not what it opened with: it may
+      // have been hidden and brought back since (see above).
+      if (shownRef.current && JSON.stringify(shownRef.current) !== JSON.stringify(catBody.categories)) setListRound((r) => r + 1)
       setCategories(catBody.categories)
       setPlaceCounts(catBody.placeCounts ?? {})
       kept = { community, categories: catBody.categories, placeCounts: catBody.placeCounts ?? {} }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-    // keptHere: the list this screen opened with, read once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, community])
 
   useLoadOnMount(load)

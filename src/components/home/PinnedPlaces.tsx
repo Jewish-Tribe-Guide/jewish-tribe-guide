@@ -18,6 +18,7 @@ import { routes } from '@/lib/routes'
 import { ChevronRightIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import { NextMinyans, useNextMinyan } from '@/components/resources/nextMinyans'
+import { isMinyanim } from '@/lib/davening'
 
 // ── Pinned places, on the Today home and their own page (step 6) ─────────────
 // A visitor's pins (pinned.ts: saved on this device, no account). Today shows
@@ -68,12 +69,12 @@ export const eruvPlaceView = (p: Extract<PinnedPlace, { kind: 'eruv' }>, now: nu
 
 /** A saved place's picture: a listing's photo or its category's icon; an
  *  eruv's initials, as on its listing. */
-export function PlaceIcon({ place, color }: { place: PinnedPlace; color: string }) {
+export function PlaceIcon({ place, color, className = 'h-11 w-11 text-lg', sizePx = 44 }: { place: PinnedPlace; color: string; className?: string; sizePx?: number }) {
   const { category } = place
   return place.kind === 'eruv' ? (
-    <CategoryIcon icon="" initials={initialsOf(place.eruv.name)} shape="square" color={color} className="h-11 w-11 text-lg" sizePx={44} />
+    <CategoryIcon icon="" initials={initialsOf(place.eruv.name)} shape="square" color={color} className={className} sizePx={sizePx} />
   ) : (
-    <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={photoOf(place.item)} initials={initialsOf(place.item.name)} shape="square" color={color} className="h-11 w-11 text-lg" sizePx={44} />
+    <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={photoOf(place.item)} initials={initialsOf(place.item.name)} shape="square" color={color} className={className} sizePx={sizePx} />
   )
 }
 
@@ -88,13 +89,22 @@ export const TONE: Record<RowFact['tone'], string> = {
   plain: '',
 }
 
-export const hasMinyanim = (c: CategoryConfig) => c.detailFields.some((f) => f.type === 'minyanim')
+/** Whether this place has davening times of its own. Its category having a
+ *  minyanim field isn't enough: Food has one for the restaurants that host a
+ *  minyan, and a saved restaurant without one said "No davening times
+ *  listed" instead of whether it's open (Nov 15). GenericDirectory decides
+ *  the same way, place by place. */
+export const davensHere = (c: CategoryConfig, item: DirectoryResource) =>
+  c.detailFields.some((f) => {
+    const v = item[f.key]
+    return f.type === 'minyanim' && isMinyanim(v) && v.length > 0
+  })
 export const milesFrom = (from: LatLng, item: DirectoryResource) => (item.geo ? haversineMiles(from, item.geo) : null)
 export const photoOf = (item: DirectoryResource) => (typeof item.photo === 'string' && item.photo.trim() ? item.photo : undefined)
 
 /** The rows' shuls, so each can say its next minyan. */
 export function WithMinyans({ places, children }: { places: PinnedPlace[]; children: React.ReactNode }) {
-  const shuls = places.flatMap((p) => (p.kind === 'listing' && hasMinyanim(p.category) ? [p.item] : []))
+  const shuls = places.flatMap((p) => (p.kind === 'listing' && davensHere(p.category, p.item) ? [p.item] : []))
   return (
     <NextMinyans enabled={shuls.length > 0} items={shuls}>
       {children}
@@ -144,7 +154,7 @@ function TodayPinnedRow({ place, communitySlug, from, now }: { place: PinnedPlac
   const status =
     place.kind === 'eruv'
       ? eruv && { text: eruv.label, className: `font-semibold ${TONE_WORDS[eruv.tone]}` }
-      : hasMinyanim(category)
+      : davensHere(category, place.item)
         ? shul && { text: shul.text, className: TONE[shul.tone] }
         : now !== null
           ? ((f) => f && { text: f.text, className: TONE[f.tone] })(listingRowFacts(place.item, category, new Date(now)).find((f) => ['open', 'caution', 'closed', 'opens'].includes(f.tone)))

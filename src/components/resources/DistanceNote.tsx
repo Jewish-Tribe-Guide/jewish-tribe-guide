@@ -12,10 +12,12 @@ import { useActiveCommunity } from '@/lib/communityContext'
  *  "Distance" chip with no number on every row. The distances are real now,
  *  so this only has to say where they're from and offer the better
  *  version. */
-export default function DistanceNote({ className = '' }: { className?: string }) {
+export default function DistanceNote({ className = '', onPhoto = false }: { className?: string; onPhoto?: boolean }) {
   const { community } = useActiveCommunity()
+  // onPhoto: white on the category page's photo (board H4), its link
+  // underlined, as the home's own hero has it.
   return (
-    <p className={`flex flex-wrap items-center gap-x-1.5 text-[13px] text-muted ${className}`}>
+    <p className={`flex flex-wrap items-center gap-x-1.5 ${onPhoto ? 'text-[15px] text-white/90' : 'text-[13px] text-muted'} ${className}`}>
       <PinIcon className="h-3.5 w-3.5 shrink-0" />
       <span>Distances from central {community.region}</span>
       <span aria-hidden="true">·</span>
@@ -23,7 +25,7 @@ export default function DistanceNote({ className = '' }: { className?: string })
         type="button"
         onClick={() => document.dispatchEvent(new CustomEvent('jpc:open-location'))}
         // -my-1 py-1: a taller tap target without moving the line.
-        className="-my-1 cursor-pointer py-1 font-semibold text-primary hover:text-primary-dark hover:underline"
+        className={`-my-1 cursor-pointer py-1 ${onPhoto ? 'font-bold text-white underline underline-offset-2 hover:text-white/80' : 'font-semibold text-primary hover:text-primary-dark hover:underline'}`}
       >
         Use my location
       </button>

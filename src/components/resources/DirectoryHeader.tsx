@@ -30,10 +30,7 @@ type Props = {
    *  title would leave mobile with none at all. */
   titleInHeader?: boolean
   /** Desktop-only category icon badge, shown above everything else in this
-   *  header — see GenericDirectory's own doc on how this pairs (a matching
-   *  ViewTransition name) with the same badge on the category's home-screen
-   *  row, so clicking it visibly grows into this one instead of a flat
-   *  crossfade. Omitted entirely (not just visually hidden) when the
+   *  header. Omitted entirely (not just visually hidden) when the
    *  category has no icon, or on mobile, where the home->category move
    *  already communicates hierarchy via its own directional slide instead. */
   banner?: ReactNode

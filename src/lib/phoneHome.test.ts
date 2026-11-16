@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CategoryField } from './categories'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { Eruv } from './eruv'
-import { eruvSummary, openNowRows, rightNowDay, sourcesRead, sourcesSentence, trustFacts, trustLine } from './phoneHome'
+import { eruvSummary, openNowRows, rightNowChosen, rightNowDay, rightNowPicks, sourcesRead, sourcesSentence, trustFacts, trustLine } from './phoneHome'
 
 const NY = 'America/New_York'
 const DAY = 24 * 60 * 60 * 1000
@@ -104,9 +104,29 @@ describe('right now, on a weekday: what’s open', () => {
     ])
   })
 
-  it('a category with nothing open says nothing, and doesn’t hand its place to the next', () => {
-    const rows = openNowRows([place('a', 'food', shut), place('b', 'grocery', open), place('c', 'hotels', open)], [food, grocery, hotels], lunch)
-    expect(rows.map((r) => r.category.id)).toEqual(['grocery'])
+  // Board V3 (the user, Nov 15): overnight the card used to go. A category
+  // with nothing open keeps its row and says when its first place opens.
+  it('a category with nothing open says when its first place opens, and keeps its place', () => {
+    const rows = openNowRows([place('a', 'food', shut, { name: 'Early' }), place('b', 'grocery', open), place('c', 'hotels', open)], [food, grocery, hotels], lunch)
+    expect(rows.map((r) => [r.category.id, r.open, r.opens])).toEqual([
+      ['food', 0, { at: 'Wed 6 AM', first: 'Early' }],
+      ['grocery', 1, undefined],
+    ])
+  })
+
+  it('overnight: the soonest of several, today’s time with no day; a place Google says is closed doesn’t count', () => {
+    const three = new Date(2026, 9, 13, 3, 0)
+    const at = (o: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: o, close: '21:00' }]))
+    const rows = openNowRows(
+      [
+        place('a', 'food', at('09:00'), { name: 'Nine' }),
+        place('b', 'food', at('07:30'), { name: 'Half seven' }),
+        place('c', 'food', at('05:00'), { name: 'Shut for good', businessStatus: 'CLOSED_PERMANENTLY' }),
+      ],
+      [food],
+      three,
+    )
+    expect(rows).toEqual([expect.objectContaining({ open: 0, opens: { at: '7:30 AM', first: 'Half seven' } })])
   })
 
   it('a category whose places say no hours is skipped; one without a pick-list has no breakdown', () => {
@@ -143,19 +163,70 @@ describe('right now, on a weekday: what’s open', () => {
   })
 })
 
+// Board V1 (the user, Nov 15): the admin picks what Right now answers, from
+// the categories that can say something about now.
+describe('what Right now can answer, and what the admin chose', () => {
+  const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours' }
+  const minyanim: CategoryField = { key: 'minyanim', label: 'Minyanim', type: 'minyanim' }
+  const food = makeCategory({ id: 'food', detailFields: [hours] })
+  const grocery = makeCategory({ id: 'grocery', detailFields: [hours] })
+  const hotels = makeCategory({ id: 'hotels', detailFields: [hours] })
+  const shuls = makeCategory({ id: 'shuls', detailFields: [hours, minyanim] })
+  const eruv = makeCategory({ id: 'eruv', kind: 'eruv', detailFields: [] })
+  const map = makeCategory({ id: 'map', kind: 'map', detailFields: [] })
+  const plain = makeCategory({ id: 'plain', detailFields: [] })
+  const open = { mon: { open: '09:00', close: '21:00' } }
+  const listings = [
+    makeListing({ id: 'a', category: 'food', hours: open }),
+    makeListing({ id: 'b', category: 'grocery', hours: open }),
+    makeListing({ id: 'c', category: 'hotels' }),
+    makeListing({ id: 'd', category: 'shuls', minyanim: [{ name: 'Shacharis', time: '07:00', days: ['mon'] }] }),
+    makeListing({ id: 'e', category: 'plain' }),
+  ]
+  const all = [map, shuls, food, plain, hotels, grocery, eruv]
+
+  it('the ones that can, in the admin’s order: hours that places fill in, the minyan page, the eruv', () => {
+    expect(rightNowPicks(all, listings).map((p) => [p.category.id, p.answer])).toEqual([
+      ['shuls', 'minyan'],
+      ['food', 'open'],
+      ['grocery', 'open'],
+      ['eruv', 'eruv'],
+    ])
+  })
+
+  it('no choice: the first two whose places say their hours, as before', () => {
+    expect(rightNowChosen([food, plain, hotels, grocery], listings, null).map((p) => p.category.id)).toEqual(['food', 'grocery'])
+  })
+
+  it('the admin’s choice, in their order, leaving out what’s gone or can’t answer', () => {
+    expect(rightNowChosen(all, listings, ['eruv', 'shuls']).map((p) => [p.category.id, p.answer])).toEqual([
+      ['eruv', 'eruv'],
+      ['shuls', 'minyan'],
+    ])
+    expect(rightNowChosen(all, listings, ['deleted', 'hotels', 'grocery']).map((p) => p.category.id)).toEqual(['grocery'])
+    expect(rightNowChosen(all, listings, [])).toEqual([])
+  })
+})
+
 describe('the label over Right now', () => {
   // No Hebrew date (the user, Oct 18: the phone home read as too Jewish for
   // everyone it serves).
   it('just the weekday', () => {
-    expect(rightNowDay(Date.parse('2026-10-13T16:30:00Z'), NY)).toBe('Tuesday')
+    expect(rightNowDay(Date.parse('2026-10-13T16:30:00Z'), NY, false)).toBe('Tuesday')
   })
 
-  it('Saturday is Shabbos', () => {
-    expect(rightNowDay(Date.parse('2026-10-17T15:00:00Z'), NY)).toBe('Shabbos')
+  it('Saturday is Shabbos while it is Shabbos', () => {
+    expect(rightNowDay(Date.parse('2026-10-17T15:00:00Z'), NY, true)).toBe('Shabbos')
+  })
+
+  // The user, Nov 14: after havdalah Right now shows what's open, under
+  // "Shabbos". It's Saturday night.
+  it('Saturday after havdalah is Saturday', () => {
+    expect(rightNowDay(Date.parse('2026-10-18T00:30:00Z'), NY, false)).toBe('Saturday')
   })
 
   it('nothing before there’s a clock', () => {
-    expect(rightNowDay(null, NY)).toBeNull()
+    expect(rightNowDay(null, NY, false)).toBeNull()
   })
 })
 

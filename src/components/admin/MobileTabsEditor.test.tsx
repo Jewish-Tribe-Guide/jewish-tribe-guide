@@ -113,4 +113,15 @@ describe('MobileTabsEditor', () => {
     expect(screen.queryByLabelText('Add a tab')).toBeNull()
     expect(screen.getByText(/Five tabs at most/)).toBeInTheDocument()
   })
+
+  // What changed is held back, but can be a tab to see it (Nov 15). A
+  // built-in screen is named as the site calls it, not as the picker
+  // describes it: "What changed", not "What changed (held back…)".
+  it('What changed can be added, named as the site calls it', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    renderWithProviders(<MobileTabsEditor tabs={[]} onChange={onChange} />)
+    await user.selectOptions(screen.getByLabelText('Add a tab'), 'changes')
+    expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({ label: 'What changed', target: 'changes' })])
+  })
 })

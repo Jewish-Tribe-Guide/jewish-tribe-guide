@@ -33,7 +33,7 @@ export type ChangeLogRow = {
   hidden: boolean
   /** What it changed, as visitors read it (migration 069; null before). */
   changes?: ChangePart[] | null
-  listing: { id: string; name: string; category: string; status: string } | null
+  listing: { id: string; name: string; category: string; status: string; photo?: string | null } | null
 }
 
 export type ChangeKind = 'added' | 'edited' | 'removed' | 'items' | 'google'
@@ -45,7 +45,8 @@ export type Change = {
   rowIds: number[]
   at: string
   kind: ChangeKind
-  listing: { id: string; name: string; category: string }
+  /** photo: the place's own picture (details.photo), when it has one. */
+  listing: { id: string; name: string; category: string; photo?: string | null }
   items: string[]
   /** What it changed: "Hours" · "Sunday 11 AM – 10 PM", or a new place's
    *  facts. Empty for an edit from before migration 069 ("updated"). */
@@ -79,7 +80,7 @@ export function whatChanged(rows: readonly ChangeLogRow[], timezone: string, opt
             ? 'google'
             : 'edited'
     const newest = group.reduce((a, b) => (b.createdAt > a.createdAt ? b : a))
-    const { id, name, category } = newest.listing!
+    const { id, name, category, photo } = newest.listing!
     // The items an edit added already head the line ("Challah added at
     // ALDI"); their list isn't said again under it.
     const itemFields = new Set(group.filter((r) => r.kind === 'item_added' && r.fieldKey).map((r) => r.fieldKey))
@@ -89,7 +90,7 @@ export function whatChanged(rows: readonly ChangeLogRow[], timezone: string, opt
       rowIds: group.map((r) => r.id),
       at: newest.createdAt,
       kind,
-      listing: { id, name, category },
+      listing: { id, name, category, ...(photo ? { photo } : {}) },
       items,
       parts,
       hidden: group.every((r) => r.hidden),

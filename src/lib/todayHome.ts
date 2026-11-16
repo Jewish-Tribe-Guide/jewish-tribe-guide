@@ -105,6 +105,11 @@ export type CandleItemRow = {
   closest: number | null
 }
 
+/** What Friday's shopping comes to: a row per item found, the items no
+ *  store open now lists, and (Shabbos shopping, board U3f, Nov 14) how many
+ *  stores open now have any of them, and the nearest of those. */
+export type CandleShopping = { rows: CandleItemRow[]; missing: string[]; stores: number; closest: number | null }
+
 /** Friday's shopping, one row per item (the user, Oct 28: "people don't want
  *  to see one store"): how many stores open now have it, and how near the
  *  nearest is. Each row opens Grocery with "Has: Challah" and "Open now" on,
@@ -122,8 +127,8 @@ export function beforeCandles(
   items: readonly string[],
   now: Date,
   from: LatLng,
-): { rows: CandleItemRow[]; missing: string[] } {
-  let best: { rows: CandleItemRow[]; missing: string[]; found: number } | null = null
+): CandleShopping {
+  let best: (CandleShopping & { found: number }) | null = null
   for (const category of categories) {
     const field = itemsField(category)
     // Without a filterable hours field the page has no "Open now" to turn on.
@@ -137,19 +142,22 @@ export function beforeCandles(
     )
     const rows: CandleItemRow[] = []
     const missing: string[] = []
+    const any = new Set<DirectoryResource>()
     for (const item of items) {
       const have = open.filter((store) => listingHas(store, field.key, [item]))
       if (have.length === 0) {
         missing.push(item)
         continue
       }
+      for (const store of have) any.add(store)
       const miles = have.flatMap((s) => (s.geo ? [haversineMiles(from, s.geo)] : []))
       rows.push({ item, category, fieldKey: field.key, stores: have.length, closest: miles.length ? Math.min(...miles) : null })
     }
     const found = rows.reduce((n, r) => n + r.stores, 0)
-    if (found > (best?.found ?? 0)) best = { rows, missing, found }
+    const near = [...any].flatMap((s) => (s.geo ? [haversineMiles(from, s.geo)] : []))
+    if (found > (best?.found ?? 0)) best = { rows, missing, stores: any.size, closest: near.length ? Math.min(...near) : null, found }
   }
-  return best ? { rows: best.rows, missing: best.missing } : { rows: [], missing: [...items] }
+  return best ? { rows: best.rows, missing: best.missing, stores: best.stores, closest: best.closest } : { rows: [], missing: [...items], stores: 0, closest: null }
 }
 
 /** Grocery with "Has: Challah" and "Open now" on: the address searchLands'

@@ -149,6 +149,15 @@ export function MessageIcon({ className }: IconProps) {
   )
 }
 
+// A pulse line — the What changed tab (the guide's activity).
+export function PulseIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 12h4l3-7 4 14 3-7h4" />
+    </svg>
+  )
+}
+
 // Left chevron — the phone map sheet's "Back to list", and the desktop
 // map sidebar's edge tab (collapse).
 export function ChevronLeftIcon({ className }: IconProps) {
@@ -321,8 +330,8 @@ export function SkylineIcon({ className }: IconProps) {
   )
 }
 
-// People — UpdateListingsCard's header icon (Phase 6, desktop mockup
-// rework). Two overlapping figures, not one — "kept by the community" is
+// People — the trust sheet and band's "People fill in the rest" (once
+// UpdateListingsCard's). Two overlapping figures, not one — "kept by the community" is
 // about the group, not an individual.
 export function PeopleIcon({ className }: IconProps) {
   return (

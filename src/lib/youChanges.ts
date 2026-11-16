@@ -7,6 +7,9 @@ import type { Change } from './whatChanged'
 
 const SEEN_KEY = 'jpc:you-seen-at'
 
+/** Sent when You is opened, so the dot on its tab and link goes out at once. */
+export const SEEN_EVENT = 'jpc:you-seen'
+
 /** When this phone last opened You, or null the first time. */
 export function loadSeenAt(): number | null {
   try {
@@ -20,6 +23,7 @@ export function loadSeenAt(): number | null {
 export function storeSeenAt(ms: number): void {
   try {
     localStorage.setItem(SEEN_KEY, String(ms))
+    window.dispatchEvent(new Event(SEEN_EVENT))
   } catch {
     // Best-effort: without it, no dots, which is what a first visit shows.
   }
@@ -45,4 +49,22 @@ export function changedSince(changes: readonly Change[] | null, ids: ReadonlySet
     if (Date.parse(c.at) > since) out.set(c.listing.id, changeWords(c))
   }
   return out
+}
+
+/** When each listing last changed (a removal doesn't count: You takes a
+ *  removed place off), newest first in, so the first seen wins. */
+export function latestChangeByListing(changes: readonly Change[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const c of changes) {
+    if (c.kind === 'removed' || c.listing.id in out) continue
+    out[c.listing.id] = c.at
+  }
+  return out
+}
+
+/** The blue dot on You: a saved place changed after You was last opened.
+ *  None before You has ever been opened, as on You itself (changedSince). */
+export function youHasNews(latest: Readonly<Record<string, string>> | null, ids: readonly string[], since: number | null): boolean {
+  if (!latest || since === null) return false
+  return ids.some((id) => latest[id] !== undefined && Date.parse(latest[id]!) > since)
 }

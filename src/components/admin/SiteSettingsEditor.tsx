@@ -9,12 +9,15 @@ import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { adminBase } from '@/lib/adminNav'
-import DesktopTopicsManager from './DesktopTopicsManager'
+import DesktopTopicsManager, { withoutCard } from './DesktopTopicsManager'
+import RightNowScreen, { ScreenHeader, inHomeOrder, rightNowSummary, useRightNowData } from './RightNowScreen'
+import { useStepsInAddress } from './useStepsInAddress'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SitePreview, { type PreviewDevice } from './SitePreview'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
+import { PREVIEW_DAY_WORDS, type PreviewDay } from '@/lib/previewDay'
 import SaveBar, { useLeaveGuard } from './SaveBar'
 import { AdminBox, AdminField, AdminPreviewButton, adminInputClass } from './AdminUI'
 import { features } from '@/lib/features'
@@ -76,10 +79,15 @@ function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange
   )
 }
 
+type CardScreen = 'rightNow' | 'map'
+
 export default function SiteSettingsEditor({ token }: { token: string }) {
   const { community } = useActiveCommunity()
   // Which version of the page the boxes and the preview are of.
   const [device, setDevice] = useState<PreviewDevice>('computer')
+  // The day the preview shows Right now on, picked on Right Now's screen
+  // (previewDay.ts); null for now. Kept while on Home page, never saved.
+  const [previewDay, setPreviewDay] = useState<PreviewDay | null>(null)
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
   const [sections, setSections] = useState<HomeSection[] | null>(null)
@@ -116,6 +124,13 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   // here so it survives the field unmounting when Computer or Phone changes.
   const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
   const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
+  const [mapOriginal, setMapOriginal] = useState<File | string | null>(null)
+  // A card's own screen (boards V4/V4b, Nov 15), in the address as
+  // ?card=rightNow, so Back returns to the list and a reload stays on it.
+  const [cardScreen, setCardScreen] = useState<CardScreen | null>(null)
+  useStepsInAddress('card', cardScreen ? [cardScreen] : [], ([to]) => setCardScreen(to === 'rightNow' || to === 'map' ? to : null))
+  const rightNowLoaded = useRightNowData(community.slug)
+  const rightNowData = rightNowLoaded && sectionsDraft ? inHomeOrder(rightNowLoaded, sectionsDraft) : null
 
   const load = useCallback(async () => {
     setError(null)
@@ -206,7 +221,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   }
 
   const openPreview = () => {
-    writePreviewDraft({ settings: draft, sections: sectionsDraft })
+    writePreviewDraft({ settings: draft, sections: sectionsDraft, day: previewDay })
     setPreviewing(true)
     history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
@@ -253,6 +268,55 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     </div>
   )
 
+  const cardOn = (kind: string) => sectionsDraft.find((x) => x.kind === kind)
+  const takeOff = (kind: string) => {
+    const card = cardOn(kind)
+    if (card) setHomeSections(withoutCard(sectionsDraft, card.id))
+    setCardScreen(null)
+  }
+  const rightNowScreen = (
+    <div {...spotOn('card-rightNow')}>
+      <RightNowScreen
+        data={rightNowData}
+        chosen={draft.rightNowCategories}
+        onChoose={(ids) => set('rightNowCategories', ids)}
+        items={draft.beforeCandleItems}
+        onItems={(items) => set('beforeCandleItems', items)}
+        onBack={() => setCardScreen(null)}
+        onRemove={computer && cardOn('rightNow') ? () => takeOff('rightNow') : undefined}
+        day={previewDay}
+        onDay={setPreviewDay}
+      />
+    </div>
+  )
+  const mapScreen = (
+    <section data-testid="map-card-screen" aria-label="Map" className="overflow-hidden rounded-2xl border border-slate-200 bg-white" {...spotOn('card-map')}>
+      <ScreenHeader title="Map" onBack={() => setCardScreen(null)} onRemove={cardOn('map') ? () => takeOff('map') : undefined} />
+      <div className="p-5">
+        {/* The map card's photo (board G3), on the card's own screen (V4). */}
+        <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
+        <ImageUploadField
+          value={draft.desktopMapImage?.url ?? ''}
+          onChange={(url) => set('desktopMapImage', url ? { url, alt: '' } : null)}
+          uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+          token={token}
+          shape="square"
+          aspect={26 / 15}
+          showRepositionHint={false}
+          collapseUrlInput
+          originalSource={mapOriginal}
+          onOriginalSourceChange={setMapOriginal}
+        />
+      </div>
+    </section>
+  )
+  const cardOpens = {
+    rightNow: { summary: rightNowSummary(rightNowData, draft.rightNowCategories), onOpen: () => setCardScreen('rightNow') },
+    map: { summary: draft.desktopMapImage ? 'Photo' : 'No photo', onOpen: () => setCardScreen('map') },
+  }
+  // The Map card is the computer's only; Right now is on both homes.
+  const openScreen = cardScreen === 'rightNow' ? rightNowScreen : cardScreen === 'map' && computer ? mapScreen : null
+
   return (
     <div className="flex flex-col gap-4">
       {/* Full width on a phone, like the Preview button under it (the user,
@@ -275,6 +339,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           <div className="lg:hidden">
             <AdminPreviewButton onClick={openPreview} />
           </div>
+          {openScreen ?? (
+          <>
           {nameAndLogo}
           {computer ? (
             <>
@@ -295,10 +361,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                     <AdminField label="Big line">
                       <input value={draft.desktopHeroHeadline} onChange={(e) => set('desktopHeroHeadline', e.target.value)} className={adminInputClass} />
                     </AdminField>
-                    {/* Wraps, so the whole line shows (the user, Nov 4). */}
-                    <AdminField label="Line under it">
-                      <textarea rows={2} value={draft.desktopHeroSubhead} onChange={(e) => set('desktopHeroSubhead', e.target.value)} className={adminInputClass} />
-                    </AdminField>
+                    {/* No line under it: the big line, then the search (the
+                        user, Nov 11). */}
                     {/* No description: the photo is decoration (HeroHeading). */}
                     <div>
                       <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
@@ -323,13 +387,38 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
 
               <div {...spotOn('cards')}>
                 <AdminBox title="Cards under the search">
-                  <DesktopTopicsManager sections={sectionsDraft} onChange={setHomeSections} settings={draft} onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')} />
+                  <DesktopTopicsManager
+                    sections={sectionsDraft}
+                    onChange={setHomeSections}
+                    settings={draft}
+                    onPointCard={(kind) => setSpot(kind ? `card-${kind}` : 'cards')}
+                    opens={cardOpens}
+                  />
                 </AdminBox>
               </div>
             </>
           ) : (
             <>
               {searchBox}
+
+              {/* The phone home always has Right now, under the search. */}
+              <div {...spotOn('card-rightNow')}>
+                <AdminBox title="Under the search">
+                  <div className="p-3">
+                    <button
+                      type="button"
+                      onClick={cardOpens.rightNow.onOpen}
+                      className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-left hover:border-primary"
+                    >
+                      <span className="flex-1 text-[15px] font-medium text-slate-900">Right Now</span>
+                      {cardOpens.rightNow.summary && <span className="truncate text-[14px] text-muted">{cardOpens.rightNow.summary}</span>}
+                      <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-slate-400">
+                        <path d="M1.5 1.5l6 6-6 6" />
+                      </svg>
+                    </button>
+                  </div>
+                </AdminBox>
+              </div>
 
               {/* Held back from the site for now (see features.ts). */}
               {features.todayHome && (
@@ -386,10 +475,23 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
               </div>
             </>
           )}
+          </>
+          )}
         </div>
 
         <aside aria-label="Preview" className="hidden lg:block shrink-0 sticky top-8">
-          {roomy && <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} />}
+          {roomy && previewDay && (
+            // Which day it shows, when it isn't now, and the way back to now.
+            <p className="m-0 mb-2 flex items-center gap-1 text-sm font-semibold text-slate-900">
+              <span className="rounded-full bg-primary/10 py-1 pl-3 pr-1 text-primary">
+                Showing {PREVIEW_DAY_WORDS[previewDay].replace(/^A /, 'a ')}
+                <button type="button" aria-label="Back to now" onClick={() => setPreviewDay(null)} className="ml-1 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full hover:bg-primary/15">
+                  ×
+                </button>
+              </span>
+            </p>
+          )}
+          {roomy && <SitePreview community={community.slug} settings={draft} sections={sectionsDraft} device={device} spot={spot} onOpen={openPreview} day={previewDay} />}
         </aside>
       </div>
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { DraftHomeSection } from '@/lib/homeSections'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
+import type { PreviewDay } from '@/lib/previewDay'
 import { lightSpot } from '@/lib/previewSpot'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { IframeViewport } from './DevicePreviewFrame'
@@ -182,10 +183,13 @@ export default function SitePreview({
   device,
   spot = null,
   onOpen,
+  day = null,
 }: {
   community: string
   settings: SiteSettings
   sections: DraftHomeSection[]
+  /** The day Right now is shown on (previewDay.ts), null for now. */
+  day?: PreviewDay | null
   /** Which version of the page, picked beside it. */
   device: PreviewDevice
   spot?: string | null
@@ -199,11 +203,11 @@ export default function SitePreview({
 
   useEffect(() => {
     const t = setTimeout(() => {
-      writePreviewDraft({ settings, sections })
+      writePreviewDraft({ settings, sections, day })
       setVersion((v) => v + 1)
     }, PREVIEW_PAUSE_MS)
     return () => clearTimeout(t)
-  }, [settings, sections])
+  }, [settings, sections, day])
 
   return <PreviewBeside src={version > 0 ? previewUrl(community) : undefined} reload={version} device={device} spot={spot} onOpen={onOpen} wholePage={device === 'computer'} />
 }

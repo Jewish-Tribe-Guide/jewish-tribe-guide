@@ -1,4 +1,4 @@
-import type { CategoryConfig } from '@/lib/categories'
+import { bandImageFor, type CategoryConfig } from '@/lib/categories'
 
 // A category's colour is stored on the category (CategoryConfig.pinColor,
 // editable in the category editor). Shared by the map (pins, NearbyList) and
@@ -87,6 +87,16 @@ export function getCategoryColor(categories: CategoryConfig[] | null | undefined
   if (index === -1) return FALLBACK_COLOR
   const stored = list[index].pinColor?.trim()
   return stored || PALETTE[index % PALETTE.length]
+}
+
+/** The category a home card stands for. Cards are keyed by category id,
+ *  except the eruv card, which is always `eruv` (cardSearch.ts) whatever the
+ *  community's eruv category is called: Philly's is `eruv-information`, so
+ *  matching on id alone lost its picture. */
+function cardCategory(categories: readonly CategoryConfig[] | null | undefined, cardId: string | undefined): CategoryConfig | undefined {
+  if (!cardId) return undefined
+  const list = categories ?? []
+  return list.find((c) => c.id === cardId) ?? (cardId === 'eruv' ? list.find((c) => c.kind === 'eruv') : undefined)
 }
 
 /** The palette offered in the category editor's colour picker. Exported so the
@@ -183,3 +193,11 @@ export function categoryColorUsage(
 // and all, into every category page's code.
 export const HOSPITAL_COLOR = '#b6302b'
 export const HOSPITAL_ICON = '🏥'
+
+/** The photo for a category's tile on the computer home's Explore by
+ *  Category, and its page's photo: the category's one picture
+ *  (bandImageFor), or null for the plain glyph on grey. */
+export function getCategoryTilePhoto(categories: readonly CategoryConfig[] | null | undefined, categoryId: string | undefined): string | null {
+  const c = cardCategory(categories, categoryId)
+  return c ? bandImageFor(c) : null
+}

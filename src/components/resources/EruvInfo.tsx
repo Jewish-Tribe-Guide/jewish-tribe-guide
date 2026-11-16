@@ -5,8 +5,7 @@ import type { ParamsOpts } from './GenericDirectory'
 import { ListingBar } from './ListingColumn'
 import { mapQueryString, routes } from '@/lib/routes'
 import DirectoryHeader from './DirectoryHeader'
-import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
-import { CategoryGlyph } from '@/lib/categoryIcons'
+import { CategoryBandFrame, HeroTitle } from './CategoryBandFrame'
 import { ChevronRightIcon } from '@/components/icons'
 import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
@@ -86,7 +85,7 @@ const ERUV_STEP = 'eruv'
 /** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
 type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
-export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange, openFullest = false, startEditing = false }: Props) {
+export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', bandImageUrl, itemId = null, onParamsChange, openFullest = false, startEditing = false }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -133,12 +132,6 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
       live = false
     }
   }, [slug])
-
-  const banner = !isMobile && icon ? (
-    <CategoryBandBadge color={color}>
-      <CategoryGlyph categoryId={undefined} icon={icon} className="h-[55%] w-[55%]" />
-    </CategoryBandBadge>
-  ) : null
 
   const now = clock === null ? null : new Date(clock)
   const ready = loaded?.available && now ? loaded : null
@@ -243,11 +236,18 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   )
 
   return (
-    <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
-      {/* An open eruv has the top of the page, as a category's opened
-          listing has (GenericDirectory's deskListing): its ‹ is the way
-          back, so the title over it would say the same thing twice. */}
-      <DirectoryHeader title={title} titleInHeader banner={banner} titleOnly={column} />
+    // A computer's top is the category pages' photo with the title on it
+    // (board H4; the user, Nov 15: this page still had the old band), and
+    // it stays while an eruv is open, as over a category's opened listing
+    // (board W10 A). A phone's is the site header's ‹ {title}.
+    <CategoryBandFrame
+      color={color}
+      imageUrl={bandImageUrl}
+      hero={<HeroTitle eyebrow={loaded?.available ? `${loaded.eruvim.length} ${loaded.eruvim.length === 1 ? 'eruv' : 'eruvim'}` : null} title={title} />}
+    >
+      {isMobile && <DirectoryHeader title={title} titleInHeader titleOnly={column} />}
+      {/* The photo's 44px, then the list, as a category's sits under it. */}
+      <div aria-hidden="true" className="hidden h-8 desktop:block" />
 
       {loaded && (!loaded.available || loaded.eruvim.length === 0) && (
         <p className="text-sm text-muted" data-testid="eruv-none">
@@ -270,7 +270,9 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
               <section ref={columnRef} aria-label={open.name} data-testid="eruv-column">
                 {!editing && (
                   <ListingBar
-                    backLabel={title}
+                    // "‹ All 3 eruvim", as a category's opened listing says
+                    // it: the title is on the photo right above (Nov 15).
+                    backLabel={ready.eruvim.length === 1 ? title : `All ${ready.eruvim.length} eruvim`}
                     onBack={closeEruv}
                     position={{ index: openIndex, total: ready.eruvim.length }}
                     onStep={stepEruv}

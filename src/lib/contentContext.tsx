@@ -103,6 +103,12 @@ export function useHomeSections() {
   return draft ? draftSectionsAsHomeSections(draft.sections) : content.homeSections
 }
 
+/** The day the admin's preview shows Right now on, or null (previewDay.ts).
+ *  Always null outside the preview. */
+export function usePreviewDay() {
+  return usePreviewDraft()?.day ?? null
+}
+
 export function useForms() {
   return useContent().forms
 }

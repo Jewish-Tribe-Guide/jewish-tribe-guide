@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { RELATIVE_ELIGIBLE, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, parseTimeToMinutes, type Minyan, type Season, type Tefillah } from '@/lib/davening'
-import { BOX_DAYS, boxChangeCount, type MinyanBox } from '@/lib/minyanimBox'
+import { BOX_DAYS, boxChangeCount, differsFrom, pairWithListing, type MinyanBox } from '@/lib/minyanimBox'
 import type { MinyanWriting } from '@/lib/minyanText'
 import type { MinyanPart } from '@/lib/categories'
 import { RelativeTimeFields, ZMAN_ANCHOR_ORDER, useTimeModes } from '@/components/intake/ZmanTimeFields'
@@ -115,8 +115,10 @@ export default function MinyanBoxEditor({
     const id = reopen.id
     setOpen(id === null ? null : id === 'new' ? 'new' : (rows[Number(id)]?.id ?? null))
   }
-  const was = new Map(original.map((m) => [m.id, m]))
-  const isChanged = (m: Minyan) => !was.has(m.id) || boxChangeCount([was.get(m.id)!], [m]) > 0
+  // Each row's own on the listing, by id or else by its day, tefillah
+  // and time (pairWithListing): a week read again is the same minyanim.
+  const was = pairWithListing(original, rows)
+  const isChanged = (m: Minyan) => !was.has(m.id) || differsFrom(was.get(m.id)!, m)
 
   const editing = open === 'new' ? null : rows.find((m) => m.id === open)
   const title = open === null ? null : open === 'new' ? 'Add a minyan' : TEFILLAH_LABELS[editing!.tefillah]
@@ -186,7 +188,8 @@ export function MinyanBoxRows({
   box: MinyanBox
   writing: MinyanWriting
   mark?: (m: Minyan) => 'Changed' | 'New' | null
-  /** The listing's own, by id: a changed time says what it was (E1Times). */
+  /** The listing's own, by the row's id (pairWithListing): a changed time
+   *  says what it was (E1Times), a changed note shows the old one crossed out. */
   was?: ReadonlyMap<string, Minyan>
   onOpen?: (id: string) => void
 }) {
@@ -203,6 +206,9 @@ export function MinyanBoxRows({
               const kind = kindOf(m, box)
               const old = was?.get(m.id)
               const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, m.joinLink ? 'Online' : null, noteText(m.notes), old && timeText(old) !== timeText(m) ? `was ${timeText(old)}` : null].filter(Boolean).join(' · ')
+              // A changed note: the old one crossed out under it, as a
+              // changed time says what it was (the user, Nov 11).
+              const oldNote = old && noteText(old.notes) !== noteText(m.notes) ? noteText(old.notes) : null
               const marked = mark?.(m) ?? null
               const inside = (
                 <>
@@ -216,6 +222,7 @@ export function MinyanBoxRows({
                       <span className={kind === 'weekday' ? 'font-bold' : 'text-slate-700'}>{timeText(m)}</span>
                     </span>
                     {sub && <span className="mt-0.5 block text-[13.5px] text-muted">{sub}</span>}
+                    {oldNote && <del className="mt-0.5 block text-[13.5px] text-slate-500">{oldNote}</del>}
                   </span>
                   {marked && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">{marked}</span>}
                   {onOpen && <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />}

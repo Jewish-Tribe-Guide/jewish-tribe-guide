@@ -32,21 +32,29 @@ test.skip(({ isMobile }) => !!isMobile, 'the worker is not viewport-dependent')
  *  a registered worker that hasn't taken over yet caches nothing, so asserting
  *  on registration alone would pass while offline support was broken.
  *
- *  Done in two steps rather than one wait on `controller`, which was flaky
- *  under a parallel run. ServiceWorker.tsx registers on `window.load`, and the
- *  worker then has to install (which fetches /offline over the network),
- *  activate, and claim before it controls anything. Waiting on the end of that
- *  chain means waiting on a race. Waiting for activation and then reloading if
- *  the page still isn't controlled makes it deterministic: a page loaded after
- *  a worker is active is always controlled by it. */
+ *  Done in two steps rather than one wait on `controller`.
+ *  ServiceWorker.tsx registers on `window.load`, and the worker then has to
+ *  install (which fetches /offline over the network), activate, and claim
+ *  before it controls anything. So: wait until the page's registration has an
+ *  active worker, and reload if the page still isn't controlled. A navigation
+ *  sent once a worker is active is always controlled by it — even one sent
+ *  while it is still activating, which Chrome holds until activation ends.
+ *
+ *  The first wait must really wait. It used to be `page.waitForFunction` with
+ *  an async predicate, which Playwright never awaits: the Promise is truthy,
+ *  so it returned at once, the reload went out mid-install, loaded
+ *  uncontrolled, and the worker then claimed the page being unloaded instead.
+ *  Nothing ever controlled the new one, and the second wait timed out after
+ *  30s — "the flaky offline test" (Nov 15; src/test/e2eWaitForFunction.test.ts).
+ *  `navigator.serviceWorker.ready` resolves exactly when the registration has
+ *  an active worker, and `evaluate` awaits it. */
 async function serviceWorkerReady(page: import('@playwright/test').Page): Promise<void> {
-  await page.waitForFunction(
-    async () => {
-      const reg = await navigator.serviceWorker?.getRegistration()
-      return !!reg?.active
-    },
-    null,
-    { timeout: 30_000 },
+  await page.evaluate(
+    () =>
+      Promise.race([
+        navigator.serviceWorker.ready.then(() => undefined),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('no active service worker after 30s')), 30_000)),
+      ]),
   )
 
   if (await page.evaluate(() => navigator.serviceWorker.controller == null)) {

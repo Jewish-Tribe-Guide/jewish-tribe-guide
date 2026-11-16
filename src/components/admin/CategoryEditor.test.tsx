@@ -673,6 +673,30 @@ describe('CategoryEditor — Page · A listing · Adding', () => {
     expect(body.fields.find((f: { key: string }) => f.key === 'denom').filterable).toBe(false)
   })
 
+  // The user, Nov 11: a list of items was always "Has", with no switch:
+  // "I don't want any hidden rules".
+  it('takes a list of items out of Has when In the filter is turned off, and saves it off', async () => {
+    computer()
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const initial = baseCategory({
+      detailFields: [{ key: 'm', label: 'Kosher items available', type: 'tags', renderAs: 'badge', filterable: false, tagGroup: 'more_kosher_items' }],
+    })
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={null} onSaved={onSaved} onCancel={vi.fn()} />)
+    // Its row says it's in the filter.
+    await user.click(screen.getByRole('button', { name: 'Kosher items availableFilter' }))
+    const looks = screen.getByRole('complementary', { name: 'How it looks' })
+    expect(within(looks).getByRole('tab', { name: 'Filters' })).toBeInTheDocument()
+    const filter = screen.getByRole('switch', { name: 'In the filter' })
+    expect(filter).toHaveAttribute('aria-checked', 'true')
+    await user.click(filter)
+    expect(within(looks).queryByRole('tab', { name: 'Filters' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.fields.find((f: { key: string }) => f.key === 'm').itemFilter).toBe(false)
+  })
+
   // The user, Nov 7: opened full size, the field went away.
   it('opens the whole page full size from beside a field, the field on it', async () => {
     computer()

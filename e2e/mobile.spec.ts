@@ -99,7 +99,8 @@ test.describe('mobile', () => {
   // The user, Oct 15: "not much room to click feedback, about, privacy on
   // mobile". They were 23px-tall words whose last line sat 37px over the
   // tab bar; a first fix pushed them ~100px up ("way too far"). Each is a
-  // 44px tap target now, the words about 58px over the bar. Positional, so
+  // 44px tap target now, the words about 25px over the bar (58px until the
+  // footer moved down to the bar on Nov 14). Positional, so
   // jsdom can't see it.
   test('Feedback, About and Privacy are each a full tap target, near the tab bar but not crowded by it', async ({ page }) => {
     const community = await defaultCommunity(page)
@@ -121,8 +122,11 @@ test.describe('mobile', () => {
           r.selectNodeContents(a)
           return r.getBoundingClientRect().bottom
         })
-        expect(barTop - wordsBottom, `${name}: room over the tab bar`).toBeGreaterThanOrEqual(45)
-        expect(barTop - wordsBottom, `${name}: not floating far above it`).toBeLessThanOrEqual(75)
+        // Closer since Nov 14 (the user: the footer read as sitting high):
+        // the screen leaves the bar plus 4px (TAB_BAR_CLEARANCE), so the
+        // words end about 25px over it, in their own 44px box.
+        expect(barTop - wordsBottom, `${name}: room over the tab bar`).toBeGreaterThanOrEqual(16)
+        expect(barTop - wordsBottom, `${name}: not floating far above it`).toBeLessThanOrEqual(40)
       }
     }).toPass({ timeout: 5_000 })
   })

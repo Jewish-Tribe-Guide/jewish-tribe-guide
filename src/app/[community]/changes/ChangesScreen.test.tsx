@@ -53,6 +53,24 @@ afterEach(() => {
 })
 
 describe('the What changed page', () => {
+  // Board W9 C (the user, Nov 15): each row is about one place, so its own
+  // picture, whole on a white tile (most are logos, which filling a square
+  // cuts). A place with no picture keeps its category's icon.
+  it('each place’s own picture, whole on a white tile; the category’s icon where it has none', () => {
+    show([
+      row('2026-10-01T22:00:00Z', { listing: { id: '22222222-bbbb', name: 'Ben & Jerry’s', category: 'restaurant', status: 'approved', photo: 'https://example.supabase.co/storage/v1/object/public/site-assets/listing-photo/bj.jpeg' } }),
+      row('2026-10-01T16:00:00Z'),
+    ])
+    const [withPhoto, without] = screen.getAllByTestId('change')
+    const tile = withPhoto!.querySelector('[data-whole-picture]')
+    expect(tile).not.toBeNull()
+    expect(tile).toHaveClass('rounded-xl')
+    expect(decodeURIComponent(tile!.querySelector('img')!.getAttribute('src')!)).toContain('listing-photo/bj')
+    expect(tile!.querySelector('img')).toHaveClass('object-contain')
+    expect(without!.querySelector('[data-whole-picture]')).toBeNull()
+    expect(without!.querySelector('img')).toBeNull()
+  })
+
   it('by day in the community’s time, newest first, each line opening its listing', () => {
     show([
       row('2026-10-01T22:00:00Z', { listing: { id: '22222222-bbbb', name: 'Ben & Jerry’s', category: 'restaurant', status: 'approved' } }),
@@ -64,7 +82,18 @@ describe('the What changed page', () => {
     expect(days.map((d) => d.querySelector('h2')?.textContent)).toEqual(['Yesterday', 'Wednesday, Sep 30'])
     expect(within(days[0]).getAllByTestId('change').map((c) => c.textContent)).toEqual(['Ben & Jerry’s updatedFood · 6 PM', 'Pretzel Buns added at ALDIGrocery · 12 PM'])
     expect(within(days[1]).getByRole('link')).toHaveTextContent('New: Charlie was a sinner.')
-    expect(screen.getByText(/^3 changes in the last 7 days/)).toBeInTheDocument()
+  })
+
+  // Board W11 (the user, Nov 15): the count is of the 30 days the page lists,
+  // not the last 7, on the photo on a computer and under the title on a
+  // phone; no paragraph explaining it; Suggest a listing beside the days.
+  it('counts the 30 days it lists, on the photo and under the phone’s title, with Suggest a listing beside', () => {
+    show([row('2026-10-01T22:00:00Z'), row('2026-09-15T16:00:00Z'), row('2026-09-10T16:00:00Z')])
+    expect(screen.getByTestId('category-hero-count')).toHaveTextContent('3 changes in the last 30 days')
+    expect(screen.getByTestId('changes-count')).toHaveTextContent('3 changes in the last 30 days')
+    expect(screen.queryByText(/places added, edited or taken out/)).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('changes-suggest')).getByRole('button', { name: 'Suggest a listing' })).toBeInTheDocument()
+    expect(screen.getByTestId('changes-box').querySelectorAll('[data-testid=changes-day]')).toHaveLength(3)
   })
 
   it('under each edit, everything it changed, one to a line, in full', () => {

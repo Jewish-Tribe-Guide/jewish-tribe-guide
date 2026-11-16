@@ -97,7 +97,15 @@ export default function ChangeRow({
     <li data-testid="change">
       <div className={`relative flex items-start gap-3 border-t border-slate-100 py-2.5 ${linked ? 'hover:bg-slate-50' : ''}`}>
         <span className={`pt-px ${change.hidden ? 'opacity-45' : ''}`}>
-          <CategoryIcon icon={category?.icon ?? ''} categoryId={change.listing.category} color={getCategoryColor([...categories], change.listing.category)} className="h-9 w-9 text-base" sizePx={36} />
+          {/* The place's own picture, whole on a white tile (board W9 C,
+              the user, Nov 15): each row is about one place, and its logo
+              tells it apart where the category's icon repeats. No picture:
+              the category's icon, as before. */}
+          {change.listing.photo ? (
+            <CategoryIcon icon={category?.icon ?? ''} categoryId={change.listing.category} iconImageUrl={change.listing.photo} wholePicture shape="square" color={getCategoryColor([...categories], change.listing.category)} className="h-11 w-11" sizePx={44} />
+          ) : (
+            <CategoryIcon icon={category?.icon ?? ''} categoryId={change.listing.category} color={getCategoryColor([...categories], change.listing.category)} className="h-9 w-9 text-base" sizePx={36} />
+          )}
         </span>
         <span className={`min-w-0 flex-1 ${change.hidden ? 'opacity-45' : ''}`}>
           <span className="block text-[15px] leading-snug text-slate-700">

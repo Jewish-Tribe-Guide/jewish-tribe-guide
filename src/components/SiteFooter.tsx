@@ -11,13 +11,9 @@ import type { SiteSettings } from '@/lib/siteSettings'
 
 export default function SiteFooter({
   previewSettings,
-  onPromoteFeedbackToPage,
   year,
 }: {
   previewSettings?: SiteSettings
-  /** Forwarded to FeedbackButton — see its own note. Omitted by the admin
-   *  category preview, which has no page-level feedback screen to hand off to. */
-  onPromoteFeedbackToPage?: () => void
   /** The copyright year, resolved on the server and passed in.
    *
    *  It used to be `new Date().getFullYear()` right here, which reads the clock
@@ -32,7 +28,10 @@ export default function SiteFooter({
   const communitySlug = useCommunitySlug()
 
   return (
-    <footer className="mt-16 border-t border-slate-200/80 bg-surface">
+    <footer className="mt-16 border-t border-slate-200/80 bg-surface desktop:bg-white">
+      {/* Board K2 (Nov 11): white on the computer, so the page clearly ends
+          rather than running on in the page's grey. The phone keeps the
+          grey (the user: "I'm ok with how it is for mobile"). */}
       {/* desktop:max-w-7xl matches the home screen's own content container
           (Landing.tsx/HeroHeading.tsx) so this footer's edges line up with
           the cards above it — not the narrower max-w-6xl category/listing
@@ -80,12 +79,7 @@ export default function SiteFooter({
             <Link href={routes.privacy(communitySlug)} className="underline hover:text-slate-600">Privacy</Link>
           </p>
           {settings.feedbackEnabled && (
-            <FeedbackButton
-              buttonLabel={settings.feedbackButtonLabel}
-              heading={settings.feedbackHeading}
-              successMessage={settings.feedbackSuccessMessage}
-              onPromoteToPage={onPromoteFeedbackToPage}
-            />
+<FeedbackButton buttonLabel={settings.feedbackButtonLabel} />
           )}
         </div>
       </div>

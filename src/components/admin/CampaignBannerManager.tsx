@@ -261,22 +261,23 @@ function CampaignScreen({
                   <option value="list">Browse Listings</option>
                 </select>
               </AdminField>
+              {/* min-w-0: a date input's own width otherwise pushes Ends off a phone's card. */}
               <div className="flex gap-3">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <AdminField label="Starts">
                     <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className={adminInputClass} />
                   </AdminField>
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <AdminField label="Ends">
                     <input type="date" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} className={adminInputClass} />
                   </AdminField>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={BANNER_PHOTO} alt="" className="h-11 w-[72px] rounded-md object-cover" />
-                <span className="text-[13px] font-semibold text-slate-700">Photo</span>
+              {/* On a phone there's no room beside the form, so the banner as it
+                  will look sits under the dates instead (the user, Nov 15). */}
+              <div className="lg:hidden">
+                <BannerPreview title={form.title} subtitle={form.subtitle} />
               </div>
             </div>
           </AdminBox>
@@ -298,18 +299,7 @@ function CampaignScreen({
             ))}
         </div>
         <aside aria-label="Preview" className="hidden lg:block w-[340px] shrink-0 sticky top-8">
-          <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
-            <div className="relative h-[140px]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={BANNER_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/40 to-transparent" />
-              <div className="absolute inset-x-3 bottom-2.5">
-                <p className="m-0 text-[15px] font-bold text-slate-900">{form.title || 'Sukkah Map'}</p>
-                <p className="m-0 text-[12px] text-slate-700">{form.subtitle || 'Find open sukkahs to visit this Sukkot'}</p>
-              </div>
-            </div>
-            <p className="m-0 border-t border-slate-200 px-3 py-2.5 text-[12.5px] text-slate-600">Shows at the top of the home page between the two dates</p>
-          </div>
+          <BannerPreview title={form.title} subtitle={form.subtitle} />
         </aside>
       </div>
       {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -336,4 +326,22 @@ export function dateRange(from: string, to: string): string {
     return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(y === thisYear ? {} : { year: 'numeric' }) })
   }
   return `${day(from)} – ${day(to)}`
+}
+
+/** The banner as the home will show it, with the words typed so far. */
+function BannerPreview({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div data-testid="campaign-banner-preview" className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
+      <div className="relative h-[140px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={BANNER_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/40 to-transparent" />
+        <div className="absolute inset-x-3 bottom-2.5">
+          <p className="m-0 text-[15px] font-bold text-slate-900">{title || 'Sukkah Map'}</p>
+          <p className="m-0 text-[12px] text-slate-700">{subtitle || 'Find open sukkahs to visit this Sukkot'}</p>
+        </div>
+      </div>
+      <p className="m-0 border-t border-slate-200 px-3 py-2.5 text-[12.5px] text-slate-600">Shows at the top of the home page between the two dates</p>
+    </div>
+  )
 }

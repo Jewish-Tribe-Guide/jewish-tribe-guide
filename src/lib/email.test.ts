@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNightlyEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, namedSender, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNightlyEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -15,10 +15,12 @@ const minimalContact: ContactHospitalData = {
 const mockGetCommunityNotifyRecipients = vi.hoisted(() => vi.fn())
 const mockGetReviewActionRecipients = vi.hoisted(() => vi.fn())
 const mockListCommunities = vi.hoisted(() => vi.fn())
+const mockResolveCommunity = vi.hoisted(() => vi.fn())
 vi.mock('./communityStore', () => ({
   getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients,
   getReviewActionRecipients: mockGetReviewActionRecipients,
   listCommunities: mockListCommunities,
+  resolveCommunity: mockResolveCommunity,
 }))
 
 const mockGetCategoryById = vi.hoisted(() => vi.fn())
@@ -130,6 +132,24 @@ describe('sendEmail', () => {
       expect(sendSpy).toHaveBeenCalledWith(
         expect.objectContaining({ from: 'onboarding@resend.dev', to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>' }),
       )
+    })
+
+    // The user, Nov 15: the emails arrived from a bare "notifications@…".
+    it('sends in the name of the community the email is about', async () => {
+      vi.stubEnv('RESEND_FROM', 'notifications@ourdomain.org')
+      mockResolveCommunity.mockImplementation(async (slug: string) => ({ slug, name: slug === 'ues' ? 'UES Jewish Guide' : 'Philly Jewish Guide' }))
+      await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>', community: 'ues' })
+      expect(mockResolveCommunity).toHaveBeenCalledWith('ues')
+      expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ from: '"UES Jewish Guide" <notifications@ourdomain.org>' }))
+      mockResolveCommunity.mockReset()
+    })
+
+    it('still sends, from the bare address, when the community can\'t be read', async () => {
+      vi.stubEnv('RESEND_FROM', 'notifications@ourdomain.org')
+      mockResolveCommunity.mockRejectedValue(new Error('supabase down'))
+      await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>', community: 'philly' })
+      expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ from: 'notifications@ourdomain.org' }))
+      mockResolveCommunity.mockReset()
     })
 
     it('sends from RESEND_FROM when set', async () => {
@@ -845,3 +865,39 @@ describe('user-supplied text never reaches an inbox as live HTML', () => {
   })
 })
 
+
+describe('namedSender', () => {
+  it('puts the name before a bare address', () => {
+    expect(namedSender('notifications@x.org', 'Philly Jewish Guide')).toBe('"Philly Jewish Guide" <notifications@x.org>')
+  })
+  it('leaves an address that already has a name, and one with no name to add', () => {
+    expect(namedSender('Guide <notifications@x.org>', 'Philly Jewish Guide')).toBe('Guide <notifications@x.org>')
+    expect(namedSender('notifications@x.org', null)).toBe('notifications@x.org')
+    expect(namedSender('notifications@x.org', '  ')).toBe('notifications@x.org')
+  })
+  it('keeps quotes, brackets and line breaks in a name from breaking the header', () => {
+    expect(namedSender('n@x.org', 'The "Best" <Guide>\r\nBcc: a@b.c')).toBe('"The Best GuideBcc: a@b.c" <n@x.org>')
+  })
+})
+
+// Every email is about a community, so every send says which, and goes out
+// in its name; only the two sign-in links have none (they get the default
+// community's). Read from the source, so a new email can't be added without.
+describe('every sendEmail call names its community', () => {
+  it.each(['email.ts', 'confirmationEmail.ts', 'subscriberEmail.ts'])('%s', async (file) => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
+    const calls = [...src.matchAll(/(?<!function )sendEmail\(\{/g)].map((m) => {
+      let depth = 0
+      let i = m.index! + 'sendEmail('.length
+      for (; i < src.length; i++) {
+        if (src[i] === '{') depth++
+        else if (src[i] === '}' && --depth === 0) break
+      }
+      return src.slice(m.index!, i + 1)
+    })
+    expect(calls.length).toBeGreaterThan(0)
+    const without = calls.filter((c) => !/\bcommunity:/.test(c) && !/sign-in link/.test(c))
+    expect(without).toEqual([])
+  })
+})

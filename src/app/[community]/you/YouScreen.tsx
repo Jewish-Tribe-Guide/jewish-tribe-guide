@@ -5,7 +5,7 @@ import Link from 'next/link'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
 import SaveButton from '@/components/SaveButton'
 import { BookmarkIcon } from '@/components/icons'
-import { PlaceIcon, TONE, WithMinyans, eruvPlaceView, hasMinyanim, milesFrom, placeHref, placeName, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
+import { PlaceIcon, TONE, WithMinyans, eruvPlaceView, davensHere, milesFrom, placeHref, placeName, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
 import { TONE_WORDS } from '@/lib/eruvTone'
 import { useNextMinyan } from '@/components/resources/nextMinyans'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
@@ -23,6 +23,8 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { listingRowFacts } from '@/lib/listingRow'
 import { milesText, type LatLng } from '@/lib/geo'
+import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
+import PhotoHeader from '@/components/PhotoHeader'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
@@ -79,70 +81,103 @@ export default function YouScreen() {
   }
 
   const empty = places !== null && places.length === 0 && searches.length === 0
-  const both = !!places?.length && searches.length > 0
+
+  // On the photo (board W11): what's kept here, "5 places · 1 search".
+  const counted = (n: number, one: string, many: string) => (n > 0 ? [`${n} ${n === 1 ? one : many}`] : [])
+  const eyebrow = places === null ? null : [...counted(places.length, 'place', 'places'), ...counted(searches.length, 'search', 'searches')].join(' · ') || null
 
   return (
     <main
       data-testid="you-page"
-      className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-5 sm:px-6 desktop:max-w-5xl desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]"
+      className={`mx-auto w-full max-w-6xl flex-1 px-4 ${TAB_BAR_CLEARANCE} pt-5 sm:px-6 desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]`}
     >
-      <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:text-[36px]">You</h1>
+      {/* Board W11 (the user, Nov 15): a computer's top is the category
+          pages' photo with the title on it; a phone keeps its own title. */}
+      <PhotoHeader eyebrow={eyebrow} title="You">
+        <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:hidden">You</h1>
 
-      {empty ? (
-        <div className="mt-24 flex flex-col items-center text-center" data-testid="you-empty">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <BookmarkIcon className="h-6 w-6" />
-          </span>
-          <p className="mt-4 text-[19px] font-extrabold text-ink">Nothing saved yet</p>
-          <p className="mt-1 text-[15px] text-slate-500">Tap Save on a place or a search.</p>
-        </div>
-      ) : (
-        places !== null && (
-          <>
-            <SwipeRowGroup>
-              <div className={`mt-4 ${both ? 'desktop:grid desktop:grid-cols-2 desktop:items-start desktop:gap-8' : ''}`}>
-                {places.length > 0 && (
-                  <Section title="Places" testId="you-places">
-                    <WithMinyans places={places}>
-                      {places.map((p) => (
-                        <PlaceRow
-                          key={p.id}
-                          place={p}
-                          communitySlug={community.slug}
-                          from={from}
-                          now={now}
-                          changed={dots.get(p.id) ?? null}
-                          onRemove={() => togglePlace({ id: p.id, categoryId: p.category.id })}
-                        />
-                      ))}
-                    </WithMinyans>
-                  </Section>
-                )}
-                {searches.length > 0 && saved && (
-                  <Section title="Searches" testId="you-searches" className={places.length > 0 ? 'mt-6 desktop:mt-0' : ''}>
-                    {searches.map((s) => (
-                      <SearchRow key={s.key} search={s} {...searchRow(s)} onRemove={() => saved.toggle(s)} />
-                    ))}
-                  </Section>
-                )}
+        {empty ? (
+          <div data-testid="you-empty">
+            <div className="mt-24 flex flex-col items-center text-center desktop:hidden">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <BookmarkIcon className="h-6 w-6" />
+              </span>
+              <p className="mt-4 text-[19px] font-extrabold text-ink">Nothing saved yet</p>
+              <p className="mt-1 text-[15px] text-slate-500">{SAVE_HOW}</p>
+            </div>
+            {/* A computer: where the cards will go, drawn as dashed outlines,
+                the first saying how. */}
+            <div aria-hidden="true" data-testid="you-empty-cards" className="hidden grid-cols-3 gap-5 desktop:grid">
+              <div className={EMPTY_CARD}>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <BookmarkIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-[17px] font-extrabold text-ink">Nothing saved yet</span>
+                  <span className="block text-[14px] text-slate-500">{SAVE_HOW.replace(/\.$/, '')}</span>
+                </span>
               </div>
-            </SwipeRowGroup>
-            <p className="mt-3 text-[13px] text-slate-500">
-              <span className="desktop:hidden">Saved on this phone</span>
-              <span className="hidden desktop:inline">Saved in this browser</span>
-            </p>
-          </>
-        )
-      )}
+              <div className={EMPTY_CARD} />
+              <div className={EMPTY_CARD} />
+            </div>
+          </div>
+        ) : (
+          places !== null && (
+            <>
+              <SwipeRowGroup>
+                <div className="mt-4 desktop:mt-0">
+                  {places.length > 0 && (
+                    <Section title="Places" testId="you-places">
+                      <WithMinyans places={places}>
+                        {places.map((p) => (
+                          <PlaceRow
+                            key={p.id}
+                            place={p}
+                            communitySlug={community.slug}
+                            from={from}
+                            now={now}
+                            changed={dots.get(p.id) ?? null}
+                            onRemove={() => togglePlace({ id: p.id, categoryId: p.category.id })}
+                          />
+                        ))}
+                      </WithMinyans>
+                    </Section>
+                  )}
+                  {searches.length > 0 && saved && (
+                    <Section title="Searches" testId="you-searches" className={places.length > 0 ? 'mt-6 desktop:mt-9' : ''}>
+                      {searches.map((s) => (
+                        <SearchRow key={s.key} search={s} {...searchRow(s)} onRemove={() => saved.toggle(s)} />
+                      ))}
+                    </Section>
+                  )}
+                </div>
+              </SwipeRowGroup>
+              <p className="mt-3 text-[13px] text-slate-500 desktop:mt-9">
+                <span className="desktop:hidden">Saved on this phone</span>
+                <span className="hidden desktop:inline">Saved in this browser</span>
+              </p>
+            </>
+          )
+        )}
+      </PhotoHeader>
     </main>
   )
 }
 
+/** How to save, said the same on a phone and a computer (board W11). */
+const SAVE_HOW = 'Save a place or a search to keep it here.'
+const EMPTY_CARD = 'flex h-24 items-center gap-4 rounded-2xl border-2 border-dashed border-slate-300 px-5'
+
+/** A phone: one white box, a row each. A computer (board W11): a card
+ *  each, three across. */
+const ROW = 'group border-t border-slate-100 first:border-t-0 desktop:overflow-hidden desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:first:border-t desktop:hover:shadow-md'
+const ROW_LINK = 'flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3 desktop:px-5 desktop:py-5'
+
 function Section({ title, testId, className = '', children }: { title: string; testId: string; className?: string; children: React.ReactNode }) {
   return (
     <section data-testid={testId} className={className}>
-      <h2 className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">{title}</h2>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">{children}</div>
+      <h2 className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500 desktop:mb-3">{title}</h2>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white desktop:grid desktop:grid-cols-3 desktop:gap-4 desktop:overflow-visible desktop:rounded-none desktop:border-0 desktop:bg-transparent">{children}</div>
     </section>
   )
 }
@@ -190,7 +225,7 @@ function PlaceRow({
       ? eruv
         ? [{ text: eruv.label, className: `font-semibold ${TONE_WORDS[eruv.tone]}` }, ...(eruv.checked ? [{ text: eruv.checked.split(' · ')[0], className: '' }] : [])]
         : []
-      : hasMinyanim(category)
+      : davensHere(category, place.item)
         ? shul
           ? [{ text: shul.text, className: TONE[shul.tone] }]
           : []
@@ -200,7 +235,7 @@ function PlaceRow({
             .map((f) => ({ text: f.text, className: TONE[f.tone] }))
   const miles = place.kind === 'eruv' || category.hasAddress === false ? null : milesFrom(from, place.item)
   return (
-    <div className="group border-t border-slate-100 first:border-t-0">
+    <div className={ROW}>
       <SwipeRow
         rowId={`place:${place.id}`}
         // A phone's swipe only: desktop removes with the bookmark.
@@ -209,8 +244,8 @@ function PlaceRow({
         className="bg-white"
         contentClassName="relative flex items-center bg-white touch-pan-y desktop:group-hover:bg-slate-50"
       >
-        <Link href={placeHref(communitySlug, place)} prefetch={false} className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3">
-          <PlaceIcon place={place} color={getCategoryColor(categories, category.id)} />
+        <Link href={placeHref(communitySlug, place)} prefetch={false} className={ROW_LINK}>
+          <PlaceIcon place={place} color={getCategoryColor(categories, category.id)} className="h-11 w-11 text-lg desktop:h-14 desktop:w-14" sizePx={56} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <span className="truncate text-[15.5px] font-bold text-ink">{name}</span>
@@ -239,7 +274,7 @@ function SearchRow({ search, sub, href, onRemove }: { search: SavedSearch; sub: 
   const name = `“${search.words}”`
   const isMobile = useIsMobile()
   return (
-    <div className="group border-t border-slate-100 first:border-t-0">
+    <div className={ROW}>
       <SwipeRow
         rowId={`search:${search.key}`}
         enabled={isMobile}
@@ -247,8 +282,8 @@ function SearchRow({ search, sub, href, onRemove }: { search: SavedSearch; sub: 
         className="bg-white"
         contentClassName="relative flex items-center bg-white touch-pan-y desktop:group-hover:bg-slate-50"
       >
-        <Link href={href} prefetch={false} className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Link href={href} prefetch={false} className={ROW_LINK}>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary desktop:h-14 desktop:w-14">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-5 w-5">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />

@@ -7,6 +7,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
+import { HOME_CARD_OUTLINE, SIGN_OFF_BUTTON, SIGN_OFF_CARD, SIGN_OFF_EYEBROW, SIGN_OFF_HEADING, SIGN_OFF_LINE } from './AnswerCard'
 
 // ── "Stay in the loop" signup — desktop only, right after the map ──────────
 // The home screen ends at the map with nothing after it but the footer; this
@@ -25,9 +26,15 @@ import Honeypot from '@/components/Honeypot'
 // besides the unsubscribe link every notification carries.
 export default function SubscribeSection({
   bare = false,
+  band = false,
   eyebrow = 'Email updates',
   heading = 'Stay in the Loop',
 }: {
+  /** The computer home's last stop (board G5b, Nov 11): a navy box with the
+   *  words on the left and the email box and Sign up on the right. Every
+   *  category, new places and closures both; the choices stay on the
+   *  manage-subscription page every email links to. */
+  band?: boolean
   /** Skip this section's own outer `<section>`/card shell and render just the
    *  heading + form — Landing renders this inside its own standalone card
    *  now (own border/padding). */
@@ -190,6 +197,43 @@ export default function SubscribeSection({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (band) {
+    return (
+      // Board W7l (Nov 15): white and quiet beside Suggest a listing, the
+      // page's sign-off under the map; it was solid blue and as tall as the
+      // map's words. The email box goes under the words below 540px.
+      <div className="@container h-full">
+      <div data-testid="home-subscribe" className={`${SIGN_OFF_CARD} ${HOME_CARD_OUTLINE}`}>
+        <div className="min-w-0 @[540px]:flex-1">
+          <p className={SIGN_OFF_EYEBROW}>{eyebrow}</p>
+          <h2 className={SIGN_OFF_HEADING}>{heading}</h2>
+          <p className={SIGN_OFF_LINE}>
+            {done ? 'You’re subscribed. Every email has an unsubscribe link.' : 'An email when a place is added or closes.'}
+          </p>
+          {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
+        </div>
+        {!done && (
+          <form onSubmit={handleSubmit} className="flex w-full gap-2 @[540px]:w-auto @[540px]:shrink-0">
+            <Honeypot value={honeypot} onChange={setHoneypot} />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your email"
+              aria-label="Email address"
+              className="h-10 min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 text-[14.5px] text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary @[540px]:w-[200px] @[540px]:flex-none"
+            />
+            <button type="submit" disabled={submitting} className={SIGN_OFF_BUTTON}>
+              {submitting ? 'Signing up…' : 'Sign up'}
+            </button>
+          </form>
+        )}
+      </div>
+      </div>
+    )
   }
 
   const content = (

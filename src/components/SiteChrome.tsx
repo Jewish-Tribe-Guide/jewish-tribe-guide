@@ -42,6 +42,7 @@ function screenFromPath(pathname: string): { mode: AppMode; cardId: string | nul
   if (first === 'feedback') return { mode: 'feedback', cardId: null }
   if (first === 'browse') return { mode: 'browse', cardId: null }
   if (first === 'you') return { mode: 'you', cardId: null }
+  if (first === 'changes') return { mode: 'changes', cardId: null }
   // Anything else is a category or form slug.
   return { mode: 'find', cardId: first }
 }
@@ -64,6 +65,7 @@ function PathAwareTabBar({ tabs, iconForTarget }: {
     else if (tab.target === 'feedback') navigate(null, 'feedback')
     else if (tab.target === 'browse') navigate(null, 'browse')
     else if (tab.target === 'you') navigate(null, 'you')
+    else if (tab.target === 'changes') navigate(null, 'changes')
     // Anything else is a card id — a category opens its directory, a form
     // opens its wizard. Both live at the same path, so this is one call now;
     // the [slug] route decides which it is. That also retires the old guard
@@ -84,7 +86,7 @@ function PathAwareTabBar({ tabs, iconForTarget }: {
 
 function Chrome({ children, year }: { children: React.ReactNode; year: number }) {
   const { controls, liveTracking } = useLocation()
-  const { navigate, goHome } = useSiteNavigation()
+  const { goHome } = useSiteNavigation()
   const categories = useCategories()
   const settings = useSiteSettings()
 
@@ -127,7 +129,7 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           the forms that collect personal data, which is where it belongs on
           every device (see PrivacyNote). */}
       <div className="hidden desktop:block">
-        <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} year={year} />
+        <SiteFooter year={year} />
       </div>
       <Suspense fallback={null}>
         <PathAwareTabBar

@@ -26,10 +26,17 @@ import { routes } from './routes'
 // instead, so a visitor tapping in a loop can't hold functions open.
 // revalidateContent.test.ts holds every caller to that.
 // ─────────────────────────────────────────────────────────────────────────────
-export async function revalidatePublicContent(): Promise<void> {
+//
+// `newCommunity`: the community list is expired outright instead of served
+// stale. Stale, a community just created is missing from it, so its own
+// address is a 404 until a background refresh lands — which in CI it hadn't
+// by the time the create test asked for the page (PR 387, Nov 16). Adding a
+// community is rare and its admin is the one waiting, so the one blocking
+// read is worth it.
+export async function revalidatePublicContent({ newCommunity = false }: { newCommunity?: boolean } = {}): Promise<void> {
   const communities = await listCommunities().catch(() => [])
 
-  revalidateTag(TAGS.communities, 'max')
+  revalidateTag(TAGS.communities, newCommunity ? { expire: 0 } : 'max')
   for (const community of communities) {
     for (const tag of allCommunityTags(community.slug)) {
       // 'max' keeps serving the stale value while the fresh one regenerates,

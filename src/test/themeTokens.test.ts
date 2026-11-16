@@ -48,9 +48,10 @@ describe('colour classes', () => {
     const unknown: string[] = []
     for (const file of sourceFiles('src')) {
       for (const m of readFileSync(file, 'utf-8').matchAll(COLOUR_CLASS)) {
-        // One side's colour: border-b-slate-100 is slate-100.
+        // One side's colour: border-b-slate-100 is slate-100, border-l-primary
+        // the theme's primary.
         const side = /^[btlrxy]-(.+)$/.exec(m[1])
-        const name = side && PALETTE.has(side[1].split('-')[0]) ? side[1] : m[1]
+        const name = side && (PALETTE.has(side[1].split('-')[0]) || DEFINED.has(side[1])) ? side[1] : m[1]
         if (name.startsWith('gradient-') || NOT_COLOURS.has(name)) continue
         if (PALETTE.has(name.split('-')[0]) || DEFINED.has(name)) continue
         unknown.push(`${file}: ${m[0]}`)

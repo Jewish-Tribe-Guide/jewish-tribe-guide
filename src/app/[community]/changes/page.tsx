@@ -4,6 +4,8 @@ import ChangesScreen from './ChangesScreen'
 import { ChangesProvider } from '@/lib/changesContext'
 import { listChangeLog } from '@/lib/changesStore'
 import { features } from '@/lib/features'
+import { getSiteSettings } from '@/lib/siteSettingsStore'
+import { changesLinked } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 
@@ -18,9 +20,10 @@ export async function generateMetadata(props: PageProps<'/[community]/changes'>)
 }
 
 export default async function ChangesPage(props: PageProps<'/[community]/changes'>) {
-  // Held back from the site for now (see features.ts).
-  if (!features.whatChanged) notFound()
+  // Held back from the site for now (see features.ts), unless the admin has
+  // put it on a tab or a header link to see it (the user, Nov 15).
   const { community } = await props.params
+  if (!features.whatChanged && !changesLinked(await getSiteSettings(community))) notFound()
   const rows = await listChangeLog(community).catch((err) => {
     console.error('[changes] the log failed to load:', err)
     return null

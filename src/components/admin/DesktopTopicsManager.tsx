@@ -1,14 +1,17 @@
 'use client'
 
-import { BUILT_IN_BLOCKS, canShareRow, cardRows, fromCardRows, MAX_CARDS_IN_ROW, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
+import { BUILT_IN_BLOCKS, canShareRow, cardRows, fromCardRows, MAX_CARDS_IN_ROW, ROW_OF_ITS_OWN, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
-import DragList, { AddListButton, InnerRow } from './DragList'
+import DragList, { AddListButton, InnerRow, type DragRow } from './DragList'
 
 // ── The computer home's cards under the search, in rows (the user, Nov 4;
 // drawn as artifact 8HpeQANzsQyGbyHVPsXrc5). A card on its own fills its
 // row; cards in one box share a row, up to three, and Categories is always
 // alone (cardRows in homeSections.ts). Each card is a handle, its name and
-// an ×: nothing opens, and there is no width. A card taken off comes back
+// an ×, and there is no width. A card with choices (Right now, the Map)
+// ends instead in what it's set to and a chevron, and opens a screen of its
+// own (boards V4/V4b, Nov 15: the list was filling up with their settings);
+// "Take off the page" is on that screen. A card taken off comes back
 // from "+ Add". Same shared draft/Save pipeline as the category sections
 // (see homeSectionsDraft.ts).
 //
@@ -29,18 +32,19 @@ import DragList, { AddListButton, InnerRow } from './DragList'
 // reads/reorders the cards, leaving plain category sections and retired
 // kinds in the draft untouched.
 
-type CardKind = Exclude<HomeBlockKind, 'section' | 'map'>
+type CardKind = Exclude<HomeBlockKind, 'section' | 'listings'>
 
-/** The cards offered, in the order "+ Add" lists them. 'map' (the map on the
- *  home screen) is retired: Landing.tsx renders nothing for a leftover row. */
-const CARD_KINDS: CardKind[] = ['browse', 'davening', 'listings', 'suggest', 'subscribe', 'jewishTimes']
+/** The cards offered, in the order "+ Add" lists them. 'map' is the
+ *  "Everything on one map" card (board G3, Nov 11; its photo is set under
+ *  this list). 'listings' (Kept by the Community, now the trust band under
+ *  the hero, Nov 11) is retired: Landing.tsx renders nothing for a leftover
+ *  row, and this list keeps one aside, untouched, like a section. */
+const CARD_KINDS: CardKind[] = ['browse', 'rightNow', 'map', 'davening', 'suggest', 'subscribe', 'jewishTimes']
 const CARD_KIND_SET = new Set<string>(CARD_KINDS)
 
 /** The setting that names a card on the site, where it has one. */
 const HEADING_KEY: Partial<Record<CardKind, keyof SiteSettings>> = {
-  listings: 'desktopListingsHeading',
   subscribe: 'desktopSubscribeHeading',
-  jewishTimes: 'desktopJewishTimesHeading',
 }
 
 type Card = DraftHomeSection & { kind: CardKind }
@@ -97,7 +101,8 @@ function turnedDown(refused: readonly Item[], liftedId: string): { ids: Set<stri
   const lifted = run.find((c) => c.id === liftedId)!
   const box = run.filter((c) => c.id !== liftedId)
   if (!box.length) return null
-  const why = lifted.kind === 'browse' || box.some((c) => c.kind === 'browse') ? 'Categories has a row of its own' : `Full: ${MAX_CARDS_IN_ROW} cards at most`
+  const alone = [lifted, ...box].find((c) => ROW_OF_ITS_OWN.has(c.kind))
+  const why = alone ? `${alone.kind === 'map' ? 'Map' : 'Categories'} has a row of its own` : `Full: ${MAX_CARDS_IN_ROW} cards at most`
   return { ids: new Set(box.map((c) => c.id)), why }
 }
 
@@ -106,6 +111,7 @@ export default function DesktopTopicsManager({
   onChange,
   settings,
   onPointCard,
+  opens = {},
 }: {
   sections: DraftHomeSection[]
   onChange: (sections: DraftHomeSection[]) => void
@@ -113,6 +119,9 @@ export default function DesktopTopicsManager({
   settings: SiteSettings
   /** The mouse on a card, or null off it: the preview lights that card. */
   onPointCard?: (kind: string | null) => void
+  /** The cards that open a screen of their own: what each is set to, and
+   *  how to open it. */
+  opens?: Partial<Record<string, { summary?: string; onOpen: () => void }>>
 }) {
   const cards = sections.filter((s): s is Card => s.kind !== 'section' && CARD_KIND_SET.has(s.kind))
   const others = sections.filter((s) => s.kind === 'section' || !CARD_KIND_SET.has(s.kind))
@@ -133,7 +142,7 @@ export default function DesktopTopicsManager({
   }
 
   function removeCard(id: string) {
-    save(cardRows(cards).map((row) => row.filter((c) => c.id !== id)).filter((row) => row.length))
+    onChange(withoutCard(sections, id))
   }
 
   // A row's box, drawn on the spots its cards sit in, so it stays put while
@@ -181,7 +190,11 @@ export default function DesktopTopicsManager({
           const { card } = item
           return (
             <div onMouseEnter={() => onPointCard?.(card.kind)} onMouseLeave={() => onPointCard?.(null)}>
-              <InnerRow row={row} name={nameOf(card.kind)} onRemove={() => removeCard(card.id)} className="rounded-[10px] border border-slate-200 bg-white" />
+              {opens[card.kind] ? (
+                <OpensRow row={row} name={nameOf(card.kind)} summary={opens[card.kind]!.summary} onOpen={opens[card.kind]!.onOpen} />
+              ) : (
+                <InnerRow row={row} name={nameOf(card.kind)} onRemove={() => removeCard(card.id)} className="rounded-[10px] border border-slate-200 bg-white" />
+              )}
             </div>
           )
         }}
@@ -196,6 +209,32 @@ export default function DesktopTopicsManager({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/** The sections with one card taken off, the rows closed up around it. */
+export function withoutCard(sections: DraftHomeSection[], id: string): DraftHomeSection[] {
+  const cards = sections.filter((s): s is Card => s.kind !== 'section' && CARD_KIND_SET.has(s.kind))
+  const others = sections.filter((s) => s.kind === 'section' || !CARD_KIND_SET.has(s.kind))
+  return [...others, ...fromCardRows(cardRows(cards).map((row) => row.filter((c) => c.id !== id)).filter((row) => row.length))]
+}
+
+/** A card that opens its own screen (board V4): the handle, its name, what
+ *  it's set to, and a chevron; the whole row is the button. */
+function OpensRow({ row, name, summary, onOpen }: { row: DragRow; name: string; summary?: string; onOpen: () => void }) {
+  return (
+    <div className="rounded-[10px] border border-slate-200 bg-white hover:border-primary">
+      <div className="flex min-h-11 items-center gap-1 pl-1 pr-1">
+        {row.handle}
+        <button type="button" onClick={onOpen} {...row.rowProps} aria-label={`${name}${summary ? `: ${summary}` : ''}`} className="flex min-w-0 flex-1 cursor-pointer select-none items-center gap-2 py-2 pr-3 text-left">
+          <span className="flex-1 text-[15px] font-medium text-slate-900">{name}</span>
+          {summary && <span className="truncate text-[14px] text-muted">{summary}</span>}
+          <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-slate-400">
+            <path d="M1.5 1.5l6 6-6 6" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }

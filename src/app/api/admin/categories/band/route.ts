@@ -3,7 +3,7 @@ import { getAdminUser } from '@/lib/adminAuth'
 import { getAdminClient } from '@/lib/supabase/admin'
 
 // Same bucket every admin-uploaded image goes to (see
-// categories/icon/route.ts, which this mirrors) — one public "site-assets"
+// the old categories/icon upload, which this mirrored) — one public "site-assets"
 // bucket, just a different path prefix per use.
 const BUCKET = 'site-assets'
 const MAX_BYTES = 5 * 1024 * 1024 // 5MB
@@ -18,7 +18,7 @@ async function ensureBucket() {
 // form-data, field "file") to storage and returns its public URL, for use as
 // a category's desktop directory-banner photo (CategoryConfig.cardBandImageUrl).
 // Admin only. Doesn't touch the category row itself — same as
-// categories/icon, the editor sets the returned URL on its draft, batched
+// that old icon upload, the editor sets the returned URL on its draft, batched
 // into the normal Save changes flow via PATCH /api/admin/categories/:id.
 export async function POST(request: Request) {
   const admin = await getAdminUser(request)

@@ -252,11 +252,11 @@ test.describe('URLs', () => {
     await previewSettings(page, community, { homeStyle: 'classic' })
     await page.goto(`/${community}?preview=1`)
     await dismissLocationPrompt(page)
-    // Desktop's grid caps at a handful of tiles behind a trailing "More"
-    // tile (see CategoryTileRow) — a low-listing-count category like eruv
+    // Desktop's grid caps at a handful of tiles behind a trailing "All
+    // categories" tile (see CategoryTileRow) — a low-listing-count category like eruv
     // can easily land behind it, so expand first if there's anything to
     // expand. `.click()`'s own actionability wait covers the category data
-    // still loading; the `catch` covers there being no "More" button at all
+    // still loading; the `catch` covers there being no "All categories" button at all
     // — mobile's own grid (CardGrid) has no such cap and renders none, and
     // a community with 9 or fewer categories never shows one either.
     // Scoped to the browse card specifically — HeaderNav's own "More" menu
@@ -264,7 +264,7 @@ test.describe('URLs', () => {
     // otherwise make this a strict-mode violation.
     await page
       .getByTestId('browse-everything-card')
-      .getByRole('button', { name: /More/ })
+      .getByRole('button', { name: 'All categories' })
       .click({ timeout: 5000 })
       .catch(() => {})
     // A real <a>, not a <button> — see sections.tsx's CardDef.href, added so

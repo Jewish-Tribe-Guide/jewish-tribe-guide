@@ -34,6 +34,7 @@ import DragList, { AddListButton, AddMenu, AddRowButton, InnerRow, ListCard, Ord
 const BUILT_IN_LABELS: Record<string, string> = {
   map: 'Map',
   you: 'You (saved places and searches)',
+  changes: 'What changed (held back from the site)',
   about: 'About page',
   privacy: 'Privacy page',
   feedback: 'Feedback form',
@@ -45,12 +46,13 @@ function newItemId(): string {
 
 /** A new link's name, as the site's own header calls it. Links aren't
  *  renamed here, so it has to read right on the site. */
-const LINK_NAMES: Record<string, string> = { map: 'Map', you: 'You', about: 'About', privacy: 'Privacy', feedback: 'Feedback' }
+const LINK_NAMES: Record<string, string> = { map: 'Map', you: 'You', about: 'About', privacy: 'Privacy', feedback: 'Feedback', changes: 'What changed' }
 
 /** What a row says its link opens, as the site's own screens are called. */
 const OPENS: Record<string, string> = {
   map: 'the Map',
   you: 'You',
+  changes: 'What changed',
   about: 'the About page',
   privacy: 'the Privacy page',
   feedback: 'the Feedback form',

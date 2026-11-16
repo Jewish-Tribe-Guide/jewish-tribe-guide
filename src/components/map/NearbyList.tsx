@@ -248,9 +248,9 @@ function NearbyRow({ point: p, category, place, now, showCategory, canViewListin
             icon={p.glyph ?? '📍'}
             categoryId={p.filterId}
             iconImageUrl={
-              (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
+              typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
                 ? (p.raw[PHOTO_FIELD_KEY] as string)
-                : p.glyphSrc) ?? undefined
+                : undefined
             }
             color={p.color}
             className="h-10 w-10 text-xl"

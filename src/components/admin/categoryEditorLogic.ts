@@ -37,9 +37,6 @@ export type Draft = {
   placeKind: PlaceKind | ''
   /** One emoji shown on the card (home grid, map legend, admin list). */
   icon: string
-  /** An uploaded picture shown instead of `icon` — see CategoryConfig's own
-   *  iconImageUrl. Blank means none (fall back to the emoji). */
-  iconImageUrl: string
   description: string
   hasAddress: boolean
   hasPhone: boolean
@@ -146,7 +143,6 @@ export function toDraft(c: CategoryConfig | null): Draft {
     pluralLabel: c?.pluralLabel ?? '',
     placeKind: c ? (c.placeKind ?? placeKindFromSlug(c.id)) : 'plain',
     icon: c?.icon ?? '',
-    iconImageUrl: c?.iconImageUrl ?? '',
     description: c?.description ?? '',
     hasAddress: c?.hasAddress ?? true,
     hasPhone: c?.hasPhone ?? true,
@@ -375,6 +371,8 @@ export const FIELD_FLAG_MEANS: Record<FieldFlag, (f: CategoryField) => boolean> 
   linkInDetails: (f) => !!f.linkInDetails,
   hideLabel: (f) => !!f.hideLabel,
   filterable: (f) => !!f.filterable,
+  // A list of items is the page's "Has" filter unless turned off.
+  itemFilter: (f) => f.itemFilter !== false,
   multiSelect: (f) => !!f.multiSelect,
   allowOther: (f) => !!f.allowOther,
   showInHeader: (f) => !!f.showInHeader,

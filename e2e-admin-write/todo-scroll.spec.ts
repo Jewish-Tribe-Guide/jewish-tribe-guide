@@ -55,7 +55,9 @@ async function openTodo(page: Page) {
   page.on('requestfailed', (r) => void inFlight.delete(r))
   await page.setViewportSize({ width: 1280, height: 700 })
   await page.goto('/philly/admin')
-  await expect(page.getByRole('button', { name: `Open ${names[9]}` })).toBeVisible()
+  // The same 30s as the wait below: on CI To do was still "Loading
+  // submissions…" when a 5s wait ran out (PR 387, Nov 16; main, Nov 14).
+  await expect(page.getByRole('button', { name: `Open ${names[9]}` })).toBeVisible({ timeout: 30_000 })
   let rows = -1
   await expect
     .poll(

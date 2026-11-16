@@ -39,6 +39,416 @@ Small open items from Nov 9:
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
 
+**Nov 14, on this branch (appearance, held for its own PR):** the header
+Categories menu and the Add a listing picker list categories by name only,
+with no icons. The computer home's Suggest a listing card lifts on hover
+like the other cards, and a click anywhere on it opens the picker.
+(The picker has no Escape-to-close; small, not done.)
+
+Board Q1 (Nov 14, built): on the phone home, Right now's rows are photo
+rows, the category's picture filling the row with the words white over a
+dark fade, and no chevron (the user, Nov 14). The phone's Try asking row
+shows only while the search box has focus; tapping a chip keeps the box
+focused. The computer keeps Try asking under its box as before. Still
+drawn only: N1, N3, O1–O3, P1/P1b.
+
+Board R3 (Nov 14, built): the phone's category tiles are the picture with
+the name under it in dark text (as J2), no longer white words on a
+darkened photo, so they don't read as more of Right now's photo rows. The
+Kept up card stays a card above the search, chevron and all (decided Nov
+14: it's how people find out they can trust the site, and opening it shows
+how everything is checked).
+
+Boards U1 + U3f/U3g (Nov 14, canvas
+https://claude.ai/artifact/1L9Ep2cBxk84xQ2BePNbzL, built Nov 15): the
+computer home has Right now under Explore by Category, the same answers as
+the phone, two photo rows side by side on a weekday; on Friday the candles
+card and **Shabbos shopping** side by side (stacked on the phone). Shabbos
+shopping replaces Before candles: the grocery picture, how many stores open
+now have any of the admin's items, the closest, and a button per item
+(Challah, Wine, Chicken) opening Grocery with Has and Open now on. Left off
+the board: "· until candles" (a store can close before candles). No "Right
+now" label on the computer (the user, Nov 15: "let's actually take off the
+right now label"; may come back, they'll see); the phone keeps it and says
+"Saturday" after havdalah instead of "Shabbos".
+  - Right now is a card kind (`rightNow`) in Home page › cards. Next
+    minyan and Jewish Times stay as cards an admin can add (the user: other
+    communities may want them). A community with no card rows gets Right
+    now by default instead of those two.
+  - Migration 097 (allows `rightNow`): run on dev Nov 15, **not on prod**.
+  - **Waiting on the user:** add Right now to Philly's cards and take off
+    Next minyan / Jewish Times, on dev in the admin; on prod after 097,
+    each with a yes.
+
+Boards V1/V2/V3 (Nov 15, same canvas; the user: "yes, but I'm worried
+about that admin cage getting cluttered"): an admin chooses what Right now
+answers on a weekday, two at most, from the categories that can say
+something about now: places with hours ("25 open now"), the minyan page
+(the next minyan, to that day's davening times), the eruv (up or down).
+With no choice made it's the first two categories with hours, as before
+(Food and Grocery on Philly's). Built on the site Nov 15:
+  - **Overnight (V3):** a row says "Opens Wed 6 AM · Nothing open now ·
+    first: HipCityVeg" and opens the category, instead of the card going.
+  - **The choice** is `site_settings.right_now_categories` (migration
+    **098, not run anywhere**). Before 098 a save that changes it says
+    it isn't set up; every other save still works.
+  - The next-minyan row shows no distance (Right now measures from the
+    map's centre when the visitor hasn't said where they are).
+  - **Where the admin chooses: boards V4/V4b, approved and built Nov 15.**
+    Home page › Cards under the search is names only. Right Now and Map
+    end in what they're set to ("Food, Grocery", "Photo") and a chevron,
+    and open a screen of their own (`?card=rightNow`, `?card=map`) with
+    Back, and "Take off the page" in place of the ×. Right Now's screen:
+    the categories that can answer (two at most) and Shabbos shopping's
+    items (× and + Add; before this they could only be changed in the
+    held-back Today home's box). Map's screen: its photo, moved off the
+    list. On Phone, a box "Under the search" opens the same Right Now
+    screen (the phone home always has Right now), with nothing to take
+    off. **Changed from Nov 4:** "each card is a handle, its name and an
+    ×: nothing opens" now holds for every card but these two.
+  - Left off the board: the grips on the chosen categories (V4b) for
+    reordering them. The chosen are listed first, in the order they were
+    ticked; untick and tick again to swap.
+  - **W1 and W2, built Nov 15 (the user: "fix 1, you can fix 2").**
+    W1: Right Now's screen spells out each part of the week. "Saturday
+    night to Thursday" (was "On a weekday") with the picks; "Friday, until
+    candles" (Erev Yom Tov the same): candle lighting with the eruv, and
+    Shabbos shopping's items; "Candles to havdalah" (Yom Tov the same):
+    candle lighting with the eruv, nothing open, nothing to buy, nothing to
+    set. W2:
+    the computer's Explore by Category has no white box; its tiles stand
+    on the grey page under the heading, as the phone's do (M1). A tile
+    with no picture is white rather than grey, which read as a hole on
+    the grey. The other cards keep their boxes. W3a/W3b (the phone two
+    per row) were drawn only; the user: leave them.
+  - **Three follow-ups, built Nov 15.** Explore's "All categories" tile
+    appears only from 16 cards, so 15 all show (it used to hide one card
+    behind a button in its own spot). The computer's Right now cards lift
+    on hover like the home's other cards, no grey outline (they're
+    photos). And the preview shows another day: clicking (or tabbing to)
+    a part of the week on Right Now's screen shows that day in the
+    preview beside it, with a blue edge on the part and a "Showing
+    Friday ×" chip above the preview; the day stays while the admin is
+    on Home page, back on the card list included, until × ("Back to
+    now"). No switch on the preview (the user: clicking a section is
+    enough). It's viewing only, never saved or in the address. How:
+    the preview's clock moves (previewDay.ts: Friday 3 hours before
+    candles, Shabbos 3 hours before havdalah, a weekday 3 days before
+    candles), so the candles card and Shabbos shopping are right, but a
+    weekday's Next minyan row still reads today's schedule.
+  - **W2c, built Nov 15: a thin outline round each Explore picture.**
+    The home cards' grey line round each picture (All categories too),
+    the name outside it; the pointer anywhere on the tile turns it blue
+    and lifts the picture, as the other cards do (the user: "the same
+    light up blue and pop out"). W2b (one outline round the whole
+    section) was drawn only and not picked.
+  - **W4d, built Nov 15: the computer's Right now cards are white.** Under
+    the outlined photo tiles, two more photo cards read as more tiles
+    (the user: "too much pictures right next to each other"). Each card
+    is now white with the home cards' outline and hover, its category's
+    picture a band down the left quarter, the answer dark on the white
+    beside it; a category with no picture shows its line glyph in the
+    band, as its tile does. The phone keeps its photo rows (no hero photo
+    there, so they're the colour at the top). Drawn and not picked: W4
+    and W4b (the line icon in a blue square), W4c (a photo square). The
+    phone with the same card was drawn (W4e) beside today's; the user
+    chose to keep today's photo rows (decided Nov 15).
+  - **Computer home: anchors, drawn only, paused Nov 15 (the user's
+    call to come back to it).** The problem: "too many fragmented pieces
+    and not enough anchors". Liked but not yet approved to build: Explore
+    on a white band from edge to edge, and the map as a band edge to edge
+    too (W7c/W7d on the desk canvas 1L9Ep2cBxk84xQ2BePNbzL; the user: "we
+    really nailed the category and map going full screen"), with Right
+    now back under Explore, today's order, so no section-order write
+    on live. Not settled: the middle piece between the bands, Right now.
+    Drawn: W7e (one bar split in two), W7f (one box cut in four, pictures
+    on a diagonal), W7g/W7h (a faint blue tray with a lead like the trust
+    band's and raised white cells, two or three). The user picked
+    neither ("not sure we've hit the middle pieces"). Also raised: You and
+    What changed as extra cells only when they have something to say,
+    not as sections (my view; nothing decided). Earlier boards in the
+    row (W2b, W4-W4c, W5a/b, W6a/b, W7, W7b) are older options; the
+    W7c-W7h boards use today's pictures and map from the dev site.
+    Later Nov 15: someone the user showed it to liked Explore in two
+    rows, so W7i/W7j redraw W7d with the tiles seven across (Philly's
+    13 in two rows), the map at 540px (W7i) and at 420px (W7j, my pick,
+    so the two bands weigh about the same). The user's worry: a shorter
+    map leaves Suggest and Stay in the Loop under it too close to its
+    size. W7k (drawn): W7j with those two quieter, about 135px instead
+    of ~260 (21px headings, a small button, Stay in the Loop white
+    instead of solid blue, the same words). The user: not seven across,
+    five across with the All categories tile, so W7l (drawn) is W7k with
+    two rows of five, the first nine and All categories last (the built
+    tiles show 14 and the tile, in three rows). W7m (drawn): W7l for
+    someone with saved places, three white cards across the top with
+    what each is doing now and You's blue dot on one that changed;
+    nothing saved, W7l. The user, Nov 15: the phone isn't much of a
+    landing page and its tabs are what people use, so the phone home
+    stays and its You tab gets the dot (PhoneYouDot). The user dropped
+    W7m's Saved row ("if it's going to be this small... we don't need
+    it at all"). **W7l and the You dot BUILT Nov 15**: Explore two rows
+    of five with All categories on a white band edge to edge, Open now
+    under it as it was (asked; left), the map a 420px band edge to edge,
+    Suggest and Stay in the Loop small and white; a blue dot on the
+    phone's You tab and the header's You link when a saved place changed
+    since You was last opened (`/api/changes`, `useYouDot`). Dev's home
+    rows were swapped so Explore comes before Open now. **Live needs
+    the user's OK when it ships**: production's home rows are still the
+    old order (browse, davening, listings, ... no Right now), so they
+    want setting to browse, rightNow, map, suggest, subscribe. Dev's
+    change log is all test-suite churn (its newest 400 rows are on test
+    listings), so the dot never lights on the preview without a real
+    edit to a saved place; production's log is real.
+  - **What changed can be a tab while it's held back** (the user, Nov 15:
+    "add it to the tabs to see it and then take it off the tab in admin
+    with the ability to add it back"). Site › Home page › Phone › Tabs ›
+    Add a tab › What changed, or a header link on the Computer side; its
+    page (`/<community>/changes`) answers only while a tab or link has
+    it, and is a 404 again once it's taken off (`changesLinked`). The
+    switch in `features.ts` stays off; the admin's own What changed tab
+    (hiding a change) is still held back with it. Dev's page is empty
+    (its log is test churn); live's would show the real log, once this
+    ships and the user adds the tab there themselves. The user's view
+    (Nov 15): an activity feed is the first thing after testers' feedback;
+    my view was to lead with new places, closures, hechsher and minyan
+    changes and fold small edits into one line. Nothing decided.
+    **Fixed Nov 15:** the user added the tab on the preview and got "Page
+    not found". A settings save marks pages stale, and the first load
+    after it still gets the old copy (here, the 404) while a new one is
+    made; a reload showed it. The save now expires `/<community>/changes`
+    at once, so the next load is the page (`route.test.ts`, red without).
+  - **W8 BUILT Nov 15**: Open now on the computer drawn like the cards at
+    the bottom (the user: "more of the same pictures when we just passed a
+    row or two of pictures"): white, no photo, the category as a small grey
+    label, the answer big, a blue button ("See what's open"; "See all
+    times" for a minyan, "See the eruv"). Replaces W4d's photo band. The
+    phone keeps its photo rows.
+  - **What changed reads past deleted listings (Nov 15).** The log read
+    took the newest 400 rows and the page then dropped any whose listing
+    was gone; on dev the write suites' fixtures (4,307 rows in two weeks)
+    filled all 400, so the page was always empty there. It now reads only
+    rows on listings the community has. Dev has the 16-row seed
+    (`scripts/seed-dev-activity.mjs --apply`, dated from today; `--remove`
+    takes it off), so the preview's What changed shows something. Dev
+    still has a leftover write-suite listing, "E2E Admin Write 6eabdb10-…",
+    which shows there as new.
+  - **W9 BUILT Nov 15**: What changed shows each place's own picture,
+    whole on a small white tile (most are logos; filling a square cut wide
+    ones), and the category's icon where a place has none (118 of dev's
+    151 places have one). Board on the canvas, row "What changed".
+  - **Computer category pages (Nov 15)**: 44px of photo under the search
+    box, as above the count; it was 22 and the box sat on the photo's
+    edge. The photo is 262px (was 240); the list and map stay where they
+    were under it.
+  - **W10 A BUILT Nov 15**: a listing opened on a computer category page
+    keeps the photo, the title and the search where the list has them;
+    only the column under them changes, so nothing moves on the click (the
+    user: without the photo it "feels a bit weird"). Clicking into the
+    search goes back to the list. The way back reads "‹ All 71 places",
+    across from "2 of 71", since the title is right above it.
+  - **Eruv and Candle Lighting on the photo header (Nov 15)** (the user:
+    they "still have the old layout on desktop"): both had the coloured
+    banner with an icon; they now have the category pages' photo, with the
+    title on it ("5 eruvim" above Eruv Information; the location under
+    Candle Lighting & Zmanim). An opened eruv keeps it, as a listing does,
+    and its way back reads "‹ All 5 eruvim". Phones unchanged.
+  - **W11 BUILT Nov 15** (the user: What changed and You should "look a
+    little less boring"; canvas v90, row "What changed and You"; "leave
+    out search and filter and if we need it we can add it"). On a
+    computer, What changed, You, About and Privacy have the category
+    pages' photo header (`PhotoHeader`, the community's home photo) with
+    the title on it.
+    - **What changed:** the photo's count is the 30 days the page lists
+      ("68 changes in the last 30 days"), and the explaining paragraph is
+      gone. On a computer the days sit in one white box, with "Know a
+      place we're missing? / Suggest a listing" beside it. On a phone the
+      count is the line under the title, and each day's changes are in a
+      white box under its heading on the grey.
+    - **You:** the photo says "5 places · 1 search". Saved places and
+      searches are cards, three across, with 56px pictures. An empty You
+      on a computer shows three dashed outlines. On both phone and
+      computer the empty state says "Save a place or a search to keep it
+      here."
+    - **About and Privacy:** on a computer the text is in one white card
+      (at most 760px) under the photo, lined up with the title.
+      Privacy's "Last updated" is the card's first line. Phones are
+      unchanged, and Feedback stays plain.
+    - **Not drawn, not built:** a "Recent changes" box on each listing
+      (raised Nov 15, undecided).
+  - **About and Privacy, rewritten and redrawn (Nov 15)**, from the
+    review page "About and Privacy" (artifact 8XRGFGqR1HXc9MWeJajwwj, v6:
+    About v2 and Privacy and terms, both approved: "let's build this").
+    BUILT. This replaces the "white box per section" pass and its two
+    pending content changes (`promote-page-headings.mjs` is no longer
+    needed: the new text has real headings).
+    - The text stays admin-edited in the Pages tab. The layout comes from
+      its shape (`src/lib/pageSections.ts`): the text before the first
+      heading is the lead, each heading is a section, and a list whose
+      every item opens in bold becomes named points with an icon matched
+      from their words.
+    - About: the count and title on the photo, the mission large, The
+      problem beside What the guide does, Who it's for and What sets it
+      apart as cards (one box of rows on a phone), Who runs it beside Ways
+      to help (Tell us; Help run the guide and Start a guide for your
+      community email the address the text gives).
+    - Privacy: the short version as icon rows, then the details. On a
+      computer a contents list beside them marks the one being read; on a
+      phone they are rows that open one at a time.
+    - **On the dev database for the preview.** Live still has the old
+      text, which renders as a lead with no sections (readable, plain).
+      **Writing the new text to live needs the user's go-ahead, after this
+      deploys.**
+    - **Fixed Nov 15: the bottom of both pages ran under the phone's tab
+      bar** (the user: "getting cut off at the bottom"). They had a flat
+      48px under them, as the old pages did; now the bar's clearance plus
+      a small gap, like Feedback and the other tab screens.
+    - **PostHog replays are mentioned** (the user, Nov 15, after asking
+      whether sites usually say so): "and recordings of some visits, with
+      anything typed hidden". The code records whenever Session Replay is
+      on in PostHog's project settings (`src/instrumentation-client.ts`)
+      and leaves PostHog's default of hiding typed input
+      (`src/lib/deferredPostHog.ts`); the project settings themselves
+      were not checked.
+    - **Open question for the user:** is one contact email right for
+      every community (the page rows are shared by all communities, and
+      the email is Philly's)?
+  - **Feedback, redrawn (Nov 15)**, from the same review page (v7, board
+    Feedback; the user: "Yes, build it"). BUILT.
+    - "Know something we don't?" first, About's card word for word, which
+      opens the + Add box. On a phone it sits above the form; on a computer
+      to its right, under "About a place"
+      (`src/components/pages/TellUsCard.tsx`).
+    - The form: "Your note" and "Email, for a reply", no "(optional …)"
+      and no star; 16px fields; a tall Send with an icon, pale until
+      there's a note; "Read by the people who run the guide. Privacy".
+      After sending, a check, "Thanks, it's sent", the admin's thank-you
+      words and Send another.
+    - **A change to an earlier decision:** Feedback kept plain on a
+      computer (Nov 15). It now has the photo header, like About.
+    - The computer page's "Rather email?" card gives the address About's
+      text gives (one shared row, so Philly's for every community), and
+      is left out when there is none. No per-community contact setting
+      was added; same open question as above.
+    - The heading and thank-you words stay admin-editable; the drawn words
+      ("Feedback", "We read every note. If you left an email, we'll write
+      back.") are the new defaults. Migration 099 changes the column
+      defaults and any row still holding the old words. **Dev rows
+      updated (Nov 16); 099's column defaults not run on dev; nothing run
+      on live — live still says "Send feedback" until 099 runs there,
+      which needs the user's go-ahead.**
+    - **"Add it to the guide" (the user, Nov 16: open + Add, not
+      Feedback).** Checking found the board's question was out of date: no
+      search has linked to Feedback since Oct 10 (3fe02e6d left "Ask in a
+      WhatsApp group" as the nothing-found card's only action). Feedback's
+      leftover `?about=` prefill is removed. Bringing a + Add button back
+      to the nothing-found card would undo the Oct 10 decision; **decided
+      Nov 16: leave it** ("Ask in a WhatsApp group" stays the only action).
+    - **Feedback is a page on a computer too (the user, Nov 16: "let's do
+      full page").** A change to an earlier decision: the footer's "Send a
+      note" and the header's Feedback opened a dialog over the page being
+      read; both now link to `/[community]/feedback`, the same page a phone
+      has, so Back and a reload work and there's one form, not two. Before
+      this, no visible link on a computer reached the page at all. The
+      dialog and its drawn one-surface redesign (board, Nov 16) are gone.
+      A note still doesn't record which page it was written on; adding that
+      was offered, not asked for.
+  - **Fixed Nov 16: "Kept up by the community" said twice on the computer
+    home** (the user). The trust band near the top says it; the "Know a
+    place we're missing?" card at the bottom had it as its eyebrow too. The
+    card's eyebrow is now "Add or fix a place" (the user's yes, Nov 16),
+    matching Stay in the Loop's "Email updates" beside it, here and on
+    What changed's side card.
+  - **Feedback's fields are white** (the user, Nov 16: grey "makes me
+    think I can't click on it"). A change to the Nov 15 board, which drew
+    them grey until focused. Send stays pale until there's a note. The
+    admin preview matches.
+  - **Fixed Nov 16: Escape didn't close the Add a listing picker** (from
+    "Suggest a listing" on the computer home). Found while looking at it.
+  - **Photos in the Add a listing picker (the user, Nov 16: "Add photos
+    first").** A change to the Nov 14 decision (names only): each name has
+    its home tile's photo beside it, 40px, the same picture the tile uses
+    (so Food's banner picture too), or the tile's plain tint where a
+    category has none. Still no icons or emoji.
+  - **Fixed Nov 16: a new community's site could 404 at first** (CI on
+    PR 387). Creating one marked the community list stale, so the first
+    load of its address could read the old list. It's now expired outright
+    on create. Same CI run: two admin-write tests waited too little on a
+    slow runner, and RightNow's tests assumed the machine was in
+    Philadelphia. **Not fixed, seen in that log:** the test project's
+    moderation queue read failed once with "Failed to load current rows:
+    Bad Request" (`submissionStore.ts`); the suite still passed, cause
+    not looked into (the test project has no pending suggestion pointing
+    at a place, so it isn't leftover data).
+  - **Fixed Nov 16: Delete this page could undo itself** (CI on PR 387).
+    Going back to a category page you had open before a save brought back
+    its old screen (Next keeps it, hidden), and when the list arrived it
+    started the page over, throwing away a Delete already asked (or
+    anything begun). It now takes the newest list before it draws.
+  - **Fixed Nov 15: a solid circle under the selected map pin** (a
+    visitor's phone, sent by the user). It was the pin's pulsing halo with
+    Reduce Motion on: the site cuts animations short there, and the halo's
+    resting look was a solid disc. Both looping rings (the halo, and the
+    pulse around your own dot) now rest invisible. Phones without Reduce
+    Motion look the same as before.
+  - **Fixed Nov 15: the "flaky" offline test was a test bug.**
+    `e2e/offline.spec.ts`'s wait for the service worker never waited
+    (an async `waitForFunction` predicate, which Playwright doesn't
+    await), so its reload raced the worker's install and the page never
+    became controlled. The worker itself was fine. Now 161/161 under
+    load; a unit check stops the same mistake in any suite.
+  - **Fixed Nov 15: a saved restaurant on You said "No davening times
+    listed"**. Food has a minyanim field (for restaurants that host one),
+    and You treated every place in such a category as a shul. It now asks
+    whether the place itself lists minyanim, as the category page does,
+    and otherwise says whether it's open. Same on the held-back Today's
+    Pinned block.
+  - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
+    (the user: "don't seem to appear great on mobile"). The campaign's
+    Ends date ran ~4px off its card, and the banner preview lived only
+    in the computer's side column, so a phone saw a thumbnail and the
+    word "Photo"; it now shows the banner as it will look under the
+    dates. A category's banner photo (280px wide) kept Upload, Paste and
+    URL beside it, off the card's edge, and the page moved sideways; the
+    row now wraps them under the picture when there's no room.
+    `e2e-admin-write/phone-photos.spec.ts`, 2 of 2 red on the old code.
+    In the full admin-write run `category-open.spec.ts` failed once (it
+    fetched `cat:cache-roundtrip-seed`, a category another test makes);
+    it passed twice alone. Watch for it again.
+  - **Done Nov 15 (the user's yes): emails arrive in the community's
+    name**, "Philly Jewish Guide" <notifications@…> instead of the bare
+    address. `sendEmail` takes the community the email is about and puts
+    its name (`community.name`) on the sender; the two sign-in links have
+    none and get the default community's. Nothing to change on live:
+    `RESEND_FROM` stays the bare address (one set as `Name <address>`
+    is left as it is). `email.test.ts` also fails if a new send doesn't
+    name its community. Shows on live once the branch merges.
+  - **Done Nov 15 (the user's yes): a listing opened on a computer has
+    no category photo above it.** It was a 132px strip of the category's
+    picture with nothing on it, pushing the listing and the map down; now
+    they start under the header, as on any other page. The category page
+    itself keeps its 240px photo. `GenericDirectory.test.tsx`, red on the
+    old band.
+  - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
+    hadn't run e2e on this branch since the last PR): budgets' computer
+    check waited for the Next minyan card (skips now where Right now took
+    its place), phone-home said a computer has no Right now (it has its
+    own, `data-wide`), mobile held the footer words 45-75px over the tab
+    bar (16-40 now; they sit ~25px over it).
+
+Nov 14, later, the user's yes to both:
+- **The Kept up card is one line**, as tall as the search box (48px; it
+  was 59px on two lines, the bigger box on the page): "Kept up by the
+  community · 149 places", still a card with its chevron. A longer trust
+  line ("· every listing dated") is cut off with "…" on a narrow phone;
+  the sheet it opens says it all.
+- **Fixed: a gap under the footer in Safari** (none in the app added to
+  the home screen). Every phone screen over the tab bar left a flat 96px
+  for a 58px bar, which only the home-screen app's 34px safe area filled.
+  It is now the bar plus the safe area (`TAB_BAR_CLEARANCE`), on the home,
+  category pages, Browse, What changed, Feedback and You. The Add button
+  sits beside Feedback · About · Privacy at the bottom now, in Safari as
+  it already did in the home-screen app.
+
 ## Open from the boxes and fields work (Nov 10)
 
 The user's answers on Nov 10, evening, and what was done with them:
@@ -224,7 +634,238 @@ The user's answers on Nov 10, evening, and what was done with them:
       already compared plain values. Swept by
       `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
       every switch on every field's screen and every box name.
-- **"By synagogue | By time" replaces the green Minyanim card** (BUILT
+- **Computer home: the hero centred** (BUILT Nov 11, the user's yes to
+  board C on the desk canvas: "much calmer and more directs my attention").
+  The headline, the big search and what to try are centred over the photo,
+  now full width and dimmed; white type. Named changes: Browse Categories
+  and View Map are gone from the hero (the header has Categories and Map),
+  and the header no longer goes see-through over the hero (dark header
+  text can't sit on a dimmed photo; the board draws it white). No line
+  under the headline (the user, Nov 11), and the admin's "Line under it"
+  field is gone (the stored value is left, unused). Everything below the hero is unchanged, and the
+  phone home is untouched. Held off for a look with real people: the
+  showcase sections, search in the header.
+- **Open from Nov 11's home review** (the user's notes on the built hero):
+  - The switch and day pills are blue (the site's colour for a picked
+    thing), BUILT.
+  - Explore by Category showing every category instead of "More": held,
+    to ask visitors.
+  - Explore by Category as photo tiles (board H1 on the desk canvas, the
+    user: "soooo much better. let's do it"): BUILT Nov 11. Five across, the
+    name under each photo, no counts; the first nine and an "All
+    categories" tile (was "More"), which expands to every tile. A tile's
+    photo is the category's own picture, else its wide card photo, else its
+    line icon on grey, else its initial (never its emoji). Changes to
+    earlier decisions: the 64px circles with listing counts are gone on the
+    computer. Fixed with it: the eruv card never found Philly's eruv
+    category's picture (its id is `eruv-information`; the card is always
+    `eruv`), and the trust band's point text ignored its two-line clamp.
+    Open: the phone's category tiles still mix photos and tinted icons;
+    H1 didn't cover them. Networking's and Eruv Information's pictures
+    don't work as tiles (generic tech art; a blurry thumbnail).
+  - **"Everything on one map" card** (board G3, the user, Nov 11: "let's
+    build this and let's have it in the admin too with room for
+    adding/changing the photo"): BUILT Nov 11. A wide card, a row of its
+    own like Categories: a photo on the left, "One map / Everything on one
+    map", the community's five biggest categories by name, and "Open the
+    map"; the whole card links to the map. No map is drawn in it (the
+    drawn one in G "looks very fake"). Its photo is set in Site → Home page,
+    under "Cards under the search", while the card is in that list ("Map
+    card photo"); with none it shows the plain map glyph. It is the old
+    'map' card kind come back, offered again in "+ Add", and the default
+    for a community with no cards saved, after Categories. Computer only.
+    Named changes: the map card was retired (it embedded the map); it is
+    back as a link. City Hall moves from the hero to this card, and the
+    hero gets a photo of the community, still to find (the user's call,
+    in the admin). Needs **migration 095** (`site_settings.desktop_map_image`)
+    to save a photo: not run on dev, test or live yet. Without it the card
+    still shows (glyph), every other setting still saves, and choosing a
+    photo says it isn't set up. **On live, Philly already has an old 'map'
+    row** (after Suggest a Listing, before Stay in the Loop), so the card
+    appears there once this deploys; move it in the admin. Fixed on the
+    way (found on dev): the card moved by keyboard could land inside a row
+    of two and be squeezed to a third of the width; it now passes rows.
+  - **Computer home, one thing at a time** (board G5b on the desk canvas,
+    the user, Nov 11: "Let's first build out the drawing with no
+    picture"): BUILT Nov 11. Top to bottom: the photo, the trust strip
+    (no chevron, lifts on hover), Explore by Category in three rows of
+    five (14 tiles and "All categories"), two white answer cards side by
+    side ("Next minyan / Maariv 7 PM / the shul · distance" and "This
+    Shabbos / Candles 4:28 PM / Friday · Havdalah Saturday 5:28 PM", each
+    one link, no chevron, lifting on hover), the map card 540px tall, a
+    plain "Know a place we're missing?" card with "Suggest a listing", and
+    a navy "Stay in the Loop" box (email and Sign up only: every category,
+    new places and closures). Named changes: the minyan and Shabbat cards
+    lose their photos, headings and buttons ("View Times", Minyanim / All
+    zmanim / Eruv); the Shabbat card is white, not night ink; Suggest
+    loses its photo; Stay in the Loop loses its category picker and
+    switches on the home page (they stay on the manage page every email
+    links to); the "Jewish Times card heading" setting is removed (no
+    migration; the column is no longer read). The default order for a
+    community with no cards saved is the G5b order; **Philly's live order
+    is the admin's** (Categories, Davening + Suggest, Map, Shabbat, Stay in
+    the Loop), so it needs moving in the live admin to match (dev is
+    moved). Differs from the board: "This Shabbos" (the site's word) not
+    "This Shabbat"; a small source line under the Shabbat time (Hebrew
+    date, place, Hebcal.com), kept for visible trust. Fixed on the way:
+    the minyan card linked to (and drew the glyph of) the first category
+    with a minyan field, Food on dev, instead of the shuls page the
+    schedule reads. The map card's picture came after (below).
+  - **Computer home, more room** (board G5c, the user, Nov 11: "Yes, build
+    G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), now 48px
+    (the user, Nov 11, once the cards were outlined: the gaps read too
+    big; "you can fix the gaps too"), the
+    first still 32px under the trust strip. "Know a place we're missing?"
+    is a 240px-tall section with a 38px heading, bigger line and a 56px
+    button; the navy Stay in the Loop box is 260px tall with a 38px
+    heading, a 320px email box and 56px controls. Phone unchanged.
+  - **Map card picture: an OpenStreetMap street map** (the user, Nov 11:
+    "OSM, farther out", picked over a close-in Center City view and over
+    Google's Static Maps). BUILT Nov 11. `scripts/map-card-picture.mjs
+    <slug>` makes one saved picture from the community's map centre,
+    framed about as wide as the map page opens, centre 70% across (right
+    of the words), and sets it as the card's photo with the credit
+    OpenStreetMap asks for; the card shows "© OpenStreetMap contributors"
+    small in the corner. An admin's own photo replaces both. It differs
+    from the Google map page in colour (pink and orange main roads, more
+    green), not framing; the user accepted that. The picture fades to the
+    card's ground under the words (180 KB on the home before, over the
+    150 KB image budget; 110 KB after), and waits until the screen
+    measures as a computer: fixed on the way, phones were downloading
+    the card's picture, any picture, though the card is computer-only
+    (since G3; unseen until a picture was set). **Dev has it. Live needs
+    migration 095 first, then the script with `--prod --apply`: both need
+    the user's go-ahead.**
+  - **Category pages open on the home tile's picture** (boards H4 computer,
+    H5 phone; the user, Nov 11: "let's do H4 and the phone"). BUILT Nov 11.
+    Computer: the band is a 240px photo under a dark gradient carrying "N
+    PLACES", the title at 44px (now the page's h1) and the distances line
+    in white; the search is a white pill on the photo's bottom, 688px wide.
+    Phone: the same picture, 120px, edge to edge under the header, no
+    second title; the rest as before. Changes to what was there: the round
+    category badge and the thin 132px strip are gone (the home tile's photo
+    now grows into the band instead of the badge morphing); listing rows
+    are a step bigger on a computer everywhere they're used (18px name, 48px
+    picture), phones unchanged; the count shows twice ("71 PLACES" on the
+    photo, "71 listings" over the list, which counts what's filtered).
+    Not drawn, decided while building: a category with no picture gets its
+    colour behind the words; a listing opened on a computer drops back to
+    the old 132px band with no words (it keeps the top of the page, as
+    decided Oct). Eruv's own page and Zmanim keep the old band.
+  - **A category has one picture, its banner, and its icon isn't set any
+    more** (the user, Nov 11: "the picture can just be the banner. So maybe
+    we don't need the option to change the icon"; "Yes, build it"). BUILT
+    Nov 11. The admin's Banner photo (else the older pasted card photo) is
+    the computer home's tile, the category page's photo and a phone's
+    picture under the header. The Icon section is gone from the category
+    editor (emoji box, Browse icons, "Or use a picture instead"); Basics
+    still shows the icon beside the name, not tappable. Every category
+    draws its kind's line icon; one with none of its own gets a plain
+    four-squares line icon where its emoji used to show (badges, map pins,
+    the nearby list). `icon_image_url` is no longer read or written (the
+    column stays, no migration) and its upload route is deleted, so the
+    soft 612px icon pictures on dev no longer show anywhere. Forms keep
+    their emoji Icon field. Changes to earlier decisions: home badges
+    (search rows) no longer show a category picture, and
+    Food's page now opens on its banner rather than the picture set as its
+    icon.
+  - **No more flying picture** (the user, Nov 11: "when I click on a
+    category card I see the background picture come flying in"). BUILT
+    Nov 11: the home tile and the category page's photo no longer share a
+    view-transition name, so the page just appears. Change to H4 as built
+    (the tile used to grow into the photo).
+  - **Outlined cards on the computer, photo tiles on the phone** (boards
+    J1b and J2b, the user's "J1b and J2b"). BUILT Nov 11:
+    - J1b: every white card on the computer home (Next minyan, Before
+      candles, the map card, the trust band, Suggest a listing, the Explore
+      box) carries a quiet grey outline all the time; under the pointer it
+      lifts and the outline goes blue. One constant, `HOME_CARD_OUTLINE`.
+      The photo tiles stay unoutlined. J1 (soft blue) not built.
+    - J2b: the phone home's tiles stay three across, each filled by the
+      category's one picture (banner, else card photo) with its name on it
+      over a dark fade. A category with no picture keeps its tint and line
+      icon. A long name grows its row rather than being cut. Change to the
+      Oct 17 decision ("not the old photo tiles"): every tile is now a
+      picture download (120px thumbnails from storage), inside the home's
+      600 KB image budget. J2 (name under the picture) not built.
+  - **Phone home as board K1c, computer footer as K2** (the user, Nov 11:
+    "I like it" to K1c; K2 "I like the footer for desktop"). BUILT Nov 11:
+    - The tiles sit in one white box under a small "EXPLORE BY CATEGORY"
+      label, the same label and box as Right now's, so the home reads
+      label, box, label, box.
+      Changed Nov 12 (board M1, the user: "Build M1"): the white box
+      round the tiles is gone. The photo tiles are cards themselves, so
+      it read as a box in a box. The tiles sit on the grey page under
+      their label, as wide as Right now's card, which keeps its box.
+      Drawn, not built: M2 (white page) and M3 (white page, Right now as
+      bare rows).
+    - Each name is in the middle of its tile, over an even darkening
+      ("I'm fighting my brain/eyes which wants to look center"). Changes
+      J2b's name at the bottom over a fade. The computer's tiles keep
+      theirs at the bottom.
+    - No icons on the phone home ("It feels childish"): a Right now row
+      shows its category's picture, the same as its tile, and none when it
+      has no picture; a tile with no picture is its tint and its name.
+      Changes this morning's "small badges stay icons" for these two spots.
+      The search lines keep their icons; not asked yet.
+    - The 72px gap above Right now is gone: it was the computer's spacing
+      between card rows (G5c) collapsing through the phone's empty copies.
+      Now 20px.
+    - The phone footer is unchanged (the user: "I'm ok with how it is for
+      mobile"). The computer's footer is a white band (K2).
+    - Drawn, not built: K1 (names at the bottom in the box) and K1b (K1c
+      with icons and the heading inside the box).
+  - **The eruv line on the computer's Shabbos card** (board L1, the user,
+    Nov 11: "Yes, build L1"). BUILT Nov 11. From erev Shabbos or Yom Tov
+    to havdalah (the same window as the phone's candles card), the This
+    Shabbos card carries the phone's eruv line along its bottom, in a
+    light grey band: the nearest eruv by name with a location, the summary
+    without one, one that's down named first. The line is its own link to
+    the Eruv page; the rest of the card still opens Zmanim, so on those
+    days the card is a box holding two links. Weekdays: no line, one link.
+    No line without an Eruv page.
+  - **The computer home fits a narrower window** (the user, Nov 12: it
+    isn't "so great at shrinking", and Suggest a listing beside Stay in
+    the Loop came out badly). BUILT Nov 12. Each section now sizes itself
+    by its own box, not the window, so it also holds up when an admin
+    puts two in one row:
+    - Suggest a listing and Stay in the Loop: words, then the button or
+      email box under them, while the card is under 920px wide; side by
+      side from there, as drawn. Two in a row are the same height.
+    - The trust strip: under 900px, its heading on a row of its own and the
+      three points sharing the row under it.
+    - Next minyan and This Shabbos: under 448px, the round glyph goes and
+      the time drops from 34 to 30px, so it stays on one line.
+    - Looks unchanged at full width.
+  - **The computer's This Shabbos card names only the place** under its
+    times (the user, Nov 12: "Yes, just the place"). BUILT Nov 12. The
+    Hebrew date and "from Hebcal.com" are gone from the card; both stay on
+    the Zmanim page it opens, as Next minyan leaves its sources to its
+    page. Change to an earlier decision: the line had been kept for
+    visible trust.
+  - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
+    user's "Let's do F1b for now"). A full-width band below the hero photo,
+    not overlapping it: shield, the trust line, and the phone sheet's three
+    points, the whole band opening the same sheet as a centred dialog. The
+    phone is unchanged. The "Kept by the Community" card is gone with it:
+    a saved row of it draws nothing, the admin's card list no longer offers
+    it, and its eyebrow and heading settings are removed (no migration; the
+    two columns just stop being read).
+  - The big map: G2 on the canvas, a card in words only (map glyph, "ONE
+    MAP", "Everything on one map", one line, "Open the map"), the whole
+    card tappable, under the categories. The user didn't want a drawn
+    map. Not built: waiting on the user's go-ahead.
+  - The headline is 48px (was 40), in an 880px column so it stays on one
+    line about as wide as the 688px search box under it. BUILT.
+  - A category's own picture ("Or use a picture instead") now shows on
+    every home badge of it: computer tiles, search rows, phone tiles,
+    Browse, Right now, the Add picker. It used to show only in the search
+    dropdown, so Food's new picture never appeared. BUILT. Change to an
+    earlier decision: the search rows had dropped photos because the wide
+    home-screen photo turns to mush at 32px; this is the separate picture
+    chosen for the icon spot. Open: pictures for the other categories
+    (Food is the only one so far, so it stands out among icons).
+- **"Synagogue | Minyan" (first "By synagogue | By time") replaces the green Minyanim card** (BUILT
   Nov 11, the user's yes to D1/D2 on the desk canvas, "Plain switch, as
   drawn"). The list's heading is a two-part switch on phone and computer;
   By time is the Minyanim view at `?davening=1`, a history step as before.
@@ -239,6 +880,9 @@ The user's answers on Nov 10, evening, and what was done with them:
   dropped a toggle because "if we need a sign the toggle isn't
   noticeable"; reminded of that, they still chose plain. Held off for a
   look with real people: next minyan in rows, one map switch, side by side.
+  Renamed later on Nov 11 to "Synagogue | Minyan", no "By" (the user:
+  "take out 'by' and replace time with minyan"). Then as tall as Filters
+  beside it, 40px (was 34px; the user: "Yes, match it").
 - **Minyanim by time opens on the page whose places have minyanim** (fixed
   Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
   test project's Food was, ahead of Synagogues. The search's "next maariv"
@@ -251,9 +895,20 @@ The user's answers on Nov 10, evening, and what was done with them:
   Choice shown as a badge, so Hours ("Open now") and a list of items
   (Grocery's Kosher items, always the page's "Has" filter) showed none.
   The row now says Filter the way the site filters (`inFilter`), and
-  removing a list of items warns that the filter loses it. Whether an
-  admin should be able to take a list of items out of "Has" is the user's
-  call; today it is always in.
+  removing a list of items warns that the filter loses it. A list of items
+  has the "In the filter" switch like any filter now (the user: "I don't
+  want any hidden rules"), saved as `itemFilter: false` when off, since
+  saving had forced `filterable` off on every list; off, it leaves Filters
+  and a search for an item no longer ticks it.
+- **To do's week box marks only what changed** (Nov 11, the user on the
+  Shtiebel item). A week read again comes with every minyan under a new id,
+  and the box matched the site's by id, so all of them said "New". It now
+  pairs by id, else by day, tefillah and time (`pairWithListing`, also in
+  the change count): an unchanged minyan has no mark, and a note-only
+  change says Changed with the old note crossed out under the new one, the
+  way a changed time shows what it was. Two admin-write flakes seen while
+  running it, each green alone: todo-scroll's resize line and
+  category-open's no-request check.
 - **A shul's week read again with its notes only reworded files nothing**
   (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
   a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;
@@ -282,7 +937,7 @@ The user's answers on Nov 10, evening, and what was done with them:
   on purpose: the times themselves, and "working again". With nothing
   waiting but something broken, the subject says "1 stopped working".
   Phone, computer and quiet renders checked against N7-N9. **Migration
-  096 isn't run anywhere yet** (see "Waiting for a yes"); until it is,
+  096 is on dev (Nov 12), not live** (see "Waiting for a yes"); until it is,
   Google's changes are emailed at once as before and the nightly email
   just has no Changed on its own. Not seen in a real inbox yet: the
   first one goes out the night after this reaches the live site.
@@ -336,6 +991,9 @@ The user's answers on Nov 10, evening, and what was done with them:
   shown once, "Not listed? Fill it in yourself" as its last row), and a
   pasted post turning the same box into the reader with "See what
   changes". Both rows wait on the user.
+- **Later (the user, Nov 16): + Add might start by hand, with AI as the
+  option**, the opposite of today. Not now ("that's for later"); nothing
+  drawn or built.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the
@@ -626,8 +1284,14 @@ The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
 0. **Migration 096 (`night_note`, Nov 12):** a new table for the
-   nightly email's Google line. On dev since Nov 12; live needs a yes,
-   before or with the deploy. The site works without it.
+   nightly email's Google line. On dev since Nov 12; live needs a yes.
+   The email itself is live (PR 384), so until 096 runs there, Google's
+   changes go out at once as before. The site works without it.
+0. **Migration 095 (map card photo, Nov 11):** one `add column if not
+   exists`. Run it on live before or with the deploy that ships the map
+   card; the card works without it, only its photo can't be saved. Then
+   the photo is set in the admin (City Hall, by the user's call). Needs a
+   yes.
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site
@@ -1904,8 +2568,8 @@ real prod numbers (Friday Oct 30, 1 PM; candles 5:44 PM).
   answers every row, the one whose open places carry the most of the items
   (Grocery): Food's main dishes are an item list too, and on the test
   project they answered "Challah" and "Chicken" with restaurants until this.
-- The computer home (boards 4 and 5) is drawn, not built: waiting on the
-  user.
+- The computer home (boards 4 and 5) was overtaken by board U1 (built
+  Nov 15; see the top of this file).
 
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
@@ -5612,7 +6276,8 @@ build").
 - **Right now:** on a weekday, what's open in Food and Grocery (Grocery says
   how many kosher items are tracked); on Friday, the candles card with the
   eruvim's status on it and Before candles; on Shabbos, the card with the
-  eruvim. Never weekday minyanim.
+  eruvim. Never weekday minyanim on Philly's (Nov 15: an admin can choose
+  the next minyan or the eruv instead, boards V1/V2).
 - **Trust sheet ("How this guide stays right"):** the idea in three lines,
   naming only the checks that ran that week, by what they check, never by
   source (Oct 23). No reading

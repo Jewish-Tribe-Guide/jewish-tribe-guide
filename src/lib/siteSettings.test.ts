@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { iconVersion, shareDescription } from './siteSettings'
+import { changesLinked, DEFAULT_DESKTOP_NAV_ITEMS, DEFAULT_MOBILE_TABS, iconVersion, shareDescription } from './siteSettings'
 
 // The home-screen icon is generated from the admin's logo, and its URL used to
 // be constant — so uploading a new logo left phones showing the old icon
@@ -57,5 +57,21 @@ describe('shareDescription', () => {
 
   it('falls back to the old description only when both are empty', () => {
     expect(shareDescription(words(' ', ''))).toBe('The old description')
+  })
+})
+
+// What changed is held back, but an admin can put it on a tab or a header
+// link to see it, and take it off again (the user, Nov 15).
+describe('changesLinked', () => {
+  const tabs = [{ id: 'you', label: 'You', target: 'you' }]
+  it('a phone tab, a header link, or a link inside a menu', () => {
+    expect(changesLinked({ mobileTabs: [...tabs, { id: 'c', label: 'What changed', target: 'changes' }], desktopNavItems: [] })).toBe(true)
+    expect(changesLinked({ mobileTabs: tabs, desktopNavItems: [{ id: 'c', label: 'What changed', kind: 'link', target: 'changes' }] })).toBe(true)
+    expect(
+      changesLinked({ mobileTabs: tabs, desktopNavItems: [{ id: 'more', label: 'More', kind: 'more-menu', items: [{ id: 'c', label: 'What changed', kind: 'link', target: 'changes' }] }] }),
+    ).toBe(true)
+  })
+  it('nowhere: off, as the defaults are', () => {
+    expect(changesLinked({ mobileTabs: DEFAULT_MOBILE_TABS, desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS })).toBe(false)
   })
 })

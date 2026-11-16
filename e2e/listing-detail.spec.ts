@@ -182,15 +182,17 @@ test.describe('listing detail — desktop', () => {
     await expect(column.getByRole('heading', { level: 2 }).first()).toBeInViewport()
     expect((await column.boundingBox())!.y, 'the listing starts below the site header').toBeGreaterThanOrEqual(headerBottom.y + headerBottom.height - 1)
 
-    await column.getByTestId('listing-column-bar').getByRole('button', { name: category.pluralLabel, exact: true }).click()
+    await column.getByTestId('listing-column-bar').getByRole('button', { name: /^All \d+ places?$/ }).click()
     await expect(column).toHaveCount(0)
     await expect(row).toBeInViewport()
   })
 
-  // Oct 6, B: the listing has the top of the page. The list's search and
-  // examples stayed above it and pushed it halfway down the screen. And the
-  // browser's own Back closes it, as the column's "‹ {category}" does.
-  test('has the top of the page, and the browser’s Back closes it', async ({ page, request }) => {
+  // Board W10 A (Nov 15): the listing takes the list's column and nothing
+  // above it moves: the photo, the title and the search stay where the list
+  // has them (with no photo the page jumped on the click). Clicking into the
+  // search goes back to the list. And the browser's own Back closes it, as
+  // the column's "‹ All N places" does. Positional, so a real browser.
+  test('keeps the top of the page as the list has it, and the browser’s Back closes it', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
 
@@ -198,18 +200,28 @@ test.describe('listing detail — desktop', () => {
     await dismissLocationPrompt(page)
     const search = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
     await expect(search).toBeVisible()
+    const before = (await search.boundingBox())!
 
     await page.getByRole('button', { name: /^Show details for / }).first().click()
     const column = page.getByTestId('listing-column')
     await expect(column).toBeVisible()
-    await expect(search).toBeHidden()
-    const viewport = page.viewportSize()!
-    expect((await column.boundingBox())!.y, 'the listing starts in the top half of the screen').toBeLessThan(viewport.height / 2)
+    await expect(search).toBeVisible()
+    const after = (await search.boundingBox())!
+    expect(Math.abs(after.y - before.y), 'the search moved when the listing opened').toBeLessThanOrEqual(1)
+    expect((await column.boundingBox())!.y, 'the listing starts under the search').toBeGreaterThan(after.y + after.height)
 
     await page.goBack()
     await expect(column).toHaveCount(0)
     await expect(search).toBeVisible()
     expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+
+    // Clicking into the search over a listing goes back to the list.
+    await page.getByRole('button', { name: /^Show details for / }).first().click()
+    await expect(column).toBeVisible()
+    await search.click()
+    await expect(column).toHaveCount(0)
+    await expect(search).toBeFocused()
+    expect(new URL(page.url()).searchParams.get('item')).toBeNull()
   })
 
   // ← → and the column's own ‹ › step through the list as it's shown, and

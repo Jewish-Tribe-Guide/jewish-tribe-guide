@@ -10,8 +10,9 @@
 // that moves to another place (Places, To do) can take every one off:
 // they belong to the place that was open.
 
-// `box`: the site's + Add box (TellUsSheet), on any page.
-export const STEP_PARAMS = ['found', 'over', 'edit', 'row', 'step', 'box'] as const
+// `box`: the site's + Add box (TellUsSheet), on any page. `card`: a home
+// card's own screen in Home page (Right now, the Map; boards V4/V4b).
+export const STEP_PARAMS = ['found', 'over', 'edit', 'row', 'step', 'box', 'card'] as const
 export type StepParam = (typeof STEP_PARAMS)[number]
 
 /** `owner`: a screen sharing its parameter with others mounted beside it

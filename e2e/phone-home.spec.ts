@@ -95,6 +95,60 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText(/minyan|Mincha/i)
   })
 
+  // Board K1c (Nov 11): Right now sits close under the search. The
+  // computer's spacing between its card rows used to collapse through the
+  // phone's empty copies of them into 72px of nothing here. Board Q1
+  // (Nov 14): Try asking waits for a tap into the box, so at rest Right now
+  // sits under the box itself.
+  test('Right now sits close under the search, with no empty gap', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    const now = page.getByTestId('right-now')
+    await expect(now).toBeVisible()
+    await expect(page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button')).toHaveCount(0)
+    const box = await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().locator('xpath=..').boundingBox()
+    const top = await now.boundingBox()
+    const gap = (top?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0))
+    expect(gap, `the gap between the search box and Right now is ${gap}px`).toBeLessThanOrEqual(32)
+    expect(gap).toBeGreaterThanOrEqual(8)
+  })
+
+  // The user, Nov 14: in Safari a gap under Feedback · About · Privacy,
+  // none in the app added to the home screen. The page left a flat 96px
+  // for a 58px tab bar, which only the home-screen app's 34px safe area
+  // filled. Chromium, like Safari, has no safe area here, so this is
+  // Safari's case: the footer ends just above the bar, as close as the
+  // home-screen app had it (4px of air past the bar; 14px read as high).
+  test('the footer ends just above the tab bar, no empty band', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    const privacy = page.getByRole('link', { name: 'Privacy', exact: true }).filter({ visible: true }).last()
+    await expect(privacy).toBeVisible()
+    await expect(async () => {
+      const link = await privacy.boundingBox()
+      const bar = await page.getByRole('navigation', { name: 'Primary' }).boundingBox()
+      const gap = (bar?.y ?? 0) - ((link?.y ?? 0) + (link?.height ?? 0))
+      expect(gap, `the footer's last link ends ${gap}px above the tab bar`).toBeLessThanOrEqual(16)
+      expect(gap).toBeGreaterThanOrEqual(0)
+    }).toPass({ timeout: 5_000 })
+  })
+
+  // One line, as tall as the search box (the user, Nov 14).
+  test('Kept up is as tall as the search box', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    const band = await page.getByTestId('trust-band').boundingBox()
+    // The box the input sits in; the input itself is one line of text.
+    const box = await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().locator('xpath=..').boundingBox()
+    expect(Math.abs(Math.round(band?.height ?? 0) - Math.round(box?.height ?? 0)), `Kept up ${band?.height}px, the search box ${box?.height}px`).toBeLessThanOrEqual(2)
+  })
+
+  test('Try asking shows once the box is tapped, and a chip keeps it open', async ({ page }) => {
+    await openHome(page, 'tuesday')
+    const chips = page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button')
+    await expect(chips).toHaveCount(0)
+    await page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }).first().click()
+    await expect(chips.first()).toBeVisible()
+  })
+
   test('Friday afternoon: the candles card with the eruvim on it, and nothing “open now”', async ({ page, request }) => {
     const community = await openHome(page, 'friday')
     const now = page.getByTestId('right-now')
@@ -114,31 +168,34 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText('open now')
   })
 
-  // The user, Oct 28: a row per item, not the one store that has them all.
-  // Each opens its stores with Has and Open now on, and the list it opens is
-  // as long as the row says.
-  test('Friday afternoon: Before candles is a row per item, opening the stores open now that have it', async ({ page }) => {
+  // The user, Oct 28: an answer per item, not the one store that has them
+  // all. Board U3f (Nov 14): Shabbos shopping, a button per item, each
+  // opening its stores with Has and Open now on; the card's number is how
+  // many stores open now have any of them, so no item's list is longer.
+  test('Friday afternoon: Shabbos shopping, a button per item opening the stores open now that have it', async ({ page }) => {
     const community = await openHome(page, 'friday')
     await expect(page.getByTestId('today-candles')).toBeVisible()
-    const rows = page.getByTestId('today-before-candles').getByRole('link')
-    test.skip((await rows.count()) === 0, 'no store in the test project lists a Before candles item')
-    for (const link of await rows.all()) {
+    const card = page.getByTestId('shabbos-shopping')
+    const buttons = card.getByRole('link')
+    test.skip((await buttons.count()) === 0, 'no store in the test project lists a Shabbos shopping item')
+    for (const link of await buttons.all()) {
       await expect(link).toHaveAttribute('href', new RegExp(`^/${community}/[^/?]+\\?openNow=1&has_[^=&]+=[^&]+$`))
-      await expect(link).toContainText(/\d+ stores? open/)
     }
-    const first = rows.first()
+    const stores = Number((await card.textContent())!.match(/(\d+) stores? open/)![1])
+    const first = buttons.first()
     const href = (await first.getAttribute('href'))!
-    const stores = Number((await first.textContent())!.match(/(\d+) stores? open/)![1])
     await first.click()
     await expect(page).toHaveURL(href)
-    await expect(page.getByTestId('directory-row').filter({ visible: true })).toHaveCount(stores)
+    const rows = page.getByTestId('directory-row').filter({ visible: true })
+    await expect(rows.first()).toBeVisible()
+    expect(await rows.count()).toBeLessThanOrEqual(stores)
   })
 
   test('Shabbos: the card says when it ends; nothing to buy and nothing open', async ({ page }) => {
     await openHome(page, 'shabbos')
     await expect(page.getByTestId('right-now')).toHaveAttribute('data-moment', 'shabbos')
     await expect(page.getByTestId('today-candles')).toContainText('Havdalah 6:59 PM')
-    await expect(page.getByTestId('today-before-candles')).toHaveCount(0)
+    await expect(page.getByTestId('shabbos-shopping')).toHaveCount(0)
     await expect(page.getByTestId('right-now')).not.toContainText('open now')
   })
 
@@ -161,8 +218,9 @@ test.describe('on a phone', () => {
     const community = await openHome(page, 'tuesday')
     const tiles = page.getByTestId('category-tiles')
     await expect(tiles.getByRole('listitem').first()).toBeVisible()
-    // No group headings (the user, Oct 17), and no "Also:" line.
-    await expect(tiles.getByRole('heading')).toHaveCount(0)
+    // No group headings (the user, Oct 17), and no "Also:" line. One
+    // heading: the small label over the tiles (board K1c, Nov 11).
+    await expect(tiles.getByRole('heading')).toHaveText(['Explore by Category'])
     await expect(tiles).not.toContainText('Also:')
     // Every category with a page has its tile.
     const hrefs = await tiles.getByRole('listitem').getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
@@ -201,10 +259,13 @@ test.describe('on a phone', () => {
   })
 })
 
-test('on a computer, none of it: the photo band home as before', async ({ page, isMobile }) => {
+// The computer has a Right now of its own since board U1 (Nov 14), wide,
+// under Explore; the phone's stays hidden.
+test('on a computer, none of the phone’s: the photo band home, Right now its own wide one', async ({ page, isMobile }) => {
   test.skip(!!isMobile, 'the computer’s home')
   await openHome(page, 'tuesday')
   await expect(page.getByTestId('trust-band')).toBeHidden()
   await expect(page.getByTestId('category-tiles')).toBeHidden()
-  await expect(page.getByTestId('right-now')).toBeHidden()
+  await expect(page.locator('[data-testid="right-now"]:not([data-wide])')).toBeHidden()
+  await expect(page.locator('[data-testid="right-now"][data-wide]')).toBeVisible()
 })

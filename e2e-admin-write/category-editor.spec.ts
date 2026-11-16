@@ -113,6 +113,80 @@ test('creating a category through the real editor makes it live, and deleting it
   expect(afterDelete, 'the category should be gone after confirming delete').toBeNull()
 })
 
+test('a page brought back after a save keeps a Delete already asked while the list is still loading', async ({ page }) => {
+  const name = `E2E Admin Write ${randomUUID().slice(0, 8)}`
+  pendingCategoryNames.push(name)
+
+  // .and(':visible') everywhere below — Next keeps the just-navigated-away-
+  // from route mounted (React <Activity>, see MapScreen.tsx's own comment
+  // on the same behavior), so a hidden duplicate element from the
+  // pre-navigation page can otherwise make these locators ambiguous. Same
+  // treatment as the "Title" input in form-editor.spec.ts.
+  const visible = (l: Locator) => l.and(page.locator(':visible'))
+
+  await page.goto('/philly/admin/categories')
+  await visible(page.getByRole('button', { name: '+ New category page' })).click()
+
+  await visible(page.getByRole('button', { name: 'Make your own page' })).click()
+  await visible(page.getByLabel('Name', { exact: true })).fill(name)
+  await visible(page.getByRole('button', { name: 'Create category' })).click()
+
+  // Creating opens the new category's own page, saved (its heading is the
+  // name typed, so it shows before the save lands); back to the list.
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(page).toHaveURL(/\/philly\/admin\/categories\/cat:e2e-admin-write-/)
+
+  // Add a field, from a box of Fields (E1b: every box open, its Add a
+  // field at its foot): the ready-made list loads (boards 7 and 11), and a
+  // field from it is saved onto the page, in that box.
+  await visible(page.getByRole('button', { name: 'Add a field to Contact' })).click()
+  await visible(page.getByRole('button', { name: /^Hours/ })).click()
+  await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
+  await expect(visible(page.getByRole('region', { name: 'Fields' }).getByRole('button', { name: /^Hours/ }))).toBeVisible()
+  await visible(page.getByRole('button', { name: 'Save' })).click()
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+
+  // From here the list answers 4s late, as it did on CI. Opening the page
+  // again brings back its screen from before the field was added (Next keeps
+  // it, hidden); that screen used to notice only when the list arrived, and
+  // start the page over, throwing away the Delete asked meanwhile (PR 387).
+  await page.route('**/api/admin/categories?*', async (r) => { await new Promise((res) => setTimeout(res, 4000)); await r.continue() })
+  await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
+  // One row per page, saying how many places it has (board 1).
+  const row = visible(page.getByRole('button', { name }))
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await expect(row).toContainText(`${name}0 places`)
+
+  const supabase = getAdminClient()
+  const { data: created } = await supabase
+    .from('category')
+    .select('id, plural_label, kind, fields')
+    .eq('plural_label', name)
+    .maybeSingle()
+  expect(created, 'the category should exist in the database after Create').not.toBeNull()
+  expect(created!.kind).toBe('listing')
+  expect((created!.fields as { type: string }[]).some((f) => f.type === 'hours'), 'the ready-made Hours field should be saved').toBe(true)
+
+  // Delete it back out through the same real UI, from the foot of its page.
+  await row.click()
+  await visible(page.getByRole('button', { name: 'Delete this page' })).click()
+  await expect(visible(page.getByText(`Delete ${name} and every place on it?`))).toBeVisible()
+  // Past the late list's arrival: the question is still there.
+  await page.waitForTimeout(6000)
+  await expect(visible(page.getByText(`Delete ${name} and every place on it?`)), 'Delete this page was started over by the list arriving').toBeVisible()
+  await page.unroute('**/api/admin/categories?*')
+  await visible(page.getByRole('button', { name: 'Delete it' })).click()
+  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible({ timeout: 30_000 })
+  await expect(row).not.toBeVisible()
+
+  const { data: afterDelete } = await supabase
+    .from('category')
+    .select('id')
+    .eq('id', created!.id)
+    .maybeSingle()
+  expect(afterDelete, 'the category should be gone after confirming delete').toBeNull()
+})
+
 test('a category created hidden stays hidden, and Places\' Add a place publishes a listing to it directly with no moderation queue', async ({ page }) => {
   const categoryName = `E2E Hidden Cat ${randomUUID().slice(0, 8)}`
   const listingName = `E2E Direct Listing ${randomUUID().slice(0, 8)}`

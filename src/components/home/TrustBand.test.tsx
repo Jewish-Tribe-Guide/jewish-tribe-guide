@@ -51,10 +51,22 @@ const rows = async () => {
 }
 
 describe('the trust line', () => {
+  // The user, Nov 14: on two lines it stood 59px to the search box's 48,
+  // the bigger box on the page. One line now, as tall as the box (h-12),
+  // still a card with its chevron.
+  it('one line, as tall as the search box, with its chevron', () => {
+    show({ places: 149, googleChecked: 0, checkedThisWeek: 0, dated: 0 })
+    const band = screen.getByTestId('trust-band')
+    expect(band).toHaveClass('h-12')
+    expect(band.querySelectorAll('.block')).toHaveLength(0)
+    expect(band.querySelector('.truncate')).toHaveTextContent('Kept up by the community · 149 places')
+    expect(band.querySelectorAll('svg')).toHaveLength(2)
+  })
+
   // The user, Oct 23: Google checks more than hours, and not every night.
   it('says who keeps it, how many places, and that they’re checked with Google', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
-    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · checked with Google')
+    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community · 155 places · checked with Google')
     // Nothing fetched while the home itself is loading.
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -116,7 +128,7 @@ describe('the trust line', () => {
 
   it('every place dated: the band says “every listing dated”', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 155 })
-    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · every listing dated')
+    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community · 155 places · every listing dated')
   })
 
   // A check that's set up but hasn't dated anything this week, and no eruv

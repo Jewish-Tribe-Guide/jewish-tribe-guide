@@ -229,15 +229,14 @@ export default function ImageUploadField({
 
   return (
     <div>
-      {/* Preview and buttons stay side by side at every width — the buttons
-          now carry short mobile labels ("Upload"/"Camera"/"URL", see below)
-          specifically so they fit the leftover width next to the preview
-          without wrapping, rather than needing the row's full width the
-          longer labels did. An earlier version stacked the preview above
-          the buttons on narrow screens to solve that same crowding, but
-          shortening the labels keeps the picture and its buttons on one
-          line instead, which is how this looked before either change. */}
-      <div className="flex items-center gap-3">
+      {/* Preview and buttons side by side when they fit: the buttons carry
+          short phone labels ("Upload"/"Paste"/"URL", below) so a square or
+          near-square preview keeps them on its line. A banner-wide preview
+          (a category's, aspect 5: 280px) can't share a phone's width with
+          them, so the row wraps and the buttons go under it rather than
+          off the card's edge (the user, Nov 15: the banner photo "doesn't
+          appear great on mobile"). */}
+      <div data-testid="image-upload-row" className="flex flex-wrap items-center gap-3">
         {/* The preview doubles as the drop target — dragging a file directly
             onto the picture it's about to replace reads more naturally than
             a separate empty dropzone box floating nearby. */}
@@ -278,7 +277,7 @@ export default function ImageUploadField({
           // needs to vary: a square icon preview stays 56×56, a wide hero
           // preview becomes a correspondingly wide 56-tall strip instead of
           // a misleadingly square box.
-          style={{ width: 56 * aspect }}
+          style={{ width: 56 * aspect, maxWidth: '100%' }}
         >
           {value.trim() ? (
             // Plain <img>, not next/image: this previews a file that may have

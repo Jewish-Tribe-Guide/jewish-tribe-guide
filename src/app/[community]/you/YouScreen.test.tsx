@@ -78,10 +78,14 @@ afterEach(() => {
 })
 
 describe('You', () => {
-  it('nothing saved: says how to save', () => {
+  // Board W11 (the user, Nov 15): the same words on a phone and a computer,
+  // and on a computer three dashed outlines where the cards will go.
+  it('nothing saved: says how to save, and a computer draws where the cards will go', () => {
     show()
     expect(screen.getByTestId('you-empty')).toHaveTextContent('Nothing saved yet')
-    expect(screen.getByTestId('you-empty')).toHaveTextContent('Tap Save on a place or a search.')
+    expect(screen.getByTestId('you-empty')).toHaveTextContent('Save a place or a search to keep it here.')
+    expect(screen.getByTestId('you-empty-cards').children).toHaveLength(3)
+    expect(screen.getByTestId('category-hero-count')).toBeEmptyDOMElement()
   })
 
   it('saved places, newest first, and saved searches with what they find now, in the home line’s words', async () => {
@@ -95,6 +99,8 @@ describe('You', () => {
     expect(within(searches).getByRole('link')).toHaveAttribute('href', '/test-community/grocery?q=challah')
     expect(await within(searches).findByText('Grocery · 2 with Challah')).toBeInTheDocument()
     expect(screen.getByText('Saved on this phone')).toBeInTheDocument()
+    // Board W11: what's kept here, on the computer's photo.
+    expect(screen.getByTestId('category-hero-count')).toHaveTextContent('2 places · 1 search')
   })
 
   it('removing a place says so, with Undo, which puts it back where it was', async () => {
@@ -185,6 +191,40 @@ describe('You', () => {
 
   // Oct 15: an eruv couldn't be saved; now it's saved from its listing as
   // the Eruv page's, and You says whether it's up.
+  it('a saved restaurant in a category that can list minyanim says whether it’s open, not “No davening times”', () => {
+    // Food has a minyanim field for the few restaurants that host one; a
+    // place without any is a restaurant, and its row is its hours (Nov 15).
+    const food = makeCategory({
+      id: 'food',
+      label: 'Food',
+      pluralLabel: 'Food',
+      detailFields: [
+        { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' },
+        { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+      ],
+    })
+    const allDay = { open: '00:00', close: '23:59' }
+    const hours = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, allDay]))
+    const cafe = makeListing({ id: 'cafe', name: 'HipCityVeg', category: 'food', hours })
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'cafe', categoryId: 'food' }]))
+    clock.at = new Date(2026, 9, 7, 14, 0).getTime()
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <LocationProvider>
+          <ListingsProvider listings={[cafe]}>
+            <ChangesProvider rows={null}>
+              <YouScreen />
+            </ChangesProvider>
+          </ListingsProvider>
+        </LocationProvider>
+      </ForcedViewport>,
+      { content: { categories: [food] } },
+    )
+    const row = screen.getByText('HipCityVeg').closest('.group') as HTMLElement
+    expect(within(row).getByText(/^Open/)).toBeTruthy()
+    expect(within(row).queryByText(/davening/i)).toBeNull()
+  })
+
   it('a saved eruv: whether it’s up and when the guide checked, opening it on the Eruv page; removing it says so', async () => {
     const user = userEvent.setup()
     clock.at = Date.parse('2026-10-09T19:00:00Z') // Fri 3 PM in Philadelphia

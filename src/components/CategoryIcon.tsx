@@ -50,6 +50,10 @@ type Props = {
    *  where that's what tells it apart (a minyan that isn't a shul: a
    *  clock). Drawn in the same darker shade the initials are. */
   glyph?: ReactNode
+  /** The picture whole on a small white tile, not filling the shape: most
+   *  places' pictures are logos, and filling a square cuts a wide one at
+   *  both ends (What changed, board W9 C, Nov 15). */
+  wholePicture?: boolean
 }
 
 /** The circular category avatar — a category's line icon (or, lacking one,
@@ -58,7 +62,7 @@ type Props = {
  *  list/place detail, category chips) shows a place the same way regardless
  *  of which it's using, and so the image-vs-icon-vs-emoji fallback logic
  *  exists exactly once. */
-export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true, shape = 'circle', initials, glyph }: Props) {
+export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true, shape = 'circle', initials, glyph, wholePicture = false }: Props) {
   const hasImage = !!iconImageUrl?.trim()
   // A small copy made by Supabase Storage, for an uploaded photo — see
   // storageThumbnailUrl. Falls back to the original if that request fails
@@ -70,7 +74,12 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
   return (
     <span
       className={`relative flex shrink-0 items-center justify-center overflow-hidden ${shape === 'square' ? 'rounded-xl' : 'rounded-full'} ${className}`}
-      style={{ backgroundColor: categoryTint(color), color, ...(ring ? { boxShadow: categoryRing(color) } : {}) }}
+      data-whole-picture={hasImage && wholePicture ? '' : undefined}
+      style={
+        hasImage && wholePicture
+          ? { backgroundColor: '#fff', boxShadow: 'inset 0 0 0 1px #e2e8f0' }
+          : { backgroundColor: categoryTint(color), color, ...(ring ? { boxShadow: categoryRing(color) } : {}) }
+      }
       aria-hidden="true"
     >
       {hasImage ? (
@@ -83,7 +92,7 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
           alt=""
           fill
           sizes={`${sizePx}px`}
-          className="object-cover"
+          className={wholePicture ? 'object-contain p-1' : 'object-cover'}
           // The thumbnail is already the right size, so it never goes through
           // Vercel's optimizer (which is the whole point).
           unoptimized={useThumb || !isOptimizableImage(iconImageUrl!)}

@@ -6,6 +6,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import SuggestListingCard from './SuggestListingCard'
+import { LIFT_ON_HOVER } from './AnswerCard'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -18,48 +19,62 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-// New card (Phase 6d, docs/desktop-mockup-plan.md) — fixed, non-admin-
-// editable copy, and a single action that opens the same ContributePicker
-// UpdateListingsCard's own Add button used to (see that component's doc for
-// why the action moved here).
+// Board G5b (Nov 11): on its own after the map, a heading, one line and one
+// button that opens the same ContributePicker as "+ Add". No photo.
 describe('SuggestListingCard', () => {
-  it('renders its fixed copy', () => {
+  it('asks for a missing place, in words and no photo', () => {
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
 
-    expect(screen.getByText('Get involved')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Suggest a Listing' })).toBeInTheDocument()
-    expect(screen.getByText('Help keep our community guide accurate and useful.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toBeInTheDocument()
+    expect(screen.getByText('Add it, or fix one that’s out of date. A person checks every change.')).toBeInTheDocument()
+    expect(screen.getByTestId('home-suggest').querySelector('img')).toBeNull()
   })
 
-  it('opens ContributePicker on "Submit a Listing"', async () => {
+  // The computer home's trust band already says "Kept up by the community";
+  // the card said it again. Its label is now its job, as Stay in the Loop's
+  // beside it is "Email updates" (the user, Nov 16).
+  it('is labelled “Add or fix a place”, not “Kept up by the community”', () => {
+    renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    expect(screen.getByText('Add or fix a place')).toBeInTheDocument()
+    expect(screen.queryByText('Kept up by the community')).not.toBeInTheDocument()
+  })
+
+  it('opens ContributePicker on "Suggest a listing"', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Submit a Listing' }))
+    await user.click(screen.getByRole('button', { name: 'Suggest a listing' }))
 
     expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
   })
 
-  // Regression: this photo went out with no unoptimized gate at all, unlike
-  // every other hardcoded photo on the home screen (CampaignBannerCard,
-  // DaveningTimesCard, HeroHeading) — invisible locally and in a normal
-  // deploy, since next/image's own optimizer just did its job. It broke the
-  // moment the site's real Image Optimization quota was exhausted: Vercel
-  // returned a 402 for this one request (confirmed live) and the card
-  // rendered with no photo, with no way to route around it — the
-  // NEXT_PUBLIC_IMAGES_UNOPTIMIZED kill switch (see imageHosts.ts) existed
-  // for exactly this but this image never checked it.
-  it('routes the photo unoptimized once NEXT_PUBLIC_IMAGES_UNOPTIMIZED is set', () => {
-    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+  // Nov 14: the whole card lifts like the other computer-home cards and
+  // opens the picker from anywhere on it; the picker can still close.
+  it('lifts on hover and opens the picker from anywhere on the card', async () => {
+    const user = userEvent.setup()
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    const box = screen.getByTestId('home-suggest')
+    expect(box).toHaveClass(...LIFT_ON_HOVER.split(' '))
 
-    // Unoptimized: the raw Unsplash URL, untouched. Optimized (the default)
-    // would instead be routed through /_next/image?url=... — exactly the
-    // request Vercel's optimizer 402s once the quota runs out.
-    const img = document.querySelector('img')
-    expect(img?.getAttribute('src')).toBe(
-      'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3RvcmV8ZW58MHx8MHx8fDA%3D',
-    )
+    await user.click(screen.getByRole('heading', { name: 'Know a place we’re missing?' }))
+    expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  // Board W7l (Nov 15): the page's quiet sign-off, so the map above stays
+  // the bigger thing: a small heading and a small button, beside the words
+  // once the card is 540px wide, stacked under that (jsdom has no layout;
+  // the widths themselves are e2e/desktop-home-widths.spec.ts).
+  it('is a quiet card: a small heading, side by side from 540px, stacked in a narrow box', () => {
+    renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    const box = screen.getByTestId('home-suggest')
+    expect(box).toHaveClass('flex-col', '@[540px]:flex-row')
+    expect(box).not.toHaveClass('@[920px]:min-h-[240px]')
+    expect(box.parentElement).toHaveClass('@container')
+    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('text-[21px]')
+    expect(screen.getByRole('button', { name: 'Suggest a listing' })).toHaveClass('h-10')
   })
 })

@@ -99,7 +99,6 @@ describe('listCategoriesUncached', () => {
       capabilities: { add: false, edit: true, report: true, directorySearch: true, map: false },
       externalLink: { label: 'Website', url: 'https://example.com' },
       cardImageUrl: 'https://example.com/card.png',
-      iconImageUrl: null,
       mapZoomRadiusMiles: null,
       active: true,
       // No place_kind saved: the kind comes from the slug.
