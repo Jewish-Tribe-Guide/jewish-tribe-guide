@@ -130,7 +130,12 @@ export default function YouScreen() {
             for a screen reader. A computer's is the photo's. */}
         <h1 className="sr-only desktop:hidden">You</h1>
 
-        <div ref={searchRef} data-testid="you-search" className="desktop:mt-0 desktop:mb-9 desktop:max-w-[520px]">
+        {/* On a computer the box rides up onto the photo (searchOnPhoto),
+            with 45px of photo under it (HERO_OVERLAP_PX less the box): 77px
+            puts what's saved 32px below the photo, as the other photo
+            pages' content starts (PhotoHeader's h-8). 36px had the Places
+            heading start inside the photo (Nov 16). */}
+        <div ref={searchRef} data-testid="you-search" className="desktop:mt-0 desktop:mb-[77px] desktop:max-w-[520px]">
           <SearchBox
             look="box"
             onPhoto

@@ -103,7 +103,9 @@ are unbalanced; about 6–7 min looks reachable.
   Fixed the same day (the user, a computer at phone width): a click away
   left You's results open. Now a tap or click away closes them as the
   home's do, opening nothing, and Escape too (useCloseOnTapAway, shared
-  with the home's HeroHeading).
+  with the home's HeroHeading). And on a computer the Places heading
+  started inside the photo, half hidden (36px under the box where the
+  photo has 45); now what's saved starts 32px below the photo.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them

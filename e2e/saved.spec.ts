@@ -171,6 +171,25 @@ test.describe('saved places', () => {
     await expect(page).toHaveURL(new RegExp(`/${community}/${category.id}`))
   })
 
+  // Nov 16 (the user, "Desktop You seems weird"): You's search on the photo
+  // left 36px under it where the photo has 45, so the Places heading started
+  // inside the photo, half hidden under it. A computer only: a phone has no
+  // photo. Positional, so here rather than in jsdom.
+  test('on a computer, what’s saved starts below the photo, not under it', async ({ page, request }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'a phone has no photo')
+    const community = await defaultCommunity(page)
+    const listing = await mappableListing(request, community)
+    await seedPinned(page, { id: listing.id, categoryId: listing.category })
+    await page.goto(`/${community}/you`)
+    await dismissLocationPromptIfItAppears(page)
+    const heading = page.getByTestId('you-places').getByRole('heading', { name: 'Places' })
+    await expect(heading).toBeVisible()
+    const photo = await page.getByTestId('category-hero').locator('> div').first().boundingBox()
+    const top = (await heading.boundingBox())!.y
+    expect(photo, 'the photo').not.toBeNull()
+    expect(top, 'the Places heading starts below the photo').toBeGreaterThanOrEqual(photo!.y + photo!.height)
+  })
+
   test('the old Pinned page goes to You', async ({ request }) => {
     const community = await defaultCommunitySlug(request)
     const res = await request.get(`/${community}/pinned`, { maxRedirects: 0 })
