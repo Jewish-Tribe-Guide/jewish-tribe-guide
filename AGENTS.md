@@ -343,11 +343,17 @@ summary block, not the tail.** Two separate traps, both hit in one session
   present, so the exit code is not a substitute either. Grep the whole
   summary block: `grep -E '^\s+[0-9]+ (failed|passed|flaky|skipped)'`.
 
-**No e2e test fails on every local run any more, but two are flaky.**
-`offline.spec.ts` fails about one run in two (the service worker not taking
-control in time; see [[project-e2e-flakiness-baseline]]), and
-`server-rendering.spec.ts:127` desktop about one in four (two copies of the
-count text mid-transition). In CI, `saved.spec.ts` has twice missed its
+**No e2e test fails on every local run any more, and one is known flaky:**
+`server-rendering.spec.ts:127` desktop, about one in four (two copies of the
+count text mid-transition). `offline.spec.ts` used to be the other, written
+off for two months as "the service worker not taking control in time". It
+was a test bug: its wait for an active worker was `page.waitForFunction`
+with an `async` predicate, which Playwright never awaits (the Promise is
+truthy, so it returns at once), and the reload behind it raced the
+worker's install. Fixed Nov 15 with `navigator.serviceWorker.ready`;
+161/161 under `--repeat-each=20 --workers=5`, where the old helper failed
+3–5 in every ~88. `src/test/e2eWaitForFunction.test.ts` now fails on any
+async `waitForFunction` predicate in any suite. In CI, `saved.spec.ts` has twice missed its
 Saved chip within 5s (Nov 5 :130 mobile, Nov 9 :104 desktop; both passed
 on a rerun, cause not found yet). Anything else red is worth taking seriously.
 Before concluding you broke something, get a baseline:

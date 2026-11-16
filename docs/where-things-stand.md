@@ -287,6 +287,12 @@ With no choice made it's the first two categories with hours, as before
       "The Guide is built to stay current…" and "A community effort"
       before "The goal is simple…", are new words, so they go in through
       the Pages tab (the user's, or mine on a yes). Not written.
+  - **Fixed Nov 15: the "flaky" offline test was a test bug.**
+    `e2e/offline.spec.ts`'s wait for the service worker never waited
+    (an async `waitForFunction` predicate, which Playwright doesn't
+    await), so its reload raced the worker's install and the page never
+    became controlled. The worker itself was fine. Now 161/161 under
+    load; a unit check stops the same mistake in any suite.
   - **Fixed Nov 15: a saved restaurant on You said "No davening times
     listed"**. Food has a minyanim field (for restaurants that host one),
     and You treated every place in such a category as a shul. It now asks
