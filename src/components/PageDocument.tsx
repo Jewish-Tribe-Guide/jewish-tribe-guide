@@ -22,11 +22,10 @@ type Props = {
  *  per-section boxes give the page the same rhythm as the listing cards.
  *
  *  Desktop (board W11, the user, Nov 15): the category pages' photo with
- *  the title on it (PhotoHeader), and the document in one white card under
- *  it, left-aligned with the title and no wider than 760px, about 80
- *  characters of 16px prose a line. The sections are still separate elements
- *  there but carry no box (see `.rich-text-section` in globals.css), so the
- *  text renders exactly as the unsplit body did. */
+ *  the title on it (PhotoHeader), and under it the same white box per
+ *  section as a phone (`.rich-text-section` in globals.css; the user: "so
+ *  it doesn't look like one boring essay"), left-aligned with the title and
+ *  no wider than 760px, about 80 characters of 16px prose a line. */
 export default function PageDocument({ title, subtitle, body }: Props) {
   // dangerouslySetInnerHTML below is load-bearing and safe only because
   // pageBodyToHtml sanitizes against an allowlist — see lib/richText.ts.
@@ -36,11 +35,11 @@ export default function PageDocument({ title, subtitle, body }: Props) {
     <main className={`${PAGE_COLUMN} pt-4 pb-12 desktop:pt-8`}>
       <PageScreenHeader title={title} />
       <PhotoHeader title={title}>
-        <div data-testid="page-document" className="desktop:max-w-[760px] desktop:rounded-lg desktop:border desktop:border-slate-200 desktop:bg-white desktop:p-10 desktop:shadow-sm">
+        <div data-testid="page-document" className="desktop:max-w-[760px]">
           {/* A phone's, for screen readers: the header says it. A computer's
               is on the photo. */}
           <h1 className="sr-only desktop:hidden">{title}</h1>
-          {subtitle && <p className="mx-0.5 text-sm text-muted desktop:mx-0 desktop:mb-5">{subtitle}</p>}
+          {subtitle && <p className="mx-0.5 text-sm text-muted desktop:mx-0 desktop:mb-3">{subtitle}</p>}
           <div className="rich-text mt-3 text-[16px] leading-[1.75] text-slate-700 desktop:mt-0">
             {sections.map((html, i) => (
               <div key={i} className="rich-text-section" dangerouslySetInnerHTML={{ __html: html }} />

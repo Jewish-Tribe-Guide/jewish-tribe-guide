@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import PageDocument from './PageDocument'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -57,6 +59,21 @@ describe('PageDocument — About and Privacy', () => {
       'What we collectVery little.',
       'What we don’tAnything else.',
     ])
+  })
+
+  // The user (Nov 15): a box per section on a computer too, "so it doesn't
+  // look like one boring essay". The box is plain CSS, so this reads the
+  // stylesheet: the rule that draws it must sit outside any media query,
+  // where it reaches every screen, not only a phone's.
+  it('draws each section’s white box on every screen, a computer’s included', () => {
+    const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
+    const box = css.search(/\.rich-text-section \{[^}]*background: white/)
+    expect(box).toBeGreaterThan(-1)
+    let depth = 0
+    for (const ch of css.slice(0, box)) depth += ch === '{' ? 1 : ch === '}' ? -1 : 0
+    expect(depth).toBe(0)
+    renderPage()
+    expect(screen.getByTestId('page-document')).not.toHaveClass('desktop:bg-white')
   })
 
   it('shows the subtitle (Privacy’s “Last updated”)', () => {

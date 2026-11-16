@@ -463,32 +463,36 @@ body {
 .rich-text > .rich-text-section:last-child > :last-child {
   margin-bottom: 0;
 }
-/* Phone only — the negation of the `desktop` variant at the top of this file.
-   Each section is a white box, like the rest of the app's content. Desktop
-   gets none of this: the sections stay unstyled blocks, so the heading's
-   margin collapses through them and the page reads as the one document it
-   always did, hairlines between sections included. */
-@media not all and (min-width: 640px) and (min-height: 640px) {
+/* Each section is a white box, like the rest of the app's content, on a
+   phone and (board W11, the user, Nov 15: "so it doesn't look like one
+   boring essay") on a computer too, where the boxes get more room. */
+.rich-text-section {
+  background: white;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+.rich-text-section + .rich-text-section {
+  margin-top: 0.75rem;
+}
+.rich-text-section > :first-child {
+  margin-top: 0;
+}
+.rich-text-section > :last-child {
+  margin-bottom: 0;
+}
+/* The box is the divider now; a hairline inside it would be a second one. */
+.rich-text-section > h2:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+@media (min-width: 640px) and (min-height: 640px) {
   .rich-text-section {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: 1rem;
-    padding: 1rem;
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+    padding: 2rem 2.5rem;
   }
   .rich-text-section + .rich-text-section {
-    margin-top: 0.75rem;
-  }
-  .rich-text-section > :first-child {
-    margin-top: 0;
-  }
-  .rich-text-section > :last-child {
-    margin-bottom: 0;
-  }
-  /* The box is the divider now; a hairline inside it would be a second one. */
-  .rich-text-section > h2:first-child {
-    padding-top: 0;
-    border-top: 0;
+    margin-top: 1rem;
   }
 }
 .rich-text ul,

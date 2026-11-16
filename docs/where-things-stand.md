@@ -275,6 +275,18 @@ With no choice made it's the first two categories with hours, as before
       unchanged, and Feedback stays plain.
     - **Not drawn, not built:** a "Recent changes" box on each listing
       (raised Nov 15, undecided).
+  - **About and Privacy: a white box per section on a computer too**
+    (the user, Nov 15: "so it doesn't look like one boring essay"). BUILT:
+    the phone's per-heading boxes now draw on every screen. The live text
+    barely splits yet, so it **waits on two content changes, each needing
+    the user's go-ahead, after this deploys:**
+    - Privacy: its 19 section titles are underlined paragraphs, not
+      headings. `scripts/promote-page-headings.mjs --prod` (now dropping
+      the underline) promotes all 19; the dry run lists them. Not run.
+    - About: no headings. The drafted ones, "How it stays current" before
+      "The Guide is built to stay current…" and "A community effort"
+      before "The goal is simple…", are new words, so they go in through
+      the Pages tab (the user's, or mine on a yes). Not written.
   - **Fixed Nov 15: a saved restaurant on You said "No davening times
     listed"**. Food has a minyanim field (for restaurants that host one),
     and You treated every place in such a category as a shul. It now asks

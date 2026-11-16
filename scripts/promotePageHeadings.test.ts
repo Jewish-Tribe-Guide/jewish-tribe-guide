@@ -57,6 +57,16 @@ describe('promote — bodies already written through the editor', () => {
     expect(out).toBe('<h2>Location</h2><p>If you choose to share your location, it stays on your device.</p>')
   })
 
+  // Live Privacy (Nov 15) marks its 19 section titles by underlining a
+  // paragraph. A heading is the mark now, so the underline goes, or every
+  // title would be an underlined heading that reads like a link.
+  it('drops an underline or bold wrapped around the whole title', () => {
+    const html = '<p><u>Searching</u></p><p>Body.</p><p><strong>Location</strong></p><p>More body.</p>'
+    const { out, promoted } = promote(html)
+    expect(promoted).toEqual(['Searching', 'Location'])
+    expect(out).toBe('<h2>Searching</h2><p>Body.</p><h2>Location</h2><p>More body.</p>')
+  })
+
   it('leaves an existing heading untouched rather than double-wrapping it', () => {
     const html = '<h2>Location</h2><p>Body.</p>'
     expect(promote(html).out).toBe(html)

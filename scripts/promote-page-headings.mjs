@@ -72,7 +72,10 @@ export function promote(body) {
       const text = inner.replace(/<[^>]+>/g, '').trim()
       if (!isHeading(text)) return whole
       promoted.push(text)
-      return `<h2>${inner}</h2>`
+      // A title marked by underlining or bolding the whole paragraph (live
+      // Privacy's 19, Nov 15): the heading is the mark now.
+      const bare = inner.trim().replace(/^<(u|strong|b|em)>([\s\S]*)<\/\1>$/, '$2')
+      return `<h2>${bare}</h2>`
     })
     return { out, promoted }
   }
