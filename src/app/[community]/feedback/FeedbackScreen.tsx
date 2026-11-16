@@ -8,7 +8,7 @@ import { GlyphDot } from '@/components/pages/PageGlyph'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
-import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { useSetScreenHeader, useSetTabHeader } from '@/lib/headerVisibility'
 import { PAGE_COLUMN } from '@/lib/pageColumn'
 import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
@@ -39,11 +39,12 @@ export default function FeedbackScreen({ email = null }: { email?: string | null
   // drill-down like them: "‹ Feedback" in the header, back to home. Tabs are
   // admin-configurable, though, and Feedback can be one (it is in
   // DEFAULT_MOBILE_TABS) — a tab is a top-level screen with nothing to go back
-  // to, so then it keeps the site header and shows its own heading instead.
-  const isTab =
-    settings.feedbackEnabled && (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).some((t) => t.target === 'feedback')
-  const drillDown = isMobile && !isTab
+  // to, so then the header names it with no Back, as every tab's page does
+  // (useSetTabHeader, the user, Nov 16).
+  const tab = settings.feedbackEnabled ? (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).find((t) => t.target === 'feedback') : undefined
+  const drillDown = isMobile && !tab
   useSetScreenHeader(drillDown, 'Feedback', goHome)
+  useSetTabHeader(tab?.label?.trim() || 'Feedback', isMobile && !!tab)
 
   const tellUs = ui.contributions.add
   const heading = settings.feedbackHeading
@@ -55,7 +56,7 @@ export default function FeedbackScreen({ email = null }: { email?: string | null
           data-testid="page-document"
           className="mb-4 flex flex-col gap-3 desktop:mb-0 desktop:grid desktop:grid-cols-[minmax(0,1fr)_420px] desktop:items-start desktop:gap-8 desktop:pt-3"
         >
-          <h1 className={drillDown ? 'sr-only' : 'mx-1 text-[24px] font-extrabold tracking-tight text-slate-900 desktop:hidden'}>{heading}</h1>
+          <h1 className={isMobile ? 'sr-only' : 'mx-1 text-[24px] font-extrabold tracking-tight text-slate-900 desktop:hidden'}>{heading}</h1>
           {/* The side column: on a phone only its Tell us card shows, above
               the form; on a computer it sits to the right. */}
           <div className={`${sent ? 'hidden desktop:flex' : 'contents desktop:flex'} desktop:col-start-2 desktop:row-start-1 desktop:flex-col desktop:gap-4`}>

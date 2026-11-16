@@ -1,5 +1,7 @@
 'use client'
 
+import { useSetTabHeader } from '@/lib/headerVisibility'
+import { useTabLabel } from '@/lib/useTabLabel'
 import Link from 'next/link'
 import ChangeRow from '@/components/changes/ChangeRow'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
@@ -17,6 +19,8 @@ import SuggestListingCard from '@/components/home/SuggestListingCard'
  *  community's time, against the visitor's clock (so the days are right
  *  however long the page was cached). */
 export default function ChangesScreen({ failed }: { failed: boolean }) {
+  // A phone's header says which tab this is (the user, Nov 16).
+  useSetTabHeader(useTabLabel('changes', 'What changed'))
   const { community } = useActiveCommunity()
   const timezone = useCommunityTimezone()
   const categories = useCategories() ?? []
@@ -56,7 +60,9 @@ export default function ChangesScreen({ failed }: { failed: boolean }) {
             </Link>
           )}
           <div className="desktop:hidden">
-            <h1 className="text-[28px] font-extrabold tracking-tight text-ink">What changed</h1>
+            {/* A phone's title is the header's (useSetTabHeader, the user,
+                Nov 16); this h1 is for a screen reader. */}
+            <h1 className="sr-only">What changed</h1>
             <p data-testid="changes-count" className="mt-0.5 min-h-[1.375em] text-[15px] leading-snug text-slate-600">
               {count}
             </p>

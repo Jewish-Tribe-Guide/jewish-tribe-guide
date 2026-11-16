@@ -20,7 +20,10 @@ afterEach(() => cleanup())
 // Stands in for SiteHeader: shows whatever the screen asked the header to say.
 function HeaderProbe() {
   const header = useScreenHeader()
-  return header && <button data-testid="header-back" onClick={header.onBack}>‹ {header.title}</button>
+  if (!header) return null
+  // A tab's page: its name, with no Back.
+  if (!header.onBack) return <p data-testid="header-tab">{header.title}</p>
+  return <button data-testid="header-back" onClick={header.onBack}>‹ {header.title}</button>
 }
 
 const noFeedbackTab = SITE_SETTINGS_DEFAULTS.mobileTabs!.filter((t) => t.target !== 'feedback')
@@ -50,10 +53,13 @@ describe('FeedbackScreen — on a phone it is a drill-down, like About and Priva
     expect(screen.getByRole('heading', { level: 1, name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toHaveClass('sr-only')
   })
 
-  it('stays a top-level screen when an admin has made Feedback a tab', () => {
-    renderScreen(true, SITE_SETTINGS_DEFAULTS.mobileTabs!)
+  // Nov 16 (the user): a tab's page names itself in the header, in the tab
+  // bar's word for it, with no Back; its own heading is for a screen reader.
+  it('as a tab, names itself in the header with no Back, in the tab’s own word', () => {
+    renderScreen(true, SITE_SETTINGS_DEFAULTS.mobileTabs!.map((t) => (t.target === 'feedback' ? { ...t, label: 'Notes' } : t)))
     expect(screen.queryByTestId('header-back')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1, name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toHaveClass('sr-only')
+    expect(screen.getByTestId('header-tab')).toHaveTextContent(/^Notes$/)
+    expect(screen.getByRole('heading', { level: 1, name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toHaveClass('sr-only')
   })
 
   it('leaves the desktop header alone (nothing to go back to there)', () => {

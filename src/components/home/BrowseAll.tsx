@@ -62,8 +62,10 @@ export default function BrowseAll(props: Props) {
 
   return (
     <div data-testid="browse-page">
-      <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:text-[36px]">Browse</h1>
-      <div className="mt-3">
+      {/* A phone's title is the header's (useSetTabHeader in BrowseScreen,
+          the user, Nov 16); there this h1 is for a screen reader. */}
+      <h1 className="sr-only desktop:not-sr-only desktop:text-[36px] desktop:font-extrabold desktop:tracking-tight desktop:text-ink">Browse</h1>
+      <div className="desktop:mt-3">
         <SearchBox query={query} onQueryChange={setQuery} onSubmit={ask} placeholder={settings.searchPlaceholder} />
       </div>
       <BrowseList {...props} />

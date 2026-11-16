@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -128,3 +130,27 @@ describe('the What changed page', () => {
     expect(screen.queryByText(/Nothing’s changed/)).not.toBeInTheDocument()
   })
 })
+
+// The user, Nov 16: a tab's page names itself in the phone header, in the
+// tab bar's own word for it, and the page starts with its content.
+describe('ChangesScreen — the header', () => {
+  function HeaderTitle() {
+    const h = useScreenHeader()
+    return <p data-testid="header-state">{h ? `${h.title}${h.onBack ? ' ‹' : ''}` : 'none'}</p>
+  }
+  it('names the tab as the bar does, with no Back; the page’s own title is for a screen reader', () => {
+    renderWithProviders(
+      <ScreenHeaderProvider>
+        <ChangesProvider rows={[]}>
+          <ChangesScreen failed={false} />
+          <HeaderTitle />
+        </ChangesProvider>
+      </ScreenHeaderProvider>,
+      { content: { categories, settings: { ...SITE_SETTINGS_DEFAULTS, mobileTabs: [{ id: 'changes', label: 'Activity', target: 'changes' }] } }, community: { timezone: 'America/New_York' } },
+    )
+    expect(screen.getByTestId('header-state')).toHaveTextContent(/^Activity$/)
+    // The phone's (the computer's is on the photo).
+    expect(screen.getAllByRole('heading', { level: 1, name: 'What changed' }).some((h) => h.classList.contains('sr-only'))).toBe(true)
+  })
+})
+

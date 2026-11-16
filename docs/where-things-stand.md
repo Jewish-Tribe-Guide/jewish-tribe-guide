@@ -100,6 +100,16 @@ are unbalanced; about 6–7 min looks reachable.
   itself still opens what it names, and Enter goes to the first. On a
   computer the box sits on the photo, as a category page's does.
   Not drawn but built: "Nothing in the guide for "…"" when nothing matches.
+- A tab's own page names itself in the phone header (the user's OK,
+  Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
+  the tab bar's word for them
+  beside the logo, with no Back (useSetTabHeader); the page starts with
+  its content, its own h1 kept for a screen reader. A chevron is what
+  says a page is a step down, so a category, a listing, About, and
+  Feedback when it isn't a tab keep "‹ title". Home keeps the site's name. A computer keeps
+  the site's name everywhere. With several communities the header's name
+  is the switcher, so it stays the community's name on a tab page too.
+  The Map tab hides the header on a phone, as before.
 - One e2e flake seen once (Nov 16), 0 of 10 on a repeat:
   `offline.spec.ts:109` desktop, `locator('main')` found two `<main>`s,
   one with React's `vt-update` (the server copy, mid view transition).

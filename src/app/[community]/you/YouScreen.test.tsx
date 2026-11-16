@@ -13,6 +13,7 @@ import type { ChangeLogRow } from '@/lib/whatChanged'
 import type { Eruv } from '@/lib/eruv'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import { ForcedViewport } from '@/lib/useIsMobile'
+import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import YouScreen from './YouScreen'
 
 vi.mock('next/navigation', () => ({
@@ -299,3 +300,32 @@ describe('You', () => {
     })
   })
 })
+
+// The user, Nov 16: You names itself in the phone header, so a phone's page
+// starts with its search.
+describe('You — the header', () => {
+  function HeaderTitle() {
+    const h = useScreenHeader()
+    return <p data-testid="header-state">{h ? `${h.title}${h.onBack ? ' ‹' : ''}` : 'none'}</p>
+  }
+  it('says You there, with no Back, and the page’s own title is for a screen reader', () => {
+    renderWithProviders(
+      <ScreenHeaderProvider>
+        <ForcedViewport isMobile>
+          <LocationProvider>
+            <ListingsProvider listings={listings}>
+              <ChangesProvider rows={null}>
+                <YouScreen />
+                <HeaderTitle />
+              </ChangesProvider>
+            </ListingsProvider>
+          </LocationProvider>
+        </ForcedViewport>
+      </ScreenHeaderProvider>,
+      { content: { categories: [grocery, eruvPage] } },
+    )
+    expect(screen.getByTestId('header-state')).toHaveTextContent(/^You$/)
+    expect(screen.getByRole('heading', { level: 1, name: 'You' })).toHaveClass('sr-only')
+  })
+})
+

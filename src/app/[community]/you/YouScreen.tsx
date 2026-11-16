@@ -28,6 +28,8 @@ import { listingRowFacts } from '@/lib/listingRow'
 import { milesText, type LatLng } from '@/lib/geo'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import PhotoHeader from '@/components/PhotoHeader'
+import { useSetTabHeader } from '@/lib/headerVisibility'
+import { useTabLabel } from '@/lib/useTabLabel'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
@@ -55,6 +57,8 @@ export default function YouScreen() {
   const saved = useSavedSearches()
   const { toggle: togglePlace } = usePinned()
   const changeLog = useChangeLog()
+  // A phone's header says which tab this is (the user, Nov 16).
+  useSetTabHeader(useTabLabel('you', 'You'))
 
   // When You was last opened here, read once as the page opens; then now is
   // written as the new last look, so the dots are this visit's only.
@@ -115,9 +119,11 @@ export default function YouScreen() {
       {/* Board W11 (the user, Nov 15): a computer's top is the category
           pages' photo with the title on it; a phone keeps its own title. */}
       <PhotoHeader eyebrow={eyebrow} title="You" searchOnPhoto>
-        <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:hidden">You</h1>
+        {/* A phone's title is the header's (useSetTabHeader); this h1 is
+            for a screen reader. A computer's is the photo's. */}
+        <h1 className="sr-only desktop:hidden">You</h1>
 
-        <div data-testid="you-search" className="mt-4 desktop:mt-0 desktop:mb-9 desktop:max-w-[520px]">
+        <div data-testid="you-search" className="desktop:mt-0 desktop:mb-9 desktop:max-w-[520px]">
           <SearchBox
             look="box"
             onPhoto
