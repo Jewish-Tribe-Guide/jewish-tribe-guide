@@ -377,7 +377,13 @@ With no choice made it's the first two categories with hours, as before
     Philadelphia. **Not fixed, seen in that log:** the test project's
     moderation queue read failed once with "Failed to load current rows:
     Bad Request" (`submissionStore.ts`); the suite still passed, cause
-    not looked into.
+    not looked into (the test project has no pending suggestion pointing
+    at a place, so it isn't leftover data).
+  - **Fixed Nov 16: Delete this page could undo itself** (CI on PR 387).
+    Going back to a category page you had open before a save brought back
+    its old screen (Next keeps it, hidden), and when the list arrived it
+    started the page over, throwing away a Delete already asked (or
+    anything begun). It now takes the newest list before it draws.
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's
