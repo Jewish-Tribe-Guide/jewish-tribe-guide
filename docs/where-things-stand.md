@@ -134,9 +134,21 @@ are unbalanced; about 6–7 min looks reachable.
   the click, while the cache job (a separate CI job, same test project)
   was renaming that fixture. 21/21 locally on a real category. The e2e
   pickers in helpers.ts now skip other suites' fixtures
-  (writtenByOtherSuites). A lead, not proven: closing a listing opened
+  (now changedByTests). A lead, not proven: closing a listing opened
   from its own link changes the address with history.replaceState,
   which a later Next update can overwrite (AGENTS.md's rule).
+- Done Nov 16 (the user: "Yes, fix it here"): the suites that share the
+  test project no longer pick each other's rows. `e2e/suiteRows.ts`
+  lists every existing row each suite changes (cache: its seed category,
+  the About page, Philly's site settings; admin-write: `e2e-…` pages,
+  Privacy, Philly's team list, a watch job). `categories()` in the e2e
+  helpers skips them, and so do the eight pickers that read the list
+  themselves. `src/test/suiteRows.test.ts` fails on a write to a row its
+  suite hasn't claimed, a row two suites claim, or a pick that doesn't
+  skip them (8 picks flagged against the old code). Still open: two CI
+  runs from different branches at once each run the same suite, and
+  rename the same fixture over each other. Not seen yet; one branch at a
+  time is the usual case.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them

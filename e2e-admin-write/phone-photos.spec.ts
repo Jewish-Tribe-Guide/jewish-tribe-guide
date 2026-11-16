@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { changedByTests } from '../e2e/suiteRows'
 
 // The user, Nov 15: "Campaign and banner photo don't seem to appear great on
 // mobile for admin". On a 390px phone the campaign's Ends date ran off its
@@ -37,7 +38,7 @@ test('a new campaign fits a phone, with the banner shown as it will look', async
 
 test('a category’s banner photo keeps its buttons on the phone’s screen', async ({ page, request }) => {
   const body = await (await request.get('/api/categories?community=philly')).json()
-  const category = (body.categories as { id: string; kind?: string }[]).find((c) => !c.kind || c.kind === 'listing')
+  const category = (body.categories as { id: string; kind?: string }[]).find((c) => (!c.kind || c.kind === 'listing') && !changedByTests(c))
   expect(category, 'no listing category in the test project').toBeTruthy()
   await page.goto(`/philly/admin/categories/${encodeURIComponent(category!.id)}`)
   const visible = page.locator(':visible')
