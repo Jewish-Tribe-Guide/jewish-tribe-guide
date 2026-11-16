@@ -210,6 +210,11 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   expect((await supabase.from('menu_reading').select('status').eq('resource_id', id).single()).data?.status).toBe('approved')
 })
 
+// A click's save reaching the database, polled from outside: 15s, as
+// moderation's saves (PR 390's CI, Nov 16: the menu link hadn't landed at
+// expect.poll's 5s on a slow runner).
+const SAVED = { timeout: 15_000 }
+
 // A place whose menu couldn't be read: not checked, and "Stop reading it"
 // (Nov 4: not "No menu online") kept and undone (Read it again); then its menu link given, saved on the
 // listing even when the reader can't open it (a .invalid address never
@@ -240,7 +245,7 @@ test('a menu that can’t be read: Stop reading it, read again, then its menu li
 
   const reading = async () => (await supabase.from('menu_reading').select('status, note, decided_by').eq('resource_id', id).maybeSingle()).data
   await problem.getByRole('button', { name: 'Stop reading it' }).click()
-  await expect.poll(async () => (await reading())?.note).toBe('Can’t be read')
+  await expect.poll(async () => (await reading())?.note, SAVED).toBe('Can’t be read')
   expect((await reading())?.decided_by).toBeTruthy()
 
   // Kept: after a reload it isn't read, and Read it again undoes it.
@@ -248,7 +253,7 @@ test('a menu that can’t be read: Stop reading it, read again, then its menu li
   const notRead = off.getByRole('region', { name: 'Not read' })
   await expect(notRead).toContainText('Not read · its menu')
   await notRead.getByRole('button', { name: 'Read it again' }).click()
-  await expect.poll(reading).toBeNull()
+  await expect.poll(reading, SAVED).toBeNull()
 
   // Fail it again for the link.
   await supabase.from('menu_reading').insert({ community_id: 'philly', resource_id: id, status: 'failed', source_url: null, note: 'Couldn’t read a menu on its website.', dishes: [] })
@@ -257,6 +262,6 @@ test('a menu that can’t be read: Stop reading it, read again, then its menu li
   await again.getByLabel('Its menu page').fill('menu.example.invalid/our-menu')
   await again.getByRole('button', { name: 'Use this' }).click()
   const details = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
-  await expect.poll(async () => (await details()).menuUrl).toBe('https://menu.example.invalid/our-menu')
+  await expect.poll(async () => (await details()).menuUrl, SAVED).toBe('https://menu.example.invalid/our-menu')
   expect((await details()).website).toBe('https://menu.example.invalid')
 })

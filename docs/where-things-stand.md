@@ -149,6 +149,10 @@ are unbalanced; about 6–7 min looks reachable.
   runs from different branches at once each run the same suite, and
   rename the same fixture over each other. Not seen yet; one branch at a
   time is the usual case.
+- CI, Nov 16 (PR 390): job-off and main-dishes failed on 5s waits right
+  after a save, on a slow runner (admin-write 4.0 min vs 2.6 locally).
+  Watches also draws its last-seen list first and reads it again, so Links
+  was still listed. Both waits are 15s now, as moderation's.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them
