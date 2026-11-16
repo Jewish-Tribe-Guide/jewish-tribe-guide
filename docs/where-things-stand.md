@@ -60,8 +60,9 @@ are unbalanced; about 6–7 min looks reachable.
   ran it and set the photo, then it was copied to production's own storage
   (it pointed at dev's). The live home shows the copy once its cache
   refreshes (any Site tab save does it).
-- Open: About and Privacy's new text is on dev only; the layout is live.
-  Copying the text to live needs the user's go-ahead.
+- Done: About and Privacy's new text copied from dev to live (the user's
+  yes, Nov 16), refreshed by a Pages tab save; the live home shows the map
+  photo from production's storage since the same save.
 - Open: Activity says "Mei Shalva updated" for a visitor's edit to its
   Keilim notes, which reads as "updated by Mei Shalva". Wording is the
   user's call.
