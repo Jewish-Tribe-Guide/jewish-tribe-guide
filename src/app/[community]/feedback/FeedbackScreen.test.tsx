@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import FeedbackScreen from './FeedbackScreen'
-import PageDocument from '@/components/PageDocument'
+import AboutDocument from '@/components/pages/AboutDocument'
 import { PAGE_TITLE_DESKTOP } from '@/lib/pageColumn'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -73,7 +73,7 @@ describe('FeedbackScreen — the same box as About and Privacy', () => {
     const { container } = renderScreen(true)
     const feedbackMain = container.querySelector('main')!
     cleanup()
-    const page = renderWithProviders(<ScreenHeaderProvider><PageDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
+    const page = renderWithProviders(<ScreenHeaderProvider><AboutDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
     const pageMain = page.container.querySelector('main')!
 
     expect(widthClasses(feedbackMain)).toEqual(widthClasses(pageMain))
@@ -110,7 +110,7 @@ describe('FeedbackScreen — on a desktop it is a page', () => {
     const feedbackMain = container.querySelector('main')!
     const feedbackTitle = screen.getByRole('heading', { level: 1 })
     cleanup()
-    const page = renderWithProviders(<ScreenHeaderProvider><PageDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
+    const page = renderWithProviders(<ScreenHeaderProvider><AboutDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
     const pageMain = page.container.querySelector('main')!
 
     expect(widthClasses(feedbackMain)).toEqual(widthClasses(pageMain))

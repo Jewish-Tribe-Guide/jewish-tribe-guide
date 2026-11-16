@@ -275,21 +275,33 @@ With no choice made it's the first two categories with hours, as before
       unchanged, and Feedback stays plain.
     - **Not drawn, not built:** a "Recent changes" box on each listing
       (raised Nov 15, undecided).
-  - **About and Privacy: a white box per section on a computer too**
-    (the user, Nov 15: "so it doesn't look like one boring essay"). BUILT:
-    the phone's per-heading boxes now draw on every screen. The live text
-    barely splits yet, so it **waits on two content changes, each needing
-    the user's go-ahead, after this deploys:**
-    - Privacy: its 19 section titles are underlined paragraphs, not
-      headings. `scripts/promote-page-headings.mjs --prod` (now dropping
-      the underline) promotes all 19; the dry run lists them. Not run.
-    - About: no headings. The drafted ones, "How it stays current" before
-      "The Guide is built to stay current…" and "A community effort"
-      before "The goal is simple…", are new words, so they go in through
-      the Pages tab (the user's, or mine on a yes). Not written.
-    - **On the dev database for the preview (Nov 15):** both drafts, made
-      from the live text, so the preview shows what live would get. Dev's
-      old copies are backed up in the session scratchpad. Live untouched.
+  - **About and Privacy, rewritten and redrawn (Nov 15)**, from the
+    review page "About and Privacy" (artifact 8XRGFGqR1HXc9MWeJajwwj, v6:
+    About v2 and Privacy and terms, both approved: "let's build this").
+    BUILT. This replaces the "white box per section" pass and its two
+    pending content changes (`promote-page-headings.mjs` is no longer
+    needed: the new text has real headings).
+    - The text stays admin-edited in the Pages tab. The layout comes from
+      its shape (`src/lib/pageSections.ts`): the text before the first
+      heading is the lead, each heading is a section, and a list whose
+      every item opens in bold becomes named points with an icon matched
+      from their words.
+    - About: the count and title on the photo, the mission large, The
+      problem beside What the guide does, Who it's for and What sets it
+      apart as cards (one box of rows on a phone), Who runs it beside Ways
+      to help (Tell us; Help run the guide and Start a guide for your
+      community email the address the text gives).
+    - Privacy: the short version as icon rows, then the details. On a
+      computer a contents list beside them marks the one being read; on a
+      phone they are rows that open one at a time.
+    - **On the dev database for the preview.** Live still has the old
+      text, which renders as a lead with no sections (readable, plain).
+      **Writing the new text to live needs the user's go-ahead, after this
+      deploys.**
+    - **Open questions for the user:** does PostHog record visit replays
+      (the text says it does, with typing hidden)? And is one contact
+      email right for every community (the page rows are shared by all
+      communities, and the email is Philly's)?
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's

@@ -107,7 +107,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
       // The page's own <main> sets the gutter and the width (PAGE_COLUMN,
       // shared with About/Privacy), so the card just fills it — it used to
       // add a second px-4 of its own and stop at 448px. On a desktop it's the
-      // pages' card too: the same corners and padding as PageDocument's.
+      // pages' card too: the same corners and padding as the About and Privacy boxes.
       return (
         <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm desktop:rounded-lg desktop:p-10">{children}</div>
       )

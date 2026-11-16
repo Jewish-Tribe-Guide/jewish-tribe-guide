@@ -1,4 +1,6 @@
-import PageDocument from '@/components/PageDocument'
+import AboutDocument from '@/components/pages/AboutDocument'
+import { listCategories } from '@/lib/categoryStore'
+import { listApprovedResources } from '@/lib/resourceStore'
 import type { Metadata } from 'next'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
@@ -6,6 +8,7 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 import { getPage } from '@/lib/pagesStore'
+import { aboutCount } from '@/lib/pageSections'
 
 // Self-referencing canonical — see [community]/page.tsx's comment on why
 // every screen under [community] needs one.
@@ -26,21 +29,21 @@ export async function generateMetadata(props: PageProps<'/[community]/about'>): 
   }
 }
 
-// Community-scoped route (used to be a plain top-level /about, outside
-// [community] entirely) purely for the chrome that comes with living under
-// [community]/layout.tsx: this page rendered with no SiteHeader and no
-// SiteFooter at all before, since that's the one thing the old location
-// opted out of. The CONTENT stays exactly what it was — one shared `page`
-// row across every community (getPage takes no community argument; see
-// pagesStore.ts) — a visitor reaches this page FROM some specific
-// community's own screens, so it's that community's header/footer they see
-// around the same shared copy, not a second "which community is this"
-// decision. Content is admin-editable (see /admin's Pages tab); this
-// component only renders it, and PageDocument (shared with /privacy) owns the
-// layout — including why a phone shows each section in its own box.
-export default async function AboutPage() {
-  const page = await getPage('about')
-  const title = page?.title ?? 'About'
+// Community-scoped route (it used to be a plain top-level /about): it lives
+// under [community]/layout.tsx for that community's header and footer. The
+// TEXT is one shared `page` row across every community (getPage takes no
+// community argument; see pagesStore.ts), edited in /admin's Pages tab, so it
+// is written to fit any community. The count above the title is this
+// community's own. AboutDocument owns the layout (board "About v2", Nov 15).
+export default async function AboutPage(props: PageProps<'/[community]/about'>) {
+  const { community } = await props.params
+  const [page, categories, listings] = await Promise.all([
+    getPage('about'),
+    listCategories(community).catch(() => []),
+    listApprovedResources(community).catch(() => []),
+  ])
+  const shown = new Set(categories.map((c) => c.id))
+  const eyebrow = aboutCount(listings.filter((l) => shown.has(l.category)).length, shown.size)
 
-  return <PageDocument title={title} body={page?.body} />
+  return <AboutDocument title={page?.title ?? 'About'} eyebrow={eyebrow} body={page?.body} />
 }

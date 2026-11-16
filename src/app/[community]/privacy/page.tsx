@@ -1,4 +1,4 @@
-import PageDocument from '@/components/PageDocument'
+import PrivacyDocument from '@/components/pages/PrivacyDocument'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { listCommunities } from '@/lib/communityStore'
@@ -28,7 +28,8 @@ export async function generateMetadata(props: PageProps<'/[community]/privacy'>)
 // Community-scoped route (used to be a plain top-level /privacy, outside
 // [community] entirely) purely for the chrome that comes with living under
 // [community]/layout.tsx — see AboutPage's own doc for the full reasoning,
-// identical here. The CONTENT stays one shared `page` row across every
+// identical here. PrivacyDocument owns the layout (board "Privacy and
+// terms", Nov 15). The CONTENT stays one shared `page` row across every
 // community (getPage takes no community argument).
 //
 // The closing "questions about this policy — email us" paragraph used to be
@@ -58,5 +59,5 @@ export default async function PrivacyPage() {
       })
     : null
 
-  return <PageDocument title={title} subtitle={lastUpdated && `Last updated: ${lastUpdated}`} body={page?.body} />
+  return <PrivacyDocument title={title} updated={lastUpdated && `Updated ${lastUpdated}`} body={page?.body} />
 }
