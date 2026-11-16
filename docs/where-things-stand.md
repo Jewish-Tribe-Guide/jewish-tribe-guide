@@ -316,14 +316,13 @@ With no choice made it's the first two categories with hours, as before
     Feedback; the user: "Yes, build it"). BUILT.
     - "Know something we don't?" first, About's card word for word, which
       opens the + Add box. On a phone it sits above the form; on a computer
-      to its right, under "About a place". In the footer's dialog the
-      dialog steps aside while the box is up, and closing the box closes
-      Feedback (`src/components/pages/TellUsCard.tsx`).
+      to its right, under "About a place"
+      (`src/components/pages/TellUsCard.tsx`).
     - The form: "Your note" and "Email, for a reply", no "(optional …)"
       and no star; 16px fields; a tall Send with an icon, pale until
       there's a note; "Read by the people who run the guide. Privacy".
       After sending, a check, "Thanks, it's sent", the admin's thank-you
-      words and Send another (Close in the dialog).
+      words and Send another.
     - **A change to an earlier decision:** Feedback kept plain on a
       computer (Nov 15). It now has the photo header, like About.
     - The computer page's "Rather email?" card gives the address About's
@@ -344,6 +343,20 @@ With no choice made it's the first two categories with hours, as before
       leftover `?about=` prefill is removed. Bringing a + Add button back
       to the nothing-found card would undo the Oct 10 decision; **decided
       Nov 16: leave it** ("Ask in a WhatsApp group" stays the only action).
+    - **Feedback is a page on a computer too (the user, Nov 16: "let's do
+      full page").** A change to an earlier decision: the footer's "Send a
+      note" and the header's Feedback opened a dialog over the page being
+      read; both now link to `/[community]/feedback`, the same page a phone
+      has, so Back and a reload work and there's one form, not two. Before
+      this, no visible link on a computer reached the page at all. The
+      dialog and its drawn one-surface redesign (board, Nov 16) are gone.
+      A note still doesn't record which page it was written on; adding that
+      was offered, not asked for.
+  - **Fixed Nov 16: "Kept up by the community" said twice on the computer
+    home** (the user). The trust band near the top says it; the "Know a
+    place we're missing?" card at the bottom had it as its eyebrow too. The
+    card leaves it off on the home and keeps it on What changed's side
+    card, where there's no band.
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's
@@ -951,6 +964,9 @@ The user's answers on Nov 10, evening, and what was done with them:
   shown once, "Not listed? Fill it in yourself" as its last row), and a
   pasted post turning the same box into the reader with "See what
   changes". Both rows wait on the user.
+- **Later (the user, Nov 16): + Add might start by hand, with AI as the
+  option**, the opposite of today. Not now ("that's for later"); nothing
+  drawn or built.
 - **The Add box's steps are in the address, and its first link is "Find
   the place"** (the user's yes, Nov 10). Each step of the + Add box is an
   entry in the browser's history (`?box=find`, `?box=find/add`, then the

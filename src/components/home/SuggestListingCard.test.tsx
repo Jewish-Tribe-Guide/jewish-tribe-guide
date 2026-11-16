@@ -30,6 +30,18 @@ describe('SuggestListingCard', () => {
     expect(screen.getByTestId('home-suggest').querySelector('img')).toBeNull()
   })
 
+  // The computer home's trust band already says "Kept up by the community"
+  // near the top; the card at the bottom said it again (the user, Nov 16).
+  it('leaves "Kept up by the community" to the trust band on the home', () => {
+    renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    expect(screen.queryByText('Kept up by the community')).not.toBeInTheDocument()
+  })
+
+  it('keeps the eyebrow where it is asked for (What changed’s side card)', () => {
+    renderWithProviders(<SuggestListingCard line={false} eyebrow />, { content: { categories: [makeCategory()] } })
+    expect(screen.getByText('Kept up by the community')).toBeInTheDocument()
+  })
+
   it('opens ContributePicker on "Suggest a listing"', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
