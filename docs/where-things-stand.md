@@ -337,9 +337,13 @@ With no choice made it's the first two categories with hours, as before
       updated (Nov 16); 099's column defaults not run on dev; nothing run
       on live — live still says "Send feedback" until 099 runs there,
       which needs the user's go-ahead.**
-    - **Still the user's call:** "Add it to the guide" (a search that
-      found nothing) still opens Feedback with the search written in; the
-      board asked whether it should open the + Add box instead.
+    - **"Add it to the guide" (the user, Nov 16: open + Add, not
+      Feedback).** Checking found the board's question was out of date: no
+      search has linked to Feedback since Oct 10 (3fe02e6d left "Ask in a
+      WhatsApp group" as the nothing-found card's only action). Feedback's
+      leftover `?about=` prefill is removed. Bringing a + Add button back
+      to the nothing-found card would undo the Oct 10 decision, so it
+      waits for the user to say so.
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's

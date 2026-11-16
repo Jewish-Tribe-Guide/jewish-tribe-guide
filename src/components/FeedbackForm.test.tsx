@@ -133,19 +133,13 @@ describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
   })
 })
 
-// "Add it to the guide", from a search that found nothing, arrives with the
-// question in the link: it's already written in.
-describe('FeedbackForm — arriving from a search that found nothing', () => {
-  it('starts with the question written in', async () => {
+// Feedback took "?about=" from a search that found nothing until Oct 10,
+// when that link left the search. Where a place is missing, the + Add box
+// is the way in (the user, Nov 16), so Feedback no longer writes it in.
+describe('FeedbackForm — a stale "?about=" link', () => {
+  it('starts empty all the same', async () => {
     window.history.replaceState(null, '', '/philly/feedback?about=frozen%20gefilte%20fish')
-    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
-    expect(await screen.findByDisplayValue('“frozen gefilte fish” isn’t in the guide. You can find it at:', { exact: false })).toBeInTheDocument()
-    window.history.replaceState(null, '', '/')
-  })
-
-  it('starts empty otherwise', async () => {
-    window.history.replaceState(null, '', '/philly/feedback')
-    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
     expect(await screen.findByRole('textbox', { name: 'Your note' })).toHaveValue('')
     window.history.replaceState(null, '', '/')
   })
