@@ -53,6 +53,11 @@ async function openMoreDetails(page: import('@playwright/test').Page) {
   await visible(page, page.getByRole('button', { name: /show more details/i })).click()
 }
 
+// Create, then a full load of the new console. 7–8.5s for the whole delete
+// test locally, and the create step alone overran 10s on a CI runner (PR 387,
+// Nov 16; main on Nov 14 too).
+const CREATED = 30_000
+
 test('creating a community through the real UI, starting empty, makes it live with no redeploy', async ({ page, request }) => {
   const slug = `e2e-fresh-${randomUUID().slice(0, 8)}`
   pendingSlugs.push(slug)
@@ -75,7 +80,7 @@ test('creating a community through the real UI, starting empty, makes it live wi
   await visible(page, page.getByRole('button', { name: 'Create community' })).click()
 
   // Successful creation redirects into the new community's own admin console.
-  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: 10_000 })
+  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: CREATED })
 
   const supabase = getAdminClient()
   const { data: created } = await supabase.from('community').select('slug, name, admin_emails').eq('slug', slug).maybeSingle()
@@ -141,7 +146,7 @@ test('cloning from an existing community carries its categories over', async ({ 
   await page.getByLabel('Map center latitude').fill('39.95')
   await page.getByLabel('Map center longitude').fill('-75.16')
   await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-  await expect(page).toHaveURL(new RegExp(`/${sourceSlug}/admin$`), { timeout: 10_000 })
+  await expect(page).toHaveURL(new RegExp(`/${sourceSlug}/admin$`), { timeout: CREATED })
 
   // One category, seeded directly — cloneCommunityContent reads categories
   // with an uncached query, so this needs no cache-busting of its own.
@@ -187,7 +192,7 @@ test('cloning from an existing community carries its categories over', async ({ 
   await page.getByLabel('Starting content').selectOption({ label: `Clone from ${sourceName}` })
 
   await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-  await expect(page).toHaveURL(new RegExp(`/${targetSlug}/admin$`), { timeout: 10_000 })
+  await expect(page).toHaveURL(new RegExp(`/${targetSlug}/admin$`), { timeout: CREATED })
 
   const { data: clonedCategory } = await supabase
     .from('category')
@@ -221,7 +226,7 @@ test('deleting a community through the real UI removes it and everything in it',
   await page.getByLabel('Map center latitude').fill('39.95')
   await page.getByLabel('Map center longitude').fill('-75.16')
   await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: 10_000 })
+  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: CREATED })
 
   // A category + listing, added directly — there's something real to prove
   // gets swept along with the community, beyond what the creation flow

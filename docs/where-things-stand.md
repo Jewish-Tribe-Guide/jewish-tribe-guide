@@ -369,6 +369,15 @@ With no choice made it's the first two categories with hours, as before
     its home tile's photo beside it, 40px, the same picture the tile uses
     (so Food's banner picture too), or the tile's plain tint where a
     category has none. Still no icons or emoji.
+  - **Fixed Nov 16: a new community's site could 404 at first** (CI on
+    PR 387). Creating one marked the community list stale, so the first
+    load of its address could read the old list. It's now expired outright
+    on create. Same CI run: two admin-write tests waited too little on a
+    slow runner, and RightNow's tests assumed the machine was in
+    Philadelphia. **Not fixed, seen in that log:** the test project's
+    moderation queue read failed once with "Failed to load current rows:
+    Bad Request" (`submissionStore.ts`); the suite still passed, cause
+    not looked into.
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's

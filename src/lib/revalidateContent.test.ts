@@ -73,6 +73,19 @@ describe('revalidatePublicContent', () => {
     }
   })
 
+  // A new community's address read the stale list and 404'd until a
+  // background refresh landed (community-editor.spec.ts in CI, PR 387).
+  it('expires the community list outright when a community was just added', async () => {
+    listCommunities.mockResolvedValue([community('philly')])
+
+    await revalidatePublicContent({ newCommunity: true })
+
+    expect(revalidateTag).toHaveBeenCalledWith(TAGS.communities, { expire: 0 })
+    for (const [tag, profile] of revalidateTag.mock.calls) {
+      if (tag !== TAGS.communities) expect(profile).toBe('max')
+    }
+  })
+
   it('invalidates the community list itself, not just the content inside it', async () => {
     listCommunities.mockResolvedValue([community('philly')])
 
@@ -167,5 +180,14 @@ describe('who may call revalidatePublicContent', () => {
       (f) => !/^src\/app\/api\/(admin|cron)\//.test(f),
     )
     expect(others, 'a public route calling this holds a function open for every visitor request').toEqual([])
+  })
+})
+
+describe('creating a community', () => {
+  // The route is the only caller that adds a community; without the flag its
+  // page reads the stale list and 404s for the first visitor.
+  it('expires the community list outright, so the new address works at once', () => {
+    const src = readFileSync('src/app/api/admin/communities/route.ts', 'utf-8')
+    expect(src).toContain('revalidatePublicContent({ newCommunity: true })')
   })
 })

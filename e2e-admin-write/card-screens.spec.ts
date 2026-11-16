@@ -15,7 +15,10 @@ test('Right now’s screen: Back returns to the boxes, Forward and a reload reop
 
   const screenOf = page.getByTestId('right-now-screen')
   await expect(screenOf).toBeVisible()
-  await expect(page).toHaveURL(/\/philly\/admin\/home\?card=rightNow$/)
+  // router.push writes the address once the server's answer lands. This file
+  // sorts first, so in CI that is a cold server's first admin navigation:
+  // over 5s on PR 387 (Nov 16), with the screen already showing.
+  await expect(page).toHaveURL(/\/philly\/admin\/home\?card=rightNow$/, { timeout: 20_000 })
   // What can answer, once the categories have loaded.
   await expect(screenOf.getByRole('checkbox').first()).toBeVisible({ timeout: 20_000 })
 

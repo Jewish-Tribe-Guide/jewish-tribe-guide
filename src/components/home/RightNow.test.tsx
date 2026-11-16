@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -101,6 +101,19 @@ const eruvim = [
   { id: 'cc', name: 'Center City Eruv', hotline: null, statusUrl: 'https://example.org/', statusDated: false, status: 'up', statusWords: 'Up', statusPostedOn: null, statusCheckedAt: '2026-10-16T17:25:00Z', statusErrorAt: null, statusError: null },
   { id: 'ne', name: 'Northeast Eruv', hotline: '(215) 333-ERUV', statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null },
 ]
+// A shop's hours read the visitor's own clock (hours.ts, on purpose), and
+// every time here is a Philadelphia one, so the visitor is in Philadelphia.
+// Unpinned, CI's UTC clock made Tuesday 11:30 PM into Wednesday 3:30 AM and
+// the overnight row said "Opens 9 AM" instead of "Opens Wed 9 AM" (CI on
+// PR 387, Nov 16); in Tokyo five tests failed.
+const machineTZ = process.env.TZ
+beforeAll(() => {
+  process.env.TZ = NY
+})
+afterAll(() => {
+  process.env.TZ = machineTZ
+})
+
 beforeEach(() => {
   clearEruvStatuses()
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, available: true, timezone: NY, candles: null, eruvim }))))
