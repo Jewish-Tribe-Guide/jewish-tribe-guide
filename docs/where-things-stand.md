@@ -78,9 +78,8 @@ are unbalanced; about 6–7 min looks reachable.
   admin save, approval and nightly job moves on and every server reads
   fresh. A page still behind after a refresh gets at most two tries per
   change, and the refresh waits until the visitor has been still 1.5s
-  (RefreshContentOnReturn). **Migration 100 is not run anywhere yet**
-  (dev, then live with the user's yes); until it is, the check falls back
-  to the old fingerprint. Visitors' one-tap confirmations don't move the
+  (RefreshContentOnReturn). Migration 100 is run on dev and live (the
+  user, Nov 16). Visitors' one-tap confirmations don't move the
   stamp (they only change "checked" dates). Not covered: a
   phone that throws the page away in the background reloads it, and taps
   do nothing until it has loaded; not measured.
@@ -88,6 +87,10 @@ are unbalanced; about 6–7 min looks reachable.
   live; copied to production's (the user's yes, Nov 16). Live has no eruv
   photo pointing at dev. Dev alone has photos for Eruv, Hospitals,
   Childcare and Schools (iStock links) and Hotels; not copied.
+- Fixed: a search for a name several places share ("Rita's", five of
+  them) listed three in alphabetical-tie order, the 1.2 mi one last and
+  the 0.8 mi one not at all. Equal matches now come nearest first
+  (`namedListings`, from the visitor or the community's centre).
 - Open question, not a decision: should a visitor order their You page?
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header

@@ -10,6 +10,8 @@ import { listingSlug } from '@/lib/listingSlug'
 import { minyanimPage } from '@/lib/davening'
 import { fixedViewSlug, routes } from '@/lib/routes'
 import type { Reading } from '@/lib/questionReader'
+import { haversineMiles } from '@/lib/geo'
+import type { LatLng } from '@/lib/googleMapsLinks'
 
 // ── Search takes you to the page (Oct 13) ─────────────────────────────────────
 // The home search used to answer in place: a sentence, places and categories
@@ -296,6 +298,9 @@ export type LinesContext = {
   /** The home's other cards whose words match (see cardSearch.ts): Patient
    *  & Family Support, the Map, a form. */
   cards?: readonly { id?: string; title: string; href?: string | null; description?: string }[]
+  /** Where distances are from (the visitor, else the community's centre):
+   *  places matching a name equally well come nearest first. */
+  near?: LatLng | null
   /** How a listing line says where it is and whether it's open. */
   placeSub?: (item: DirectoryResource, category: CategoryConfig) => string
   /** The eruvim and their live statuses (/api/eruv), for a question about
@@ -325,7 +330,10 @@ const fold = (s: string) => s.toLowerCase().replace(/['’]/g, '').trim()
 /** Listings named by what was typed: by the whole of it ("maxx") or every
  *  word starting one of the name's ("trader jo"). Names starting with it
  *  first. */
-export function namedListings(listings: readonly DirectoryResource[], raw: string): DirectoryResource[] {
+/** Places whose names the words match, best match first. Among equally good
+ *  matches the nearest to `near` comes first: five Rita's match "rita's"
+ *  alike, and the one a mile away belongs above the one eleven away. */
+export function namedListings(listings: readonly DirectoryResource[], raw: string, near: LatLng | null = null): DirectoryResource[] {
   const typed = fold(raw)
   if (typed.length < 2) return []
   const typedWords = words(raw)
@@ -337,7 +345,8 @@ export function namedListings(listings: readonly DirectoryResource[], raw: strin
       return { l, rank }
     })
     .filter((x) => x.rank >= 0)
-  return scored.sort((a, b) => a.rank - b.rank || a.l.name.localeCompare(b.l.name)).map((x) => x.l)
+    .map((x) => ({ ...x, miles: near && x.l.geo ? haversineMiles(near, x.l.geo) : Infinity }))
+  return scored.sort((a, b) => a.rank - b.rank || a.miles - b.miles || a.l.name.localeCompare(b.l.name)).map((x) => x.l)
 }
 
 export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
@@ -395,7 +404,7 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
   }
 
   // Places by name.
-  const named = namedListings(listings, q).slice(0, 3)
+  const named = namedListings(listings, q, ctx.near ?? null).slice(0, 3)
   const placeLines: SearchLine[] = named.flatMap((l) => {
     const category = categories.find((c) => c.id === l.category)
     if (!category) return []

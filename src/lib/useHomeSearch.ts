@@ -107,6 +107,7 @@ export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: 
           timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
           cards,
           placeSub,
+          near: coords ?? community.mapCenter,
           eruvim: eruvStatuses?.available ? eruvStatuses : null,
         })
       : []

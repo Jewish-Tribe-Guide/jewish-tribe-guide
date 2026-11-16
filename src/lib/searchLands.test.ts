@@ -57,6 +57,21 @@ describe('searchLines — where Enter goes', () => {
     expect(lines('maxx')).toHaveLength(1)
   })
 
+  // Nov 16: five Rita's, and the one 1.2 mi away came last, two others
+  // never shown (alphabetical, among names that match alike).
+  it('places matching a name alike come nearest first, and the nearest three are the ones shown', () => {
+    const at = (lat: number) => ({ lat, lng: -75.15 })
+    const ritas = [11, 9, 1, 5, 14].map((mi, i) =>
+      makeListing({ id: `r${i}`, category: 'restaurant', name: 'Rita’s Italian Ice', address: `${mi} mi`, geo: at(39.95 + mi / 69) }),
+    )
+    const all = [...listings, ...ritas]
+    const options = { now: NOW }
+    const shown = searchLines('rita’s', { slug: 'philly', categories, listings: all, result: searchAsk(all, categories, 'rita’s', options), options, near: at(39.95) })
+      .filter((l) => l.kind === 'listing')
+      .map((l) => l.listing?.address)
+    expect(shown).toEqual(['1 mi', '5 mi', '9 mi'])
+  })
+
   it('a kind of place with conditions: that page, the words in its box, the count it will show (board 3)', () => {
     expect(brief('grocery with challah open now')).toEqual(['Grocery · 2 open now with Challah → /philly/grocery?q=challah+open+now'])
   })
