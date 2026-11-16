@@ -298,10 +298,14 @@ With no choice made it's the first two categories with hours, as before
       text, which renders as a lead with no sections (readable, plain).
       **Writing the new text to live needs the user's go-ahead, after this
       deploys.**
-    - **Open questions for the user:** does PostHog record visit replays
-      (the text says it does, with typing hidden)? And is one contact
-      email right for every community (the page rows are shared by all
-      communities, and the email is Philly's)?
+    - **PostHog replays: the text no longer mentions them** (the user,
+      Nov 15: no replays). The code still records them whenever Session
+      Replay is on in PostHog's project settings
+      (`src/instrumentation-client.ts`), so that setting has to be off,
+      or the code switched off, for the text to be true. Not checked.
+    - **Open question for the user:** is one contact email right for
+      every community (the page rows are shared by all communities, and
+      the email is Philly's)?
   - **Fixed Nov 15: a solid circle under the selected map pin** (a
     visitor's phone, sent by the user). It was the pin's pulsing halo with
     Reduce Motion on: the site cuts animations short there, and the halo's
