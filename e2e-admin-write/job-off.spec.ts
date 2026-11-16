@@ -16,17 +16,14 @@ test('a job turned off leaves Watches, and comes back from Add a watch', async (
     await page.getByRole('button', { name: 'Turn it off' }).click()
 
     await expect(page).toHaveURL(/\/philly\/admin\/watches$/)
-    // Watches draws the list it last saw, then reads it again: a save and a
-    // full reload, not a redraw, so 15s as moderation's (PR 390's CI, Nov
-    // 16: still listed at expect's 5s on a slow runner).
-    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).toHaveCount(0, { timeout: 15_000 })
+    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).toHaveCount(0)
     await page.getByRole('link', { name: '+ Add a watch' }).click()
     await page.getByRole('button', { name: /^Links/ }).click()
 
     await expect(page).toHaveURL(/\/philly\/admin\/watches$/)
     // Back in its own section, and under Needs fixing too once its last run
     // is a week old, so either row will do.
-    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ }).first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ }).first()).toBeVisible()
   } finally {
     // The session's own cookie signs this request.
     const token = await page.evaluate(() => Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '')

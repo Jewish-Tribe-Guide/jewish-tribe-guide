@@ -149,10 +149,23 @@ are unbalanced; about 6–7 min looks reachable.
   runs from different branches at once each run the same suite, and
   rename the same fixture over each other. Not seen yet; one branch at a
   time is the usual case.
-- CI, Nov 16 (PR 390): job-off and main-dishes failed on 5s waits right
-  after a save, on a slow runner (admin-write 4.0 min vs 2.6 locally).
-  Watches also draws its last-seen list first and reads it again, so Links
-  was still listed. Both waits are 15s now, as moderation's.
+- Admin saves were slow, not the tests (Nov 16, the user: "if we just
+  keep relaxing rules what are we even testing"). The 15s waits put in
+  that morning are gone again; the tests are back on expect's 5s.
+  - Cause: every save on a place read all 13 watch jobs again and showed
+    "Saving…" until the last came back (4.4s for one menu Accept on a
+    laptop, over 5s in CI). Now a save waits only for the jobs its writes
+    reach (`jobsChangedBy`), and the rest are read behind it. Turning a
+    job off or on updates the remembered list at once (`noteJobSwitched`).
+  - Places opened with its own read queued behind those 13 (the browser
+    opens six connections to an HTTP/1.1 server, as in the tests). It now
+    reads the jobs after its list is in, as To do already did.
+  - Still open: a place's own screen (`PlacePage`) shows nothing until all
+    13 jobs are in, so opening one is still 2–3 round trips of reads, and
+    main-dishes' `openPlace` failed on it once in four full runs. The fix
+    is one read that returns every job at once. Moderation's 15s waits
+    (from Nov 3) are the approve request itself, about ten database round
+    trips in a row; left as they are.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them

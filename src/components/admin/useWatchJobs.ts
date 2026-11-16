@@ -95,6 +95,17 @@ export function coverageOf(jobs: Jobs): Map<string, PlaceCoverage> | null {
 
 const lastSeen = new Map<string, Jobs>()
 
+/** A job just turned off or on, as the server confirmed: what Watches
+ *  shows on its way there. It shows what it last saw, then reads again,
+ *  and the job's own read (runs) is the slowest of them, so it showed the
+ *  job as it was for seconds (PR 390's CI, Nov 16: Links still listed). */
+export function noteJobSwitched(community: string, kind: NightKindId, off: boolean) {
+  const seen = lastSeen.get(community)
+  if (!seen?.runs) return
+  const others = (seen.runs.off ?? []).filter((k) => k !== kind)
+  lastSeen.set(community, { ...seen, runs: { ...seen.runs, off: off ? [...others, kind] : others } })
+}
+
 /** For tests: start each one with nothing seen. */
 export function forgetWatchJobs() {
   lastSeen.clear()
@@ -117,37 +128,84 @@ export function loadDishes(token: string, community: string): Promise<Jobs['dish
 }
 
 /** Every job's places, each handed over as it comes in. */
-export async function loadJobs(token: string, community: string, fill: <K extends keyof Jobs>(key: K, value: Jobs[K]) => void, failed: (key: keyof Jobs) => void) {
-  const headers = { Authorization: `Bearer ${token}` }
-  const get = <T,>(path: string) => fetchJson<T>(withCommunity(path, community), { headers }, '').catch(() => null)
-  const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
-  await Promise.all([
-    get<{ categories: CategoryConfig[] }>('/api/admin/categories').then((d) => (d ? fill('categories', d.categories ?? null) : failed('categories'))),
-    get<{ places: Jobs['dishes'] }>('/api/admin/main-dishes').then((d) => (d ? fill('dishes', d.places ?? null) : failed('dishes'))),
-    get<{ hospitals: Hospital[] }>('/api/admin/watches/hospitals?counts').then((d) => (d ? fill('hospitals', d.hospitals ?? null) : failed('hospitals'))),
-    get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts').then((d) => (d ? fill('hours', job(d)) : failed('hours'))),
-    get<{ name: string; places: HoursPlace[] }>('/api/admin/watches/hours?counts&job=times').then((d) => (d ? fill('times', job(d)) : failed('times'))),
-    get<{ places: Jobs['sites'] }>('/api/admin/watches/sites').then((d) => (d ? fill('sites', d.places ?? null) : failed('sites'))),
-    get<EruvJobLoaded>('/api/admin/watches/eruv').then((d) => (d ? fill('eruvim', d.available ? d : null) : failed('eruvim'))),
-    get<KosherLoaded>('/api/admin/watches/kosher').then((d) => (d ? fill('kosher', d.lists ? d : null) : failed('kosher'))),
-    get<{ counts: JobCounts; places: GooglePlace[] }>('/api/admin/watches/google').then((d) => (d ? fill('google', d.places ? d : null) : failed('google'))),
-    get<{ links: LinkStanding[] }>('/api/admin/watches/links').then((d) => (d ? fill('links', d.links ?? null) : failed('links'))),
-    get<NightlyRunsLoaded>('/api/admin/watches/runs').then((d) => (d ? fill('runs', d.kinds ? d : null) : failed('runs'))),
-    get<{ places: AdminPlace[] }>('/api/admin/listings').then((d) => (d ? fill('places', d.places ?? null) : failed('places'))),
-    get<LookAgainLoaded>('/api/admin/watches/look-again').then((d) => (d?.items ? fill('lookAgain', d) : failed('lookAgain'))),
-  ])
+type JobKey = keyof Jobs
+type Read = { path: string; take: (d: never) => unknown }
+const job = (j: { name: string; places: HoursPlace[] }): PagesJob => (j.places ? { name: j.name, places: j.places } : null)
+/** Each job's read, and what it keeps of the answer (null: couldn't). */
+const READS: { [K in JobKey]-?: { path: string; take: (d: never) => Jobs[K] | undefined } } = {
+  categories: { path: '/api/admin/categories', take: (d: { categories?: CategoryConfig[] }) => d.categories ?? null },
+  dishes: { path: '/api/admin/main-dishes', take: (d: { places?: Jobs['dishes'] }) => d.places ?? null },
+  hospitals: { path: '/api/admin/watches/hospitals?counts', take: (d: { hospitals?: Hospital[] }) => d.hospitals ?? null },
+  hours: { path: '/api/admin/watches/hours?counts', take: (d: { name: string; places: HoursPlace[] }) => job(d) },
+  times: { path: '/api/admin/watches/hours?counts&job=times', take: (d: { name: string; places: HoursPlace[] }) => job(d) },
+  sites: { path: '/api/admin/watches/sites', take: (d: { places?: Jobs['sites'] }) => d.places ?? null },
+  eruvim: { path: '/api/admin/watches/eruv', take: (d: EruvJobLoaded) => (d.available ? d : null) },
+  kosher: { path: '/api/admin/watches/kosher', take: (d: KosherLoaded) => (d.lists ? d : null) },
+  google: { path: '/api/admin/watches/google', take: (d: { counts: JobCounts; places: GooglePlace[] }) => (d.places ? d : null) },
+  links: { path: '/api/admin/watches/links', take: (d: { links?: LinkStanding[] }) => d.links ?? null },
+  runs: { path: '/api/admin/watches/runs', take: (d: NightlyRunsLoaded) => (d.kinds ? d : null) },
+  places: { path: '/api/admin/listings', take: (d: { places?: AdminPlace[] }) => d.places ?? null },
+  // No items: failed, not empty.
+  lookAgain: { path: '/api/admin/watches/look-again', take: (d: LookAgainLoaded) => (d.items ? d : undefined) },
+}
+export const ALL_JOBS = Object.keys(READS) as JobKey[]
+
+/** The jobs a write to `path` can change: what a save waits to see again
+ *  before it's done (the rest are read again behind it). Nothing known:
+ *  every job. */
+export function jobsChangedBy(path: string): JobKey[] {
+  const p = path.split('?')[0]
+  if (p.startsWith('/api/admin/main-dishes')) return ['dishes']
+  if (p.startsWith('/api/admin/watches/google')) return ['google', 'places']
+  if (p.startsWith('/api/admin/watches/hours')) return ['hours', 'times']
+  if (p.startsWith('/api/admin/watches/sites')) return ['sites']
+  if (p.startsWith('/api/admin/watches/links')) return ['links']
+  if (p.startsWith('/api/admin/watches/eruv')) return ['eruvim']
+  if (p.startsWith('/api/admin/watches/kosher')) return ['kosher']
+  if (p.startsWith('/api/admin/watches/hospitals')) return ['hospitals']
+  if (p.startsWith('/api/admin/watches/look-again')) return ['lookAgain']
+  if (p === '/api/admin/watches') return ['runs']
+  return ALL_JOBS
 }
 
-/** And `reload`, for a page that acts on a place: every job read again,
- *  done when they all are. */
-export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () => Promise<void> } {
+export async function loadJobs(token: string, community: string, fill: <K extends keyof Jobs>(key: K, value: Jobs[K]) => void, failed: (key: keyof Jobs) => void, keys: readonly JobKey[] = ALL_JOBS) {
+  const headers = { Authorization: `Bearer ${token}` }
+  await Promise.all(
+    keys.map(async <K extends JobKey>(key: K) => {
+      const read = READS[key] as Read
+      const d = await fetchJson<never>(withCommunity(read.path, community), { headers }, '').catch(() => null)
+      const value = d === null ? undefined : (read.take(d) as Jobs[K] | undefined)
+      if (value === undefined) failed(key)
+      else fill(key, value)
+    }),
+  )
+}
+
+/** And `reload`, for a page that acts on a place: every job read again.
+ *  Given the jobs a save changed, it is done once those are back, and only
+ *  then are the rest read, behind it. It used to wait for all thirteen,
+ *  read at once and slowing each other down: a click on Accept showed
+ *  "Saving…" for 4.4s on a laptop and over 5s in CI, where the admin
+ *  tests failed on it all of Nov 16 (PR 389, PR 390).
+ *
+ *  `ready`: false holds the first read back until the screen's own data is
+ *  in. Thirteen reads at once fill the browser's connections to the site
+ *  (six, over HTTP/1.1), and a screen's own read waited behind them: Places
+ *  still said Loading… after 5s in the admin tests (Nov 16). To do reads
+ *  its jobs after its own data the same way (useTodo's loadWaiting). */
+export function useWatchJobsAndReload(token: string, { ready = true }: { ready?: boolean } = {}): { jobs: Jobs; reload: (changed?: readonly JobKey[]) => Promise<void> } {
   const community = useCommunitySlug()
   const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community) ?? {})
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (given?: readonly JobKey[]) => {
+    // Passed as a callback too (`.then(reload)`, onTried): anything but a
+    // list of jobs is every job.
+    const changed = Array.isArray(given) ? given : ALL_JOBS
     const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => setJobs((j) => ({ ...j, [key]: value }))
     const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
-    await loadJobs(token, community, fill, failed)
+    await loadJobs(token, community, fill, failed, changed)
+    const rest = ALL_JOBS.filter((k) => !changed.includes(k))
+    if (rest.length) void loadJobs(token, community, fill, failed, rest)
   }, [token, community])
 
   useEffect(() => {
@@ -162,6 +220,6 @@ export function useWatchJobsAndReload(token: string): { jobs: Jobs; reload: () =
     return () => clearTimeout(t)
   }, [reading, jobs.dishes, token, community])
 
-  useLoadOnMount(load)
+  useLoadOnMount(useCallback(() => void (ready && load()), [load, ready]))
   return { jobs, reload: load }
 }
