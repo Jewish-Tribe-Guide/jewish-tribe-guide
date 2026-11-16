@@ -12,13 +12,16 @@ const PHOTO_HEADER_COLOR = '#334155'
  *  (board W11, the user, Nov 15): What changed, You, About and Privacy. The
  *  photo is the community's home photo; on it, a small count and the
  *  page's title. A computer only: on a phone this renders `children` alone,
- *  and the page keeps its own title. */
-export default function PhotoHeader({ eyebrow, title, children }: { eyebrow?: string | null; title: string; children: ReactNode }) {
+ *  and the page keeps its own title.
+ *
+ *  `searchOnPhoto`: the first thing a computer shows under it is a search,
+ *  which rides up onto the photo as a category page's does (You, Nov 16). */
+export default function PhotoHeader({ eyebrow, title, searchOnPhoto = false, children }: { eyebrow?: string | null; title: string; searchOnPhoto?: boolean; children: ReactNode }) {
   const settings = useSiteSettings()
   return (
-    <CategoryBandFrame color={PHOTO_HEADER_COLOR} imageUrl={settings.desktopHeroImage?.url ?? null} hero={<HeroTitle eyebrow={eyebrow} title={title} />}>
+    <CategoryBandFrame color={PHOTO_HEADER_COLOR} imageUrl={settings.desktopHeroImage?.url ?? null} hero={<HeroTitle eyebrow={eyebrow} title={title} />} heroOverlap={searchOnPhoto}>
       {/* As far under the photo as a category's list sits under its own. */}
-      <div aria-hidden="true" className="hidden h-8 desktop:block" />
+      {!searchOnPhoto && <div aria-hidden="true" className="hidden h-8 desktop:block" />}
       {children}
     </CategoryBandFrame>
   )

@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import SearchBox from '@/components/home/SearchBox'
+import SearchLines from '@/components/home/SearchLines'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
 import SaveButton from '@/components/SaveButton'
 import { BookmarkIcon } from '@/components/icons'
@@ -18,7 +21,7 @@ import { useChangeLog } from '@/lib/changesContext'
 import { whatChanged } from '@/lib/whatChanged'
 import { changedSince, loadSeenAt, storeSeenAt } from '@/lib/youChanges'
 import { useHomeSearch } from '@/lib/useHomeSearch'
-import { landSub, savedLand } from '@/lib/searchLands'
+import { landSub, savedLand, type SearchLine } from '@/lib/searchLands'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { listingRowFacts } from '@/lib/listingRow'
@@ -36,6 +39,11 @@ import PhotoHeader from '@/components/PhotoHeader'
 // which has no swipe (Oct 15, as a listing row has none), click its
 // bookmark. Either way with Undo; nothing reorders. Saved on this phone, no
 // account.
+//
+// A search box under the title (Nov 16, canvas "Search on You", boards 1-4
+// and 2b): the home's own lines, each with a bigger round bookmark, so a
+// place or a search can be saved without leaving You. A line still opens
+// what it names, as on the home.
 
 export default function YouScreen() {
   const { community } = useActiveCommunity()
@@ -82,6 +90,19 @@ export default function YouScreen() {
 
   const empty = places !== null && places.length === 0 && searches.length === 0
 
+  // The search: the home's lines for what's typed (useHomeSearch). Enter
+  // goes where the first line does.
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+  const q = query.trim()
+  const asked = q && home.listings && home.schedule ? home.ask(q) : null
+  const lines = asked ? home.linesFor(q, asked.result, asked.answer) : []
+  const goTo = (line: SearchLine) => {
+    if (line.href) router.push(line.href)
+    else if (line.kind === 'add') document.dispatchEvent(new CustomEvent('jpc:open-add'))
+  }
+  const hasSaves = !!places && (places.length > 0 || searches.length > 0)
+
   // On the photo (board W11): what's kept here, "5 places · 1 search".
   const counted = (n: number, one: string, many: string) => (n > 0 ? [`${n} ${n === 1 ? one : many}`] : [])
   const eyebrow = places === null ? null : [...counted(places.length, 'place', 'places'), ...counted(searches.length, 'search', 'searches')].join(' · ') || null
@@ -93,12 +114,30 @@ export default function YouScreen() {
     >
       {/* Board W11 (the user, Nov 15): a computer's top is the category
           pages' photo with the title on it; a phone keeps its own title. */}
-      <PhotoHeader eyebrow={eyebrow} title="You">
+      <PhotoHeader eyebrow={eyebrow} title="You" searchOnPhoto>
         <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:hidden">You</h1>
+
+        <div data-testid="you-search" className="mt-4 desktop:mt-0 desktop:mb-9 desktop:max-w-[520px]">
+          <SearchBox
+            look="box"
+            onPhoto
+            label="Find a place or a search to save"
+            placeholder={hasSaves ? 'Find more to save' : 'Find a place or a search to save'}
+            query={query}
+            onQueryChange={setQuery}
+            onSubmit={() => lines[0] && goTo(lines[0])}
+          />
+          {lines.length > 0 && <SearchLines lines={lines} categories={home.categories} typed={q} onPick={goTo} roundSave className="mt-2" />}
+          {asked && lines.length === 0 && (
+            <p data-testid="you-search-nothing" className="mt-2 px-1 text-[14px] text-slate-500 desktop:text-white">
+              Nothing in the guide for “{q}”
+            </p>
+          )}
+        </div>
 
         {empty ? (
           <div data-testid="you-empty">
-            <div className="mt-24 flex flex-col items-center text-center desktop:hidden">
+            <div className="mt-16 flex flex-col items-center text-center desktop:hidden">
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <BookmarkIcon className="h-6 w-6" />
               </span>
@@ -125,7 +164,7 @@ export default function YouScreen() {
           places !== null && (
             <>
               <SwipeRowGroup>
-                <div className="mt-4 desktop:mt-0">
+                <div className="mt-6 desktop:mt-0">
                   {places.length > 0 && (
                     <Section title="Places" testId="you-places">
                       <WithMinyans places={places}>
@@ -165,7 +204,7 @@ export default function YouScreen() {
 }
 
 /** How to save, said the same on a phone and a computer (board W11). */
-const SAVE_HOW = 'Save a place or a search to keep it here.'
+const SAVE_HOW = 'Tap the bookmark on any place or search.'
 const EMPTY_CARD = 'flex h-24 items-center gap-4 rounded-2xl border-2 border-dashed border-slate-300 px-5'
 
 /** A phone: one white box, a row each. A computer (board W11): a card

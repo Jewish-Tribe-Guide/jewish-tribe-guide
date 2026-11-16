@@ -92,6 +92,18 @@ are unbalanced; about 6–7 min looks reachable.
   the 0.8 mi one not at all. Equal matches now come nearest first
   (`namedListings`, from the visitor or the community's centre).
 - Open question, not a decision: should a visitor order their You page?
+- You has its own search (the user's yes after canvas "Search on You",
+  boards 1-4 and 2b, Nov 16): a box under the title, "Find a place or a
+  search to save" ("Find more to save" once something is), with the
+  home's lines under it. Each line's bookmark is 2b's bigger round one
+  (SaveButton `round`): a tinted circle, solid blue once saved. The line
+  itself still opens what it names, and Enter goes to the first. On a
+  computer the box sits on the photo, as a category page's does.
+  Not drawn but built: "Nothing in the guide for "…"" when nothing matches.
+- One e2e flake seen once (Nov 16), 0 of 10 on a repeat:
+  `offline.spec.ts:109` desktop, `locator('main')` found two `<main>`s,
+  one with React's `vt-update` (the server copy, mid view transition).
+  Same family as `server-rendering.spec.ts:127`. Not chased.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

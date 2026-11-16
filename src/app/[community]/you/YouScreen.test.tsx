@@ -83,7 +83,7 @@ describe('You', () => {
   it('nothing saved: says how to save, and a computer draws where the cards will go', () => {
     show()
     expect(screen.getByTestId('you-empty')).toHaveTextContent('Nothing saved yet')
-    expect(screen.getByTestId('you-empty')).toHaveTextContent('Save a place or a search to keep it here.')
+    expect(screen.getByTestId('you-empty')).toHaveTextContent('Tap the bookmark on any place or search.')
     expect(screen.getByTestId('you-empty-cards').children).toHaveLength(3)
     expect(screen.getByTestId('category-hero-count')).toBeEmptyDOMElement()
   })
@@ -247,5 +247,55 @@ describe('You', () => {
     show()
     const places = await screen.findByTestId('you-places')
     expect(within(places).getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('Trader Joe’s')])
+  })
+
+  // Nov 16 (canvas "Search on You", boards 1-4 and 2b): a place or a search
+  // can be saved without leaving You. The home's lines, under a box of You's
+  // own, each with a bigger round bookmark.
+  describe('its own search', () => {
+    it('a box under the title, asking for a place or a search; once something is saved, for more', () => {
+      show()
+      expect(screen.getByRole('textbox', { name: 'Find a place or a search to save' })).toHaveAttribute('placeholder', 'Find a place or a search to save')
+      cleanup()
+      save('tj')
+      show()
+      expect(screen.getByRole('textbox', { name: 'Find a place or a search to save' })).toHaveAttribute('placeholder', 'Find more to save')
+    })
+
+    it('typing a name shows its place with the round bookmark, which saves it into Places right there', async () => {
+      const user = userEvent.setup()
+      show()
+      await user.type(screen.getByRole('textbox', { name: 'Find a place or a search to save' }), 'trader')
+      const lines = await screen.findByTestId('search-lines')
+      const bookmark = within(lines).getByRole('button', { name: 'Save Trader Joe’s' })
+      expect(bookmark).toHaveAttribute('aria-pressed', 'false')
+      // Board 2b: a tinted 44px circle even before it's saved.
+      expect(bookmark.className).toMatch(/\bh-11\b/)
+      expect(bookmark.className).toMatch(/bg-primary\/10/)
+      await user.click(bookmark)
+      expect(within(screen.getByTestId('search-lines')).getByRole('button', { name: 'Save Trader Joe’s' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(screen.getByTestId('you-places')).getByText('Trader Joe’s')).toBeInTheDocument()
+      expect(mockRouter.push).not.toHaveBeenCalled()
+    })
+
+    it('a kind of place’s line saves the search; the line itself, or Enter, still opens it', async () => {
+      const user = userEvent.setup()
+      mockRouter.push.mockClear()
+      show()
+      const box = screen.getByRole('textbox', { name: 'Find a place or a search to save' })
+      await user.type(box, 'challah')
+      const lines = await screen.findByTestId('search-lines')
+      await user.click(within(lines).getByRole('button', { name: /^Save “challah” in / }))
+      expect(within(screen.getByTestId('you-searches')).getByText('“challah”')).toBeInTheDocument()
+      await user.type(box, '{Enter}')
+      expect(mockRouter.push).toHaveBeenCalledWith(expect.stringContaining('/test-community/grocery'))
+    })
+
+    it('nothing found says so', async () => {
+      const user = userEvent.setup()
+      show()
+      await user.type(screen.getByRole('textbox', { name: 'Find a place or a search to save' }), 'zzzqqq')
+      expect(await screen.findByTestId('you-search-nothing')).toHaveTextContent('Nothing in the guide for “zzzqqq”')
+    })
   })
 })

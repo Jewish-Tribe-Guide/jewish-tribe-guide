@@ -345,7 +345,8 @@ summary block, not the tail.** Two separate traps, both hit in one session
 
 **No e2e test fails on every local run any more, and one is known flaky:**
 `server-rendering.spec.ts:127` desktop, about one in four (two copies of the
-count text mid-transition). `offline.spec.ts` used to be the other, written
+count text mid-transition). `offline.spec.ts:109` desktop failed once the
+same way (two `<main>`s, Nov 16; 0 of 10 on a repeat). `offline.spec.ts` used to be the other, written
 off for two months as "the service worker not taking control in time". It
 was a test bug: its wait for an active worker was `page.waitForFunction`
 with an `async` predicate, which Playwright never awaits (the Promise is

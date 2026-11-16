@@ -11,6 +11,7 @@ export default function SaveButton({
   onToggle,
   name,
   plain = false,
+  round = false,
   className = '',
 }: {
   saved: boolean
@@ -20,6 +21,9 @@ export default function SaveButton({
   /** No ring when unsaved: inside a search box, where a ring would read as
    *  a second box. */
   plain?: boolean
+  /** A bigger, tinted circle (44px), unsaved too (board 2b, Nov 16): You's
+   *  own search, where saving is the whole point of the line. */
+  round?: boolean
   className?: string
 }) {
   return (
@@ -35,16 +39,18 @@ export default function SaveButton({
       title={saved ? 'Saved' : 'Save'}
       data-testid="save-button"
       className={[
-        'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors',
+        `inline-flex ${round ? 'h-11 w-11' : 'h-9 w-9'} shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors`,
         saved
           ? 'bg-primary text-white hover:bg-primary-dark'
-          : plain
+          : round
+            ? 'bg-primary/10 text-primary hover:bg-primary/20'
+            : plain
             ? 'text-primary hover:bg-primary/10'
             : 'border border-slate-300 bg-white text-primary hover:border-slate-400',
         className,
       ].join(' ')}
     >
-      <BookmarkIcon filled={saved} className="h-[17px] w-[17px]" />
+      <BookmarkIcon filled={saved} className={round ? 'h-5 w-5' : 'h-[17px] w-[17px]'} />
     </button>
   )
 }
