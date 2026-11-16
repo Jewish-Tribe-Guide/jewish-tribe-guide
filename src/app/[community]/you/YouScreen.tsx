@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCloseOnTapAway } from '@/lib/useCloseOnTapAway'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import SearchBox from '@/components/home/SearchBox'
@@ -106,6 +107,12 @@ export default function YouScreen() {
     else if (line.kind === 'add') document.dispatchEvent(new CustomEvent('jpc:open-add'))
   }
   const hasSaves = !!places && (places.length > 0 || searches.length > 0)
+  // A tap or click away, or Escape, closes the results with the words left
+  // in the box, as the home's do; the box again, or typing, opens them.
+  const searchRef = useRef<HTMLDivElement>(null)
+  const [closed, setClosed] = useState(false)
+  const showResults = !!asked && !closed
+  useCloseOnTapAway(showResults, [searchRef], () => setClosed(true))
 
   // On the photo (board W11): what's kept here, "5 places · 1 search".
   const counted = (n: number, one: string, many: string) => (n > 0 ? [`${n} ${n === 1 ? one : many}`] : [])
@@ -123,18 +130,22 @@ export default function YouScreen() {
             for a screen reader. A computer's is the photo's. */}
         <h1 className="sr-only desktop:hidden">You</h1>
 
-        <div data-testid="you-search" className="desktop:mt-0 desktop:mb-9 desktop:max-w-[520px]">
+        <div ref={searchRef} data-testid="you-search" className="desktop:mt-0 desktop:mb-9 desktop:max-w-[520px]">
           <SearchBox
             look="box"
             onPhoto
             label="Find a place or a search to save"
             placeholder={hasSaves ? 'Find more to save' : 'Find a place or a search to save'}
             query={query}
-            onQueryChange={setQuery}
+            onQueryChange={(next) => {
+              setQuery(next)
+              setClosed(false)
+            }}
+            onFocus={() => setClosed(false)}
             onSubmit={() => lines[0] && goTo(lines[0])}
           />
-          {lines.length > 0 && <SearchLines lines={lines} categories={home.categories} typed={q} onPick={goTo} roundSave className="mt-2" />}
-          {asked && lines.length === 0 && (
+          {showResults && lines.length > 0 && <SearchLines lines={lines} categories={home.categories} typed={q} onPick={goTo} roundSave className="mt-2" />}
+          {showResults && lines.length === 0 && (
             <p data-testid="you-search-nothing" className="mt-2 px-1 text-[14px] text-slate-500 desktop:text-white">
               Nothing in the guide for “{q}”
             </p>

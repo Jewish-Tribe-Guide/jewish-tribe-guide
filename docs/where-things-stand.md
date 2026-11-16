@@ -100,6 +100,10 @@ are unbalanced; about 6–7 min looks reachable.
   itself still opens what it names, and Enter goes to the first. On a
   computer the box sits on the photo, as a category page's does.
   Not drawn but built: "Nothing in the guide for "…"" when nothing matches.
+  Fixed the same day (the user, a computer at phone width): a click away
+  left You's results open. Now a tap or click away closes them as the
+  home's do, opening nothing, and Escape too (useCloseOnTapAway, shared
+  with the home's HeroHeading).
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them

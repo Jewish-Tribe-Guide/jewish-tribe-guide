@@ -292,6 +292,31 @@ describe('You', () => {
       expect(mockRouter.push).toHaveBeenCalledWith(expect.stringContaining('/test-community/grocery'))
     })
 
+    // Nov 16 (the user, a computer shrunk to a phone's width): a click away
+    // left the results open. As the home's do, a tap or click away closes
+    // them, without opening what it landed on; Escape too; the box again
+    // brings them back.
+    it('a tap or click away closes the results, opening nothing; Escape too; the box brings them back', async () => {
+      const user = userEvent.setup()
+      mockRouter.push.mockClear()
+      save('ac')
+      show(null, { mobile: true })
+      const box = screen.getByRole('textbox', { name: 'Find a place or a search to save' })
+      await user.type(box, 'trader')
+      expect(await screen.findByTestId('search-lines')).toBeInTheDocument()
+      // Onto a saved place's row: closes the results, doesn't open it.
+      await user.click(within(screen.getByTestId('you-places')).getByText('ACME'))
+      expect(screen.queryByTestId('search-lines')).not.toBeInTheDocument()
+      expect(box).toHaveValue('trader')
+      expect(mockRouter.push).not.toHaveBeenCalled()
+      await user.click(box)
+      expect(screen.getByTestId('search-lines')).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByTestId('search-lines')).not.toBeInTheDocument()
+      await user.type(box, 's')
+      expect(screen.getByTestId('search-lines')).toBeInTheDocument()
+    })
+
     it('nothing found says so', async () => {
       const user = userEvent.setup()
       show()
