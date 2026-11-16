@@ -13,6 +13,9 @@ vi.mock('next/dynamic', () => import('./src/test/eagerDynamic'))
 beforeAll(async () => {
   const { dynamicLoaded } = await import('./src/test/eagerDynamic')
   await dynamicLoaded()
+  // The same for pieces loaded ahead on purpose (preloadable.tsx).
+  const { preloadEverything } = await import('./src/lib/preloadable')
+  await preloadEverything()
 })
 
 // What this tab confirmed (confirmedHere) is kept for the life of the page,

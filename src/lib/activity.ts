@@ -51,6 +51,19 @@ export function normalizeEmail(raw: unknown): string | null {
   return email
 }
 
+/** Who sent an edit, from its submission's submitted_by: one of the
+ *  guide's own checks (every watch and Google sign "… (automated)"), an
+ *  admin editing in place (the admin route signs with their email as the
+ *  name), or else a visitor (the user, Nov 16: "A visitor updated Mei
+ *  Shalva" for a visitor's edit, which read as Mei Shalva's own). */
+export type EditedBy = 'visitor' | 'admin' | 'check'
+export function editedBy(submittedBy: { name?: string; email?: string } | null | undefined): EditedBy {
+  const name = submittedBy?.name?.trim() ?? ''
+  if (/\(automated\b/i.test(name)) return 'check'
+  if (name && submittedBy?.email && name === submittedBy.email) return 'admin'
+  return 'visitor'
+}
+
 export function sourceOfSubmission(submittedBy: { name?: string; email?: string } | null | undefined): ActivitySource {
   return submittedBy?.name === GOOGLE_SUBMITTER_NAME ? 'google' : 'submission'
 }

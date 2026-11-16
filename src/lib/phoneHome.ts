@@ -98,6 +98,12 @@ function checksOn(l: DirectoryResource, category: CategoryConfig, now: number): 
 /** Every place says a date on it. */
 export const everyListingDated = (facts: TrustFacts) => facts.places > 0 && facts.dated === facts.places
 
+/** "155 places": all the phone's one-line band has room for after its
+ *  heading (the user, Nov 16: the rest was cut off). */
+export function placesCount(facts: TrustFacts): string {
+  return `${facts.places} ${facts.places === 1 ? 'place' : 'places'}`
+}
+
 /** The line under "Kept up by the community": "155 places · every listing
  *  dated" (the user, Oct 17), once that's so; until then "155 places ·
  *  checked with Google" (the user, Oct 23: Google checks more than hours,
@@ -105,7 +111,7 @@ export const everyListingDated = (facts: TrustFacts) => facts.places > 0 && fact
  *  checked, and, once the clock is known, where nothing was checked this
  *  week: the check has stopped. */
 export function trustLine(facts: TrustFacts): string {
-  const places = `${facts.places} ${facts.places === 1 ? 'place' : 'places'}`
+  const places = placesCount(facts)
   if (everyListingDated(facts)) return `${places} · every listing dated`
   const google = facts.googleChecked > 0 && facts.checkedThisWeek !== 0
   return google ? `${places} · checked with Google` : places

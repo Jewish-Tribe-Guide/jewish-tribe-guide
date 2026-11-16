@@ -87,6 +87,31 @@ test.describe('mobile', () => {
     expect(widths.scroll).toBeLessThanOrEqual(widths.client)
   })
 
+  // The user, Nov 16: the Activity page slid sideways on a phone. A join
+  // link or a long minyan line has nowhere to wrap, and a row with one
+  // pushed the page past the screen (421px on a 375px phone, live). The
+  // root's overflow-x doesn't stop a phone panning. What the rows say
+  // depends on the data, so the test puts one such line in a row itself.
+  test('a line with nowhere to wrap keeps the Activity page phone-wide', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    await page.goto(`/${community}/changes`)
+    await dismissLocationPrompt(page)
+    const row = page.getByTestId('change').first()
+    await expect(row).toBeVisible()
+    await row.getByRole('link').first().evaluate((link) => {
+      const line = document.createElement('span')
+      line.className = 'block'
+      line.textContent = `chat.whatsapp.com/${'CWC22du8mHX978ypdeImjw'.repeat(3)}`
+      link.parentElement!.append(line)
+    })
+    // Text spilling out of its box widens what the page scrolls, not the box.
+    const widths = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      screen: document.documentElement.clientWidth,
+    }))
+    expect(widths.scroll).toBeLessThanOrEqual(widths.screen)
+  })
+
   test('the home screen renders its card grid inline', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)

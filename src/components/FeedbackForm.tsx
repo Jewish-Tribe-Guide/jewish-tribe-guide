@@ -139,7 +139,8 @@ export default function FeedbackForm({ successMessage, afterTellUs = false, onSe
           disabled={status === 'submitting' || !message.trim()}
           className={`${BIG_BUTTON} mt-5 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-200`}
         >
-          <PageGlyph name="send" className="h-[18px] w-[18px]" />
+          {/* The word alone: a paper plane beside it read as an emoji (the
+              user, Nov 16). */}
           {status === 'submitting' ? 'Sending…' : 'Send'}
         </button>
         <PrivacyNote short className="mt-3" />

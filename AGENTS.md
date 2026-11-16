@@ -353,9 +353,14 @@ truthy, so it returns at once), and the reload behind it raced the
 worker's install. Fixed Nov 15 with `navigator.serviceWorker.ready`;
 161/161 under `--repeat-each=20 --workers=5`, where the old helper failed
 3–5 in every ~88. `src/test/e2eWaitForFunction.test.ts` now fails on any
-async `waitForFunction` predicate in any suite. In CI, `saved.spec.ts` has twice missed its
-Saved chip within 5s (Nov 5 :130 mobile, Nov 9 :104 desktop; both passed
-on a rerun, cause not found yet). Anything else red is worth taking seriously.
+async `waitForFunction` predicate in any suite. `saved.spec.ts` missing its
+Saved chip in CI (Nov 5, Nov 9, Nov 16) was not a flake either: Google
+refuses the Maps key on localhost, its code then threw inside our pin
+redraw before it had said so, and the error replaced the whole Map page
+(the trace's snapshot is the "Something went wrong" screen). Fixed Nov 16
+with `MapBoundary` around the Map page's map, as the category page had.
+When a test can't find something, look at the failure's page snapshot
+before calling it slow. Anything else red is worth taking seriously.
 Before concluding you broke something, get a baseline:
 `git worktree add --detach <tmp> <pre-change-sha>`, `npm ci` inside it (a
 symlinked `node_modules` makes Turbopack panic with "points out of the
@@ -449,6 +454,12 @@ These were all real gaps at one point and are named in old commit history / memo
 - **Form submission end-to-end** — closed by `e2e-form/` (`npm run test:form-roundtrip`): fills in and submits a real intake wizard against the test project.
 
 **If you close a gap like this, update this section in the same commit** — this file is read as authoritative instructions, so a stale "still missing" claim here is actively worse than no claim at all.
+
+# Speed
+
+`docs/speed-targets.md` holds the targets (≤0.1s to a visible response, ≤1s to
+the answer on a phone, Core Web Vitals at p75) and where each is checked. CI
+checks order and counts, never time.
 
 # Sentry
 

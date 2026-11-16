@@ -3,6 +3,7 @@
 import { track } from '@vercel/analytics'
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
+import MapBoundary from './MapBoundary'
 import { createHighlight, type Highlight } from './highlight'
 import CategoryFilter, { CHIP_GLYPH, CHIP_SIZE, type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
@@ -2724,5 +2725,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
  *  hover never moves the map: ResourceMap frames only on frameToken. */
 function MapWithHover({ highlight, selectedId, ...props }: ComponentProps<typeof ResourceMap> & { highlight: Highlight }) {
   const hovered = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
-  return <ResourceMap {...props} selectedId={selectedId ?? hovered ?? undefined} />
+  // A map Google broke stays in its own box: the page's search, chips and
+  // list go on working (MapBoundary).
+  return (
+    <MapBoundary>
+      <ResourceMap {...props} selectedId={selectedId ?? hovered ?? undefined} />
+    </MapBoundary>
+  )
 }

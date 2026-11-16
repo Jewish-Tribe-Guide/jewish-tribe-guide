@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 11, 2026.
+Last updated: Nov 16, 2026.
 
 ## The branch
 
@@ -28,16 +28,67 @@ the next PR.
 
 Small open items from Nov 9:
 
-- `e2e/saved.spec.ts` failed in CI twice on a Saved chip that didn't show
-  within 5s: Nov 5 (:130, mobile) and Nov 9 (:104 desktop, PR #379, which
-  passed on a rerun). Both times the branch hadn't touched saving. Treat it as
-  a flake to look into, not a regression.
+- ~~`e2e/saved.spec.ts` missing its Saved chip in CI~~ Found Nov 16 (third
+  time, PR #388): Google refused the key on localhost and threw inside the
+  Map page's pin redraw, which replaced the whole page with the error
+  screen. Fixed: `MapBoundary` keeps a broken map in its own box on the Map
+  page too, as on the category page. A real visitor whose map Google
+  refuses now keeps the search, chips and list.
 - Dev's pretend Riverton community has no pages left and can be deleted
   (dev only; no yes needed).
 - "How it looks" isn't built for the phone (nothing sits beside a field
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
+
+**Nov 16, after #387 merged (on `redesign/speed-targets`):** speed
+targets agreed and written down in `docs/speed-targets.md` (≤0.1s to a
+visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
+The first tap on a place on a phone no longer slides up an empty sheet:
+its code loads once a category page is idle (`src/lib/preloadable.tsx`),
+checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
+(~12 min now). The e2e shards wait for cache-roundtrip and admin-write and
+are unbalanced; about 6–7 min looks reachable.
+
+**Nov 16, the user's notes after the release:**
+
+- Fixed: the Activity page slid sideways on a phone (a join link or long
+  minyan line had nowhere to wrap; 421px on a 375px phone, live). Rows wrap.
+- Fixed: the phone's "Kept up by the community" card was cut off with "…".
+  It says the count only now ("· 158 places"); "every listing dated" and
+  "checked with Google" are in the sheet it opens.
+- Fixed: Feedback's Send has no paper-plane icon ("No emoji for send").
+- The computer home's map photo: production lacked migration 095; the user
+  ran it and set the photo, then it was copied to production's own storage
+  (it pointed at dev's). The live home shows the copy once its cache
+  refreshes (any Site tab save does it).
+- Done: About and Privacy's new text copied from dev to live (the user's
+  yes, Nov 16), refreshed by a Pages tab save; the live home shows the map
+  photo from production's storage since the same save.
+- Fixed: Activity says "A visitor updated Mei Shalva" for a visitor's edit
+  (the user: "we can say visitor updated"). An admin's own edit and the
+  checks' ("… (automated)") still say "Mei Shalva updated" (activity.ts
+  `editedBy`, read from each edit's submission).
+- Fixed: coming back to the app re-rendered the whole page on nearly every
+  return, and a tap made then waited for it. Live, the server's content
+  fingerprint flipped between two values (instances with different cached
+  copies) and pages cached hours earlier carried a third, so it never
+  matched. Fixed at the source: the answer is one stored stamp
+  (`content_stamp`, migration 100, `src/lib/contentStamp.ts`) that every
+  admin save, approval and nightly job moves on and every server reads
+  fresh. A page still behind after a refresh gets at most two tries per
+  change, and the refresh waits until the visitor has been still 1.5s
+  (RefreshContentOnReturn). **Migration 100 is not run anywhere yet**
+  (dev, then live with the user's yes); until it is, the check falls back
+  to the old fingerprint. Visitors' one-tap confirmations don't move the
+  stamp (they only change "checked" dates). Not covered: a
+  phone that throws the page away in the background reloads it, and taps
+  do nothing until it has loaded; not measured.
+- Food's band photo and Mike's Chicken's photo pointed at dev's storage on
+  live; copied to production's (the user's yes, Nov 16). Live has no eruv
+  photo pointing at dev. Dev alone has photos for Eruv, Hospitals,
+  Childcare and Schools (iStock links) and Hotels; not copied.
+- Open question, not a decision: should a visitor order their You page?
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

@@ -9,7 +9,7 @@ import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 import { routes } from '@/lib/routes'
-import { sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
+import { placesCount, sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
 import { fetchEruvStatuses, useEruvStatuses } from '@/lib/useEruvStatuses'
 import { fetchChecksRun, useChecksRun } from '@/lib/useChecksRun'
 import { useNow } from '@/lib/useNow'
@@ -89,7 +89,7 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
       >
         <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" />
         <span className="min-w-0 flex-1 truncate text-[14px] leading-none text-slate-500">
-          <span className="font-extrabold text-ink">Kept up by the community</span> · {trustLine(facts)}
+          <span className="font-extrabold text-ink">Kept up by the community</span> · {placesCount(facts)}
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
       </button>

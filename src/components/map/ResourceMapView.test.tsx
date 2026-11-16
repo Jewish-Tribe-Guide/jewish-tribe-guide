@@ -55,6 +55,9 @@ vi.mock('next/navigation', () => ({
 // ResourceMapView's own logic (filtering, search, chip selection, point
 // selection) without ever touching window.google. Same approach as
 // Landing.test.tsx's DaveningTimesCard mock.
+// `broken`: as Google's own code does once it has refused the map, the
+// stand-in throws while drawing.
+const googleMap = vi.hoisted(() => ({ broken: false }))
 vi.mock('./ResourceMap', () => ({
   default: ({
     points,
@@ -80,7 +83,9 @@ vi.mock('./ResourceMap', () => ({
     frameEruvim?: boolean
     cornerControl?: ReactNode
     selectedId?: string
-  }) => (
+  }) => {
+    if (googleMap.broken) throw new TypeError("Cannot read properties of undefined (reading 'keys')")
+    return (
     <div data-testid="resource-map">
       <div data-testid="map-corner">{cornerControl}</div>
       <p data-testid="point-count">{points.length}</p>
@@ -102,7 +107,8 @@ vi.mock('./ResourceMap', () => ({
       ))}
       <button onClick={() => onBackgroundClick?.()}>Click map background</button>
     </div>
-  ),
+    )
+  },
 }))
 
 // localStorage.clear(): PinnedProvider/DroppedPinsProvider persist there (see
@@ -183,6 +189,25 @@ describe('ResourceMapView — loading', () => {
 
     expect(screen.getByText('Loading map…')).toBeInTheDocument()
     expect(screen.queryByTestId('resource-map')).not.toBeInTheDocument()
+  })
+})
+
+describe('ResourceMapView — a map Google broke', () => {
+  // Seen in CI (Nov 16): Google refused the key, its code threw as a saved
+  // place's pin was redrawn, and the error replaced the whole Map page.
+  it('keeps the failure in the map\'s box: the search and the list stay', () => {
+    googleMap.broken = true
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })], [grocery])
+
+      expect(screen.getByRole('status')).toHaveTextContent('The map couldn’t load. Everything on it is in the list.')
+      expect(screen.getByPlaceholderText(/Search name, address/)).toBeInTheDocument()
+    } finally {
+      googleMap.broken = false
+      quiet.mockRestore()
+    }
   })
 })
 

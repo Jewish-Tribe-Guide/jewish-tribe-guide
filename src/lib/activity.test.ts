@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  editedBy,
   addedItems,
   dayInTimezone,
   itemFieldKeys,
@@ -19,6 +20,18 @@ describe('normalizeEmail', () => {
     for (const bad of ['', 'rachel', 'a@b', 'a b@c.com', 42, null, undefined, `${'a'.repeat(250)}@x.com`]) {
       expect(normalizeEmail(bad)).toBeNull()
     }
+  })
+})
+
+describe('editedBy', () => {
+  it('names one of the guide’s checks, an admin editing in place, and everyone else as a visitor', () => {
+    expect(editedBy({ name: 'Their website (automated)' })).toBe('check')
+    expect(editedBy({ name: 'Keystone-K list (automated)' })).toBe('check')
+    expect(editedBy({ name: 'Google Places (automated)' })).toBe('check')
+    expect(editedBy({ name: 'admin@example.com', email: 'admin@example.com' })).toBe('admin')
+    expect(editedBy({ name: 'Sara', email: 'sara@example.com' })).toBe('visitor')
+    expect(editedBy({})).toBe('visitor')
+    expect(editedBy(null)).toBe('visitor')
   })
 })
 
