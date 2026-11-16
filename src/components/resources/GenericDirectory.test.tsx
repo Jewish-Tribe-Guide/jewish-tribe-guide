@@ -2707,6 +2707,33 @@ describe('GenericDirectory — the Minyanim tab', () => {
     expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Synagogues')
   })
 
+  // Nov 16: "what time is mincha today" on the home landed on By time; the
+  // header's ‹ showed Synagogues, then the view came back by itself, since
+  // a minyan question in the box over the shuls opens it.
+  it('left with a minyan question in the box, it stays left; new words ask again', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)))
+    renderWithProviders(
+      <ScreenHeaderProvider>
+        <ForcedViewport isMobile>
+          <GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView initialSearch="what time is mincha today" {...handlers} />
+        </ForcedViewport>
+        <HeaderProbe />
+      </ScreenHeaderProvider>,
+      { content: { categories: [shulCat] } },
+    )
+    expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()
+    await user.click(screen.getByTestId('header-back'))
+    expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
+    await wait(1000)
+    expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
+
+    await user.clear(screen.getByRole('searchbox'))
+    await user.type(screen.getByRole('searchbox'), 'maariv tonight')
+    await wait(1000)
+    expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()
+  })
+
   // It replaced the address, so Back (a phone's swipe) left Synagogues.
   it('opened from the page, it’s a step Back undoes, and its own back takes that step', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })

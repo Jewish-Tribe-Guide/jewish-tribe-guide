@@ -106,6 +106,12 @@ are unbalanced; about 6–7 min looks reachable.
   with the home's HeroHeading). And on a computer the Places heading
   started inside the photo, half hidden (36px under the box where the
   photo has 45); now what's saved starts 32px below the photo.
+- Fixed Nov 16 (the user, on a phone): search "what time is mincha
+  today", open Minyanim by time, tap the header's ‹, and Synagogues
+  showed for a moment before the view came back. A minyan question in
+  the box over the shuls opens the view after 0.7s, and the question was
+  still there. Now leaving the view keeps it left for those words; new
+  words or Enter ask again. The ‹ still goes to Synagogues, not home.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them
