@@ -22,10 +22,9 @@ const EYEBROW = 'mx-0.5 text-[13px] font-bold uppercase tracking-[0.06em] text-s
 // photo header, the note on the left, and on the right that card and the
 // email address the About page gives.
 //
-// On a desktop it's normally opened as a dialog from the footer or the
-// header's More menu, over the page someone is reading — which is what
-// feedback is usually about — so this URL is reached there only by a typed
-// or shared link.
+// On a computer the footer's "Send a note" and the header's Feedback link
+// here. They opened a dialog over the page instead until Nov 16, when the
+// user chose one page everywhere ("let's do full page").
 //
 // Split out of page.tsx (a thin server wrapper exporting generateMetadata,
 // which a 'use client' file can't) so the page can have its own canonical tag.
@@ -78,8 +77,6 @@ export default function FeedbackScreen({ email = null }: { email?: string | null
           </div>
           <div className="min-w-0 desktop:col-start-1 desktop:row-start-1">
             <FeedbackForm
-              variant="inline"
-              heading={heading}
               successMessage={settings.feedbackSuccessMessage}
               afterTellUs={tellUs}
               onSentChange={setSent}

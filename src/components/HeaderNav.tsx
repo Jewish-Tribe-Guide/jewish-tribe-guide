@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { resourceCards, groupCardsIntoSections, useEntryCards } from '@/components/home/sections'
-import dynamic from 'next/dynamic'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
@@ -16,10 +15,6 @@ import { YouDot } from './YouDot'
 import { DEFAULT_DESKTOP_NAV_ITEMS, type DesktopNavItem } from '@/lib/siteSettings'
 import { tabHolds, tabItems } from '@/lib/navTabs'
 
-// Loaded when Feedback is first opened (it carries the anti-spam check), not
-// with every page's header.
-const FeedbackForm = dynamic(() => import('@/components/FeedbackForm'), { loading: () => null })
-
 /** How long a mega-menu stays open after the pointer leaves — same value and
  *  same reason as SectionTabs used to use: without it, the gap between the
  *  trigger word and its panel closes the menu mid-travel. */
@@ -30,8 +25,8 @@ const CLOSE_DELAY_MS = 120
 // whatever id it happens to have.
 type OpenPanel = string | null
 
-/** Resolves a 'link' item's target to a real href, or null for 'feedback'
- *  (an action, not a page) or a target this community doesn't have (a
+/** Resolves a 'link' item's target to a real href, or null for a target
+ *  this community doesn't have (a
  *  category that's since been deleted). The Map is there wherever it's
  *  linked to (navTabs.ts linksToMap). */
 function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string): string | null {
@@ -40,7 +35,9 @@ function resolveHref(target: string, hrefById: Map<string, string>, communitySlu
   if (target === 'changes') return routes.changes(communitySlug)
   if (target === 'about') return routes.about(communitySlug)
   if (target === 'privacy') return routes.privacy(communitySlug)
-  if (target === 'feedback') return null
+  // A page on a computer too since Nov 16 (the user: "let's do full
+  // page"); it used to open a dialog over the page being read.
+  if (target === 'feedback') return routes.feedback(communitySlug)
   return hrefById.get(target) ?? null
 }
 
@@ -78,7 +75,6 @@ export default function HeaderNav() {
   const entryCards = useEntryCards(openFlow)
 
   const [open, setOpen] = useState<OpenPanel>(null)
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navRef = useRef<HTMLElement>(null)
   const categoriesWrapRef = useRef<HTMLDivElement>(null)
@@ -163,21 +159,7 @@ export default function HeaderNav() {
 
   function linkAction(item: DesktopNavItem, onNavigate?: () => void) {
     const href = resolveHref(item.target!, hrefById, communitySlug)
-    if (item.target === 'feedback') {
-      if (!settings.feedbackEnabled) return null
-      return (
-        <button
-          key={item.id}
-          onClick={() => {
-            onNavigate?.()
-            setFeedbackOpen(true)
-          }}
-          className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
-        >
-          {item.label}
-        </button>
-      )
-    }
+    if (item.target === 'feedback' && !settings.feedbackEnabled) return null
     if (!href) return null
     return (
       <Link
@@ -274,17 +256,6 @@ export default function HeaderNav() {
         if (links.length === 1) {
           const target = links[0]!.target!
           const href = resolveHref(target, hrefById, communitySlug)
-          if (target === 'feedback') {
-            return (
-              <button
-                key={item.id}
-                onClick={() => setFeedbackOpen(true)}
-                className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary cursor-pointer"
-              >
-                {item.label}
-              </button>
-            )
-          }
           if (!href) return null
           return (
             <Link
@@ -359,13 +330,6 @@ export default function HeaderNav() {
         )
       })}
 
-      {feedbackOpen && (
-        <FeedbackForm
-          heading={settings.feedbackHeading}
-          successMessage={settings.feedbackSuccessMessage}
-          onClose={() => setFeedbackOpen(false)}
-        />
-      )}
     </nav>
   )
 }

@@ -86,7 +86,7 @@ function PathAwareTabBar({ tabs, iconForTarget }: {
 
 function Chrome({ children, year }: { children: React.ReactNode; year: number }) {
   const { controls, liveTracking } = useLocation()
-  const { navigate, goHome } = useSiteNavigation()
+  const { goHome } = useSiteNavigation()
   const categories = useCategories()
   const settings = useSiteSettings()
 
@@ -129,7 +129,7 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           the forms that collect personal data, which is where it belongs on
           every device (see PrivacyNote). */}
       <div className="hidden desktop:block">
-        <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} year={year} />
+        <SiteFooter year={year} />
       </div>
       <Suspense fallback={null}>
         <PathAwareTabBar

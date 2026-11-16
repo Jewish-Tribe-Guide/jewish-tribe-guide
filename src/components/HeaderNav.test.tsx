@@ -176,7 +176,7 @@ describe('HeaderNav — More', () => {
     expect(panel).not.toHaveClass('right-0')
   })
 
-  it('offers About and Privacy as real links, and opens feedback as an in-place modal', async () => {
+  it('offers About, Privacy and Feedback as real links', async () => {
     const user = userEvent.setup()
     renderWithProviders(<HeaderNav />, {
       content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true } },
@@ -186,17 +186,28 @@ describe('HeaderNav — More', () => {
 
     expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/test-community/about')
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/test-community/privacy')
-
-    // Opens the same in-place FeedbackForm modal the footer's own
-    // FeedbackButton does — not a page navigation, so this component (and
-    // everything else on the page) stays mounted underneath it.
+    // Feedback is a page on a computer too since Nov 16 (the user: "let's do
+    // full page"); it opened a dialog over the page until then.
     //
     // This menu item is a fixed "Feedback", not settings.feedbackButtonLabel
-    // — that's a full sentence meant for SiteFooter's wider button, not this
+    // — that's a full sentence meant for SiteFooter's wider link, not this
     // compact dropdown (see HeaderNav's own comment on it).
-    expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Feedback' }))
-    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Feedback' })).toHaveAttribute('href', '/test-community/feedback')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('makes a top-level Feedback item a link to the page', () => {
+    renderWithProviders(<HeaderNav />, {
+      content: {
+        categories: [grocery],
+        settings: {
+          ...SITE_SETTINGS_DEFAULTS,
+          feedbackEnabled: true,
+          desktopNavItems: [{ id: 'fb', label: 'Tell us', kind: 'link', target: 'feedback' }],
+        },
+      },
+    })
+    expect(screen.getByRole('link', { name: 'Tell us' })).toHaveAttribute('href', '/test-community/feedback')
   })
 
   it('renders an admin-configured nav — a renamed top-level link, and a custom label on a More sub-item', async () => {

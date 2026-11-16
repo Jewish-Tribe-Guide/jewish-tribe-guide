@@ -11,13 +11,9 @@ import type { SiteSettings } from '@/lib/siteSettings'
 
 export default function SiteFooter({
   previewSettings,
-  onPromoteFeedbackToPage,
   year,
 }: {
   previewSettings?: SiteSettings
-  /** Forwarded to FeedbackButton — see its own note. Omitted by the admin
-   *  category preview, which has no page-level feedback screen to hand off to. */
-  onPromoteFeedbackToPage?: () => void
   /** The copyright year, resolved on the server and passed in.
    *
    *  It used to be `new Date().getFullYear()` right here, which reads the clock
@@ -83,12 +79,7 @@ export default function SiteFooter({
             <Link href={routes.privacy(communitySlug)} className="underline hover:text-slate-600">Privacy</Link>
           </p>
           {settings.feedbackEnabled && (
-            <FeedbackButton
-              buttonLabel={settings.feedbackButtonLabel}
-              heading={settings.feedbackHeading}
-              successMessage={settings.feedbackSuccessMessage}
-              onPromoteToPage={onPromoteFeedbackToPage}
-            />
+<FeedbackButton buttonLabel={settings.feedbackButtonLabel} />
           )}
         </div>
       </div>

@@ -123,7 +123,8 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
  *  one (FeedbackForm) loads Turnstile, which the console has no need of. At
  *  its own size, not shrunk with the page around it like the other
  *  previews: the form is all there is to see, and shrunk it can't be read.
- *  On a computer it's a dialog; on a phone, a page. */
+ *  A page on both: on a computer the form on the left and the Tell us card
+ *  on the right; on a phone the card first, then the form. */
 function FeedbackFormLook({ heading }: { heading: string }) {
   const [device, setDevice] = useState<'computer' | 'phone'>('computer')
   const box = 'mt-1 w-full rounded-[8px] border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-400'
@@ -144,17 +145,19 @@ function FeedbackFormLook({ heading }: { heading: string }) {
       </div>
       <div
         inert
-        className={`bg-slate-50 border border-slate-200 p-4 ${device === 'phone' ? 'w-[240px] min-h-[420px] rounded-[22px] pt-8' : 'w-[340px] rounded-[10px]'}`}
+        className={`bg-slate-50 border border-slate-200 p-4 ${device === 'phone' ? 'w-[240px] min-h-[420px] rounded-[22px] pt-8' : 'w-[520px] rounded-[10px]'}`}
       >
         <p className="m-0 text-[16px] font-extrabold text-slate-900">{heading}</p>
-        <div className="mt-3 rounded-[12px] border border-slate-200 bg-white p-2.5 text-[12px] font-bold text-slate-900">Know something we don’t?</div>
-        <div className="mt-2 rounded-[12px] border border-slate-200 bg-white p-3">
-          <p className="m-0 text-[13px] font-extrabold text-slate-900">Anything else?</p>
-          <p className="mt-2 mb-0 text-[12px] font-bold text-slate-900">Your note</p>
-          <div className={`${box} h-16`}>An idea, something that didn’t work…</div>
-          <p className="mt-3 mb-0 text-[12px] font-bold text-slate-900">Email, for a reply</p>
-          <div className={box}>you@example.com</div>
-          <div className="mt-3 w-full rounded-[10px] bg-blue-600 px-3 py-2 text-center text-[12px] font-bold text-white">Send</div>
+        <div className={device === 'phone' ? '' : 'mt-3 grid grid-cols-[minmax(0,1fr)_170px] items-start gap-3'}>
+          <div className={`rounded-[12px] border border-slate-200 bg-white p-2.5 text-[12px] font-bold text-slate-900 ${device === 'phone' ? 'mt-3' : 'col-start-2 row-start-1'}`}>Know something we don’t?</div>
+          <div className={`rounded-[12px] border border-slate-200 bg-white p-3 ${device === 'phone' ? 'mt-2' : 'col-start-1 row-start-1'}`}>
+            <p className="m-0 text-[13px] font-extrabold text-slate-900">{device === 'phone' ? 'Anything else?' : 'What’s on your mind?'}</p>
+            <p className="mt-2 mb-0 text-[12px] font-bold text-slate-900">Your note</p>
+            <div className={`${box} h-16`}>An idea, something that didn’t work…</div>
+            <p className="mt-3 mb-0 text-[12px] font-bold text-slate-900">Email, for a reply</p>
+            <div className={box}>you@example.com</div>
+            <div className="mt-3 w-full rounded-[10px] bg-blue-600 px-3 py-2 text-center text-[12px] font-bold text-white">Send</div>
+          </div>
         </div>
       </div>
     </div>
