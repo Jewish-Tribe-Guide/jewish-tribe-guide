@@ -450,6 +450,12 @@ These were all real gaps at one point and are named in old commit history / memo
 
 **If you close a gap like this, update this section in the same commit** — this file is read as authoritative instructions, so a stale "still missing" claim here is actively worse than no claim at all.
 
+# Speed
+
+`docs/speed-targets.md` holds the targets (≤0.1s to a visible response, ≤1s to
+the answer on a phone, Core Web Vitals at p75) and where each is checked. CI
+checks order and counts, never time.
+
 # Sentry
 
 ```bash

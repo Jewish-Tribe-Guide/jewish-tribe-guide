@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 11, 2026.
+Last updated: Nov 16, 2026.
 
 ## The branch
 
@@ -38,6 +38,15 @@ Small open items from Nov 9:
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
+
+**Nov 16, after #387 merged (on `redesign/speed-targets`):** speed
+targets agreed and written down in `docs/speed-targets.md` (≤0.1s to a
+visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
+The first tap on a place on a phone no longer slides up an empty sheet:
+its code loads once a category page is idle (`src/lib/preloadable.tsx`),
+checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
+(~12 min now). The e2e shards wait for cache-roundtrip and admin-write and
+are unbalanced; about 6–7 min looks reachable.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

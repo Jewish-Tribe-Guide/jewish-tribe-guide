@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, Suspense, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, Suspense, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
@@ -33,13 +33,18 @@ import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
 import { countEvent } from '@/lib/countEvent'
+import { preloadable, whenLoadedAndIdle } from '@/lib/preloadable'
 
 // The opened listing (its view, editor, Still right, the anti-spam check,
 // the map) loads when a listing is first opened, not with every list of
 // cards: the home draws these cards for its search answers, and loading all
 // that with the home put it over its 400 KB budget (Oct 2).
 const ListingDetailModal = dynamic(() => import('./ListingDetailModal'), { loading: () => null })
-const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'), { loading: () => null })
+// On a phone the place opens in a sheet. Its code is loaded ahead on a
+// category page (below), so the first tap fills the sheet at once instead of
+// sliding it up empty for ~0.3s (see preloadable.tsx). Not on the home: its
+// cards are search answers, and the home has a budget to keep.
+const MapPlaceDetail = preloadable(() => import('@/components/map/MapPlaceDetail'))
 
 /** Save and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately
@@ -249,6 +254,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const itemsLine = found?.items.length ? null : (allFacts.find((f) => f.ownLine)?.text ?? null)
   // A category page's row: see the `place` prop.
   const pageRow = place !== undefined
+  useEffect(() => {
+    if (pageRow && isMobile) whenLoadedAndIdle(MapPlaceDetail.preload)
+  }, [pageRow, isMobile])
   const rowNote = listingRowNote(item, category, now, { flagUnconfirmed })
   const note = rowNote && (pageRow || rowNote.kind === 'exception') ? rowNote : null
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
