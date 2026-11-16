@@ -25,9 +25,10 @@ type Props = {
 // Nov 16, when Feedback became one page on every screen.
 
 // The board's fields (Feedback, Nov 15): 16px, so an iPhone doesn't zoom in
-// on focus; soft until focused, then white with a blue ring.
+// on focus; a blue ring when focused. White, not the board's grey: grey
+// read as switched off beside a pale Send (the user, Nov 16).
 const FIELD =
-  'mt-2 block w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-3 text-[16px] text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-600/15'
+  'mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[16px] text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-[3px] focus:ring-blue-600/15'
 const LABEL = 'block text-[15px] font-bold text-slate-900'
 const BIG_BUTTON = 'flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] text-[16px] font-bold transition'
 

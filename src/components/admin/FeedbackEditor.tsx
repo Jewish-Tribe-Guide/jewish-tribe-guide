@@ -127,7 +127,7 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
  *  on the right; on a phone the card first, then the form. */
 function FeedbackFormLook({ heading }: { heading: string }) {
   const [device, setDevice] = useState<'computer' | 'phone'>('computer')
-  const box = 'mt-1 w-full rounded-[8px] border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-400'
+  const box = 'mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] text-slate-400'
   return (
     <div className="flex flex-col gap-3">
       <div role="group" aria-label="Preview on" className="self-start inline-flex rounded-lg border border-slate-300 bg-white p-0.5">

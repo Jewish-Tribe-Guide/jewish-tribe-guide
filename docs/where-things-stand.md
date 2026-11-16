@@ -355,8 +355,13 @@ With no choice made it's the first two categories with hours, as before
   - **Fixed Nov 16: "Kept up by the community" said twice on the computer
     home** (the user). The trust band near the top says it; the "Know a
     place we're missing?" card at the bottom had it as its eyebrow too. The
-    card leaves it off on the home and keeps it on What changed's side
-    card, where there's no band.
+    card's eyebrow is now "Add or fix a place" (the user's yes, Nov 16),
+    matching Stay in the Loop's "Email updates" beside it, here and on
+    What changed's side card.
+  - **Feedback's fields are white** (the user, Nov 16: grey "makes me
+    think I can't click on it"). A change to the Nov 15 board, which drew
+    them grey until focused. Send stays pale until there's a note. The
+    admin preview matches.
   - **Fixed Nov 16: Escape didn't close the Add a listing picker** (from
     "Suggest a listing" on the computer home). Found while looking at it.
   - **Photos in the Add a listing picker (the user, Nov 16: "Add photos

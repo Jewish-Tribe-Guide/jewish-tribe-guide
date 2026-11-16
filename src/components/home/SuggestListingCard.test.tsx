@@ -30,16 +30,13 @@ describe('SuggestListingCard', () => {
     expect(screen.getByTestId('home-suggest').querySelector('img')).toBeNull()
   })
 
-  // The computer home's trust band already says "Kept up by the community"
-  // near the top; the card at the bottom said it again (the user, Nov 16).
-  it('leaves "Kept up by the community" to the trust band on the home', () => {
+  // The computer home's trust band already says "Kept up by the community";
+  // the card said it again. Its label is now its job, as Stay in the Loop's
+  // beside it is "Email updates" (the user, Nov 16).
+  it('is labelled “Add or fix a place”, not “Kept up by the community”', () => {
     renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+    expect(screen.getByText('Add or fix a place')).toBeInTheDocument()
     expect(screen.queryByText('Kept up by the community')).not.toBeInTheDocument()
-  })
-
-  it('keeps the eyebrow where it is asked for (What changed’s side card)', () => {
-    renderWithProviders(<SuggestListingCard line={false} eyebrow />, { content: { categories: [makeCategory()] } })
-    expect(screen.getByText('Kept up by the community')).toBeInTheDocument()
   })
 
   it('opens ContributePicker on "Suggest a listing"', async () => {

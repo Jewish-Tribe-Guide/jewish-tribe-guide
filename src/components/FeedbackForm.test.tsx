@@ -67,6 +67,18 @@ describe('FeedbackForm — the board’s form', () => {
     for (const label of ['Your note', 'Email, for a reply']) expect(screen.getByLabelText(label)).toHaveClass('text-[16px]')
   })
 
+  // The user, Nov 16: grey boxes read as switched off ("That makes me
+  // think I can't click on it"), the more so beside a pale Send. White,
+  // as the site's other fields are; only Send waits for a note.
+  it('draws its fields white, not grey', () => {
+    renderWithProviders(<FeedbackForm successMessage="Thanks!" />)
+    for (const label of ['Your note', 'Email, for a reply']) {
+      const field = screen.getByLabelText(label)
+      expect(field).toHaveClass('bg-white')
+      expect(field.className).not.toMatch(/(^|\s)bg-slate-/)
+    }
+  })
+
   it('keeps Send pale until there is a note', async () => {
     const user = userEvent.setup()
     renderWithProviders(<FeedbackForm successMessage="Thanks!" />)

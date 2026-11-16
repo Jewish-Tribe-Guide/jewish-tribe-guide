@@ -87,7 +87,7 @@ export default function ChangesScreen({ failed }: { failed: boolean }) {
                 ))}
               </div>
               <aside data-testid="changes-suggest" className="sticky top-24 hidden desktop:block">
-                <SuggestListingCard line={false} eyebrow />
+                <SuggestListingCard line={false} />
               </aside>
             </div>
           )}
