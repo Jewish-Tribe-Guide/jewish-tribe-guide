@@ -112,6 +112,11 @@ are unbalanced; about 6–7 min looks reachable.
   the box over the shuls opens the view after 0.7s, and the question was
   still there. Now leaving the view keeps it left for those words; new
   words or Enter ask again. The ‹ still goes to Synagogues, not home.
+- CI, Nov 16 (PR 389): admin-write's category-open test picked the
+  alphabetically first category, which was `cache-roundtrip-seed`, the
+  fixture the cache suite renames while both run against the test
+  project. It now skips other suites' fixtures (`e2e-…`,
+  `cache-roundtrip…`).
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them
