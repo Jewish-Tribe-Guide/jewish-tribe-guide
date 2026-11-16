@@ -1,6 +1,7 @@
 import { revalidateTag } from 'next/cache'
 import { listCommunities } from './communityStore'
 import { allCommunityTags, TAGS } from './cacheTags'
+import { bumpContentStamp } from './contentStamp'
 import { revalidateRouteAfterInFlightRenders } from './revalidateAfterInFlightRenders'
 import { routes } from './routes'
 
@@ -34,7 +35,9 @@ import { routes } from './routes'
 // community is rare and its admin is the one waiting, so the one blocking
 // read is worth it.
 export async function revalidatePublicContent({ newCommunity = false }: { newCommunity?: boolean } = {}): Promise<void> {
-  const communities = await listCommunities().catch(() => [])
+  // The stamp first, so a page regenerated after the invalidation below is
+  // built with the new one and an open tab's check sees it once (Nov 16).
+  const [communities] = await Promise.all([listCommunities().catch(() => []), bumpContentStamp()])
 
   revalidateTag(TAGS.communities, newCommunity ? { expire: 0 } : 'max')
   for (const community of communities) {

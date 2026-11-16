@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import RefreshContentOnReturn, { MIN_REFRESH_INTERVAL_MS, QUIET_MS } from './RefreshContentOnReturn'
+import RefreshContentOnReturn, { MIN_REFRESH_INTERVAL_MS, QUIET_MS, REFRESHES_PER_VERSION } from './RefreshContentOnReturn'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
 
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter }))
@@ -122,20 +122,24 @@ describe('RefreshContentOnReturn', () => {
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
   })
 
-  // Nov 16: live, the server's answer flipped between two fingerprints and
-  // a page cached hours earlier carried a third; refreshing it brought the
-  // same old one back, so every return refreshed and held the next tap.
-  it('refreshes once for a fingerprint, even when the page it brings back still carries an old one', async () => {
+  // Nov 16: a page cached before a change, refreshed, came back with the
+  // same old version, so every return refreshed it and held the next tap.
+  it('refreshes a page still behind at most twice for the same change, not on every return', async () => {
     show()
-    for (const answer of ['v2', 'v3', 'v2', 'v3', 'v1']) {
-      serverVersion = answer
+    for (let i = 0; i < 5; i++) {
       letThrottleExpire()
       window.dispatchEvent(new Event('focus'))
       await settle()
     }
-    // v2 and v3, once each; v1 is what the tab loaded with.
     expect(fetchMock).toHaveBeenCalledTimes(5)
-    expect(mockRouter.refresh).toHaveBeenCalledTimes(2)
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(REFRESHES_PER_VERSION)
+
+    // A newer change gets its own tries.
+    serverVersion = 'v3'
+    letThrottleExpire()
+    window.dispatchEvent(new Event('focus'))
+    await settle()
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(REFRESHES_PER_VERSION + 1)
   })
 
   // The tap someone came back to make is never the one held behind it.

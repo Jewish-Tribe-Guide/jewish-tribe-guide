@@ -64,8 +64,12 @@ import { useRouter } from 'next/navigation'
 // instances held different cached copies), and a page cached hours earlier
 // carried a third; refreshing that page brought the same old one back, so it
 // never matched and every return refreshed. Now:
-//   • a fingerprint this tab has refreshed for, or loaded with, never
-//     refreshes it again; only a new one does, once.
+//   • the answer is one stored stamp every server reads fresh
+//     (contentStamp.ts, migration 100), so it says "changed" only when
+//     something did.
+//   • a page that's still behind after a refresh (a cached copy built
+//     before the change) is refreshed at most REFRESHES_PER_VERSION times
+//     for that change, never on every return.
 //   • the refresh waits until the visitor has been still for QUIET_MS, and
 //     a tap or key restarts the wait, so the tap they came back to make is
 //     never the one held behind it.
@@ -82,6 +86,10 @@ import { useRouter } from 'next/navigation'
  *  admin saves — rarely — so there is nothing to gain from being twitchier. */
 export const MIN_REFRESH_INTERVAL_MS = 10_000
 
+/** A refresh can bring back a cached copy built before the change (it's
+ *  regenerated in the background), so a second try is allowed; never more. */
+export const REFRESHES_PER_VERSION = 2
+
 /** How long the visitor must be still before a refresh goes out. */
 export const QUIET_MS = 1_500
 
@@ -89,11 +97,13 @@ export default function RefreshContentOnReturn({ community, version }: { communi
   const router = useRouter()
   // The fingerprint of what's on screen, kept current as a refresh brings a
   // new one down with the layout.
-  // Every fingerprint this tab has shown or refreshed for.
-  const seen = useRef(new Set([version]))
+  // The version on screen, kept current as a refresh brings a new one, and
+  // how many refreshes each newer version has had.
+  const shown = useRef(version)
   useEffect(() => {
-    seen.current.add(version)
+    shown.current = version
   }, [version])
+  const tries = useRef(new Map<string, number>())
   // Seeded in the effect below rather than here. `useRef(Date.now())` reads
   // the clock during render, and Cache Components rejects that outright in a
   // prerendered client component ("Next.js encountered the unstable value
@@ -117,10 +127,11 @@ export default function RefreshContentOnReturn({ community, version }: { communi
         const res = await fetch(`/api/content-version?community=${encodeURIComponent(community)}`, { cache: 'no-store' })
         const body = (await res.json()) as { ok?: boolean; version?: string }
         // No answer (offline, a failed read) is no reason to re-render.
-        if (res.ok && body.ok && body.version && !seen.current.has(body.version)) {
-          seen.current.add(body.version)
-          refreshWhenStill()
-        }
+        if (!res.ok || !body.ok || !body.version || body.version === shown.current) return
+        const tried = tries.current.get(body.version) ?? 0
+        if (tried >= REFRESHES_PER_VERSION) return
+        tries.current.set(body.version, tried + 1)
+        refreshWhenStill()
       } catch {
         // Offline: `online` asks again when it's back.
       }

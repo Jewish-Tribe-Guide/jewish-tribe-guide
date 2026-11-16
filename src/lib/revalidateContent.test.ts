@@ -37,6 +37,11 @@ vi.mock('./communityStore', () => ({
   listCommunities: () => listCommunities(),
 }))
 
+const order: string[] = []
+vi.mock('./contentStamp', () => ({
+  bumpContentStamp: async () => void order.push('bump'),
+}))
+
 const { revalidatePublicContent } = await import('./revalidateContent')
 
 const community = (slug: string) => ({ slug, name: slug, isDefault: false })
@@ -52,6 +57,19 @@ beforeEach(() => {
 const invalidated = () => revalidateTag.mock.calls.map(([tag]) => tag as string)
 
 describe('revalidatePublicContent', () => {
+  // Nov 16: an open tab asks whether anything changed; the stored stamp is
+  // the answer, so every save moves it, and before the invalidation, so a
+  // page regenerated after it is built with the new one.
+  it('moves the content stamp before invalidating anything', async () => {
+    order.length = 0
+    listCommunities.mockResolvedValue([community('philly')])
+    revalidateTag.mockImplementation(() => void order.push('tag'))
+    await revalidatePublicContent()
+    revalidateTag.mockReset()
+    expect(order[0]).toBe('bump')
+    expect(order).toContain('tag')
+  })
+
   it('invalidates every content tag for every community', async () => {
     listCommunities.mockResolvedValue([community('philly'), community('baltimore')])
 

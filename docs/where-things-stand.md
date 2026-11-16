@@ -71,8 +71,15 @@ are unbalanced; about 6–7 min looks reachable.
   return, and a tap made then waited for it. Live, the server's content
   fingerprint flipped between two values (instances with different cached
   copies) and pages cached hours earlier carried a third, so it never
-  matched. Now a tab refreshes once per new fingerprint, and only after the
-  visitor has been still 1.5s (RefreshContentOnReturn). Not covered: a
+  matched. Fixed at the source: the answer is one stored stamp
+  (`content_stamp`, migration 100, `src/lib/contentStamp.ts`) that every
+  admin save, approval and nightly job moves on and every server reads
+  fresh. A page still behind after a refresh gets at most two tries per
+  change, and the refresh waits until the visitor has been still 1.5s
+  (RefreshContentOnReturn). **Migration 100 is not run anywhere yet**
+  (dev, then live with the user's yes); until it is, the check falls back
+  to the old fingerprint. Visitors' one-tap confirmations don't move the
+  stamp (they only change "checked" dates). Not covered: a
   phone that throws the page away in the background reloads it, and taps
   do nothing until it has loaded; not measured.
 - Food's band photo and Mike's Chicken's photo pointed at dev's storage on
