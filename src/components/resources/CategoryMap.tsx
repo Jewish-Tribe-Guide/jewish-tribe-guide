@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Component, lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import * as Sentry from '@sentry/nextjs'
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import MapBoundary from '@/components/map/MapBoundary'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
@@ -56,29 +56,6 @@ export function useWide(): boolean {
 
 import type { Highlight } from '@/components/map/highlight'
 export { createHighlight, type Highlight } from '@/components/map/highlight'
-
-/** Keeps a failing map from taking the page down with it. Seen with Google
- *  refusing the map (a key that doesn't allow the address): Google's own
- *  code then threw as soon as a row's pin was lit, and the error replaced
- *  the whole page, list and all. Now only the map's box says so. */
-class MapBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() {
-    return { failed: true }
-  }
-  componentDidCatch(error: unknown) {
-    console.error('[category map]', error)
-    Sentry.captureException(error)
-  }
-  render() {
-    if (!this.state.failed) return this.props.children
-    return (
-      <div role="status" className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 px-8 text-center text-[14px] text-slate-600">
-        The map couldn’t load. Everything on it is in the list.
-      </div>
-    )
-  }
-}
 
 type Props = {
   category: CategoryConfig

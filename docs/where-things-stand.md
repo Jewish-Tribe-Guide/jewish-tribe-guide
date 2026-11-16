@@ -28,10 +28,12 @@ the next PR.
 
 Small open items from Nov 9:
 
-- `e2e/saved.spec.ts` failed in CI twice on a Saved chip that didn't show
-  within 5s: Nov 5 (:130, mobile) and Nov 9 (:104 desktop, PR #379, which
-  passed on a rerun). Both times the branch hadn't touched saving. Treat it as
-  a flake to look into, not a regression.
+- ~~`e2e/saved.spec.ts` missing its Saved chip in CI~~ Found Nov 16 (third
+  time, PR #388): Google refused the key on localhost and threw inside the
+  Map page's pin redraw, which replaced the whole page with the error
+  screen. Fixed: `MapBoundary` keeps a broken map in its own box on the Map
+  page too, as on the category page. A real visitor whose map Google
+  refuses now keeps the search, chips and list.
 - Dev's pretend Riverton community has no pages left and can be deleted
   (dev only; no yes needed).
 - "How it looks" isn't built for the phone (nothing sits beside a field
