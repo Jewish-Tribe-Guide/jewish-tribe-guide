@@ -1,7 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCloseOnTapAway } from '@/lib/useCloseOnTapAway'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import SearchBox from '@/components/home/SearchBox'
+import SearchLines from '@/components/home/SearchLines'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
 import SaveButton from '@/components/SaveButton'
 import { BookmarkIcon } from '@/components/icons'
@@ -18,13 +22,15 @@ import { useChangeLog } from '@/lib/changesContext'
 import { whatChanged } from '@/lib/whatChanged'
 import { changedSince, loadSeenAt, storeSeenAt } from '@/lib/youChanges'
 import { useHomeSearch } from '@/lib/useHomeSearch'
-import { landSub, savedLand } from '@/lib/searchLands'
+import { landSub, savedLand, type SearchLine } from '@/lib/searchLands'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { listingRowFacts } from '@/lib/listingRow'
 import { milesText, type LatLng } from '@/lib/geo'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import PhotoHeader from '@/components/PhotoHeader'
+import { useSetTabHeader } from '@/lib/headerVisibility'
+import { useTabLabel } from '@/lib/useTabLabel'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
@@ -36,6 +42,11 @@ import PhotoHeader from '@/components/PhotoHeader'
 // which has no swipe (Oct 15, as a listing row has none), click its
 // bookmark. Either way with Undo; nothing reorders. Saved on this phone, no
 // account.
+//
+// A search box under the title (Nov 16, canvas "Search on You", boards 1-4
+// and 2b): the home's own lines, each with a bigger round bookmark, so a
+// place or a search can be saved without leaving You. A line still opens
+// what it names, as on the home.
 
 export default function YouScreen() {
   const { community } = useActiveCommunity()
@@ -47,6 +58,8 @@ export default function YouScreen() {
   const saved = useSavedSearches()
   const { toggle: togglePlace } = usePinned()
   const changeLog = useChangeLog()
+  // A phone's header says which tab this is (the user, Nov 16).
+  useSetTabHeader(useTabLabel('you', 'You'))
 
   // When You was last opened here, read once as the page opens; then now is
   // written as the new last look, so the dots are this visit's only.
@@ -82,6 +95,25 @@ export default function YouScreen() {
 
   const empty = places !== null && places.length === 0 && searches.length === 0
 
+  // The search: the home's lines for what's typed (useHomeSearch). Enter
+  // goes where the first line does.
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+  const q = query.trim()
+  const asked = q && home.listings && home.schedule ? home.ask(q) : null
+  const lines = asked ? home.linesFor(q, asked.result, asked.answer) : []
+  const goTo = (line: SearchLine) => {
+    if (line.href) router.push(line.href)
+    else if (line.kind === 'add') document.dispatchEvent(new CustomEvent('jpc:open-add'))
+  }
+  const hasSaves = !!places && (places.length > 0 || searches.length > 0)
+  // A tap or click away, or Escape, closes the results with the words left
+  // in the box, as the home's do; the box again, or typing, opens them.
+  const searchRef = useRef<HTMLDivElement>(null)
+  const [closed, setClosed] = useState(false)
+  const showResults = !!asked && !closed
+  useCloseOnTapAway(showResults, [searchRef], () => setClosed(true))
+
   // On the photo (board W11): what's kept here, "5 places · 1 search".
   const counted = (n: number, one: string, many: string) => (n > 0 ? [`${n} ${n === 1 ? one : many}`] : [])
   const eyebrow = places === null ? null : [...counted(places.length, 'place', 'places'), ...counted(searches.length, 'search', 'searches')].join(' · ') || null
@@ -93,12 +125,41 @@ export default function YouScreen() {
     >
       {/* Board W11 (the user, Nov 15): a computer's top is the category
           pages' photo with the title on it; a phone keeps its own title. */}
-      <PhotoHeader eyebrow={eyebrow} title="You">
-        <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:hidden">You</h1>
+      <PhotoHeader eyebrow={eyebrow} title="You" searchOnPhoto>
+        {/* A phone's title is the header's (useSetTabHeader); this h1 is
+            for a screen reader. A computer's is the photo's. */}
+        <h1 className="sr-only desktop:hidden">You</h1>
+
+        {/* On a computer the box rides up onto the photo (searchOnPhoto),
+            with 45px of photo under it (HERO_OVERLAP_PX less the box): 77px
+            puts what's saved 32px below the photo, as the other photo
+            pages' content starts (PhotoHeader's h-8). 36px had the Places
+            heading start inside the photo (Nov 16). */}
+        <div ref={searchRef} data-testid="you-search" className="desktop:mt-0 desktop:mb-[77px] desktop:max-w-[520px]">
+          <SearchBox
+            look="box"
+            onPhoto
+            label="Find a place or a search to save"
+            placeholder={hasSaves ? 'Find more to save' : 'Find a place or a search to save'}
+            query={query}
+            onQueryChange={(next) => {
+              setQuery(next)
+              setClosed(false)
+            }}
+            onFocus={() => setClosed(false)}
+            onSubmit={() => lines[0] && goTo(lines[0])}
+          />
+          {showResults && lines.length > 0 && <SearchLines lines={lines} categories={home.categories} typed={q} onPick={goTo} roundSave className="mt-2" />}
+          {showResults && lines.length === 0 && (
+            <p data-testid="you-search-nothing" className="mt-2 px-1 text-[14px] text-slate-500 desktop:text-white">
+              Nothing in the guide for “{q}”
+            </p>
+          )}
+        </div>
 
         {empty ? (
           <div data-testid="you-empty">
-            <div className="mt-24 flex flex-col items-center text-center desktop:hidden">
+            <div className="mt-16 flex flex-col items-center text-center desktop:hidden">
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <BookmarkIcon className="h-6 w-6" />
               </span>
@@ -125,7 +186,7 @@ export default function YouScreen() {
           places !== null && (
             <>
               <SwipeRowGroup>
-                <div className="mt-4 desktop:mt-0">
+                <div className="mt-6 desktop:mt-0">
                   {places.length > 0 && (
                     <Section title="Places" testId="you-places">
                       <WithMinyans places={places}>
@@ -165,7 +226,7 @@ export default function YouScreen() {
 }
 
 /** How to save, said the same on a phone and a computer (board W11). */
-const SAVE_HOW = 'Save a place or a search to keep it here.'
+const SAVE_HOW = 'Tap the bookmark on any place or search.'
 const EMPTY_CARD = 'flex h-24 items-center gap-4 rounded-2xl border-2 border-dashed border-slate-300 px-5'
 
 /** A phone: one white box, a row each. A computer (board W11): a card

@@ -1,6 +1,8 @@
 'use client'
 
 import BrowseAll from '@/components/home/BrowseAll'
+import { useSetTabHeader } from '@/lib/headerVisibility'
+import { useTabLabel } from '@/lib/useTabLabel'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
 import { useAllListings } from '@/lib/useAllListings'
 import { useLocation } from '@/lib/locationContext'
@@ -11,6 +13,8 @@ import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 /** The Browse page's client half: the clock, the minyanim and the zmanim its
  *  live lines read. */
 export default function BrowseScreen() {
+  // A phone's header says which tab this is (the user, Nov 16).
+  useSetTabHeader(useTabLabel('browse', 'Browse'))
   const { community } = useActiveCommunity()
   const timezone = useCommunityTimezone()
   const { coords } = useLocation()

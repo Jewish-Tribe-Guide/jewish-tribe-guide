@@ -141,8 +141,12 @@ export function useCollapseHeader(collapse: boolean): void {
 
 /** `named`: the guide's own name goes over the title, small, for a page
  *  someone may have arrived at from a link and not know whose it is (a
- *  listing's own page). */
-type ScreenHeaderState = { title: string; onBack: () => void; named?: boolean } | null
+ *  listing's own page).
+ *
+ *  No `onBack`: a tab's own page (You, Activity, Browse; the user, Nov 16).
+ *  The header keeps the logo and shows the page's name in place of the
+ *  site's, with no Back: a chevron is what says a page is a step down. */
+type ScreenHeaderState = { title: string; onBack?: () => void; named?: boolean } | null
 
 const ScreenHeaderContext = createContext<{
   screenHeader: ScreenHeaderState
@@ -264,4 +268,16 @@ export function useScrollShowHide(enabled: boolean): boolean {
   }, [enabled])
 
   return !enabled || visible
+}
+
+/** A tab's own page: its name in the phone header in place of the site's,
+ *  under the logo, with no Back (see ScreenHeaderState). Reset on unmount,
+ *  as useSetScreenHeader's is. */
+export function useSetTabHeader(title: string, active = true): void {
+  const { setScreenHeader } = useContext(ScreenHeaderContext)
+  useLayoutEffect(() => {
+    if (!active) return
+    setScreenHeader({ title })
+    return () => setScreenHeader(null)
+  }, [active, title, setScreenHeader])
 }

@@ -32,6 +32,7 @@ export default function SearchLines({
   categories,
   onPick,
   typed = '',
+  roundSave = false,
   className = '',
 }: {
   lines: SearchLine[]
@@ -40,6 +41,8 @@ export default function SearchLines({
   categories: readonly CategoryConfig[] | null
   /** A line was chosen (tap, click or Enter): the page goes there. */
   onPick: (line: SearchLine) => void
+  /** The bigger, tinted save button (SaveButton's `round`): You's search. */
+  roundSave?: boolean
   className?: string
 }) {
   const saved = useSavedSearches()
@@ -53,11 +56,11 @@ export default function SearchLines({
     const placeId = line.kind === 'listing' ? line.listing?.id : line.eruvId
     if (placeId && line.categoryId) {
       const place = { id: placeId, categoryId: line.categoryId }
-      return <SaveButton plain saved={isPinned(place.id)} onToggle={() => togglePlace(place)} name={line.title} className="mr-2.5" />
+      return <SaveButton plain round={roundSave} saved={isPinned(place.id)} onToggle={() => togglePlace(place)} name={line.title} className="mr-2.5" />
     }
     const search = saved ? lineSearch(line, typed) : null
     if (!search || !saved) return null
-    return <SaveButton plain saved={saved.isSaved(search.key)} onToggle={() => saved.toggle(search)} name={`“${search.words}” in ${line.title}`} className="mr-2.5" />
+    return <SaveButton plain round={roundSave} saved={saved.isSaved(search.key)} onToggle={() => saved.toggle(search)} name={`“${search.words}” in ${line.title}`} className="mr-2.5" />
   }
   return (
     <div

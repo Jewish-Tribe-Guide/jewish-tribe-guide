@@ -2,12 +2,13 @@
 
 import Image, { getImageProps } from 'next/image'
 import { preload } from 'react-dom'
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import SearchBox from './SearchBox'
 import SearchPrompts from './SearchPrompts'
+import { useCloseOnTapAway } from '@/lib/useCloseOnTapAway'
 
 /** The `desktop:` variant's own media query (see globals.css) — the hero band is
  *  `hidden` outside it. Kept in sync by hand; it's a link `media` attribute, so
@@ -148,40 +149,7 @@ export default function HeroHeading({
   // The phone's box and its results, in the page's flow.
   const phoneShellRef = useRef<HTMLDivElement>(null)
 
-  const dismiss = useEffectEvent(() => setDismissed(true))
-  useEffect(() => {
-    if (!dropdownOpen) return
-    function onPointerDown(e: MouseEvent) {
-      // A click in a dialog open over the page (the "Share your live
-      // location?" prompt) is an answer to the dialog, not a click away from
-      // the results. It used to close them: a shared answer
-      // (/philly/ask/…) opened, the visitor tapped "Not now", and the answer
-      // was gone.
-      if (document.querySelector('[aria-modal="true"]')) return
-      const target = e.target as Node
-      if ([searchShellRef, phoneShellRef].some((r) => r.current?.contains(target))) return
-      dismiss()
-      // The tap that closes the results does only that. It used to go on to
-      // whatever was under it: search "hospital", tap away, and Grocery
-      // opened. The click follows this tap's mouseup; nothing else is eaten.
-      document.addEventListener('click', swallow, true)
-      document.addEventListener('mouseup', () => setTimeout(() => document.removeEventListener('click', swallow, true)), { once: true, capture: true })
-    }
-    function swallow(e: MouseEvent) {
-      e.preventDefault()
-      e.stopPropagation()
-      document.removeEventListener('click', swallow, true)
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') dismiss()
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [dropdownOpen])
+  useCloseOnTapAway(dropdownOpen, [searchShellRef, phoneShellRef], () => setDismissed(true))
 
   function handleQueryChange(next: string) {
     setDismissed(false)

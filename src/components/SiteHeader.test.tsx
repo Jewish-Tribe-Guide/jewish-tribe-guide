@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCommunity } from '@/test/providerFixtures'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
-import { HeaderCollapseProvider, ScreenHeaderProvider, useCollapseHeader, useHeaderOverlay, useSetScreenHeader } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider, useCollapseHeader, useHeaderOverlay, useSetScreenHeader, useSetTabHeader } from '@/lib/headerVisibility'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { LocationControls } from '@/components/home/LocationControl'
@@ -312,3 +312,46 @@ describe('SiteHeader — "Add a place"', () => {
     expect(screen.queryByRole('button', { name: 'Add a place' })).toBeNull()
   })
 })
+
+// The user, Nov 16: a tab's own page (You, Activity, Browse) names itself in
+// the phone header, as a page a step down does, so the page itself starts
+// with its content. No Back: the chevron is what says a page is a step down.
+describe('SiteHeader — a tab’s own page', () => {
+  function TabStandIn({ title }: { title: string }) {
+    useSetTabHeader(title)
+    return null
+  }
+  const render = ({ mobile = true, communities }: { mobile?: boolean; communities?: ReturnType<typeof makeCommunity>[] } = {}) =>
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <ScreenHeaderProvider>
+          <ForcedViewport isMobile={mobile}>
+            <TabStandIn title="You" />
+            <SiteHeader onGoHome={vi.fn()} location={location()} />
+          </ForcedViewport>
+        </ScreenHeaderProvider>
+      </HeaderCollapseProvider>,
+      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory' } }, ...(communities ? { community: communities[0], communities } : {}) },
+    )
+
+  it('a phone: the tab’s name where the site’s was, beside the logo, with no Back', () => {
+    render()
+    expect(screen.getByTestId('header-tab-title')).toHaveTextContent('You')
+    expect(screen.queryByText('Test Directory')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /You/ })).not.toBeInTheDocument()
+    expect(document.querySelector('path[d="M15 19l-7-7 7-7"]')).toBeNull()
+  })
+
+  it('a computer keeps the site’s name', () => {
+    render({ mobile: false })
+    expect(screen.getByText('Test Directory')).toBeInTheDocument()
+    expect(screen.queryByTestId('header-tab-title')).not.toBeInTheDocument()
+  })
+
+  it('several communities: the switcher keeps the community’s name', () => {
+    render({ communities: [makeCommunity({ slug: 'philly', name: 'Philadelphia' }), makeCommunity({ slug: 'baltimore', name: 'Baltimore' })] })
+    expect(screen.getByRole('button', { name: 'Switch community' })).toBeInTheDocument()
+    expect(screen.queryByTestId('header-tab-title')).not.toBeInTheDocument()
+  })
+})
+

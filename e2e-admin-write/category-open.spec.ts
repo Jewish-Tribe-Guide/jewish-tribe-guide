@@ -22,7 +22,12 @@ test('a category page opens from the list without asking the server', async ({ p
   // A page with places on it, by its name in the list.
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const { data: rows } = await supabase.from('category').select('id, plural_label').eq('community_id', 'philly').eq('kind', 'listing').order('plural_label')
-  const target = rows![0]
+  // Never another suite's fixture. They run at the same time against this
+  // same project, and cache-roundtrip renames `cache-roundtrip-seed` over
+  // and over: picked first alphabetically (PR 389's CI, Nov 16), the page
+  // changed under the click and was asked for again.
+  const target = rows!.find((r) => !/^(e2e-|cache-roundtrip)/.test(r.id))!
+  expect(target, 'a category no other suite writes to').toBeTruthy()
   const path = `/philly/admin/categories/cat:${target.id}`
 
   // Its address, loaded behind the list. Without that there's nothing to

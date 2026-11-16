@@ -20,6 +20,8 @@ export default function SearchBox({
   // duplicate everything else here.
   className = 'pl-5 pr-2 py-2',
   look = 'pill',
+  label = 'Search resources',
+  onPhoto = false,
 }: {
   query: string
   onQueryChange: (query: string) => void
@@ -43,17 +45,24 @@ export default function SearchBox({
    *  phone page, not a pill here and a box there). Its own spacing:
    *  `className` doesn't apply. */
   look?: 'pill' | 'box'
+  /** What a screen reader calls the box. */
+  label?: string
+  /** With look 'box': on a computer it sits on a page's photo, white and
+   *  round, as a category page's search does (CategoryAsk's onPhoto). */
+  onPhoto?: boolean
 }) {
   const box = look === 'box'
   return (
     <div
       className={
         box
-          ? 'flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30'
+          ? `flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30 ${
+              onPhoto ? 'desktop:h-[52px] desktop:rounded-full desktop:border-0 desktop:pl-[18px] desktop:pr-2 desktop:shadow-[0_6px_20px_rgba(15,23,42,0.25)] desktop:focus-within:ring-white/60' : ''
+            }`
           : `flex items-center rounded-full border border-slate-200 bg-white shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)] ${className}`
       }
     >
-      <svg className={`h-5 w-5 shrink-0 ${box ? 'text-primary' : 'text-slate-400'}`} fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+      <svg className={`h-5 w-5 shrink-0 ${box ? `text-primary ${onPhoto ? 'desktop:text-slate-600' : ''}` : 'text-slate-400'}`} fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
       </svg>
       <input
@@ -81,7 +90,7 @@ export default function SearchBox({
         // category list did. Whoever runs this community's admin console
         // now owns keeping the examples current.
         placeholder={placeholder}
-        aria-label="Search resources"
+        aria-label={label}
         className={`min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none ${box ? 'text-[15.5px]' : 'px-3 text-[15px]'}`}
       />
       {query && interactive && (

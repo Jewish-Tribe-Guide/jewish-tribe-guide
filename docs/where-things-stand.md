@@ -78,9 +78,8 @@ are unbalanced; about 6–7 min looks reachable.
   admin save, approval and nightly job moves on and every server reads
   fresh. A page still behind after a refresh gets at most two tries per
   change, and the refresh waits until the visitor has been still 1.5s
-  (RefreshContentOnReturn). **Migration 100 is not run anywhere yet**
-  (dev, then live with the user's yes); until it is, the check falls back
-  to the old fingerprint. Visitors' one-tap confirmations don't move the
+  (RefreshContentOnReturn). Migration 100 is run on dev and live (the
+  user, Nov 16). Visitors' one-tap confirmations don't move the
   stamp (they only change "checked" dates). Not covered: a
   phone that throws the page away in the background reloads it, and taps
   do nothing until it has loaded; not measured.
@@ -88,7 +87,70 @@ are unbalanced; about 6–7 min looks reachable.
   live; copied to production's (the user's yes, Nov 16). Live has no eruv
   photo pointing at dev. Dev alone has photos for Eruv, Hospitals,
   Childcare and Schools (iStock links) and Hotels; not copied.
+- Fixed: a search for a name several places share ("Rita's", five of
+  them) listed three in alphabetical-tie order, the 1.2 mi one last and
+  the 0.8 mi one not at all. Equal matches now come nearest first
+  (`namedListings`, from the visitor or the community's centre).
 - Open question, not a decision: should a visitor order their You page?
+- You has its own search (the user's yes after canvas "Search on You",
+  boards 1-4 and 2b, Nov 16): a box under the title, "Find a place or a
+  search to save" ("Find more to save" once something is), with the
+  home's lines under it. Each line's bookmark is 2b's bigger round one
+  (SaveButton `round`): a tinted circle, solid blue once saved. The line
+  itself still opens what it names, and Enter goes to the first. On a
+  computer the box sits on the photo, as a category page's does.
+  Not drawn but built: "Nothing in the guide for "…"" when nothing matches.
+  Fixed the same day (the user, a computer at phone width): a click away
+  left You's results open. Now a tap or click away closes them as the
+  home's do, opening nothing, and Escape too (useCloseOnTapAway, shared
+  with the home's HeroHeading). And on a computer the Places heading
+  started inside the photo, half hidden (36px under the box where the
+  photo has 45); now what's saved starts 32px below the photo.
+- Fixed Nov 16 (the user, on a phone): search "what time is mincha
+  today", open Minyanim by time, tap the header's ‹, and Synagogues
+  showed for a moment before the view came back. A minyan question in
+  the box over the shuls opens the view after 0.7s, and the question was
+  still there. Now leaving the view keeps it left for those words; new
+  words or Enter ask again. The ‹ still goes to Synagogues, not home.
+- CI, Nov 16 (PR 389): admin-write's category-open test picked the
+  alphabetically first category, which was `cache-roundtrip-seed`, the
+  fixture the cache suite renames while both run against the test
+  project. It now skips other suites' fixtures (`e2e-…`,
+  `cache-roundtrip…`).
+- CI, Nov 16 (PR 389, next run): moderation's Reject test failed on
+  "Rejecting…" at expect's 5s default on a slow runner (4.1 min vs 2.7).
+  The approve test got 15s for the same thing on Nov 3; the reject,
+  edited-approve and History waits never did. All four have 15s now.
+- Fixed Nov 16 (PR 389's CI, then 4 of 10 locally, on main too): in the
+  admin, a category page's editor started over whenever its list arrived
+  with ANY page changed, so a screen just opened (Add a field) closed
+  itself while another admin, or another test, changed some other page.
+  Now only a change to the open page starts it over. editor-screens went
+  from 8 failures in 20 to 1 in 34. That 1 is still open, as a lead:
+  "See the whole page" showed the preview but the address stayed at
+  `?field=hours` (no trace; it didn't come back in 25 more runs).
+- CI, Nov 16 (PR 389): e2e's listing-detail Back test picked
+  `cache-roundtrip-seed` and its address went back to the listing after
+  the click, while the cache job (a separate CI job, same test project)
+  was renaming that fixture. 21/21 locally on a real category. The e2e
+  pickers in helpers.ts now skip other suites' fixtures
+  (writtenByOtherSuites). A lead, not proven: closing a listing opened
+  from its own link changes the address with history.replaceState,
+  which a later Next update can overwrite (AGENTS.md's rule).
+- A tab's own page names itself in the phone header (the user's OK,
+  Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
+  the tab bar's word for them
+  beside the logo, with no Back (useSetTabHeader); the page starts with
+  its content, its own h1 kept for a screen reader. A chevron is what
+  says a page is a step down, so a category, a listing, About, and
+  Feedback when it isn't a tab keep "‹ title". Home keeps the site's name. A computer keeps
+  the site's name everywhere. With several communities the header's name
+  is the switcher, so it stays the community's name on a tab page too.
+  The Map tab hides the header on a phone, as before.
+- One e2e flake seen once (Nov 16), 0 of 10 on a repeat:
+  `offline.spec.ts:109` desktop, `locator('main')` found two `<main>`s,
+  one with React's `vt-update` (the server copy, mid view transition).
+  Same family as `server-rendering.spec.ts:127`. Not chased.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

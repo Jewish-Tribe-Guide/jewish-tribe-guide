@@ -110,12 +110,29 @@ export default function CategoryManager({
   useLayoutEffect(() => {
     shownRef.current = categories
   }, [categories])
+  // Only the open page changing starts it again. Any page did: another
+  // admin's change to some other page, between opening this one and its
+  // list arriving, threw away a screen just opened here (Add a field,
+  // closing itself; CI on PR 389, Nov 16, where the other tests make and
+  // delete their own pages throughout). The rest of the list reaches the
+  // open page as props.
+  const openId = editingId?.startsWith(CAT_PREFIX) ? editingId.slice(CAT_PREFIX.length) : null
+  const openIdRef = useRef(openId)
+  useLayoutEffect(() => {
+    openIdRef.current = openId
+  }, [openId])
+  const openPageChanged = (before: CategoryConfig[], after: CategoryConfig[]) => {
+    const id = openIdRef.current
+    if (!id) return false
+    return JSON.stringify(before.find((c) => c.id === id)) !== JSON.stringify(after.find((c) => c.id === id))
+  }
   useLayoutEffect(() => {
     if (!keptNow(community) || !shownRef.current || keptNow(community)!.categories === shownRef.current) return
     const latest = keptNow(community)!
+    const restart = openPageChanged(shownRef.current, latest.categories)
     setCategories(latest.categories)
     setPlaceCounts(latest.placeCounts)
-    setListRound((r) => r + 1)
+    if (restart) setListRound((r) => r + 1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -125,10 +142,11 @@ export default function CategoryManager({
       const catRes = await fetch(withCommunity('/api/admin/categories?counts=1', community), { headers: { Authorization: `Bearer ${token}` } })
       const catBody = await parseOkJson<{ categories: CategoryConfig[]; placeCounts?: Record<string, number> }>(catRes, 'Failed to load categories.')
       // A kept list that turns out stale (changed in another tab) starts
-      // the open page again from what's saved, before anything's typed.
+      // the open page again from what's saved, before anything's typed,
+      // when the open page is what changed.
       // Against what this screen shows now, not what it opened with: it may
       // have been hidden and brought back since (see above).
-      if (shownRef.current && JSON.stringify(shownRef.current) !== JSON.stringify(catBody.categories)) setListRound((r) => r + 1)
+      if (shownRef.current && openPageChanged(shownRef.current, catBody.categories)) setListRound((r) => r + 1)
       setCategories(catBody.categories)
       setPlaceCounts(catBody.placeCounts ?? {})
       kept = { community, categories: catBody.categories, placeCounts: catBody.placeCounts ?? {} }

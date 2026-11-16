@@ -82,6 +82,24 @@ describe('CategoryManager — opening a page quickly', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('Eats')
   })
 
+  // CI on PR 389 (Nov 16): Add a field opened and closed itself. Another
+  // page changed between opening this one and its list arriving, and the
+  // open page started again, losing what had just been done on it.
+  it('keeps what’s open when only another page changed', async () => {
+    show([shul, food])
+    await screen.findByText('Food')
+    cleanup()
+    let answer: (v: unknown) => void = () => {}
+    vi.mocked(parseOkJson).mockImplementation(() => new Promise((r) => (answer = r)))
+    renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Name'), ' and more')
+    answer({ categories: [{ ...shul, pluralLabel: 'Shuls' }, food], placeCounts: {} })
+    await waitFor(() => expect(vi.mocked(parseOkJson)).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getByLabelText('Name')).toHaveValue('Food and more')
+  })
+
   it('opened from its address, asks for its places beside the list, not after', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ url })))
     vi.mocked(parseOkJson).mockImplementation(never)

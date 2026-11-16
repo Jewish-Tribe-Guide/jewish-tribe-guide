@@ -64,7 +64,10 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   // Home, and the screen's own heading already says where you are, so this
   // only ever applies at mobile widths.
   const screenHeader = useScreenHeader()
-  const showScreenHeader = isMobile && !!screenHeader
+  const showScreenHeader = isMobile && !!screenHeader?.onBack
+  // A tab's own page (no Back): its name where the site's would be, beside
+  // the logo, on a phone. A computer keeps the site's name.
+  const tabTitle = isMobile && screenHeader && !screenHeader.onBack ? screenHeader.title : null
 
   // Hides the header while scrolling down — more room for what you're
   // reading — and brings it back the moment you scroll up, even slightly,
@@ -225,11 +228,12 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // header carried the message twice before a visitor had read
           // either in full. That was the tagline's only render site, so the
           // setting itself is gone too.
-          const title = (
-            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink">
-              {settings.name}
+          const titleOf = (text: string, tab = false) => (
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink" data-testid={tab ? 'header-tab-title' : undefined}>
+              {text}
             </span>
           )
+          const title = titleOf(settings.name)
 
           // A real <Link>, not a <button onClick> — is what makes cmd/ctrl/
           // middle-click "open in new tab" work, which a click handler alone
@@ -262,7 +266,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
               return (
                 <span className="flex min-w-0 shrink items-center gap-2.5">
                   {mark}
-                  {title}
+                  {tabTitle ? titleOf(tabTitle, true) : title}
                 </span>
               )
             }
@@ -280,6 +284,8 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
 
           // Several communities: the title becomes the switcher (it already
           // names where you are), so "go home" moves onto the mark beside it.
+          // It keeps the community's name on a tab's page too: a tab's name
+          // there would hide which community this is.
           // Split into two controls rather than one because a button can't
           // nest inside a button.
           return (

@@ -987,7 +987,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // A minyan question typed over the list of shuls ("mincha tonight") is
   // asked of Minyanim by time, as the home search would send it: the list
   // of shuls has nothing to answer it with.
-  const asksMinyan = hasMinyanim && !minyanimViewOn && !!todayResult?.query.minyan
+  //
+  // Except the question the visitor just left the view on (Nov 16: search
+  // "what time is mincha today" on the home, land on Minyanim by time, tap
+  // the header's ‹, and Synagogues showed for a moment, then the view came
+  // back, since the question was still in the box). Leaving says they want
+  // the shuls; new words, or Enter, ask again.
+  const minyanQuestion = hasMinyanim && !minyanimViewOn && !!todayResult?.query.minyan
+  const [leftViewOn, setLeftViewOn] = useState<string | null>(null)
+  const [viewWasOn, setViewWasOn] = useState(minyanimViewOn)
+  if (viewWasOn !== minyanimViewOn) {
+    setViewWasOn(minyanimViewOn)
+    setLeftViewOn(minyanimViewOn ? null : search)
+  }
+  const asksMinyan = minyanQuestion && search !== leftViewOn
   useEffect(() => {
     if (!asksMinyan) return
     const timer = setTimeout(() => setMinyanimViewOn(true), 700)
@@ -1655,7 +1668,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (useLearnAfterPause). Not a search a shared link arrived with.
   useLearnAfterPause({
     query: search,
-    foundNothing: !!searchFoundNothing && !minyanimView && !asksMinyan,
+    foundNothing: !!searchFoundNothing && !minyanimView && !minyanQuestion,
     ready: search !== (initialSearch ?? ''),
     community: communitySlug,
   })
@@ -1847,7 +1860,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 onSearch={setSearch}
                 scope={minyanimView ? 'minyanim' : undefined}
                 onSubmit={() => {
-                  if (asksMinyan) setMinyanimViewOn(true)
+                  if (minyanQuestion) setMinyanimViewOn(true)
                   // Read in the background for Read questions (learnFrom).
                   else if (searchFoundNothing) learnFrom(search, communitySlug)
                 }}

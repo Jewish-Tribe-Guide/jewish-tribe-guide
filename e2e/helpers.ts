@@ -120,12 +120,20 @@ export async function minyanimCategory(request: APIRequestContext, community: st
 
 /** A listing-kind category that actually has listings, so directory tests
  *  exercise a populated page rather than an empty state. */
+/** A category another suite writes to while this one runs against the same
+ *  test project: cache-roundtrip renames `cache-roundtrip-seed` over and
+ *  over, and the admin-write suite makes and deletes `e2e-…` pages. A test
+ *  that picks one reads it mid-change (PR 389's CI, Nov 16: a listing's
+ *  Back left the address on the listing, on that fixture). Picked
+ *  categories skip them; the whole list is left as the site shows it. */
+export const writtenByOtherSuites = (c: { id: string }) => /^(e2e-|cache-roundtrip)/.test(c.id)
+
 export async function categoryWithListings(
   request: APIRequestContext,
   community: string,
 ): Promise<{ category: Category; count: number }> {
   const all = await categories(request, community)
-  for (const category of all.filter((c) => c.kind === 'listing')) {
+  for (const category of all.filter((c) => c.kind === 'listing' && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     if (body.ok && (body.resources as unknown[]).length > 0) {
       return { category, count: (body.resources as unknown[]).length }
@@ -145,7 +153,7 @@ export async function listingWithFourActions(
   community: string,
 ): Promise<{ category: Category; item: { id: string; name: string } }> {
   const all = await categories(request, community)
-  for (const category of all.filter((c) => c.kind === 'listing')) {
+  for (const category of all.filter((c) => c.kind === 'listing' && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     if (!body.ok) continue
     for (const item of body.resources as DirectoryResource[]) {
@@ -170,7 +178,7 @@ export async function categoryWithDistances(
   community: string,
 ): Promise<{ category: Category; count: number }> {
   const all = await categories(request, community)
-  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     const resources = (body.resources ?? []) as unknown[]
     if (body.ok && resources.length > 0) return { category, count: resources.length }
@@ -187,7 +195,7 @@ export async function categoryWithGeocodedListings(
   community: string,
 ): Promise<{ category: Category }> {
   const all = await categories(request, community)
-  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     const resources = (body.resources ?? []) as { geo?: { lat: number; lng: number } | null }[]
     if (body.ok && resources.some((r) => r.geo)) return { category }
@@ -243,7 +251,7 @@ export async function categoryWithMapPoints(
   community: string,
 ): Promise<{ category: Category; count: number }> {
   const all = await categories(request, community)
-  for (const category of all.filter((c) => c.kind === 'listing')) {
+  for (const category of all.filter((c) => c.kind === 'listing' && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     if (!body.ok) continue
     const withGeo = (body.resources as { geo?: unknown }[]).filter((r) => r.geo)
@@ -255,7 +263,7 @@ export async function categoryWithMapPoints(
 /** How many live listings each listing category has, by the API. */
 export async function listingCounts(request: APIRequestContext, community: string): Promise<Record<string, number>> {
   const counts: Record<string, number> = {}
-  for (const category of (await categories(request, community)).filter((c) => c.kind === 'listing')) {
+  for (const category of (await categories(request, community)).filter((c) => c.kind === 'listing' && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     counts[category.id] = body.ok ? (body.resources as unknown[]).length : 0
   }
@@ -275,7 +283,7 @@ export async function largestCategory(
 ): Promise<{ category: Category; count: number }> {
   const all = await categories(request, community)
   let best: { category: Category; count: number } | null = null
-  for (const category of all.filter((c) => c.kind === 'listing')) {
+  for (const category of all.filter((c) => c.kind === 'listing' && !writtenByOtherSuites(c))) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     const count = body.ok ? (body.resources as unknown[]).length : 0
     if (!best || count > best.count) best = { category, count }
