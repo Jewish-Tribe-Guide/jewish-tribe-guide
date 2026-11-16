@@ -244,7 +244,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
 
   await review.getByLabel('Name').fill(fixed)
   await review.getByRole('button', { name: 'Approve with your changes' }).click()
-  await expect(review).not.toBeVisible()
+  await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
 
   const { data: resource } = await supabase.from('resource').select('id, status').eq('name', fixed).maybeSingle()
   expect(resource, 'the fixed name should be what went live').not.toBeNull()
@@ -283,7 +283,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   await review.getByLabel(/Reason for rejection/).fill('Duplicate of an existing listing.')
   await review.getByRole('button', { name: 'Confirm rejection' }).click()
 
-  await expect(review).not.toBeVisible()
+  await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
   await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('id').eq('name', name).maybeSingle()
@@ -320,7 +320,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   const reason = `Already listed ${randomUUID().slice(0, 8)}`
   await review.getByLabel(/Reason for rejection/).fill(reason)
   await review.getByRole('button', { name: 'Confirm rejection' }).click()
-  await expect(review).not.toBeVisible()
+  await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
 
   // The click-through this test actually exists to prove: Reports' History
   // row, then Left, and the submission just left out is on it — the

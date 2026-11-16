@@ -117,6 +117,10 @@ are unbalanced; about 6–7 min looks reachable.
   fixture the cache suite renames while both run against the test
   project. It now skips other suites' fixtures (`e2e-…`,
   `cache-roundtrip…`).
+- CI, Nov 16 (PR 389, next run): moderation's Reject test failed on
+  "Rejecting…" at expect's 5s default on a slow runner (4.1 min vs 2.7).
+  The approve test got 15s for the same thing on Nov 3; the reject,
+  edited-approve and History waits never did. All four have 15s now.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them
