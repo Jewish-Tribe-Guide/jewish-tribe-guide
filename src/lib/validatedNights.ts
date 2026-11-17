@@ -8,10 +8,13 @@ import { changeDay, changeTime } from './whatChanged'
 // page: what was validated, a group per kind, every row a listing and the
 // source only in the heading (X4, X5). Only what was validated is said: a
 // place that didn't match just isn't counted, and what couldn't be read
-// stays in the admin (the user). Validated means what dates a listing's
-// box, "Confirmed by …" (validatedDuring.ts), and for Google, a listing it
-// answered for that is as Google has it (countGoogleKinds). Menus and
-// eruv websites date nothing, so they have no group.
+// stays in the admin (the user). Validated means a check read the source
+// and found it as we have it (validatedDuring.ts), whether or not the
+// listing shows a date for it (the user, Nov 17: "I don't view those as
+// the same thing"): a box dated "Confirmed by …", a menu still naming the
+// listing's dishes, an eruv website still showing its hotline or alerts
+// link, and for Google a listing it answered for that is as Google has it
+// (countGoogleKinds).
 // Pure: nightsStore.ts reads the runs, the two pages draw it.
 
 /** The two jobs whose runs make a night: Google at 1 AM, the watches at 2
@@ -20,16 +23,18 @@ export const NIGHT_JOBS: readonly JobId[] = ['sync-hours', 'watches']
 
 export type NightRun = { job: JobId; startedAt: string; finishedAt: string | null; kinds: Partial<Record<NightKindId, KindCount>> | null }
 
-export type GroupId = 'google' | 'times' | 'hours' | 'sites' | 'other' | 'contact' | 'hospitals' | 'kosher'
+export type GroupId = 'google' | 'times' | 'hours' | 'menus' | 'sites' | 'other' | 'contact' | 'eruvs' | 'hospitals' | 'kosher'
 
 /** The night page's headings, in its order. */
 export const GROUP_TITLES: Record<GroupId, string> = {
   google: 'Open or closed, against Google',
   times: 'Shul times, against their websites',
   hours: 'Hours, against their websites',
+  menus: 'Dishes, against their menus',
   sites: 'Phone, email and hours, against their websites',
   other: 'Details, against their websites',
   contact: 'Phone and email, against their websites',
+  eruvs: 'Eruv hotlines and alerts, against their websites',
   hospitals: 'Hospitals, against Refuah',
   kosher: 'Hechsher, against the kosher agencies’ lists',
 }
@@ -37,7 +42,7 @@ export const GROUP_TITLES: Record<GroupId, string> = {
 const GROUP_ORDER = Object.keys(GROUP_TITLES) as GroupId[]
 
 /** The groups the timeline row counts as "their own websites". */
-export const OWN_WEBSITES: readonly GroupId[] = ['times', 'hours', 'sites', 'other', 'contact']
+export const OWN_WEBSITES: readonly GroupId[] = ['times', 'hours', 'menus', 'sites', 'other', 'contact', 'eruvs']
 
 export type Night = {
   /** Its date where the community is, YYYY-MM-DD: its page's address. */
@@ -77,6 +82,8 @@ export function nightsFrom(runs: readonly NightRun[], timezone: string): Night[]
       put('google', k.google?.validated)
       put('times', k.times?.validated)
       put('hours', k.hours?.validated)
+      put('menus', k.menus?.validated)
+      put('eruvs', k.eruvs?.validated)
       put('sites', k.sites?.validated)
       put('other', k.other?.validated)
       put('hospitals', k.hospitals?.validated)
@@ -84,7 +91,7 @@ export function nightsFrom(runs: readonly NightRun[], timezone: string): Night[]
       for (const kind of ['times', 'hours', 'sites', 'other'] as const) put('contact', k[kind]?.contact)
     }
     // A listing whose page agreed in full isn't also listed for its phone.
-    for (const id of OWN_WEBSITES) if (id !== 'contact') for (const x of ids.get(id) ?? []) ids.get('contact')?.delete(x)
+    for (const id of ['times', 'hours', 'sites', 'other'] as const) for (const x of ids.get(id) ?? []) ids.get('contact')?.delete(x)
     const groups = GROUP_ORDER.filter((g) => ids.get(g)?.size).map((g) => ({ id: g, ids: [...ids.get(g)!] }))
     if (groups.length === 0) continue
     const starts = own.map((r) => r.startedAt).sort()

@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { submitEruvUpdate } from '@/lib/submissionStore'
 import { listEruvimForAdmin, type AdminEruv } from '@/lib/eruvStore'
+import { noteValidated } from '@/lib/validatedDuring'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { MIN_PAGE_WORDS, WATCH_FETCH_HEADERS, pageWords } from '@/lib/websiteWatch'
 import { ERUV_SUGGESTION_FIELDS, type EruvSuggestion } from '@/lib/eruvSuggestion'
@@ -71,6 +72,9 @@ export async function runEruvWebsiteWatch(community: string, url: string, fetche
 
   const readings = eruvim.map((e) => ({ eruv: e, reading: readEruvDetails(e, { text, html, url: res.url || url }) }))
   const differing = readings.filter((r) => Object.keys(r.reading.changes).length)
+  // What the page shows as we have it was validated tonight (Activity),
+  // though an eruv keeps no date for it.
+  for (const { eruv, reading } of readings) noteValidated(eruv.id, reading.same)
 
   // Everything this watch has filed for these eruvim, whatever became of it.
   let filedEarlier: (Filed & { eruvId: string })[] = []

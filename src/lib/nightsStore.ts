@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { listApprovedResources } from './resourceStore'
+import { listEruvim } from './eruvStore'
 import { resolveCommunity } from './communityStore'
 import { runTableMissing, kindsColumnMissing } from './jobRunStore'
 import { nameNight, nightsFrom, NIGHT_JOBS, type NamedNight, type NightRun } from './validatedNights'
@@ -37,8 +38,12 @@ export async function listNights(community: string): Promise<NamedNight[]> {
     finishedAt: r.finished_at,
     kinds: r.kinds?.[community] ?? null,
   }))
-  const [{ timezone }, listings] = await Promise.all([resolveCommunity(community), listApprovedResources(community)])
-  const names = new Map(listings.map((l) => [l.id, l.name]))
+  const [{ timezone }, listings, { eruvim }] = await Promise.all([
+    resolveCommunity(community),
+    listApprovedResources(community),
+    listEruvim(community).catch(() => ({ eruvim: [] })),
+  ])
+  const names = new Map([...listings, ...eruvim].map((l) => [l.id, l.name]))
   return nightsFrom(runs, timezone)
     .map((n) => nameNight(n, (id) => names.get(id)))
     .filter((n) => n.groups.length > 0)

@@ -4,6 +4,7 @@ import { TAGS } from './cacheTags'
 import type { MenuDish } from './menuReader'
 import { MENU_LINK_KEY } from './menuLink'
 import { MENU_CANT_READ_NOTE, READING_GIVES_UP_MS } from './watchJobs'
+import { noteValidated } from './validatedDuring'
 
 // What the menu reader proposed for each food place, and what an admin
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
@@ -302,6 +303,14 @@ export async function setMenuDishes(
 // those dates move too (menuWatchRun.ts). A dish added by hand that the
 // menu never named keeps its own date.
 
+/** Whether a read naming `names` agrees with the listing: it names at
+ *  least one of the dishes the listing has. Validated, then, for Activity
+ *  (validatedNights.ts), whether or not a date moves. Pure, for its tests. */
+export function menuNamesListed(details: Record<string, unknown>, fieldKey: string, names: readonly string[]): boolean {
+  const named = new Set(names.map((n) => n.trim().toLowerCase()))
+  return [fieldKey, `${fieldKey}_sometimes`].some((key) => Array.isArray(details[key]) && (details[key] as unknown[]).some((n) => typeof n === 'string' && named.has(n.trim().toLowerCase())))
+}
+
 /** The details with the listing's dishes among `names` (any case) dated on
  *  the menu at `at`. Null when nothing moves. Pure, for its tests. */
 export function withMenuChecked(details: Record<string, unknown>, fieldKey: string, names: readonly string[], at: string): Record<string, unknown> | null {
@@ -329,7 +338,9 @@ export async function dateMenuDishes(community: string, resourceId: string, fiel
   const supabase = getAdminClient()
   const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
   if (error || !data) return false
-  const details = withMenuChecked((data as { details: Record<string, unknown> | null }).details ?? {}, fieldKey, names, at)
+  const had = (data as { details: Record<string, unknown> | null }).details ?? {}
+  if (menuNamesListed(had, fieldKey, names)) noteValidated(resourceId, ['menus'])
+  const details = withMenuChecked(had, fieldKey, names, at)
   if (!details) return false
   const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
   if (saveError) {

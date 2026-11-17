@@ -75,6 +75,16 @@ describe('a night named, and its row', () => {
     expect(nightLine({ google: 0, own: 5 })).toEqual(['5 against their own websites'])
   })
 
+  it('menus and eruv websites are groups of their own, and count as their own websites', () => {
+    const [n] = nightsFrom([watches('2026-11-17', { menus: { of: 2, read: 2, validated: ['g1'] }, eruvs: { of: 1, read: 1, validated: ['lm'] } })], TZ)
+    const both = nameNight(n, (id) => ({ g1: 'Zevi’s Bakery', lm: 'Lower Merion Eruv' })[id])
+    expect(both.groups.map((g) => [g.title, g.places.map((p) => p.name)])).toEqual([
+      ['Dishes, against their menus', ['Zevi’s Bakery']],
+      ['Eruv hotlines and alerts, against their websites', ['Lower Merion Eruv']],
+    ])
+    expect(nightRow(both)).toMatchObject({ google: 0, own: 2 })
+  })
+
   it('no row for a night with only the agencies’ or Refuah’s', () => {
     const [only] = nightsFrom([watches('2026-11-17', { kosher: { of: 1, read: 1, validated: ['g1'] } })], TZ)
     expect(nightRow(nameNight(only, (id) => names[id]))).toBeNull()

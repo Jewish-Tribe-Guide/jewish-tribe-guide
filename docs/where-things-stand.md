@@ -290,14 +290,20 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   every row a listing, the source only in the heading ("Hechsher, against
   the kosher agencies' lists"), four shown then "Show all". Only what was
   validated: what couldn't be read stays in the admin, a possible change
-  is never mentioned. Validated means a watch dated the listing's box
-  (`confirmFromSource`, noted per run by `validatedDuring.ts`) or Google
-  answered and matched; the ids go in `job_run.kinds` (`validated`,
-  `contact`), no migration. Changes the Oct 2 rule that Activity shows
+  is never mentioned. Validated means a check read the source and found
+  it as we have it, whether or not the listing shows a date for it (the
+  user, Nov 17: not the same thing): a box dated by `confirmFromSource`, a
+  menu still naming the listing's dishes, an eruv website still showing
+  its hotline or alerts link, or Google answering and matching. Each is
+  noted per run by `validatedDuring.ts`; the ids go in `job_run.kinds`
+  (`validated`, `contact`), no migration. The read-menus job's first
+  reads aren't counted (its runs keep no kinds); the menu watches that
+  follow them are. Changes the Oct 2 rule that Activity shows
   only changes to the guide. Departures from the boards: Google is one
   group, "Open or closed, against Google" (most nights it checks status
-  only); no Menus or Eruv groups (those checks confirm nothing); two more
-  groups, "Phone and email" and "Details"; every night's page lists names
+  only); Menus are "Dishes, against their menus" and eruvs "Eruv
+  hotlines and alerts, against their websites", both counted in "their
+  own websites"; two more groups, "Phone and email" and "Details"; every night's page lists names
   (W2's counts-only older night is gone, since each run now keeps its
   ids); yesterday's night is titled "Validated yesterday". Rows appear
   only from the first runs after this deploys; no production write needed.

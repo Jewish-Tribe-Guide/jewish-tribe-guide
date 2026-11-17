@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-vi.mock('./supabase/admin', () => ({ getAdminClient: () => ({}) }))
-const { fromRow, isNoMenu, READING_GIVES_UP_MS, READING_NOTE, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
+const m = vi.hoisted(() => ({ client: {} as unknown }))
+vi.mock('./supabase/admin', () => ({ getAdminClient: () => m.client }))
+const { dateMenuDishes, fromRow, isNoMenu, menuNamesListed, READING_GIVES_UP_MS, READING_NOTE, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
+const { validatedDuring } = await import('./validatedDuring')
 
 // The listing's dishes a menu doesn't name (the user, Oct 21) are kept
 // among a reading's dishes, so they need no migration.
@@ -97,6 +99,29 @@ describe('withMenuChecked', () => {
   it('null when nothing moves', () => {
     expect(withMenuChecked(details, 'dishes', ['Latkes'], AT)).toBeNull()
     expect(withMenuChecked({ ...details, itemMenu: { dishes: { Sliders: AT } } }, 'dishes', ['Sliders'], AT)).toBeNull()
+  })
+})
+
+// Activity (the user, Nov 17): a menu still naming a listing's dishes
+// validated it, whether or not the listing shows a date for it ("I don't
+// view those as the same thing").
+describe('a menu that agrees, for the night', () => {
+  const details = { dishes: ['Sliders'], dishes_sometimes: ['Soup'] }
+
+  it('agrees when it names any dish the listing has, in either list, any case', () => {
+    expect(menuNamesListed(details, 'dishes', ['soup', 'Latkes'])).toBe(true)
+    expect(menuNamesListed(details, 'dishes', ['Latkes'])).toBe(false)
+    expect(menuNamesListed({}, 'dishes', ['Sliders'])).toBe(false)
+  })
+
+  it('notes the listing for the run though every date was already today’s', async () => {
+    const AT = '2026-11-17T07:00:00.000Z'
+    const row = { details: { ...details, itemMenu: { dishes: { Sliders: AT } } } }
+    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: row, error: null }) }
+    m.client = { from: () => q }
+    const { result, validated } = await validatedDuring(async () => [await dateMenuDishes('philly', 'r1', 'dishes', ['Sliders'], AT), await dateMenuDishes('philly', 'r2', 'dishes', ['Latkes'], AT)])
+    expect(result).toEqual([false, false])
+    expect(validated).toEqual([{ id: 'r1', boxes: ['menus'] }])
   })
 })
 
