@@ -17,8 +17,6 @@ import SortMenu, { headingButton } from './SortMenu'
 //
 // Filters and Sort are outlined buttons a thumb can find, 40px tall; as
 // bold blue words they were hard to hit on a phone (the user, Oct 10).
-// Words only: a symbol on every button read as decoration, "unprofessional/
-// AI" (the user, Nov 17). Sort keeps its chevron, which says it's a menu.
 // 16px under them before the first card.
 
 type Props = {
@@ -41,9 +39,9 @@ type Props = {
   /** "Show map", at the right end, once the map beside the list has been
    *  hidden. Only on a screen wide enough to show it. */
   onShowMap?: () => void
-  /** "Map", at the right end on a phone only: the Map tab on these places,
-   *  with a way back (boards G1, Nov 16, and I7, Nov 17). A computer has the
-   *  map beside the list instead. */
+  /** "Map", between Filters and Sort on a phone only: the Map tab on these
+   *  places, with a way back (board G1, Nov 16; order and no symbol, the
+   *  user, Nov 17). A computer has the map beside the list instead. */
   mapHref?: string
   /** What the list holds, where it isn't listings: ['eruv', 'eruvim']. */
   units?: [string, string]
@@ -54,7 +52,7 @@ type Props = {
 export default function ListHeading({ label, count, noun = !label, total, filters, sort, lead, onShowMap, mapHref, units = ['listing', 'listings'], suffix }: Props) {
   const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
   // With Map in the row, on a phone the buttons have the line to
-  // themselves, so Filters, Sort and Map fit at 360 (board I8, Nov 17). A
+  // themselves, so Filters, Map and Sort fit at 360 (measured Nov 17). A
   // bare count goes, the rows say it; a group's name ("Open now · 57")
   // heads the first group, so it moves under the buttons. Without Map (the
   // eruv list) nothing changes.
@@ -76,11 +74,8 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
         </h2>
         )}
-        {/* With Map on a phone, Filters and Sort follow what's on the left
-            (Synagogues' switch, or nothing) and Map stands at the right end:
-            these arrange the list, Map leaves for the Map tab (board I7,
-            Nov 17). Otherwise they sit at the right end, as on a computer. */}
-        <div className={`flex items-center gap-1.5 lg:gap-2 ${mapHref ? 'flex-1 lg:ml-auto lg:flex-none' : 'ml-auto'}`}>
+        {/* From the left on a phone when nothing is beside them. */}
+        <div className={`flex items-center gap-1.5 lg:gap-2 ${lead || !makeRoom ? 'ml-auto' : 'lg:ml-auto'}`}>
           {filters && (
             <button
               type="button"
@@ -88,6 +83,12 @@ export default function ListHeading({ label, count, noun = !label, total, filter
               aria-haspopup="dialog"
               className={headingButton(filters.active > 0)}
             >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-3.5 w-3.5">
+                  <path d="M20 7h-9" />
+                  <path d="M14 17H5" />
+                  <circle cx="17" cy="17" r="3" />
+                  <circle cx="7" cy="7" r="3" />
+                </svg>
                 Filters
                 {filters.active > 0 && (
                   <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-primary">
@@ -96,12 +97,14 @@ export default function ListHeading({ label, count, noun = !label, total, filter
                 )}
             </button>
           )}
-          {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
+          {/* Map is a word only: its symbol made the row busy (the user,
+              Nov 17). Between Filters and Sort, Sort's menu at the end. */}
           {mapHref && (
-            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} ml-auto lg:hidden`}>
+            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} lg:hidden`}>
               Map
             </Link>
           )}
+          {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
           {onShowMap && (
             <span className="hidden lg:flex">
               <TextAction>

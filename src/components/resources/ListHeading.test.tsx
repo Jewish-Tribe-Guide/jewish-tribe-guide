@@ -14,32 +14,22 @@ const filters = { active: 0, onOpen: vi.fn() }
 const sort = { byPopular: false, onSelect: vi.fn() }
 
 describe('ListHeading — Map in the row', () => {
-  it('puts Map at the right end, on a phone only, as a link to the Map tab', () => {
+  it('puts Map between Filters and Sort, on a phone only, as a link to the Map tab', () => {
     render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/philly/map?cat=restaurant&from=restaurant" />)
     const map = screen.getByRole('link', { name: 'Map' })
     expect(map).toHaveAttribute('href', '/philly/map?cat=restaurant&from=restaurant')
     // A computer has the map beside the list instead.
     expect(map.className).toMatch(/(^|\s)lg:hidden(\s|$)/)
-    // Filters and Sort arrange the list; Map leaves it, on its own at the end
-    // (board I7, Nov 17).
+    // Sort's menu at the end (the user, Nov 17).
     const buttons = [...map.parentElement!.children]
-    expect(buttons.map((b) => b.textContent)).toEqual(['Filters', expect.stringMatching(/^Sort:/), 'Map'])
-    expect(map.className).toMatch(/(^|\s)ml-auto(\s|$)/)
-    expect(map.parentElement!.className).toMatch(/(^|\s)flex-1(\s|$)/)
+    expect(buttons.map((b) => b.textContent)).toEqual(['Filters', 'Map', expect.stringMatching(/^Sort/)])
   })
 
-  it('draws words, not symbols: only Sort keeps its chevron', () => {
+  it('draws Map as a word: Filters keeps its symbol, Sort its chevron', () => {
     render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
     expect(screen.getByRole('link', { name: 'Map' }).querySelector('svg')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Filters' }).querySelector('svg')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filters' }).querySelectorAll('svg')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Sort Distance' }).querySelectorAll('svg')).toHaveLength(1)
-  })
-
-  it('shows the word Sort on a phone too, so the choice doesn’t read as a filter', () => {
-    render(<ListHeading count={71} total={71} sort={sort} mapHref="/m" />)
-    const word = screen.getByText('Sort', { exact: false, selector: 'span' })
-    expect(word.className).not.toMatch(/sr-only/)
-    expect(word).toHaveTextContent('Sort:')
   })
 
   it('takes the bare count off a phone to make room, and keeps it on a computer', () => {

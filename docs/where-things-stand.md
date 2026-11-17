@@ -238,8 +238,9 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   **Changes two earlier decisions:** the list's count ("71 listings",
   Sep 28) is off the row on a phone (a group's name, "Open now · 57",
   moves under the buttons instead); and a category's own Map link is back
-  on phones (it was removed when the tab bar was thought enough). (Sort's
-  choice alone and 10px-a-side buttons were undone Nov 17, below.) The row
+  on phones (it was removed when the tab bar was thought enough). Sort
+  shows only its choice on a phone ("Distance"). (The order and the 10px
+  sides changed Nov 17, below.) The row
   doesn't stick. `e2e/phone-map-row.spec.ts` measures the line at 360.
 - Built: arrived from a category, the Map tab's phone search bar has a
   round ‹ before it, back to the category as it was (the browser's Back;
@@ -262,15 +263,14 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   `src/lib/cameBack.ts`, loaded from the root layout like `backGuard.ts`:
   inside the tab bar's own module it heard the Back after the router had
   drawn the page. `e2e/phone-map-row.spec.ts` checks both ways back.
-- Built Nov 17 (board I7/J7, the user's pick of four on the canvas): the
-  row's buttons are words only, Filters · Sort: Distance ▾ from the left
-  and Map alone at the right end ("too many emoji type things", and the
-  row "doesn't feel right"). Sort keeps its chevron; the word "Sort" is
-  back on phones. The buttons and the Synagogue | Minyan switch have their
-  14px sides again ("a little ovaly"). Changes to earlier decisions: Map
-  is last, not first; "Sort" shows on a phone. Not drawn, done for one
-  look: Filters lost its symbol on a computer too, and the computer's Sort
-  reads "Sort: Distance". The computer's "Show map" keeps its map symbol.
+- Built Nov 17, the user's own call after the boards (rows I and J on the
+  canvas): on a phone the row is Filters (with its symbol) · Map (a word
+  only) · Distance ▾. Sort stays at the end, where its menu opens. Map in
+  the middle is a change from Nov 16 (first) and from this morning's build
+  (alone at the right end, 99bc7b3a). The buttons and the Synagogue |
+  Minyan switch are 12px a side on a phone ("a little ovaly"; 14px
+  overflowed Synagogues at 360 by 10px), 14px on a computer. The computer
+  is as it was before Nov 17. The order is one place in `ListHeading.tsx`.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

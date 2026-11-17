@@ -19,7 +19,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
  *  thumb can find, 40px tall; solid blue while it has something on
  *  (Filters, with filters on). */
 export function headingButton(on = false): string {
-  const base = 'flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30'
+  const base = 'flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[14px] lg:px-3.5 font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30'
   return `${base} ${on ? 'border-primary bg-primary text-white hover:bg-primary-dark' : 'border-slate-300 bg-white text-primary hover:bg-slate-50'}`
 }
 
@@ -88,11 +88,11 @@ export default function SortMenu({ byPopular, onSelect }: { byPopular: boolean; 
         }}
         className={headingButton()}
       >
-        {/* "Sort: Distance", read out as "Sort Distance"; the space is for
-            that name, a flex row doesn't draw it. The word came back on
-            phones with the buttons' symbols gone (board I7, Nov 17): alone,
-            "Distance ▾" read as a filter that was on. */}
-        <span className="font-medium text-slate-500">Sort<span aria-hidden="true">:</span></span>{' '}
+        {/* The space is for the name it's read out by, "Sort Popularity";
+            a flex row doesn't draw it. On a phone only the choice shows, so
+            Filters, Map and Sort fit one line at 360 (board G2, Nov 16);
+            the word stays in the name. */}
+        <span className="sr-only font-medium text-slate-500 lg:not-sr-only">Sort</span>{' '}
         <span className="flex items-center gap-0.5">
           <span data-testid="sort-shown">{CHOICES[current].label}</span>
           <svg
