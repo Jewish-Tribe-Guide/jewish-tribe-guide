@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertUsableSlug,
+  mapBackSteps,
   FIXED_VIEW_KINDS,
   fixedViewSlug,
   mapQueryString,
@@ -232,5 +233,16 @@ describe('parseMapQuery', () => {
     expect(parse('open=1').openNow).toBe(true)
     expect(parse('open=true').openNow).toBe(false)
     expect(parse('open=0').openNow).toBe(false)
+  })
+})
+
+describe('mapBackSteps', () => {
+  it('goes back past the map’s own entries to where it was opened from', () => {
+    expect(mapBackSteps(null)).toBe(1)
+    expect(mapBackSteps({ __NA: true })).toBe(1)
+    // A place's sheet open: ‹ used to close only the sheet.
+    expect(mapBackSteps({ mapSheetOpen: true })).toBe(2)
+    expect(mapBackSteps({ mapSheetOpen: true, mapSheetForm: 'edit' })).toBe(3)
+    expect(mapBackSteps({ mapSheetOpen: true, mapSheetForm: 'edit', mapSheetRemoval: true })).toBe(4)
   })
 })

@@ -251,10 +251,24 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   with the place's own framing and won; now a picked place frames itself.
   Checked by eye only: the camera needs Google's map, which refuses the
   key on CI's localhost (`shouldLeaveToSelection` is unit-tested).
-- Not built: the listing's map tile (B1), to be tried on the preview only.
-  Its picture needs Google's Maps Static API, which isn't switched on for
-  the site's key (it answers 403 "not activated"). The user's call: switch
-  it on in Google Cloud, or pick another picture.
+- Built Nov 17, for the user to try on the preview: the listing's map
+  tile (B1). A phone's listing (its sheet on a category page, and its own
+  page) has a small Google map, 120px tall, at the top of the address box,
+  "On Food's map"; a tap opens the Map tab on the place, ‹ back to the
+  listing. The user switched on the Maps Static API for the site's key
+  (Nov 17). One picture a view, fetched when it scrolls into sight, at the
+  tile's own width; none where Google refuses it (CI's localhost), so the
+  e2e suites can't see it (unit-tested). **One change from the board:** the
+  pill is top left, not bottom left, because Google's logo and credit sit
+  along the bottom and must stay visible. Not on a computer (the map is
+  beside the list there), nor in the map's own sheet.
+- Fixed with it: a map opened on one place framed it, then "nudged" the
+  pin to the strip's middle before the pin was drawn, read its box as the
+  screen's corner, and moved the map 251px the wrong way, the place behind
+  its sheet. The nudge now skips an undrawn pin; the place lands a little
+  low in the strip, but in view. And the Map tab's ‹ with a place's sheet
+  open closed only the sheet; it now goes back past the map's own entries
+  (`mapBackSteps`), checked in `e2e/phone-map-row.spec.ts`.
 - Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
   Map tab or the browser's Back, lights the tab it was first opened from
   (Home), not the Map tab just left. Opened anew from another tab, it still

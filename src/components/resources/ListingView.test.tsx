@@ -1073,3 +1073,59 @@ describe('ListingView — a field where the admin put it', () => {
     expect(screen.getByTestId('listing-details')).not.toHaveTextContent(/11:00 AM/)
   })
 })
+
+// Board B1 (Nov 16): a phone's listing has a small map at the top of its
+// address box, opening the Map tab on the place with a ‹ back here.
+describe('ListingView — the map tile', () => {
+  // jsdom lays nothing out; the tile asks for its picture at its width.
+  const clientWidth = Object.getOwnPropertyDescriptor(Element.prototype, 'clientWidth')!
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY', 'test-key')
+    Object.defineProperty(Element.prototype, 'clientWidth', { configurable: true, get: () => 301 })
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    Object.defineProperty(Element.prototype, 'clientWidth', clientWidth)
+  })
+
+  it('opens the Map tab on this place, from this category, at the top of the address box', () => {
+    view({ mapTile: true })
+    const tile = screen.getByTestId('listing-map-tile')
+    const href = new URL(tile.getAttribute('href')!, 'https://x.test')
+    expect(href.pathname).toBe('/test-community/map')
+    expect(href.searchParams.get('place')).toBe('judah')
+    expect(href.searchParams.get('cat')).toBe('restaurant')
+    expect(href.searchParams.get('from')).toBe('restaurant')
+    expect(tile).toHaveTextContent('On Food’s map')
+    // First in the box, above the address.
+    expect(screen.getByTestId('listing-details').querySelector('a, [data-testid]')).toBe(tile)
+    const src = new URL(tile.querySelector('img')!.getAttribute('src')!)
+    expect(src.host).toBe('maps.googleapis.com')
+    expect(src.searchParams.get('center')).toBe('40.085600,-75.045400')
+    expect(src.searchParams.get('key')).toBe('test-key')
+    // At the tile's own width, so cropping can't cut off Google's logo.
+    expect(src.searchParams.get('size')).toBe('301x120')
+    expect(tile.querySelector('img')).toHaveAttribute('loading', 'lazy')
+  })
+
+  it('is left out of the map’s own sheet, and where there is no map, no place on one, or no key', () => {
+    view()
+    expect(screen.queryByTestId('listing-map-tile')).toBeNull()
+    cleanup()
+    view({ mapTile: true, category: { ...food, capabilities: { map: false } } as typeof food })
+    expect(screen.queryByTestId('listing-map-tile')).toBeNull()
+    cleanup()
+    view({ mapTile: true, item: { ...judah, geo: null } })
+    expect(screen.queryByTestId('listing-map-tile')).toBeNull()
+    cleanup()
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY', '')
+    view({ mapTile: true })
+    expect(screen.queryByTestId('listing-map-tile')).toBeNull()
+  })
+
+  it('goes, rather than showing a broken picture, when Google refuses it', () => {
+    view({ mapTile: true })
+    fireEvent.error(screen.getByTestId('listing-map-tile').querySelector('img')!)
+    expect(screen.queryByTestId('listing-map-tile')).toBeNull()
+  })
+})

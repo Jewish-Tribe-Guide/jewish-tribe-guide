@@ -102,6 +102,27 @@ test.describe('the phone list row with Map', () => {
     await expect(lit).toHaveText(['Home'])
   })
 
+  // A place's sheet is an entry of the map's own; ‹ used to close only
+  // that, back to the map's list (Nov 17, found from a listing's map tile,
+  // which opens the map on a place's sheet the same way).
+  test('‹ comes back to the category with a place open on the map', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    const [c] = await mapCategories(page, community)
+    test.skip(!c, 'needs a category with a map and listings')
+    await page.goto(`/${community}/${c.id}`)
+    await ready(page)
+    await dismissLocationPrompt(page)
+    await page.getByTestId('list-heading').filter({ visible: true }).first().getByTestId('list-map').click()
+    await expect(page.getByTestId('map-back')).toBeVisible()
+    await page.getByRole('button', { name: 'Expand nearby list' }).click()
+    const list = page.getByTestId('sheet-scroll')
+    await list.getByTestId('nearby-name').first().click()
+    await expect(page.getByRole('button', { name: 'Back to list' })).toBeVisible()
+
+    await page.getByTestId('map-back').click()
+    await expect(page).toHaveURL(new RegExp(`/${community}/${c.id}(\\?.*)?$`))
+  })
+
   test('the Map tab opened as a tab has no ‹', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}/map`)

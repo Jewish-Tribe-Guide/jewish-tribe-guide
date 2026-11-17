@@ -208,6 +208,14 @@ export const routes = {
 /** Serializes the map's live view into query params, so a shared map link
  *  reopens the same pins and filters. Omits anything at its default rather than
  *  writing an empty value, keeping the common URL short. */
+/** How many entries back the map was opened from: one, plus one each for
+ *  a place's sheet (MobileNearbySheet), its edit form and the form's
+ *  removal step (MapPlaceDetail), each pushed on top of the one before. */
+export function mapBackSteps(state: unknown): number {
+  const s = (state ?? {}) as { mapSheetOpen?: boolean; mapSheetForm?: unknown; mapSheetRemoval?: boolean }
+  return 1 + (s.mapSheetOpen ? 1 : 0) + (s.mapSheetForm ? 1 : 0) + (s.mapSheetRemoval ? 1 : 0)
+}
+
 export function mapQueryString(state: {
   categories?: string[] | null
   query?: string | null

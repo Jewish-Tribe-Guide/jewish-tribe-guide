@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
-import { parseMapQuery, routes } from '@/lib/routes'
+import { mapBackSteps, parseMapQuery, routes } from '@/lib/routes'
 import { useCategoriesIfAny } from '@/lib/contentContext'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useCollapseHeader } from '@/lib/headerVisibility'
@@ -43,8 +43,14 @@ export default function MapScreen() {
     ? {
         label: `Back to ${fromCategory.pluralLabel || fromCategory.label}`,
         onBack: () => {
-          if (window.history.length > 1) router.back()
-          else router.replace(routes.slug(communitySlug, fromCategory.id))
+          // Past the map's own entries (a place's sheet, its edit form):
+          // ‹ goes back to where the map was opened from, not to the map's
+          // list (Nov 17, from a listing's map tile).
+          const steps = mapBackSteps(window.history.state)
+          if (window.history.length > steps) {
+            if (steps === 1) router.back()
+            else window.history.go(-steps)
+          } else router.replace(routes.slug(communitySlug, fromCategory.id))
         },
       }
     : undefined

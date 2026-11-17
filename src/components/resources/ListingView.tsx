@@ -69,6 +69,7 @@ import {
   ShareIcon,
 } from '@/components/icons'
 import Chip from './Chip'
+import ListingMapTile from './ListingMapTile'
 import Highlight from './Highlight'
 import DaveningCard from './DaveningCard'
 import type { BoxEdit } from './BoxEditSheet'
@@ -131,6 +132,9 @@ type Props = {
   /** The listing's own page names itself with the page's one h1; inside a
    *  category page (the sheet, the column) the category holds that. */
   titleAs?: 'h1' | 'h2'
+  /** A small map at the top of the address box, opening the Map tab on
+   *  this place (board B1): a phone's listing, never the map's own sheet. */
+  mapTile?: boolean
 }
 
 /** The key the contact box is confirmed under (migration 082): not a
@@ -151,7 +155,7 @@ const TONE: Record<RowFact['tone'], string> = {
 // not with every listing: they were 15 KB on the home screen's first load.
 const BoxEditSheet = dynamic(() => import('./BoxEditSheet'), { loading: () => null })
 
-export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '', titleAs: Title = 'h2' }: Props) {
+export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '', titleAs: Title = 'h2', mapTile = false }: Props) {
   const { community } = useActiveCommunity()
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
@@ -636,6 +640,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   // user, Oct 10): someone planning where they'll be wants to see how far
   // the next thing is from there. It was a hospital's only (Oct 6).
   const showSetLocation = category.hasAddress !== false && !!item.geo
+  // Where the category has a map at all, as its list's Map button.
+  const showMapTile = mapTile && showSetLocation && resolveCapabilities(category.capabilities).map
   // Its Edit: the editor's rows for what it shows (editorRows): address,
   // phone and links; the hours; the yes/no lines; other lists.
   const editDetails = editRows(otherHours.length > 0 ? 'Contact and hours' : contactTitle, [
@@ -657,6 +663,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   ) : undefined
   const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || contactExtra.length > 0 || quietBadges.length > 0 || otherTags.length > 0 || contactBig.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
+    {showMapTile && <ListingMapTile item={item} category={category} community={community.slug} />}
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
         <Row>

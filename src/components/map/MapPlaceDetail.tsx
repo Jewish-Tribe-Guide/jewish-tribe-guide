@@ -48,6 +48,8 @@ type Props = {
   onwardClassName?: string
   /** See ListingView's `titleAs`. */
   titleAs?: 'h1' | 'h2'
+  /** See ListingView's `mapTile`. */
+  mapTile?: boolean
   /** Whether the editor has taken the listing's place, for a host whose
    *  own controls are about the listing (ListingColumn's back and ‹ ›). */
   onEditingChange?: (editing: boolean) => void
@@ -72,7 +74,7 @@ type Props = {
  * can be corrected and recommended, the same whether you found it here or in
  * the category directory.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange, onEditor }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange, onEditor, mapTile }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   // Edit swaps this whole detail view for the listing-shaped editor
@@ -227,6 +229,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
         wide={wide}
         onwardClassName={onwardClassName}
         titleAs={titleAs}
+        mapTile={mapTile}
         foot={
           // Edit listing, and Request removal beside it. Rendered only
           // where the listing can be edited (ListingEditBar).

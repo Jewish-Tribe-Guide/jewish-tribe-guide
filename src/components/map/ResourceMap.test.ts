@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { haversineMiles } from '@/lib/geo'
-import { markerZIndex, pinHaloStyle, pointsWithinZoomRadius, resolveSelectionZoom, shouldLeaveToSelection, SELECTED_Z_BOOST, USER_PULSE_STYLE, type MapPoint } from './ResourceMap'
+import { markerZIndex, pinHaloStyle, pointsWithinZoomRadius, markerNudge, resolveSelectionZoom, shouldLeaveToSelection, SELECTED_Z_BOOST, USER_PULSE_STYLE, type MapPoint } from './ResourceMap'
 
 function point(overrides: Partial<MapPoint> = {}): MapPoint {
   return { id: 'p1', lat: 40, lng: -75, name: 'Test Place', color: '#000', ...overrides }
@@ -143,5 +143,15 @@ describe('shouldLeaveToSelection', () => {
     expect(shouldLeaveToSelection(pins, null)).toBe(false)
     expect(shouldLeaveToSelection(pins, undefined)).toBe(false)
     expect(shouldLeaveToSelection(pins, 'gone')).toBe(false)
+  })
+})
+
+describe('markerNudge', () => {
+  it('moves the map by how far the pin sits from the strip’s middle', () => {
+    expect(markerNudge({ top: 300, height: 40, width: 30 }, 251)).toBe(69)
+  })
+  it('leaves a pin not drawn yet where the camera put it', () => {
+    // Read as the map's top corner, it moved the map 251px the wrong way.
+    expect(markerNudge({ top: 0, height: 0, width: 0 }, 251)).toBeNull()
   })
 })
