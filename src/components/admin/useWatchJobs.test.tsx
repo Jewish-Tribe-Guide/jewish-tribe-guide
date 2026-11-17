@@ -12,6 +12,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/philly/admin/watches',
   useSearchParams: () => new URLSearchParams(),
 }))
+vi.unmock('@/components/admin/fetchJobs')
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,25 +24,26 @@ vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 // their waits hid it; this is what was slow.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Pending = { path: string; answer: (body: unknown) => void }
+// Each request the hook makes: the jobs it asks for, and its answer.
+type Pending = { url: string; keys: string[]; answer: (body: unknown) => void }
 let pending: Pending[] = []
 
 function answering() {
   pending = []
   vi.mocked(fetchJson).mockImplementation((url: string) => {
-    const path = new URL(url, 'http://x').pathname + (new URL(url, 'http://x').searchParams.has('counts') ? '?counts' : '')
-    return new Promise((resolve) => pending.push({ path, answer: resolve }))
+    const only = new URL(url, 'http://x').searchParams.get('only')
+    return new Promise((resolve) => pending.push({ url, keys: only ? only.split(',') : [...ALL_JOBS], answer: resolve }))
   })
 }
-const asked = () => pending.map((p) => p.path)
-const answer = async (path: string, body: unknown) => {
-  const i = pending.findIndex((p) => p.path === path)
-  expect(i, `${path} was asked for`).toBeGreaterThanOrEqual(0)
-  const [p] = pending.splice(i, 1)
-  await act(async () => p.answer(body))
+/** The jobs asked for by each request still waiting. */
+const asked = () => pending.map((p) => p.keys)
+const answer = async (jobs: Record<string, unknown> = {}) => {
+  const p = pending.shift()
+  expect(p, 'a request was made').toBeDefined()
+  await act(async () => p!.answer({ ok: true, jobs }))
 }
 const answerAll = async () => {
-  while (pending.length) await answer(pending[0].path, {})
+  while (pending.length) await answer()
 }
 
 type Hook = { jobs: Jobs; reload: (changed?: readonly (keyof Jobs)[]) => Promise<void> }
@@ -59,6 +61,17 @@ afterEach(() => {
 })
 
 describe('useWatchJobsAndReload', () => {
+  it('reads every job in one request, not thirteen the browser queues', async () => {
+    answering()
+    renderWithProviders(<Probe />)
+    expect(pending.map((p) => new URL(p.url, 'http://x').pathname)).toEqual(['/api/admin/watches/jobs'])
+    expect(asked()).toEqual([ALL_JOBS])
+    await answer({ dishes: { places: [{ id: 'p', name: 'P', href: '' }] }, runs: { kinds: [] } })
+    expect(hook.jobs.dishes).toEqual([{ id: 'p', name: 'P', href: '' }])
+    // What the request didn't bring back failed, rather than loading forever.
+    expect(hook.jobs.links).toBeNull()
+  })
+
   it('a save that changed one job is done when that job is back, and only then are the rest read', async () => {
     answering()
     renderWithProviders(<Probe />)
@@ -70,14 +83,13 @@ describe('useWatchJobsAndReload', () => {
       reloading = hook.reload(['dishes']).then(() => void (done = true))
     })
     // Only the menus are asked for: nothing else slows that read down.
-    expect(asked()).toEqual(['/api/admin/main-dishes'])
-    await answer('/api/admin/main-dishes', { places: [{ id: 'p', name: 'P', href: '' }] })
+    expect(asked()).toEqual([['dishes']])
+    await answer({ dishes: { places: [{ id: 'p', name: 'P', href: '' }] } })
     await reloading
     expect(done).toBe(true)
     expect(hook.jobs.dishes).toEqual([{ id: 'p', name: 'P', href: '' }])
     // The rest, read again behind it.
-    expect(asked()).toHaveLength(ALL_JOBS.length - 1)
-    expect(asked()).not.toContain('/api/admin/main-dishes')
+    expect(asked()).toEqual([ALL_JOBS.filter((k) => k !== 'dishes')])
     await answerAll()
   })
 
@@ -88,8 +100,7 @@ describe('useWatchJobsAndReload', () => {
 
     let done = false
     act(() => void hook.reload().then(() => void (done = true)))
-    expect(asked()).toHaveLength(ALL_JOBS.length)
-    for (const path of asked().slice(1)) await answer(path, {})
+    expect(asked()).toEqual([ALL_JOBS])
     expect(done).toBe(false)
     await answerAll()
     expect(done).toBe(true)
@@ -100,13 +111,13 @@ describe('useWatchJobsAndReload', () => {
     renderWithProviders(<Probe />)
     await answerAll()
     act(() => void (hook.reload as (x: unknown) => Promise<void>)({ ok: true }))
-    expect(asked()).toHaveLength(ALL_JOBS.length)
+    expect(asked()).toEqual([ALL_JOBS])
     await answerAll()
   })
 })
 
 describe('a screen with its own read', () => {
-  it('asks for no job until its own data is in, so that read never waits behind thirteen', async () => {
+  it('asks for no job until its own data is in, so that read never waits behind them', async () => {
     answering()
     const arrive: { now?: () => void } = {}
     const hold = (set: () => void) => void (arrive.now = set)
@@ -118,7 +129,7 @@ describe('a screen with its own read', () => {
     renderWithProviders(<Screen />)
     expect(asked()).toEqual([])
     act(() => arrive.now!())
-    expect(asked()).toHaveLength(ALL_JOBS.length)
+    expect(asked()).toEqual([ALL_JOBS])
     await answerAll()
   })
 })
@@ -133,11 +144,31 @@ describe('jobsChangedBy', () => {
 })
 
 describe('noteJobSwitched', () => {
+  it('a read that started before the switch doesn’t put the job back as it was', async () => {
+    // job-off (admin-write, Nov 16): Links turned back on, and Watches
+    // still showed it off. Add a watch's own read, asked before the
+    // switch, came back after it with the old list.
+    answering()
+    renderWithProviders(<Probe />)
+    await answer({ runs: { available: true, kinds: [{ id: 'links' }], off: ['links'] } })
+    act(() => void hook.reload())
+    noteJobSwitched('test-community', 'links', false)
+    // With another job in the same answer: the screen's whole list is
+    // remembered again when it changes, so its own copy must follow too.
+    await answer({ runs: { available: true, kinds: [{ id: 'links' }], off: ['links'] }, dishes: { places: [] } })
+    expect(hook.jobs.runs?.off).toEqual([])
+    cleanup()
+
+    answering()
+    renderWithProviders(<Probe />)
+    expect(hook.jobs.runs?.off).toEqual([])
+    await answerAll()
+  })
+
   it('Watches opens showing the job as just switched, before it reads again', async () => {
     answering()
     renderWithProviders(<Probe />)
-    await answer('/api/admin/watches/runs', { available: true, kinds: [{ id: 'links' }], off: [] })
-    await answerAll()
+    await answer({ runs: { available: true, kinds: [{ id: 'links' }], off: [] } })
     cleanup()
 
     noteJobSwitched('test-community', 'links', true)

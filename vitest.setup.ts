@@ -10,6 +10,11 @@ import { forgetConfirmed } from './src/lib/confirmedHere'
 // next/dynamic loads a piece's code on first render, so a test would find it
 // missing for a moment. Here it loads with the file instead; see eagerDynamic.
 vi.mock('next/dynamic', () => import('./src/test/eagerDynamic'))
+
+// The admin reads every watch job in one request; a component test answers
+// each job's own route instead (fetchJobsByRoute). useWatchJobs.test.tsx
+// unmocks it to test the one request itself.
+vi.mock('@/components/admin/fetchJobs', () => import('./src/test/fetchJobsByRoute'))
 beforeAll(async () => {
   const { dynamicLoaded } = await import('./src/test/eagerDynamic')
   await dynamicLoaded()

@@ -87,7 +87,13 @@ async function openPlace(page: Page, shows: string) {
   const open = page.getByTestId('place-open')
   await expect(async () => {
     await page.reload()
-    await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 3_000 })
+    // Loaded within expect's 5s, or this try fails.
+    // Then whether the place is there yet, without starting over a load
+    // still under way (a 3s try restarted every load over 3s, forever).
+    const loading = page.getByRole('main').getByText('Loading…')
+    await expect(loading.or(page.getByRole('heading', { name })).first()).toBeVisible()
+    await expect(loading).toHaveCount(0)
+    await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 1_000 })
     // Saying its menu's part, once the menu's job has it too: before, it's a
     // place nothing reads.
     await expect(open).toContainText(shows, { timeout: 3_000 })

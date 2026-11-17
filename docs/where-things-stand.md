@@ -160,12 +160,38 @@ are unbalanced; about 6–7 min looks reachable.
   - Places opened with its own read queued behind those 13 (the browser
     opens six connections to an HTTP/1.1 server, as in the tests). It now
     reads the jobs after its list is in, as To do already did.
-  - Still open: a place's own screen (`PlacePage`) shows nothing until all
-    13 jobs are in, so opening one is still 2–3 round trips of reads, and
-    main-dishes' `openPlace` failed on it once in four full runs. The fix
-    is one read that returns every job at once. Moderation's 15s waits
-    (from Nov 3) are the approve request itself, about ten database round
-    trips in a row; left as they are.
+  - A place's own screen showed nothing until all 13 were in, two or three
+    rounds of reads on those six connections, and main-dishes' `openPlace`
+    failed on it. Now every job comes in ONE request
+    (`/api/admin/watches/jobs`, the 13 routes run side by side on the
+    server; `?only=` for a save's). Unit tests answer it from each job's
+    own route (`src/test/fetchJobsByRoute.ts`, mocked in vitest.setup.ts).
+  - Turning a job back on could still show it off: a jobs read asked
+    before the switch landed after it with the old list (job-off, once in
+    two runs). A read from before a switch no longer sets which jobs are
+    off, and every open screen takes the switch too.
+  - CI's unit run failed on a timer left by `useScreenHistory` (a move's
+    wait for its address) firing after a test's page was gone; it stops
+    when there's no page now.
+  - Every admin route checked the sign-in with Supabase on its own, so one
+    jobs read made 14 checks; requests carrying the same token now share
+    the check under way (adminAuth's `checking`), dropped once answered.
+  - main-dishes' `openPlace` reloaded every 3s, so a load over 3s on a busy
+    runner was thrown away and restarted until the test gave up. Each try
+    now waits for the screen to finish loading (expect's 5s), then looks.
+  - Open: `category-open.spec.ts` failed 2 of 8 full admin-write runs on
+    Nov 16, never alone (9/9). A page whose address was loaded behind the
+    list (Cemetery) is asked for again on the click. Seen before this
+    work too; cause not found yet.
+  - Moderation's 15s waits (from Nov 3) are the approve request itself,
+    about ten database round trips in a row; left as they are.
+- Phone header titles are bigger (the user's OK, Nov 16: "be aware of long
+  names"): 22px bold when it fits, stepping down to 19, 17, 15px, then two
+  lines, measured against the room beside it (`FitTitle`). The phone row's
+  gap is 12px now (it kept the computer's 40px). On a 320px phone "Philly
+  Jewish Guide" is 15px and "Candle Lighting & Zmanim" two lines; on 375px
+  19px and 15px. The computer header is unchanged.
+  `e2e/header-title.spec.ts`.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them
