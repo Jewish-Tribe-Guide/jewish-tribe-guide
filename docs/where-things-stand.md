@@ -282,18 +282,20 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   details directly" stays, for now.
 - Drawn Nov 17, waiting on the user (a friend's idea): Activity shows
   the nightly checks, canvas "Activity: the nightly checks"
-  (6YK3gNdSPEZyhz3E1nYchS), boards B1-B3, E1-E2. A "Validated last
-  night" card at the top, the site's logo on its tile: "132 against
-  Google · 119 against their own websites", plus "Nothing had changed"
-  only when true. Agreed with the user: "validated" is fine, never
-  without what it was validated against; "Confirmed" stays for people;
-  a possible change is never mentioned (a place that didn't match just
-  comes off the count, and shows as its own row once approved). The
-  card opens its own page of what was validated, grouped, with what
-  couldn't be read listed, not counted. Changes the Oct 2 rule that
-  Activity shows only changes to the guide. Counts from
-  `job_run.kinds`; places from each source's last check, so only the
-  latest night has a list. Not built.
+  (6YK3gNdSPEZyhz3E1nYchS), boards T1-T3 (B and E boards are the
+  earlier pinned-card version, superseded). Not pinned at the top (the
+  user): each night is one quiet row in the timeline, under its day at
+  the time it ran, beside that day's changes: the site's logo on a
+  small tile, "Validated · 132 against Google · 119 against their own
+  websites · 2 AM". Last night's row opens its own page of what was
+  validated, grouped, with what couldn't be read listed, not counted
+  (B3/E2); an older night opens counts only (T2), since sources keep
+  only their last check. Agreed with the user: "validated" is fine,
+  never without what it was validated against; "Confirmed" stays for
+  people; a possible change is never mentioned (a place that didn't
+  match just comes off the count, and shows as its own row once
+  approved). Changes the Oct 2 rule that Activity shows only changes to
+  the guide. Counts from `job_run.kinds`. Not built.
 - Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
   Map tab or the browser's Back, lights the tab it was first opened from
   (Home), not the Map tab just left. Opened anew from another tab, it still
