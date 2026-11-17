@@ -59,13 +59,14 @@ export default function SiteFooter({
 
           <div className="sm:text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Spot something wrong or missing?
+              Know something we don&rsquo;t?
             </p>
+            {/* Not "Spot something wrong or missing?": it told every visitor
+                the guide is likely wrong (a tester, Nov 17). And the links
+                it named, Edit and Report, are long gone. */}
             <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-muted sm:ml-auto">
-              Use the <span className="font-medium text-slate-600">Add</span>,{' '}
-              <span className="font-medium text-slate-600">Edit</span>, or{' '}
-              <span className="font-medium text-slate-600">Report</span> links on
-              any listing — updates go straight to our reviewers.
+              Tap <span className="font-medium text-slate-600">Suggest an edit</span> on any listing, or{' '}
+              <span className="font-medium text-slate-600">+ Add</span> for a new place. A person checks each one.
             </p>
           </div>
         </div>

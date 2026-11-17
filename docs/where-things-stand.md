@@ -274,6 +274,12 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   again. The Map tab stays mounted behind other screens and restored the
   address's place once a mount; now once each time it shows. Checked in
   `e2e/phone-map-row.spec.ts` (Google's picture stood in for there).
+- Changed Nov 17 (user OK'd, from a tester): the footer's "Spot something
+  wrong or missing?" told every visitor the guide was likely wrong. Now
+  "Know something we don't?" and "Tap Suggest an edit on any listing, or
+  + Add for a new place. A person checks each one." (it used to name Edit
+  and Report links that are gone). The bottom line's "please confirm
+  details directly" stays, for now.
 - Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
   Map tab or the browser's Back, lights the tab it was first opened from
   (Home), not the Map tab just left. Opened anew from another tab, it still
