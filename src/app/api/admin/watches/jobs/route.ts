@@ -1,5 +1,6 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { shareReads } from '@/lib/supabase/sharedReads'
 import { JOB_READS, type JobKey } from '@/lib/watchJobReads'
 import { GET as categories } from '../../categories/route'
 import { GET as dishes } from '../../main-dishes/route'
@@ -26,6 +27,11 @@ import { GET as sites } from '../sites/route'
 // where admin-write's openPlace failed on it (Nov 16). Here they run side
 // by side on the server, through the same handlers, so nothing about
 // what each returns can drift from its own route.
+//
+// They read many of the same rows (the watch list, the categories, each
+// job's runs), so they run inside shareReads: an identical read is made
+// once and shared, and two screens loading at once no longer queue every
+// other admin read behind them (Nov 16; sharedReads.ts has the numbers).
 
 type Handler = (request: Request) => Promise<Response>
 
@@ -54,19 +60,21 @@ export async function GET(request: Request) {
   const only = new URL(request.url).searchParams.get('only')
   const keys = (only ? only.split(',') : Object.keys(JOB_READS)).filter((k): k is JobKey => k in JOB_READS)
 
-  const answers = await Promise.all(
-    keys.map(async (key) => {
-      const handler = HANDLERS[key]
-      const url = new URL(JOB_READS[key], request.url)
-      url.searchParams.set('community', community.slug)
-      try {
-        const res = await handler(new Request(url, { headers: request.headers }))
-        return [key, res.ok ? await res.json() : null] as const
-      } catch (err) {
-        console.error(`[admin/watches/jobs] ${key} failed:`, err)
-        return [key, null] as const
-      }
-    }),
+  const answers = await shareReads(() =>
+    Promise.all(
+      keys.map(async (key) => {
+        const handler = HANDLERS[key]
+        const url = new URL(JOB_READS[key], request.url)
+        url.searchParams.set('community', community.slug)
+        try {
+          const res = await handler(new Request(url, { headers: request.headers }))
+          return [key, res.ok ? await res.json() : null] as const
+        } catch (err) {
+          console.error(`[admin/watches/jobs] ${key} failed:`, err)
+          return [key, null] as const
+        }
+      }),
+    ),
   )
   return Response.json({ ok: true, jobs: Object.fromEntries(answers) })
 }

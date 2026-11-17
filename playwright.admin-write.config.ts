@@ -87,7 +87,17 @@ export default defineConfig({
     ? [['dot'], ['html', { open: 'never', outputFolder: 'playwright-report-admin-write' }]]
     : 'list',
 
-  use: { baseURL: BASE_URL },
+  use: {
+    baseURL: BASE_URL,
+    // A failure keeps its trace: each request's timing and the steps, so a
+    // test that waited on a slow screen says which request it waited on.
+    // Snapshots stay on: without them Playwright keeps no network log at
+    // all (checked). No screenshots, so it records less. Until Nov 16 a CI
+    // failure left only the last page, and two stalls over 5s (Places'
+    // first load, a Dismiss that is one database delete) had nothing to
+    // say where the time went.
+    trace: { mode: 'retain-on-failure', screenshots: false, snapshots: true, sources: false },
+  },
 
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/, use: { ...devices['Desktop Chrome'] } },

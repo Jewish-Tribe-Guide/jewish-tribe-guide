@@ -185,6 +185,26 @@ are unbalanced; about 6–7 min looks reachable.
     work too; cause not found yet.
   - Moderation's 15s waits (from Nov 3) are the approve request itself,
     about ten database round trips in a row; left as they are.
+  - The combined jobs read made 105 database requests, about 65 of them
+    the same read again (the admin list 14 times, the watch list 14, the
+    categories 12, each job's runs 3). Inside it, an identical read is now
+    made once and shared (`src/lib/supabase/sharedReads.ts`, GETs only,
+    one request's lifetime): 42 requests, median 1.36s to 1.07s with two
+    at once, worst of 30 2.4s to 1.45s. Measured, not the cause of the
+    open item below: Places' own read was 0.41s either way.
+  - Open: CI at 76ee5be9 (Nov 16 evening) failed two admin-write tests on
+    a server stall over 5s: Places stuck on Loading… (its read is 0.4s
+    locally) and a Dismiss still busy (one database delete). Nothing else
+    used the test database then, and the walk-routes job skips in CI (no
+    key). Cause not found; the waits were not raised. Failures now keep a
+    trace with every request's timing (`trace: retain-on-failure` in
+    playwright.admin-write.config.ts; it was a final snapshot only), so the
+    next one names the request that hung. Read that before guessing.
+  - Seen in that trace check: one Places load makes two combined jobs
+    reads. Not looked into.
+  - CI's unit run failed once on To do's "1 of 3": the test's three places
+    were dated by the clock, which sometimes ticked between them and
+    reordered the newest-first list. Fixed in the test (fixed dates).
 - Phone header titles are bigger (the user's OK, Nov 16: "be aware of long
   names"): 22px bold when it fits, stepping down to 19, 17, 15px, then two
   lines, measured against the room beside it (`FitTitle`). The phone row's
