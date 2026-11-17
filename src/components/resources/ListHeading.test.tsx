@@ -60,8 +60,17 @@ describe('ListHeading — Map in the row', () => {
     expect(screen.getByRole('heading', { name: /4 minyanim\s*left today/ }).className).not.toMatch(/(^|\s)hidden(\s|$)/)
   })
 
-  it('still reads Sort out by its whole name with the word hidden on a phone', () => {
+  it('says Sort on a phone too, not just the choice', () => {
     render(<ListHeading count={71} total={71} sort={sort} mapHref="/m" />)
-    expect(screen.getByRole('button', { name: 'Sort Distance' })).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: 'Sort Distance' })
+    const word = [...button.querySelectorAll('span')].find((e) => e.textContent === 'Sort')!
+    expect(word.className).not.toMatch(/sr-only/)
+  })
+
+  it('spaces the buttons 8px apart, a phone as a computer', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
+    const group = screen.getByRole('link', { name: 'Map' }).parentElement!
+    expect(group.className).toMatch(/(^|\s)gap-2(\s|$)/)
+    expect(group.className).not.toMatch(/gap-1\.5/)
   })
 })

@@ -238,9 +238,8 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   **Changes two earlier decisions:** the list's count ("71 listings",
   Sep 28) is off the row on a phone (a group's name, "Open now · 57",
   moves under the buttons instead); and a category's own Map link is back
-  on phones (it was removed when the tab bar was thought enough). Sort
-  shows only its choice on a phone ("Distance"). (The order and the 10px
-  sides changed Nov 17, below.) The row
+  on phones (it was removed when the tab bar was thought enough). (Sort's
+  choice alone, the order and the 10px sides changed Nov 17, below.) The row
   doesn't stick. `e2e/phone-map-row.spec.ts` measures the line at 360.
 - Built: arrived from a category, the Map tab's phone search bar has a
   round ‹ before it, back to the category as it was (the browser's Back;
@@ -265,7 +264,9 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   drawn the page. `e2e/phone-map-row.spec.ts` checks both ways back.
 - Built Nov 17, the user's own call after the boards (rows I and J on the
   canvas): on a phone the row is Filters (with its symbol) · Map (a word
-  only) · Distance ▾. Sort stays at the end, where its menu opens. Map in
+  only) · Sort Distance ▾ ("Sort" back on phones, and 8px between the
+  buttons as on a computer, the user later that day). Sort stays at the
+  end, where its menu opens. Map in
   the middle is a change from Nov 16 (first) and from this morning's build
   (alone at the right end, 99bc7b3a). The buttons and the Synagogue |
   Minyan switch are 12px a side on a phone ("a little ovaly"; 14px

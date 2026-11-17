@@ -89,10 +89,9 @@ export default function SortMenu({ byPopular, onSelect }: { byPopular: boolean; 
         className={headingButton()}
       >
         {/* The space is for the name it's read out by, "Sort Popularity";
-            a flex row doesn't draw it. On a phone only the choice shows, so
-            Filters, Map and Sort fit one line at 360 (board G2, Nov 16);
-            the word stays in the name. */}
-        <span className="sr-only font-medium text-slate-500 lg:not-sr-only">Sort</span>{' '}
+            a flex row doesn't draw it. The word shows on a phone too: alone,
+            "Distance ▾" didn't say what it was (the user, Nov 17). */}
+        <span className="font-medium text-slate-500">Sort</span>{' '}
         <span className="flex items-center gap-0.5">
           <span data-testid="sort-shown">{CHOICES[current].label}</span>
           <svg

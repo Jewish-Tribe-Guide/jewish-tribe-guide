@@ -75,7 +75,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
         </h2>
         )}
         {/* From the left on a phone when nothing is beside them. */}
-        <div className={`flex items-center gap-1.5 lg:gap-2 ${lead || !makeRoom ? 'ml-auto' : 'lg:ml-auto'}`}>
+        <div className={`flex items-center gap-2 ${lead || !makeRoom ? 'ml-auto' : 'lg:ml-auto'}`}>
           {filters && (
             <button
               type="button"
