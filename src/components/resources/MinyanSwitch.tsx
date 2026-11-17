@@ -1,5 +1,7 @@
 'use client'
 
+import { ROW_TEXT } from './SortMenu'
+
 // ── "Synagogue | Minyan": the list's two ways to read a page of shuls ───
 // The Synagogues page's way in to every minyan by time (Nov 11, the user's
 // pick from the desk canvas, D1/D2). It replaced the green "Minyanim · 5
@@ -31,7 +33,7 @@ type Props = {
 
 export default function MinyanSwitch({ singular, byTime, onChange }: Props) {
   const part = (on: boolean) =>
-    `h-[38px] cursor-pointer whitespace-nowrap px-3.5 text-[14px] font-semibold transition-colors ${on ? 'bg-primary text-white' : 'bg-white text-ink hover:bg-slate-50'}`
+    `h-[38px] cursor-pointer whitespace-nowrap px-3 ${ROW_TEXT} font-semibold lg:px-3.5 transition-colors ${on ? 'bg-primary text-white' : 'bg-white text-ink hover:bg-slate-50'}`
   return (
     <div role="group" aria-label="Show" data-testid="minyan-switch" className="inline-flex shrink-0 overflow-hidden rounded-full border border-slate-300">
       <button type="button" aria-pressed={!byTime} onClick={() => byTime && onChange(false)} className={part(!byTime)}>

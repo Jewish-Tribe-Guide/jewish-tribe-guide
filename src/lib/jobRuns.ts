@@ -95,8 +95,12 @@ export function nextRunAt(job: Pick<NightlyJob, 'cron'>, now: number): number {
 /** The kinds of source the tab gives a line each (nightKinds.ts). */
 export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'newsletters' | 'hours' | 'sites' | 'menus' | 'other' | 'links'
 
-/** How many of a kind's sources a run had, and how many it read. */
-export type KindCount = { of: number; read: number }
+/** How many of a kind's sources a run had, and how many it read.
+ *  `validated`: the listings it found just as their source has them
+ *  (validatedDuring.ts), for Activity; `contact`: those whose phone and
+ *  email alone were (a page read for more that differed on the rest).
+ *  Saved since Nov 17, and only when there are any. */
+export type KindCount = { of: number; read: number; validated?: string[]; contact?: string[] }
 
 /** job_run.kinds (migration 087): per community, per kind. */
 export type RunKinds = Record<string, Partial<Record<NightKindId, KindCount>>>
@@ -177,16 +181,19 @@ export function watchesOutcome(run: WatchesRun): JobOutcome {
 }
 
 /** readUnreadMenus's, per community. */
-export type MenuReadRun = readonly { community: string; read: number; failed?: number; left: number }[]
+export type MenuReadRun = readonly { community: string; read: number; failed?: number; left: number; validated?: readonly string[] }[]
 
 /** `kinds`: per community, of the menus never read, how many it read
- *  (the Watches tab's Menus line). */
+ *  (the Watches tab's Menus line), and the places whose first read agreed
+ *  with their listing (Activity, validatedNights.ts). */
 export function readMenusOutcome(run: { skipped: string } | { menus: MenuReadRun }): JobOutcome {
   if ('skipped' in run) return { ok: true, summary: 'Nothing read', warning: `Not set up: ${run.skipped}` }
   const read = sum(run.menus, (m) => m.read)
   const failed = sum(run.menus, (m) => m.failed ?? 0)
   const left = sum(run.menus, (m) => m.left)
-  const kinds: RunKinds = Object.fromEntries(run.menus.map((m) => [m.community, { menus: { of: m.read + (m.failed ?? 0) + m.left, read: m.read } }]))
+  const kinds: RunKinds = Object.fromEntries(
+    run.menus.map((m) => [m.community, { menus: { of: m.read + (m.failed ?? 0) + m.left, read: m.read, ...(m.validated?.length ? { validated: [...m.validated] } : {}) } }]),
+  )
   if (!read && !failed && !left) return { ok: true, summary: 'No menus left to read', kinds }
   return { ok: true, summary: [`Read ${plural(read, 'menu')}`, failed && `${failed} couldn’t be read`, left && `${left} left for the next nights`].filter(Boolean).join(' · '), kinds }
 }

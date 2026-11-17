@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertUsableSlug,
+  mapBackSteps,
   FIXED_VIEW_KINDS,
   fixedViewSlug,
   mapQueryString,
@@ -156,6 +157,7 @@ describe('parseMapQuery', () => {
       place: 'abc123',
       pinned: false,
       eruvim: true,
+      from: 'restaurant',
     }
     expect(parse(mapQueryString(state))).toEqual(state)
     expect(mapQueryString({ eruvim: true })).toBe('?eruv=1')
@@ -184,6 +186,7 @@ describe('parseMapQuery', () => {
       place: null,
       pinned: false,
       eruvim: false,
+      from: null,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -199,7 +202,16 @@ describe('parseMapQuery', () => {
       place: null,
       pinned: false,
       eruvim: false,
+      from: null,
     })
+  })
+
+  // A category's Map button and a listing's map say where the visitor came
+  // from, for the ‹ back in the phone's search bar (board G1, Nov 16).
+  it('round-trips the category the Map tab was opened from', () => {
+    expect(mapQueryString({ categories: ['restaurant'], from: 'restaurant' })).toBe('?cat=restaurant&from=restaurant')
+    expect(parse('cat=restaurant&from=restaurant').from).toBe('restaurant')
+    expect(parse('from=').from).toBeNull()
   })
 
   it('ignores empty and whitespace-only list entries', () => {
@@ -221,5 +233,16 @@ describe('parseMapQuery', () => {
     expect(parse('open=1').openNow).toBe(true)
     expect(parse('open=true').openNow).toBe(false)
     expect(parse('open=0').openNow).toBe(false)
+  })
+})
+
+describe('mapBackSteps', () => {
+  it('goes back past the map’s own entries to where it was opened from', () => {
+    expect(mapBackSteps(null)).toBe(1)
+    expect(mapBackSteps({ __NA: true })).toBe(1)
+    // A place's sheet open: ‹ used to close only the sheet.
+    expect(mapBackSteps({ mapSheetOpen: true })).toBe(2)
+    expect(mapBackSteps({ mapSheetOpen: true, mapSheetForm: 'edit' })).toBe(3)
+    expect(mapBackSteps({ mapSheetOpen: true, mapSheetForm: 'edit', mapSheetRemoval: true })).toBe(4)
   })
 })

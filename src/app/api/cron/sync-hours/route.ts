@@ -95,12 +95,12 @@ async function runSync(): Promise<SyncHoursRun> {
   const tonight = Math.floor(Date.now() / 86_400_000) % 7
   let refreshed = 0
   // Who was asked, per community, for the Watches tab's Google line.
-  const asked: { community: string; ok: boolean }[] = []
+  const asked: { community: string; ok: boolean; id: string; validated: boolean }[] = []
   for (const row of rows) {
     const full = !row.details.googleSyncedAt || refreshNight(row.id) === tonight
     if (full) refreshed++
     const result = await syncOneListing(row, { statusOnly: !full })
-    asked.push({ community: row.community_id, ok: result.outcome !== 'failed' })
+    asked.push({ community: row.community_id, ok: result.outcome !== 'failed', id: row.id, validated: result.outcome === 'synced' && !result.flaggedClosed })
     if (result.outcome === 'failed') {
       failed++
       continue

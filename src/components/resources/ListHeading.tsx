@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 import SortMenu, { headingButton } from './SortMenu'
 
@@ -38,20 +39,40 @@ type Props = {
   /** "Show map", at the right end, once the map beside the list has been
    *  hidden. Only on a screen wide enough to show it. */
   onShowMap?: () => void
+  /** "Map", between Filters and Sort on a phone only: the Map tab on these
+   *  places, with a way back (board G1, Nov 16; order and no symbol, the
+   *  user, Nov 17). A computer has the map beside the list instead. */
+  mapHref?: string
   /** What the list holds, where it isn't listings: ['eruv', 'eruvim']. */
   units?: [string, string]
   /** Said after the count, quieter: the Minyanim view's "left today". */
   suffix?: string
 }
 
-export default function ListHeading({ label, count, noun = !label, total, filters, sort, lead, onShowMap, units = ['listing', 'listings'], suffix }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, lead, onShowMap, mapHref, units = ['listing', 'listings'], suffix }: Props) {
   const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
+  // With Map in the row, on a phone the buttons have the line to
+  // themselves, so Filters, Map and Sort fit at 360 (measured Nov 17). A
+  // bare count goes, the rows say it; a group's name ("Open now · 57")
+  // heads the first group, so it moves under the buttons. Without Map (the
+  // eruv list) nothing changes.
+  const makeRoom = !!mapHref && !suffix
+  const headingClass = !makeRoom ? '' : label ? 'order-last basis-full pt-2 lg:order-none lg:basis-auto lg:pt-0' : 'hidden lg:block'
+  // On a phone, Filters and Map are always on the left, and the right holds
+  // what arranges the list: Sort, Synagogues' switch, or nothing (the user,
+  // Nov 17: "always know that filter and map are on the left"). The
+  // buttons' group dissolves into the row there (`contents`) and the right
+  // one is pushed to the edge. The switch comes after the buttons in the
+  // page itself, so a screen reader and Tab meet it where it's seen; a
+  // computer, as before, shows it first (`lg:order-first`), the buttons at
+  // the right.
+  const rightOnPhone = makeRoom ? 'max-lg:ml-auto' : ''
   return (
     <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3">
-        {lead ?? (
-        <h2 className="shrink-0 text-[15px] font-bold text-ink">
+      <div className={`flex min-h-9 flex-wrap items-center gap-x-2 lg:gap-x-3 ${makeRoom ? 'lg:justify-between' : 'justify-between'}`}>
+        {!lead && (
+        <h2 className={`shrink-0 text-[15px] font-bold text-ink ${headingClass}`}>
           {label ? (
             <>
               {label} <span className="font-medium text-slate-500">· {countText}</span>
@@ -62,7 +83,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
         </h2>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className={makeRoom ? 'contents lg:ml-auto lg:flex lg:items-center lg:gap-2' : 'ml-auto flex items-center gap-2'}>
           {filters && (
             <button
               type="button"
@@ -84,22 +105,36 @@ export default function ListHeading({ label, count, noun = !label, total, filter
                 )}
             </button>
           )}
-          {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
+          {/* Map is a word only: its symbol made the row busy (the user,
+              Nov 17). Between Filters and Sort, Sort's menu at the end.
+              Wider than the word needs, 20px a side ("more oval"), from 390
+              wide: below that Synagogues' row has no room for it. */}
+          {mapHref && (
+            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} min-[390px]:px-5 lg:hidden`}>
+              Map
+            </Link>
+          )}
+          {sort && (
+            <span className={`flex ${rightOnPhone}`}>
+              <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />
+            </span>
+          )}
           {onShowMap && (
             <span className="hidden lg:flex">
               <TextAction>
                 <button type="button" onClick={onShowMap} className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                    <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
-                    <path d="M9 4v14" />
-                    <path d="M15 6v14" />
-                  </svg>
+                  <MapGlyph className="h-4 w-4" />
                   Show map
                 </button>
               </TextAction>
             </span>
           )}
         </div>
+        {lead && (
+          <div data-testid="list-lead" className={`flex ${makeRoom ? `lg:order-first ${sort ? '' : rightOnPhone}` : 'order-first'}`}>
+            {lead}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -168,6 +203,16 @@ export function ClosedGroupLine({
       </svg>
     </button>
     </h2>
+  )
+}
+
+function MapGlyph({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+      <path d="M9 4v14" />
+      <path d="M15 6v14" />
+    </svg>
   )
 }
 

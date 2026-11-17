@@ -112,6 +112,28 @@ describe('on a page reached from a tab', () => {
     expect(lit()).toEqual(['Home'])
   })
 
+  // The user, Nov 16: back from the Map tab to Food (‹ or the browser's
+  // Back), Home again, not Map. Food opened anew from Map still lights Map.
+  it('lights the tab a category was opened from when it’s come back to', () => {
+    const { rerender } = render(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="map" tabs={tabs} onSelect={vi.fn()} />)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    rerender(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    expect(lit()).toEqual(['Home'])
+  })
+
+  it('lights the tab just left when a category is opened anew from it', () => {
+    const { rerender } = render(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    rerender(<MobileTabBar mode="map" tabs={tabs} onSelect={vi.fn()} />)
+    // A Back that closed a sheet on the Map tab, then a tap that opens Food.
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    window.dispatchEvent(new Event('pointerdown'))
+    rerender(<MobileTabBar mode="find" activeCardId="food" tabs={tabs} onSelect={vi.fn()} />)
+    expect(lit()).toEqual(['Map'])
+  })
+
   it('a category with its own tab lights that tab only', () => {
     const withShuls = [...tabs, { id: 'shuls', label: 'Shuls', target: 'shuls' }]
     const { rerender } = render(<MobileTabBar mode="you" tabs={withShuls} onSelect={vi.fn()} />)

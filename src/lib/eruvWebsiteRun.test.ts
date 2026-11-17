@@ -37,6 +37,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 
 const { runEruvWebsiteWatch, syncEruvWebsiteWatches } = await import('./eruvWebsiteRun')
+const { validatedDuring } = await import('./validatedDuring')
 
 const URL_ = 'https://lowermerioneruv.org/'
 const LOWER_MERION = { id: 'lower-merion', name: 'Lower Merion Eruv', covers: 'Bala Cynwyd', website: 'lowermerioneruv.org', hotline: '(610) 664-5626, option 3', alertsUrl: null }
@@ -70,6 +71,15 @@ describe('reading an eruv’s website', () => {
     const out = await runEruvWebsiteWatch('philly', URL_, site('Call (610) 664-5626'))
     expect(out).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees', read: ['Hotline: (610) 664-5626, option 3'], queue: null } })
     expect(m.submitEruvUpdate).not.toHaveBeenCalled()
+  })
+
+  // Activity (the user, Nov 17): what the page shows as we have it was
+  // validated, though an eruv keeps no date for it; what differs wasn't.
+  it('notes the eruv for the night when its page shows the same number, not when it differs', async () => {
+    const same = await validatedDuring(() => runEruvWebsiteWatch('philly', URL_, site('Call (610) 664-5626')))
+    expect(same.validated).toEqual([{ id: 'lower-merion', boxes: ['hotline'] }])
+    const differs = await validatedDuring(() => runEruvWebsiteWatch('philly', URL_, NEW_NUMBER))
+    expect(differs.validated).toEqual([])
   })
 
   it('never files the same reading twice: waiting, or decided before', async () => {

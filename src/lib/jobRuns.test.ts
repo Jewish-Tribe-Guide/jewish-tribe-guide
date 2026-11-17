@@ -108,6 +108,8 @@ describe('each job’s run, in a line', () => {
       summary: 'Read 1 menu · 2 couldn’t be read · 4 left for the next nights',
       kinds: { philly: { menus: { of: 7, read: 1 } } },
     })
+    // The places whose first read agreed, for Activity (Nov 17).
+    expect(readMenusOutcome({ menus: [{ community: 'philly', read: 2, left: 0, validated: ['dated'] }] }).kinds).toEqual({ philly: { menus: { of: 2, read: 2, validated: ['dated'] } } })
     expect(readMenusOutcome({ menus: [] })).toMatchObject({ ok: true, summary: 'No menus left to read' })
     expect(readMenusOutcome({ skipped: 'no OPENAI_API_KEY' })).toMatchObject({ warning: 'Not set up: no OPENAI_API_KEY' })
   })

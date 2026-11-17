@@ -182,6 +182,8 @@ export const routes = {
   browse: (community: string) => `/${community}/browse`,
   /** Places added, edited or taken out, by day (see whatChanged.ts). */
   changes: (community: string) => `/${community}/changes`,
+  /** What one night validated (validatedNights.ts); `night` is its date. */
+  validatedNight: (community: string, night: string) => `/${community}/changes/validated/${night}`,
   /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
    *  but community-scoped chrome: living under `/[community]` is what gives
    *  these two the visiting community's own header/footer, rather than
@@ -208,6 +210,14 @@ export const routes = {
 /** Serializes the map's live view into query params, so a shared map link
  *  reopens the same pins and filters. Omits anything at its default rather than
  *  writing an empty value, keeping the common URL short. */
+/** How many entries back the map was opened from: one, plus one each for
+ *  a place's sheet (MobileNearbySheet), its edit form and the form's
+ *  removal step (MapPlaceDetail), each pushed on top of the one before. */
+export function mapBackSteps(state: unknown): number {
+  const s = (state ?? {}) as { mapSheetOpen?: boolean; mapSheetForm?: unknown; mapSheetRemoval?: boolean }
+  return 1 + (s.mapSheetOpen ? 1 : 0) + (s.mapSheetForm ? 1 : 0) + (s.mapSheetRemoval ? 1 : 0)
+}
+
 export function mapQueryString(state: {
   categories?: string[] | null
   query?: string | null
@@ -226,6 +236,10 @@ export function mapQueryString(state: {
    *  no places (the Eruv chip from everything, or the Eruv page's Full
    *  map), which no `cat` can say since no `cat` means every category. */
   eruvim?: boolean | 'only'
+  /** The category the visitor came from (its list's Map button, or a
+   *  listing's map), so the phone's search bar shows a ‹ back to it (board
+   *  G1, Nov 16). Says nothing about which places show. */
+  from?: string | null
 }): string {
   const params = new URLSearchParams()
   if (state.categories?.length) params.set('cat', state.categories.join(','))
@@ -245,6 +259,7 @@ export function mapQueryString(state: {
         .join(','),
     )
   }
+  if (state.from) params.set('from', state.from)
   const qs = params.toString()
   return qs ? `?${qs}` : ''
 }
@@ -262,6 +277,7 @@ export function parseMapQuery(params: URLSearchParams): {
   place: string | null
   pinned: boolean
   eruvim: boolean | 'only'
+  from: string | null
 } {
   const list = (v: string | null) => {
     const items = (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -292,5 +308,6 @@ export function parseMapQuery(params: URLSearchParams): {
     // Any value: links from when eruvim could be picked one by one
     // (?eruv=center-city) turn them all on.
     eruvim: params.get('eruv') === 'only' ? 'only' : params.has('eruv'),
+    from: params.get('from') || null,
   }
 }

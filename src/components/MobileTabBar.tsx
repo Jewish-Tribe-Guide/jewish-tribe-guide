@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
 import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon, PulseIcon } from './icons'
@@ -9,6 +9,13 @@ import { useYouDot } from '@/lib/useYouDot'
 import { YouDot } from './YouDot'
 import { useCategoriesIfAny } from '@/lib/contentContext'
 import { kindKeyById } from '@/lib/placeKinds'
+import { backSpent, cameBack } from '@/lib/cameBack'
+
+// The tab each category page was first opened from, so coming back to it
+// (‹ on the Map tab, or the browser's Back) lights that tab again rather
+// than the one just left (the user, Nov 16: Back from the Map tab to Food
+// lit Map). Opening it anew from another tab still lights that tab.
+const openedFrom = new Map<string, AppMode>()
 
 /** Which app screens each built-in target counts as "current" for. Card tabs
  *  don't appear here — they're matched on the open category instead (see
@@ -75,6 +82,20 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
   // a category counts as reached from home.
   const [cameFrom, setCameFrom] = useState<AppMode>(mode === 'find' ? 'home' : mode)
   if (mode !== 'find' && mode !== cameFrom) setCameFrom(mode)
+  const screenKey = mode === 'find' ? `find:${activeCardId ?? ''}` : mode
+  const [lastKey, setLastKey] = useState(screenKey)
+  if (lastKey !== screenKey) {
+    setLastKey(screenKey)
+    const before = mode === 'find' && cameBack() && activeCardId ? openedFrom.get(activeCardId) : undefined
+    if (before && before !== cameFrom) setCameFrom(before)
+  }
+  useEffect(() => {
+    // The router can show the category's mode a render before its id; the
+    // Back only counts as spent once the page it landed on is known.
+    if (mode === 'find' && !activeCardId) return
+    backSpent()
+    if (mode === 'find') openedFrom.set(activeCardId!, cameFrom)
+  }, [mode, activeCardId, cameFrom])
   const ownTab = mode === 'find' && tabs.some((t) => t.target === activeCardId)
   return (
     <nav

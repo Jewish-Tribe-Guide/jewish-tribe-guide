@@ -1531,7 +1531,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     openNow,
     bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
     select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
+    from: category.id,
   })}`
+  // The phone's Map button, first in the list's row (board G1, Nov 16):
+  // the Map tab on these places, with a ‹ back here. Where the category
+  // has a map at all; a computer has it beside the list.
+  const phoneMapHref = hasMapColumn ? fullMapHref : undefined
 
   // The category's one question card (see QuestionCard), right under the
   // place it asks about (decided Oct 4, built Oct 6: it sat after the fifth
@@ -1685,6 +1690,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         sort={upvotes ? { byPopular, onSelect: selectSort } : undefined}
         lead={minyanSwitch(false)}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
+        mapHref={phoneMapHref}
       />
   )
   // The categories with no map keep the list's heading under the search,
@@ -1936,6 +1942,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           onShowing={setMinyanimShowing}
           kindOf={(item) => kindText(item, category)}
           heading={minyanSwitch(true)}
+          mapHref={phoneMapHref}
         />
       ) : searchFoundNothing ? (
         // The search found nothing: the box under the search says so, with

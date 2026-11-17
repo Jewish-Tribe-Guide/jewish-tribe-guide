@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { haversineMiles } from '@/lib/geo'
-import { markerZIndex, pinHaloStyle, pointsWithinZoomRadius, resolveSelectionZoom, SELECTED_Z_BOOST, USER_PULSE_STYLE, type MapPoint } from './ResourceMap'
+import { markerZIndex, pinHaloStyle, pointsWithinZoomRadius, markerNudge, resolveSelectionZoom, shouldLeaveToSelection, SELECTED_Z_BOOST, USER_PULSE_STYLE, type MapPoint } from './ResourceMap'
 
 function point(overrides: Partial<MapPoint> = {}): MapPoint {
   return { id: 'p1', lat: 40, lng: -75, name: 'Test Place', color: '#000', ...overrides }
@@ -126,5 +126,32 @@ describe('the looping rings without their animation', () => {
 
   it('the visitor’s own dot’s pulse is invisible', () => {
     expect(base(USER_PULSE_STYLE)).toBe('0')
+  })
+})
+
+// A map link to one place (?place=, a listing's map) opened on the whole
+// city: fitting every pin started in the same moment as the place's own
+// framing and won (Nov 16). The camera calls need the real SDK, and Google
+// refuses the key on CI's localhost, so the rule is pinned here and the
+// camera was checked by eye.
+describe('shouldLeaveToSelection', () => {
+  const pins = [point({ id: 'a' }), point({ id: 'b' })]
+  it('stands aside when the picked place is among the pins', () => {
+    expect(shouldLeaveToSelection(pins, 'b')).toBe(true)
+  })
+  it('fits every pin when nothing is picked, or the pick isn’t among them', () => {
+    expect(shouldLeaveToSelection(pins, null)).toBe(false)
+    expect(shouldLeaveToSelection(pins, undefined)).toBe(false)
+    expect(shouldLeaveToSelection(pins, 'gone')).toBe(false)
+  })
+})
+
+describe('markerNudge', () => {
+  it('moves the map by how far the pin sits from the strip’s middle', () => {
+    expect(markerNudge({ top: 300, height: 40, width: 30 }, 251)).toBe(69)
+  })
+  it('leaves a pin not drawn yet where the camera put it', () => {
+    // Read as the map's top corner, it moved the map 251px the wrong way.
+    expect(markerNudge({ top: 0, height: 0, width: 0 }, 251)).toBeNull()
   })
 })

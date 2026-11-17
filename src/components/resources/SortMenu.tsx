@@ -15,11 +15,16 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 // for a location instead (selectSort in GenericDirectory), and Sort stays
 // on Popularity until one is set.
 
+// 13px below 390 wide, 14px from there (the user, Nov 17): a phone that
+// draws text as Linux does (Android, CI) made Synagogues' row 8px too wide
+// at 360 at 14px. ROW_TEXT is MinyanSwitch's too, so the row reads as one.
+export const ROW_TEXT = 'text-[13px] min-[390px]:text-[14px]'
+
 /** Sort and the list heading's Filters (ListHeading): an outlined button a
  *  thumb can find, 40px tall; solid blue while it has something on
  *  (Filters, with filters on). */
 export function headingButton(on = false): string {
-  const base = 'flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30'
+  const base = `flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 ${ROW_TEXT} lg:px-3.5 font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30`
   return `${base} ${on ? 'border-primary bg-primary text-white hover:bg-primary-dark' : 'border-slate-300 bg-white text-primary hover:bg-slate-50'}`
 }
 
@@ -89,7 +94,8 @@ export default function SortMenu({ byPopular, onSelect }: { byPopular: boolean; 
         className={headingButton()}
       >
         {/* The space is for the name it's read out by, "Sort Popularity";
-            a flex row doesn't draw it. */}
+            a flex row doesn't draw it. The word shows on a phone too: alone,
+            "Distance ▾" didn't say what it was (the user, Nov 17). */}
         <span className="font-medium text-slate-500">Sort</span>{' '}
         <span className="flex items-center gap-0.5">
           <span data-testid="sort-shown">{CHOICES[current].label}</span>

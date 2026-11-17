@@ -32,3 +32,16 @@ describe('SiteFooter — Send a note', () => {
     expect(screen.queryByRole('link', { name: /Send a note/ })).not.toBeInTheDocument()
   })
 })
+
+// "Spot something wrong or missing?" told every visitor the guide was likely
+// wrong (a tester, Nov 17), and named Edit and Report links that are gone.
+describe('SiteFooter — the contributing line', () => {
+  it('invites what people know, and names the buttons a listing has', () => {
+    renderWithProviders(<SiteFooter year={2026} />)
+    expect(screen.getByText('Know something we don’t?')).toBeInTheDocument()
+    expect(screen.queryByText(/wrong or missing/i)).not.toBeInTheDocument()
+    const line = screen.getByText(/A person checks each one\./)
+    expect(line).toHaveTextContent('Tap Suggest an edit on any listing, or + Add for a new place.')
+    expect(line).not.toHaveTextContent(/Report/)
+  })
+})

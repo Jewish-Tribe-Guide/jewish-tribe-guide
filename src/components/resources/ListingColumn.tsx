@@ -93,7 +93,7 @@ export default function ListingColumn({ item, category, color, place, found, upv
   if (phone) {
     return (
       <section aria-label={item.name} data-testid="listing-page" className="pt-1">
-        <MapPlaceDetail item={item} category={category} color={color} place={place} found={found} upvote={upvote} onward={onward} titleAs="h1" />
+        <MapPlaceDetail item={item} category={category} color={color} place={place} found={found} upvote={upvote} onward={onward} titleAs="h1" mapTile />
       </section>
     )
   }

@@ -719,6 +719,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               upvote={upvote}
               place={place ?? null}
               onward={onward}
+              mapTile
             />}
           </Suspense>
         </MobileSheet>

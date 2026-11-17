@@ -8,6 +8,7 @@ import { itemMarks, itemWording } from '@/lib/itemMarks'
 import { findMenus, readMenuPage, readMenus, unreadMenuNote, menuPages, type Trouble } from '@/lib/menuReader'
 import { MENU_LINK_KEY, menuWebsite, readMenuLink } from '@/lib/menuLink'
 import { dateMenuDishes, listMenuReadings, saveMenuReading, type StoredMenuReading } from '@/lib/menuReadingStore'
+import { validatedDuring } from '@/lib/validatedDuring'
 import { listedDishes, newDishes } from '@/lib/menuWatch'
 import { pageRenderer } from '@/lib/renderPage'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
@@ -195,7 +196,7 @@ export async function readUnreadMenus(
     endMs = FIRST_READS_END_MS,
     now = Date.now,
   }: { perRun?: number; forMs?: number; readMs?: number; endMs?: number; now?: () => number } = {},
-): Promise<{ community: string; read: number; failed: number; left: number }[]> {
+): Promise<{ community: string; read: number; failed: number; left: number; validated?: string[] }[]> {
   const start = now()
   const until = start + forMs
   const end = start + endMs
@@ -210,6 +211,9 @@ export async function readUnreadMenus(
     if (!unread.length) continue
     let done = 0
     let failed = 0
+    // The places whose first read agreed, for Activity (validatedNights.ts):
+    // one that differs waits on the Main dishes tab and isn't among them.
+    const validated: string[] = []
     for (const { l, kind } of unread) {
       if (budget <= 0 || now() > until) break
       budget--
@@ -232,9 +236,12 @@ export async function readUnreadMenus(
       // One that couldn't be read is kept, saying why, but isn't a read.
       if (kept?.status === 'failed') failed++
       else if (kept) done++
-      if (kept) await dateIfAgreeing(slug, l, kind, kept)
+      if (kept) {
+        const found = await validatedDuring(() => dateIfAgreeing(slug, l, kind, kept))
+        validated.push(...found.validated.map((v) => v.id))
+      }
     }
-    out.push({ community: slug, read: done, failed, left: unread.length - done - failed })
+    out.push({ community: slug, read: done, failed, left: unread.length - done - failed, ...(validated.length ? { validated } : {}) })
   }
   return out
 }

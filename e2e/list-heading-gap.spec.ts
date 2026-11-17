@@ -26,7 +26,9 @@ async function gapUnderHeading(page: Page, community: string, category: Category
   const heading = page.getByTestId('list-heading').filter({ visible: true }).first()
   const row = page.getByTestId('directory-row').filter({ visible: true }).first()
   await expect(row).toBeVisible()
-  const h = (await heading.locator('h2').boundingBox())!
+  // The heading's line, not its count: on a phone the count gives way to
+  // Map where a category has one (board G1, Nov 16).
+  const h = (await heading.locator(':scope > div').first().boundingBox())!
   const r = (await row.boundingBox())!
   return r.y - (h.y + h.height)
 }

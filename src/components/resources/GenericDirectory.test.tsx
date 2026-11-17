@@ -1035,18 +1035,27 @@ describe('GenericDirectory', () => {
     expect(onParamsChange).toHaveBeenCalledWith({ davening: '1' }, { step: 'minyanim' })
   })
 
-  it('never shows its own Map link, even when a Map pseudo-category exists', () => {
-    // GenericDirectory used to render a "🗺️ Map" link (pre-filtered to this
-    // category) on both mobile and desktop. Removed on both: each platform
-    // already has exactly one persistent, always-visible way to reach the
-    // map — the header nav link on desktop, the bottom tab bar on mobile —
-    // so a second, category-scoped copy was redundant rather than useful.
-    // This guards against either one quietly coming back.
+  it('has one Map link, in the list’s row, on a phone only, to the Map tab on this category', () => {
+    // A category's own "🗺️ Map" link was removed once (each platform already
+    // had one way to the map: the header on a computer, the tab bar on a
+    // phone). It came back on phones on Nov 16, in the list's row (board
+    // G1): a tester always wants the map, and from the Map tab there was no
+    // way back to the category. A computer has the map beside the list.
     const category = makeCategory({ hasAddress: true })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />, {
       content: { categories: [category, makeCategory({ id: 'map', kind: 'map' })] },
     })
 
+    const links = screen.getAllByRole('link', { name: /Map/ })
+    expect(links).toHaveLength(1)
+    expect(within(screen.getByTestId('list-heading')).getByRole('link', { name: 'Map' })).toBe(links[0])
+    expect(links[0].className).toMatch(/(^|\s)lg:hidden(\s|$)/)
+    expect(links[0]).toHaveAttribute('href', `/test-community/map?cat=${category.id}&from=${category.id}`)
+  })
+
+  it('has no Map link where the category has no addresses', () => {
+    const category = makeCategory({ hasAddress: false })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
     expect(screen.queryByRole('link', { name: /Map/ })).not.toBeInTheDocument()
   })
 
@@ -1328,7 +1337,7 @@ describe('GenericDirectory — the list heading', () => {
     // Its label, with no arrow after it (Oct 10).
     const link = screen.getByRole('link', { name: 'Other Mikvahs' })
     expect(screen.getByTestId('external-link')).toHaveTextContent(/^Not listed here\? Other Mikvahs$/)
-    expect(within(screen.getByTestId('list-heading')).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('list-heading')).queryByRole('link', { name: /Other Mikvahs/ })).not.toBeInTheDocument()
     const lastRow = screen.getByText('Truck')
     expect(lastRow.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(link).toHaveAttribute('href', 'https://mikvah.org/directory')

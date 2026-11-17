@@ -372,6 +372,23 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
   return wrap
 }
 
+/** Whether fitting every pin should stand aside for the picked place's
+ *  own framing: it is among them. Exported for its test. */
+export function shouldLeaveToSelection(points: readonly { id: string }[], selectedId: string | null | undefined): boolean {
+  return !!selectedId && points.some((p) => p.id === selectedId)
+}
+
+/** How far to move the map so the picked pin sits in the visible strip's
+ *  middle, from where it was drawn; null when it hasn't been drawn. A pin
+ *  just jumped to (a map opened on one place, ?place=) can still have no
+ *  box when the camera settles, and read as the map's top corner it moved
+ *  the map 251px the wrong way, the place behind its own sheet (Nov 17).
+ *  Exported for its test. */
+export function markerNudge(marker: { top: number; height: number; width: number }, targetCenterY: number): number | null {
+  if (marker.width === 0 && marker.height === 0) return null
+  return marker.top + marker.height / 2 - targetCenterY
+}
+
 // Pans so `point` lands in the vertical middle of the map's visible strip —
 // the part not covered by the mobile bottom sheet OR the floating search
 // bar/category chips overlay at the top — rather than the whole container's
@@ -901,6 +918,11 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       return
     }
     if (userLocationRef.current) return
+    // A place picked among these pins frames itself (the selection effect
+    // below). Fitting every pin as well started in the same moment as that
+    // framing and won: a map link to one place (a listing's map, ?place=)
+    // opened on the whole city with the place lost in it (Nov 16).
+    if (shouldLeaveToSelection(points, selectedIdRef.current)) return
     const anchor = DEFAULT_CENTER
     const framed = pointsWithinZoomRadius(points, anchor, zoomRadiusMilesRef.current)
     if (framed.length === 1) {
@@ -1032,8 +1054,8 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
             const markerRect = markerEl.getBoundingClientRect()
             const mapRect = mapEl.getBoundingClientRect()
             const targetCenterY = mapRect.top + obscuredTop + (mapRect.height - obscured - obscuredTop) / 2
-            const actualCenterY = markerRect.top + markerRect.height / 2
-            const deltaY = actualCenterY - targetCenterY
+            const deltaY = markerNudge(markerRect, targetCenterY)
+            if (deltaY === null) return
             if (Math.abs(deltaY) > 2) panByInstant(map, deltaY)
           }
           // Fitting the visitor's own location alongside the pin only pays

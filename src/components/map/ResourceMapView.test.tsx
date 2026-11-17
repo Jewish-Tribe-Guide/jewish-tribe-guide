@@ -1728,6 +1728,50 @@ describe('ResourceMapView — the shareable URL (standalone)', () => {
     expect(params.get('open')).toBe('1')
     expect(params.get('q')).toBeNull()
   })
+  // Where the visitor came from (a category's Map button) stays while they
+  // use the map, so the ‹ back is still there after a chip or a pin.
+  it('keeps `from` through its own writes', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/test-community/map?from=grocery')
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+
+    const params = new URLSearchParams(window.location.search)
+    expect(params.get('place')).toBe('g1')
+    expect(params.get('from')).toBe('grocery')
+  })
+})
+
+// Board G1 (Nov 16): arrived from a category, the phone's search bar has a
+// round ‹ back before it. The tab bar's Map has none: it is a tab.
+describe('ResourceMapView — back to the category (phone)', () => {
+  function renderPhone(backTo?: { label: string; onBack: () => void }) {
+    return renderMobileMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible backTo={backTo} />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ category: 'grocery' })],
+    )
+  }
+
+  it('puts ‹ back before the search bar, and it goes back', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const { container } = renderPhone({ label: 'Back to Grocery Stores', onBack })
+    const back = screen.getByRole('button', { name: 'Back to Grocery Stores' })
+    const search = container.querySelector('input[placeholder^="Search name, address"]')!
+    expect(back.nextElementSibling).toBe(search.closest('form'))
+
+    await user.click(back)
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no ‹ when the map was opened as a tab', () => {
+    renderPhone()
+    expect(screen.queryByTestId('map-back')).not.toBeInTheDocument()
+  })
 })
 
 // Next feeds history.replaceState back into useSearchParams, so every

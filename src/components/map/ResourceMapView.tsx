@@ -165,6 +165,10 @@ type Props = {
    *  writes, echoed back by Next, from a real navigation; see
    *  ownWritesRef below. */
   viewSearch?: string
+  /** A round ‹ before the phone's search bar, back to the category the
+   *  visitor came from (its list's Map button or a listing's map tile;
+   *  board G1, Nov 16). The tab bar's Map has none: it is a tab. */
+  backTo?: { label: string; onBack: () => void }
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
   /** True for the one page-level map screen (mode 'map' in page.tsx) — the
@@ -219,7 +223,7 @@ function normalizeSearch(search: string): string {
   return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).toString()
 }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialEruvim, initialFilters, initialPlaceId, viewSearch, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialEruvim, initialFilters, initialPlaceId, viewSearch, backTo, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
   const timezone = useCommunityTimezone()
   const listings = useAllListings()
   const categories = useCategories()
@@ -571,6 +575,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // isn't computed yet at this point in the component — see below, right
   // after allPoints itself.
   const restoredInitialPlace = useRef<'phone' | 'desktop' | null>(null)
+  // Once a showing, not once a mount: this screen is kept mounted while
+  // another shows, so a second listing's map tile came back to the first
+  // place's sheet (Nov 17). Hiding runs effects' cleanups; showing again
+  // runs the restore below afresh with the new address's place.
+  useEffect(
+    () => () => {
+      restoredInitialPlace.current = null
+    },
+    [],
+  )
 
   const colorById = useMemo(() => {
     const map = new Map<string, string>()
@@ -1110,6 +1124,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       pinned: pinnedSelected && !allSelected,
       // The lines alone say so: no `cat` would mean every category.
       eruvim: eruvimOn && selected?.size === 0 && !pinnedSelected ? 'only' : eruvimOn,
+      // Where the visitor came from stays for as long as they're here, so
+      // the ‹ back is still there after a chip or a pin.
+      from: new URLSearchParams(window.location.search).get('from'),
     })
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
@@ -2350,6 +2367,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
                 >
                   <div className="flex items-center gap-2">
+                    {backTo && (
+                      <button
+                        type="button"
+                        onClick={backTo.onBack}
+                        aria-label={backTo.label}
+                        data-testid="map-back"
+                        className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-ink shadow-lg"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                          <path d="m15 18-6-6 6-6" />
+                        </svg>
+                      </button>
+                    )}
                     {/* A real <form> is the one reliable way to catch a mobile
                         keyboard's "Search" action key across browsers — it
                         guarantees submission the same way pressing Enter on a

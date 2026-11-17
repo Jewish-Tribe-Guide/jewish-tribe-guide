@@ -227,6 +227,127 @@ are unbalanced; about 6–7 min looks reachable.
   one with React's `vt-update` (the server copy, mid view transition).
   Same family as `server-rendering.spec.ts:127`. Not chased.
 
+**Nov 16, later: the map from a category on a phone (the user: "Yes,
+build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
+
+- Built: a Map button first in a category's list row on a phone, then
+  Filters and Sort, on one line down to 360 wide. It opens the real Map
+  tab on that category, its search and filters carried. Shown in both of
+  Synagogues' views. Where a category has no map (no addresses), no
+  button. A computer is unchanged (the map is beside the list).
+  **Changes two earlier decisions:** the list's count ("71 listings",
+  Sep 28) is off the row on a phone (a group's name, "Open now · 57",
+  moves under the buttons instead); and a category's own Map link is back
+  on phones (it was removed when the tab bar was thought enough). (Sort's
+  choice alone, the order and the 10px sides changed Nov 17, below.) The row
+  doesn't stick. `e2e/phone-map-row.spec.ts` measures the line at 360.
+- Built: arrived from a category, the Map tab's phone search bar has a
+  round ‹ before it, back to the category as it was (the browser's Back;
+  a link opened on its own goes to the category). `?from=` in the map's
+  address says where from, and survives the map's own address writes.
+  Opened as a tab, no ‹.
+- Fixed: a map link to one place (`?place=`) opened on the whole city
+  with the place lost among the pins. Fitting every pin started together
+  with the place's own framing and won; now a picked place frames itself.
+  Checked by eye only: the camera needs Google's map, which refuses the
+  key on CI's localhost (`shouldLeaveToSelection` is unit-tested).
+- Built Nov 17, for the user to try on the preview: the listing's map
+  tile (B1). A phone's listing (its sheet on a category page, and its own
+  page) has a small Google map, 120px tall, at the top of the address box,
+  "On Food's map"; a tap opens the Map tab on the place, ‹ back to the
+  listing. The user switched on the Maps Static API for the site's key
+  (Nov 17). One picture a view, fetched when it scrolls into sight, at the
+  tile's own width; none where Google refuses it (CI's localhost), so the
+  e2e suites can't see it (unit-tested). **One change from the board:** the
+  pill is top left, not bottom left, because Google's logo and credit sit
+  along the bottom and must stay visible. Not on a computer (the map is
+  beside the list there), nor in the map's own sheet.
+- Fixed with it: a map opened on one place framed it, then "nudged" the
+  pin to the strip's middle before the pin was drawn, read its box as the
+  screen's corner, and moved the map 251px the wrong way, the place behind
+  its sheet. The nudge now skips an undrawn pin; the place lands a little
+  low in the strip, but in view. And the Map tab's ‹ with a place's sheet
+  open closed only the sheet; it now goes back past the map's own entries
+  (`mapBackSteps`), checked in `e2e/phone-map-row.spec.ts`.
+- Fixed Nov 17 (the user, on the preview): the first listing's map tile
+  opened its place, every later one opened the map on the first place
+  again. The Map tab stays mounted behind other screens and restored the
+  address's place once a mount; now once each time it shows. Checked in
+  `e2e/phone-map-row.spec.ts` (Google's picture stood in for there).
+- Changed Nov 17 (user OK'd, from a tester): the footer's "Spot something
+  wrong or missing?" told every visitor the guide was likely wrong. Now
+  "Know something we don't?" and "Tap Suggest an edit on any listing, or
+  + Add for a new place. A person checks each one." (it used to name Edit
+  and Report links that are gone). The bottom line's "please confirm
+  details directly" stays, for now.
+- Built Nov 17 (user OK'd; a friend's idea): Activity shows the nightly
+  checks, canvas "Activity: the nightly checks" (6YK3gNdSPEZyhz3E1nYchS),
+  boards W1/W3 (the row) and X4/X5 (the night's page). Each night is one
+  quiet row in the timeline under its day, at the time it ran, not pinned:
+  the site's logo on a small tile, "Validated · 132 against Google · 119
+  against their own websites · 1 AM". It opens
+  `/[community]/changes/validated/<date>`: a group per kind of check,
+  every row a listing, the source only in the heading ("Hechsher, against
+  the kosher agencies' lists"), four shown then "Show all". Only what was
+  validated: what couldn't be read stays in the admin, a possible change
+  is never mentioned. Validated means a check read the source and found
+  it as we have it, whether or not the listing shows a date for it (the
+  user, Nov 17: not the same thing): a box dated by `confirmFromSource`, a
+  menu still naming the listing's dishes, an eruv website still showing
+  its hotline or alerts link, or Google answering and matching. Each is
+  noted per run by `validatedDuring.ts`; the ids go in `job_run.kinds`
+  (`validated`, `contact`), no migration. The read-menus job's first
+  reads count too when they agree (the Watches tab's Menus line already
+  counts that job); one that differs waits on the Main dishes tab and
+  never counts. Changes the Oct 2 rule that Activity shows
+  only changes to the guide. Departures from the boards: Google is one
+  group, "Open or closed, against Google" (most nights it checks status
+  only); Menus are "Dishes, against their menus" and eruvs "Eruv
+  hotlines and alerts, against their websites", both counted in "their
+  own websites"; two more groups, "Phone and email" and "Details"; every night's page lists names
+  (W2's counts-only older night is gone, since each run now keeps its
+  ids); yesterday's night is titled "Validated yesterday". Rows appear
+  only from the first runs after this deploys; no production write needed.
+- Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
+  Map tab or the browser's Back, lights the tab it was first opened from
+  (Home), not the Map tab just left. Opened anew from another tab, it still
+  lights that tab (the Nov 4 rule). The Back flag lives in
+  `src/lib/cameBack.ts`, loaded from the root layout like `backGuard.ts`:
+  inside the tab bar's own module it heard the Back after the router had
+  drawn the page. `e2e/phone-map-row.spec.ts` checks both ways back.
+- Built Nov 17, the user's own call after the boards (rows I and J on the
+  canvas): on a phone the row is Filters (with its symbol) · Map (a word
+  only) · Sort Distance ▾ ("Sort" back on phones, and 8px between the
+  buttons as on a computer, the user later that day). Sort stays at the
+  end, where its menu opens. Map in
+  the middle is a change from Nov 16 (first) and from this morning's build
+  (alone at the right end, 99bc7b3a). The buttons and the Synagogue |
+  Minyan switch are 12px a side on a phone ("a little ovaly"; 14px
+  overflowed Synagogues at 360 by 10px), 14px on a computer. The computer
+  is as it was before Nov 17. The order is one place in `ListHeading.tsx`.
+  Map is wider than its word from 375 up, 20px a side ("more oval", the
+  user later still); at 360 it stays 12px, because Synagogues' switch
+  leaves it 4px. ~~The group isn't held to the right: Food's buttons start
+  at the left, Synagogues' follow the switch (agreed).~~ Replaced later
+  on Nov 17, below.
+- Built Nov 17, the user's call ("always know that filter and map are on
+  the left and then the right is either sort, toggle, or nothing"): on a
+  phone, Filters · Map always start at the left, and the right edge holds
+  what arranges the list: Sort, Synagogues' Synagogue | Minyan switch (in
+  both views), or nothing. **Changes** the switch's place on a phone: it
+  was first in the row, now last, at the right. The switch comes after
+  the buttons in the page itself, so Tab and a screen reader meet it where
+  it's seen. A computer is unchanged (count or switch at the left, buttons
+  at the right). `e2e/phone-map-row.spec.ts` measures both sides at 360
+  and 375.
+- Built Nov 17, the user's pick after CI ("Smaller text below 390"):
+  Synagogues' row ran 8px too wide at 360 and 375 in CI, whose Linux
+  browser draws the text about 4% wider than a Mac, as Android does. Below
+  390 wide the row's words (Filters, Map, Sort, the switch) are 13px
+  instead of 14, and Map's wider padding starts at 390 instead of 375.
+  **Changes** the row's text size on small phones; 390 and up and the
+  computer are unchanged.
+
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
 with no icons. The computer home's Suggest a listing card lifts on hover
