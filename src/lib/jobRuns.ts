@@ -95,8 +95,12 @@ export function nextRunAt(job: Pick<NightlyJob, 'cron'>, now: number): number {
 /** The kinds of source the tab gives a line each (nightKinds.ts). */
 export type NightKindId = 'google' | 'kosher' | 'hospitals' | 'eruvs' | 'times' | 'newsletters' | 'hours' | 'sites' | 'menus' | 'other' | 'links'
 
-/** How many of a kind's sources a run had, and how many it read. */
-export type KindCount = { of: number; read: number }
+/** How many of a kind's sources a run had, and how many it read.
+ *  `validated`: the listings it found just as their source has them
+ *  (validatedDuring.ts), for Activity; `contact`: those whose phone and
+ *  email alone were (a page read for more that differed on the rest).
+ *  Saved since Nov 17, and only when there are any. */
+export type KindCount = { of: number; read: number; validated?: string[]; contact?: string[] }
 
 /** job_run.kinds (migration 087): per community, per kind. */
 export type RunKinds = Record<string, Partial<Record<NightKindId, KindCount>>>

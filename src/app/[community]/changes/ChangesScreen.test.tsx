@@ -9,6 +9,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { ChangesProvider } from '@/lib/changesContext'
 import type { ChangeLogRow } from '@/lib/whatChanged'
 import ChangesScreen from './ChangesScreen'
+import type { NightRow } from '@/lib/validatedNights'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -32,10 +33,10 @@ const row = (createdAt: string, over: Partial<ChangeLogRow> = {}): ChangeLogRow 
   ...over,
 })
 
-function show(rows: ChangeLogRow[] | null) {
+function show(rows: ChangeLogRow[] | null, nights: NightRow[] = []) {
   renderWithProviders(
     <ChangesProvider rows={rows}>
-      <ChangesScreen failed={rows === null} />
+      <ChangesScreen failed={rows === null} nights={nights} />
     </ChangesProvider>,
     { content: { categories }, community: { timezone: 'America/New_York' } },
   )
@@ -55,6 +56,28 @@ afterEach(() => {
 })
 
 describe('the What changed page', () => {
+  // The user, Nov 17 (board W1): each night is a quiet row in the
+  // timeline, under its day at the time it ran, not pinned at the top, and
+  // opens what it validated. A night older than the page's 30 days isn't.
+  it('each night a row under its day, at its time, among the changes, opening that night', () => {
+    show(
+      [row('2026-10-01T22:00:00Z'), row('2026-10-01T03:00:00Z')],
+      [
+        { key: '2026-10-02', at: '2026-10-02T05:00:00Z', google: 132, own: 119 },
+        { key: '2026-10-01', at: '2026-10-01T05:00:00Z', google: 131, own: 0 },
+        { key: '2026-08-01', at: '2026-08-01T05:00:00Z', google: 9, own: 9 },
+      ],
+    )
+    const days = screen.getAllByTestId('changes-day')
+    expect(days.map((d) => d.querySelector('h2')!.textContent)).toEqual(['Today', 'Yesterday', 'Wednesday, Sep 30'])
+    expect(within(days[0]).getByTestId('validated-night')).toHaveTextContent('Validated · 132 against Google · 119 against their own websites · 1 AM')
+    expect(within(days[0]).getByRole('link')).toHaveAttribute('href', '/test-community/changes/validated/2026-10-02')
+    // Yesterday: the 6 PM change, then the 1 AM night, by time.
+    expect(within(days[1]).getAllByRole('listitem').map((li) => li.getAttribute('data-testid'))).toEqual(['change', 'validated-night'])
+    expect(within(days[1]).getByTestId('validated-night')).toHaveTextContent('Validated · 131 against Google · 1 AM')
+    expect(screen.getAllByTestId('validated-night')).toHaveLength(2)
+  })
+
   // Board W9 C (the user, Nov 15): each row is about one place, so its own
   // picture, whole on a white tile (most are logos, which filling a square
   // cuts). A place with no picture keeps its category's icon.

@@ -39,6 +39,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 
 const { confirmFromSource, datedBySource } = await import('./sourceConfirm')
+const { validatedDuring } = await import('./validatedDuring')
 
 const NOW = '2026-10-19T07:47:31.000Z'
 
@@ -107,6 +108,21 @@ describe('confirmFromSource', () => {
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(await confirmFromSource('philly', ['a'], 'Keystone-K', ['kosher'], NOW)).toBe(1)
     quiet.mockRestore()
+  })
+  // Activity's "Validated" row (Nov 17) says what was confirmed: each live
+  // listing found agreeing, with what was read, whether or not its date
+  // moved (a second run the same night still validated it).
+  it('notes each listing it found agreeing, and what of it, for the night’s run', async () => {
+    m.rows = [
+      { id: 'a', details: null },
+      { id: 'c', details: { sectionConfirmed: { kosher: NOW }, sectionFrom: { kosher: AT('Keystone-K', NOW) } } },
+      { id: 'h', details: { noHechsher: true } },
+    ]
+    const { validated } = await validatedDuring(() => confirmFromSource('philly', ['a', 'c', 'h'], 'Keystone-K', (d) => (d.noHechsher ? [] : ['kosher']), NOW))
+    expect(validated).toEqual([
+      { id: 'a', boxes: ['kosher'] },
+      { id: 'c', boxes: ['kosher'] },
+    ])
   })
   it('does nothing for no listings', async () => {
     expect(await confirmFromSource('philly', [], 'Keystone-K', ['kosher'], NOW)).toBe(0)

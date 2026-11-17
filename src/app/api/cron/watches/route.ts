@@ -45,6 +45,7 @@ import { orderForRun, runSideBySide, sideBySideKeys } from '@/lib/watchRunOrder'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { watchesOutcome, type WatchesRun } from '@/lib/jobRuns'
 import { countWatchKinds } from '@/lib/nightKinds'
+import { validatedDuring, type Validated } from '@/lib/validatedDuring'
 import { loadListings } from '@/lib/listingReads'
 import { jobsOffByCommunity } from '@/lib/jobOff'
 import { isNewsletterWatch } from '@/lib/newsletter'
@@ -116,13 +117,16 @@ async function runAll(started = Date.now()): Promise<Body> {
     return !kind || !kinds.has(kind)
   })
   const queue = orderForRun(wanted, started)
+  const validated = new Map<string, Validated[]>()
   const { results, left } = await runSideBySide(queue, {
     keysOf: sideBySideKeys,
     mayStart: () => Date.now() - started <= START_NO_WATCH_AFTER_MS,
     run: async (watch) => {
       // A watch that breaks is told of in the nightly email (nightlyEmail.ts).
-      const { outcome } = await runAndRecord(watch, undefined, budget)
-      return { id: watch.id, url: watch.url, ...outcome }
+      // What it found agreeing is kept for Activity (validatedDuring.ts).
+      const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budget))
+      if (found.length) validated.set(watch.id, found)
+      return { id: watch.id, url: watch.url, ...result.outcome }
     },
   })
 
@@ -130,7 +134,7 @@ async function runAll(started = Date.now()): Promise<Body> {
   // as checked, and its kind's line says Not reached.
   const skipped = results.filter((r) => r.ok && r.skipped).length
   const read = new Set(results.filter((r) => r.ok && !r.skipped).map((r) => r.id))
-  const run = { active: queue.length, ran: results.length - skipped, notWorking: results.filter((r) => !r.ok).length, left, skipped, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap) }
+  const run = { active: queue.length, ran: results.length - skipped, notWorking: results.filter((r) => !r.ok).length, left, skipped, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap, validated) }
   return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
 }
 

@@ -280,22 +280,27 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   + Add for a new place. A person checks each one." (it used to name Edit
   and Report links that are gone). The bottom line's "please confirm
   details directly" stays, for now.
-- Drawn Nov 17, waiting on the user (a friend's idea): Activity shows
-  the nightly checks, canvas "Activity: the nightly checks"
-  (6YK3gNdSPEZyhz3E1nYchS), boards W1-W5 (T, B and E boards are
-  earlier versions, superseded). Not pinned at the top (the
-  user): each night is one quiet row in the timeline, under its day at
-  the time it ran, beside that day's changes: the site's logo on a
-  small tile, "Validated · 132 against Google · 119 against their own
-  websites · 2 AM". Last night's row opens its own page of what was
-  validated, grouped (W4/W5); an older night opens counts only (W2),
-  since sources keep only their last check. Visitors see only what was
-  validated: what couldn't be read stays in the admin (the user). Agreed with the user: "validated" is fine,
-  never without what it was validated against; "Confirmed" stays for
-  people; a possible change is never mentioned (a place that didn't
-  match just comes off the count, and shows as its own row once
-  approved). Changes the Oct 2 rule that Activity shows only changes to
-  the guide. Counts from `job_run.kinds`. Not built.
+- Built Nov 17 (user OK'd; a friend's idea): Activity shows the nightly
+  checks, canvas "Activity: the nightly checks" (6YK3gNdSPEZyhz3E1nYchS),
+  boards W1/W3 (the row) and X4/X5 (the night's page). Each night is one
+  quiet row in the timeline under its day, at the time it ran, not pinned:
+  the site's logo on a small tile, "Validated · 132 against Google · 119
+  against their own websites · 1 AM". It opens
+  `/[community]/changes/validated/<date>`: a group per kind of check,
+  every row a listing, the source only in the heading ("Hechsher, against
+  the kosher agencies' lists"), four shown then "Show all". Only what was
+  validated: what couldn't be read stays in the admin, a possible change
+  is never mentioned. Validated means a watch dated the listing's box
+  (`confirmFromSource`, noted per run by `validatedDuring.ts`) or Google
+  answered and matched; the ids go in `job_run.kinds` (`validated`,
+  `contact`), no migration. Changes the Oct 2 rule that Activity shows
+  only changes to the guide. Departures from the boards: Google is one
+  group, "Open or closed, against Google" (most nights it checks status
+  only); no Menus or Eruv groups (those checks confirm nothing); two more
+  groups, "Phone and email" and "Details"; every night's page lists names
+  (W2's counts-only older night is gone, since each run now keeps its
+  ids); yesterday's night is titled "Validated yesterday". Rows appear
+  only from the first runs after this deploys; no production write needed.
 - Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
   Map tab or the browser's Back, lights the tab it was first opened from
   (Home), not the Map tab just left. Opened anew from another tab, it still

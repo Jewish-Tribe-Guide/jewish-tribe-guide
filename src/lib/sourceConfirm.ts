@@ -1,6 +1,7 @@
 import { revalidateTag } from 'next/cache'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { TAGS } from '@/lib/cacheTags'
+import { noteValidated } from '@/lib/validatedDuring'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A watch that read its source today and found a place just as the guide
@@ -60,6 +61,8 @@ export async function confirmFromSource(
   for (const row of (data ?? []) as { id: string; details: Record<string, unknown> | null }[]) {
     const details = row.details ?? {}
     const keys = typeof boxes === 'function' ? boxes(details) : boxes
+    // Validated tonight whether or not its date moves (a second run).
+    noteValidated(row.id, keys)
     const next = datedBySource(details, named, keys, now)
     if (!next) continue
     const was = (details.sectionConfirmed as Record<string, string> | undefined) ?? {}

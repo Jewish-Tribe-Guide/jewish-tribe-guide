@@ -8,6 +8,8 @@ import { placePath } from './placeLink'
 import type { Watch } from './watches'
 import { linkBroken, linkStatus, type LinkStanding } from './linkCheck'
 import { isJobOff } from './jobOff'
+import { CONTACT_SECTION } from './contactRead'
+import type { Validated } from './validatedDuring'
 
 // ── Nightly runs, a line per kind of source (Oct 25) ────────────────────────
 // The Watches tab's "Last night" (FinalNightly): Google, Kosher
@@ -73,28 +75,44 @@ export function nightKindOf(w: KindWatch, readsOf?: ReadsOf, siteGap?: SiteGap):
   return group === 'kosher' ? 'kosher' : group === 'hospital' ? 'hospitals' : group === 'menu' ? 'menus' : group === 'times' ? 'times' : group === 'hours' ? 'hours' : 'other'
 }
 
-function add(kinds: RunKinds, community: string, kind: NightKindId, read: boolean) {
+function add(kinds: RunKinds, community: string, kind: NightKindId, read: boolean, validated: readonly Validated[] = []) {
   const own = (kinds[community] ??= {})
   const count = (own[kind] ??= { of: 0, read: 0 })
   count.of++
   if (read) count.read++
+  for (const v of validated) {
+    // A page read for more whose phone and email alone agreed validated
+    // only those (listingPageRun's `dated`).
+    const list = v.boxes.every((b) => b === CONTACT_SECTION) ? 'contact' : 'validated'
+    const ids = (count[list] ??= [])
+    if (!ids.includes(v.id)) ids.push(v.id)
+  }
 }
 
 /** What the watches run read: `queue`, every watch it meant to; `read`,
- *  the ids of those it read. */
-export function countWatchKinds(queue: readonly (KindWatch & Pick<Watch, 'id' | 'communityId'>)[], read: ReadonlySet<string>, readsOf?: ReadsOf, siteGap?: SiteGap): RunKinds {
+ *  the ids of those it read; `validated`, by watch id, the listings each
+ *  found agreeing (validatedDuring.ts). */
+export function countWatchKinds(
+  queue: readonly (KindWatch & Pick<Watch, 'id' | 'communityId'>)[],
+  read: ReadonlySet<string>,
+  readsOf?: ReadsOf,
+  siteGap?: SiteGap,
+  validated?: ReadonlyMap<string, readonly Validated[]>,
+): RunKinds {
   const kinds: RunKinds = {}
   for (const w of queue) {
     const kind = nightKindOf(w, readsOf, siteGap)
-    if (kind) add(kinds, w.communityId, kind, read.has(w.id))
+    if (kind) add(kinds, w.communityId, kind, read.has(w.id), read.has(w.id) ? validated?.get(w.id) : undefined)
   }
   return kinds
 }
 
-/** What Google's run read, a row per listing it asked about. */
-export function countGoogleKinds(rows: readonly { community: string; ok: boolean }[]): RunKinds {
+/** What Google's run read, a row per listing it asked about. `validated`:
+ *  Google answered and the listing is as Google has it, its own fields
+ *  written from it (a closing it only flagged for a person is not). */
+export function countGoogleKinds(rows: readonly { community: string; ok: boolean; id?: string; validated?: boolean }[]): RunKinds {
   const kinds: RunKinds = {}
-  for (const r of rows) add(kinds, r.community, 'google', r.ok)
+  for (const r of rows) add(kinds, r.community, 'google', r.ok, r.validated && r.id ? [{ id: r.id, boxes: ['google'] }] : [])
   return kinds
 }
 

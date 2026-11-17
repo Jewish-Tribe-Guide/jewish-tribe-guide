@@ -182,6 +182,8 @@ export const routes = {
   browse: (community: string) => `/${community}/browse`,
   /** Places added, edited or taken out, by day (see whatChanged.ts). */
   changes: (community: string) => `/${community}/changes`,
+  /** What one night validated (validatedNights.ts); `night` is its date. */
+  validatedNight: (community: string, night: string) => `/${community}/changes/validated/${night}`,
   /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
    *  but community-scoped chrome: living under `/[community]` is what gives
    *  these two the visiting community's own header/footer, rather than

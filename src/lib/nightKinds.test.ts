@@ -111,6 +111,34 @@ describe('what a run saves', () => {
     })
   })
 
+  // Nov 17: what each validated, for Activity. A page read for more whose
+  // phone and email alone agreed counts as those only.
+  it('the listings each kind validated, a phone-and-email-only one apart, none from a watch not read', () => {
+    const queue = [
+      watch({ id: 't', createdBy: 'listing pages', resourceId: 's1' }),
+      watch({ id: 'u', createdBy: 'listing pages', resourceId: 's2' }),
+      watch({ id: 'v', createdBy: 'listing pages', resourceId: 's3' }),
+    ]
+    const validated = new Map([
+      ['t', [{ id: 's1', boxes: ['weekday', 'contact'] }]],
+      ['u', [{ id: 's2', boxes: ['contact'] }]],
+      ['v', [{ id: 's3', boxes: ['weekday'] }]],
+    ])
+    expect(countWatchKinds(queue, new Set(['t', 'u']), () => 'times', undefined, validated)).toEqual({
+      philly: { times: { of: 3, read: 2, validated: ['s1'], contact: ['s2'] } },
+    })
+  })
+
+  it('Google’s validated: answered, and not a closing only flagged for a person', () => {
+    expect(
+      countGoogleKinds([
+        { community: 'philly', ok: true, id: 'a', validated: true },
+        { community: 'philly', ok: true, id: 'b', validated: false },
+        { community: 'philly', ok: false, id: 'c', validated: false },
+      ]),
+    ).toEqual({ philly: { google: { of: 3, read: 2, validated: ['a'] } } })
+  })
+
   it('Google’s: every listing it asked about', () => {
     expect(countGoogleKinds([{ community: 'philly', ok: true }, { community: 'philly', ok: false }, { community: 'ues', ok: true }])).toEqual({
       philly: { google: { of: 2, read: 1 } },
