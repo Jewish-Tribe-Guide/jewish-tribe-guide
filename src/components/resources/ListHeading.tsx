@@ -107,10 +107,10 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           )}
           {/* Map is a word only: its symbol made the row busy (the user,
               Nov 17). Between Filters and Sort, Sort's menu at the end.
-              Wider than the word needs, 20px a side ("more oval"), except
-              on a 360 phone, where Synagogues' switch leaves it 4px. */}
+              Wider than the word needs, 20px a side ("more oval"), from 390
+              wide: below that Synagogues' row has no room for it. */}
           {mapHref && (
-            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} min-[375px]:px-5 lg:hidden`}>
+            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} min-[390px]:px-5 lg:hidden`}>
               Map
             </Link>
           )}

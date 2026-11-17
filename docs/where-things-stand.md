@@ -340,6 +340,13 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   it's seen. A computer is unchanged (count or switch at the left, buttons
   at the right). `e2e/phone-map-row.spec.ts` measures both sides at 360
   and 375.
+- Built Nov 17, the user's pick after CI ("Smaller text below 390"):
+  Synagogues' row ran 8px too wide at 360 and 375 in CI, whose Linux
+  browser draws the text about 4% wider than a Mac, as Android does. Below
+  390 wide the row's words (Filters, Map, Sort, the switch) are 13px
+  instead of 14, and Map's wider padding starts at 390 instead of 375.
+  **Changes** the row's text size on small phones; 390 and up and the
+  computer are unchanged.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

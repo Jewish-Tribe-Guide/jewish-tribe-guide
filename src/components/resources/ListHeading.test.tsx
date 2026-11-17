@@ -94,8 +94,19 @@ describe('ListHeading — Map in the row', () => {
     expect(lead.className).toMatch(/(^|\s)lg:order-first(\s|$)/)
   })
 
-  it('makes Map wider than its word, from 375 wide up', () => {
+  it('makes Map wider than its word, from 390 wide up', () => {
     render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
-    expect(screen.getByRole('link', { name: 'Map' }).className).toMatch(/(^|\s)min-\[375px\]:px-5(\s|$)/)
+    expect(screen.getByRole('link', { name: 'Map' }).className).toMatch(/(^|\s)min-\[390px\]:px-5(\s|$)/)
+  })
+
+  // The user, Nov 17: Synagogues' row was 8px too wide at 360 where text
+  // is drawn as on Linux and Android (CI). Whether it fits is measured in
+  // e2e/phone-map-row; this pins the size that makes it.
+  it('sets the row’s words at 13px below 390 wide, 14px from there', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
+    for (const el of [screen.getByRole('button', { name: 'Filters' }), screen.getByRole('link', { name: 'Map' }), screen.getByRole('button', { name: 'Sort Distance' })]) {
+      expect(el.className).toMatch(/(^|\s)text-\[13px\](\s|$)/)
+      expect(el.className).toMatch(/(^|\s)min-\[390px\]:text-\[14px\](\s|$)/)
+    }
   })
 })
