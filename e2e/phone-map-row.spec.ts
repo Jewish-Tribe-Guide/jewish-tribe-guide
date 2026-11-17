@@ -123,6 +123,42 @@ test.describe('the phone list row with Map', () => {
     await expect(page).toHaveURL(new RegExp(`/${community}/${c.id}(\\?.*)?$`))
   })
 
+  // The map stays mounted while the listing shows, and restored its place
+  // once a mount: a second listing's tile opened the first one's sheet
+  // (the user, Nov 17).
+  test("a second listing's map tile opens that place, not the first", async ({ page }) => {
+    test.skip(!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, 'the tile needs a Maps key in the build')
+    // Google refuses the key on localhost; any picture keeps the tile up.
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64')
+    await page.route('https://maps.googleapis.com/maps/api/staticmap**', (r) => r.fulfill({ contentType: 'image/png', body: png }))
+    const community = await defaultCommunity(page)
+    let pick: { c: Category; names: string[] } | undefined
+    for (const c of await mapCategories(page, community)) {
+      const body = await (await page.request.get(`/api/resources?category=${c.id}&community=${community}`, { timeout: 45_000 })).json()
+      const names = (body.resources as { name: string; geo?: { lat: number } }[]).filter((r) => typeof r.geo?.lat === 'number').map((r) => r.name)
+      if (names.length >= 2) {
+        pick = { c, names }
+        break
+      }
+    }
+    test.skip(!pick, 'needs a category with two mapped listings')
+    const { c, names } = pick!
+    await page.goto(`/${community}/${c.id}`)
+    await ready(page)
+    await dismissLocationPrompt(page)
+    for (const name of names.slice(0, 2)) {
+      await page.locator('main').getByRole('button', { name: `Show details for ${name}` }).first().click()
+      const tile = page.getByTestId('listing-map-tile').filter({ visible: true }).first()
+      await tile.scrollIntoViewIfNeeded()
+      await tile.click()
+      await expect(page).toHaveURL(new RegExp(`/${community}/map\\?`))
+      await expect(page.getByTestId('map-sheet').getByRole('heading').first()).toHaveText(name)
+      await page.getByTestId('map-back').click()
+      await expect(page).toHaveURL(new RegExp(`/${community}/${c.id}(\\?.*)?$`))
+      await page.keyboard.press('Escape')
+    }
+  })
+
   test('the Map tab opened as a tab has no ‹', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}/map`)

@@ -575,6 +575,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // isn't computed yet at this point in the component — see below, right
   // after allPoints itself.
   const restoredInitialPlace = useRef<'phone' | 'desktop' | null>(null)
+  // Once a showing, not once a mount: this screen is kept mounted while
+  // another shows, so a second listing's map tile came back to the first
+  // place's sheet (Nov 17). Hiding runs effects' cleanups; showing again
+  // runs the restore below afresh with the new address's place.
+  useEffect(
+    () => () => {
+      restoredInitialPlace.current = null
+    },
+    [],
+  )
 
   const colorById = useMemo(() => {
     const map = new Map<string, string>()

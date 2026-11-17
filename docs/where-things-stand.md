@@ -269,6 +269,11 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   low in the strip, but in view. And the Map tab's ‹ with a place's sheet
   open closed only the sheet; it now goes back past the map's own entries
   (`mapBackSteps`), checked in `e2e/phone-map-row.spec.ts`.
+- Fixed Nov 17 (the user, on the preview): the first listing's map tile
+  opened its place, every later one opened the map on the first place
+  again. The Map tab stays mounted behind other screens and restored the
+  address's place once a mount; now once each time it shows. Checked in
+  `e2e/phone-map-row.spec.ts` (Google's picture stood in for there).
 - Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
   Map tab or the browser's Back, lights the tab it was first opened from
   (Home), not the Map tab just left. Opened anew from another tab, it still
