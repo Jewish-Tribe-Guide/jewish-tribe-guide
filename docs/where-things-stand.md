@@ -256,9 +256,16 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   Its picture needs Google's Maps Static API, which isn't switched on for
   the site's key (it answers 403 "not activated"). The user's call: switch
   it on in Google Cloud, or pick another picture.
-- For the user: back from the Map tab on Food, the tab bar still lights
-  Map, by the Nov 4 rule (a category page lights the tab it was reached
-  from). Coming back by ‹ may read better with Home lit.
+- Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
+  Map tab or the browser's Back, lights the tab it was first opened from
+  (Home), not the Map tab just left. Opened anew from another tab, it still
+  lights that tab (the Nov 4 rule). The Back flag lives in
+  `src/lib/cameBack.ts`, loaded from the root layout like `backGuard.ts`:
+  inside the tab bar's own module it heard the Back after the router had
+  drawn the page. `e2e/phone-map-row.spec.ts` checks both ways back.
+- Open question from the user: drop the symbol on the phone's Map button
+  to bring the count back? Measured at 360: on Food it would fit (about
+  15px spare); on Synagogues the row is already full, so no.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

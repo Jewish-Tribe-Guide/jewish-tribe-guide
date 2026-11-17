@@ -78,6 +78,18 @@ test.describe('the phone list row with Map', () => {
     await expect(back).toHaveAccessibleName(`Back to ${c.pluralLabel || c.label}`)
     await back.click()
     await expect(page).toHaveURL(new RegExp(`/${community}/${c.id}(\\?.*)?$`))
+    // Come back to, the category lights the tab it was opened from, not the
+    // Map tab just left (Nov 16). Only a real browser runs the router's Back
+    // listener in its true order against ours, which is what broke this.
+    const lit = page.locator('nav [aria-current="page"]').filter({ visible: true })
+    await expect(lit).toHaveText(['Home'])
+
+    // The browser's own Back does the same.
+    await page.getByTestId('list-heading').filter({ visible: true }).first().getByTestId('list-map').click()
+    await expect(page.getByTestId('map-back')).toBeVisible()
+    await page.goBack()
+    await expect(page).toHaveURL(new RegExp(`/${community}/${c.id}(\\?.*)?$`))
+    await expect(lit).toHaveText(['Home'])
   })
 
   test('the Map tab opened as a tab has no ‹', async ({ page }) => {
