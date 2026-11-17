@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useScreenHistory } from './useScreenHistory'
+import { moveTo, useScreenHistory } from './useScreenHistory'
 
 // Next's router as it behaves here: an entry is written only once the
 // navigation lands, and a newer navigation drops one still on its way.
@@ -49,5 +49,26 @@ describe('useScreenHistory', () => {
     expect(here()).toBe('/page?field=b')
     await result.current.back()
     expect(here()).toBe('/page')
+  })
+})
+
+describe('a move still waiting when the page goes', () => {
+  // A test's page is torn down while a move waits to land (the router here
+  // never lands it): its next look at the address threw "window is not
+  // defined" after the file had passed, failing CI's unit run (PR 390,
+  // Nov 16, from EruvInfo.test.tsx). Nothing is left to wait for then.
+  it('stops waiting instead of throwing', async () => {
+    vi.useFakeTimers()
+    try {
+      const moved = moveTo({ push: vi.fn(), replace: vi.fn() } as never, 'push', () => '/never-lands')
+      await vi.advanceTimersByTimeAsync(20)
+      vi.stubGlobal('window', undefined)
+      await vi.advanceTimersByTimeAsync(40)
+      vi.unstubAllGlobals()
+      await expect(moved).resolves.toBeUndefined()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { changedByTests } from '../e2e/suiteRows'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives a food place's menu on its kind's page for real (the Main dishes
@@ -52,6 +53,7 @@ async function dishField() {
   expect(missing?.message ?? null, 'needs migration 065 (menu_reading) on the test project').toBeNull()
   const { data: cats } = await supabase.from('category').select('id, fields').eq('community_id', 'philly')
   return (cats as { id: string; fields: Field[] }[])
+    .filter((c) => !changedByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'tags' && f.showCountInHeader && /\bdish$/i.test(f.countLabel ?? '')).map((f) => ({ c, f })))
     .at(0)
 }
@@ -85,7 +87,13 @@ async function openPlace(page: Page, shows: string) {
   const open = page.getByTestId('place-open')
   await expect(async () => {
     await page.reload()
-    await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 3_000 })
+    // Loaded within expect's 5s, or this try fails.
+    // Then whether the place is there yet, without starting over a load
+    // still under way (a 3s try restarted every load over 3s, forever).
+    const loading = page.getByRole('main').getByText('Loading…')
+    await expect(loading.or(page.getByRole('heading', { name })).first()).toBeVisible()
+    await expect(loading).toHaveCount(0)
+    await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 1_000 })
     // Saying its menu's part, once the menu's job has it too: before, it's a
     // place nothing reads.
     await expect(open).toContainText(shows, { timeout: 3_000 })

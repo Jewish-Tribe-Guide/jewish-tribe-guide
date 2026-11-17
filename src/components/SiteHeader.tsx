@@ -1,5 +1,6 @@
 'use client'
 
+import { FitTitle } from './FitTitle'
 import { type MouseEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -143,7 +144,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
       // a slide transition to protect.
       style={{ viewTransitionName: collapsed ? 'none' : 'site-header' }}
     >
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 desktop:h-[60px] flex items-center gap-10">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 desktop:h-[60px] flex items-center gap-3 desktop:gap-10">
         {showScreenHeader && screenHeader ? (
           <button
             onClick={screenHeader.onBack}
@@ -172,9 +173,11 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
             </span>
             <span className="min-w-0 flex-1">
               {screenHeader.named && <span className="block truncate text-xs font-bold tracking-wide text-muted">{settings.name}</span>}
-              <span className={`block truncate font-semibold tracking-tight text-slate-900 ${screenHeader.named ? 'text-base leading-tight' : 'text-lg'}`}>
-                {screenHeader.title}
-              </span>
+              {screenHeader.named ? (
+                <span className="block truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{screenHeader.title}</span>
+              ) : (
+                <FitTitle text={screenHeader.title} className="block truncate font-bold leading-tight tracking-tight text-slate-900" />
+              )}
             </span>
           </button>
         ) : (() => {
@@ -229,9 +232,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // either in full. That was the tagline's only render site, so the
           // setting itself is gone too.
           const titleOf = (text: string, tab = false) => (
-            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink" data-testid={tab ? 'header-tab-title' : undefined}>
-              {text}
-            </span>
+            <FitTitle text={text} testId={tab ? 'header-tab-title' : undefined} className="min-w-0 flex-1 truncate font-bold leading-tight tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink" />
           )
           const title = titleOf(settings.name)
 

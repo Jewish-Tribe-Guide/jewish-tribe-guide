@@ -87,9 +87,9 @@ export default function PlacePage({ token, id, from }: { token: string; id: stri
         token={token}
         community={community}
         now={now}
-        onChanged={async () => {
+        onChanged={async (changed) => {
           before.current = place.state
-          await reload()
+          await reload(changed)
         }}
       />
     </div>

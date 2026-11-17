@@ -12,7 +12,7 @@ import EruvKeptEmail from './EruvKeptEmail'
 import { sourceActions } from './sourceActions'
 import { shortUrl } from './watchText'
 import type { FoundStatusPage } from '@/lib/eruvFind'
-import type { Jobs } from './useWatchJobs'
+import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { groupEdit, waitingGroups, type WaitBox, type WaitGroup } from './waitingGroups'
 import { waitingAnswers } from './waitingAnswers'
 import { withSave } from './findingEdits'
@@ -231,6 +231,14 @@ const CHANGE_LABEL: Record<Change['kind'], string> = {
 const changeEmail = (c: Change) => c.kind === 'newsletter' || c.kind === 'eruv-status'
 const readFor = (c: Change | null) => (c?.kind === 'eruv-status' ? 'status' : 'times')
 
+/** What a save on a place wrote to, so it waits for just those jobs to
+ *  come back (useWatchJobsAndReload). Outside React: nothing draws from it. */
+const wrote = new Map<string, string[]>()
+function wroteFor(id: string): string[] {
+  if (!wrote.has(id)) wrote.set(id, [])
+  return wrote.get(id)!
+}
+
 export default function OpenedPlace({
   place,
   jobs,
@@ -245,7 +253,9 @@ export default function OpenedPlace({
   community: string
   now: number
   /** After a read or a new source: every job read again. */
-  onChanged: () => Promise<void>
+  /** Read the jobs again; given the ones a save changed, done once those
+   *  are (useWatchJobsAndReload). */
+  onChanged: (changed?: readonly (keyof Jobs)[]) => Promise<void>
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -261,7 +271,10 @@ export default function OpenedPlace({
   const isMobile = useIsMobile()
   const opened = openedPlace(place.id, jobs, now)
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  const post = <T,>(path: string, body: Record<string, unknown>) => {
+    wroteFor(place.id).push(path)
+    return fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  }
 
   /** Photos of a menu, read for its dishes (the Dishes page's). */
   function menuPhotos(files: File[]) {
@@ -269,15 +282,18 @@ export default function OpenedPlace({
     body.append('action', 'photos')
     body.append('resourceId', place.id)
     for (const f of files) body.append('file', f)
+    wroteFor(place.id).push('/api/admin/main-dishes')
     return fetchJson(withCommunity('/api/admin/main-dishes', community), { method: 'POST', headers: { Authorization: headers.Authorization }, body }, 'Could not read those photos.')
   }
 
   async function run(what: string, work: () => Promise<unknown>) {
     setError(null)
     setBusy(what)
+    wrote.set(place.id, [])
     try {
       await work()
-      await onChanged()
+      const paths = wroteFor(place.id)
+      await onChanged(paths.length ? [...new Set(paths.flatMap(jobsChangedBy))] : undefined)
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not do that.')

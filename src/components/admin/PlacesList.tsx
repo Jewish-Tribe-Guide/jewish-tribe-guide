@@ -125,7 +125,8 @@ export default function PlacesList({ token }: { token: string }) {
   const router = useRouter()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { jobs, reload } = useWatchJobsAndReload(token)
+  // The places first: the jobs only colour the rows and fill the coverage.
+  const { jobs, reload } = useWatchJobsAndReload(token, { ready: data !== null || error !== null })
   const [now] = useState(() => Date.now())
   const watches = useWatchesLine(token, community, now)
   const coverage = useMemo(() => coverageOf(jobs), [jobs])

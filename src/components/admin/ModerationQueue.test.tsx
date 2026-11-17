@@ -792,7 +792,12 @@ describe('ModerationQueue — a place opened', () => {
     const user = userEvent.setup()
     wide = true
     vi.mocked(fetchJson).mockResolvedValue({ ok: true })
-    const three = ['Acme Grocery', 'Giant', 'Zayde’s'].map((name, i) => submission({ id: `s${i}`, payload: { category: 'grocery', name, address: '2 Main St', details: {} } }))
+    // Dated, newest first as To do sorts them: left to `new Date()`, a
+    // clock tick between the three reordered them, and Acme opened as
+    // "3 of 3" (CI on PR 390, Nov 16; about one run in twenty locally).
+    const three = ['Acme Grocery', 'Giant', 'Zayde’s'].map((name, i) =>
+      submission({ id: `s${i}`, created_at: `2026-11-1${3 - i}T12:00:00Z`, payload: { category: 'grocery', name, address: '2 Main St', details: {} } }),
+    )
     renderRouted({ submissions: three })
     await user.click(await findRow('Acme Grocery'))
     // Waited for: on a slow CI runner the place hadn't opened yet when this

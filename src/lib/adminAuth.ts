@@ -46,9 +46,23 @@ function allowedBy(configured: readonly string[], email: string): boolean {
   return isAllowedAdminEmail(email)
 }
 
-async function verifyToken(request: Request): Promise<string | null> {
+// Checks of a token still under way, shared by requests carrying the same
+// one: the admin's jobs read runs thirteen routes at once, each checking
+// it (api/admin/watches/jobs). Dropped once answered, so every later
+// request checks again: a token signed out is never let in on an old yes.
+const checking = new Map<string, Promise<string | null>>()
+
+function verifyToken(request: Request): Promise<string | null> {
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
-  if (!token) return null
+  if (!token) return Promise.resolve(null)
+  const under = checking.get(token)
+  if (under) return under
+  const check = askSupabase(token).finally(() => checking.delete(token))
+  checking.set(token, check)
+  return check
+}
+
+async function askSupabase(token: string): Promise<string | null> {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

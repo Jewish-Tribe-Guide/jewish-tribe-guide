@@ -1,0 +1,158 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { SUITE_ROWS, changedByTests, type Suite } from '../../e2e/suiteRows'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The suites share one test database and run at the same time, so a row one
+// changes must be one no other reads. e2e/suiteRows.ts says who changes
+// what; this reads every suite's source and holds them to it.
+//
+// It reads source text, so it sees only the shapes written below. A write
+// through the admin UI (a click on Save) isn't seen. What it does see is
+// how every failure so far happened: a test calling an admin route or the
+// database directly on a row it didn't own, and a test taking "the first
+// listing category" from the whole list (PR 389's CI, Nov 16: three runs).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROOT = join(__dirname, '../..')
+
+/** Each suite's directory, and the suite it is (`e2e` claims nothing). */
+const DIRS: Record<string, Suite | 'e2e'> = {
+  e2e: 'e2e',
+  'e2e-cache': 'cache-roundtrip',
+  'e2e-form': 'form-roundtrip',
+  'e2e-admin-write': 'admin-write',
+}
+
+function files(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) return files(path)
+    return /\.ts$/.test(name) ? [path] : []
+  })
+}
+
+const sources = Object.entries(DIRS).flatMap(([dir, suite]) =>
+  files(join(ROOT, dir)).map((path) => ({ suite, file: path.slice(ROOT.length + 1), text: readFileSync(path, 'utf8') })),
+)
+
+const lineOf = (text: string, index: number) => text.slice(0, index).split('\n').length
+
+/** Every existing row a file changes, as `kind:id`, by the shapes the
+ *  suites use. A row only its own test creates and deletes (an insert, a
+ *  delete by its own id) isn't here: nothing else can be holding it. */
+export function writesIn(text: string, claims: readonly string[]): { key: string; line: number }[] {
+  const found: { key: string; line: number }[] = []
+  const add = (key: string, index: number) => found.push({ key, line: lineOf(text, index) })
+  const call = String.raw`\.(?:patch|put|post|delete)\(\s*[\`'"]`
+  for (const m of text.matchAll(new RegExp(`${call}/api/admin/site-settings`, 'g'))) add('site_settings:philly', m.index)
+  for (const m of text.matchAll(new RegExp(`${call}/api/admin/pages/(\\w+)`, 'g'))) add(`page:${m[1]}`, m.index)
+  for (const m of text.matchAll(new RegExp(`${call}/api/admin/watches`, 'g'))) add('watch_job:philly', m.index)
+  for (const m of text.matchAll(new RegExp(`${call}/api/admin/categories/([^\`'"?]+)`, 'g'))) {
+    const id = m[1]
+    if (!id.startsWith('${')) {
+      add(`category:${id}`, m.index)
+      continue
+    }
+    // By a variable: the claimed category this file names, or nothing.
+    const named = claims.find((k) => k.startsWith('category:') && !k.endsWith('*') && text.includes(`'${k.slice('category:'.length)}'`))
+    add(named ?? `category:${id}`, m.index)
+  }
+  for (const m of text.matchAll(/from\('page'\)\s*\.(?:update|upsert)\([^\n]*?\.eq\('slug',\s*'(\w+)'\)/g)) add(`page:${m[1]}`, m.index)
+  for (const m of text.matchAll(/from\('site_settings'\)\s*\.(?:update|upsert)\(/g)) add('site_settings:philly', m.index)
+  for (const m of text.matchAll(/from\('community'\)\s*\.(?:update|upsert)\(([\s\S]{0,200}?)\.eq\('slug',\s*'(\w+)'\)/g)) add(`community:${m[2]}`, m.index)
+  for (const m of text.matchAll(/from\('category'\)\s*\.(?:update|upsert)\(/g)) add('category:?', m.index)
+  return found
+}
+
+/** Reads of the whole category list that then pick from it, unless they
+ *  skip the claimed ones or narrow to a row of the test's own. */
+export function unsafePicks(text: string): number[] {
+  const lines = text.split('\n')
+  const bad: number[] = []
+  lines.forEach((line, i) => {
+    if (!/from\('category'\)\s*\.select\(|\/api\/categories/.test(line)) return
+    if (/^\s*(\/\/|\*)/.test(line)) return
+    // The statement and the few lines that use what it read.
+    const window = lines.slice(i, i + 6).join('\n')
+    if (/changedByTests/.test(window)) return
+    // Narrowed to one row it names: its own fixture, or one it made.
+    if (/\.eq\('(id|plural_label)'|\.eq\('community_id', slug\)|\.id === /.test(window)) return
+    // Read whole on purpose, never picked from. (`some` only asks whether
+    // a kind exists, which no rename changes.)
+    if (!/\.(find|filter|at)\(|\[0\]|for \(const/.test(window)) return
+    bad.push(i + 1)
+  })
+  return bad
+}
+
+describe('the suites never change a row another reads', () => {
+  it('no row is claimed by two suites', () => {
+    const owners = new Map<string, string>()
+    for (const [suite, keys] of Object.entries(SUITE_ROWS)) {
+      for (const key of keys) {
+        expect(owners.get(key), `${key} is claimed by ${owners.get(key)} and ${suite}`).toBeUndefined()
+        owners.set(key, suite)
+      }
+    }
+  })
+
+  it('every row a suite changes is one it claims', () => {
+    const unclaimed: string[] = []
+    for (const { suite, file, text } of sources) {
+      const claims: readonly string[] = suite === 'e2e' ? [] : SUITE_ROWS[suite]
+      for (const { key, line } of writesIn(text, claims)) {
+        const ok = claims.some((c) => c === key || (c.endsWith('*') && key.startsWith(c.slice(0, -1))))
+        if (!ok) unclaimed.push(`${file}:${line} changes ${key}, which ${suite} hasn't claimed in e2e/suiteRows.ts`)
+      }
+    }
+    expect(unclaimed).toEqual([])
+  })
+
+  it('every pick from the category list skips the claimed ones', () => {
+    const unsafe = sources.flatMap(({ file, text }) => unsafePicks(text).map((line) => `${file}:${line}`))
+    expect(unsafe, 'pick through changedByTests (e2e/suiteRows.ts) or categories() in e2e/helpers.ts').toEqual([])
+  })
+
+  it('categories() in e2e/helpers.ts skips them for every test that picks from it', () => {
+    // Most pickers go through it, so the scan above passes them on trust.
+    const helpers = readFileSync(join(ROOT, 'e2e/helpers.ts'), 'utf8')
+    const body = helpers.match(/export async function categories\([\s\S]*?\n\}/)?.[0]
+    expect(body).toMatch(/\.filter\(\(c\) => !changedByTests\(c\)\)/)
+  })
+
+  it('finds the writes it is meant to', () => {
+    // So the scan above can't pass by seeing nothing.
+    const all = sources.flatMap(({ suite, text }) => writesIn(text, suite === 'e2e' ? [] : SUITE_ROWS[suite]).map((w) => w.key))
+    expect(new Set(all)).toEqual(new Set(Object.values(SUITE_ROWS).flat().filter((k) => !k.endsWith('*'))))
+  })
+
+  it('changedByTests skips claimed pages and keeps the rest', () => {
+    expect(changedByTests({ id: 'cache-roundtrip-seed' })).toBe(true)
+    expect(changedByTests({ id: 'e2e-review-1234' })).toBe(true)
+    expect(changedByTests({ id: 'restaurant' })).toBe(false)
+    expect(changedByTests({ id: 'cache-roundtrip-seed-2' })).toBe(false)
+  })
+})
+
+describe('the scans themselves', () => {
+  it('catches a pick of the first listing category', () => {
+    expect(unsafePicks("const body = await (await request.get('/api/categories?community=philly')).json()\nconst c = body.categories.find((c) => c.kind === 'listing')")).toEqual([1])
+    expect(unsafePicks("const { data } = await supabase.from('category').select('id').eq('community_id', 'philly')\nconst first = data[0]")).toEqual([1])
+  })
+
+  it('lets through a filtered pick, an own row, and a read with no pick', () => {
+    expect(unsafePicks("const c = (await get('/api/categories')).categories.find((c) => c.kind === 'listing' && !changedByTests(c))")).toEqual([])
+    expect(unsafePicks("const { data } = await supabase.from('category').select('id').eq('plural_label', name).maybeSingle()")).toEqual([])
+    expect(unsafePicks("const res = await request.get('/api/categories?community=philly')\nexpect(res.status()).toBe(200)")).toEqual([])
+  })
+
+  it('reads a write by the shape each suite uses', () => {
+    expect(writesIn("await request.patch('/api/admin/pages/about', {", [])).toEqual([{ key: 'page:about', line: 1 }])
+    expect(writesIn("await supabase.from('page').update({ body }).eq('slug', 'privacy')", [])).toEqual([{ key: 'page:privacy', line: 1 }])
+    expect(writesIn("await supabase\n  .from('community')\n  .update({ admin_emails: [] })\n  .eq('slug', 'philly')", []).map((w) => w.key)).toEqual(['community:philly'])
+    expect(writesIn("const slug = 'cache-roundtrip-seed'\nawait request.patch(`/api/admin/categories/${slug}?community=philly`, {", ['category:cache-roundtrip-seed']).map((w) => w.key)).toEqual(['category:cache-roundtrip-seed'])
+    expect(writesIn('await request.patch(`/api/admin/categories/${target.id}`, {', []).map((w) => w.key)).toEqual(['category:${target.id}'])
+  })
+})

@@ -22,7 +22,7 @@ import { listingSources, rowFinding, type GiveSource, type ReadNow, type RowSour
 import OpenedPlace from './OpenedPlace'
 import { sourceActions, type Attempt } from './sourceActions'
 import type { Stop } from './openedPlaceBoxes'
-import type { Jobs } from './useWatchJobs'
+import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
 
@@ -233,7 +233,7 @@ export default function PlaceListing({
   category: CategoryConfig | undefined
   token: string
   jobs: Jobs
-  reload: () => Promise<void>
+  reload: (changed?: readonly (keyof Jobs)[]) => Promise<void>
   now: number
   onClose: () => void
   /** Saved or archived or brought back: it's done with here. */
@@ -373,7 +373,7 @@ export default function PlaceListing({
         setItem(got.item)
         setPatch({ [key]: (got.item as Record<string, unknown>)[key] ?? '' })
       }
-      await reload()
+      await reload(jobsChangedBy('/api/admin/watches/google'))
     } catch (err) {
       setRowError({ row: row.id, text: err instanceof Error ? err.message : 'Could not do that.' })
     } finally {

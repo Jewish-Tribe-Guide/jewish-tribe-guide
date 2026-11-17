@@ -9,7 +9,7 @@ import type { NightKindId } from '@/lib/jobRuns'
 import { withCommunity } from '@/lib/useCommunityData'
 import { jobLists } from '@/lib/watchJobList'
 import { AdminBack, AdminBox, AdminEmpty, AdminRow } from './AdminUI'
-import { useWatchJobsAndReload } from './useWatchJobs'
+import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
 
 // + Add a watch: everything not already on Watches. A job turned off comes
 // back on with a tap, and Other pages opens to add a page.
@@ -32,6 +32,7 @@ export default function AddWatchPage({ token }: { token: string }) {
         { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'job-on', kind }) },
         'Could not turn it on.',
       )
+      noteJobSwitched(community, kind, false)
       router.push(`${base}/watches`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not turn it on.')

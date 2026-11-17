@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt, listingWithFourActions, openListingEditor } from './helpers'
+import { changedByTests } from './suiteRows'
 
 // Desktop opens a listing in the list's own column, the map staying beside
 // it (ListingColumn); a phone opens it in a bottom sheet, the one Add and
@@ -251,7 +252,7 @@ test.describe('listing detail — desktop', () => {
     test(`a group opened, a listing in it read and closed by ${back}, closes again`, async ({ page, request }) => {
       const community = await defaultCommunity(page)
       const res = await request.get(`/api/categories?community=${community}`)
-      const grouped = ((await res.json()).categories as { id: string; kind: string; groupBy?: unknown }[]).filter((c) => c.kind === 'listing' && c.groupBy)
+      const grouped = ((await res.json()).categories as { id: string; kind: string; groupBy?: unknown }[]).filter((c) => c.kind === 'listing' && c.groupBy && !changedByTests(c))
       let found = false
       for (const category of grouped) {
         await page.goto(`/${community}/${category.id}`)

@@ -134,9 +134,84 @@ are unbalanced; about 6–7 min looks reachable.
   the click, while the cache job (a separate CI job, same test project)
   was renaming that fixture. 21/21 locally on a real category. The e2e
   pickers in helpers.ts now skip other suites' fixtures
-  (writtenByOtherSuites). A lead, not proven: closing a listing opened
+  (now changedByTests). A lead, not proven: closing a listing opened
   from its own link changes the address with history.replaceState,
   which a later Next update can overwrite (AGENTS.md's rule).
+- Done Nov 16 (the user: "Yes, fix it here"): the suites that share the
+  test project no longer pick each other's rows. `e2e/suiteRows.ts`
+  lists every existing row each suite changes (cache: its seed category,
+  the About page, Philly's site settings; admin-write: `e2e-…` pages,
+  Privacy, Philly's team list, a watch job). `categories()` in the e2e
+  helpers skips them, and so do the eight pickers that read the list
+  themselves. `src/test/suiteRows.test.ts` fails on a write to a row its
+  suite hasn't claimed, a row two suites claim, or a pick that doesn't
+  skip them (8 picks flagged against the old code). Still open: two CI
+  runs from different branches at once each run the same suite, and
+  rename the same fixture over each other. Not seen yet; one branch at a
+  time is the usual case.
+- Admin saves were slow, not the tests (Nov 16, the user: "if we just
+  keep relaxing rules what are we even testing"). The 15s waits put in
+  that morning are gone again; the tests are back on expect's 5s.
+  - Cause: every save on a place read all 13 watch jobs again and showed
+    "Saving…" until the last came back (4.4s for one menu Accept on a
+    laptop, over 5s in CI). Now a save waits only for the jobs its writes
+    reach (`jobsChangedBy`), and the rest are read behind it. Turning a
+    job off or on updates the remembered list at once (`noteJobSwitched`).
+  - Places opened with its own read queued behind those 13 (the browser
+    opens six connections to an HTTP/1.1 server, as in the tests). It now
+    reads the jobs after its list is in, as To do already did.
+  - A place's own screen showed nothing until all 13 were in, two or three
+    rounds of reads on those six connections, and main-dishes' `openPlace`
+    failed on it. Now every job comes in ONE request
+    (`/api/admin/watches/jobs`, the 13 routes run side by side on the
+    server; `?only=` for a save's). Unit tests answer it from each job's
+    own route (`src/test/fetchJobsByRoute.ts`, mocked in vitest.setup.ts).
+  - Turning a job back on could still show it off: a jobs read asked
+    before the switch landed after it with the old list (job-off, once in
+    two runs). A read from before a switch no longer sets which jobs are
+    off, and every open screen takes the switch too.
+  - CI's unit run failed on a timer left by `useScreenHistory` (a move's
+    wait for its address) firing after a test's page was gone; it stops
+    when there's no page now.
+  - Every admin route checked the sign-in with Supabase on its own, so one
+    jobs read made 14 checks; requests carrying the same token now share
+    the check under way (adminAuth's `checking`), dropped once answered.
+  - main-dishes' `openPlace` reloaded every 3s, so a load over 3s on a busy
+    runner was thrown away and restarted until the test gave up. Each try
+    now waits for the screen to finish loading (expect's 5s), then looks.
+  - Open: `category-open.spec.ts` failed 2 of 8 full admin-write runs on
+    Nov 16, never alone (9/9). A page whose address was loaded behind the
+    list (Cemetery) is asked for again on the click. Seen before this
+    work too; cause not found yet.
+  - Moderation's 15s waits (from Nov 3) are the approve request itself,
+    about ten database round trips in a row; left as they are.
+  - The combined jobs read made 105 database requests, about 65 of them
+    the same read again (the admin list 14 times, the watch list 14, the
+    categories 12, each job's runs 3). Inside it, an identical read is now
+    made once and shared (`src/lib/supabase/sharedReads.ts`, GETs only,
+    one request's lifetime): 42 requests, median 1.36s to 1.07s with two
+    at once, worst of 30 2.4s to 1.45s. Measured, not the cause of the
+    open item below: Places' own read was 0.41s either way.
+  - Open: CI at 76ee5be9 (Nov 16 evening) failed two admin-write tests on
+    a server stall over 5s: Places stuck on Loading… (its read is 0.4s
+    locally) and a Dismiss still busy (one database delete). Nothing else
+    used the test database then, and the walk-routes job skips in CI (no
+    key). Cause not found; the waits were not raised. Failures now keep a
+    trace with every request's timing (`trace: retain-on-failure` in
+    playwright.admin-write.config.ts; it was a final snapshot only), so the
+    next one names the request that hung. Read that before guessing.
+  - Seen in that trace check: one Places load makes two combined jobs
+    reads. Not looked into.
+  - CI's unit run failed once on To do's "1 of 3": the test's three places
+    were dated by the clock, which sometimes ticked between them and
+    reordered the newest-first list. Fixed in the test (fixed dates).
+- Phone header titles are bigger (the user's OK, Nov 16: "be aware of long
+  names"): 22px bold when it fits, stepping down to 19, 17, 15px, then two
+  lines, measured against the room beside it (`FitTitle`). The phone row's
+  gap is 12px now (it kept the computer's 40px). On a 320px phone "Philly
+  Jewish Guide" is 15px and "Candle Lighting & Zmanim" two lines; on 375px
+  19px and 15px. The computer header is unchanged.
+  `e2e/header-title.spec.ts`.
 - A tab's own page names itself in the phone header (the user's OK,
   Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
   the tab bar's word for them

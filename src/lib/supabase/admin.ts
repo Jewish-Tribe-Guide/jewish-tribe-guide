@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { sharedFetch } from './sharedReads'
 
 // Server-only Supabase client using the service-role key. It bypasses Row-Level
 // Security, so it must NEVER be imported into client components — only route
@@ -15,6 +16,8 @@ export function getAdminClient(): SupabaseClient {
 
   cached = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Plain fetch, except inside shareReads (the combined jobs read).
+    global: { fetch: sharedFetch },
   })
   return cached
 }

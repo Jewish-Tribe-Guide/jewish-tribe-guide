@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { changedByTests } from '../e2e/suiteRows'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the AI's readings on the Searches page for real: its readings are
@@ -43,6 +44,7 @@ async function seedReading() {
   // Any filterable pick-list with an option, on any category.
   const { data: cats } = await supabase.from('category').select('id, plural_label, fields').eq('community_id', 'philly')
   const found = (cats as { id: string; plural_label: string; fields: Field[] }[])
+    .filter((c) => !changedByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'select' && f.filterable && f.options?.length).map((f) => ({ c, f })))
     .at(0)
   test.skip(!found, 'no filterable pick-list on the test project')

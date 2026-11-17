@@ -14,7 +14,7 @@ import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
 import { withCommunity } from '@/lib/useCommunityData'
 import { JOB_STEPS } from '@/lib/watchJobList'
 import { AdminBack, AdminBox, AdminRow, adminInputClass } from './AdminUI'
-import { useWatchJobsAndReload } from './useWatchJobs'
+import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
 
 // A job, opened (board "a job"): how last night went and when it runs, what
 // it didn't read, all it tracks, its last 14 nights with a check or an X, and
@@ -132,6 +132,7 @@ export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; na
         { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'job-off', kind }) },
         'Could not turn it off.',
       )
+      noteJobSwitched(community, kind, true)
       router.push(`${adminBase(community)}/watches`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not turn it off.')

@@ -198,3 +198,36 @@ describe('getAdminUserForCommunity', () => {
     expect(await checking).toEqual({ email: 'philly-admin@example.com' })
   })
 })
+
+describe('one token checked by many routes at once', () => {
+  // The admin's jobs read (api/admin/watches/jobs) runs thirteen routes
+  // side by side, each checking the same token: one check with Supabase,
+  // not fourteen. Once it's answered, the next request checks again, so
+  // a token signed out or expired is never let in on an old answer.
+  it('asks Supabase once while the check is under way, and again after', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon')
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['a@example.com'])
+    mockSupabaseUser({ email: 'a@example.com' })
+    const all = await Promise.all(Array.from({ length: 5 }, () => getAdminUserForCommunity(req('Bearer tok'), 'philly')))
+    expect(all).toEqual(Array(5).fill({ email: 'a@example.com' }))
+    // mockSupabaseUser hands every client the same getUser.
+    const asked = () => vi.mocked((vi.mocked(createClient).mock.results[0].value as { auth: { getUser: () => void } }).auth.getUser).mock.calls.length
+    expect(asked()).toBe(1)
+    await getAdminUserForCommunity(req('Bearer tok'), 'philly')
+    expect(asked()).toBe(2)
+  })
+
+  it('never shares one token’s answer with another', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon')
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['a@example.com'])
+    vi.mocked(createClient).mockReturnValue({
+      auth: { getUser: vi.fn(async (t: string) => ({ data: { user: t === 'good' ? { email: 'a@example.com' } : null }, error: null })) },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    const [good, bad] = await Promise.all([getAdminUserForCommunity(req('Bearer good'), 'philly'), getAdminUserForCommunity(req('Bearer bad'), 'philly')])
+    expect(good).toEqual({ email: 'a@example.com' })
+    expect(bad).toBeNull()
+  })
+})

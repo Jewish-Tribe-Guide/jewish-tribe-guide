@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Request } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { changedByTests } from '../e2e/suiteRows'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A category page opens from the list without waiting on the server (the
@@ -22,11 +23,11 @@ test('a category page opens from the list without asking the server', async ({ p
   // A page with places on it, by its name in the list.
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const { data: rows } = await supabase.from('category').select('id, plural_label').eq('community_id', 'philly').eq('kind', 'listing').order('plural_label')
-  // Never another suite's fixture. They run at the same time against this
-  // same project, and cache-roundtrip renames `cache-roundtrip-seed` over
-  // and over: picked first alphabetically (PR 389's CI, Nov 16), the page
-  // changed under the click and was asked for again.
-  const target = rows!.find((r) => !/^(e2e-|cache-roundtrip)/.test(r.id))!
+  // Never one a test is changing (e2e/suiteRows.ts): cache-roundtrip
+  // renames `cache-roundtrip-seed` over and over, and picked first
+  // alphabetically (PR 389's CI, Nov 16), the page changed under the click
+  // and was asked for again.
+  const target = rows!.find((r) => !changedByTests(r))!
   expect(target, 'a category no other suite writes to').toBeTruthy()
   const path = `/philly/admin/categories/cat:${target.id}`
 

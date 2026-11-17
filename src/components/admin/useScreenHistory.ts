@@ -32,7 +32,8 @@ function landedOn(href: string): Promise<void> {
   return new Promise((done) => {
     const start = Date.now()
     const check = () => {
-      if (here() === href || Date.now() - start > LANDING_LIMIT_MS) done()
+      // The page gone (a test torn down mid-move): nothing to wait for.
+      if (typeof window === 'undefined' || here() === href || Date.now() - start > LANDING_LIMIT_MS) done()
       else setTimeout(check, 20)
     }
     check()
