@@ -73,4 +73,9 @@ describe('ListHeading — Map in the row', () => {
     expect(group.className).toMatch(/(^|\s)gap-2(\s|$)/)
     expect(group.className).not.toMatch(/gap-1\.5/)
   })
+
+  it('makes Map wider than its word, from 375 wide up', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
+    expect(screen.getByRole('link', { name: 'Map' }).className).toMatch(/(^|\s)min-\[375px\]:px-5(\s|$)/)
+  })
 })

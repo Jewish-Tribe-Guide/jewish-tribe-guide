@@ -37,18 +37,22 @@ test.describe('the phone list row with Map', () => {
     return boxes
   }
 
-  function expectOneLine(boxes: { name: string; box: { y: number; height: number; x: number; width: number } }[], where: string) {
+  function expectOneLine(boxes: { name: string; box: { y: number; height: number; x: number; width: number } }[], where: string, width: number) {
     const top = Math.min(...boxes.map((b) => b.box.y))
     for (const b of boxes) {
       expect(Math.abs(b.box.y + b.box.height / 2 - (top + boxes[0].box.height / 2)), `${where}: "${b.name}" is on another line`).toBeLessThanOrEqual(6)
-      expect(b.box.x + b.box.width, `${where}: "${b.name}" runs off the side`).toBeLessThanOrEqual(360)
+      expect(b.box.x + b.box.width, `${where}: "${b.name}" runs off the side`).toBeLessThanOrEqual(width)
     }
   }
 
-  test('Filters, Map and Sort sit on one line at 360, on every category with a map', async ({ page }) => {
+  // 360 is the narrowest phone; 375 is where Map gets wider, and leaves
+  // Synagogues 3px (measured Nov 17).
+  // One test a width: both in one ran past the 60s budget.
+  for (const width of [360, 375]) test(`Filters, Map and Sort sit on one line at ${width}, on every category with a map`, async ({ page }) => {
     const community = await defaultCommunity(page)
     const cats = await mapCategories(page, community)
     test.skip(cats.length === 0, 'needs a category with a map and listings')
+    await page.setViewportSize({ width, height: 780 })
     for (const c of cats) {
       await page.goto(`/${community}/${c.id}`)
       await ready(page)
@@ -58,13 +62,13 @@ test.describe('the phone list row with Map', () => {
       // Filters · Map · Sort (the user, Nov 17); Synagogues have no Sort.
       const kinds = boxes.map((b) => b.kind).filter((k) => k !== 'switch')
       expect(kinds, `${c.label}: ${names.join(' · ')}`).toEqual(kinds.includes('sort') ? ['filters', 'map', 'sort'] : ['filters', 'map'])
-      expectOneLine(boxes, c.label)
+      expectOneLine(boxes, `${c.label} at ${width}`, width)
       // The Minyan view keeps Map, on the same line as the switch.
       const switchEl = page.getByTestId('minyan-switch').filter({ visible: true }).first()
       if (await switchEl.count()) {
         await switchEl.getByRole('button').nth(1).click()
         await expect(page.getByTestId('minyanim-view')).toBeVisible()
-        expectOneLine(await rowBoxes(page), `${c.label}, Minyan view`)
+        expectOneLine(await rowBoxes(page), `${c.label}, Minyan view, at ${width}`, width)
       }
     }
   })

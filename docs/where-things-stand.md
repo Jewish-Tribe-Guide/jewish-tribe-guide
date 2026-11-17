@@ -272,6 +272,10 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   Minyan switch are 12px a side on a phone ("a little ovaly"; 14px
   overflowed Synagogues at 360 by 10px), 14px on a computer. The computer
   is as it was before Nov 17. The order is one place in `ListHeading.tsx`.
+  Map is wider than its word from 375 up, 20px a side ("more oval", the
+  user later still); at 360 it stays 12px, because Synagogues' switch
+  leaves it 4px. The group isn't held to the right: Food's buttons start
+  at the left, Synagogues' follow the switch (agreed).
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

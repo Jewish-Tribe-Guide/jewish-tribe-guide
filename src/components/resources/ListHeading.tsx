@@ -98,9 +98,11 @@ export default function ListHeading({ label, count, noun = !label, total, filter
             </button>
           )}
           {/* Map is a word only: its symbol made the row busy (the user,
-              Nov 17). Between Filters and Sort, Sort's menu at the end. */}
+              Nov 17). Between Filters and Sort, Sort's menu at the end.
+              Wider than the word needs, 20px a side ("more oval"), except
+              on a 360 phone, where Synagogues' switch leaves it 4px. */}
           {mapHref && (
-            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} lg:hidden`}>
+            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} min-[375px]:px-5 lg:hidden`}>
               Map
             </Link>
           )}
