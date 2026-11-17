@@ -280,6 +280,15 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   + Add for a new place. A person checks each one." (it used to name Edit
   and Report links that are gone). The bottom line's "please confirm
   details directly" stays, for now.
+- Drawn Nov 17, waiting on the user (a friend's idea): Activity shows
+  the nightly checks, canvas "Activity: the nightly checks"
+  (6YK3gNdSPEZyhz3E1nYchS). A "Checked last night" card at the top (132
+  on Google · 119 on their websites; or "1 possible change · a person
+  checks it first"), opening its own page of what was checked, grouped,
+  with what couldn't be read listed. Changes the Oct 2 rule that Activity
+  shows only changes to the guide. Counts come from `job_run.kinds`;
+  places from each source's last check, so only the latest night has a
+  list. Not built.
 - Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
   Map tab or the browser's Back, lights the tab it was first opened from
   (Home), not the Map tab just left. Opened anew from another tab, it still
