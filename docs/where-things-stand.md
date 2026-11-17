@@ -327,8 +327,19 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   is as it was before Nov 17. The order is one place in `ListHeading.tsx`.
   Map is wider than its word from 375 up, 20px a side ("more oval", the
   user later still); at 360 it stays 12px, because Synagogues' switch
-  leaves it 4px. The group isn't held to the right: Food's buttons start
-  at the left, Synagogues' follow the switch (agreed).
+  leaves it 4px. ~~The group isn't held to the right: Food's buttons start
+  at the left, Synagogues' follow the switch (agreed).~~ Replaced later
+  on Nov 17, below.
+- Built Nov 17, the user's call ("always know that filter and map are on
+  the left and then the right is either sort, toggle, or nothing"): on a
+  phone, Filters · Map always start at the left, and the right edge holds
+  what arranges the list: Sort, Synagogues' Synagogue | Minyan switch (in
+  both views), or nothing. **Changes** the switch's place on a phone: it
+  was first in the row, now last, at the right. The switch comes after
+  the buttons in the page itself, so Tab and a screen reader meet it where
+  it's seen. A computer is unchanged (count or switch at the left, buttons
+  at the right). `e2e/phone-map-row.spec.ts` measures both sides at 360
+  and 375.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

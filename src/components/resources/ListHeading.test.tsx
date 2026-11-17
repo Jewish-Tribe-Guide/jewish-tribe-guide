@@ -70,8 +70,28 @@ describe('ListHeading — Map in the row', () => {
   it('spaces the buttons 8px apart, a phone as a computer', () => {
     render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
     const group = screen.getByRole('link', { name: 'Map' }).parentElement!
-    expect(group.className).toMatch(/(^|\s)gap-2(\s|$)/)
-    expect(group.className).not.toMatch(/gap-1\.5/)
+    // On a phone the group dissolves into the row, whose gap is 8px.
+    expect(group.className).toMatch(/(^|\s)lg:gap-2(\s|$)/)
+    expect(group.parentElement!.className).toMatch(/(^|\s)gap-x-2(\s|$)/)
+  })
+
+  // The user, Nov 17: "always know that filter and map are on the left and
+  // then the right is either sort, toggle, or nothing". Where each lands
+  // is measured in e2e/phone-map-row; this pins what puts it there.
+  it('on a phone, Sort is pushed to the right, after Filters and Map', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
+    const sortBox = screen.getByRole('button', { name: 'Sort Distance' }).parentElement!.parentElement!
+    expect(sortBox.className).toMatch(/(^|\s)max-lg:ml-auto(\s|$)/)
+    expect(screen.getByRole('link', { name: 'Map' }).parentElement!.className).toMatch(/(^|\s)contents(\s|$)/)
+  })
+
+  it('on a phone, Synagogues’ switch comes after Filters and Map, to the right; a computer shows it first', () => {
+    render(<ListHeading count={71} total={71} filters={filters} mapHref="/m" lead={<span>switch</span>} />)
+    const lead = screen.getByTestId('list-lead')
+    // After them in the page itself, so Tab and a screen reader agree with the eye.
+    expect(screen.getByRole('link', { name: 'Map' }).compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(lead.className).toMatch(/(^|\s)max-lg:ml-auto(\s|$)/)
+    expect(lead.className).toMatch(/(^|\s)lg:order-first(\s|$)/)
   })
 
   it('makes Map wider than its word, from 375 wide up', () => {

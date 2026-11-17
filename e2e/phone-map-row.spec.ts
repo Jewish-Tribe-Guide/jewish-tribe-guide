@@ -2,9 +2,10 @@ import { expect, test, type Page } from '@playwright/test'
 import { categories, defaultCommunity, dismissLocationPrompt, ready, type Category } from './helpers'
 
 // A tester always wants the map (Nov 16). On a phone, a category's list row
-// is Filters · Map · Sort, on one line (the user, Nov 17), and Map opens the
-// Map tab with a ‹ back to the category (D2). Synagogues' Synagogue | Minyan
-// switch shares the line (G5), in both of its views.
+// is Filters · Map on the left and Sort at the right, on one line (the
+// user, Nov 17), and Map opens the Map tab with a ‹ back to the category
+// (D2). Synagogues' Synagogue | Minyan switch takes Sort's place at the
+// right (Nov 17), in both of its views.
 //
 // The fit is the point of the change (the count left the row, Map lost its
 // symbol, and the sides are 12px on a phone), and only a real browser lays it out, so
@@ -45,6 +46,25 @@ test.describe('the phone list row with Map', () => {
     }
   }
 
+  /** The row's own left and right edges. */
+  async function rowSides(page: Page) {
+    const box = (await page.getByTestId('list-heading').filter({ visible: true }).first().boundingBox())!
+    return { left: box.x, right: box.x + box.width }
+  }
+
+  // Filters and Map always on the left, and the right holds what arranges
+  // the list: Sort, Synagogues' switch, or nothing (the user, Nov 17:
+  // "always know that filter and map are on the left").
+  function expectSides(boxes: { kind: string; name: string; box: { x: number; width: number } }[], row: { left: number; right: number }, where: string) {
+    const kinds = boxes.map((b) => b.kind)
+    const names = boxes.map((b) => b.name).join(' · ')
+    expect(kinds.slice(0, 2), `${where}: ${names}`).toEqual(['filters', 'map'])
+    expect(kinds.length, `${where}: ${names}`).toBeLessThanOrEqual(3)
+    if (kinds[2]) expect(['sort', 'switch'], `${where}: ${names}`).toContain(kinds[2])
+    expect(Math.abs(boxes[0].box.x - row.left), `${where}: Filters isn't at the left`).toBeLessThanOrEqual(1)
+    if (boxes[2]) expect(Math.abs(boxes[2].box.x + boxes[2].box.width - row.right), `${where}: "${boxes[2].name}" isn't at the right`).toBeLessThanOrEqual(1)
+  }
+
   // 360 is the narrowest phone; 375 is where Map gets wider, and leaves
   // Synagogues 3px (measured Nov 17).
   // One test a width: both in one ran past the 60s budget.
@@ -58,17 +78,16 @@ test.describe('the phone list row with Map', () => {
       await ready(page)
       await dismissLocationPrompt(page)
       const boxes = await rowBoxes(page)
-      const names = boxes.map((b) => b.name)
-      // Filters · Map · Sort (the user, Nov 17); Synagogues have no Sort.
-      const kinds = boxes.map((b) => b.kind).filter((k) => k !== 'switch')
-      expect(kinds, `${c.label}: ${names.join(' · ')}`).toEqual(kinds.includes('sort') ? ['filters', 'map', 'sort'] : ['filters', 'map'])
+      expectSides(boxes, await rowSides(page), `${c.label} at ${width}`)
       expectOneLine(boxes, `${c.label} at ${width}`, width)
       // The Minyan view keeps Map, on the same line as the switch.
       const switchEl = page.getByTestId('minyan-switch').filter({ visible: true }).first()
       if (await switchEl.count()) {
         await switchEl.getByRole('button').nth(1).click()
         await expect(page.getByTestId('minyanim-view')).toBeVisible()
-        expectOneLine(await rowBoxes(page), `${c.label}, Minyan view, at ${width}`, width)
+        const inView = await rowBoxes(page)
+        expectSides(inView, await rowSides(page), `${c.label}, Minyan view, at ${width}`)
+        expectOneLine(inView, `${c.label}, Minyan view, at ${width}`, width)
       }
     }
   })

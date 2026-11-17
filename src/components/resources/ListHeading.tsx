@@ -58,11 +58,20 @@ export default function ListHeading({ label, count, noun = !label, total, filter
   // eruv list) nothing changes.
   const makeRoom = !!mapHref && !suffix
   const headingClass = !makeRoom ? '' : label ? 'order-last basis-full pt-2 lg:order-none lg:basis-auto lg:pt-0' : 'hidden lg:block'
+  // On a phone, Filters and Map are always on the left, and the right holds
+  // what arranges the list: Sort, Synagogues' switch, or nothing (the user,
+  // Nov 17: "always know that filter and map are on the left"). The
+  // buttons' group dissolves into the row there (`contents`) and the right
+  // one is pushed to the edge. The switch comes after the buttons in the
+  // page itself, so a screen reader and Tab meet it where it's seen; a
+  // computer, as before, shows it first (`lg:order-first`), the buttons at
+  // the right.
+  const rightOnPhone = makeRoom ? 'max-lg:ml-auto' : ''
   return (
     <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-2 lg:gap-x-3">
-        {lead ?? (
+      <div className={`flex min-h-9 flex-wrap items-center gap-x-2 lg:gap-x-3 ${makeRoom ? 'lg:justify-between' : 'justify-between'}`}>
+        {!lead && (
         <h2 className={`shrink-0 text-[15px] font-bold text-ink ${headingClass}`}>
           {label ? (
             <>
@@ -74,8 +83,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
         </h2>
         )}
-        {/* From the left on a phone when nothing is beside them. */}
-        <div className={`flex items-center gap-2 ${lead || !makeRoom ? 'ml-auto' : 'lg:ml-auto'}`}>
+        <div className={makeRoom ? 'contents lg:ml-auto lg:flex lg:items-center lg:gap-2' : 'ml-auto flex items-center gap-2'}>
           {filters && (
             <button
               type="button"
@@ -106,7 +114,11 @@ export default function ListHeading({ label, count, noun = !label, total, filter
               Map
             </Link>
           )}
-          {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
+          {sort && (
+            <span className={`flex ${rightOnPhone}`}>
+              <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />
+            </span>
+          )}
           {onShowMap && (
             <span className="hidden lg:flex">
               <TextAction>
@@ -118,6 +130,11 @@ export default function ListHeading({ label, count, noun = !label, total, filter
             </span>
           )}
         </div>
+        {lead && (
+          <div data-testid="list-lead" className={`flex ${makeRoom ? `lg:order-first ${sort ? '' : rightOnPhone}` : 'order-first'}`}>
+            {lead}
+          </div>
+        )}
       </div>
     </div>
   )
