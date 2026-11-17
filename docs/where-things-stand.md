@@ -227,6 +227,39 @@ are unbalanced; about 6–7 min looks reachable.
   one with React's `vt-update` (the server copy, mid view transition).
   Same family as `server-rendering.spec.ts:127`. Not chased.
 
+**Nov 16, later: the map from a category on a phone (the user: "Yes,
+build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
+
+- Built: a Map button first in a category's list row on a phone, then
+  Filters and Sort, on one line down to 360 wide. It opens the real Map
+  tab on that category, its search and filters carried. Shown in both of
+  Synagogues' views. Where a category has no map (no addresses), no
+  button. A computer is unchanged (the map is beside the list).
+  **Changes two earlier decisions:** the list's count ("71 listings",
+  Sep 28) is off the row on a phone (a group's name, "Open now · 57",
+  moves under the buttons instead); and a category's own Map link is back
+  on phones (it was removed when the tab bar was thought enough). Sort
+  shows only its choice on a phone ("Distance"); the row's buttons and
+  the Synagogue | Minyan switch are 10px a side there, not 14. The row
+  doesn't stick. `e2e/phone-map-row.spec.ts` measures the line at 360.
+- Built: arrived from a category, the Map tab's phone search bar has a
+  round ‹ before it, back to the category as it was (the browser's Back;
+  a link opened on its own goes to the category). `?from=` in the map's
+  address says where from, and survives the map's own address writes.
+  Opened as a tab, no ‹.
+- Fixed: a map link to one place (`?place=`) opened on the whole city
+  with the place lost among the pins. Fitting every pin started together
+  with the place's own framing and won; now a picked place frames itself.
+  Checked by eye only: the camera needs Google's map, which refuses the
+  key on CI's localhost (`shouldLeaveToSelection` is unit-tested).
+- Not built: the listing's map tile (B1), to be tried on the preview only.
+  Its picture needs Google's Maps Static API, which isn't switched on for
+  the site's key (it answers 403 "not activated"). The user's call: switch
+  it on in Google Cloud, or pick another picture.
+- For the user: back from the Map tab on Food, the tab bar still lights
+  Map, by the Nov 4 rule (a category page lights the tab it was reached
+  from). Coming back by ‹ may read better with Home lit.
+
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
 with no icons. The computer home's Suggest a listing card lifts on hover

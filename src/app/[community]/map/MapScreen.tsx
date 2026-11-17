@@ -4,7 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
-import { parseMapQuery } from '@/lib/routes'
+import { parseMapQuery, routes } from '@/lib/routes'
+import { useCategoriesIfAny } from '@/lib/contentContext'
+import { useCommunitySlug } from '@/lib/communityContext'
 import { useCollapseHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -29,6 +31,23 @@ export default function MapScreen() {
   const isMobile = useIsMobile()
 
   const view = parseMapQuery(params)
+  const communitySlug = useCommunitySlug()
+  const categories = useCategoriesIfAny()
+
+  // Arrived from a category (its list's Map button, or a listing's map):
+  // a ‹ back to it in the phone's search bar (board G1, Nov 16). Back is
+  // the browser's, so a listing comes back as it was, the list where it was
+  // scrolled to; a link opened on its own goes to the category instead.
+  const fromCategory = view.from ? categories?.find((c) => c.id === view.from) : undefined
+  const backTo = fromCategory
+    ? {
+        label: `Back to ${fromCategory.pluralLabel || fromCategory.label}`,
+        onBack: () => {
+          if (window.history.length > 1) router.back()
+          else router.replace(routes.slug(communitySlug, fromCategory.id))
+        },
+      }
+    : undefined
 
   // Exiting fullscreen goes back to whatever screen the visitor was actually
   // on before the map came up — a category directory's own "Map" button, the
@@ -65,6 +84,7 @@ export default function MapScreen() {
         initialQuery={view.query ?? undefined}
         initialPlaceId={view.place ?? undefined}
         viewSearch={params.toString()}
+        backTo={backTo}
         initialFilters={{
           openNow: view.openNow,
           openIn: view.openIn ?? undefined,

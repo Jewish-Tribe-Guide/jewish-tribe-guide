@@ -81,6 +81,7 @@ export default function MinyanimView({
   onShowing,
   kindOf = () => '',
   heading,
+  mapHref,
 }: {
   items: readonly DirectoryResource[]
   categoryId: string
@@ -122,6 +123,10 @@ export default function MinyanimView({
   /** Synagogues' switch back to the list (MinyanSwitch): it heads the
    *  view, over the days, in place of the count of minyanim. */
   heading?: ReactNode
+  /** The phone's Map button in the heading (ListHeading's mapHref): shown
+   *  in the Minyan view too, so it doesn't come and go with the switch
+   *  (the user, Nov 16). */
+  mapHref?: string
 }) {
   const schedule = useMinyanSchedule(null, items)
   const { community } = useActiveCommunity()
@@ -235,7 +240,7 @@ export default function MinyanimView({
       {/* The switch heads the view, and nothing beside it: no count of
           what's left (the user, Nov 11: "we don't need to say how many
           minyanim left today"). The rows say it. */}
-      {heading && <ListHeading count={upcoming.length} total={upcoming.length} lead={heading} filters={filters} />}
+      {heading && <ListHeading count={upcoming.length} total={upcoming.length} lead={heading} filters={filters} mapHref={mapHref} />}
       {/* How many the list shows, with Filters beside it (Oct 15): today,
           what's still ahead; Earlier today is folded away and not counted. */}
       {!heading && <div className="mt-2">
@@ -247,6 +252,7 @@ export default function MinyanimView({
           // (the user, Oct 15).
           suffix={isToday ? 'left today' : undefined}
           filters={filters}
+          mapHref={mapHref}
         />
       </div>}
       {onShowing && <Showing count={upcoming.length} onShowing={onShowing} />}

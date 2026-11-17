@@ -1,0 +1,60 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import ListHeading from './ListHeading'
+
+// The list's row on a phone (board G1, Nov 16): Map first, then Filters and
+// Sort, on one line. What gives way for Map is pinned here; whether it
+// really fits one line at 360 is a layout question, so e2e/mobile-map-row
+// asks it in a real browser.
+
+afterEach(cleanup)
+
+const filters = { active: 0, onOpen: vi.fn() }
+const sort = { byPopular: false, onSelect: vi.fn() }
+
+describe('ListHeading — Map in the row', () => {
+  it('puts Map first, on a phone only, as a link to the Map tab', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/philly/map?cat=restaurant&from=restaurant" />)
+    const map = screen.getByRole('link', { name: 'Map' })
+    expect(map).toHaveAttribute('href', '/philly/map?cat=restaurant&from=restaurant')
+    // A computer has the map beside the list instead.
+    expect(map.className).toMatch(/(^|\s)lg:hidden(\s|$)/)
+    const buttons = map.parentElement!.children
+    expect(buttons[0]).toBe(map)
+    expect(buttons[1]).toHaveTextContent('Filters')
+  })
+
+  it('takes the bare count off a phone to make room, and keeps it on a computer', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
+    const count = screen.getByRole('heading', { name: '71 listings' })
+    expect(count.className).toMatch(/(^|\s)hidden(\s|$)/)
+    expect(count.className).toMatch(/(^|\s)lg:block(\s|$)/)
+  })
+
+  it('moves a group’s name under the buttons on a phone rather than dropping it', () => {
+    render(<ListHeading label="Open now" count={57} total={71} filters={filters} mapHref="/m" />)
+    const name = screen.getByRole('heading', { name: 'Open now · 57' })
+    expect(name.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+    expect(name.className).toMatch(/(^|\s)order-last(\s|$)/)
+    expect(name.className).toMatch(/(^|\s)basis-full(\s|$)/)
+  })
+
+  it('changes nothing without Map (the eruv list keeps its count)', () => {
+    render(<ListHeading noun count={3} total={3} units={['eruv', 'eruvim']} />)
+    const count = screen.getByRole('heading', { name: '3 eruvim' })
+    expect(count.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+    expect(count.className).not.toMatch(/order-last/)
+    expect(screen.queryByRole('link', { name: 'Map' })).not.toBeInTheDocument()
+  })
+
+  it('keeps "left today", which says something the rows don’t', () => {
+    render(<ListHeading count={4} total={4} units={['minyan', 'minyanim']} suffix="left today" filters={filters} mapHref="/m" />)
+    expect(screen.getByRole('heading', { name: /4 minyanim\s*left today/ }).className).not.toMatch(/(^|\s)hidden(\s|$)/)
+  })
+
+  it('still reads Sort out by its whole name with the word hidden on a phone', () => {
+    render(<ListHeading count={71} total={71} sort={sort} mapHref="/m" />)
+    expect(screen.getByRole('button', { name: 'Sort Distance' })).toBeInTheDocument()
+  })
+})

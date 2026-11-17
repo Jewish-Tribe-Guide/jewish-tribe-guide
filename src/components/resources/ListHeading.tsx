@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 import SortMenu, { headingButton } from './SortMenu'
 
@@ -38,20 +39,31 @@ type Props = {
   /** "Show map", at the right end, once the map beside the list has been
    *  hidden. Only on a screen wide enough to show it. */
   onShowMap?: () => void
+  /** "Map", first of the buttons, on a phone only: the Map tab on these
+   *  places, with a way back (board G1, Nov 16). A computer has the map
+   *  beside the list instead. */
+  mapHref?: string
   /** What the list holds, where it isn't listings: ['eruv', 'eruvim']. */
   units?: [string, string]
   /** Said after the count, quieter: the Minyanim view's "left today". */
   suffix?: string
 }
 
-export default function ListHeading({ label, count, noun = !label, total, filters, sort, lead, onShowMap, units = ['listing', 'listings'], suffix }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, lead, onShowMap, mapHref, units = ['listing', 'listings'], suffix }: Props) {
   const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
+  // With Map in the row, on a phone the buttons have the line to
+  // themselves, so Map, Filters and Sort fit at 360 (board G2, Nov 16). A
+  // bare count goes, the rows say it; a group's name ("Open now · 57")
+  // heads the first group, so it moves under the buttons. Without Map (the
+  // eruv list) nothing changes.
+  const makeRoom = !!mapHref && !suffix
+  const headingClass = !makeRoom ? '' : label ? 'order-last basis-full pt-2 lg:order-none lg:basis-auto lg:pt-0' : 'hidden lg:block'
   return (
     <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3">
+      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-2 lg:gap-x-3">
         {lead ?? (
-        <h2 className="shrink-0 text-[15px] font-bold text-ink">
+        <h2 className={`shrink-0 text-[15px] font-bold text-ink ${headingClass}`}>
           {label ? (
             <>
               {label} <span className="font-medium text-slate-500">· {countText}</span>
@@ -62,7 +74,14 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
         </h2>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        {/* From the left on a phone when nothing is beside them. */}
+        <div className={`flex items-center gap-1.5 lg:gap-2 ${lead || !makeRoom ? 'ml-auto' : 'lg:ml-auto'}`}>
+          {mapHref && (
+            <Link href={mapHref} data-testid="list-map" className={`${headingButton()} lg:hidden`}>
+              <MapGlyph className="h-3.5 w-3.5" />
+              Map
+            </Link>
+          )}
           {filters && (
             <button
               type="button"
@@ -89,11 +108,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
             <span className="hidden lg:flex">
               <TextAction>
                 <button type="button" onClick={onShowMap} className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                    <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
-                    <path d="M9 4v14" />
-                    <path d="M15 6v14" />
-                  </svg>
+                  <MapGlyph className="h-4 w-4" />
                   Show map
                 </button>
               </TextAction>
@@ -168,6 +183,16 @@ export function ClosedGroupLine({
       </svg>
     </button>
     </h2>
+  )
+}
+
+function MapGlyph({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+      <path d="M9 4v14" />
+      <path d="M15 6v14" />
+    </svg>
   )
 }
 

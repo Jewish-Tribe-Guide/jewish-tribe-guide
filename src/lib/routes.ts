@@ -226,6 +226,10 @@ export function mapQueryString(state: {
    *  no places (the Eruv chip from everything, or the Eruv page's Full
    *  map), which no `cat` can say since no `cat` means every category. */
   eruvim?: boolean | 'only'
+  /** The category the visitor came from (its list's Map button, or a
+   *  listing's map), so the phone's search bar shows a ‹ back to it (board
+   *  G1, Nov 16). Says nothing about which places show. */
+  from?: string | null
 }): string {
   const params = new URLSearchParams()
   if (state.categories?.length) params.set('cat', state.categories.join(','))
@@ -245,6 +249,7 @@ export function mapQueryString(state: {
         .join(','),
     )
   }
+  if (state.from) params.set('from', state.from)
   const qs = params.toString()
   return qs ? `?${qs}` : ''
 }
@@ -262,6 +267,7 @@ export function parseMapQuery(params: URLSearchParams): {
   place: string | null
   pinned: boolean
   eruvim: boolean | 'only'
+  from: string | null
 } {
   const list = (v: string | null) => {
     const items = (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -292,5 +298,6 @@ export function parseMapQuery(params: URLSearchParams): {
     // Any value: links from when eruvim could be picked one by one
     // (?eruv=center-city) turn them all on.
     eruvim: params.get('eruv') === 'only' ? 'only' : params.has('eruv'),
+    from: params.get('from') || null,
   }
 }
