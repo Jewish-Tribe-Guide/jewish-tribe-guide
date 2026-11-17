@@ -17,9 +17,10 @@ import { changeDay, changeTime } from './whatChanged'
 // (countGoogleKinds).
 // Pure: nightsStore.ts reads the runs, the two pages draw it.
 
-/** The two jobs whose runs make a night: Google at 1 AM, the watches at 2
- *  (Philadelphia, in winter). */
-export const NIGHT_JOBS: readonly JobId[] = ['sync-hours', 'watches']
+/** The jobs whose runs make a night: Google at 1 AM, the watches at 2,
+ *  the first reads of menus never read at 2:30 (Philadelphia, in winter;
+ *  the Watches tab's Menus line counts that one too). */
+export const NIGHT_JOBS: readonly JobId[] = ['sync-hours', 'watches', 'read-menus']
 
 export type NightRun = { job: JobId; startedAt: string; finishedAt: string | null; kinds: Partial<Record<NightKindId, KindCount>> | null }
 

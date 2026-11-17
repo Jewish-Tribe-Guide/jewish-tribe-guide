@@ -38,8 +38,13 @@ describe('nightsFrom', () => {
     expect(nightsFrom([google('2026-11-17', []), { ...google('2026-11-16', []), kinds: { google: { of: 9, read: 9 } } }, { ...google('2026-11-15', []), kinds: null }], TZ)).toEqual([])
   })
 
-  it('only the two night jobs: the menus’ and the links’ runs aren’t validations', () => {
-    expect(nightsFrom([{ ...google('2026-11-17', ['g']), job: 'read-menus' }], TZ)).toEqual([])
+  it('the menus’ first reads are the night’s too; the links’ runs aren’t validations', () => {
+    const firstReads: NightRun = { job: 'read-menus', startedAt: '2026-11-17T07:30:00.000Z', finishedAt: '2026-11-17T07:35:00.000Z', kinds: { menus: { of: 3, read: 3, validated: ['new'] } } }
+    const [night] = nightsFrom([watches('2026-11-17', { menus: { of: 9, read: 9, validated: ['old', 'new'] } }), firstReads], TZ)
+    expect(night.groups).toEqual([{ id: 'menus', ids: ['old', 'new'] }])
+    expect(night.until).toBe('2026-11-17T07:40:00.000Z')
+    expect(nightsFrom([{ ...firstReads, kinds: { menus: { of: 3, read: 3, validated: ['new'] } } }], TZ).map((n) => n.key)).toEqual(['2026-11-17'])
+    expect(nightsFrom([{ ...google('2026-11-17', ['g']), job: 'check-links' }], TZ)).toEqual([])
   })
 
   it('a listing whose page agreed in full isn’t listed again for its phone; one whose phone alone did is', () => {

@@ -166,4 +166,15 @@ describe('readUnreadMenus', () => {
     expect(m.saveMenuReading).toHaveBeenCalledTimes(3)
     expect(m.dateMenuDishes).not.toHaveBeenCalled()
   })
+
+  // Activity (the user, Nov 17): a first read that agrees validated its
+  // place as the menu watch's next reads do; one that differs waits on an
+  // admin and isn't counted.
+  it('says which places its first read agreed with, and none that differ', async () => {
+    const { noteValidated } = await import('./validatedDuring')
+    m.dateMenuDishes.mockImplementation(async (_c: string, id: string) => (noteValidated(id, ['menus']), true))
+    expect(await readUnreadMenus('key', { perRun: 5 })).toEqual([{ community: 'philly', read: 4, failed: 0, left: 0, validated: ['dated'] }])
+    m.readMenus.mockResolvedValue({ dishes: [{ name: 'Falafel' }, { name: 'Shawarma' }], missing: [], sourceUrl: source.url, note: null, model: 'x' })
+    expect(await readUnreadMenus('key', { perRun: 5 })).toEqual([{ community: 'philly', read: 4, failed: 0, left: 0 }])
+  })
 })

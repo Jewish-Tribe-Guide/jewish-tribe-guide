@@ -297,8 +297,9 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   its hotline or alerts link, or Google answering and matching. Each is
   noted per run by `validatedDuring.ts`; the ids go in `job_run.kinds`
   (`validated`, `contact`), no migration. The read-menus job's first
-  reads aren't counted (its runs keep no kinds); the menu watches that
-  follow them are. Changes the Oct 2 rule that Activity shows
+  reads count too when they agree (the Watches tab's Menus line already
+  counts that job); one that differs waits on the Main dishes tab and
+  never counts. Changes the Oct 2 rule that Activity shows
   only changes to the guide. Departures from the boards: Google is one
   group, "Open or closed, against Google" (most nights it checks status
   only); Menus are "Dishes, against their menus" and eruvs "Eruv
