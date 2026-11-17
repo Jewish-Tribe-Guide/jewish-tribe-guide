@@ -238,9 +238,8 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   **Changes two earlier decisions:** the list's count ("71 listings",
   Sep 28) is off the row on a phone (a group's name, "Open now · 57",
   moves under the buttons instead); and a category's own Map link is back
-  on phones (it was removed when the tab bar was thought enough). Sort
-  shows only its choice on a phone ("Distance"); the row's buttons and
-  the Synagogue | Minyan switch are 10px a side there, not 14. The row
+  on phones (it was removed when the tab bar was thought enough). (Sort's
+  choice alone and 10px-a-side buttons were undone Nov 17, below.) The row
   doesn't stick. `e2e/phone-map-row.spec.ts` measures the line at 360.
 - Built: arrived from a category, the Map tab's phone search bar has a
   round ‹ before it, back to the category as it was (the browser's Back;
@@ -263,9 +262,15 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   `src/lib/cameBack.ts`, loaded from the root layout like `backGuard.ts`:
   inside the tab bar's own module it heard the Back after the router had
   drawn the page. `e2e/phone-map-row.spec.ts` checks both ways back.
-- Open question from the user: drop the symbol on the phone's Map button
-  to bring the count back? Measured at 360: on Food it would fit (about
-  15px spare); on Synagogues the row is already full, so no.
+- Built Nov 17 (board I7/J7, the user's pick of four on the canvas): the
+  row's buttons are words only, Filters · Sort: Distance ▾ from the left
+  and Map alone at the right end ("too many emoji type things", and the
+  row "doesn't feel right"). Sort keeps its chevron; the word "Sort" is
+  back on phones. The buttons and the Synagogue | Minyan switch have their
+  14px sides again ("a little ovaly"). Changes to earlier decisions: Map
+  is last, not first; "Sort" shows on a phone. Not drawn, done for one
+  look: Filters lost its symbol on a computer too, and the computer's Sort
+  reads "Sort: Distance". The computer's "Show map" keeps its map symbol.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

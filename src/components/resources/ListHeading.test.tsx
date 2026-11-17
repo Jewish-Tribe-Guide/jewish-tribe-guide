@@ -5,7 +5,7 @@ import ListHeading from './ListHeading'
 
 // The list's row on a phone (board G1, Nov 16): Map first, then Filters and
 // Sort, on one line. What gives way for Map is pinned here; whether it
-// really fits one line at 360 is a layout question, so e2e/mobile-map-row
+// really fits one line at 360 is a layout question, so e2e/phone-map-row
 // asks it in a real browser.
 
 afterEach(cleanup)
@@ -14,15 +14,32 @@ const filters = { active: 0, onOpen: vi.fn() }
 const sort = { byPopular: false, onSelect: vi.fn() }
 
 describe('ListHeading — Map in the row', () => {
-  it('puts Map first, on a phone only, as a link to the Map tab', () => {
+  it('puts Map at the right end, on a phone only, as a link to the Map tab', () => {
     render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/philly/map?cat=restaurant&from=restaurant" />)
     const map = screen.getByRole('link', { name: 'Map' })
     expect(map).toHaveAttribute('href', '/philly/map?cat=restaurant&from=restaurant')
     // A computer has the map beside the list instead.
     expect(map.className).toMatch(/(^|\s)lg:hidden(\s|$)/)
-    const buttons = map.parentElement!.children
-    expect(buttons[0]).toBe(map)
-    expect(buttons[1]).toHaveTextContent('Filters')
+    // Filters and Sort arrange the list; Map leaves it, on its own at the end
+    // (board I7, Nov 17).
+    const buttons = [...map.parentElement!.children]
+    expect(buttons.map((b) => b.textContent)).toEqual(['Filters', expect.stringMatching(/^Sort:/), 'Map'])
+    expect(map.className).toMatch(/(^|\s)ml-auto(\s|$)/)
+    expect(map.parentElement!.className).toMatch(/(^|\s)flex-1(\s|$)/)
+  })
+
+  it('draws words, not symbols: only Sort keeps its chevron', () => {
+    render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
+    expect(screen.getByRole('link', { name: 'Map' }).querySelector('svg')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filters' }).querySelector('svg')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Sort Distance' }).querySelectorAll('svg')).toHaveLength(1)
+  })
+
+  it('shows the word Sort on a phone too, so the choice doesn’t read as a filter', () => {
+    render(<ListHeading count={71} total={71} sort={sort} mapHref="/m" />)
+    const word = screen.getByText('Sort', { exact: false, selector: 'span' })
+    expect(word.className).not.toMatch(/sr-only/)
+    expect(word).toHaveTextContent('Sort:')
   })
 
   it('takes the bare count off a phone to make room, and keeps it on a computer', () => {

@@ -2,13 +2,14 @@ import { expect, test, type Page } from '@playwright/test'
 import { categories, defaultCommunity, dismissLocationPrompt, ready, type Category } from './helpers'
 
 // A tester always wants the map (Nov 16). On a phone, a category's list row
-// is Map · Filters · Sort, on one line (board G1/G2), and Map opens the Map
-// tab with a ‹ back to the category (D2). Synagogues' Synagogue | Minyan
-// switch shares the line (G3/G5), in both of its views.
+// is Filters · Sort with Map at the right end, on one line (boards I7/I8,
+// Nov 17), and Map opens the Map tab with a ‹ back to the category (D2).
+// Synagogues' Synagogue | Minyan switch shares the line (J7/J8), in both of
+// its views.
 //
-// The fit is the point of the change (the count left the row and the
-// buttons went to 10px a side to make it), and only a real browser lays it
-// out, so it's measured here at the narrowest phone width in use, 360.
+// The fit is the point of the change (the count left the row, and the
+// buttons' symbols went, Nov 17), and only a real browser lays it out, so
+// it's measured here at the narrowest phone width in use, 360.
 
 test.describe('the phone list row with Map', () => {
   test.skip(({ isMobile }) => !isMobile, 'phone only: a computer has the map beside the list')
@@ -41,7 +42,7 @@ test.describe('the phone list row with Map', () => {
     }
   }
 
-  test('Map, Filters and Sort sit on one line at 360, on every category with a map', async ({ page }) => {
+  test('Filters, Sort and Map sit on one line at 360, on every category with a map', async ({ page }) => {
     const community = await defaultCommunity(page)
     const cats = await mapCategories(page, community)
     test.skip(cats.length === 0, 'needs a category with a map and listings')
@@ -51,7 +52,10 @@ test.describe('the phone list row with Map', () => {
       await dismissLocationPrompt(page)
       const boxes = await rowBoxes(page)
       const names = boxes.map((b) => b.name)
-      expect(names.indexOf('Map'), `${c.label}: Map comes before Filters (${names.join(' · ')})`).toBeLessThan(names.findIndex((n) => n.startsWith('Filters')))
+      // Map last, on its own at the right end (board I7, Nov 17).
+      expect(names.at(-1), `${c.label}: Map comes last (${names.join(' · ')})`).toBe('Map')
+      const map = boxes.at(-1)!.box
+      expect(360 - 16 - (map.x + map.width), `${c.label}: Map sits at the right end`).toBeLessThanOrEqual(2)
       expectOneLine(boxes, c.label)
       // The Minyan view keeps Map, on the same line as the switch.
       const switchEl = page.getByTestId('minyan-switch').filter({ visible: true }).first()
